@@ -35,6 +35,5 @@ class GdriveAuth(http.Controller):
         backup_config = request.env['db.backup.configure'].sudo().browse(
             state.get('backup_config_id'))
         backup_config.get_gdrive_tokens(kw.get('code'))
-        #backup_config.hide_active = True
         backup_config.active = True
-        return request.redirect(state.get('url_return'))
+        return http.local_redirect(state.get('url_return'))

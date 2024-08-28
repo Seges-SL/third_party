@@ -19,25 +19,25 @@
 #    If not, see <http://www.gnu.org/licenses/>.
 #
 #############################################################################
-
-from odoo import models, fields, api, _
-from odoo.exceptions import UserError, ValidationError
-import odoo
-from odoo.service import db
-from odoo.http import request
-from werkzeug import urls
-from datetime import timedelta
-
 import datetime
-import os
-import paramiko
+import errno
 import ftplib
 import json
-import requests
-import tempfile
-import errno
 import logging
+import os
+import tempfile
+from datetime import timedelta
+
+import paramiko
 import requests
+from requests.auth import HTTPBasicAuth
+from werkzeug import urls
+
+import odoo
+from odoo import api, fields, models, _
+from odoo.exceptions import UserError, ValidationError
+from odoo.http import request
+from odoo.service import db
 
 _logger = logging.getLogger(__name__)
 
@@ -107,6 +107,22 @@ class AutoDatabaseBackup(models.Model):
     backup_filename = fields.Char(string='Backup Filename', help='For Storing generated backup filename')
     generated_exception = fields.Char(string='Exception', help='Exception Encountered while Backup generation')
 
+    @api.onchange('backup_destination')
+    def _onchange_backup_destination(self):
+        self.write({
+            "gdrive_backup_error_test": False,
+        })
+
+    @api.onchange('gdrive_client_key', 'gdrive_client_secret',
+                  'google_drive_folder')
+    def _onchange_gdrive_backup_error_test(self):
+        if self.backup_destination == 'google_drive':
+            if self.gdrive_backup_error_test:
+                self.write({
+                    "gdrive_backup_error_test": False
+                })
+
+
     def _compute_redirect_uri(self):
         """Compute the redirect URI Google Drive"""
         for rec in self:
@@ -123,12 +139,32 @@ class AutoDatabaseBackup(models.Model):
 
     def action_get_gdrive_auth_code(self):
         """Generate google drive authorization code"""
-        action = self.env["ir.actions.act_window"].sudo()._for_xml_id(
-            "auto_database_backup.db_backup_configure_action")
+        action = self.env.ref(
+            "auto_database_backup.action_db_backup_configure")
+        action_data = {
+            'id': action.id,
+            'name': action.name,
+            'type': action.type,
+            'xml_id': action.xml_id,
+            'help': action.help,
+            'binding_model_id': action.binding_model_id,
+            'binding_type': action.binding_type,
+            'binding_view_types': action.binding_view_types,
+            'display_name': action.display_name,
+            'res_model': action.res_model,
+            'target': action.target,
+            'view_mode': action.view_mode,
+            'views': action.views,
+            'groups_id': [(6, 0, action.groups_id.ids)],
+            'search_view_id': action.search_view_id.id if action.search_view_id else False,
+            'filter': action.filter,
+            'search_view': action.search_view,
+            'limit': action.limit,
+        }
         base_url = request.env['ir.config_parameter'].get_param('web.base.url')
         url_return = base_url + \
                      '/web#id=%d&action=%d&view_type=form&model=%s' % (
-                         self.id, action['id'], 'db.backup.configure')
+                         self.id, action_data['id'], 'db.backup.configure')
         state = {
             'backup_config_id': self.id,
             'url_return': url_return
@@ -205,11 +241,13 @@ class AutoDatabaseBackup(models.Model):
                     'gdrive_token_validity': fields.Datetime.now() + timedelta(
                         seconds=expires_in) if expires_in else False,
                 })
-        except requests.HTTPError:
-            error_msg = _(
-                "Something went wrong during your token generation. Maybe your"
-                " Authorization Code is invalid")
-            raise UserError(error_msg)
+                if self.gdrive_backup_error_test:
+                    self.write({
+                        'gdrive_backup_error_test': False
+                    })
+        except Exception:
+            if not self.gdrive_backup_error_test:
+                self.write({"gdrive_backup_error_test": True})
 
     @api.constrains('db_name', 'master_pwd')
     def _check_db_credentials(self):
