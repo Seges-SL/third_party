@@ -140,7 +140,7 @@ class AutoDatabaseBackup(models.Model):
     def action_get_gdrive_auth_code(self):
         """Generate google drive authorization code"""
         action = self.env.ref(
-            "auto_database_backup.action_db_backup_configure")
+            "auto_database_backup.db_backup_configure_action")
         action_data = {
             'id': action.id,
             'name': action.name,
