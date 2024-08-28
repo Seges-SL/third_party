@@ -106,6 +106,7 @@ class AutoDatabaseBackup(models.Model):
     user_id = fields.Many2one('res.users', string='User')
     backup_filename = fields.Char(string='Backup Filename', help='For Storing generated backup filename')
     generated_exception = fields.Char(string='Exception', help='Exception Encountered while Backup generation')
+    gdrive_backup_error_test = fields.Boolean(string="Google Drive Error Test")
 
     @api.onchange('backup_destination')
     def _onchange_backup_destination(self):
