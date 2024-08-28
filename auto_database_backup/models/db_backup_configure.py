@@ -424,16 +424,19 @@ class AutoDatabaseBackup(models.Model):
                             headers=headers,
                             files=files
                         )
+                        _logger.info('requests.post')
                         if rec.auto_remove:
                             query = "parents = '%s'" % rec.google_drive_folder_key
                             files_req = requests.get(
                                 "https://www.googleapis.com/drive/v3/files?q=%s" % query,
                                 headers=headers)
                             files = files_req.json()['files']
+                            _logger.info('requests.get')
                             for file in files:
                                 file_date_req = requests.get(
                                     "https://www.googleapis.com/drive/v3/files/%s?fields=createdTime" %
                                     file['id'], headers=headers)
+                                _logger.info('requests.get_createdTime')
                                 create_time = file_date_req.json()[
                                                   'createdTime'][
                                               :19].replace('T', ' ')
@@ -444,6 +447,7 @@ class AutoDatabaseBackup(models.Model):
                                     requests.delete(
                                         "https://www.googleapis.com/drive/v3/files/%s" %
                                         file['id'], headers=headers)
+                                    _logger.info('requests.delete')
                         if rec.notify_user:
                             mail_template_success.send_mail(rec.id,
                                                             force_send=True)
