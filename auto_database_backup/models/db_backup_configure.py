@@ -421,7 +421,7 @@ class AutoDatabaseBackup(models.Model):
                         }
                         _logger.info('before requests.post')
                         requests.post(
-                            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+                            "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable",
                             headers=headers,
                             files=files
                         )
