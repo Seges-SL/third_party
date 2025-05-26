@@ -85,7 +85,7 @@ class TripleDiscount(models.AbstractModel):
 
     def write(self, vals):
         discount_fields = self._get_multiple_discount_field_names()
-        if "discount" in vals:
+        if "discount" in vals and not any (field in vals for field in discount_fields[1:]):
             vals["discount1"] = vals.pop("discount")
             vals.update({field: 0 for field in discount_fields[1:]})
         return super().write(vals)
