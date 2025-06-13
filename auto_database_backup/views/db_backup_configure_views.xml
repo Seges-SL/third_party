@@ -142,6 +142,8 @@
                                    invisible="backup_destination != 'amazon_s3'"/>
                             <field name="aws_secret_access_key"
                                    invisible="backup_destination != 'amazon_s3'"/>
+                            <field name="endpoint_url"
+                                   invisible="backup_destination != 'amazon_s3'"/>       
                             <field name="bucket_file_name"
                                    invisible="backup_destination != 'amazon_s3'"/>
                             <field name="aws_folder_name"

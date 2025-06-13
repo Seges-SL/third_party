@@ -196,6 +196,8 @@ class DbBackupConfigure(models.Model):
     aws_secret_access_key = fields.Char(string='Amazon S3 Secret Key',
                                         help="Field used to store the Secret"
                                              " Key for an Amazon S3 bucket.")
+    endpoint_url = fields.Char(string='Endpoint Url',
+                                        help="Field used to store the Endpoint Url.")
     bucket_file_name = fields.Char(string='Bucket Name',
                                    help="Field used to store the name of an"
                                         " Amazon S3 bucket.")
@@ -211,7 +213,8 @@ class DbBackupConfigure(models.Model):
                 s3_client = boto3.client(
                     's3',
                     aws_access_key_id=self.aws_access_key,
-                    aws_secret_access_key=self.aws_secret_access_key
+                    aws_secret_access_key=self.aws_secret_access_key,
+                    endpoint_url=self.endpoint_url,
                 )
                 response = s3_client.head_bucket(Bucket=self.bucket_file_name)
                 if response['ResponseMetadata']['HTTPStatusCode'] == 200:
