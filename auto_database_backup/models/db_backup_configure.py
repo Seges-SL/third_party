@@ -197,7 +197,7 @@ class DbBackupConfigure(models.Model):
                                         help="Field used to store the Secret"
                                              " Key for an Amazon S3 bucket.")
     endpoint_url = fields.Char(string='Endpoint Url',
-                                        help="Field used to store the Endpoint Url.")
+                                        help="Field used to store the Endpoint Url with https://.")
     bucket_file_name = fields.Char(string='Bucket Name',
                                    help="Field used to store the name of an"
                                         " Amazon S3 bucket.")
@@ -957,7 +957,8 @@ class DbBackupConfigure(models.Model):
                         bo3 = boto3.client(
                             's3',
                             aws_access_key_id=rec.aws_access_key,
-                            aws_secret_access_key=rec.aws_secret_access_key)
+                            aws_secret_access_key=rec.aws_secret_access_key,
+                            endpoint_url=self.endpoint_url,)
                         # If auto_remove is enabled, remove the backups that
                         # are older than specified days from the S3 bucket
                         if rec.auto_remove:
@@ -980,7 +981,8 @@ class DbBackupConfigure(models.Model):
                         s3 = boto3.resource(
                             's3',
                             aws_access_key_id=rec.aws_access_key,
-                            aws_secret_access_key=rec.aws_secret_access_key)
+                            aws_secret_access_key=rec.aws_secret_access_key,
+                            endpoint_url=self.endpoint_url,)
                         # Create a folder in the specified bucket, if it
                         # doesn't already exist
                         s3.Object(rec.bucket_file_name,
