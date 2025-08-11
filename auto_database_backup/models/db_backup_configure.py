@@ -959,7 +959,7 @@ class DbBackupConfigure(models.Model):
                             's3',
                             aws_access_key_id=rec.aws_access_key,
                             aws_secret_access_key=rec.aws_secret_access_key,
-                            endpoint_url=self.endpoint_url,)
+                            endpoint_url=rec.endpoint_url,)
                         _logger.info('Amazon S3 bo3')
                         # If auto_remove is enabled, remove the backups that
                         # are older than specified days from the S3 bucket
@@ -984,7 +984,7 @@ class DbBackupConfigure(models.Model):
                             's3',
                             aws_access_key_id=rec.aws_access_key,
                             aws_secret_access_key=rec.aws_secret_access_key,
-                            endpoint_url=self.endpoint_url,)
+                            endpoint_url=rec.endpoint_url,)
                         _logger.info('Amazon S3 s3 resource')
                         # Create a folder in the specified bucket, if it
                         # doesn't already exist
