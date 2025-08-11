@@ -952,7 +952,6 @@ class DbBackupConfigure(models.Model):
             elif rec.backup_destination == 'amazon_s3':
                 if rec.aws_access_key and rec.aws_secret_access_key:
                     try:
-                        _logger.info('Amazon S3 try')
                         # Create a boto3 client for Amazon S3 with provided
                         # access key id and secret access key
                         bo3 = boto3.client(
@@ -960,7 +959,6 @@ class DbBackupConfigure(models.Model):
                             aws_access_key_id=rec.aws_access_key,
                             aws_secret_access_key=rec.aws_secret_access_key,
                             endpoint_url=rec.endpoint_url,)
-                        _logger.info('Amazon S3 bo3')
                         # If auto_remove is enabled, remove the backups that
                         # are older than specified days from the S3 bucket
                         if rec.auto_remove:
@@ -985,14 +983,11 @@ class DbBackupConfigure(models.Model):
                             aws_access_key_id=rec.aws_access_key,
                             aws_secret_access_key=rec.aws_secret_access_key,
                             endpoint_url=rec.endpoint_url,)
-                        _logger.info('Amazon S3 s3 resource')
                         # Create a folder in the specified bucket, if it
                         # doesn't already exist
                         s3.Object(rec.bucket_file_name,
                                   rec.aws_folder_name + '/').put()
-                        _logger.info('Amazon S3 Object')
                         bucket = s3.Bucket(rec.bucket_file_name)
-                        _logger.info('Amazon S3 bucket')
                         # Get all the prefixes in the bucket
                         prefixes = set()
                         for obj in bucket.objects.all():
