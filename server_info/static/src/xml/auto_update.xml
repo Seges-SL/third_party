@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name='server_info.auto_update'>
+        <div  id="server_info">
+            <div class="row mt16 o_settings_container" name="server_info_setting_container">
+                <div class="col-12 col-lg-6 o_setting_box" id="cpu_info_setting">
+                    <div class="o_setting_right_pane" name="cpu_info">
+                        <span class="font-weight-bold">
+                            <u>CPU</u>
+                        </span>
+                        <br />
+                        <span class="font-weight-bold">Uso: </span>
+                        <span name="cpu_usage" />
+                        <br />
+                        <span class="font-weight-bold">Count: </span>
+                        <span name="cpu_count" />
+                    </div>
+                </div>
+                <div class="col-12 col-lg-6 o_setting_box" id="mem_info_setting">
+                    <div class="o_setting_right_pane" name="mem_info">
+                        <span class="font-weight-bold">
+                            <u>Memoria</u>
+                        </span>
+                        <br />
+                        <span
+                            class="font-weight-bold">Total: </span>
+                        <span name="mem_total" />
+                        <br />
+                        <span
+                            class="font-weight-bold w-auto">Uso: </span>
+                        <span class="w-auto"
+                            name="mem_used" /> (<span class="w-auto" name="mem_used_percent" />) 
+                        <!--<br />
+                        <span
+                            class="font-weight-bold">Free: </span>
+                        <span name="mem_free" />-->
+                    </div>
+                </div>
+                <div class="col-12 col-lg-6 o_setting_box" id="disk_mem_info_setting">
+                    <div class="o_setting_right_pane" name="disk_mem_info">
+                        <span class="font-weight-bold">
+                            <u>Almacenamiento</u>
+                        </span>
+                        <br />
+                        <span
+                            class="font-weight-bold">Total: </span>
+                        <span name="disk_mem_total" />
+                        <br />
+                        <span
+                            class="font-weight-bold w-auto">Usada: </span>
+                        <span class="w-auto"
+                            name="disk_mem_used" /> (<span class="w-auto"
+                            name="disk_mem_used_percent" />) <br />
+                        <span class="font-weight-bold">
+                        Libre: </span>
+                        <span name="disk_mem_free" />
+                    </div>
+                </div>
+                <div class="col-12 col-lg-6 o_setting_box" id="ip_info_setting">
+                <div class="o_setting_right_pane" name="ip_info">
+                    <span class="font-weight-bold"><u>Host</u></span>
+                    <br/>
+                    <span class="font-weight-bold">IPv4: </span>
+                    <span name="ip4_info"/>
+                    <br/>
+                    <span class="font-weight-bold w-auto">IPv6: </span>
+                    <span name="ip6_info"/>
+                </div>
+            </div>
+            </div>
+        </div> 
+    </t>       
+
+</templates>

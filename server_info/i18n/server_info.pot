@@ -1,0 +1,99 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* server_info
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 14.0+e\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-05-21 13:15+0000\n"
+"PO-Revision-Date: 2021-05-21 13:15+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. module: server_info
+#: model:ir.model.fields.selection,name:server_info.selection__res_config_settings__update_frequency__60000
+msgid "1 Min"
+msgstr ""
+
+#. module: server_info
+#: model:ir.model.fields.selection,name:server_info.selection__res_config_settings__update_frequency__1000
+msgid "1 Sec"
+msgstr ""
+
+#. module: server_info
+#: model:ir.model.fields.selection,name:server_info.selection__res_config_settings__update_frequency__10000
+msgid "10 Sec"
+msgstr ""
+
+#. module: server_info
+#: model:ir.model.fields.selection,name:server_info.selection__res_config_settings__update_frequency__2000
+msgid "2 Sec"
+msgstr ""
+
+#. module: server_info
+#: model:ir.model.fields.selection,name:server_info.selection__res_config_settings__update_frequency__30000
+msgid "30 Sec"
+msgstr ""
+
+#. module: server_info
+#: model:ir.model.fields.selection,name:server_info.selection__res_config_settings__update_frequency__300000
+msgid "5 Min"
+msgstr ""
+
+#. module: server_info
+#: model:ir.model.fields.selection,name:server_info.selection__res_config_settings__update_frequency__5000
+msgid "5 Sec"
+msgstr ""
+
+#. module: server_info
+#: model_terms:ir.ui.view,arch_db:server_info.res_config_settings_view_form_modification
+msgid "<span class=\"font-weight-bold\">Update Frequency: </span>"
+msgstr ""
+
+#. module: server_info
+#: model:ir.model,name:server_info.model_res_config_settings
+msgid "Config Settings"
+msgstr ""
+
+#. module: server_info
+#: model:ir.model.fields,field_description:server_info.field_ir_http__display_name
+#: model:ir.model.fields,field_description:server_info.field_res_config_settings__display_name
+msgid "Display Name"
+msgstr ""
+
+#. module: server_info
+#: model:ir.model,name:server_info.model_ir_http
+msgid "HTTP Routing"
+msgstr ""
+
+#. module: server_info
+#: model:ir.model.fields,field_description:server_info.field_ir_http__id
+#: model:ir.model.fields,field_description:server_info.field_res_config_settings__id
+msgid "ID"
+msgstr ""
+
+#. module: server_info
+#: model:ir.model.fields,field_description:server_info.field_ir_http____last_update
+#: model:ir.model.fields,field_description:server_info.field_res_config_settings____last_update
+msgid "Last Modified on"
+msgstr ""
+
+#. module: server_info
+#: model_terms:ir.ui.view,arch_db:server_info.res_config_settings_view_form_modification
+msgid "Server Info Settings"
+msgstr ""
+
+#. module: server_info
+#: model:ir.model.fields,help:server_info.field_res_config_settings__update_frequency
+msgid "This value sets time between Server Info updates."
+msgstr ""
+
+#. module: server_info
+#: model:ir.model.fields,field_description:server_info.field_res_config_settings__update_frequency
+msgid "Time between updates"
+msgstr ""

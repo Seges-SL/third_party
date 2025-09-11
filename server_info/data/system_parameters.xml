@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <data noupdate="0">
+        <record id="host_name_minlength" model="ir.config_parameter">
+            <field name="key">host_name</field>
+            <field name="value">liyben.com</field>
+        </record>
+    </data>
+</odoo> 

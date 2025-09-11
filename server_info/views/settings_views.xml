@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="res_config_settings_view_form_modification" model="ir.ui.view">
+            <field name="name">res.config.settings.view.form.modification</field>
+            <field name="model">res.config.settings</field>
+            <field name="inherit_id" ref="base.res_config_settings_view_form" />
+            <field name="arch" type="xml">
+                <xpath expr="//form" position="inside">
+                    <app data-string="Server Info" string="Server Info" name="server_info_settings"
+                        logo="/server_info/static/description/icon.png">
+
+                        <div class="app_settings_block" data-string="Update Frequency"
+                            data-key="server_info">
+                            <h2>URL/Dominio Info</h2>
+                            <div class="row mt16 o_settings_container" name="domain_info_container">
+                                <div class="col-xs-12 col-md-6 o_setting_box" id="domain_info_setting">
+                                    <div class="o_setting_right_pane">
+                                        <field class="font-weight-bold" name="host_name"/>
+                                    </div>
+                                </div>
+                            </div>
+                            <h2>Update Frequency</h2>
+                            <div class="row mt16 o_settings_container"
+                                name="server_info_setting_container">
+                                <div class="col-12 col-lg-6 o_setting_box" id="cpu_info_setting">
+                                    <div class="o_setting_right_pane">
+                                        <span class="font-weight-bold">Update Frequency: </span>
+                                        <field name="update_frequency" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="app_settings_block" data-string="Server Info">
+                                <h2>Server Info</h2>
+                                <widget name='auto_update' />
+                            </div>
+                        </div>
+                    </app>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>
