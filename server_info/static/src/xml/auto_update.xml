@@ -30,10 +30,10 @@
                             class="font-weight-bold w-auto">Uso: </span>
                         <span class="w-auto"
                             name="mem_used" /> (<span class="w-auto" name="mem_used_percent" />) 
-                        <!--<br />
+                        <br />
                         <span
                             class="font-weight-bold">Free: </span>
-                        <span name="mem_free" />-->
+                        <span name="mem_free" />
                     </div>
                 </div>
                 <div class="col-12 col-lg-6 o_setting_box" id="disk_mem_info_setting">

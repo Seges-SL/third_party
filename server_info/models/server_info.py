@@ -1,6 +1,7 @@
 from odoo import api, fields, models, _
 import logging
 import psutil
+import netifaces as ni
 import socket
 
 _logger = logging.getLogger(__name__)
@@ -24,16 +25,21 @@ class IrHttp(models.AbstractModel):
         result["cpu_count"] = psutil.cpu_count()
 
         mem_info = psutil.virtual_memory()
-        result["mem_total"] = f"{(mem_info.total/(1024*1024)):.0f} Mb"
-        result["mem_used"] = f"{(mem_info.used/(1024*1024)):.0f} Mb"
-        result["mem_used_percent"] = f"{mem_info.percent} %"
-        result["mem_free"] = f"{(mem_info.free/(1024*1024)):.0f} Mb"
+        result['mem_total'] = f'{(mem_info.total/(1024*1024*1024)):.2f} GB'
+        result['mem_used'] = f'{(mem_info.used/(1024*1024*1024)):.2f} GB'
+        result['mem_used_percent'] = f'{mem_info.percent} %'
+        result['mem_free'] = f'{(mem_info.free/(1024*1024*1024)):.2f} GB'
 
-        disk_mem_info = psutil.disk_usage("/")
-        result["disk_mem_total"] = f"{(disk_mem_info.total / (1024 * 1024)):.0f} Mb"
-        result["disk_mem_used"] = f"{(disk_mem_info.used / (1024 * 1024)):.0f} Mb"
-        result["disk_mem_used_percent"] = f"{disk_mem_info.percent} %"
-        result["disk_mem_free"] = f"{(disk_mem_info.free / (1024 * 1024)):.0f} Mb"
+        disk_mem_info = psutil.disk_usage('/')
+        result['disk_mem_total'] = f'{(disk_mem_info.total/(1024*1024*1024)):.2f} GB'
+        result['disk_mem_used'] = f'{(disk_mem_info.used/(1024*1024*1024)):.2f} GB'
+        result['disk_mem_used_percent'] = f'{disk_mem_info.percent} %'
+        result['disk_mem_free'] = f'{(disk_mem_info.free/(1024*1024*1024)):.2f} GB'
+
+        ip4_info = ni.ifaddresses('ens3')[ni.AF_INET][0]['addr']
+        result['ip4_info'] = f'{(ip4_info)}'
+        ip6_info = ni.ifaddresses('ens3')[ni.AF_INET6][0]['addr']
+        result['ip6_info'] = f'{(ip6_info)}'
         return result
 
 
