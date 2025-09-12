@@ -35,10 +35,10 @@ class IrHttp(models.AbstractModel):
         disk_total = (disk_mem_info.total/(1024*1024*1024)) + (disk_vol_info.total/(1024*1024*1024))
         disk_used = (disk_mem_info.used/(1024*1024*1024)) + (disk_vol_info.used/(1024*1024*1024))
         disk_free = (disk_mem_info.free/(1024*1024*1024)) + (disk_vol_info.free/(1024*1024*1024))
-        disk_percent = 100 - ((disk_used/disk_total)*100)
+        disk_percent = (disk_used/disk_total)*100
         result['disk_mem_total'] = f'{disk_total:.2f} GB'
         result['disk_mem_used'] = f'{disk_used:.2f} GB'
-        result['disk_mem_used_percent'] = f'{disk_percent} %'
+        result['disk_mem_used_percent'] = f'{disk_percent:.2f} %'
         result['disk_mem_free'] = f'{disk_free:.2f} GB'
 
         ip4_info = ni.ifaddresses('ens3')[ni.AF_INET][0]['addr']
