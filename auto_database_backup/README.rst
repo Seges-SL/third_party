@@ -1,6 +1,6 @@
 Automatic Database Backup
 =========================
-* Generate Database Backups and store to multiple locations. Adapted by Liyben for 14.0 version.
+* Generate Database Backups and store to multiple locations
 
 Installation
 ============
@@ -19,8 +19,7 @@ Company
 Credits
 -------
 * Developer:
-(v14) Midilaj @ Cybrosys
-Adapted by Liyben for 14.0 version.
+(v14) Midilaj @ Cybrosys, Farhana Jahan PT @ Cybrosys,
 
 
 Contacts
