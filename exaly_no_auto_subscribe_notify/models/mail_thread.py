@@ -11,6 +11,8 @@ class MailThread(models.AbstractModel):
         """
         for record in self:
             company = hasattr(record, 'company_id') and record.company_id or self.env.company
-            if record._name in company.exaly_no_notify_models.mapped('model'):
+            # SOLUCIÓN: Agregamos .sudo() al recordset de la compañía para poder leer 
+            # los registros de ir.model sin generar un Access Error para usuarios estándar.
+            if record._name in company.sudo().exaly_no_notify_models.mapped('model'):
                 return
         super()._message_auto_subscribe_notify(partner_ids, template)
