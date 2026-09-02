@@ -13,7 +13,7 @@
             <field name="sequence">90</field>
         </record>
 
-        <record id="privilege_ai" model="res.groups.privilege">
+        <record id="privilege_ai" model="res.groups">
             <field name="name">Artificial Intelligence</field>
             <field name="category_id" ref="module_category_ai"/>
         </record>
