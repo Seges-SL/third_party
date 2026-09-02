@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_mcp" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.mcp.inherit</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority" eval="40"/>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[hasclass('settings')]" position="inside">
+                <div class="app_settings_block" data-string="AI Engine" string="AI Engine"
+                     data-key="pns_ai_mcp" groups="pns_ai_mcp.group_ai_admin">
+
+                    <h2>External AI agents</h2>
+                    <div class="text-muted mb-2">
+                        Endpoint agents declared by installed modules (data/ai_agent_data.xml).
+                        Each module owns a card below. The LLM runs in the external client;
+                        Odoo serves context and tools. Bare /mcp uses MCP Server.
+                    </div>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box" id="mcp_agent_pns_ai_mcp">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">MCP Server</div>
+                                <div class="text-muted">
+                                    Module pns_ai_mcp · endpoint · code pns_ai_mcp · bare /mcp.
+                                </div>
+                                <h3 class="mt16 mb8">Agent Protocol</h3>
+                                <div class="mt8">
+                                    <button name="action_open_module_agent" type="object"
+                                            string="Configuration" class="btn-link" icon="fa-external-link"
+                                            context="{'agent_code': 'pns_ai_mcp'}"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt8">
+                        <button name="action_open_module_endpoint_agents"
+                                type="object" string="Browse all external agents"
+                                class="btn-link" icon="fa-list"/>
+                    </div>
+
+                    <h2>Internal AI agents</h2>
+                    <div class="text-muted mb-2">
+                        Inference agents declared by installed modules (data/ai_agent_data.xml).
+                        Each module owns a card below (product preferences + Agent Protocol).
+                        Use Configuration for providers, contexts and skills.
+                    </div>
+                    <div class="mt8">
+                        <button name="action_open_module_inference_agents"
+                                type="object" string="Browse all internal agents"
+                                class="btn-link" icon="fa-list"/>
+                    </div>
+
+                    <h2>Consumption costs</h2>
+                    <div class="text-muted mb-2">
+                        How Chatboo shows token spend. Vendors bill in USD; one display currency applies to every provider in the thread. Quote feeds convert at open time. Not the Safe Plan URL whitelist.
+                    </div>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">Display currency</div>
+                                <div class="text-muted">
+                                    ISO currency for cost chips. Same for all providers in a conversation.
+                                </div>
+                                <div class="mt8">
+                                    <field name="display_currency"/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">Quote sources</div>
+                                <div class="text-muted">
+                                    HTTPS JSON feeds with a USD-based rates map. First success wins; the next is failover.
+                                </div>
+                                <div class="mt8">
+                                    <button name="action_open_fx_sources"
+                                            type="object" string="Manage quote sources"
+                                            class="btn-link" icon="fa-external-link"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2>Domain knowledge</h2>
+                    <div class="text-muted mb-2">
+                        Keep the always-on agent bundle small: indexed domain
+                        packs load only on matching turns. Disable to restore
+                        the monolith (all linked domains in cache).
+                    </div>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_left_pane">
+                                <field name="domain_index_inject"/>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <label for="domain_index_inject"/>
+                                <div class="text-muted">
+                                    When on, indexed domains leave the always-on cache and are injected per matching turn. When off, linked domains stay in the cache. Saving a change rebuilds inference agent caches.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2>Instance skills</h2>
+                    <div class="text-muted mb-2">
+                        Prefixes for skills created on this instance
+                        (/create-skill). Code is snake_case; the slash is kebab-case.
+                        Empty = no prefix. A tenant pack may seed defaults.
+                        Prefixes must not equal an existing slash or a builtin.
+                    </div>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">Skill code prefix</div>
+                                <div class="text-muted">
+                                    Snake-case catalog prefix. Empty = none.
+                                </div>
+                                <div class="mt8">
+                                    <field name="skill_code_prefix" placeholder=""/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">Skill command prefix</div>
+                                <div class="text-muted">
+                                    Kebab-case slash prefix. Empty = none.
+                                </div>
+                                <div class="mt8">
+                                    <field name="skill_command_prefix" placeholder=""/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2>Safe Plan</h2>
+                    <div class="text-muted mb-2">
+                        Security settings for AI supervised operations (Safe Plan / Caja B).
+                    </div>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">URL access policy</div>
+                                <div class="text-muted">
+                                    Whitelist only: domains outside the list are blocked unless an AI Administrator approves adding them. Open: new domains are added automatically on access.
+                                </div>
+                                <div class="mt8">
+                                    <field name="url_access_policy" widget="radio"/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">URL Whitelist</div>
+                                <div class="text-muted">
+                                    Global list of allowed domains. Under Whitelist only, only listed domains are accessible to regular users.
+                                </div>
+                                <div class="mt8">
+                                    <button name="action_open_url_whitelist"
+                                            type="object" string="Manage URL Whitelist"
+                                            class="btn-link" icon="fa-external-link"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2>Configuration backup</h2>
+                    <div class="text-muted mb-2">
+                        Save the full AI configuration to a JSON file and restore it after
+                        an uninstall/reinstall or on another instance.
+                    </div>
+                    <div class="alert alert-warning" role="alert">
+                        The exported file contains secrets (API keys, tokens) in clear text. Keep it safe.
+                    </div>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">Export configuration</div>
+                                <div class="mt8">
+                                    <button name="action_export_ai_config"
+                                            type="object" string="Export configuration"
+                                            class="btn-primary" icon="fa-download"/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">Import configuration</div>
+                                <div class="mt8">
+                                    <button name="action_import_ai_config"
+                                            type="object" string="Import configuration"
+                                            class="btn-secondary" icon="fa-upload"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2>Partial artifact bundle</h2>
+                    <div class="text-muted mb-2">
+                        Export or import a subset of AI artifacts (skills, contexts,
+                        providers, agents, external servers, MCP users, URL whitelist,
+                        settings) by explicit selection. Import only applies what is in
+                        the bundle; enable replace to upsert by business key.
+                    </div>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">Export artifact bundle</div>
+                                <div class="mt8">
+                                    <button name="action_export_artifact_bundle"
+                                            type="object" string="Export selection"
+                                            class="btn-primary" icon="fa-download"/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">Import artifact bundle</div>
+                                <div class="mt8">
+                                    <button name="action_import_artifact_bundle"
+                                            type="object" string="Import bundle"
+                                            class="btn-secondary" icon="fa-upload"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2>Module license</h2>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">License and copyright</div>
+                                <div class="text-muted">
+                                    PNS AI Engine is distributed under the Apache License 2.0.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_module_endpoint_agents" model="ir.actions.act_window">
+        <field name="name">External AI agents</field>
+        <field name="res_model">ai.agent</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('origin', '=', 'module'), ('active', '=', True), ('agent_type', '=', 'endpoint')]</field>
+        <field name="context">{'create': False, 'delete': False}</field>
+    </record>
+
+    <record id="action_module_inference_agents" model="ir.actions.act_window">
+        <field name="name">Internal AI agents</field>
+        <field name="res_model">ai.agent</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('origin', '=', 'module'), ('active', '=', True), ('agent_type', '=', 'inference')]</field>
+        <field name="context">{'create': False, 'delete': False}</field>
+    </record>
+
+    <record id="action_mcp_configuration" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">inline</field>
+        <field name="context">{'module': 'pns_ai_mcp', 'bin_size': False}</field>
+    </record>
+
+    <menuitem id="menu_mcp_settings"
+              name="Settings"
+              parent="pns_ai_mcp.menu_mcp_main"
+              action="action_mcp_configuration"
+              sequence="50"
+              groups="pns_ai_mcp.group_ai_admin"/>
+</odoo>

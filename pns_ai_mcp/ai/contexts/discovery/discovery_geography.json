@@ -1,0 +1,14 @@
+{
+  "code": "discovery_geography",
+  "tipo": "discovery",
+  "target": "geography",
+  "priority": 73,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "state_id",
+    "country_id",
+    "res.country",
+    "res.country.state"
+  ]
+}

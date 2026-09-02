@@ -1,0 +1,21 @@
+/* mcp_context_list.css
+ *
+ * Scoped CSS for the MCP Context list view (Odoo 17+).
+ * The class .o_mcp_context_action is added to the .o_action container
+ * by McpContextListController.setup() via onMounted.
+ *
+ * Goal: hide the label text of the system ⚙️ cog button (ActionMenus)
+ * that shows the action name "Contextos", keeping only the icon.
+ * This is a system-rendered button we cannot remove, but can compact.
+ */
+
+/* Hide the text label inside the action menu cog button,
+   keeping the ⚙️ icon. Targets the Odoo 19 ActionMenus component. */
+.o_mcp_context_action .o_cp_action_menus .o_dropdown_title {
+    display: none !important;
+}
+
+/* Fallback: if title is in a span or direct text node rendered via .btn */
+.o_mcp_context_action .o_cp_action_menus > .btn > span:not(.fa):not([class*="fa-"]) {
+    display: none !important;
+}

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- First-install OpenAPI shells. No tokens. Inactive until the admin
+     pastes a credential and activates the row. Product codes (sesame, cdmon)
+     stay generic so an instance that already has its own server codes is
+     not overwritten. Loaded from post_init_hook only (not manifest data:).
+     noupdate=1. -->
+<odoo noupdate="1">
+
+    <record id="external_server_sesame" model="ai.api.server">
+        <field name="name">Sesame HR</field>
+        <field name="code">sesame</field>
+        <field name="api_type">openapi</field>
+        <field name="server_type">sse</field>
+        <field name="spec_url">https://apidocs.sesametime.com/openapi.json</field>
+        <field name="base_url">https://api-eu4.sesametime.com</field>
+        <field name="auth_type">bearer</field>
+        <field name="timeout">30</field>
+        <field name="trusted" eval="False"/>
+        <field name="active" eval="False"/>
+        <field name="notes">Factory shell. Paste a bearer token and activate. Discover downloads the public OpenAPI spec. Trusted stays off (Safe Plan toast).</field>
+        <field name="usage_guide"><![CDATA[
+WHEN TO USE (server "sesame"):
+- Employee time tracking, worked hours, check-ins, attendance, punctuality.
+- ALWAYS via propose_safe_operations op=api_call. NEVER RelaxAICode on ai.api.server, spec_json, or drivers.
+
+RECOMMENDED WORKFLOW:
+1. Find employee: ListEmployees (use limit + page; filter by email/name in your next step from returned data).
+2. Aggregated worked hours: WorkedHoursByEmployee — REQUIRED: from, to (YYYY-MM-DD). Optional: employeeIds[in]=[id], limit, page.
+3. Raw check-ins / work entries: ListWorkEntries — employeeId, from, to, limit, page.
+4. Monthly breakdown / punctuality: api_call ListWorkEntries or WorkedHoursByEmployee, then execute_relaxaicode ONLY to aggregate/format the JSON returned by api_call (never to call Sesame directly).
+
+PAGINATION (mandatory):
+- Always pass limit (50–100) and page in arguments for ListEmployees, ListWorkEntries, WorkedHoursByEmployee.
+- If api_call result has truncated=true, read pagination.suggested_arguments and propose a follow-up api_call with those args.
+- Do not dump full company datasets in one call.
+
+DO NOT:
+- Probe spec_json/tools_json via execute_relaxaicode or fetch_url swagger hunting.
+- Use fetch_url against api-eu4.sesametime.com for live HR data (api_call only).
+- Use type(...).__name__ or ORM shortcuts (_get_driver, .call) — blocked by sandbox.
+
+EXAMPLES (api_call steps):
+- List employees page 1: {"server":"sesame","tool":"ListEmployees","arguments":{"limit":50,"page":1}}
+- Worked hours: {"server":"sesame","tool":"WorkedHoursByEmployee","arguments":{"from":"2026-01-01","to":"2026-07-31","employeeIds[in]":[123],"limit":50,"page":1}}
+- Check-ins: {"server":"sesame","tool":"ListWorkEntries","arguments":{"employeeId":123,"from":"2026-01-01","to":"2026-07-31","limit":100,"page":1}}
+
+DATES: YYYY-MM-DD. This factory shell is not trusted — api_call waits for the Safe Plan toast.
+]]></field>
+    </record>
+
+    <record id="external_server_cdmon" model="ai.api.server">
+        <field name="name">CDMON</field>
+        <field name="code">cdmon</field>
+        <field name="api_type">openapi</field>
+        <field name="server_type">sse</field>
+        <field name="spec_manual" eval="True"/>
+        <field name="base_url">https://api-domains.cdmon.services</field>
+        <field name="auth_type">bearer</field>
+        <field name="timeout">30</field>
+        <field name="trusted" eval="False"/>
+        <field name="active" eval="False"/>
+        <field name="notes">Factory shell. Public apidocs.cdmon.com is not a usable OpenAPI document. Paste a converted spec into spec_json (or ship data/openapi/cdmon.json). Discover will not download spec_url. Paste a bearer token and activate.</field>
+        <field name="usage_guide"><![CDATA[
+WHEN TO USE (server "cdmon"):
+- Domain and DNS administration for the configured CDMON account.
+- ALWAYS via propose_safe_operations op=api_call. NEVER RelaxAICode on ai.api.server or spec_json.
+
+WORKFLOW:
+- The admin must paste the converted OpenAPI document (Manual spec) before Discover can build the tool catalogue.
+- Use only tools from that catalogue. Pass pagination arguments when the schema has them.
+
+DO NOT:
+- Uncheck Manual spec and Discover from https://apidocs.cdmon.com/openapi.json (not a usable spec).
+- Store tokens inside spec_json.
+- Call the API with fetch_url; use api_call only.
+]]></field>
+    </record>
+
+    <function model="ai.api.server" name="_load_factory_spec_json">
+        <value eval="'pns_ai_mcp.external_server_cdmon'"/>
+        <value eval="'cdmon.json'"/>
+    </function>
+
+</odoo>

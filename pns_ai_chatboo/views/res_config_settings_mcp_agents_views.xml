@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Chatboo: product settings + Agent Protocol shortcut. -->
+    <record id="res_config_settings_view_form_chatboo_mcp" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.chatboo.mcp.agents</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="pns_ai_mcp.res_config_settings_view_form_mcp"/>
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='action_open_module_inference_agents']" position="after">
+                <div class="row mt16 o_settings_container">
+                <div class="col-12 o_setting_box" id="mcp_agent_chatboo">
+                    <div class="o_setting_right_pane">
+                        <div class="o_form_label">Chatboo</div>
+                        <div class="text-muted">
+                            Conversational client (pns_ai_chatboo · inference · code pns_ai_chatboo).
+                            Product preferences below; use Configuration for providers, contexts and skills.
+                        </div>
+                        <h3 class="mt16 mb8">Interface</h3>
+                        <div class="row mt8 o_settings_container">
+                            <div class="col-12 col-lg-6 o_setting_box">
+                                <div class="o_setting_left_pane">
+                                    <field name="chatboo_show_systray"/>
+                                </div>
+                                <div class="o_setting_right_pane">
+                                    <label for="chatboo_show_systray"/>
+                                    <div class="text-muted">Show the Chatboo launcher in the top bar.</div>
+                                </div>
+                            </div>
+                        </div>
+                        <h3 class="mt16 mb8">Conversation memory</h3>
+                        <div class="row mt8 o_settings_container">
+                            <div class="col-12 col-lg-6 o_setting_box">
+                                <div class="o_setting_right_pane">
+                                    <label for="chatboo_dataset_cache_max_mb"/>
+                                    <field name="chatboo_dataset_cache_max_mb"/>
+                                </div>
+                            </div>
+                            <div class="col-12 col-lg-6 o_setting_box">
+                                <div class="o_setting_right_pane">
+                                    <label for="chatboo_query_data_ttl_hours"/>
+                                    <field name="chatboo_query_data_ttl_hours"/>
+                                </div>
+                            </div>
+                        </div>
+                        <h3 class="mt16 mb8">Data presentation</h3>
+                        <div class="row mt8 o_settings_container">
+                            <div class="col-12 col-lg-6 o_setting_box">
+                                <div class="o_setting_right_pane">
+                                    <label for="chatboo_chart_engine"/>
+                                    <field name="chatboo_chart_engine"/>
+                                    <div class="text-muted">Chart library for server-rendered tables.</div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-lg-6 o_setting_box">
+                                <div class="o_setting_right_pane">
+                                    <label for="chatboo_default_show_mode"/>
+                                    <field name="chatboo_default_show_mode"/>
+                                    <div class="text-muted">Layout for new conversations (sticky per session after user phrasing).</div>
+                                </div>
+                            </div>
+                        </div>
+                        <h3 class="mt16 mb8">Agent Protocol</h3>
+                        <div class="mt8">
+                            <button name="action_open_module_agent" type="object"
+                                    string="Configuration" class="btn-link" icon="fa-external-link"
+                                    context="{'agent_code': 'pns_ai_chatboo'}"/>
+                        </div>
+                    </div>
+                </div>
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>

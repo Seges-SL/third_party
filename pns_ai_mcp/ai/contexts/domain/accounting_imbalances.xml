@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <domain_knowledge>
+        <module name="accounting_imbalances" model="account.move.line">
+            <description>Accounting imbalances. Unbalanced entry: sum(debit) != sum(credit) in lines of the same move_id. Unbalanced balance: total sum debit != total sum credit in the period.</description>
+            <rules>
+                <rule>Unbalanced entry: group account.move.line by move_id, sum debit and credit per entry. If they differ, it is unbalanced.</rule>
+                <rule>Filter posted: move_id.state = 'posted'.</rule>
+                <rule>Avoid records as dict key: use move_id.id to group.</rule>
+                <rule>Sort with operator.itemgetter on list of dicts.</rule>
+                <rule>Variables: start_date, end_date (str 'YYYY-MM-DD').</rule>
+            </rules>
+            <pattern name="unbalanced_moves">
+                <description>Accounting entries with sum(debit) != sum(credit)</description>
+                <code_snippet>
+# Unbalanced entries in period (start_date, end_date)
+domain = [
+    ('move_id.state', '=', 'posted'),
+    ('date', '>=', start_date),
+    ('date', '<=', end_date),
+]
+lines = env['account.move.line'].search(domain)
+by_move = {}
+for line in lines:
+    mid = line.move_id.id
+    if mid not in by_move:
+        by_move[mid] = {'debit': 0, 'credit': 0, 'move': line.move_id}
+    by_move[mid]['debit'] += line.debit
+    by_move[mid]['credit'] += line.credit
+result = []
+for mid, data in by_move.items():
+    m = data['move']
+    diff = abs(data['debit'] - data['credit'])
+    if diff > 0.01:
+        result.append({
+            'asiento': m.name,
+            'fecha': str(m.date),
+            'debe': data['debit'],
+            'haber': data['credit'],
+            'diferencia': data['debit'] - data['credit']
+        })
+result = sorted(result, key=operator.itemgetter('fecha'))
+result
+                </code_snippet>
+            </pattern>
+            <pattern name="period_balance_check">
+                <description>Check if the period is balanced: sum(debit) = sum(credit)</description>
+                <code_snippet>
+# Does the period balance? (start_date, end_date)
+domain = [
+    ('move_id.state', '=', 'posted'),
+    ('date', '>=', start_date),
+    ('date', '<=', end_date),
+]
+lines = env['account.move.line'].search(domain)
+total_debit = sum(l.debit for l in lines)
+total_credit = sum(l.credit for l in lines)
+diff = total_debit - total_credit
+result = {
+    'total_debe': total_debit,
+    'total_haber': total_credit,
+    'diferencia': diff,
+    'cuadra': abs(diff) < 0.01
+}
+result
+                </code_snippet>
+            </pattern>
+        </module>
+    </domain_knowledge>
+</context>

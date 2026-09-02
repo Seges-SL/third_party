@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_import_users_wizard_form" model="ir.ui.view">
+        <field name="name">pns.ai.mcp.import.users.wizard.form</field>
+        <field name="model">pns_ai_mcp.import_users_wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import MCP Users">
+                <sheet>
+                    <div class="alert alert-info" role="alert" >
+                        <p>Upload a JSON file exported from another instance. The API key is
+                        matched by its hash (field <code>mcp_api_key_hash</code>); legacy files
+                        with a plaintext <code>mcp_api_key</code> are also accepted.</p>
+                        <p>With "Replace existing" checked (default), users with the same login are updated including their API key.</p>
+                        <p>If unchecked, existing users are skipped — except when they have no API key yet (key is merged).</p>
+                    </div>
+                    <group >
+                        <field name="json_file" filename="filename"/>
+                        <field name="filename" invisible="1"/>
+                        <field name="replace_existing"/>
+                    </group>
+</sheet>
+                <footer>
+                    <button name="action_import" string="Import" type="object" class="btn-primary" />
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+</footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_import_users_wizard" model="ir.actions.act_window">
+        <field name="name">Import MCP Users (JSON)</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">pns_ai_mcp.import_users_wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

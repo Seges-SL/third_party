@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <metadata>
+        <code>hr_payroll</code>
+        <tipo>domain</tipo>
+        <description>[RECOMMENDED] Payroll: accounting first, payslip fallback, honest empty state</description>
+        <author>System</author>
+        <version>4.2</version>
+        <created_at>2025-01-25</created_at>
+        <created_by>Administrator</created_by>
+        <modified_at>2026-07-15</modified_at>
+        <modified_by>Administrator</modified_by>
+        <is_fallback>true</is_fallback>
+    </metadata>
+    
+    <domain_knowledge>
+# Payroll Extraction (Generic)
+
+**Source cascade** (same order for every locale; accounts and bruto/neto formulas
+live in the locale variant `hr_payroll_*`):
+
+1. **account.move.line** — payroll accounts for the chart (primary).
+2. **hr.payslip** — only when step 1 returned **no rows**, or the user explicitly
+   needs payslip salary-rule line detail.
+3. **No data** — tell the user clearly; never invent figures.
+
+Use **one** source per answer — never mix payslip totals with accounting totals in
+the same table.
+
+## Step 1: Accounting (locale variant)
+
+The active locale context (`hr_payroll_es_ES`, `hr_payroll_en_US`, …) defines:
+
+- Which account codes to read (640 PGC, 421 FR, 5100 US, …).
+- Debit vs credit side.
+- How to derive **bruto** and **neto** from multiple accounts when the user asks
+  for net pay (Spain: 640 − 4751 − SS employee on 476, etc.).
+
+After building `by_partner`, render via **hr_payroll_accounting_present**.
+
+## Step 2: Payslip fallback
+
+Only when step 1 is empty or the user needs payslip rule breakdown. If
+`hr.payslip` exists, search `done`/`paid` slips for the period and use
+`employee_id`, `identification_id`, `net_wage` (and salary lines for gross/rules).
+Keep this step **short** — do not prefer payslip when accounting data exists.
+
+## Step 3: No data
+
+```python
+result = {'formatted_text': 'No payroll data is available for the requested period.'}
+```
+    </domain_knowledge>
+</context>

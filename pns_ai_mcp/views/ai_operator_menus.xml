@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Operator-facing AI Engine menus (Writer / External URL / External API).
+    Admins keep full CRUD menus under group_ai_admin.
+-->
+<odoo>
+    <menuitem id="menu_mcp_contexts_writer"
+              name="My Contexts"
+              parent="pns_ai_mcp.menu_ai_knowledge"
+              action="action_mcp_contexts_writer"
+              sequence="40"
+              groups="pns_ai_mcp.group_ai_writer"/>
+
+    <menuitem id="menu_ai_skill_writer"
+              name="My Skills"
+              parent="pns_ai_mcp.menu_ai_knowledge"
+              action="action_ai_skill_writer"
+              sequence="50"
+              groups="pns_ai_mcp.group_ai_writer"/>
+</odoo>

@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ai_skill_tree" model="ir.ui.view">
+        <field name="name">ai.skill.tree</field>
+        <field name="model">ai.skill</field>
+        <field name="arch" type="xml">
+            <tree string="Skills" class="o_pns_list o_pns_skill_list">
+                <field name="sequence" widget="handle"/>
+                <field name="code" optional="show"/>
+                <field name="agent_ids" widget="many2many_tags" optional="show"/>
+                <field name="command" optional="show"/>
+                <field name="name" optional="show"/>
+                <field name="version" optional="show"/>
+                <field name="owner_id" optional="show" groups="pns_ai_mcp.group_ai_admin"/>
+                <field name="is_system" optional="show"/>
+                <field name="show_in_slash" optional="show"/>
+                <field name="active" optional="show"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_ai_skill_form" model="ir.ui.view">
+        <field name="name">ai.skill.form</field>
+        <field name="model">ai.skill</field>
+        <field name="arch" type="xml">
+            <form string="Skill">
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        <strong>Procedure vs Code:</strong> put the <b>orchestration</b>
+                        in <b>Procedure</b> (when to use it, parameters, how to
+                        present/interpret the result) and the <b>deterministic
+                        computation</b> in <b>Code</b> (queries, math, scoring).
+                        Don't duplicate the same logic in both: the <b>Code is the
+                        source of truth</b>, the <b>Procedure</b> tells the agent when
+                        to run it and what to do with the output.
+                    </div>
+                    <group>
+                        <field name="name"/>
+                        <field name="code"/>
+                        <field name="command"/>
+                        <field name="agent_ids" widget="many2many_tags"/>
+                        <field name="version"/>
+                        <field name="sequence"/>
+                        <field name="active"/>
+                        <field name="show_in_slash"/>
+                        <field name="owner_id" readonly="1" groups="pns_ai_mcp.group_ai_admin"/>
+                        <field name="is_system" readonly="1"/>
+                        <field name="rel_path" readonly="1"/>
+                    </group>
+                    <group string="Selection hint (shown in prompts/list)">
+                        <field name="description" nolabel="1"
+                               placeholder="Short, precise hint the model uses to decide whether to load this skill."/>
+                    </group>
+                    <notebook>
+                        <page string="Procedure" name="procedure">
+                            <field name="content" nolabel="1"
+                                   placeholder="PROSE / orchestration (Markdown): WHEN to use this skill, its user-facing parameters, and HOW to present/interpret the result. Do NOT restate the formulas/logic implemented in Code (avoids drift) — point to it instead."/>
+                        </page>
+                        <page string="Code (relaxaicode)" name="code_body">
+                            <field name="code_body" nolabel="1"
+                                   placeholder="Executable Python (relaxaicode): the deterministic mechanics (queries, math, scoring). Source of truth for the computation; the agent runs it via relaxaicode. Don't duplicate guidance/presentation that belongs in Procedure."/>
+                        </page>
+                        <page string="Parameters" name="parameters">
+                            <group>
+                                <field name="arg_hint" string="Argument hint"
+                                       placeholder="Short usage example shown as the Chatboo input placeholder, e.g. Seville tomorrow or mes=2025-01. Purely informative."/>
+                                <field name="args_policy" string="Empty-args policy"/>
+                                <field name="painter"
+                                       string="Painter"/>
+                                <field name="param_schema" string="Param schema (JSON)"
+                                       placeholder='{"mes": {"type": "string", "desc": "..."}}'/>
+                            </group>
+                        </page>
+                        <page string="Referenced contexts" name="contexts">
+                            <field name="context_ids">
+                                <tree>
+                                    <field name="code" optional="show"/>
+                                    <field name="context_type" optional="show"/>
+                                    <field name="active" optional="show"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_ai_skill_search" model="ir.ui.view">
+        <field name="name">ai.skill.search</field>
+        <field name="model">ai.skill</field>
+        <field name="arch" type="xml">
+            <search string="Skills">
+                <field name="code"/>
+                <field name="command"/>
+                <field name="name"/>
+                <field name="agent_ids"/>
+                <filter name="only_mine" string="Only mine"
+                        domain="[('owner_id', '=', uid)]"/>
+                <filter name="active" string="Active"
+                        domain="[('active', '=', True)]"/>
+                <filter name="inactive" string="Inactive"
+                        domain="[('active', '=', False)]"/>
+                <filter name="slash_visible" string="In slash menu"
+                        domain="[('show_in_slash', '=', True)]"/>
+                <filter name="slash_hidden" string="Hidden from slash"
+                        domain="[('show_in_slash', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_ai_skill" model="ir.actions.act_window">
+        <field name="name">Skills</field>
+        <field name="res_model">ai.skill</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_ai_skill_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create a skill</p>
+            <p>A skill is a selectable procedure (how to do X). Unlike a context
+               (knowledge, always injected in the bundle), a skill is chosen by the
+               model via its description and exposed over MCP as <code>skill.&lt;code&gt;</code>.</p>
+        </field>
+    </record>
+
+    <record id="action_ai_skill_writer" model="ir.actions.act_window">
+        <field name="name">My Skills</field>
+        <field name="res_model">ai.skill</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('owner_id', '=', uid)]</field>
+        <field name="context">{
+            'default_owner_id': uid
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create a skill</p>
+            <p>Personal procedures for your own use (<code>/&lt;code&gt;</code> in chat).</p>
+        </field>
+    </record>
+
+    <record id="action_server_skill_export_all" model="ir.actions.server">
+        <field name="name">Export all skills to ZIP</field>
+        <field name="model_id" ref="model_ai_skill"/>
+        <field name="binding_model_id" eval="False"/>
+        <field name="state">code</field>
+        <field name="code">action = model.export_all_to_zip()</field>
+    </record>
+
+    <record id="action_server_skill_export_selected" model="ir.actions.server">
+        <field name="name">Export selected skills to ZIP</field>
+        <field name="model_id" ref="model_ai_skill"/>
+        <field name="binding_model_id" ref="model_ai_skill"/>
+        <field name="binding_view_types">list</field>
+        <field name="groups_id" eval="[(4, ref('pns_ai_mcp.group_ai_admin'))]"/>
+        <field name="state">code</field>
+        <field name="code">action = records.action_export_selected()</field>
+    </record>
+
+    <record id="action_server_skill_import_zip" model="ir.actions.server">
+        <field name="name">Import skills from ZIP</field>
+        <field name="model_id" ref="model_ai_skill"/>
+        <field name="binding_model_id" ref="model_ai_skill"/>
+        <field name="binding_view_types">list</field>
+        <field name="groups_id" eval="[(4, ref('pns_ai_mcp.group_ai_admin'))]"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_import_wizard()</field>
+    </record>
+
+    <record id="action_server_skill_reload_files" model="ir.actions.server">
+        <field name="name">Reload skills from server (files)</field>
+        <field name="model_id" ref="model_ai_skill"/>
+        <field name="binding_model_id" ref="model_ai_skill"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">action = model.reload_from_server()</field>
+    </record>
+</odoo>

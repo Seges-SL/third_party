@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Archivo: views/mcp_user_views.xml
+    Creado: 2025-11-16 03:50:00
+    Modificado: 2025-11-26 06:59:53
+    Descripción: Vistas para gestión de usuarios MCP
+-->
+<odoo>
+    <!-- Vista tree para usuarios MCP -->
+    <record id="view_mcp_user_tree" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.user.tree</field>
+        <field name="model">ai.mcp.user</field>
+        <field name="arch" type="xml">
+            <tree create="0" delete="0" string="MCP Users" class="o_pns_list">
+                <field name="name" readonly="1" optional="show"/>
+                <field name="login" readonly="1" optional="show"/>
+                <field name="is_mcp_manager" readonly="1" optional="show"/>
+                <field name="is_ai_writer" readonly="1" optional="show"/>
+                <field name="is_ai_external_url" readonly="1" optional="show"/>
+                <field name="is_ai_external_api" readonly="1" optional="show"/>
+                <field name="mcp_api_key_state" optional="show" readonly="1"/>
+                <field name="mcp_api_key_generated_date" optional="show" readonly="1"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Vista form para usuarios MCP -->
+    <record id="view_mcp_user_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.user.form</field>
+        <field name="model">ai.mcp.user</field>
+        <field name="arch" type="xml">
+            <form string="MCP User">
+                <header>
+                    <button name="generate_mcp_api_key" 
+                            string="Generate API Key" 
+                            type="object" 
+                            class="oe_stat_button" 
+                            icon="fa-key"
+                            attrs="{'invisible': [('mcp_api_key_hash', '!=', False)]}"/>
+                    <button name="generate_mcp_api_key" 
+                            string="Regenerate API Key" 
+                            type="object" 
+                            class="oe_stat_button" 
+                            icon="fa-refresh"
+                            attrs="{'invisible': [('mcp_api_key_hash', '=', False)]}"/>
+                    <button name="clear_mcp_api_key" 
+                            string="Delete API Key" 
+                            type="object" 
+                            class="oe_stat_button btn-danger" 
+                            icon="fa-trash"
+                            attrs="{'invisible': [('mcp_api_key_hash', '=', False)]}"/>
+                </header>
+                <sheet>
+                    <field name="mcp_api_key_hash" invisible="1"/>
+                    <field name="last_mcp_client_label" invisible="1"/>
+                    <group>
+                        <group>
+                            <field name="name" readonly="1"/>
+                            <field name="login" readonly="1"/>
+                            <field name="email" readonly="1"/>
+                        </group>
+                        <group string="AI Permissions">
+                            <field name="is_mcp_manager"/>
+                            <field name="is_ai_writer"/>
+                            <field name="is_ai_external_url"/>
+                            <field name="is_ai_external_api"/>
+                        </group>
+                    </group>
+                    <group string="API Key MCP">
+                        <div colspan="2" class="text-muted">
+                            <p>The API key is stored only as a one-way hash. It is shown
+                            once, at generation time (Generate button). Use
+                            <strong>Import existing API key</strong> (Action menu) to set a
+                            known value from another instance or a client.</p>
+                        </div>
+                        <group>
+                            <field name="mcp_api_key_state" readonly="1"/>
+                            <field name="mcp_api_key_generated_date" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Last MCP Client" attrs="{'invisible': [('last_mcp_client_label', '=', False)]}">
+                        <field name="last_mcp_client_label" readonly="1"/>
+                        <field name="last_mcp_client_ip" readonly="1"/>
+                        <field name="last_mcp_client_seen" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_server_mcp_user_import_api_key" model="ir.actions.server">
+        <field name="name">Import existing API key</field>
+        <field name="model_id" ref="model_ai_mcp_user"/>
+        <field name="binding_model_id" ref="model_ai_mcp_user"/>
+        <field name="binding_view_types">form</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_import_mcp_api_key()</field>
+    </record>
+
+    <!-- Menú: server action sincroniza usuarios y abre la lista -->
+    <record id="action_server_open_mcp_users" model="ir.actions.server">
+        <field name="name">MCP Users</field>
+        <field name="model_id" ref="model_ai_mcp_user"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_mcp_users_list()</field>
+    </record>
+
+    <!-- Ventana lista/form (abierta por action_open_mcp_users_list) -->
+    <record id="action_mcp_users" model="ir.actions.act_window">
+        <field name="name">MCP Users</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">ai.mcp.user</field>
+        <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="view_mcp_user_tree"/>
+        <field name="domain">[]</field>
+        <field name="context">{'create': False, 'no_create': True, 'no_delete': True, 'ensure_all_users': True}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Gestión de Usuarios MCP
+            </p>
+            <p>
+                Gestiona las API keys de los usuarios para acceso al servidor MCP
+                y controla quién pertenece al grupo MCP Manager. Los usuarios Odoo activos
+                se añaden solos al abrir esta lista. Menú ⚙️: <strong>Import JSON</strong> /
+                <strong>Export JSON</strong> entre instancias.
+            </p>
+        </field>
+    </record>
+
+    <!-- AI Engine root: admins and operational AI permission holders -->
+    <menuitem id="menu_mcp_main"
+              name="AI Engine"
+              sequence="10"
+              web_icon="pns_ai_mcp,static/description/icon.png"
+              groups="pns_ai_mcp.group_ai_admin,pns_ai_mcp.group_ai_writer,pns_ai_mcp.group_ai_external_url,pns_ai_mcp.group_ai_external_api"/>
+
+    <!-- Groups must load here (before child menus in this and later data files).
+         Order: identity (Agents) → catalog (Knowledge) → pipes (Connections)
+         → governance (Security) → knobs (Settings).
+         Agents leaf is in ai_menus.xml (needs action_ai_agent). -->
+    <menuitem id="menu_ai_connections"
+              name="Connections"
+              parent="menu_mcp_main"
+              sequence="30"
+              groups="pns_ai_mcp.group_ai_admin"/>
+    <menuitem id="menu_ai_knowledge"
+              name="Knowledge"
+              parent="menu_mcp_main"
+              sequence="20"
+              groups="pns_ai_mcp.group_ai_admin,pns_ai_mcp.group_ai_writer"/>
+    <menuitem id="menu_ai_security"
+              name="Security"
+              parent="menu_mcp_main"
+              sequence="40"
+              groups="pns_ai_mcp.group_ai_admin,pns_ai_mcp.group_ai_writer,pns_ai_mcp.group_ai_external_url,pns_ai_mcp.group_ai_external_api"/>
+
+    <!-- Menú de usuarios MCP (quién autentica / autoriza el motor) -->
+    <menuitem id="menu_mcp_users"
+              name="Users"
+              parent="menu_ai_security"
+              action="action_server_open_mcp_users"
+              sequence="5"
+              groups="pns_ai_mcp.group_ai_admin"/>
+</odoo>
+

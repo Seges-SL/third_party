@@ -1,0 +1,18 @@
+{
+  "code": "discovery_account_es_ES",
+  "tipo": "discovery",
+  "locale": "es_ES",
+  "target": "account",
+  "priority": 70,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "asiento contable",
+    "asientos contables",
+    "apunte contable",
+    "apuntes contables",
+    "diario contable",
+    "plan contable",
+    "cuenta contable"
+  ]
+}

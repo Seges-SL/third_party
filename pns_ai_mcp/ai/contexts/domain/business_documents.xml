@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <metadata>
+        <code>business_documents</code>
+        <tipo>domain</tipo>
+        <description>Read, create and modify business documents (quotations, orders, invoices, pickings)</description>
+    </metadata>
+
+    <domain_knowledge>
+        <documents>
+            <document type="budget" model="sale.order">
+                <discount>
+                    <!-- Standard Odoo line Discount (%): spoken 50% → write 50. -->
+                    <line field="discount" model="sale.order.line" unit="percent"/>
+                </discount>
+                <conventions>
+                    <convention name="cite_one_document">
+                        When this turn is a read of one concrete business document,
+                        cite only the document header (one card). A lines table may
+                        carry row ids for cell links. Do not publish the counterpart
+                        or each product as extra cards. Partner lists, period
+                        aggregates and multi-document rankings follow those packs.
+                    </convention>
+                    <convention name="generate">
+                        Create one header. Put new lines in the same vals (Odoo
+                        command 0). Do not create a second header for extra lines.
+                    </convention>
+                    <convention name="modify">
+                        After a Confirm write, the chat ack already carries the
+                        document id. Adding lines or changing the header without
+                        naming a document is a write on that last document id in
+                        this thread — not a second create of a header.
+                    </convention>
+                    <convention name="discount">
+                        A global / document-level discount (a percent with no
+                        named article) writes the line field above on every
+                        article line of this document (a line that has a
+                        product), and only if that field exists
+                        (field in env[line_model]._fields). Spoken "50%" →
+                        write 50. Apply it on the line's document unit price
+                        (price_unit). Do not change price_unit. Do not stack
+                        on a price that already has another discount: set the
+                        line percent to the spoken value. Do not write
+                        comparison or margin header fields.
+                        A discount for a named article (product code, name, or
+                        an indirect reference such as the most expensive crane
+                        remote) writes the line field on that line only.
+                    </convention>
+                    <convention name="line_price">
+                        A spoken price for an article named in this document
+                        writes price_unit on that line, and only if that
+                        field exists (field in env[line_model]._fields).
+                        Do not write the product list price. Cite only the
+                        document header, not the product and not the line.
+                    </convention>
+                </conventions>
+            </document>
+        </documents>
+        <mappings>
+            <mapping name="customer_invoice">account.move (out_invoice / out_refund / proforma-on-move) → partner_id, invoice_line_ids.product_id</mapping>
+            <mapping name="vendor_bill">account.move (in_invoice / in_refund) → partner_id, invoice_line_ids.product_id</mapping>
+            <mapping name="sale">sale.order (quotation or sales order) → partner_id, order_line.product_id</mapping>
+            <mapping name="purchase">purchase.order → partner_id, order_line.product_id</mapping>
+            <mapping name="picking">stock.picking → partner_id when set, move_ids.product_id</mapping>
+        </mappings>
+    </domain_knowledge>
+</context>

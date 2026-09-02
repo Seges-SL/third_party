@@ -1,0 +1,14 @@
+{
+  "code": "discovery_fetch_url_recipe",
+  "tipo": "discovery",
+  "target": "fetch_url_recipe",
+  "priority": 68,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "fetch_url",
+    "url whitelist",
+    "whitelist url",
+    "external http"
+  ]
+}

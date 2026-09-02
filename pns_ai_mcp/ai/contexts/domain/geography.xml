@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <metadata>
+        <code>geography</code>
+        <tipo>domain</tipo>
+        <description>Geographic knowledge - country/province/city model, administrative levels (region is NOT a state), resolution funnel, and HONEST handling of missing geo data (report, never invent)</description>
+        <version>1.1</version>
+        <created_at>2026-07-13</created_at>
+        <created_by>Administrator</created_by>
+        <modified_at>2026-07-13</modified_at>
+        <modified_by>Administrator</modified_by>
+    </metadata>
+
+    <domain_knowledge>
+        <module name="geography" model="res.partner">
+            <overview>Geography in Odoo is standard and country-agnostic: administrative divisions live in dedicated models and records link to them by RELATION, never by free text. Resolve place names against those models; do NOT parse addresses by hand.</overview>
+
+            <model_mapping>
+                <field concept="Country / País">res.partner.country_id -&gt; res.country (name, code)</field>
+                <field concept="Province / State / Provincia / Estado">res.partner.state_id -&gt; res.country.state (name, code, country_id)</field>
+                <field concept="City / Ciudad (a partner's own address text)">res.partner.city (plain Char, NOT a relation)</field>
+                <field concept="Municipality / Town / Población / Municipio (as a REFERENCE place, e.g. 'which province is town X in')">res.city (name, state_id, country_id) — the gazetteer that maps a town to its province via state_id, WHEN POPULATED. Check first: if env['res.city'].search_count([]) == 0 the table is EMPTY and there is NO in-DB municipality source; say so, do NOT fuzzy-match towns against unrelated tables.</field>
+                <field concept="ZIP / Postal code / Código postal">res.partner.zip (plain Char, NOT a relation)</field>
+                <note>state_id and country_id are Many2one RELATIONS; city and zip are free text. Every province belongs to a country (res.country.state.country_id), so disambiguate by country when a province name is ambiguous.</note>
+            </model_mapping>
+
+            <administrative_levels severity="critical">
+                <rule>Odoo stores EXACTLY ONE subdivision level below the country: res.country.state. WHICH real-world level that is depends on the country (province in ES, state in US, département/région in FR, Bundesland in DE…). There is NO model for any grouping ABOVE that level.</rule>
+                <rule>A REGION / autonomous community / macro-region that sits ABOVE the state level — e.g. "Andalucía", "Cataluña", "País Vasco" (ES); "New England", "the Midwest" (US); "Occitanie" (FR) — is NOT a res.country.state and does NOT exist as a record. Filtering state_id.name = '&lt;region&gt;' returns ZERO (or a few stray homonyms) and is a silent-failure trap.</rule>
+                <rule>VERIFY-THEN-EXPAND, always, before filtering by a place name at the state level: (1) check the term resolves to a state with an anchored search, e.g. n = env['res.country.state'].search_count([('country_id.code','=',cc), ('name','=ilike', term)]). (2) If n &gt; 0 → filter state_id in that state. (3) If n == 0 → the term is almost certainly a region/grouping (or a typo): resolve it to its MEMBER states/provinces (from world knowledge, e.g. Andalucía → its 8 provinces) and filter ('state_id.name','in',[those]) or state_id in [those ids]. (4) If you cannot resolve the member states with confidence, SAY SO and ask — never fall back to state_id.name = '&lt;region&gt;'.</rule>
+                <rule>The region→provinces expansion is WORLD KNOWLEDGE you already have; do NOT hardcode or persist any list, and do NOT invent membership. When you expand, still resolve each member province against res.country.state (tolerant match) so the ids are real.</rule>
+            </administrative_levels>
+
+            <odoo_gazetteer>
+                <rule>Odoo's own tables ARE the geographic gazetteer / source of truth. Do NOT maintain, hardcode or invent a separate list of place names — match user terms against res.country / res.country.state with ilike.</rule>
+                <rule>COUNTRY names ARE translated by Odoo (res.country.name is translatable): a term in any language (España / Spain / Espagne) resolves via ilike, no custom mapping needed.</rule>
+                <rule>PROVINCE/STATE names are NOT translated (res.country.state.name is stored in its official/local form). They may be bilingual (e.g. "Alacant (Alicante)") or uppercase/without accents (e.g. "MALAGA"). Match with a tolerant ilike and never assume a single canonical spelling. If a name does not resolve to a state_id, report it as UNKNOWN rather than guessing an id.</rule>
+            </odoo_gazetteer>
+            <name_matching severity="critical">
+                <rule>Match place names PRECISELY. Use an anchored/exact match — e.g. ('name', '=ilike', term) — NEVER a bare substring ('name', 'ilike', term) with limit=1, which grabs the first unrelated row that merely CONTAINS the text (real failures: 'linares' -&gt; "Embalse de Linares" in Segovia; 'ronda' -&gt; "Artatza Foronda" in Álava).</rule>
+                <rule>Filter by country when known (e.g. ('country_id.code', '=', 'ES')) to avoid homonyms in other countries.</rule>
+                <rule>If a term returns 0 matches, or MORE than one plausible match, do NOT pick one at random: report that item as "no encontrada" / "ambigua". A per-item "no encontrada" is a correct, expected outcome — never disguise it, and NEVER claim "all found" or "all have a province assigned" when some items did not resolve.</rule>
+                <rule>Preserve the user's spelling in the report. If a term looks like a typo (e.g. "úbda" for "Úbeda"), say so instead of silently matching something else.</rule>
+            </name_matching>
+            <resolution_funnel>
+                <step>1. Province: env['res.country.state'].search([('name', 'ilike', t)]) (optionally filter by country_id).</step>
+                <step>2. Country: env['res.country'].search([('name', 'ilike', t)]).</step>
+                <step>3. City/ZIP fallback: env['res.partner'].search(['|', ('city', 'ilike', t), ('zip', '=like', t + '%')]).</step>
+                <rule>Prefer the RELATION (state_id/country_id) over city/zip text whenever the place is an administrative division.</rule>
+            </resolution_funnel>
+
+            <missing_data severity="critical">
+                <rule>ABSENT DATA IS A VALID, REPORTABLE ANSWER. Before grouping, filtering or ranking by a geographic dimension, remember the field may be EMPTY on the records.</rule>
+                <rule>If the requested dimension is not populated (e.g. partners with state_id unset), SAY SO explicitly (e.g. "los clientes no tienen provincia asignada — el campo state_id está vacío"). Do NOT invent provinces, do NOT infer them from the name/city/zip, and do NOT silently drop the dimension and return an unrelated list as if it answered the question.</rule>
+                <rule>Distinguish two different outcomes and word them differently: (a) FILTER MATCHED NOTHING = the province exists but no record falls in it; (b) FIELD NOT POPULATED = the field is empty across the data, so the grouping cannot be done at all. NEVER present (b) as if it were (a), and never disguise (b) with fabricated rows.</rule>
+                <rule>When a grouping is impossible due to missing data, state it clearly and, only if genuinely useful, offer what CAN be answered with the data that DOES exist (e.g. "puedo darte el ranking global sin desglose por provincia"). Never fabricate the missing breakdown to look complete.</rule>
+                <coverage_check>Good practice: when asked to group by a geo dimension, first measure COVERAGE (how many records have that field set, e.g. search_count with the field != False). If coverage is 0 or very low, lead with that fact instead of returning a misleading or empty table.</coverage_check>
+            </missing_data>
+
+            <country_specific>
+                <note>Mappings such as "ZIP prefix -&gt; province" are COUNTRY-specific and are NOT native in Odoo. Do not assume such a mapping exists, and do not derive a province from a ZIP/city unless a country-specific rule explicitly provides that mapping. If it is not provided and state_id is empty, treat the province as UNKNOWN (see missing_data) — report it, never guess.</note>
+            </country_specific>
+        </module>
+    </domain_knowledge>
+</context>

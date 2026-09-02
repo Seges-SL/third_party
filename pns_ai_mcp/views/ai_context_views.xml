@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Archivo: views/mcp_context_views.xml
+    Creado: 2025-11-22 22:23:42
+    Modificado: 2025-11-26 07:01:12
+    Descripción: Vistas para gestión de contextos dinámicos MCP
+-->
+<odoo>
+    <!-- Vista tree para contextos MCP -->
+    <record id="view_mcp_context_tree" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.context.tree</field>
+        <field name="model">ai.context</field>
+        <field name="arch" type="xml">
+            <tree string="MCP Contexts" create="1" delete="1"
+                  class="o_pns_list o_pns_context_list"
+                  decoration-info="context_type == 'core'">
+                <field name="active" optional="show" attrs="{'readonly': [('context_type', '=', 'core')]}"/>
+                <field name="context_type" optional="show"/>
+                <field name="code" optional="show" attrs="{'readonly': [('context_type', '=', 'core')]}"/>
+                <field name="agent_ids" widget="many2many_tags" optional="show"/>
+                <field name="owner_id" optional="show" groups="pns_ai_mcp.group_ai_admin"/>
+                <field name="rel_path" optional="show" readonly="1"/>
+                <field name="base_code" optional="hide" readonly="1"/>
+                <field name="locale" optional="show"/>
+                <field name="description" optional="show" attrs="{'readonly': [('context_type', '=', 'core')]}"/>
+                <field name="create_date" optional="hide" readonly="1"/>
+                <field name="write_date" optional="hide" readonly="1"/>
+                <field name="create_uid" optional="hide" readonly="1"/>
+                <field name="write_uid" optional="hide" readonly="1"/>
+            </tree>
+        </field>
+    </record>
+    
+    <!-- Vista search para filtrar contextos -->
+    <record id="view_mcp_context_search" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.context.search</field>
+        <field name="model">ai.context</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="code" string="Code" filter_domain="[('code', 'ilike', self)]"/>
+                <field name="description" string="Description"/>
+                <field name="context_type"/>
+                <field name="agent_ids"/>
+                <field name="locale"/>
+                
+                <!-- Role tokens (not translated; same as JSON tipo / hub) -->
+                <filter name="type_core" string="core"
+                        domain="[('context_type', '=', 'core')]"/>
+                <filter name="type_domain" string="domain"
+                        domain="[('context_type', '=', 'domain')]"/>
+                <filter name="type_locale" string="locale"
+                        domain="[('context_type', '=', 'locale')]"/>
+                <filter name="type_discovery" string="discovery"
+                        domain="[('context_type', '=', 'discovery')]"/>
+                
+                <separator/>
+
+                <!-- Locale scope: default (no chip) = all locales. -->
+                <filter name="locale_all" string="All locales"
+                        domain="[(1, '=', 1)]"/>
+                <filter name="locale_none" string="No locale"
+                        domain="['|', ('locale', '=', False), ('locale', '=', '')]"/>
+                <filter name="my_locale" string="My language (Locale)"
+                        domain="['|', ('locale', '=', False),
+                                 ('locale', '=', context.get('lang', 'en_US'))]"/>
+                
+                <filter name="my_contexts" string="Only mine"
+                        domain="[('owner_id', '=', uid)]"/>
+                
+                <separator/>
+                
+                <!-- Filtros por estado -->
+                <filter name="active" string="Active" 
+                        domain="[('active', '=', True)]"/>
+                <filter name="inactive" string="Inactive" 
+                        domain="[('active', '=', False)]"/>
+                
+                <separator/>
+                <filter name="group_agent" string="AI Agent"
+                        context="{'group_by': 'agent_ids'}"/>
+                <filter name="group_type" string="Type" 
+                        context="{'group_by': 'context_type'}"/>
+                <filter name="group_locale" string="Locale" 
+                        context="{'group_by': 'locale'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Vista form para contextos MCP -->
+    <record id="view_mcp_context_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.context.form</field>
+        <field name="model">ai.context</field>
+        <field name="arch" type="xml">
+            <form string="MCP Context">
+
+                <div attrs="{'invisible': [('context_type', '!=', 'core')]}" class="alert alert-info" role="alert">
+                    <strong>⚠️ Read-only Record:</strong> This is a Core Context synced automatically from module code. It cannot be modified or deleted.
+                </div>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="code" 
+                                   placeholder="ej: glosario_contabilidad"
+                                   attrs="{'readonly': [('context_type', '=', 'core')]}"/>
+                            <field name="active" 
+                                   attrs="{'readonly': [('context_type', '=', 'core')]}"/>
+                            <field name="context_type"/>
+                            <field name="agent_ids" widget="many2many_tags" attrs="{'readonly': [('context_type', '=', 'core')]}"/>
+                            <field name="owner_id" readonly="1" groups="pns_ai_mcp.group_ai_admin"/>
+                            <field name="locale"
+                                   attrs="{'readonly': [('context_type', '=', 'core')]}"/>
+                            <field name="base_code" readonly="1"
+                                   attrs="{'invisible': [('base_code', '=', False)]}"/>
+                        </group>
+                        <group>
+                            <field name="create_date" readonly="1"/>
+                            <field name="write_date" readonly="1"/>
+                            <field name="create_uid" readonly="1"/>
+                            <field name="write_uid" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="description" 
+                               placeholder="Context description and usage instructions"
+                               attrs="{'readonly': [('context_type', '=', 'core')]}"/>
+                    </group>
+                    <separator string="Metadata (Extracted)"/>
+                    <group>
+                        <group>
+                            <field name="author" 
+                                   placeholder="Autor del contexto"
+                                   attrs="{'readonly': [('context_type', '=', 'core')]}"/>
+                            <field name="version" 
+                                   placeholder="Context version"
+                                   attrs="{'readonly': [('context_type', '=', 'core')]}"/>
+                        </group>
+                        <group>
+                            <field name="date_modified" 
+                                   placeholder="Modification date"
+                                   attrs="{'readonly': [('context_type', '=', 'core')]}"/>
+                        </group>
+                    </group>
+                    <separator string="Size Metrics (Token Optimization)"/>
+                    <group>
+                        <group>
+                            <field name="content_size_bytes" readonly="1" 
+                                   widget="integer" 
+                                   string="Total Size"/>
+                            <field name="content_size_without_metadata" readonly="1" 
+                                   widget="integer" 
+                                   string="Size Sent to LLM"/>
+                        </group>
+                        <group>
+                            <field name="metadata_overhead_bytes" readonly="1" 
+                                   widget="integer" 
+                                   string="Token Savings"
+                                   decoration-success="metadata_overhead_bytes > 0"/>
+                            <div class="o_form_label text-muted" colspan="2">Metadata is stripped before sending to LLM</div>
+                        </group>
+                    </group>
+                    <separator string="Content"/>
+                    <field name="content" 
+                           widget="text" 
+                           placeholder="Context Content (Markdown format)"
+                           nolabel="1"
+                           class="o_mcp_context_content"
+                           options="{'resizable': true}"
+                           attrs="{'readonly': [('context_type', '=', 'core')]}"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Acción para abrir contextos MCP -->
+    <record id="action_mcp_contexts" model="ir.actions.act_window">
+        <field name="name">Contexts</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">ai.context</field>
+        <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="view_mcp_context_tree"/>
+        <field name="search_view_id" ref="view_mcp_context_search"/>
+        <field name="domain">[]</field>
+        <field name="context">{
+            'active_test': False,
+            'search_default_my_locale': 1
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Manage Dynamic Contexts
+            </p>
+            <p>
+                Manage dynamic contexts (prompts) for the MCP server.
+                System contexts (hardcoded) are theoretically synced automatically from files upon module install/update.
+            </p>
+        </field>
+    </record>
+
+    <!-- Menú de contextos MCP. Visible para AI Administrator. -->
+    <menuitem id="menu_mcp_contexts"
+              name="Contexts"
+              parent="menu_ai_knowledge"
+              action="action_mcp_contexts"
+              sequence="10"
+              groups="pns_ai_mcp.group_ai_admin"/>
+
+    <record id="action_mcp_contexts_writer" model="ir.actions.act_window">
+        <field name="name">My Contexts</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">ai.context</field>
+        <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="view_mcp_context_tree"/>
+        <field name="search_view_id" ref="view_mcp_context_search"/>
+        <field name="domain">[('owner_id', '=', uid)]</field>
+        <field name="context">{
+            'default_owner_id': uid,
+            'default_context_type': 'domain'
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create your first context</p>
+            <p>Personal knowledge snippets for your own use.</p>
+        </field>
+    </record>
+
+
+    <!-- NOTE: Global Stats menu removed - now uses JS button in Contexts view -->
+</odoo>

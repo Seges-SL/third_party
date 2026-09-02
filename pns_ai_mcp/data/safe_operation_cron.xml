@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Caduca pendientes vencidos: sin esto la cola de Autorizaciones acumula zombis
+         (status=pending + is_expired) y el toast de confirmación se vuelve inutilizable.
+         Stack owl1 (Odoo 13/14): numbercall/doall. -->
+    <record id="ir_cron_ai_safe_operation_expire" model="ir.cron">
+        <field name="name">AI: expire pending supervised operations</field>
+        <field name="model_id" ref="model_ai_safe_operation"/>
+        <field name="state">code</field>
+        <field name="code">model.cleanup_expired()</field>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="numbercall">-1</field>
+        <field name="doall" eval="False"/>
+        <field name="active" eval="True"/>
+    </record>
+    <!-- NO hay cron de «execute confirmed»: secuestraba workers (forever-busy)
+         y competía con el toast. Confirm y execute son dos HTTP distintos;
+         el apply lo dispara Chatboo (/verification/execute) o Autorizaciones.
+         El registro legacy se apaga en migración 3.0.146. -->
+</odoo>

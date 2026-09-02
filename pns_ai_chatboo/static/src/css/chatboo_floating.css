@@ -1,0 +1,1349 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   CHATBOO DESIGN TOKENS — single source of truth for colors/typography
+   ═══════════════════════════════════════════════════════════════════════ */
+:root {
+    --chatboo-primary: #00A09D;
+    --chatboo-primary-dark: #007f7d;
+    --chatboo-primary-light: #e0f7f6;
+    --chatboo-bg: #f5f6f8;
+    --chatboo-surface: #ffffff;
+    --chatboo-border: #e0e0e0;
+    --chatboo-text: #1d1d1d;
+    --chatboo-text-muted: #6c757d;
+    --chatboo-radius: 8px;
+    --chatboo-radius-lg: 16px;
+    --chatboo-radius-pill: 20px;
+    --chatboo-font: system-ui, 'Segoe UI', Roboto, -apple-system, sans-serif;
+    --chatboo-font-mono: ui-monospace, 'Cascadia Code', 'Fira Code', Consolas, monospace;
+    --chatboo-font-size: 13.5px;
+    --chatboo-font-size-sm: 12px;
+    --chatboo-transition: 0.2s ease-in-out;
+    --chatboo-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --chatboo-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MESSAGE BUBBLES — modern rounded chat layout
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* User messages: teal with asymmetric radius */
+.o_chatboo_message.bg-primary {
+    background: linear-gradient(135deg, var(--chatboo-primary), var(--chatboo-primary-dark)) !important;
+    color: #fff !important;
+    border-radius: var(--chatboo-radius-lg) var(--chatboo-radius-lg) 4px var(--chatboo-radius-lg) !important;
+    box-shadow: var(--chatboo-shadow);
+    max-width: 85% !important;
+}
+.o_chatboo_message.bg-primary .o_chatboo_content,
+.o_chatboo_message.bg-primary .o_chatboo_content * {
+    color: #fff !important;
+}
+
+/* Assistant messages: clean white with subtle border */
+.o_chatboo_message.bg-white {
+    background: var(--chatboo-surface) !important;
+    border: 1px solid var(--chatboo-border) !important;
+    border-radius: var(--chatboo-radius-lg) var(--chatboo-radius-lg) var(--chatboo-radius-lg) 4px !important;
+    box-shadow: var(--chatboo-shadow);
+    max-width: 92% !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CONTENT TYPOGRAPHY — readable prose, monospace for data
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Base content styling */
+.o_chatboo_content {
+    font-family: var(--chatboo-font);
+    font-size: var(--chatboo-font-size);
+    line-height: 1.55;
+    color: var(--chatboo-text);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Tables — MONOSPACE preserved, cleaner borders */
+.o_chatboo_content table {
+    font-family: var(--chatboo-font-mono);
+    font-size: var(--chatboo-font-size-sm);
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.5em 0;
+    border-radius: var(--chatboo-radius);
+    overflow: hidden;
+}
+
+.o_chatboo_content th,
+.o_chatboo_content td {
+    padding: 6px 10px;
+    border: 1px solid var(--chatboo-border);
+    text-align: start;
+}
+
+.o_chatboo_content th.o_chatboo_num,
+.o_chatboo_content td.o_chatboo_num,
+.o_chatboo_content th.text-end,
+.o_chatboo_content td.text-end {
+    text-align: end !important;
+    font-variant-numeric: tabular-nums;
+}
+
+.o_chatboo_content th {
+    background-color: #f0f2f5;
+    font-weight: 600;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--chatboo-text-muted);
+}
+
+.o_chatboo_content tr:hover td {
+    background-color: #fafbfc;
+}
+
+/* Cell hover tip: pastel yellow + black, anchored near letter (cell center). */
+.o_chatboo_content table:has(td[data-tip]) {
+    overflow: visible;
+}
+.o_chatboo_content .table-responsive:has(td[data-tip]) {
+    overflow: visible;
+}
+.o_chatboo_content td.o_chatboo_tiptarget[data-tip] {
+    position: relative;
+    cursor: help;
+}
+.o_chatboo_content td.o_chatboo_tiptarget[data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    /* Near the letter / cursor: from cell mid-point, just above */
+    inset-inline-start: 50%;
+    top: 50%;
+    bottom: auto;
+    transform: translate(-50%, calc(-100% - 6px));
+    z-index: 40;
+    box-sizing: border-box;
+    max-width: 18rem;
+    width: max-content;
+    padding: 0.35em 0.6em;
+    border: 1px solid #e6d48a;
+    border-radius: 4px;
+    background: #fff9c4;
+    color: #000;
+    font-size: 0.8rem;
+    font-weight: 500;
+    line-height: 1.35;
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: normal;
+    text-align: start;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    pointer-events: none;
+}
+.o_chatboo_content td.o_chatboo_tiptarget[data-tip]:hover::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: 50%;
+    top: 50%;
+    bottom: auto;
+    transform: translate(-50%, calc(-100% - 1px));
+    z-index: 41;
+    border: 5px solid transparent;
+    border-top-color: #fff9c4;
+    pointer-events: none;
+}
+
+/* Code blocks — dark theme, rounded */
+.o_chatboo_content pre {
+    background: #1e1e2e !important;
+    color: #cdd6f4 !important;
+    padding: 14px 16px !important;
+    border-radius: var(--chatboo-radius) !important;
+    border: 1px solid #313244 !important;
+    overflow-x: auto;
+    font-family: var(--chatboo-font-mono);
+    font-size: var(--chatboo-font-size-sm);
+    line-height: 1.45;
+    margin: 0.5em 0;
+}
+
+.o_chatboo_content pre code {
+    background: transparent !important;
+    padding: 0 !important;
+    border: none !important;
+    font-size: inherit;
+    color: inherit;
+}
+
+/* Inline code — subtle pill */
+.o_chatboo_content code:not([class*="language"]) {
+    font-family: var(--chatboo-font-mono);
+    font-size: 0.9em;
+    background: #f0f2f5;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #d63384;
+}
+
+/* Blockquotes — accent bar */
+.o_chatboo_content blockquote {
+    border-inline-start: 3px solid var(--chatboo-primary);
+    padding: 8px 14px;
+    margin: 0.5em 0;
+    background: var(--chatboo-primary-light);
+    border-radius: 0 var(--chatboo-radius) var(--chatboo-radius) 0;
+    color: var(--chatboo-text);
+}
+
+/* Headings inside messages */
+.o_chatboo_content h1,
+.o_chatboo_content h2,
+.o_chatboo_content h3 {
+    margin-top: 0.8em;
+    margin-bottom: 0.3em;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--chatboo-text);
+}
+
+.o_chatboo_content h1 { font-size: 1.2em; }
+.o_chatboo_content h2 { font-size: 1.1em; }
+.o_chatboo_content h3 { font-size: 1.0em; }
+
+.o_chatboo_content p,
+.o_chatboo_content .o_chatboo_prose_p,
+.o_chatboo_content .o_chatboo_prose_li,
+.o_chatboo_content .o_chatboo_prose,
+.o_chatboo_content .pns-result-footer {
+    letter-spacing: normal;
+    word-spacing: normal;
+    text-align: start;
+}
+
+.o_chatboo_content p {
+    margin: 0.45em 0;
+    line-height: 1.5;
+}
+
+.o_chatboo_content .o_chatboo_prose h1,
+.o_chatboo_content .o_chatboo_prose h2,
+.o_chatboo_content .o_chatboo_prose h3,
+.o_chatboo_content .o_chatboo_prose h4,
+.o_chatboo_content .pns-result-footer h1,
+.o_chatboo_content .pns-result-footer h2,
+.o_chatboo_content .pns-result-footer h3,
+.o_chatboo_content .pns-result-footer h4 {
+    font-weight: 700;
+    line-height: 1.3;
+    margin-top: 0.85em;
+    margin-bottom: 0.35em;
+}
+
+.o_chatboo_content .o_chatboo_prose h1,
+.o_chatboo_content .pns-result-footer h1 { font-size: 1.25em; }
+.o_chatboo_content .o_chatboo_prose h2,
+.o_chatboo_content .pns-result-footer h2 { font-size: 1.15em; }
+.o_chatboo_content .o_chatboo_prose h3,
+.o_chatboo_content .pns-result-footer h3 { font-size: 1.05em; }
+
+/* Título resumen: sin hueco superior; tipografía más grande */
+.o_chatboo_content h3.o_chatboo_result_title,
+.o_chatboo_content h3.pns-result-title.o_chatboo_result_title {
+    margin: 0 !important;
+    font-size: 1.65rem !important;
+    font-weight: 700 !important;
+    line-height: 1.2 !important;
+}
+
+.o_chatboo_content .o_chatboo_grouped_result {
+    margin-top: 0 !important;
+}
+
+.o_chatboo_content .o_chatboo_result_title + .o_chatboo_table_block.o_chatboo_titled_block,
+.o_chatboo_content .o_chatboo_grouped_result > .o_chatboo_table_block.o_chatboo_titled_block:first-of-type {
+    margin-top: 0 !important;
+    margin-bottom: 1.1em;
+}
+
+.o_chatboo_content .o_chatboo_ficha table,
+.o_chatboo_content table.o_chatboo_ficha_table {
+    margin: 0 !important;
+}
+
+/* Links */
+.o_chatboo_content a {
+    color: var(--chatboo-primary);
+    text-decoration: none;
+}
+.o_chatboo_content a:hover {
+    color: var(--chatboo-primary-dark);
+    text-decoration: underline;
+}
+
+/* Horizontal rule */
+.o_chatboo_content hr {
+    border: none;
+    border-top: 1px solid var(--chatboo-border);
+    margin: 1em 0;
+}
+
+/* Charts under server-rendered tables (Chart.js) */
+.o_chatboo_table_block {
+    margin: 0.5em 0 1em 0;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.o_chatboo_block_title {
+    margin: 0 0 0.45em 0 !important;
+}
+
+/* Ficha: título = 1ª fila del thead (pegada a columnas) */
+.o_chatboo_table_block.o_chatboo_titled_block {
+    margin: 0.85em 0 1.1em 0;
+    border: none;
+    background: transparent;
+}
+
+.o_chatboo_table_block .table-responsive.o_chatboo_ficha {
+    margin: 0 !important;
+    border: 1px solid #dde5ec;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.o_chatboo_ficha_table {
+    margin-bottom: 0 !important;
+}
+
+.o_chatboo_ficha_table thead tr.o_chatboo_ficha_title th {
+    border-top: 0;
+    border-bottom: 0;
+    vertical-align: middle;
+}
+
+.o_chatboo_ficha_table thead tr:not(.o_chatboo_ficha_title) th {
+    border-top: 0;
+}
+
+.o_chatboo_table_block .o_chatboo_chart_toolbar {
+    margin-top: 0;
+}
+
+.o_chatboo_chart_toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.35em 0 0.5em 0;
+}
+
+/* Contraste fijo: btn-outline-secondary se pierde sobre fondo blanco del chat. */
+.o_chatboo_chart_toolbar .o_chatboo_chart_toggle {
+    color: #1a1a1a !important;
+    background-color: #f1f3f5 !important;
+    border: 1px solid #6c757d !important;
+    font-weight: 600;
+    opacity: 1 !important;
+}
+
+.o_chatboo_chart_toolbar .o_chatboo_chart_toggle:hover,
+.o_chatboo_chart_toolbar .o_chatboo_chart_toggle:focus {
+    color: #fff !important;
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+}
+
+.o_chatboo_chart_toolbar .o_chatboo_chart_toggle[aria-pressed="true"] {
+    color: #fff !important;
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+}
+
+.o_chatboo_chart_toolbar .o_chatboo_chart_type {
+    width: auto;
+    min-width: 8rem;
+    max-width: 12rem;
+    display: inline-block;
+    color: #1a1a1a;
+    background-color: #fff;
+    border: 1px solid #6c757d;
+}
+
+.o_chatboo_chart_toolbar .o_chatboo_chart_rotate {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    padding: 0.25rem 0.4rem;
+    color: #1a1a1a !important;
+    background-color: #f1f3f5 !important;
+    border: 1px solid #6c757d !important;
+    line-height: 1;
+}
+
+.o_chatboo_chart_toolbar .o_chatboo_chart_rotate:hover,
+.o_chatboo_chart_toolbar .o_chatboo_chart_rotate:focus {
+    color: #fff !important;
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+}
+
+.o_chatboo_chart_toolbar .o_chatboo_chart_rotate svg {
+    display: block;
+}
+
+.o_chatboo_chart_host {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    /* Fallback; JS (applyChartHostHeight) fija altura según series/categorías. */
+    height: 360px;
+    max-height: 640px;
+    margin: 0 0 0.75em 0;
+}
+
+.o_chatboo_chart_host canvas {
+    display: block;
+    /* Chart.js controla el box; max-width:100% deja un init 0×0 aplastado. */
+}
+
+.o_chatboo_chart_host .o_chatboo_echarts_surface {
+    width: 100%;
+    height: 100%;
+    min-height: 280px;
+}
+
+.o_chatboo_table_block .table-responsive.o_chatboo_table_collapsed {
+    display: none;
+}
+
+.o_chatboo_table_block[data-chatboo-show-mode="chart-table"] .o_chatboo_chart_host {
+    margin-bottom: 0.35em;
+}
+
+.o_chatboo_series_stats {
+    margin: 0.35em 0 0.85em;
+    width: 100%;
+    overflow-x: auto;
+}
+.o_chatboo_series_stats table {
+    width: 100%;
+    font-size: 0.85em;
+    margin: 0;
+}
+.o_chatboo_series_stats caption {
+    caption-side: top;
+    text-align: left;
+    font-weight: 600;
+    padding: 0 0 0.35em;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CONTEXT INFO BAR — token counter styling
+   ═══════════════════════════════════════════════════════════════════════ */
+.o_chatboo_context_info {
+    font-family: var(--chatboo-font-mono);
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: #f8f9fa;
+    color: var(--chatboo-text-muted);
+    border: 1px solid #e9ecef;
+    margin-top: 6px;
+}
+.o_chatboo_usage_chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+.o_chatboo_usage_chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    border-radius: 999px;
+    border: 1px solid #e9ecef;
+    background: #fff;
+    line-height: 1.4;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   COPY BUTTON — floating action on messages
+   ═══════════════════════════════════════════════════════════════════════ */
+.o_chatboo_copy_btn {
+    opacity: 0.5;
+    transition: opacity var(--chatboo-transition), transform var(--chatboo-transition);
+}
+
+.o_chatboo_copy_btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.o_chatboo_ts_row {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin-top: 0.5rem;
+}
+
+.o_chatboo_ts_row .o_chatboo_ts {
+    margin-top: 0;
+    min-width: 0;
+}
+
+.o_chatboo_ts_row .o_chatboo_export_bar {
+    margin-inline-start: auto;
+    flex-shrink: 0;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MAP THUMBS + COORDS COPY
+   ═══════════════════════════════════════════════════════════════════════ */
+.o_chatboo_mapthumb {
+    display: inline-block;
+    text-decoration: none;
+    vertical-align: middle;
+}
+.o_chatboo_mapthumb_wrap {
+    position: relative;
+    display: inline-block;
+    line-height: 0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.o_chatboo_mapthumb_tiles_osm .o_chatboo_mapthumb_wrap {
+    border: 2px solid #6aa84f;
+}
+.o_chatboo_mapthumb_tiles_gm .o_chatboo_mapthumb_wrap {
+    border: 2px solid #4285f4;
+}
+.o_chatboo_mapthumb_hybrid .o_chatboo_mapthumb_wrap {
+    border: 2px dashed #4285f4;
+    box-shadow: inset 0 0 0 1px #6aa84f;
+}
+.o_chatboo_mapthumb_badge {
+    position: absolute;
+    inset-inline-end: 3px;
+    bottom: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 3px;
+    color: #fff;
+    background: rgba(33, 37, 41, 0.78);
+    letter-spacing: 0.02em;
+}
+.o_chatboo_mapthumb_gm .o_chatboo_mapthumb_badge {
+    background: rgba(66, 133, 244, 0.92);
+}
+.o_chatboo_mapthumb_osm .o_chatboo_mapthumb_badge {
+    background: rgba(106, 168, 79, 0.92);
+}
+.o_chatboo_mapthumb_hybrid .o_chatboo_mapthumb_badge {
+    background: rgba(66, 133, 244, 0.92);
+}
+
+/* Shared multipin map banner (capa A) — looks like a map, not a bare link */
+.o_chatboo_map_banner {
+    margin: 0.35em 0 0.85em 0;
+}
+.o_chatboo_map_banner_card {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    max-width: 420px;
+    text-decoration: none !important;
+    color: inherit;
+    border: 1px solid #c5d0da;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.o_chatboo_map_banner_card:hover {
+    border-color: #7aa2c4;
+    box-shadow: 0 4px 14px rgba(16, 24, 40, 0.12);
+}
+.o_chatboo_map_banner_preview {
+    position: relative;
+    flex: 0 0 148px;
+    min-height: 88px;
+    background:
+        linear-gradient(160deg, rgba(255,255,255,0.35), rgba(255,255,255,0) 45%),
+        linear-gradient(0deg, rgba(46, 125, 50, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(46, 125, 50, 0.08) 1px, transparent 1px),
+        linear-gradient(135deg, #d7e8d2 0%, #cfe0ef 48%, #e8f0e4 100%);
+    background-size: auto, 18px 18px, 18px 18px, auto;
+}
+.o_chatboo_map_banner_gm .o_chatboo_map_banner_preview {
+    background:
+        linear-gradient(160deg, rgba(255,255,255,0.35), rgba(255,255,255,0) 45%),
+        linear-gradient(0deg, rgba(66, 133, 244, 0.10) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(66, 133, 244, 0.10) 1px, transparent 1px),
+        linear-gradient(135deg, #e8eef8 0%, #d5e3f7 48%, #eef3fa 100%);
+    background-size: auto, 18px 18px, 18px 18px, auto;
+}
+.o_chatboo_map_banner_pins {
+    position: absolute;
+    inset: 8px 6px 4px 6px;
+    width: calc(100% - 12px);
+    height: calc(100% - 12px);
+}
+.o_chatboo_map_banner_meta {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.2rem;
+    padding: 0.65rem 0.85rem;
+    min-width: 0;
+}
+.o_chatboo_map_banner_title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    line-height: 1.25;
+}
+.o_chatboo_map_banner_count {
+    font-size: 0.8rem;
+    color: #5b6b7a;
+}
+.o_chatboo_map_banner_cta {
+    margin-top: 0.15rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #0d6efd;
+}
+.o_chatboo_map_banner_card:hover .o_chatboo_map_banner_cta {
+    text-decoration: underline;
+}
+.o_chatboo_map_banner_thumb {
+    display: inline-block;
+}
+
+/* Link banner — same gesture as the map card (preview + title + CTA) */
+.o_chatboo_link_banner {
+    max-width: 420px;
+}
+.o_chatboo_link_banner_card {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    max-width: 420px;
+    text-decoration: none !important;
+    color: inherit;
+    border: 1px solid #c5d0da;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.o_chatboo_link_banner_card:hover {
+    border-color: #7aa2c4;
+    box-shadow: 0 4px 14px rgba(16, 24, 40, 0.12);
+}
+.o_chatboo_link_banner_preview {
+    position: relative;
+    flex: 0 0 148px;
+    min-height: 88px;
+    background:
+        linear-gradient(160deg, rgba(255,255,255,0.4), rgba(255,255,255,0) 45%),
+        linear-gradient(0deg, rgba(13, 110, 253, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(13, 110, 253, 0.08) 1px, transparent 1px),
+        linear-gradient(135deg, #e8eef8 0%, #d5e3f7 48%, #eef3fa 100%);
+    background-size: auto, 18px 18px, 18px 18px, auto;
+}
+.o_chatboo_link_banner_mark {
+    position: absolute;
+    inset: 8px 6px 4px 6px;
+    width: calc(100% - 12px);
+    height: calc(100% - 12px);
+}
+.o_chatboo_link_banner_meta {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.2rem;
+    padding: 0.65rem 0.85rem;
+    min-width: 0;
+}
+.o_chatboo_link_banner_title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    line-height: 1.25;
+}
+.o_chatboo_link_banner_host {
+    font-size: 0.8rem;
+    color: #5b6b7a;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.o_chatboo_link_banner_cta {
+    margin-top: 0.15rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #0d6efd;
+}
+.o_chatboo_link_banner_card:hover .o_chatboo_link_banner_cta {
+    text-decoration: underline;
+}
+
+/* File banner — same gesture as link/map cards (preview + title + CTA) */
+.o_chatboo_file_banner_list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0.2em 0 0.55em 0;
+    max-width: 420px;
+}
+.o_chatboo_file_banner_card {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    max-width: 420px;
+    text-decoration: none !important;
+    color: inherit;
+    border: 1px solid #c5d0da;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.o_chatboo_file_banner_card:hover {
+    border-color: #7aa2c4;
+    box-shadow: 0 4px 14px rgba(16, 24, 40, 0.12);
+}
+.o_chatboo_file_banner_preview {
+    flex: 0 0 88px;
+    min-height: 88px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    background:
+        linear-gradient(160deg, rgba(255,255,255,0.45), rgba(255,255,255,0) 45%),
+        linear-gradient(135deg, #eef1f5 0%, #e2e8ef 100%);
+    color: #495057;
+}
+.o_chatboo_file_banner_pdf .o_chatboo_file_banner_preview {
+    background:
+        linear-gradient(160deg, rgba(255,255,255,0.5), rgba(255,255,255,0) 45%),
+        linear-gradient(135deg, #fdecea 0%, #f8d7da 100%);
+    color: #b71c1c;
+}
+.o_chatboo_file_banner_excel .o_chatboo_file_banner_preview {
+    background:
+        linear-gradient(160deg, rgba(255,255,255,0.5), rgba(255,255,255,0) 45%),
+        linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+    color: #1b5e20;
+}
+.o_chatboo_file_banner_word .o_chatboo_file_banner_preview {
+    background:
+        linear-gradient(160deg, rgba(255,255,255,0.5), rgba(255,255,255,0) 45%),
+        linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    color: #1565c0;
+}
+.o_chatboo_file_banner_text .o_chatboo_file_banner_preview {
+    background:
+        linear-gradient(160deg, rgba(255,255,255,0.5), rgba(255,255,255,0) 45%),
+        linear-gradient(135deg, #f4f5f7 0%, #e6e8eb 100%);
+    color: #495057;
+}
+.o_chatboo_file_banner_code .o_chatboo_file_banner_preview {
+    background:
+        linear-gradient(160deg, rgba(255,255,255,0.5), rgba(255,255,255,0) 45%),
+        linear-gradient(135deg, #eef2f6 0%, #d9e2ec 100%);
+    color: #37474f;
+}
+.o_chatboo_file_banner_meta {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.2rem;
+    padding: 0.65rem 0.85rem;
+    min-width: 0;
+}
+.o_chatboo_file_banner_title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.o_chatboo_file_banner_size {
+    font-size: 0.8rem;
+    color: #5b6b7a;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.o_chatboo_file_banner_cta {
+    margin-top: 0.15rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #0d6efd;
+}
+.o_chatboo_file_banner_card:hover .o_chatboo_file_banner_cta {
+    text-decoration: underline;
+}
+
+.o_chatboo_svg_cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin: 0.35em 0 0.85em 0;
+}
+.o_chatboo_svg_card {
+    max-width: 420px;
+}
+.o_chatboo_svg_card_btn {
+    display: block;
+    margin: 0;
+    padding: 0;
+    border: 1px solid #c5d0da;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+    cursor: pointer;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.o_chatboo_svg_card_btn:hover {
+    border-color: #7aa2c4;
+    box-shadow: 0 4px 14px rgba(16, 24, 40, 0.12);
+}
+.o_chatboo_svg_card_btn svg {
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
+
+.o_chatboo_coords {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+.o_chatboo_coords_text {
+    font-size: 11px;
+    background: transparent;
+    color: inherit;
+    padding: 0;
+}
+.o_chatboo_cell_copy {
+    border: 0;
+    background: transparent;
+    padding: 0 2px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.45;
+    color: inherit;
+}
+.o_chatboo_cell_copy:hover {
+    opacity: 1;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   EXISTING RULES — original chatboo_floating.css below
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Footer del client action (chat principal) — no mezclar con el widget flotante */
+.o_chatboo_messages {
+    padding-bottom: 1.75rem;
+}
+
+.o_chatboo_main_footer {
+    --o-chatboo-composer-ctrl: 42px;
+    /* JS mirrors CHATBOO_PROMPT_MAX_LINES; keep 10 as CSS fallback. */
+    --o-chatboo-prompt-max-lines: 10;
+    overflow: visible;
+}
+
+.o_chatboo_prompt_wrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* Prompt multilínea: 1 línea por defecto; crece hasta max-lines. */
+.o_chatboo_main_footer textarea.o_chatboo_prompt {
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    min-height: var(--o-chatboo-composer-ctrl);
+    height: var(--o-chatboo-composer-ctrl);
+    /* Safety net: 1.35 = line-height; +16px padding. JS sets precise max-height. */
+    max-height: calc((1.35em * var(--o-chatboo-prompt-max-lines, 10)) + 16px + 2px);
+    resize: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+    line-height: 1.35;
+    padding: 8px 12px;
+    border-radius: 8px;
+    field-sizing: fixed;
+}
+
+.o_chatboo_prompt_resize {
+    position: absolute;
+    inset-inline-start: 50%;
+    bottom: -11px;
+    transform: translateX(-50%);
+    z-index: 3;
+    width: 28px;
+    height: 18px;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 9px !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    font-size: 11px;
+    color: #495057;
+    background: #fff !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.o_chatboo_prompt_resize:hover {
+    color: #212529;
+    background: #f8f9fa !important;
+}
+
+.o_chatboo_prompt_wrap.o_chatboo_prompt_has_toggle {
+    margin-bottom: 10px;
+}
+
+/* TTS / attach / send: cuadrados alineados con la 1.ª línea del prompt. */
+.o_chatboo_main_footer .o_chatboo_composer_btn,
+.o_chatboo_main_footer .o_chatboo_tts_toggle {
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    width: var(--o-chatboo-composer-ctrl);
+    height: var(--o-chatboo-composer-ctrl);
+    min-width: var(--o-chatboo-composer-ctrl);
+    min-height: var(--o-chatboo-composer-ctrl);
+    padding: 0 !important;
+    margin: 0 !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    line-height: 1;
+}
+
+.o_chatboo_tts_toggle {
+    opacity: 1;
+    background-color: #fff !important;
+    border-color: #dee2e6 !important;
+}
+
+.o_chatboo_tts_toggle.o_chatboo_tts_on {
+    background-color: #e8f4fd !important;
+    border-color: #b6d9f5 !important;
+}
+
+.o_chatboo_tts_toggle img {
+    display: block;
+    width: 22px;
+    height: 22px;
+    pointer-events: none;
+    opacity: 0.88;
+}
+
+.o_chatboo_tts_toggle.o_chatboo_tts_on img {
+    opacity: 1;
+}
+
+.o_chatboo_slash.dropdown-menu {
+    display: block;
+    width: auto;
+    min-width: 100%;
+    max-height: calc(2.25rem * 10 + 0.5rem);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: y mandatory;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+#o_chatboo_slash_menu.o_chatboo_slash {
+    max-height: calc(2.25rem * 10 + 0.5rem);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: y mandatory;
+}
+
+.o_chatboo_slash .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    height: 2.25rem;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-align: start;
+    color: #1d1d1d;
+    background-color: transparent;
+    border: 0;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+}
+
+.o_chatboo_slash .o_chatboo_slash_desc {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.o_chatboo_slash .dropdown-item:hover,
+.o_chatboo_slash .dropdown-item:focus {
+    color: #1d1d1d;
+    background-color: rgba(0, 0, 0, 0.04);
+}
+
+/* Estilo O19: check en la fila activa, sin fondo morado en toda la fila */
+.o_chatboo_slash .dropdown-item.active,
+.o_chatboo_slash .dropdown-item:active,
+#o_chatboo_slash_menu .dropdown-item.active,
+#o_chatboo_slash_menu .dropdown-item:active {
+    color: #1d1d1d;
+    background-color: transparent;
+}
+
+.o_chatboo_slash .o_chatboo_slash_check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.1rem;
+    flex-shrink: 0;
+    color: #017e84;
+    font-size: 0.85em;
+    visibility: hidden;
+}
+
+.o_chatboo_slash .dropdown-item.active .o_chatboo_slash_check,
+#o_chatboo_slash_menu .dropdown-item.active .o_chatboo_slash_check {
+    visibility: visible;
+}
+
+.o_chatboo_slash .badge.badge-secondary {
+    background-color: #e9ecef;
+    color: #495057;
+    font-weight: 500;
+}
+
+.o_chatboo_mode_badge {
+    display: inline-block;
+    margin-inline-start: 0.35em;
+    padding: 0.1em 0.45em;
+    font-size: 0.7em;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+    text-transform: lowercase;
+    color: #495057;
+    background: #e9ecef;
+    border-radius: 0.35rem;
+    vertical-align: middle;
+}
+
+
+/* Vista principal de Chatboo (client action) - height/max-height removed; absolute positioning handles bounds */
+.o_chatboo_container {
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow: visible !important;
+}
+
+/* Cabecera del client action (servidor / LLM) */
+.o_chatboo_main_header {
+    flex-shrink: 0;
+}
+
+.o_chatboo_floating_window {
+    position: fixed;
+    bottom: 0;
+    inset-inline-end: 70px; /* Separado del borde inline-end como el Discuss nativo */
+    width: 360px;
+    height: 480px;
+    background-color: white;
+    border-radius: 6px 6px 0 0;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    z-index: 1050; /* Por encima de la mayoría de vistas de Odoo */
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s ease-in-out, height 0.2s;
+}
+
+/* Modo Minimizado - Solo se ve la cabecera en el bottom */
+.o_chatboo_floating_window.o_chatboo_minimized {
+    transform: translateY(calc(100% - 35px)); /* Oculta todo menos los 35px del header */
+}
+
+/* Cabecera (Header) */
+.o_chatboo_header {
+    background-color: var(--chatboo-primary); /* Odoo Enterprise Color, ajustable via --chatboo-primary */
+    color: white;
+    padding: 0 10px;
+    height: 35px;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer; /* Indicar que puede hacer clic para restaurar */
+    user-select: none;
+}
+
+.o_chatboo_title {
+    font-size: 14px;
+}
+
+.o_chatboo_controls button {
+    background: transparent;
+    border: none;
+    color: white;
+    opacity: 0.8;
+    padding: 0 5px;
+}
+
+.o_chatboo_controls button:hover {
+    opacity: 1;
+}
+
+/* Cuerpo (Zona de Mensajes) */
+.o_chatboo_body {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 10px;
+    background-color: var(--chatboo-bg);
+}
+
+/* Input Area (Footer) */
+.o_chatboo_footer {
+    padding: 10px;
+    background-color: white;
+    border-top: 1px solid var(--chatboo-border);
+}
+
+.o_chatboo_footer .o_chatboo_input,
+.o_chatboo_floating_window .o_chatboo_input {
+    min-height: 38px;
+    max-height: 120px;
+    border-radius: 20px;
+    overflow-y: hidden;
+}
+
+.o_chatboo_btn_send {
+    border-radius: 50%;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Parpadeo mágico para avisar al usuario de que la IA terminó */
+@keyframes chatboo_attention_pulse {
+    0% { background-color: var(--chatboo-primary); }
+    50% { background-color: #28a745; }
+    100% { background-color: var(--chatboo-primary); }
+}
+
+.o_chatboo_floating_window.o_chatboo_attention .o_chatboo_header {
+    animation: chatboo_attention_pulse 2s infinite;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   STANDALONE IMAGES — outside tables, natural size within chat
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Standalone images: max 66% of container width, auto height, rounded */
+.o_chatboo_content > img:not(td img),
+.o_chatboo_content > a > img:not(td img),
+.o_chatboo_content > div > img:not(td img),
+.o_chatboo_content > div > a > img:not(td img),
+.o_chatboo_content > p > img,
+.o_chatboo_content > p > a > img,
+.o_chatboo_message img {
+    max-width: 66%;
+    height: auto;
+    border-radius: var(--chatboo-radius);
+    box-shadow: var(--chatboo-shadow);
+    margin: 0.5em 0;
+    display: block;
+    transition: transform var(--chatboo-transition), box-shadow var(--chatboo-transition);
+}
+
+/* Clickable image: pointer + hover zoom hint */
+.o_chatboo_content a[target="_blank"] > img {
+    cursor: pointer;
+}
+.o_chatboo_content a[target="_blank"] > img:hover {
+    transform: scale(1.02);
+    box-shadow: var(--chatboo-shadow-lg);
+}
+
+/* Ensure table images keep their compact inline styles */
+.o_chatboo_content td img {
+    max-width: 100%;
+}
+
+/* ─── Indicador "pensando": tres puntos que laten (CSS puro, sin librería) ───
+   Tamaño fijo en px para que NO herede el font-size grande del contenido. */
+.o_chatboo_typing {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    vertical-align: middle;
+}
+.o_chatboo_typing > span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--chatboo-primary, #00A09D);
+    opacity: 0.35;
+    animation: o_chatboo_typing_bounce 1.2s infinite ease-in-out;
+}
+.o_chatboo_typing > span:nth-child(2) { animation-delay: 0.18s; }
+.o_chatboo_typing > span:nth-child(3) { animation-delay: 0.36s; }
+@keyframes o_chatboo_typing_bounce {
+    0%, 80%, 100% { opacity: 0.3; transform: translateY(0) scale(0.85); }
+    40%           { opacity: 1;   transform: translateY(-4px) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .o_chatboo_typing > span {
+        animation: o_chatboo_typing_fade 1.2s infinite ease-in-out;
+    }
+    @keyframes o_chatboo_typing_fade {
+        0%, 100% { opacity: 0.3; }
+        50%      { opacity: 1; }
+    }
+}
+
+/* ─── Modal de historial de sesiones (diseño portado de O19) ───
+   Modal propio (no el estándar de Bootstrap): ligero, redondeado y con
+   sombra. Se coloca por encima del overlay flotante de Chatboo (z-index 1050). */
+.o_chatboo_session_modal_backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 1060;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 8vh;
+}
+
+.o_chatboo_session_modal {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+    width: min(720px, 92vw);
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.o_chatboo_ack_records {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+}
+.o_chatboo_ack_doc_card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid #b6d4fe;
+    border-left: 3px solid var(--chatboo-primary);
+    border-radius: 10px;
+    background: linear-gradient(180deg, #f7fbff 0%, #eef4ff 100%);
+    color: #0d6efd;
+    text-decoration: none;
+    box-shadow: var(--chatboo-shadow);
+}
+.o_chatboo_ack_doc_card:hover {
+    text-decoration: none;
+    color: #0a58ca;
+    border-color: #86b7fe;
+}
+.o_chatboo_ack_doc_icon {
+    flex: 0 0 28px;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--chatboo-primary);
+}
+.o_chatboo_ack_doc_body {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+.o_chatboo_ack_doc_name {
+    font-size: 0.92em;
+    font-weight: 600;
+    color: var(--chatboo-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.o_chatboo_ack_doc_meta {
+    font-size: 0.72em;
+    color: var(--chatboo-text-muted);
+}
+.o_chatboo_ack_doc_open {
+    flex: 0 0 auto;
+    font-size: 0.78em;
+    opacity: 0.7;
+}
+.o_chatboo_ack_related {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.o_chatboo_ack_chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border: 1px solid #b6d4fe;
+    border-radius: 6px;
+    background: #eef4ff;
+    color: #0d6efd;
+    font-size: 0.78em;
+    max-width: 240px;
+    text-decoration: none;
+}
+.o_chatboo_ack_chip:hover {
+    text-decoration: none;
+    color: #0a58ca;
+}

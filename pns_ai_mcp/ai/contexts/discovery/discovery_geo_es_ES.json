@@ -1,0 +1,21 @@
+{
+  "code": "discovery_geo_es_ES",
+  "tipo": "discovery",
+  "locale": "es_ES",
+  "target": "geo",
+  "priority": 75,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "mapa",
+    "mapas",
+    "coordenadas",
+    "latitud",
+    "longitud",
+    "pins en el mapa",
+    "ruta en mapa",
+    "tour geografico",
+    "tour geográfico",
+    "ubicaciones en mapa"
+  ]
+}

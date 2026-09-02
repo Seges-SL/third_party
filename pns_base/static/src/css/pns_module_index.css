@@ -1,0 +1,13 @@
+/* iframe of the module index inside the Apps standard sheet */
+.pns_module_index,
+.o_field_widget.pns_module_index {
+    display: block;
+    width: 100%;
+}
+.pns_module_index_iframe {
+    width: 100%;
+    min-height: 80vh;
+    border: 0;
+    display: block;
+    background: #fff;
+}

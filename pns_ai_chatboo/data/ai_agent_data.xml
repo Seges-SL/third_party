@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Baseline composition. required_context_codes (self_chatboo,
+         presentation_grids, ui_focus) cannot be unlinked from this agent. Other modules may still
+         bundle.link / bundle.unlink the rest of the dynamic bundle.
+         See pns_ai_mcp docs/decisions/knowledge_bundle_crud.md -->
+    <record id="ai_agent_chatboo" model="ai.agent">
+        <field name="name">Chatboo</field>
+        <field name="code">pns_ai_chatboo</field>
+        <field name="sequence">1</field>
+        <field name="agent_type">inference</field>
+        <field name="origin">module</field>
+        <field name="module_name">pns_ai_chatboo</field>
+        <!-- Minimal pull: MCP nucleus + own UI/identity. Geo, ACL and
+             client packs pin themselves. Core system_prompt is automatic. -->
+        <field name="default_context_codes">@pns_ai_mcp
+@pns_ai_chatboo</field>
+        <field name="required_context_codes">self_chatboo
+presentation_grids
+ui_focus</field>
+        <field name="default_skill_codes">@pns_ai_chatboo</field>
+        <field name="description">Conversational AI assistant integrated in the Odoo backend.
+Provides a chat interface for natural-language queries, tool execution,
+and skill-based procedures (slash commands).
+Baseline knowledge: @pns_ai_mcp + @pns_ai_chatboo.</field>
+    </record>
+</odoo>

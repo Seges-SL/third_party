@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Archivo: views/assets.xml
+    Descripción: Assets JavaScript para Odoo 14 ÚNICAMENTE.
+    Este archivo es cargado dinámicamente SOLO en Odoo 14 por compat.py.
+    En Odoo 17+, los assets se declaran en __manifest__.py > assets > web.assets_backend.
+
+    Los archivos _v14.js son copias de los archivos originales escritos con odoo.define()
+    para la web legacy framework de Odoo 14.
+-->
+<odoo>
+    <template id="assets_backend" inherit_id="web.assets_backend">
+        <xpath expr="." position="inside">
+            <link rel="stylesheet" type="text/css" href="/pns_ai_mcp/static/src/css/mcp_log_tree.css"/>
+            <link rel="stylesheet" type="text/css" href="/pns_ai_mcp/static/src/css/mcp_context.css"/>
+            <link rel="stylesheet" type="text/css" href="/pns_ai_mcp/static/src/css/mcp_rtl.css"/>
+            <link rel="stylesheet" type="text/css" href="/pns_ai_mcp/static/src/css/mcp_context_list.css"/>
+            <link rel="stylesheet" type="text/css" href="/pns_ai_mcp/static/src/css/pns_list.css"/>
+            <!-- Vendor libs -->
+            <script type="text/javascript" src="/pns_ai_mcp/static/src/js/showdown.js"/>
+            <script type="text/javascript" src="/pns_ai_mcp/static/src/js/jspdf.umd.min.js"/>
+            <script type="text/javascript" src="/pns_ai_mcp/static/src/js/xlsx.full.min.js"/>
+            <!-- Widgets (v14) -->
+            <script type="text/javascript" src="/pns_ai_mcp/static/src/js/mcp_api_key_widget_v14.js"/>
+            <script type="text/javascript" src="/pns_ai_mcp/static/src/js/pns_html_readonly_widget_v14.js"/>
+            <script type="text/javascript" src="/pns_ai_mcp/static/src/js/mcp_iso_datetime_widget_v14.js"/>
+            <script type="text/javascript" src="/pns_ai_mcp/static/src/js/mcp_json_compressed_widget_v14.js"/>
+            <script type="text/javascript" src="/pns_ai_mcp/static/src/js/context_window_combo_v14.js"/>
+            <script type="text/javascript" src="/pns_ai_mcp/static/src/js/mcp_log_form_v14.js"/>
+            <script type="text/javascript" src="/pns_ai_mcp/static/src/js/ai_agent_origin_filter_v14.js"/>
+            <!-- Tree views with Operations button (v14) -->
+            <script type="text/javascript" src="/pns_ai_mcp/static/src/js/ai_agent_tree_v14.js"/>
+            <script type="text/javascript" src="/pns_ai_mcp/static/src/js/ai_provider_tree_v14.js"/>
+            <script type="text/javascript" src="/pns_ai_mcp/static/src/js/mcp_user_tree_v14.js"/>
+            <script type="text/javascript" src="/pns_ai_mcp/static/src/js/mcp_context_tree_v14.js"/>
+            <script type="text/javascript" src="/pns_ai_mcp/static/src/js/mcp_skill_tree_v14.js"/>
+            <script type="text/javascript" src="/pns_ai_mcp/static/src/js/mcp_log_tree_v14.js"/>
+            <script type="text/javascript" src="/pns_ai_mcp/static/src/js/whitelist_tree_v14.js"/>
+            <script type="text/javascript" src="/pns_ai_mcp/static/src/js/external_server_tree_v14.js"/>
+            <script type="text/javascript" src="/pns_ai_mcp/static/src/js/safe_operation_tree_v14.js"/>
+        </xpath>
+    </template>
+
+
+
+</odoo>

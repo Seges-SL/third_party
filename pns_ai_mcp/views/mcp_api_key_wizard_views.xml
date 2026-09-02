@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Archivo: views/mcp_api_key_wizard_views.xml
+    Creado: 2025-11-16 04:10:00
+    Modificado: 2025-11-26 07:01:12
+    Descripción: Vistas para wizard de regeneración de API keys MCP
+-->
+<odoo>
+    <!-- Acción para abrir wizard -->
+    <record id="action_mcp_api_key_wizard" model="ir.actions.act_window">
+        <field name="name">Generate AI API Key</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">pns_ai_mcp.api_key_wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Vista del wizard -->
+    <record id="view_mcp_api_key_wizard_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.api_key_wizard.form</field>
+        <field name="model">pns_ai_mcp.api_key_wizard</field>
+        <field name="arch" type="xml">
+            <form string="Generate AI API Key">
+                <field name="has_api_key" invisible="1"/>
+                <field name="is_clear" invisible="1"/>
+                <field name="is_import" invisible="1"/>
+
+                <!-- Panel "cópiala ahora": la clave se muestra UNA sola vez -->
+                <div attrs="{'invisible': [('generated_key', '=', False)]}">
+                    <div class="alert alert-success" role="alert">
+                        <h5>✅ API Key generated</h5>
+                        <p><strong>Copy it now.</strong> For security it is stored only as a
+                        hash: it will <strong>not</strong> be shown again. If you lose it,
+                        generate a new one.</p>
+                    </div>
+                    <group>
+                        <field name="generated_key"
+                               nolabel="1"
+                               widget="mcp_api_key_display"
+                               readonly="1"/>
+                    </group>
+                </div>
+
+                <!-- Flujo normal (generar / importar / borrar): oculto tras generar -->
+                <div attrs="{'invisible': [('generated_key', '!=', False)]}">
+                    <!-- Alerta cuando se va a eliminar (rojo) -->
+                    <div attrs="{'invisible': [('is_clear', '=', False)]}">
+                        <div class="alert alert-danger" role="alert" style="background-color: #f8d7da; border-color: #f5c6cb; color: #721c24;">
+                            <h5 style="color: #721c24;">⚠️ Advertencia</h5>
+                            <p><strong>The API key for this user will be deleted.</strong></p>
+                            <p>The user will not be able to use the MCP server until a new key is generated.</p>
+                        </div>
+                    </div>
+
+                    <!-- Alerta cuando ya existe una key y se va a regenerar (naranja) -->
+                    <div attrs="{'invisible': ['|', ('has_api_key', '=', False), ('is_clear', '=', True)]}">
+                        <div class="alert alert-warning" role="alert" style="background-color: #fff3cd; border-color: #ffeaa7; color: #856404;">
+                            <h5 style="color: #856404;">⚠️ Advertencia</h5>
+                            <p><strong>This user already has an API key configured.</strong></p>
+                            <p>Generating a new key will immediately invalidate the existing key.</p>
+                            <p>The user will not be able to use the MCP server until they update the new key.</p>
+                        </div>
+                    </div>
+
+                    <!-- Mensaje informativo cuando no hay key (celeste) -->
+                    <div attrs="{'invisible': ['|', ('has_api_key', '=', True), ('is_clear', '=', True)]}">
+                        <div class="alert alert-info" role="alert" style="background-color: #d1ecf1; border-color: #bee5eb; color: #0c5460;">
+                            <h5 style="color: #0c5460;">ℹ️ Information</h5>
+                            <p>No API key exists for this user.</p>
+                            <p>Genera una nueva clave o importa una existente de otra instancia.</p>
+                        </div>
+                    </div>
+
+                    <group>
+                        <field name="mcp_user_id" readonly="1"/>
+                        <!-- Campo de importación manual: solo visible en modo importar -->
+                        <field name="manual_key"
+                               attrs="{'invisible': [('is_import', '=', False)], 'required': [('is_import', '=', True)]}"
+                               password="False"
+                               placeholder="Paste the API key from another instance here..."/>
+                        <field name="confirmed" string="I understand and confirm this action"/>
+                    </group>
+                </div>
+
+                <!-- Botones de acción -->
+                <footer>
+                    <button string="Generate Key"
+                            name="action_generate"
+                            type="object"
+                            class="btn-primary"
+                            attrs="{'invisible': ['|', '|', ('generated_key', '!=', False), ('confirmed', '=', False), '|', ('is_clear', '=', True), ('is_import', '=', True)]}"/>
+                    <button string="Import existing Key"
+                            name="action_generate"
+                            type="object"
+                            class="btn-primary"
+                            attrs="{'invisible': ['|', '|', ('generated_key', '!=', False), ('confirmed', '=', False), ('is_import', '=', False)]}"/>
+                    <button string="Delete Key"
+                            name="action_generate"
+                            type="object"
+                            class="btn-danger"
+                            attrs="{'invisible': ['|', '|', ('generated_key', '!=', False), ('confirmed', '=', False), ('is_clear', '=', False)]}"/>
+                    <button string="Done"
+                            class="btn-primary"
+                            special="cancel"
+                            attrs="{'invisible': [('generated_key', '=', False)]}"/>
+                    <button string="Cancel"
+                            class="btn-secondary"
+                            special="cancel"
+                            attrs="{'invisible': [('generated_key', '!=', False)]}"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>
+

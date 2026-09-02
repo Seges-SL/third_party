@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Import domain contexts authored in pns_ai_chatboo (e.g. self identity). -->
+<odoo>
+    <data noupdate="0">
+        <function model="ai.context" name="_import_all_from_module" eval="[True, 'pns_ai_chatboo']"/>
+    </data>
+</odoo>

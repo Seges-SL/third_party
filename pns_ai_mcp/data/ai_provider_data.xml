@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- First-install LLM shells. No API keys. Not linked to Chatboo.
+     Loaded from post_init_hook only (not manifest data:). A -u of an
+     already-installed engine does not create these xmlids.
+     noupdate=1: the admin may change endpoint/model after install. -->
+<odoo noupdate="1">
+
+    <record id="provider_openrouter" model="ai.provider">
+        <field name="name">OpenRouter</field>
+        <field name="protocol">openai</field>
+        <field name="endpoint">https://openrouter.ai/api/v1/chat/completions</field>
+        <field name="temperature">0.4</field>
+        <field name="footmode">foot-verbose</field>
+        <field name="painter">painter-local</field>
+        <field name="context_window">262144</field>
+        <field name="is_on_premise" eval="False"/>
+    </record>
+    <record id="provider_openrouter_model" model="ai.provider.model">
+        <field name="name">x-ai/grok-4.5</field>
+        <field name="provider_id" ref="provider_openrouter"/>
+    </record>
+    <record id="provider_openrouter" model="ai.provider">
+        <field name="model_id" ref="provider_openrouter_model"/>
+    </record>
+
+    <record id="provider_ovh" model="ai.provider">
+        <field name="name">OVH</field>
+        <field name="protocol">openai</field>
+        <field name="endpoint">https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions</field>
+        <field name="temperature">0.7</field>
+        <field name="footmode">foot-verbose</field>
+        <field name="painter">painter-local</field>
+        <field name="context_window">131072</field>
+        <field name="is_on_premise" eval="False"/>
+    </record>
+    <record id="provider_ovh_model" model="ai.provider.model">
+        <field name="name">Qwen3.6-27B</field>
+        <field name="provider_id" ref="provider_ovh"/>
+    </record>
+    <record id="provider_ovh" model="ai.provider">
+        <field name="model_id" ref="provider_ovh_model"/>
+    </record>
+
+    <record id="provider_lemonade" model="ai.provider">
+        <field name="name">Lemonade</field>
+        <field name="protocol">openai</field>
+        <field name="endpoint">http://localhost:13305/api/v1/chat/completions</field>
+        <field name="temperature">0.3</field>
+        <field name="footmode">foot-laconic</field>
+        <field name="painter">painter-local</field>
+        <field name="context_window">131072</field>
+        <field name="is_on_premise" eval="True"/>
+    </record>
+
+    <record id="provider_ollama" model="ai.provider">
+        <field name="name">Ollama</field>
+        <field name="protocol">openai</field>
+        <field name="endpoint">http://localhost:11434/v1/chat/completions</field>
+        <field name="temperature">0.3</field>
+        <field name="footmode">foot-laconic</field>
+        <field name="painter">painter-local</field>
+        <field name="context_window">131072</field>
+        <field name="is_on_premise" eval="True"/>
+    </record>
+
+</odoo>

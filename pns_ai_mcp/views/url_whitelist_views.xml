@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Safe Plan URL Whitelist — CRUD de dominios de confianza para fetch_url.
+    Dominios aquí = 🟢 (fast-track). Dominios fuera = 🔴 (cooldown 5s + warning).
+-->
+<odoo>
+    <record id="view_url_whitelist_tree" model="ir.ui.view">
+        <field name="name">ai.url.whitelist.tree</field>
+        <field name="model">ai.url.whitelist</field>
+        <field name="arch" type="xml">
+            <tree string="URL Whitelist" class="o_pns_list">
+                <field name="domain" placeholder="api.example.com" optional="show"/>
+                <field name="kind" optional="show"/>
+                <field name="active" optional="show"/>
+                <field name="valid_from" optional="show"/>
+                <field name="valid_until" optional="show"/>
+                <field name="notes" optional="show"/>
+                <field name="added_by" optional="show"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_url_whitelist_form" model="ir.ui.view">
+        <field name="name">ai.url.whitelist.form</field>
+        <field name="model">ai.url.whitelist</field>
+        <field name="arch" type="xml">
+            <form string="URL Whitelist Entry">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="domain" placeholder="api.example.com"/>
+                            <field name="kind"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="valid_from"/>
+                            <field name="valid_until"/>
+                            <field name="added_by"/>
+                            <field name="create_date"/>
+                        </group>
+                    </group>
+                    <group string="Notes">
+                        <field name="notes" nolabel="1" placeholder="Why is this domain trusted?"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_url_whitelist_search" model="ir.ui.view">
+        <field name="name">ai.url.whitelist.search</field>
+        <field name="model">ai.url.whitelist</field>
+        <field name="arch" type="xml">
+            <search string="URL Whitelist">
+                <field name="domain"/>
+                <filter name="active" string="Active" domain="[('active', '=', True)]"/>
+                <filter name="inactive" string="Inactive" domain="[('active', '=', False)]"/>
+                <separator/>
+                <filter name="kind_web" string="Web" domain="[('kind', '=', 'web')]"/>
+                <filter name="kind_mcp" string="MCP" domain="[('kind', '=', 'mcp')]"/>
+                <filter name="kind_openapi" string="OpenAPI" domain="[('kind', '=', 'openapi')]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_url_whitelist" model="ir.actions.act_window">
+        <field name="name">Whitelist</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">ai.url.whitelist</field>
+        <field name="view_mode">tree,form</field>
+        <field name="context">{'search_default_active': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Add a trusted domain</p>
+            <p>Global list of domains allowed for AI URL queries. Under Whitelist only
+               policy, only listed domains are accessible to regular users.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_url_whitelist"
+              name="Whitelist"
+              parent="pns_ai_mcp.menu_ai_connections"
+              action="action_url_whitelist"
+              sequence="20"
+              groups="pns_ai_mcp.group_ai_admin"/>
+</odoo>

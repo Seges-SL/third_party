@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="fx_source_er_api" model="ai.fx.source">
+        <field name="name">Open Exchange Rates (er-api)</field>
+        <field name="url">https://open.er-api.com/v6/latest/USD</field>
+        <field name="sequence">10</field>
+        <field name="active" eval="True"/>
+    </record>
+    <record id="fx_source_frankfurter" model="ai.fx.source">
+        <field name="name">Frankfurter</field>
+        <field name="url">https://api.frankfurter.app/latest?from=USD</field>
+        <field name="sequence">20</field>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>

@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Discover contexts (context_type=discovery): read-only routing index. -->
+
+    <record id="view_ai_discover_context_tree" model="ir.ui.view">
+        <field name="name">ai.context.discover.tree</field>
+        <field name="model">ai.context</field>
+        <field name="arch" type="xml">
+            <tree string="Domain Discovery" create="false" delete="1" edit="false"
+                  class="o_pns_list">
+                <field name="discovery_priority" optional="show"/>
+                <field name="code" optional="show"/>
+                <field name="locale" optional="show"/>
+                <field name="discovery_target_kind" optional="show"/>
+                <field name="discovery_target" optional="show"/>
+                <field name="discovery_triggers" optional="show"/>
+                <field name="discovery_soft_depends" optional="show"/>
+                <field name="source_module" optional="show"/>
+                <field name="active" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_ai_discover_context_search" model="ir.ui.view">
+        <field name="name">ai.context.discover.search</field>
+        <field name="model">ai.context</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="code"/>
+                <field name="locale"/>
+                <field name="discovery_target"/>
+                <field name="discovery_triggers"/>
+                <separator/>
+                <filter name="locale_all" string="All locales"
+                        domain="[(1, '=', 1)]"/>
+                <filter name="locale_none" string="No locale"
+                        domain="['|', ('locale', '=', False), ('locale', '=', '')]"/>
+                <filter name="my_locale" string="My language (Locale)"
+                        domain="['|', ('locale', '=', False),
+                                 ('locale', '=', context.get('lang', 'en_US'))]"/>
+                <separator/>
+                <filter name="active" string="Active"
+                        domain="[('active', '=', True)]"/>
+                <filter name="inactive" string="Inactive"
+                        domain="[('active', '=', False)]"/>
+                <separator/>
+                <filter name="group_locale" string="Locale"
+                        context="{'group_by': 'locale'}"/>
+                <filter name="group_target_kind" string="Discovery target kind"
+                        context="{'group_by': 'discovery_target_kind'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_ai_domain_discovery" model="ir.actions.act_window">
+        <field name="name">Domain Discovery</field>
+        <field name="res_model">ai.context</field>
+        <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="view_ai_discover_context_tree"/>
+        <field name="search_view_id" ref="view_ai_discover_context_search"/>
+        <field name="domain">[('context_type', '=', 'discovery')]</field>
+        <field name="context">{'create': False, 'edit': False}</field>
+    </record>
+
+    <menuitem id="menu_ai_domain_discovery"
+              name="Domain Discovery"
+              parent="pns_ai_mcp.menu_ai_knowledge"
+              action="action_ai_domain_discovery"
+              sequence="7"
+              groups="pns_ai_mcp.group_ai_admin"/>
+
+</odoo>

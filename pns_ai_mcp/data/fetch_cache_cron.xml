@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Purga las entradas caducadas de la caché de fetch_url inmutable.
+         Las lecturas ya ignoran lo caducado; esto solo evita que la tabla crezca.
+         Stack owl1 (Odoo 13/14): usa numbercall/doall (existen en esta versión). -->
+    <record id="ir_cron_ai_fetch_cache_gc" model="ir.cron">
+        <field name="name">AI: purge expired fetch_url cache</field>
+        <field name="model_id" ref="model_ai_fetch_cache"/>
+        <field name="state">code</field>
+        <field name="code">model.gc_expired()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="numbercall">-1</field>
+        <field name="doall" eval="False"/>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>

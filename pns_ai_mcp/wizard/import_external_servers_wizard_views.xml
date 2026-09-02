@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_import_external_servers_wizard_form" model="ir.ui.view">
+        <field name="name">pns.ai.mcp.import.external.servers.wizard.form</field>
+        <field name="model">pns_ai_mcp.import_external_servers_wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import External MCP Servers">
+                <sheet>
+                    <div class="alert alert-info" role="alert" >
+                        <p>Upload a JSON file exported from another instance.</p>
+                        <p>If "Replace existing" is checked, servers with the same code will be updated.</p>
+                    </div>
+                    <group >
+                        <field name="json_file" filename="filename"/>
+                        <field name="filename" invisible="1"/>
+                        <field name="replace_existing"/>
+                    </group>
+</sheet>
+                <footer>
+                    <button name="action_import" string="Import" type="object" class="btn-primary" />
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+</footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_import_external_servers_wizard" model="ir.actions.act_window">
+        <field name="name">Import External MCP Servers (JSON)</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">pns_ai_mcp.import_external_servers_wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

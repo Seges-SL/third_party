@@ -1,0 +1,246 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* pns_base
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-06-13 12:00+0000\n"
+"PO-Revision-Date: 2026-06-13 12:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: es_ES\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+
+#. module: pns_base
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid "Operation result"
+msgstr "Resultado de la operación"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_html
+msgid "Result"
+msgstr "Resultado"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid "Close"
+msgstr "Cerrar"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_created
+msgid "Created"
+msgstr "Creados"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_updated
+msgid "Updated"
+msgstr "Actualizados"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_skipped
+msgid "Skipped"
+msgstr "Omitidos"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_removed
+msgid "Removed"
+msgstr "Eliminados"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_linked
+msgid "Linked"
+msgstr "Vinculados"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_manifest
+msgid "Manifest"
+msgstr "Manifiesto"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_errors
+msgid "Errors"
+msgstr "Errores"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_warnings
+msgid "Warnings"
+msgstr "Advertencias"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_detail
+msgid "Details"
+msgstr "Detalles"
+
+#. module: pns_base
+#: model:ir.model.fields.selection,name:pns_base.selection__pns_operation_report_wizard__result_status__success
+msgid "Success"
+msgstr "Éxito"
+
+#. module: pns_base
+#: model:ir.model.fields.selection,name:pns_base.selection__pns_operation_report_wizard__result_status__warning
+msgid "Warning"
+msgstr "Aviso"
+
+#. module: pns_base
+#: model:ir.model.fields.selection,name:pns_base.selection__pns_operation_report_wizard__result_status__danger
+msgid "Danger"
+msgstr "Peligro"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_ir_module_module__pns_index_url
+msgid "Index"
+msgstr "Index"
+
+#. module: pns_base
+#: model:ir.model.fields,help:pns_base.field_ir_module_module__pns_index_url
+msgid "Local Apps index (static/description/index.html) when the module ships one."
+msgstr "Index local de Apps (static/description/index.html) si el módulo lo trae."
+
+#. module: pns_base
+#. openerp-web
+#: code:addons/pns_base/static/src/js/pns_invalid_fields_dedupe.js:0
+msgid "Required field: %s"
+msgstr "Campo obligatorio: %s"
+
+#. module: pns_base
+#. openerp-web
+#: code:addons/pns_base/static/src/js/pns_invalid_fields_dedupe.js:0
+msgid "Required fields: %s"
+msgstr "Campos obligatorios: %s"
+
+#. module: pns_base
+#: code:addons/pns_base/utils/settings_io.py:0
+msgid "Invalid backup file: expected a settings object."
+msgstr "Archivo de copia de seguridad no válido: se esperaba un objeto de ajustes."
+
+#. module: pns_base
+#: code:addons/pns_base/utils/settings_io.py:0
+msgid "Unknown setting '%s' skipped."
+msgstr "Ajuste desconocido '%s' omitido."
+
+#. module: pns_base
+#: code:addons/pns_base/utils/settings_io.py:0
+msgid "Could not apply setting '%s'; skipped."
+msgstr "No se pudo aplicar el ajuste '%s'; se omitió."
+
+#. module: pns_base
+#: code:addons/pns_base/utils/settings_io.py:0
+msgid "Invalid backup file: expected a JSON object."
+msgstr "Archivo de copia de seguridad no válido: se esperaba un objeto JSON."
+
+#. module: pns_base
+#: code:addons/pns_base/utils/settings_io.py:0
+msgid "Backup file has no 'settings' section."
+msgstr "El archivo de copia de seguridad no tiene sección 'settings'."
+
+#. module: pns_base
+#: code:addons/pns_base/utils/settings_io.py:0
+msgid "Could not read settings fields; nothing was imported."
+msgstr "No se pudieron leer los campos de ajustes; no se importó nada."
+
+#. module: pns_base
+#: code:addons/pns_base/utils/settings_io.py:0
+msgid "Could not read current settings; applying file values only."
+msgstr "No se pudieron leer los ajustes actuales; se aplican solo los del archivo."
+
+#. module: pns_base
+#: model:ir.model,name:pns_base.model_pns_export_file_wizard
+msgid "Export file result wizard"
+msgstr "Asistente de resultado de exportación"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_export_file_wizard__attachment_id
+msgid "Attachment"
+msgstr "Adjunto"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_export_file_wizard__export_filename
+msgid "File name"
+msgstr "Nombre de archivo"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_export_file_wizard_form
+msgid "Export"
+msgstr "Exportar"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_export_file_wizard_form
+msgid "Download"
+msgstr "Descargar"
+
+#. module: pns_base
+#: code:addons/pns_base/models/export_file_wizard.py:0
+msgid "No file available for download."
+msgstr "No hay archivo disponible para descargar."
+
+#. module: pns_base
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "Unknown field '%s' skipped."
+msgstr "Campo desconocido '%s' omitido."
+
+#. module: pns_base
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "Invalid value for '%s' skipped."
+msgstr "Valor no válido para '%s'; se omitió."
+
+#. module: pns_base
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "Expected a JSON object for a record; skipped."
+msgstr "Se esperaba un objeto JSON para el registro; se omitió."
+
+#. module: pns_base
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "ZIP file does not contain any .json files."
+msgstr "El ZIP no contiene ningún archivo .json."
+
+#. module: pns_base
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "File '%s' in ZIP has unexpected format, skipped."
+msgstr "El archivo '%s' del ZIP tiene un formato inesperado; se omitió."
+
+#. module: pns_base
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "File '%s' in ZIP could not be parsed: %s"
+msgstr "No se pudo interpretar el archivo '%s' del ZIP: %s"
+
+#. module: pns_base
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "No valid JSON data found in the ZIP file."
+msgstr "No se encontraron datos JSON válidos en el ZIP."
+
+#. module: pns_base
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "File is neither valid JSON nor a ZIP archive: %s"
+msgstr "El archivo no es JSON válido ni un ZIP: %s"
+
+#. module: pns_base
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "JSON contained a single object; wrapped into a list."
+msgstr "El JSON contenía un solo objeto; se envolvió en una lista."
+
+#. module: pns_base
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "Expected a JSON array, got %s."
+msgstr "Se esperaba un array JSON, se recibió %s."
+
+#. module: pns_base
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "Export completed successfully."
+msgstr "Exportación completada correctamente."
+
+#. module: pns_base
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "Click \"Download\" to choose where to save the file."
+msgstr "Pulsa «Descargar» para elegir dónde guardar el archivo."
+
+#. module: pns_base
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "Records exported"
+msgstr "Registros exportados"

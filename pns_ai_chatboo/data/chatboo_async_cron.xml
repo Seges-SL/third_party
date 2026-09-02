@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Red de seguridad de la cola asíncrona de Chatboo: reclama jobs colgados
+         (worker muerto tras reinicio) y purga los terminados antiguos. Esto es
+         lo que hace la cola resistente a caídas, no solo a la navegación.
+         Stack owl1 (Odoo 13/14): usa numbercall/doall (existen en esta versión). -->
+    <record id="ir_cron_chatboo_async_maintenance" model="ir.cron">
+        <field name="name">Chatboo: async queue maintenance</field>
+        <field name="model_id" ref="model_chatboo_async_request"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_maintenance()</field>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="numbercall">-1</field>
+        <field name="doall" eval="False"/>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>

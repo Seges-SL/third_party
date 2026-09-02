@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <metadata>
+        <code>presentation_grids</code>
+        <tipo>domain</tipo>
+        <description>Chatboo table presentation — soft pastels, pijama, quartiles/terciles, readable text colours</description>
+        <version>1.35</version>
+    </metadata>
+
+    <domain_knowledge>
+# Table presentation (grids)
+
+When the user asks to restyle a multi-row table (pijama / zebra, pastels,
+quartiles, terciles, bold highlights, …), keep **structured rows** and let the
+**server** render the HTML. Do not hand-build HTML tables for homogeneous data.
+
+## Contract (structured rows)
+- Row background: `_row_color` = soft pastel hex (e.g. `#eef2f8`).
+- Cell text colour: `_color_&lt;ColumnKey&gt;` with keys matching the visible column
+  name exactly (e.g. `_color_Saldo`).
+- Optional emphasis: `_style_&lt;ColumnKey&gt;` (e.g. `font-weight:bold`) and/or
+  `_class_&lt;ColumnKey&gt;`.
+- Optional hover tip: `_title_&lt;ColumnKey&gt;` = plain text shown as a Chatboo
+  pastel-yellow tooltip (`data-tip`, black text). No HTML inside the tip.
+- Group / table header pastel: optional `title_bg` (or `header_bg`) = soft hex
+  on each entry of `tables` / `groups` / `sections` (same family as row pastels).
+- Prefer transforming `raw_data` / `previous_result` when only presentation
+  changes (same rows, same scope). Never hardcode a new list of dicts with
+  invented amounts — restyle in place (`apply_pajama_coloring(raw_data)` then
+  `result = {'data': raw_data}`). Prefer one relaxaicode that queries AND
+  styles together.
+
+## Table vs list
+Tables only when each entity has two or more numeric/date/currency attributes.
+Each entity = one ROW, each attribute = one COLUMN. Max 5 columns.
+Simple enumerations (names, items) → bullet list, never a table.
+Explanations and recommendations → plain paragraphs.
+WRONG: `| Item1 | Item2 | Item3 |` (entities as columns).
+RIGHT: `- Item A` / `- Item B` (one bullet per item).
+
+## Presentation axes (Chatboo)
+Three tokens, slash = value. This block is the Chatboo painter contract.
+
+**painter:** `painter-local` (Chatboo composes HTML tables/charts FROM structured
+rows; AFTER a server table this turn, write at most a short footer) or
+`painter-free` (you own the entire bubble). Under painter-free: footmode and
+showmode are suspended; narrative/greetings/captions are prose, never a pipe
+or HTML table; a drawing the user asked for is SVG markup (Chatboo files it —
+leftover text stays prose); native Chatboo table/chart blocks ONLY if THIS
+turn has real rows/series you embed. When there is NO server table this turn:
+greetings stay prose; time/date follows this context; other single facts may
+use `result = {'card': {…}}` (`fact` / `link`).
+
+**footmode:** `foot-verbose` (warm footer after local tables) or `foot-laconic`
+(no footer).
+
+**showmode:** `show-table` or `show-chart` (session layout under painter-local;
+optional result `show_mode` show-chart / table / dashboard). Do not use
+`laconic_mode`, `formatting_mode`, `/report`, `/table`, table-chart, or
+chart-table.
+
+**DATA PLOTS:** structured `data` rows; Chatboo hydrates ECharts (user clicks
+"Gráfico") under painter-local. Do not hand-draw bar/line/pie geometry. Do
+not emit SVG paths for those plots. A drawing the user asked for is not a
+data plot: emit the SVG; Chatboo stores it as a session file. SINGLE-FACT
+CARD: `fact` / `link` via `result = {'card': {…}}`. SVG is eyes-only; asked
+facts must be text. Under painter-free you MAY embed `formatted_text` native
+blocks (`data-chatboo-dataset` / `data-chatboo-card`) only when THIS turn has
+real rows/series.
+
+**RENDERED DATA FOOTER:** when the tool result has `data_rendered=true`, the
+visible HTML table is the source of truth. Default closing prose: a warm
+sign-off (1–2 short sentences). Do not re-list every row.
+
+**NO ECHO:** do not paste a previous assistant reply (HTML tables,
+`o_chatboo_table_block` / `data-chatboo-dataset`) into the new bubble.
+
+**DELIVERY under painter-local:** listing / ranking / chart / dashboard / map
+→ structured rows and `return_mode=direct_to_user` (or `__return_direct__`).
+Explanation / report → `return_mode=inspect_result` and a Markdown report;
+do not push a server table first unless the user also asked for the listing.
+Ambiguous table vs chart vs dashboard: pick `show_mode` yourself — do not
+ask the user.
+
+## Client file export
+When the user names a known download format (**PDF**, **Excel** / xlsx,
+**Word**, **txt**, **Markdown**, **HTML**), the server attaches a **download card**
+on the session (same box as a clipboard, a manual attach, or a Sesame
+file). Do not call tools to build the file.
+
+Never call `propose_safe_operations` and never create `ir.attachment`
+for a named download — that is caja B, not the session history.
+Never import `reportlab` or `openpyxl` in RelaxAICode.
+
+Return structured rows (`data`) and set `__title__` to a short phrase
+in the user's language (Locale in the header, as with `self`) that
+names the **content** — not a copy of the prompt. The server slugs
+that title for the filename and uses it as the interior heading
+(PDF / Word / Markdown / HTML). Optional: `__filename_stem__` (slug, no
+extension) if the title would make an ugly file name;
+`__sheet_caption__` (one line above a **single** Excel sheet; omit it
+when the document name is enough); `__column_labels__` (map column
+key → visible header). Column keys should already be human labels
+in Locale when you can.
+
+The server serializes Excel / txt / Markdown and pins the card.
+Word, PDF, and HTML **mirror this turn** (table, chart, or both) and
+are assembled by the Chatboo client (same file for the session card
+and the bubble icons). Do not rebuild those files in RelaxAICode.
+
+The server **does not paint the listing** unless you set
+`result['__show_table__'] = True` or `show_mode` is `show-table` /
+`chart-table` / `table`. `show-chart` without `__show_table__` keeps
+the chart and hides the listing (dataset stays for the canvas).
+
+If they also asked to **see** the listing, set `__show_table__` on the
+result (plus `data`) so the table stays next to the card. Otherwise
+a chart-only turn stays chart-only. Match the user's language
+(Locale in the header), as with `self`.
+
+Server PDF is landscape A4 in every language; do not call tools to
+rotate the page. If they asked for portrait, set
+`result['__landscape__'] = False` (Locale like `self`). Do not invent
+other orientation keys.
+
+Point the user to the card in one sentence. The PDF / Excel / Word icons
+on the bubble stay for “I did not ask for a file, but I want a clip of
+this turn”.
+
+Word is a session download (Office HTML `.doc`; `word` / `doc` / `docx`
+are the same card). Default Word mirrors this turn (table, chart, or
+both — same assembler as the bubble icon). If they asked for a
+showpiece document, set `result['__rich_doc__'] = True` (Locale like
+`self`) so the client wraps this turn's HTML. Do not invent adjective lists.
+
+PowerPoint, ODT, and any other type outside PDF, Excel, Word, txt,
+Markdown, and HTML: the server refuses in one sentence and does not call tools.
+
+Charts stay in the chat (chart / show-chart on the existing table) and
+in Word / PDF / HTML when that turn has chartable rows. Excel and Markdown stay tables only.
+A “more professional” look is a restyle of
+`previous_result`, not a new file type and not a new query of the same
+rows.
+
+## Soft pastel palette (backgrounds)
+Use only **soft, desaturated, almost translucent** pastels. Prefer the sandbox
+helper and palette when available:
+
+```python
+# unique tones (default for "pijama" / "sin repetir tono")
+apply_pajama_coloring(rows, unique=True)
+# classic 2-tone zebra
+apply_pajama_coloring(rows, unique=False)
+# or pick from PASTEL_ROW_COLORS yourself
+```
+
+If you assign hex by hand, stay in the same family as `PASTEL_ROW_COLORS`
+(lavender mist, soft yellow, peach, mint, cyan mist, cream, lilac, …).
+
+### Forbidden backgrounds
+- Saturated / neon / “strident” colours.
+- Strong red, green, blue or purple that compete with foreground text.
+- Dark fills that force white text.
+
+## Foreground text (always readable on pastels)
+Keep body text **dark**. Allowed accent colours for numbers / flags:
+
+| Role        | Hex (examples)     | Notes                          |
+|-------------|--------------------|--------------------------------|
+| Default     | `#212121` / black  | Normal amounts and labels      |
+| Negative    | `#b71c1c`          | Soft dark red, not neon        |
+| Positive    | `#1b5e20`          | Soft dark green                |
+| Info / link | `#0d47a1`          | Soft dark blue                 |
+
+Bold (`font-weight:bold`) is fine on those colours. Never put bright red/green
+text on a pink/green row of similar hue.
+
+## Modes the user may request
+1. **Pijama / zebra / pastel** — colour every row with soft pastels.
+   - If they say tones must **not repeat** (or “sin repetir tono”):
+     `apply_pajama_coloring(rows, unique=True)`.
+   - Otherwise alternating two soft tones is enough (`unique=False`).
+2. **Quartiles / terciles / by bands** — sort by the metric they name, then
+   either leave rows without `_row_color` so the **server** applies soft tier
+   pastels, or set explicit soft `_row_color` per band yourself. Do not use
+   loud traffic-light fills.
+3. **Business colours** (risk, status) — soft pastel row + dark accent on the
+   score/status column only.
+
+## Charts (Chatboo UI)
+**showmode (session, not your choice each turn):** the session keeps
+show-table or show-chart until `/show-table`, `/show-chart`, or phrasing
+(“haz un gráfico…” / “muéstralo en tabla…”). Default for new chats is
+show-table (Chatboo Settings). Suspended under painter-free. Do **not**
+pick layout in prose or invent HTML chart chrome.
+
+| showmode | What the client does |
+|---|---|
+| **show-table** | Table visible. Toolbar/chart only when **X is temporal** and ≥1 **Y** column key looks like money, %/ratio, or a counter (structural key shape — not business entities). CP/coords/other codes are ignored. |
+| **show-chart** | Chart open + table collapsible (always with its table). Any analyzable numeric series (even odd ones) — user asked for a graphic view. |
+
+Categorical X (contacts, names, areas) does **not** auto-offer a chart under
+show-table — a bar of every partner duplicates the table; the user can still
+ask for a chart (showmode flips to show-chart).
+
+Do **not** hand-draw bar/line/pie geometry (ASCII, fenced “graphs”, custom
+plot HTML). Keep structured rows; the client hydrates Chart.js / ECharts.
+A painted SVG is for human eyes in this chat bubble. Facts the user asked
+for (time, date, a number) **MUST** also exist as text — a Markdown list,
+a sentence, or a table cell — so any app, export or reader can consume
+them. Time and civil date: **not** a clock card. Compute from `now` +
+`ZoneInfo('IANA/…')` (session `user_tz` only for the user's own zone).
+
+Instant format (sortable, locale-proof): weekday in the user's language,
+then `yyyy-mm-dd hh:mm:ss ±HH:MM`. The offset is numeric — never an IANA
+name (`+09:00`, not `Asia/Tokyo`). Do not name the ISO column `fecha` /
+`date` (the server would locale-format it).
+
+- **One** place: `Place — domingo 2026-08-16 02:33:00 +02:00`
+- **Two or more** places: structured rows (aligned table, still text):
+
+```python
+result = {'data': [
+    {'lugar': '…', 'dia': 'domingo', 'instante': '2026-08-16 09:33:00 +09:00'},
+    {'lugar': '…', 'dia': 'sábado', 'instante': '2026-08-15 17:33:00 -07:00'},
+]}
+```
+
+Do **not** emit `kind: clock` for “qué hora / qué día / en estos sitios”.
+Do **not** hand-build a Markdown list of the same three columns (it will
+not align). Do **not** claim a card already showed the day. A clock face
+is only if the user explicitly asks for the analog widget.
+
+Other single facts the user asked to see prettily: SVG `kind: fact` or
+`kind: link` (`data-chatboo-card`). Do not emit SVG paths. Do not invent a URL.
+
+**When to set `show_mode` in the result dict (rare):**
+- `'table'` — opt out of charts entirely (e.g. geo pin lists).
+- `'dashboard'` — card grid.
+- `'show-chart'` — only if this answer **is** a chart (known time-series skill)
+  and you must open chart-first regardless of session showmode.
+- Otherwise omit `show_mode` — session + message hints already choose layout.
+  Optional: `'dual_axis'` when you need to force one/two Y axes.
+
+## Map thumbnails (OSM / Google)
+When the user asks for map previews next to coordinates, **do not** invent
+`staticmap.openstreetmap.de` (or similar) Markdown images — they break.
+
+Use the sandbox helpers from `pns_geo` when present (server-side PNG + link):
+
+```python
+enrich_map_thumbnails(
+    rows, lat='Lat', lon='Lon',
+    coords='Coords', osm='Mapa OSM', google='Mapa GM',
+)
+result = {'data': rows, 'summary': '...'}
+```
+
+Or per cell: `row['Mapa OSM'] = map_thumbnail(lat, lon, provider='osm')`.
+Coords use universal `lat,lon` decimals plus a copy button.
+Google with **Geo** Settings (GM key) → GM thumbnail; without key → OSM
+thumbnail that still opens Google Maps (hybrid badge).
+OSM street geocode: optional LocationIQ key in the same Geo section.
+Never hotlink OSM tile URLs in Markdown. If helpers are absent, say Geo is
+not installed — do not invent coordinates or distances.
+
+**Y-axis scales are client-side.** Re-emitting the same € columns does **not**
+change axes. Do **not** claim “same scale / one Y axis” unless you actually
+control it:
+
+1. **Same-unit comparison** (Facturación + Salarios in €) — return only those
+   absolute columns. The client keeps **one Y axis** for comparable amounts.
+   Optional: `result = {'data': rows, 'dual_axis': False}`.
+2. **€ + % in the same table** — the % column uses a **secondary** axis (correct).
+   If the user wants **one** axis for both € series, either omit the `%` column
+   or set `'dual_axis': False` (then % shares the € scale and looks flat — warn
+   briefly). Prefer omitting `%` for an honest € comparison.
+3. **User said “un solo eje / misma escala”** — set `'dual_axis': False` (or omit
+   ratio columns). Never invent two separate tables as a workaround unless they
+   ask for that.
+4. Toolbar also has **“1 eje Y” / “2 ejes Y”** — the user can flip without a
+   new query.
+
+**Presentation layout** is sticky server-side (table-first vs chart-first; see
+Charts above). You do **not** set layout in prose or HTML — return structured
+`data` rows. Only set `show_mode` / `dual_axis` in the result when the rare
+cases in Charts apply.
+
+### Grouped bar charts / histograms (critical)
+When the user asks for a **grouped histogram**, **bars by business area**, or
+**N bars per category** (e.g. 4 quarters, 12 months on X = areas/products/…):
+
+1. **Wide table** — one row per X category; one **numeric column per bucket**
+   (e.g. `T1`, `T2`, `T3`, `T4` or month names). Example row:
+   `{'Área': 'INC', 'T1 2026': 1200, 'T2 2026': 980, 'T3 2025': 1100, 'T4 2025': 900}`.
+2. **Forbidden for charts** — long/tidy rows like
+   `{'Área': 'INC', 'Trimestre': 'T1', 'Importe': 1200}` (the client cannot pivot).
+3. **Include every bucket** the user asked for (4 quarters ⇒ 4 numeric columns;
+   12 months ⇒ 12 columns). Missing columns ⇒ wrong chart.
+4. **Separate metrics** ⇒ separate tables/groups (`tables` / `groups` with titles
+   like “Importe €” and “Nº facturas”) — each table stays wide.
+5. **Do not confuse words** — **quartiles / terciles** here = soft row banding on
+   a sorted column (see above). **Trimestres / quarters / months** = time buckets
+   as **column headers**, not quartile coloring.
+6. **relaxaicode sort keys** — prefer `sorted(rows, key=operator.itemgetter('field'))`
+   or `key=lambda x: x['field']`. Also OK: `def sort_key(x): return x['field']` then
+   `key=sort_key`. To order trimestres use a list constant and
+   `key=lambda t: TRIM_ORDER.index(t['Trimestre'])` (`.index` / `.casefold` /
+   `.strptime` on safe accessors are allowed). If you need `.split()` or multi-step
+   logic, **precompute** `_ord` on each row then `itemgetter('_ord')`. Forbidden in
+   lambdas: nested defs, arbitrary helpers, or `key=str` on dict rows.
+
+## After colouring
+Return `result = {'data': rows, 'summary': '...'}`. One short spoken sign-off;
+do not re-list amounts in prose when `data_rendered` is true.
+
+The server **rejects fabricated amounts** on restyle: if you hardcode debe/haber
+/saldo instead of transforming `raw_data`, prior figures are restored. Prefer
+one shot (query + style) over a second execute that re-types numbers.
+    </domain_knowledge>
+</context>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ai_skill_tools_wizard_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.skill.tools.wizard.form</field>
+        <field name="model">pns_ai_mcp.skill.tools.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Skills Tools">
+                <group>
+                    <div class="alert alert-info mb-0" role="alert">
+                        <p>Select the operation to perform on skills:</p>
+                        <ul class="mb-0">
+                            <li>Restore: Re-sync skills from module files (system &amp; custom) into the database.</li>
+                            <li>Export Zip: Export all skills to a ZIP with manifest.</li>
+                            <li>Import Zip: Import skills from a previously exported ZIP.</li>
+                        </ul>
+                    </div>
+                </group>
+                <group>
+                    <field name="replace_existing"/>
+                </group>
+                <footer>
+                    <button name="action_reload" string="Restore" type="object" class="btn-warning" icon="fa-refresh" confirm="Restore skills from module files? Skills whose code matches will be overwritten only if 'Overwrite matching skills' is checked."/>
+                    <button name="action_export_zip" string="Export ZIP" type="object" class="btn-secondary" icon="fa-download"/>
+                    <button name="action_import" string="Import ZIP" type="object" class="btn-secondary" icon="fa-upload"/>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ai_skill_tools_wizard" model="ir.actions.act_window">
+        <field name="name">Skills Tools</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">pns_ai_mcp.skill.tools.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_ai_skill_tools_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+</odoo>

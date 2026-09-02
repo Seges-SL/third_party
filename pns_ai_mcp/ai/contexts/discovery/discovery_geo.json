@@ -1,0 +1,16 @@
+{
+  "code": "discovery_geo",
+  "tipo": "discovery",
+  "target": "geo",
+  "priority": 75,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "map",
+    "maps",
+    "geocod",
+    "geocode",
+    "geocoding",
+    "leaflet"
+  ]
+}

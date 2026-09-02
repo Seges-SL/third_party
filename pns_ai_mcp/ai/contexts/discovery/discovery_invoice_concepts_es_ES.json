@@ -1,0 +1,25 @@
+{
+  "code": "discovery_invoice_concepts_es_ES",
+  "tipo": "discovery",
+  "locale": "es_ES",
+  "target": "invoice_concepts",
+  "priority": 78,
+  "soft_depends": [
+    "partners",
+    "business_documents"
+  ],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "factura",
+    "facturas",
+    "factura impagada",
+    "facturas impagadas",
+    "moroso",
+    "morosos",
+    "pendiente de cobro",
+    "riesgo de cobro",
+    "base imponible",
+    "trimestre fiscal",
+    "ejercicio fiscal"
+  ]
+}

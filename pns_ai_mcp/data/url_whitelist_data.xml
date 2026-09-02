@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- First-install web whitelist for weather (Open-Meteo).
+     OpenAPI hosts are added when those servers are activated.
+     Loaded from post_init_hook only (not manifest data:). noupdate=1. -->
+<odoo noupdate="1">
+
+    <record id="url_whitelist_open_meteo" model="ai.url.whitelist">
+        <field name="domain">api.open-meteo.com</field>
+        <field name="kind">web</field>
+        <field name="active" eval="True"/>
+        <field name="notes">Factory seed — weather forecast (Open-Meteo).</field>
+    </record>
+
+    <record id="url_whitelist_open_meteo_geocoding" model="ai.url.whitelist">
+        <field name="domain">geocoding-api.open-meteo.com</field>
+        <field name="kind">web</field>
+        <field name="active" eval="True"/>
+        <field name="notes">Factory seed — geocoding for weather forecast (Open-Meteo).</field>
+    </record>
+
+</odoo>

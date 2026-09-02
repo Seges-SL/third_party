@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <metadata>
+        <code>fetch_url_recipe</code>
+        <tipo>domain</tipo>
+        <description>How to fetch external data: use the fetch_url safe operation, never import urllib/requests in relaxaicode</description>
+        <version>1.1</version>
+    </metadata>
+
+    <domain_knowledge>
+# Fetching external data (fetch_url recipe)
+
+When the user asks for information you do NOT already have and that lives OUTSIDE
+Odoo — a public web page, a REST/JSON API, weather, prices, exchange rates, live
+status, timetables — you obtain it with the `fetch_url` safe operation.
+
+NEVER write relaxaicode that imports `urllib`, `requests`, `http` or `socket`:
+those are blocked and the code is rejected before it runs. `relaxaicode`
+is a read-only Odoo sandbox with NO network access — it is for database data, not
+for the web.
+
+## The pattern (imitate this)
+
+1. If unsure whether the domain is allowed, read the `url_whitelist` resource
+   first with `fetch_native_mcp_resource`.
+2. Call `propose_safe_operations` with a `steps` list of `fetch_url` steps. Each
+   step needs: `op = "fetch_url"`, a full `url`, and optionally `method`
+   (`GET` default; also `HEAD`, `OPTIONS`, or `QUERY` with `body` +
+   `content_type`). Safe methods only — no POST/PUT/PATCH/DELETE here.
+3. When the fetch returns, answer using ONLY the data in that result and cite the
+   URL as the source. Never invent figures.
+4. For authenticated or mutating HTTP against a known API, use `api_call` on a
+   registered external server (MCP/OpenAPI), not `fetch_url`.
+
+## Worked example
+
+User: "What is the current USD→EUR exchange rate?"
+
+WRONG — this is blocked, never do it:
+
+    import urllib.request, json
+    raw = urllib.request.urlopen("https://api.example.com/rate?base=USD").read()
+    result = json.loads(raw)
+
+RIGHT — call `propose_safe_operations` with these arguments:
+
+    {
+      "steps": [
+        {"op": "fetch_url",
+         "url": "https://api.exchangerate.host/latest?base=USD&amp;symbols=EUR",
+         "method": "GET"}
+      ]
+    }
+
+Then read the returned JSON `body` and reply with the rate, citing the source.
+
+## Good habits
+- BATCH: put several URLs as several steps in ONE `propose_safe_operations` call
+  (they confirm and run together) instead of one call per URL.
+- Prefer JSON APIs: `fetch_url` is a plain HTTP request with no JavaScript, so
+  single-page-app pages return empty HTML shells.
+- Whitelisted domains auto-confirm; other domains wait for a human click.
+- Safe query WITH a body (RFC 10008): use `"method": "QUERY"` plus `"body"` and
+  `"content_type"` — for APIs whose read endpoint expects the query in the
+  request body. QUERY is safe/idempotent like GET; it is NOT a POST.
+- Need a real POST or arbitrary custom headers? `fetch_url` cannot do it —
+  use a registered external API server via `api_call` (MCP or OpenAPI), or tell
+  the user it is out of scope. Never fall back to importing an HTTP library.
+    </domain_knowledge>
+</context>

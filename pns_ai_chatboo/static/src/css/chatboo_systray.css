@@ -1,0 +1,3 @@
+/* Chatboo systray icon (OWL1 / Odoo 14).
+ * Badge uses native Odoo/BS4 classes (o_notification_counter badge badge-pill).
+ * No custom CSS needed — the classes handle colors and positioning. */

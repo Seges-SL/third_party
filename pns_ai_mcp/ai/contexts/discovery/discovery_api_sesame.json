@@ -1,0 +1,16 @@
+{
+  "code": "discovery_api_sesame",
+  "tipo": "discovery",
+  "target": "sesame",
+  "target_kind": "api_server",
+  "priority": 70,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "sesame",
+    "sesametime",
+    "sesame hr",
+    "workStatus",
+    "sesametime.com"
+  ]
+}

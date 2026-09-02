@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Endpoint agent. Baseline pull: own nucleus. Domain packs
+         (Geo, ACL, client) pin themselves at runtime — this XML
+         does not name modules this addon does not depend on.
+         See docs/decisions/knowledge_bundle_crud.md -->
+
+    <record id="ai_agent_mcp" model="ai.agent">
+        <field name="name">MCP Server</field>
+        <field name="code">pns_ai_mcp</field>
+        <field name="sequence">0</field>
+        <field name="agent_type">endpoint</field>
+        <field name="origin">module</field>
+        <field name="module_name">pns_ai_mcp</field>
+        <field name="default_context_codes">@pns_ai_mcp</field>
+        <field name="required_context_codes">self_mcp</field>
+        <field name="description">MCP protocol endpoint agent.
+Serves contexts and tools to external AI clients (Cursor, Claude Desktop, etc.).
+The LLM runs in the client — this agent only provides the knowledge layer.
+Baseline knowledge: @pns_ai_mcp.</field>
+    </record>
+    <!-- El antiguo agente semilla `ocr` se retiró: el OCR vive en `pns_ocr`
+         (agente `pns_ocr`). Un `-u pns_ai_mcp` NO borra el registro obsoleto;
+         la purga idempotente está en `i_restore.py`. -->
+</odoo>

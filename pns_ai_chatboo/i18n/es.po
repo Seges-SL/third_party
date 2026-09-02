@@ -1,0 +1,1747 @@
+# Translation of pns_ai_chatboo.
+# English is the source/fallback language.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: pns_ai_chatboo\n"
+"Report-Msgid-Bugs-To: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: es_ES\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: \n"
+
+
+#. module: pns_ai_chatboo
+msgid "Chatboo Assistant"
+msgstr "Asistente Chatboo"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "New"
+msgstr "Nuevo"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "New chat"
+msgstr "Nuevo chat"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "History"
+msgstr "Historial"
+
+#. module: pns_ai_chatboo
+msgid "Sessions"
+msgstr "Sesiones"
+
+#. module: pns_ai_chatboo
+msgid "No sessions yet."
+msgstr "Sin sesiones todavía."
+
+#. module: pns_ai_chatboo
+msgid "Delete"
+msgstr "Borrar"
+
+#. module: pns_ai_chatboo
+msgid "How can I help you today?"
+msgstr "¿En qué puedo ayudarte hoy?"
+
+#. module: pns_ai_chatboo
+msgid "Copy"
+msgstr "Copiar"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Thinking…"
+msgstr "Pensando…"
+
+#. module: pns_ai_chatboo
+msgid "Type your message… (Enter to send, Shift+Enter for newline)"
+msgstr "Escribe tu mensaje… (Enter envía, Shift+Enter salto de línea)"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Connecting…"
+msgstr "Conectando…"
+
+#. module: pns_ai_chatboo
+msgid "Unknown"
+msgstr "Desconocido"
+
+#. module: pns_ai_chatboo
+msgid "Offline"
+msgstr "Sin conexión"
+
+#. module: pns_ai_chatboo
+msgid "Could not load the session."
+msgstr "No se pudo cargar la sesión."
+
+#. module: pns_ai_chatboo
+msgid "Could not create the session."
+msgstr "No se pudo crear la sesión."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Could not delete the session."
+msgstr "No se pudo borrar la sesión."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Could not delete the sessions."
+msgstr "No se pudieron borrar las sesiones."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Delete this chat session?"
+msgstr "¿Eliminar esta sesión de chat?"
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "Could not delete the session: a background Chatboo job still locks related data. Wait a few seconds, or restart the Odoo service, then try again."
+msgstr "No se pudo borrar la sesión: un trabajo de Chatboo en segundo plano aún bloquea datos relacionados. Espera unos segundos o reinicia el servicio Odoo e inténtalo de nuevo."
+
+#. module: pns_ai_chatboo
+msgid "*(no response)*"
+msgstr "*(sin respuesta)*"
+
+#. module: pns_ai_chatboo
+msgid "Copied to clipboard."
+msgstr "Copiado al portapapeles."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Could not copy."
+msgstr "No se pudo copiar."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
+msgid "Name cannot be empty"
+msgstr "El nombre no puede estar vacío"
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
+msgid "A list of session IDs is required."
+msgstr "Se requiere una lista de IDs de sesión."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
+msgid "The requested sessions were not found."
+msgstr "No se encontraron las sesiones solicitadas."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
+msgid "Access denied to one or more sessions."
+msgstr "Acceso denegado a una o más sesiones."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
+msgid "Message cannot be empty"
+msgstr "El mensaje no puede estar vacío"
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
+msgid "MCP engine error:"
+msgstr "Error en el motor MCP:"
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_async_request.py:0
+msgid "The request timed out or the server was restarted."
+msgstr "La petición expiró o el servidor se reinició."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_async_request.py:0
+msgid "The model returned no content. Check the AI provider (endpoint reachable, model loaded) and the server log."
+msgstr "El modelo no devolvió contenido. Revisa el proveedor de IA (endpoint accesible, modelo cargado) y el registro del servidor."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_async_request.py:0
+msgid "(incomplete response: interrupted by a server restart)"
+msgstr "(respuesta incompleta: interrumpida por un reinicio del servidor)"
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_async_request.py:0
+msgid "The response was interrupted by a server restart. Please resend."
+msgstr "La respuesta se interrumpió por un reinicio del servidor. Vuelve a enviarla."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_async_request.py:0
+msgid "The request could not be started. Please resend."
+msgstr "No se pudo iniciar la petición. Vuelve a enviarla."
+
+#. module: pns_ai_chatboo
+msgid "No AI provider is configured for the \"%s\" role. Assign at least one AI provider to this role before using the assistant."
+msgstr "No hay ningún proveedor de IA configurado para el rol «%s». Asigna al menos un proveedor de IA a este rol antes de usar el asistente."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
+msgid "Request body is not valid JSON"
+msgstr "El cuerpo no es un JSON válido"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Saved"
+msgstr "Guardado"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "No response from the provider (possible hang). Please try again."
+msgstr "Sin respuesta del proveedor (posible cuelgue). Inténtalo de nuevo."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Generation cancelled."
+msgstr "Generación cancelada."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_async_request__error
+#: model:ir.model.fields.selection,name:pns_ai_chatboo.selection__chatboo_async_request__state__error
+msgid "Error"
+msgstr "Error"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Error while saving"
+msgstr "Error al guardar"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "No context information available"
+msgstr "No hay información de contexto disponible"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Copied to clipboard"
+msgstr "Copiado al portapapeles"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Error: jsPDF is not available"
+msgstr "Error: jsPDF no está disponible"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Error: SheetJS is not available"
+msgstr "Error: SheetJS no está disponible"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Error while generating PDF"
+msgstr "Error al generar PDF"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_export.js:0
+msgid "Nothing to export"
+msgstr "Nada que exportar"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Error while generating Excel"
+msgstr "Error al generar Excel"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_export.js:0
+msgid "Error while generating Word"
+msgstr "Error al generar Word"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Error copying to clipboard"
+msgstr "Error al copiar al portapapeles"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Are you sure you want to delete the selected sessions (%s)?"
+msgstr "¿Seguro que deseas eliminar las sesiones seleccionadas (%s)?"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_systray.js:0
+msgid "New Chatboo response ready"
+msgstr "Nueva respuesta de Chatboo lista"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_systray.js:0
+msgid "Chatboo is waiting for your confirmation"
+msgstr "Chatboo espera tu confirmación"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Send"
+msgstr "Enviar"
+
+#. module: pns_ai_chatboo
+msgid "Session History"
+msgstr "Historial de sesiones"
+
+#. module: pns_ai_chatboo
+msgid "Select all"
+msgstr "Seleccionar todo"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Current"
+msgstr "Actual"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "messages"
+msgstr "mensajes"
+
+#. module: pns_ai_chatboo
+msgid "Close"
+msgstr "Cerrar"
+
+#. module: pns_ai_chatboo
+msgid "Working tokens (K1):"
+msgstr "Tokens de trabajo (K1):"
+
+#. module: pns_ai_chatboo
+msgid "K1: Tokens available to keep the conversational context"
+msgstr "K1: Tokens disponibles para mantener el contexto conversacional"
+
+#. module: pns_ai_chatboo
+msgid "Generation speed"
+msgstr "Velocidad de generación"
+
+#. module: pns_ai_chatboo
+msgid "Ask Chatboo... (↑↓ for history)"
+msgstr "Pregunta a Chatboo... (↑↓ para el historial)"
+
+#. module: pns_ai_chatboo
+msgid "Send in the background — you will get a notification when it is ready"
+msgstr "Enviar en segundo plano — recibirás una notificación cuando esté listo"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Save"
+msgstr "Guardar"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Cancel"
+msgstr "Cancelar"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_async_request__cancel_requested
+msgid "Cancel requested"
+msgstr "Cancelación solicitada"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Rename session"
+msgstr "Renombrar sesión"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Delete session"
+msgstr "Eliminar sesión"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Download as PDF"
+msgstr "Descargar como PDF"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Download as Excel"
+msgstr "Descargar como Excel"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Download as Word"
+msgstr "Descargar como Word"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Restore default width"
+msgstr "Restaurar ancho por defecto"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_res_users__chatboo_card_width_ratio
+msgid "Chatboo card width"
+msgstr "Ancho de tarjeta Chatboo"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_users__chatboo_card_width_ratio
+msgid "0 = default (two thirds of the chat canvas). Else 0–1 of that canvas."
+msgstr "0 = valor por defecto (dos tercios del lienzo del chat). Si no, 0–1 de ese lienzo."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Download"
+msgstr "Descargar"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Copy content"
+msgstr "Copiar contenido"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Copy as Markdown"
+msgstr "Copiar como Markdown"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Copy to clipboard"
+msgstr "Copiar al portapapeles"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Open image"
+msgstr "Abrir imagen"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Arrow keys ↑↓ to navigate the prompt history"
+msgstr "Flechas ↑↓ para navegar por el historial de prompts"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Confirm AI write operation"
+msgstr "Confirmar escritura de la IA"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "This operation will not run until you confirm it."
+msgstr "Esta operación no se ejecutará hasta que la confirmes."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Confirm"
+msgstr "Confirmar"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Executing..."
+msgstr "Ejecutando..."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Operation executed"
+msgstr "Operación ejecutada"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Operation cancelled"
+msgstr "Operación cancelada"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "the operation"
+msgstr "la operación"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "unknown"
+msgstr "desconocido"
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "Session %s"
+msgstr "Sesión %s"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "List the available skills"
+msgstr "Listar las skills disponibles"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Presentation modes (painter, footer, table/chart)"
+msgstr "Modos de presentación (painter, pie, tabla/gráfico)"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "This command takes no arguments. Help is deterministic (no AI)."
+msgstr "Este comando no lleva argumentos. La ayuda es determinista (sin IA)."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Empty arguments run with the built-in default. Help is deterministic (no AI)."
+msgstr "Sin argumentos se ejecuta con el default del comando. La ayuda es determinista (sin IA)."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "This command asks for arguments when none are given. Help is deterministic (no AI)."
+msgstr "Este comando pide argumentos si no se indican. La ayuda es determinista (sin IA)."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Common"
+msgstr "Común"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Owner"
+msgstr "Propietario"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Parameters"
+msgstr "Parámetros"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Name"
+msgstr "Nombre"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Type"
+msgstr "Tipo"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Description"
+msgstr "Descripción"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Default"
+msgstr "Por defecto"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "No formal parameters."
+msgstr "Sin parámetros formales."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Error:"
+msgstr "Error:"
+
+#. module: pns_ai_chatboo
+msgid "Floating popup"
+msgstr "Popup flotante"
+
+#. module: pns_ai_chatboo
+msgid "Side drawer"
+msgstr "Panel lateral"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_ai_agent__chatboo_show_systray
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_res_config_settings__chatboo_show_systray
+msgid "Show Chatboo in systray"
+msgstr "Mostrar Chatboo en la barra del sistema"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_ai_agent__chatboo_notify_sound
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_res_config_settings__chatboo_notify_sound
+msgid "Play sound on AI result"
+msgstr "Reproducir sonido al recibir respuesta de la IA"
+
+#. module: pns_ai_chatboo
+#: model:ir.ui.menu,name:pns_ai_chatboo.menu_chatboo_root
+msgid "Chatboo"
+msgstr "Chatboo"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Confirm AI operation"
+msgstr "Confirmar operación IA"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__name
+msgid "Session Name"
+msgstr "Nombre de sesión"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_async_request__user_id
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__user_id
+msgid "User"
+msgstr "Usuario"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__messages
+msgid "Messages"
+msgstr "Mensajes"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__input_history
+msgid "Prompt History"
+msgstr "Historial de prompts"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__conversation_id
+msgid "Conversation ID"
+msgstr "ID de conversación"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__last_used_date
+msgid "Last Used"
+msgstr "Último uso"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_async_request__session_id
+msgid "Session"
+msgstr "Sesión"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_async_request__prompt
+msgid "Prompt"
+msgstr "Consulta"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_async_request__history
+msgid "History (JSON)"
+msgstr "Historial (JSON)"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_async_request__agent_code
+msgid "Agent code"
+msgstr "Código de agente"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_async_request__provider_id
+msgid "Provider id"
+msgstr "ID de proveedor"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_async_request__state
+msgid "State"
+msgstr "Estado"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_async_request__partial
+msgid "Partial content"
+msgstr "Contenido parcial"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_async_request__struct_events
+msgid "Structured events (JSON)"
+msgstr "Eventos estructurados (JSON)"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_async_request__done_meta
+msgid "Done meta (JSON)"
+msgstr "Metadatos de cierre (JSON)"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_async_request__response
+msgid "Final response"
+msgstr "Respuesta final"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_async_request__seen
+msgid "Seen by client"
+msgstr "Visto por el cliente"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_async_request__started_at
+msgid "Started at"
+msgstr "Iniciado el"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_async_request__finished_at
+msgid "Finished at"
+msgstr "Finalizado el"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__last_query_code
+msgid "Last successful data query"
+msgstr "Última consulta de datos con éxito"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__last_query_data
+msgid "Last dataset (cache)"
+msgstr "Último dataset (caché)"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__last_query_data_date
+msgid "Dataset cache time"
+msgstr "Hora de caché del dataset"
+
+#. module: pns_ai_chatboo
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
+msgid "Conversation memory"
+msgstr "Memoria de conversación"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_ai_agent__chatboo_dataset_cache_max_mb
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_res_config_settings__chatboo_dataset_cache_max_mb
+msgid "Dataset reuse limit (MB)"
+msgstr "Límite de reutilización de datos (MB)"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_ai_agent__chatboo_query_data_ttl_hours
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_res_config_settings__chatboo_query_data_ttl_hours
+msgid "Dataset reuse expiry (hours)"
+msgstr "Caducidad de reutilización de datos (horas)"
+
+#. module: pns_ai_chatboo
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
+msgid "Data presentation"
+msgstr "Presentación de datos"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_res_config_settings__chatboo_chart_engine
+msgid "Chart engine"
+msgstr "Motor de gráficos"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_res_config_settings__chatboo_default_show_mode
+msgid "Default showmode"
+msgstr "Showmode por defecto"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields.selection,name:pns_ai_chatboo.selection__res_config_settings__chatboo_chart_engine__echarts
+msgid "ECharts"
+msgstr "ECharts"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields.selection,name:pns_ai_chatboo.selection__res_config_settings__chatboo_chart_engine__chartjs
+msgid "Chart.js"
+msgstr "Chart.js"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields.selection,name:pns_ai_chatboo.selection__res_config_settings__chatboo_default_show_mode__show-table
+msgid "show-table (table first; smart chart when eligible)"
+msgstr "show-table (tabla primero; gráfico inteligente si aplica)"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields.selection,name:pns_ai_chatboo.selection__res_config_settings__chatboo_default_show_mode__show-chart
+msgid "show-chart (chart open, table always available)"
+msgstr "show-chart (gráfico abierto, tabla siempre disponible)"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Cancel the response in progress? Any text received so far may be kept in the chat."
+msgstr "¿Cancelar la respuesta en curso? El texto recibido hasta ahora puede conservarse en el chat."
+
+#. module: pns_ai_chatboo
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
+msgid "Interface"
+msgstr "Interfaz"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_async_request__screen_context
+msgid "Screen context (JSON)"
+msgstr "Contexto de pantalla (JSON)"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Timeout waiting for confirmation (server busy or locked). Retry after cancelling stuck operations."
+msgstr "Tiempo de espera agotado al confirmar (servidor ocupado o bloqueado). Reintenta tras cancelar operaciones colgadas."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Already being confirmed in another window…"
+msgstr "Ya se está confirmando en otra ventana…"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Already executed"
+msgstr "Ya ejecutada"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Blocked by another server process. Restart Odoo container, then retry Confirm."
+msgstr "Bloqueado por otro proceso del servidor. Reinicia el contenedor Odoo y vuelve a Confirmar."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Timeout waiting for confirmation (server busy or locked). Restart Odoo and retry."
+msgstr "Tiempo de espera agotado al confirmar (servidor ocupado o bloqueado). Reinicia Odoo y reintenta."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Confirmed — applying in background…"
+msgstr "Confirmado — aplicando en segundo plano…"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Confirming…"
+msgstr "Confirmando…"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Confirmed — applying…"
+msgstr "Confirmado — aplicando…"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Confirmed — apply pending (Approvals if needed)"
+msgstr "Confirmado — aplicación pendiente (Autorizaciones si hace falta)"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Timeout confirming (server busy). Retry Confirm."
+msgstr "Tiempo agotado al confirmar (servidor ocupado). Reintenta Confirmar."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
+msgid "No AI provider is assigned. Ask an administrator to assign one to the agent."
+msgstr "No hay ningún proveedor de IA asignado. Pide a un administrador que asigne uno al agente."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__active_skill_code
+msgid "Active skill"
+msgstr "Skill activo"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__active_skill_params
+msgid "Active skill params"
+msgstr "Parámetros del skill activo"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__staged_assistant_files
+msgid "Staged assistant downloads"
+msgstr "Descargas del asistente en espera"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__staged_assistant_files
+msgid "Temporary JSON list of download chips until the assistant message of the current turn is saved. Not shown to the user."
+msgstr "Lista JSON temporal de chips de descarga hasta que se guarde el mensaje del asistente del turno actual. No se muestra al usuario."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__presentation_show_mode
+msgid "Presentation show mode"
+msgstr "Modo de presentación"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__presentation_show_mode
+msgid "Session showmode: show-table (table first) or show-chart (chart first). From Chatboo Settings at session start; updated by /show-table, /show-chart or phrasing. Suspended under painter-free. Not shown to the user; not an LLM selector."
+msgstr "Showmode de sesión: show-table (tabla primero) o show-chart (gráfico primero). Desde Ajustes de Chatboo al crear la sesión; lo actualizan /show-table, /show-chart o el phrasing. En suspenso bajo painter-free. No se muestra al usuario; no es un selector del LLM."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Ask Chatboo... (/ for commands & skills, ↑↓ for history)"
+msgstr "Pregunta a Chatboo... (/ para comandos y skills, ↑↓ historial)"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Arguments, e.g.: %s"
+msgstr "Argumentos, p. ej.: %s"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Could not read the image."
+msgstr "No se pudo leer la imagen."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_async_request__images
+msgid "Images (JSON)"
+msgstr "Imágenes (JSON)"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "File too large (max 10 MB):"
+msgstr "Archivo demasiado grande (máx. 10 MB):"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Could not read the file."
+msgstr "No se pudo leer el archivo."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_async_request__files
+msgid "Files (JSON)"
+msgstr "Archivos (JSON)"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_async_request__image_names
+msgid "Image names (JSON)"
+msgstr "Nombres de imágenes (JSON)"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Drop files to attach here"
+msgstr "Suelta los archivos aquí para adjuntarlos"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Alright — I cancelled «%s». No changes were applied."
+msgstr "De acuerdo: he cancelado «%s». No se ha aplicado ningún cambio."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
+msgid "Chatboo access denied. An MCP API key is required."
+msgstr "Chatboo access denied. An MCP API key is required."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
+msgid "No AI provider is configured for the \"%s\" agent. Assign at least one AI provider to this agent before using the assistant."
+msgstr "No hay ningún proveedor de IA configurado para el agente «%s». Asigna al menos un proveedor de IA a este agente antes de usar el asistente."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields.selection,name:pns_ai_chatboo.selection__chatboo_async_request__state__pending
+msgid "Pending"
+msgstr "Pendiente"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields.selection,name:pns_ai_chatboo.selection__chatboo_async_request__state__running
+msgid "Running"
+msgstr "En ejecución"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields.selection,name:pns_ai_chatboo.selection__chatboo_async_request__state__done
+msgid "Done"
+msgstr "Hecho"
+
+#. module: pns_ai_chatboo
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
+msgid "Agent Protocol"
+msgstr "Protocolo de Agente"
+
+#. module: pns_ai_chatboo
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
+msgid "Configuration"
+msgstr "Configuración"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Capture a turn as an instance skill (extra, with you as author). Typing /create-skill fills the last chip (you can change it), then the slash name. Settings prefixes apply. Help: /create-skill ?"
+msgstr "Captura un turno como skill de instancia (extra, con tu autoría). Al escribir /create-skill se rellena el último chip (se puede cambiar) y luego el slash. Se aplican los prefijos de Ajustes. Ayuda: /create-skill ?"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Edit turn id and slash name if needed, then press Enter"
+msgstr "Edita el id de turno y el slash si hace falta y pulsa Intro"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Confirm turn id and slash name. Edit if needed, then press Enter to open the wizard."
+msgstr "Confirma el id de turno y el slash. Edita si hace falta y pulsa Intro para abrir el asistente."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Turn id is required. Paste or type the 4-character chip, then the slash name."
+msgstr "El id de turno es obligatorio. Pega o escribe el chip de 4 caracteres y luego el slash."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Proposed slash name from that turn (instance prefix applied). Edit if needed, then press Enter to open the wizard."
+msgstr "Slash propuesto a partir de ese turno (con prefijo de instancia). Edita si hace falta y pulsa Intro para abrir el asistente."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Slash name (instance prefix is applied), then press Enter"
+msgstr "Nombre del slash (se aplica el prefijo de instancia) y pulsa Intro"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Paste or type the 4-character chip, then the slash name"
+msgstr "Pega o escribe el chip de 4 caracteres y luego el slash"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "4-character MCP turn id (chip). Required."
+msgstr "Id de turno MCP de 4 caracteres (chip). Obligatorio."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "last turn"
+msgstr "último turno"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Slash name. Settings prefix is applied."
+msgstr "Nombre del slash. Se aplica el prefijo de Ajustes."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Delete a skill you created. Empty opens the picker. Help: /delete-skill ?"
+msgstr "Borra un skill que hayas creado. Vacío abre el selector. Ayuda: /delete-skill ?"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Slash of a skill you created. Stem or prefixed."
+msgstr "Slash de un skill tuyo. Stem o con prefijo."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "opens picker"
+msgstr "abre el selector"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Rename a skill you created. Empty opens the picker. Help: /rename-skill ?"
+msgstr "Renombra un skill que hayas creado. Vacío abre el selector. Ayuda: /rename-skill ?"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Current slash (stem or prefixed)."
+msgstr "Slash actual (stem o con prefijo)."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "New slash name. Instance prefix is applied."
+msgstr "Nuevo slash. Se aplica el prefijo de instancia."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "You have no skills to rename."
+msgstr "No tienes skills que renombrar."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "New slash name, then press Enter"
+msgstr "Nuevo slash y pulsa Intro"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Skill to rename, e.g.: %s"
+msgstr "Skill a renombrar, p. ej.: %s"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "AI Writer permission is required to manage skills from Chatboo."
+msgstr "Se necesita permiso AI Writer para gestionar skills desde Chatboo."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "No active session."
+msgstr "No hay sesión activa."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Could not open the skill wizard."
+msgstr "No se pudo abrir el asistente de skill."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Could not open the skill wizard from here. Use AI Skills menu."
+msgstr "No se pudo abrir el asistente desde aquí. Usa el menú AI Skills."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
+msgid "session_id is required."
+msgstr "session_id es obligatorio."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
+msgid "Session not found."
+msgstr "Sesión no encontrada."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
+msgid "Access denied."
+msgstr "Acceso denegado."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "When to use: describe the user request this skill answers."
+msgstr "Cuándo usar: describe la petición del usuario a la que responde este skill."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "Parameters: list the user-facing parameters (e.g. period, employee)."
+msgstr "Parámetros: lista los parámetros visibles para el usuario (p. ej. periodo, empleado)."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "Output: explain how to present the result."
+msgstr "Salida: explica cómo presentar el resultado."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "The Code must fetch live data on each run (api_call / relaxaicode). Do NOT rely on cached session rows (last_query_data) or pasted row literals."
+msgstr "El Code debe obtener datos en vivo en cada ejecución (api_call / relaxaicode). NO uses filas cacheadas de sesión (last_query_data) ni literales pegados."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "Run the captured Code with relaxaicode; do not recompute its logic."
+msgstr "Ejecuta el Code capturado con relaxaicode; no recalcules su lógica."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "The captured code contains pasted row literals (e.g. data = [{...}, ...]). Replace that block with live api_call fetches before publishing the skill."
+msgstr "El código capturado contiene filas pegadas (p. ej. data = [{...}, ...]). Sustituye ese bloque por api_call en vivo antes de publicar el skill."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "The captured code may contain hardcoded rows. Replace them with live api_call fetches before publishing the skill."
+msgstr "El código capturado puede contener filas hardcodeadas. Sustitúyelas por api_call en vivo antes de publicar el skill."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "This skill will replay the turn fetch (auto-confirmable api_call / fetch_url), then the captured painter."
+msgstr "Este skill repetirá el fetch del turno (api_call / fetch_url auto-confirmable) y después el pintor capturado."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "The captured painter reads previous_result. The source turn had no auto-confirmable fetch plan, so the slash will paint empty until propose_steps are added."
+msgstr "El pintor capturado lee previous_result. El turno origen no tenía un plan de fetch auto-confirmable, así que el slash pintará vacío hasta que se añadan propose_steps."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/ai_skill.py:0
+msgid "Skill /%s created."
+msgstr "Skill /%s creado."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/ai_skill.py:0
+msgid "Skill /%s renamed."
+msgstr "Skill /%s renombrado."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Skill name (optional), e.g.: %s"
+msgstr "Nombre del skill (opcional), p. ej.: %s"
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "Capture skill from chat"
+msgstr "Capturar skill desde chat"
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "WARNING: the captured Code may contain hardcoded row literals from a one-off answer. Replace them with live api_call fetches before publishing."
+msgstr "AVISO: el Code capturado puede contener filas literales de una respuesta puntual. Sustitúyelas por api_call en vivo antes de publicar."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "Access denied to this session."
+msgstr "Acceso denegado a esta sesión."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "AI Writer permission is required to create skills from Chatboo."
+msgstr "Se requiere permiso AI Writer para crear skills desde Chatboo."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "Turn id is required. Use /create-skill VWVN slash-name (4-character code from the chip)."
+msgstr "El id de turno es obligatorio. Usa /create-skill VWVN slash (código de 4 caracteres del chip)."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "Invalid turn id %s. Use the 4-character code from the chip (e.g. VWVN)."
+msgstr "Id de turno %s no válido. Usa el código de 4 caracteres del chip (p. ej. VWVN)."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "No MCP log found for turn %s (or it is not yours)."
+msgstr "No hay log MCP del turno %s (o no es tuyo)."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "No capturable query code found for turn %s."
+msgstr "No hay código de consulta capturable en el turno %s."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Turn id (MCP log). Click to copy. Use with /create-skill."
+msgstr "Id de turno (log MCP). Clic para copiar. Úsalo con /create-skill."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Turn id copied."
+msgstr "Id de turno copiado."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Chatboo composes tables this turn"
+msgstr "Chatboo compone las tablas en este turno"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "The model owns the whole bubble this turn"
+msgstr "El modelo compone toda la burbuja en este turno"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Warm footer after local tables"
+msgstr "Pie breve tras tablas locales"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "No footer after local tables"
+msgstr "Sin pie tras tablas locales"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Table first (this session)"
+msgstr "Tabla primero (esta sesión)"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Chart first (this session)"
+msgstr "Gráfico primero (esta sesión)"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Optional question…"
+msgstr "Pregunta opcional…"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__llm_formatting_mode
+msgid "LLM formatting mode"
+msgstr "Modo de formateo LLM"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields.selection,name:pns_ai_chatboo.selection__chatboo_session__llm_formatting_mode__report
+msgid "Report"
+msgstr "Report"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields.selection,name:pns_ai_chatboo.selection__chatboo_session__llm_formatting_mode__table
+msgid "Table"
+msgstr "Tabla"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Session context occupancy · provider cap"
+msgstr "Ocupación del contexto de la sesión · tope del proveedor"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Tokens billed this turn (all LLM rounds)"
+msgstr "Tokens facturados en este turno (todas las rondas)"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Attach file"
+msgstr "Adjuntar archivo"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Expand prompt"
+msgstr "Expandir prompt"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Collapse prompt"
+msgstr "Contraer prompt"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Remove file"
+msgstr "Quitar archivo"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Remove image"
+msgstr "Quitar imagen"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Screen context active — click to ignore this chat"
+msgstr "Contexto de pantalla activo — clic para ignorar este chat"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Screen context off — click to re-enable"
+msgstr "Contexto de pantalla desactivado — clic para reactivar"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Could not convert to %s: shown in USD"
+msgstr "No se pudo convertir a %s: importe en USD"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "no exchange rate available"
+msgstr "no hay tipo de cambio disponible"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Cost unknown"
+msgstr "Coste desconocido"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Generation speed (tokens/s)"
+msgstr "Velocidad de generación (tokens/s)"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Click on the chat to play"
+msgstr "Clic en el chat para reproducir"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Enable read-aloud"
+msgstr "Activar lectura en voz alta"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "SESSION"
+msgstr "SESIÓN"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "tokens billed"
+msgstr "tokens facturados"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "last turn"
+msgstr "último turno"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "COST"
+msgstr "COSTE"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "this session"
+msgstr "esta sesión"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Last turn · sent vs provider cap"
+msgstr "Último turno · enviado vs tope"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "of the %s k cap"
+msgstr "del tope de %s k"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Occupancy this session"
+msgstr "Ocupación de esta sesión"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Context status"
+msgstr "Estado del contexto"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Test connection"
+msgstr "Probar conexión"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Change provider"
+msgstr "Cambiar proveedor"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Delete a skill you created"
+msgstr "Borrar un skill que creaste"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Rename a skill you created"
+msgstr "Renombrar un skill que creaste"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "mine"
+msgstr "mío"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "system"
+msgstr "sistema"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "shared"
+msgstr "compartido"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "You have no skills to delete."
+msgstr "No tienes skills que borrar."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Usage: /rename-skill old-name new-name"
+msgstr "Uso: /rename-skill nombre-viejo nombre-nuevo"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Delete skill /%s? This cannot be undone."
+msgstr "¿Borrar el skill /%s? No se puede deshacer."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Could not delete the skill."
+msgstr "No se pudo borrar el skill."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+#: code:addons/pns_ai_chatboo/models/ai_skill.py:0
+msgid "Skill /%s deleted."
+msgstr "Skill /%s borrado."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Could not rename the skill."
+msgstr "No se pudo renombrar el skill."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+#: code:addons/pns_ai_chatboo/models/ai_skill.py:0
+msgid "Skill renamed: /%s → /%s"
+msgstr "Skill renombrado: /%s → /%s"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Skill to delete, e.g.: %s"
+msgstr "Skill a borrar, p. ej.: %s"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_choice_list.js:0
+msgid "Choose views"
+msgstr "Elegir vistas"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_choice_list.js:0
+msgid "Mark the screens that should receive this change. Confirm comes next."
+msgstr "Marca las pantallas que deben recibir este cambio. Después viene Confirmar."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_choice_list.js:0
+msgid "All"
+msgstr "Todas"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_choice_list.js:0
+msgid "None"
+msgstr "Ninguna"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_choice_list.js:0
+msgid "Accept"
+msgstr "Aceptar"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_choice_list.js:0
+msgid "Saving…"
+msgstr "Guardando…"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_choice_list.js:0
+msgid "Error: "
+msgstr "Error: "
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_ai_agent__chatboo_show_systray
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_show_systray
+msgid "Show the Chatboo launcher icon in the top navigation bar."
+msgstr "Mostrar el icono de Chatboo en la barra de navegación superior."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_ai_agent__chatboo_dataset_cache_max_mb
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_dataset_cache_max_mb
+msgid "Max size of the dataset cached from a data query so the NEXT turn can reformat/reorder the SAME list without re-querying (kernel-like reuse; data never enters the model context). Bigger datasets are not cached (the model just reuses the query code). 0 = no limit. Guards per-turn (de)serialization cost, not DB storage."
+msgstr "Tamaño máximo del conjunto de datos cacheado de una consulta para que el SIGUIENTE turno pueda reformatear o reordenar la MISMA lista sin volver a consultar (reutilización tipo kernel; los datos no entran en el contexto del modelo). Los conjuntos más grandes no se cachean (el modelo solo reutiliza el código de la consulta). 0 = sin límite. Protege el coste de (des)serialización por turno, no el almacenamiento en la base de datos."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_ai_agent__chatboo_query_data_ttl_hours
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_query_data_ttl_hours
+msgid "How long a cached dataset stays reusable. After this it is ignored and purged by the maintenance cron so blobs never pile up. 0 = never expires (only cleared by session retention)."
+msgstr "Cuánto tiempo permanece reutilizable un conjunto de datos cacheado. Después se ignora y el cron de mantenimiento lo elimina para que no se acumulen blobs. 0 = no caduca (solo se limpia por retención de sesión)."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__name
+msgid "Descriptive name to identify the session"
+msgstr "Nombre descriptivo para identificar la sesión"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__user_id
+msgid "Owner of the session"
+msgstr "Propietario de la sesión"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__messages
+msgid "JSON with the full message history (role, content, timestamp, ...)"
+msgstr "JSON con el historial completo de mensajes (rol, contenido, marca de tiempo, …)"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__input_history
+msgid "JSON array with the user's prompt history (readline)"
+msgstr "Array JSON con el historial de prompts del usuario (readline)"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__conversation_id
+msgid "Conversation id kept across turns to preserve historical context"
+msgstr "Identificador de conversación que se conserva entre turnos para mantener el contexto histórico"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__last_used_date
+msgid "Date and time of the last use of this session"
+msgstr "Fecha y hora del último uso de esta sesión"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__last_screen_context
+msgid "Last Chatboo overlay screen (action_id, view_type, model)."
+msgstr "Última pantalla superpuesta de Chatboo (action_id, view_type, model)."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__last_query_code
+msgid "Python code of the last relaxaicode call that produced data in this session. It is re-injected as a hint on the next turn so the model REUSES/adapts it for reformat/reorder follow-ups ('same list but…', 'sort by…') instead of re-deriving the query from scratch — the main source of turn-to-turn variability (see docs). Not shown to the user."
+msgstr "Código Python de la última llamada relaxaicode que produjo datos en esta sesión. Se reinyecta como pista en el siguiente turno para que el modelo lo REUTILICE o adapte en reformateos y reordenaciones («la misma lista pero…», «ordena por…») en lugar de rederivar la consulta desde cero — la principal fuente de variabilidad entre turnos (véase la documentación). No se muestra al usuario."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__last_query_data
+msgid "JSON with the ROWS of the last successful data query in this session (size-capped). Re-injected as 'previous_result' into the next relaxaicode namespace so reformat/reorder follow-ups transform the SAME data server-side instead of re-querying — no extra tokens, mirroring a code-interpreter kernel. Auto-expired by age (see query_data_ttl_hours) and purged by cron. Never shown to the user."
+msgstr "JSON con las FILAS de la última consulta de datos correcta de esta sesión (con tope de tamaño). Se reinyecta como previous_result en el siguiente espacio de nombres relaxaicode para que los reformateos y reordenaciones transformen los MISMOS datos en el servidor en lugar de volver a consultar — sin tokens extra, como un kernel de intérprete. Caduca por antigüedad (véase query_data_ttl_hours) y el cron lo elimina. Nunca se muestra al usuario."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__last_query_data_date
+msgid "When last_query_data was cached; used to expire it (freshness TTL) so stale datasets are not reused nor kept forever."
+msgstr "Cuándo se cacheó last_query_data; se usa para caducarlo (TTL de frescura) y que los conjuntos obsoletos no se reutilicen ni se conserven para siempre."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__active_skill_code
+msgid "Code of the skill kept 'sticky' for this session. While set, a follow-up (natural language or `/<same code> args`) is judged by the AI: if it refines the same task, the skill re-runs with merged params; if it's a new topic, this is cleared. A bare `/<code>` (no args) starts fresh. Not shown to the user."
+msgstr "Código de la habilidad que queda «pegada» en esta sesión. Mientras esté asignado, un seguimiento (lenguaje natural o `/<mismo código> args`) lo juzga la IA: si refina la misma tarea, la habilidad se reejecuta con los parámetros fusionados; si es un tema nuevo, se limpia. Un `/<código>` suelto (sin argumentos) empieza de cero. No se muestra al usuario."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__active_skill_params
+msgid "JSON with the current parameters of active_skill_code. The AI merges each refinement onto these (add/remove/change) so the conversation can rotate params over the previous state without a turn limit. Not shown to the user."
+msgstr "JSON con los parámetros actuales de active_skill_code. La IA fusiona cada refinamiento (añadir/quitar/cambiar) para rotar parámetros sobre el estado anterior sin límite de turnos. No se muestra al usuario."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__llm_formatting_mode
+msgid "Deprecated leftover. Painter is one-shot per turn (/painter-local /painter-free); empty inherits the provider. Kept for schema compat and cleared automatically."
+msgstr "Resto obsoleto. El painter es de un solo uso por turno (/painter-local /painter-free); vacío hereda el del proveedor. Se mantiene por compatibilidad de esquema y se limpia automáticamente."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_chart_engine
+msgid "Library used to render charts under server-built tables. ECharts is recommended for combined bar/line charts."
+msgstr "Biblioteca usada para pintar gráficos bajo las tablas generadas en el servidor. Se recomienda ECharts para gráficos combinados de barras y líneas."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_default_show_mode
+msgid "Starting showmode for each new Chatboo conversation: show-table or show-chart. Stays until /show-table, /show-chart or phrasing (“show as chart” / “show as table”). Suspended under painter-free. Not a per-turn LLM choice."
+msgstr "Modo de presentación inicial de cada conversación nueva de Chatboo: show-table o show-chart. Se mantiene hasta /show-table, /show-chart o una frase («muéstralo como gráfico» / «muéstralo como tabla»). Se suspende con painter-free. No es una elección del LLM por turno."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__last_screen_context
+msgid "Last screen context (JSON)"
+msgstr "Último contexto de pantalla (JSON)"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_export.js:0
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_charts.js:0
+msgid "Series statistics"
+msgstr "Estadística de series"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_export.js:0
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_charts.js:0
+msgid "Statistics"
+msgstr "Estadísticas"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_export.js:0
+msgid "Chart"
+msgstr "Gráfico"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_export.js:0
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_charts.js:0
+msgid "n"
+msgstr "n"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_export.js:0
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_charts.js:0
+msgid "Min"
+msgstr "Mín"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_export.js:0
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_charts.js:0
+msgid "Max"
+msgstr "Máx"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_export.js:0
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_charts.js:0
+msgid "Mean"
+msgstr "Media"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_export.js:0
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_charts.js:0
+msgid "Median"
+msgstr "Mediana"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_export.js:0
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_charts.js:0
+msgid "Std. dev."
+msgstr "Desv. típ."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_export.js:0
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_charts.js:0
+msgid "Sum"
+msgstr "Suma"

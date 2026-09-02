@@ -1,0 +1,134 @@
+/* Archivo: static/src/css/mcp_context.css
+   Creado: 2025-11-22 22:23:42
+   Modificado: 2025-11-24 13:29:28
+   Descripción: Estilos para formularios y botones de contextos MCP */
+
+/* Estilos para el campo content en contextos MCP */
+/* Selectores múltiples para asegurar que se aplique */
+.o_mcp_context_content textarea,
+.o_mcp_context_content .o_field_text textarea,
+.o_mcp_context_content .o_input textarea,
+field[name="content"] textarea,
+.o_field_text.o_mcp_context_content textarea,
+.o_sheet .o_mcp_context_content textarea,
+.o_form_view .o_mcp_context_content textarea {
+    min-height: 200px !important;
+    width: 100% !important;
+    resize: vertical !important;
+    font-family: 'Courier New', 'Consolas', 'Monaco', 'Lucida Console', monospace !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+    box-sizing: border-box !important;
+    padding: 8px !important;
+}
+
+/* Asegurar que el contenedor también tenga altura */
+.o_mcp_context_content,
+.o_mcp_context_content .o_field_text,
+.o_mcp_context_content .o_input,
+field[name="content"],
+.o_field_text.o_mcp_context_content {
+    min-height: 200px !important;
+    display: block !important;
+}
+
+/* OpenAPI spec_json paste (no Ace: Odoo 14 only ships python/xml modes) */
+.o_mcp_spec_json textarea,
+.o_form_view .o_mcp_spec_json textarea,
+.o_field_text.o_mcp_spec_json textarea {
+    min-height: 360px !important;
+    width: 100% !important;
+    resize: vertical !important;
+    font-family: 'Courier New', 'Consolas', 'Monaco', 'Lucida Console', monospace !important;
+    font-size: 13px !important;
+    line-height: 1.45 !important;
+    box-sizing: border-box !important;
+    padding: 8px !important;
+}
+.o_mcp_spec_json,
+.o_field_text.o_mcp_spec_json {
+    min-height: 360px !important;
+    display: block !important;
+}
+
+/* Botones de importación/exportación en la barra de herramientas */
+.o_control_panel .o_cp_buttons .o_mcp_context_toolbar_btn {
+    margin-inline-end: 8px;
+}
+
+/* Context statistics wizard — no empty flex/padding gaps */
+.o_mcp_context_stats_form.o_form_view,
+.o_form_view.o_mcp_context_stats_form {
+    padding: 0 !important;
+    min-height: 0 !important;
+    height: auto !important;
+}
+.o_mcp_context_stats_form .o_form_sheet_bg,
+.o_mcp_context_stats_form .o_form_sheet {
+    margin: 0 !important;
+    padding: 8px 20px 4px !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    min-height: 0 !important;
+}
+.o_mcp_context_stats_form .o_mcp_context_stats_flags {
+    margin-bottom: 4px !important;
+    padding-inline: 4px;
+}
+.o_mcp_context_stats_form .o_mcp_context_stats_flags .o_wrap_field,
+.o_mcp_context_stats_form .o_mcp_context_stats_flags .o_cell {
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+}
+.o_mcp_context_stats_scroll {
+    max-height: 60vh;
+    overflow-y: auto;
+    flex: 0 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0;
+    padding: 0 4px;
+}
+.o_mcp_context_stats_scroll .o_field_widget,
+.o_mcp_context_stats_scroll .pns_html_readonly,
+.o_mcp_context_stats_html {
+    min-height: 0 !important;
+    height: auto !important;
+    display: block;
+}
+.modal-body:has(.o_mcp_context_stats_form) {
+    padding-top: 8px !important;
+    padding-bottom: 4px !important;
+    padding-inline: 16px !important;
+}
+
+.o_form_view .o_pns_origin_filter_bar,
+.o_form_view .o_pns_origin_filter {
+    pointer-events: auto;
+}
+.o_pns_origin_filter {
+    cursor: pointer;
+    user-select: none;
+}
+.o_form_view .o_field_x2many {
+    overflow-anchor: none;
+}
+.o_field_x2many tr.o_pns_origin_hidden {
+    display: none !important;
+}
+.o_form_view th[data-name="composition_origin"],
+.o_form_view th[data-id="composition_origin"],
+.o_form_view th.o_pns_origin_sortable {
+    cursor: pointer;
+    user-select: none;
+}
+.o_form_view th.o_pns_origin_sortable::after {
+    content: " \25B2";
+    font-size: 0.7em;
+    opacity: 0.55;
+}
+.o_form_view th.o_pns_origin_sortable[aria-sort="descending"]::after {
+    content: " \25BC";
+}
+

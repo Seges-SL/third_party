@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Assets backend (OWL1 / Odoo <=14) para Chatboo. -->
+<odoo>
+    <template id="assets_backend" inherit_id="web.assets_backend">
+        <xpath expr="." position="inside">
+            <link rel="stylesheet" type="text/css" href="/pns_ai_chatboo/static/src/css/chatboo_floating.css"/>
+            <link rel="stylesheet" type="text/css" href="/pns_ai_chatboo/static/src/css/chatboo_dashboard.css"/>
+            <link rel="stylesheet" type="text/css" href="/pns_ai_chatboo/static/src/css/chatboo_systray.css"/>
+            <!-- Protocolo SSE compartido (common/) — replace/body/footer -->
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_sse.js"/>
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_screen_context.js"/>
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_choice_list.js"/>
+            <!-- Librerías vendor: Markdown (showdown), PDF (jsPDF), Excel (SheetJS). -->
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/showdown.js"/>
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/jspdf.umd.min.js"/>
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/jspdf.plugin.autotable.min.js"/>
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/html2canvas.min.js"/>
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/xlsx.full.min.js"/>
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chart.umd.min.js"/>
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/echarts.min.js"/>
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_dashboard.js"/>
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_card_width.js"/>
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_charts.js"/>
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_svg_cards.js"/>
+            <!-- Chatboo: extracted modules (loaded before main component). -->
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_tts.js"/>
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_formatters.js"/>
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_export.js"/>
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_context_stats.js"/>
+            <!-- Chatboo: main component. -->
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_component_v2.js"/>
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_systray.js"/>
+        </xpath>
+    </template>
+</odoo>

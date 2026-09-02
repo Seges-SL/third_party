@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_safe_operation_tools_wizard_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.safe.operation.tools.wizard.form</field>
+        <field name="model">pns_ai_mcp.safe.operation.tools.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Authorization Tools">
+                <div class="alert alert-info mb-0" role="alert">
+                    <p>Select the operation to perform:</p>
+                    <ul class="mb-0">
+                        <li>Refresh expiry: Mark timed-out pending/confirmed operations as Expired (no cron).</li>
+                        <li>Export JSON: Download audit data (administrators only).</li>
+                    </ul>
+                </div>
+                <footer>
+                    <button name="action_refresh_expiry" string="Refresh expiry statuses"
+                            type="object" class="btn-primary" icon="fa-refresh"/>
+                    <button name="action_export" string="Export JSON" type="object"
+                            class="btn-secondary" icon="fa-download"
+                            groups="pns_ai_mcp.group_ai_admin"/>
+                    <button special="cancel" string="Close" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_safe_operation_tools_wizard" model="ir.actions.act_window">
+        <field name="name">Authorization Tools</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">pns_ai_mcp.safe.operation.tools.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_safe_operation_tools_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+</odoo>

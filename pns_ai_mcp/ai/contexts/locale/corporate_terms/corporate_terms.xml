@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <metadata>
+        <code>corporate_terms</code>
+        <tipo>locale</tipo>
+        <description>English corporate terminology mapping - Odoo field and model translations (factory fallback)</description>
+        <author>System</author>
+        <version>1.2</version>
+        <created_at>2025-01-25</created_at>
+        <created_by>Administrator</created_by>
+        <modified_at>2026-08-27</modified_at>
+        <modified_by>Administrator</modified_by>
+        <is_fallback>true</is_fallback>
+    </metadata>
+    
+    <term_mapping_definitions>
+        <formatting_conventions locale="en_US">
+            <decimal_separator>.</decimal_separator>
+            <thousands_separator>,</thousands_separator>
+            <csv_field_separator>,</csv_field_separator>
+            <csv_quote_char>"</csv_quote_char>
+            <date_format>MM/DD/YYYY</date_format>
+            <time_format>HH:MM:SS</time_format>
+            <currency_symbol>$</currency_symbol>
+            <currency_position>prefix</currency_position>
+            <note>Factory fallback (English): CSV uses comma (,) as field separator. Numbers: $1,234.56 (thousands=comma, decimal=dot, currency before amount)</note>
+        </formatting_conventions>
+        
+        <mapping locale="en_US">
+            
+            <!-- Invoicing & Accounting -->
+            <term key="Invoices, Bills, Proforma, Proforma invoice">account.move (module: accounting, search by move_type)</term>
+            <term key="Payroll, Salary, Salaries, Payslip">→ hr_payroll</term>
+            <term key="Employment contract, Labour contract, Labor contract, Employee contract, Work contract">→ hr_contracts (hr.employee first; hr.contract only if installed; NEVER contract.contract)</term>
+            <term key="Permissions, Roles, ACL, Access rights, AccessError, Discover roles">→ acl_security + Settings → ACL Manager (module pns_acl_manager; migrate then prune; ad-hoc writes with Confirm)</term>
+            <term key="Customer, Client">res.partner with ≥1 posted sales invoice (account.move move_type in out_invoice/out_refund, state=posted) as invoice partner / commercial partner. NEVER customer_rank. NEVER calendar attendees (partner_ids) alone. NEVER hr.employee.</term>
+            <term key="Supplier, Vendor">res.partner with supplier_rank > 0</term>
+            <term key="Partner, Contact">res.partner</term>
+            <term key="Address, Location">res.partner (use location_search pattern)</term>
+            
+            <!-- HR -->
+            <term key="Employee, Staff">hr.employee (module: hr, NOT res.partner)</term>
+            <term key="NIF, CIF, DNI, Tax ID, Identification ID">Synonyms for identification/tax number. res.partner: use vat. hr.employee: use identification_id. Choose field by model.</term>
+            <term key="Department">hr.department</term>
+            <term key="Sales Team, Business Area">crm.team (module: sales/crm)</term>
+            
+            <!-- Analytics & Reporting -->
+            <term key="Filter, Custom View">ir.filters</term>
+            <term key="Cost Center, Analytic Account">account.analytic.account</term>
+            <term key="Analytic Group">account.analytic.group (aggregates analytic accounts)</term>
+            <term key="Analytic Line, Analytic Entry">account.analytic.line (analytic entry)</term>
+            <term key="Revenue, Income">Positive amounts in analytic lines</term>
+            <term key="Expenses">Negative amounts in analytic lines</term>
+            
+            <!-- Financial Fields -->
+            <term key="Taxable Base, Untaxed Amount, Amount without VAT">amount_untaxed</term>
+            <term key="Invoice Total">amount_total</term>
+            <term key="Tax, VAT, Tax Amount, VAT Amount">Tax amount (total - untaxed)</term>
+            
+            <!-- General -->
+            <term key="Journal Entry">account.move (accounting entry)</term>
+            <term key="Journal Item, Account Move Line, Accounting Line">account.move.line (accounting line)</term>
+            <term key="Tax (model), VAT (model)">account.tax</term>
+            <term key="Product, Item">product.product</term>
+            <term key="Sales Order, Quotation, Budget, Estimate">sale.order</term>
+            <term key="Purchase Order">purchase.order</term>
+            <term key="Delivery note, Delivery notes, Picking, Pickings, Delivery slip">stock.picking</term>
+            <term key="Unpaid Invoice, Unpaid Invoices, Outstanding Invoice, Overdue Invoice, Open Invoice, Accounts Receivable Pending, Payment History, Good Payer, Bad Payer, Credit Risk">→ invoice_concepts (query details, grouping conventions, risk analysis)</term>
+            <term key="Quarter, Quarterly, Half-Year, Semi-Annual, Fiscal Year, Annual, Month, Monthly, YTD, Year to Date">→ invoice_concepts (accounting_periods convention: use natural calendar periods, not rolling days)</term>
+            <term key="Best, Top, Main, Principal, Highest, Ranking, N most, N top, N best">SEMANTIC ORDERING: When user asks for N best/top/main/highest in any dimension (customers, products, suppliers, employees, etc.), ALWAYS order by the most relevant metric descending (ORDER BY ... DESC) and limit to N. NEVER use alphabetical order (name) as default. Examples: "10 best customers" → ORDER BY sum(amount_untaxed) DESC LIMIT 10; "top 5 products" → ORDER BY qty_sold DESC LIMIT 5; "main suppliers" → ORDER BY sum(purchase_total) DESC. If metric is not explicit in the question, infer billing total (sum of amount_untaxed or amount_total on posted invoices).</term>
+        </mapping>
+    </term_mapping_definitions>
+</context>

@@ -1,0 +1,16 @@
+{
+  "code": "discovery_api_cdmon_es_ES",
+  "tipo": "discovery",
+  "locale": "es_ES",
+  "target": "cdmon",
+  "target_kind": "api_server",
+  "priority": 70,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "cdmon",
+    "dominios cdmon",
+    "dns cdmon",
+    "api-domains.cdmon"
+  ]
+}
