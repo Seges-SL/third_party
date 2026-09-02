@@ -1,0 +1,22 @@
+{
+  "code": "discovery_invoice_concepts",
+  "tipo": "discovery",
+  "target": "invoice_concepts",
+  "priority": 78,
+  "soft_depends": [
+    "partners",
+    "business_documents"
+  ],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "invoice",
+    "invoices",
+    "bill",
+    "bills",
+    "amount_untaxed",
+    "amount_total",
+    "out_invoice",
+    "in_invoice",
+    "ytd"
+  ]
+}

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_json_export_wizard_form" model="ir.ui.view">
+        <field name="name">pns.ai.mcp.json.export.wizard.form</field>
+        <field name="model">pns_ai_mcp.json_export_wizard</field>
+        <field name="arch" type="xml">
+            <form string="Export result">
+                <sheet>
+                    <field name="result_html" nolabel="1" widget="pns_html_readonly"/>
+                    <field name="attachment_id" invisible="1"/>
+                    <field name="export_filename" invisible="1"/>
+                </sheet>
+                <footer>
+                    <button name="action_download" string="Download" type="object"
+                            class="btn-primary" icon="fa-download"
+                            attrs="{'invisible': [('attachment_id', '=', False)]}"/>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

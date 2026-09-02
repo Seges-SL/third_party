@@ -1,0 +1,69 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_mcp_log_user,AI Log User,model_ai_log,base.group_user,1,0,0,0
+access_mcp_context_user,AI Context User,model_ai_context,base.group_user,1,0,0,0
+access_ai_trusted_action_user,AI Trusted Action User,model_ai_trusted_action,base.group_user,1,0,0,0
+access_mcp_safe_operation_user,AI Supervised Operation User,model_ai_safe_operation,base.group_user,1,1,0,0
+access_url_whitelist_user,URL Whitelist User,model_ai_url_whitelist,base.group_user,1,0,0,0
+access_external_server_user,External API Server User,model_ai_api_server,base.group_user,1,0,0,0
+access_api_server_key_user,External API Server Key User,model_ai_api_server_key,base.group_user,1,1,1,1
+access_ai_fetch_cache_user,AI Fetch Cache User,model_ai_fetch_cache,base.group_user,1,0,0,0
+access_ai_api_result_cache_user,AI API Result Cache User,model_ai_api_result_cache,base.group_user,1,0,0,0
+access_ai_provider_user,AI Provider User,model_ai_provider,base.group_user,1,0,0,0
+access_ai_provider_model_user,AI Provider Model User,model_ai_provider_model,base.group_user,1,0,0,0
+access_ai_provider_usage_day_user,AI Provider Usage Day User,model_ai_provider_usage_day,base.group_user,1,0,0,0
+access_ai_fx_source_user,AI FX Source User,model_ai_fx_source,base.group_user,1,0,0,0
+access_ai_context_agent_user,AI Agent User,model_ai_agent,base.group_user,1,0,0,0
+access_ai_skill_user,AI Skill User,model_ai_skill,base.group_user,1,0,0,0
+access_pns_ai_mcp_context_stats_wizard,Context Stats Wizard,model_pns_ai_mcp_context_stats_wizard,base.group_user,1,1,1,1
+access_mcp_context_tools_wizard_admin,Context Tools Wizard Admin,model_pns_ai_mcp_context_tools_wizard,group_ai_admin,1,1,1,1
+access_mcp_context_writer,AI Context Writer,model_ai_context,group_ai_writer,1,1,1,1
+access_ai_skill_writer,AI Skill Writer,model_ai_skill,group_ai_writer,1,1,1,1
+access_ai_context_agent_compose_wizard_writer,Agent Compose Wizard Writer,model_pns_ai_mcp_agent_compose_wizard,group_ai_writer,1,1,1,1
+access_ai_context_agent_compose_line_writer,Agent Compose Line Writer,model_pns_ai_mcp_agent_compose_line,group_ai_writer,1,1,1,1
+access_ai_context_agent_cache_rebuild_wizard_writer,Agent Cache Rebuild Wizard Writer,model_pns_ai_mcp_agent_cache_rebuild_wizard,group_ai_writer,1,1,1,1
+access_ai_skill_capture_wizard_writer,Skill Capture Wizard Writer,model_pns_ai_mcp_skill_capture_wizard,group_ai_writer,1,1,1,1
+access_pns_ai_mcp_skill_tools_wizard_admin,Skill Tools Wizard Admin,model_pns_ai_mcp_skill_tools_wizard,group_ai_admin,1,1,1,1
+access_pns_ai_mcp_skill_import_wizard_admin,Skill Import Wizard Admin,model_pns_ai_mcp_skill_import_wizard,group_ai_admin,1,1,1,1
+access_pns_ai_mcp_context_import_wizard_admin,Context Import Wizard Admin,model_pns_ai_mcp_context_import_wizard,group_ai_admin,1,1,1,1
+access_pns_ai_mcp_json_export_wizard_admin,JSON Export Wizard Admin,model_pns_ai_mcp_json_export_wizard,group_ai_admin,1,1,1,1
+access_pns_ai_mcp_agent_tools_wizard_admin,Agent Tools Wizard Admin,model_pns_ai_mcp_agent_tools_wizard,group_ai_admin,1,1,1,1
+access_pns_ai_mcp_agent_context_import_wizard_admin,Agent Context Import Wizard Admin,model_pns_ai_mcp_agent_context_import_wizard,group_ai_admin,1,1,1,1
+access_pns_ai_mcp_agent_skill_import_wizard_admin,Agent Skill Import Wizard Admin,model_pns_ai_mcp_agent_skill_import_wizard,group_ai_admin,1,1,1,1
+access_pns_ai_mcp_agent_import_wizard_admin,Agent Import Wizard Admin,model_pns_ai_mcp_agent_import_wizard,group_ai_admin,1,1,1,1
+access_mcp_user_admin,MCP User Admin,model_ai_mcp_user,group_ai_admin,1,1,1,1
+access_mcp_api_key_wizard_admin,MCP API Key Wizard Admin,model_pns_ai_mcp_api_key_wizard,group_ai_admin,1,1,1,1
+access_mcp_log_admin,AI Log Admin,model_ai_log,group_ai_admin,1,1,1,1
+access_ai_change_journal_admin,AI Change Journal Admin,model_ai_change_journal,group_ai_admin,1,1,1,0
+access_ai_change_journal_system,AI Change Journal System,model_ai_change_journal,base.group_system,1,1,1,0
+access_mcp_log_delete_menu_admin,MCP Log Delete Menu Admin,model_pns_ai_mcp_log_delete_menu,group_ai_admin,1,1,1,1
+access_mcp_log_delete_menu_system,MCP Log Delete Menu System,model_pns_ai_mcp_log_delete_menu,base.group_system,1,1,1,1
+access_mcp_safe_operation_admin,AI Supervised Operation Admin,model_ai_safe_operation,group_ai_admin,1,1,1,1
+access_url_whitelist_admin,URL Whitelist Admin,model_ai_url_whitelist,group_ai_admin,1,1,1,1
+access_external_server_admin,External API Server Admin,model_ai_api_server,group_ai_admin,1,1,1,1
+access_api_server_key_admin,External API Server Key Admin,model_ai_api_server_key,group_ai_admin,1,1,1,1
+access_ai_fetch_cache_admin,AI Fetch Cache Admin,model_ai_fetch_cache,group_ai_admin,1,1,1,1
+access_ai_api_result_cache_admin,AI API Result Cache Admin,model_ai_api_result_cache,group_ai_admin,1,1,1,1
+access_ai_provider_admin,AI Provider Admin,model_ai_provider,group_ai_admin,1,1,1,1
+access_ai_provider_model_admin,AI Provider Model Admin,model_ai_provider_model,group_ai_admin,1,1,1,1
+access_ai_provider_usage_day_admin,AI Provider Usage Day Admin,model_ai_provider_usage_day,group_ai_admin,1,1,1,1
+access_ai_fx_source_admin,AI FX Source Admin,model_ai_fx_source,group_ai_admin,1,1,1,1
+access_ai_provider_tools_wizard_admin,AI Provider Tools Wizard Admin,model_pns_ai_mcp_provider_tools_wizard,group_ai_admin,1,1,1,1
+access_ai_agent_provider_admin,AI Agent Provider Admin,model_ai_agent_provider,group_ai_admin,1,1,1,1
+access_ai_context_agent_admin,AI Agent Admin,model_ai_agent,group_ai_admin,1,1,1,1
+access_import_servers_wizard_admin,Import Servers Wizard Admin,model_pns_ai_mcp_import_servers_wizard,group_ai_admin,1,1,1,1
+access_import_users_wizard_admin,Import Users Wizard Admin,model_pns_ai_mcp_import_users_wizard,group_ai_admin,1,1,1,1
+access_import_whitelist_wizard_admin,Import Whitelist Wizard Admin,model_pns_ai_mcp_import_whitelist_wizard,group_ai_admin,1,1,1,1
+access_import_external_servers_wizard_admin,Import External Servers Wizard Admin,model_pns_ai_mcp_import_external_servers_wizard,group_ai_admin,1,1,1,1
+access_import_agents_wizard_admin,Import Agents Wizard Admin,model_pns_ai_mcp_import_agents_wizard,group_ai_admin,1,1,1,1
+access_mcp_user_tools_wizard_admin,User Tools Wizard Admin,model_pns_ai_mcp_user_tools_wizard,group_ai_admin,1,1,1,1
+access_whitelist_tools_wizard_admin,Whitelist Tools Wizard Admin,model_pns_ai_mcp_whitelist_tools_wizard,group_ai_admin,1,1,1,1
+access_external_server_tools_wizard_admin,External Server Tools Wizard Admin,model_pns_ai_mcp_external_server_tools_wizard,group_ai_admin,1,1,1,1
+access_mcp_log_tools_wizard_admin,Log Tools Wizard Admin,model_pns_ai_mcp_log_tools_wizard,group_ai_admin,1,1,1,1
+access_safe_operation_tools_wizard_user,Safe Operation Tools Wizard User,model_pns_ai_mcp_safe_operation_tools_wizard,base.group_user,1,1,1,1
+access_config_backup_wizard_admin,Config Backup Wizard Admin,model_pns_ai_mcp_config_backup_wizard,group_ai_admin,1,1,1,1
+access_artifact_bundle_export_wizard_admin,Artifact Bundle Export Wizard Admin,model_pns_ai_mcp_artifact_bundle_export_wizard,group_ai_admin,1,1,1,1
+access_artifact_bundle_import_wizard_admin,Artifact Bundle Import Wizard Admin,model_pns_ai_mcp_artifact_bundle_import_wizard,group_ai_admin,1,1,1,1
+access_ai_trusted_action_admin,AI Trusted Action Admin,model_ai_trusted_action,group_ai_admin,1,1,1,1
+access_ai_system_action_admin,AI System Action Admin,model_ai_system_action,group_ai_admin,1,1,1,1
+access_ai_view_policy_admin,AI View Policy Admin,model_ai_view_policy,group_ai_admin,1,1,1,1
+access_ai_safe_choice_user,AI Safe Choice User,model_ai_safe_choice,base.group_user,1,1,1,1

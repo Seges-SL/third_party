@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<title>AI Engine</title>
+</head>
+<body>
+<style>
+  .pns-apps {
+    --apps-brand: #875A7B;
+    --apps-accent: #C4A35A;
+    --apps-ink: #2B2A29;
+    --apps-muted: #5c6570;
+    --apps-line: #d7deea;
+    --apps-paper: #f4f7fb;
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 28px 20px 40px;
+    color: var(--apps-ink);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    line-height: 1.55;
+  }
+  .pns-apps * { box-sizing: border-box; }
+  .pns-apps-hero {
+    text-align: center;
+    padding: 8px 0 28px;
+    border-bottom: 4px solid var(--apps-accent);
+  }
+  .pns-apps-hero img {
+    width: 112px;
+    height: 112px;
+    border-radius: 26px;
+    border: 3px solid var(--apps-brand);
+    background: #fff;
+    display: block;
+    margin: 0 auto 16px;
+  }
+  .pns-apps-hero h1 {
+    margin: 0 0 8px;
+    color: var(--apps-brand);
+    font-size: 1.85rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .pns-apps-hero p {
+    margin: 0 auto;
+    max-width: 36em;
+    color: var(--apps-muted);
+    font-size: 1.05rem;
+  }
+  .pns-apps-card {
+    margin-top: 22px;
+    padding: 20px 22px 18px;
+    background: #fff;
+    border: 1px solid var(--apps-line);
+    border-radius: 14px;
+  }
+  .pns-apps-card.alt { background: var(--apps-paper); }
+  .pns-apps-card h2 {
+    margin: 0 0 12px;
+    color: var(--apps-brand);
+    font-size: 1.15rem;
+  }
+  .pns-apps-card p { margin: 0 0 10px; }
+  .pns-apps-card p:last-child { margin-bottom: 0; }
+  .pns-apps-grid { display: block; }
+  .pns-apps-grid ul { margin: 0; padding-left: 1.15em; }
+  .pns-apps-grid li { margin: 0 0 10px; }
+  .pns-apps-grid li:last-child { margin-bottom: 0; }
+  .pns-apps-steps { margin: 0; padding-left: 1.2em; }
+  .pns-apps-steps li { margin: 0 0 8px; }
+  .pns-apps table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+  }
+  .pns-apps th, .pns-apps td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--apps-line);
+    vertical-align: top;
+  }
+  .pns-apps th { background: var(--apps-brand); color: #fff; font-weight: 600; }
+  .pns-apps tr:nth-child(even) td { background: #eef3f9; }
+  .pns-apps code {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 0.88em;
+    background: #e8eef6;
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  .pns-apps-foot { margin-top: 18px; color: var(--apps-muted); font-size: 0.92rem; }
+  .pns-apps-foot a { color: var(--apps-brand); }
+  @media (min-width: 700px) {
+    .pns-apps-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; }
+  }
+</style>
+<div class="pns-apps">
+  <header class="pns-apps-hero">
+    <img src="icon.png" alt="AI Engine"/>
+    <h1>AI Engine</h1>
+    <p>Patanegra AI engine and MCP server for Odoo. Reference host of PAAP &mdash; the Patanegra Application Agent Protocol.</p>
+  </header>
+
+  <section class="pns-apps-card">
+    <h2>Where to configure</h2>
+    <p>
+      <strong>AI Engine</strong> app (not Settings &rarr; General Settings, not
+      Technical). Providers, agents, URL whitelist and MCP users live in that
+      app.
+    </p>
+    <p>
+      Paste the provider API key on the <strong>provider</strong> form. Set
+      failover order on the <strong>agent</strong> (the Chatboo agent, or the
+      one your MCP user uses). Secrets never travel in the addon.
+    </p>
+  </section>
+
+  <section class="pns-apps-card alt">
+    <h2>What it is</h2>
+    <p>
+      The <strong>product</strong> AI layer. It owns providers, agents, contexts,
+      skills, Safe Plan writes and the MCP endpoint that Cursor (and other
+      clients) call. Chatboo is a separate module: it owns the conversation UI
+      and talks to this engine. This module does not depend on Chatboo.
+    </p>
+    <p>
+      Knowledge that is generic to the suite lives here (geo fabric, partners,
+      accounting, ACL&hellip;). Pilot-only skills, Sesame/CDMON connectors and
+      the Occidente failover chain belong in <code>occ_custom_ai</code>, not
+      in this repo.
+    </p>
+  </section>
+
+  <section class="pns-apps-card">
+    <h2>What it ships</h2>
+    <div class="pns-apps-grid">
+      <ul>
+        <li><strong>MCP server</strong> &mdash; tools and prompts for Cursor and other MCP clients. The instance is the source of truth; clients do not keep a second copy of skills.</li>
+        <li><strong>Inference</strong> &mdash; LLM drivers (OpenAI-compatible, Anthropic, Ollama, &hellip;) and provider failover on the agent. A key is pasted per instance; it never travels in the module.</li>
+        <li><strong>Safe Plan</strong> &mdash; proposed writes wait for a human Confirm in Odoo. The engine does not apply ORM writes behind the operator&rsquo;s back.</li>
+      </ul>
+      <ul>
+        <li><strong>Knowledge</strong> &mdash; product contexts and skills (<code>pns_*</code>). Domain cheat-sheets regenerate; they are not versioned as customer dumps.</li>
+        <li><strong>External APIs</strong> &mdash; OpenAPI / MCP servers plus a typed URL whitelist. A whitelist row is a hostname, not a secret.</li>
+        <li><strong>PAAP</strong> &mdash; the open agent protocol this engine implements. Chatboo, OCR and future UIs are consumers, not a second engine.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="pns-apps-card alt">
+    <h2>What it does not do</h2>
+    <ul>
+      <li><strong>No chat UI</strong> &mdash; that is <code>pns_ai_chatboo</code>. Install Chatboo if people will talk from the Odoo systray.</li>
+      <li><strong>No customer pack</strong> &mdash; Occidente skills, Sesame/CDMON tokens and the pilot failover chain are <code>occ_custom_ai</code>.</li>
+      <li><strong>No map HTTP</strong> &mdash; geocoding and routes go through <code>pns_geo</code> / <code>geo.service</code>. The engine must not call Google or OSM itself.</li>
+      <li><strong>No secrets in the addon</strong> &mdash; provider keys, API tokens and <code>env</code> credentials stay in the database (or the instance env). The module only leaves the slot.</li>
+    </ul>
+  </section>
+
+  <section class="pns-apps-card">
+    <h2>How to configure</h2>
+    <ol class="pns-apps-steps">
+      <li>Before Apps: in the Odoo Python, install the extras stock Odoo does not ship (<code>httpx</code>, <code>pydantic</code>; on Odoo 14 also <code>openpyxl&gt;=3.1.2</code>). Then install <code>pns_base</code> and this module. Install <code>pns_geo</code> if maps or geocoding will be used.</li>
+      <li>Open the <strong>AI Engine</strong> app. Create or open a provider, paste the API key, pick a model and save.</li>
+      <li>On the Chatboo agent (or the agent your MCP user uses), set the provider and the failover chain. Order is on the agent, not in Chatboo.</li>
+      <li>If Cursor will call this instance: create an MCP user / API key and point the client at this database. Whitelist any extra hostnames the tools need.</li>
+      <li>Pilot databases: install <code>occ_custom_ai</code> after the engine so Occidente skills and connectors seed on top. Paste Sesame/CDMON tokens there, not here.</li>
+    </ol>
+  </section>
+
+  <section class="pns-apps-card alt">
+    <h2>Family</h2>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>Where</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>pns_ai_mcp</code></td>
+          <td>O14 and O19</td>
+          <td>This engine: providers, knowledge, MCP, Safe Plan</td>
+        </tr>
+        <tr>
+          <td><code>pns_ai_chatboo</code></td>
+          <td>O14 and O19</td>
+          <td>In-Odoo chat UI; depends on the engine</td>
+        </tr>
+        <tr>
+          <td><code>occ_custom_ai</code></td>
+          <td>O14 and O19</td>
+          <td>Occidente pack: pilot skills and connectors. Product never depends on it.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="pns-apps-foot">
+      UI source in English. Layout: <code>common/</code> plus OWL1 (O13&ndash;14) and OWL2 (O15&ndash;19+) stacks.
+    </p>
+    <p class="pns-apps-foot">
+      <a href="https://patanegra.com">PATANEGRA Soft</a>
+      &mdash; Apache License 2.0 (OSI approved). See <a href="LICENSE">LICENSE</a>.
+    </p>
+  </section>
+</div>
+</body>
+</html>

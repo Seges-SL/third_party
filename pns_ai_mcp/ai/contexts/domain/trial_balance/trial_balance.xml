@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <metadata>
+        <code>trial_balance</code>
+        <tipo>domain</tipo>
+        <description>Trial balance - accounts with debits, credits and balance by date range (generic fallback)</description>
+        <created_at>2026-02-19</created_at>
+        <modified_at>2026-02-19</modified_at>
+        <is_fallback>true</is_fallback>
+    </metadata>
+    
+    <domain_knowledge>
+        <module name="trial_balance" model="account.move.line">
+            <description>Trial balance. Group journal items by account (account_id), sum debits and credits.</description>
+            <rules>
+                <rule>Filter only posted moves: move_id.state = 'posted'.</rule>
+                <rule>Use debit, credit fields in account.move.line. Balance = debit - credit.</rule>
+                <rule>Dates: date in account.move.line (or date in account.move if filtering by move).</rule>
+                <rule>Accounts: account_id (account.account). Exclude lines without account: ('account_id', '!=', False).</rule>
+                <rule>Sorting: sorted(result, key=operator.itemgetter('code')). operator is preloaded. Do NOT sort records directly.</rule>
+                <rule>Variables: define start_date and end_date (str 'YYYY-MM-DD') before the domain.</rule>
+                <rule severity="critical">OUTPUT COLUMNS: The final output MUST ALWAYS contain exactly these columns, regardless of the grouping level: 1. account code or required digits (code), 2. account name or grouping (account), 3. debit, 4. credit, 5. balance.</rule>
+            </rules>
+            <pattern name="trial_balance_basic">
+                <description>Basic trial balance by date range</description>
+                <code_snippet>
+# Trial balance (start_date, end_date in YYYY-MM-DD format)
+start_date = 'YYYY-MM-DD' # AI must replace with requested dates natively
+end_date = 'YYYY-MM-DD' # AI must replace with requested dates natively
+# Exclude lines without account to avoid type errors
+domain = [
+    ('move_id.state', '=', 'posted'),
+    ('date', '>=', start_date),
+    ('date', '<=', end_date),
+    ('account_id', '!=', False),
+]
+lines = env['account.move.line'].search(domain)
+# Group by account_id.id (flat dict, no imports)
+by_account = {}
+for line in lines:
+    acc = line.account_id
+    if acc:
+        aid = acc.id
+        if aid not in by_account:
+            by_account[aid] = {'debit': 0, 'credit': 0, 'account': acc}
+        by_account[aid]['debit'] += line.debit
+        by_account[aid]['credit'] += line.credit
+# Build result and sort by code (operator preloaded, avoids type conflict)
+result = []
+for data in by_account.values():
+    acc = data['account']
+    result.append({
+        'code': acc.code or '',
+        'account': acc.name or '',
+        'debit': data['debit'],
+        'credit': data['credit'],
+        'balance': data['debit'] - data['credit']
+    })
+result = sorted(result, key=operator.itemgetter('code'))
+                </code_snippet>
+            </pattern>
+            <pattern name="trial_balance_grouped_by_digits">
+                <description>Trial balance grouped by the first X digits of the account code</description>
+                <code_snippet>
+# Grouped trial balance by account prefix level (e.g. 2 digits)
+# Variable `digits` is dynamically passed or defaults to None
+digits_level = 2
+start_date = 'YYYY-MM-DD' # AI must replace with requested dates natively
+end_date = 'YYYY-MM-DD' # AI must replace with requested dates natively
+domain = [
+    ('move_id.state', '=', 'posted'),
+    ('date', '>=', start_date),
+    ('date', '<=', end_date),
+    ('account_id', '!=', False),
+]
+lines = env['account.move.line'].search(domain)
+
+by_prefix = {}
+for line in lines:
+    acc = line.account_id
+    if acc and acc.code:
+        # Extract exact substring based on digit level
+        prefix = acc.code[:digits_level]
+        if prefix not in by_prefix:
+            by_prefix[prefix] = {'debit': 0, 'credit': 0}
+        
+        by_prefix[prefix]['debit'] += line.debit
+        by_prefix[prefix]['credit'] += line.credit
+
+# Build result exactly with the 5 MANDATORY columns
+result = []
+for prefix, data in by_prefix.items():
+    result.append({
+        'code': prefix,
+        # If no real account exists to represent the group, invent a virtual name
+        'account': 'Group ' + prefix, 
+        'debit': data['debit'],
+        'credit': data['credit'],
+        'balance': data['debit'] - data['credit']
+    })
+# Sort alphabetically standard
+result = sorted(result, key=operator.itemgetter('code'))
+                </code_snippet>
+            </pattern>
+        </module>
+    </domain_knowledge>
+</context>

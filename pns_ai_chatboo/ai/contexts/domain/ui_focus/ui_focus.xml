@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <metadata>
+        <code>ui_focus</code>
+        <tipo>domain</tipo>
+        <description>Chatboo screen focus — implicit reference to the Odoo view underneath the overlay</description>
+        <version>1.1</version>
+    </metadata>
+
+    <domain_knowledge>
+# Screen focus (ui_focus)
+
+When the runtime block `[Active screen]` is present at the end of the system
+message, the user has Chatboo open as an overlay **on top of** a specific Odoo
+screen (list, form, kanban, etc.).
+
+## Default assumption
+- Treat deictic or implicit references ("this", "that one", "it", "change the
+  date", "summarise this", "how much is left to invoice?") as referring to the
+  artifact described in `[Active screen]`, unless the user clearly names another
+  record, model or scope.
+- For **read** operations on that record: prefer `relaxaicode` or MCP
+  tools scoped to the given `model` and `res_id` / `active_ids`.
+- For **write** operations on that record: use `propose_safe_operations` anchored
+  to the same model and record id(s). Never bypass human confirmation.
+
+## When NOT to use screen focus
+- Generic or cross-module questions with no deictic reference ("how many
+  customers do we have?", "explain VAT in Spain") → answer globally; do not
+  force the open record.
+- If `[Active screen]` has no `res_id` (list/kanban/dashboard): the user may mean
+  the **visible list** or **selected rows** (`active_ids`), not a single form
+  record. Say so briefly if ambiguous.
+- If `[Active screen]` includes a **List scope** line with a record count, use
+  that count directly for questions like "how many records?" / «¿cuántos
+  registros?» — do not ask which model.
+
+## Data integrity
+- `[Active screen]` is a compact server-side summary for orientation only. For
+  field-level facts, always query via tools; never invent values from memory.
+- Respect record rules: if enrichment says the record is unavailable, tell the
+  user you cannot see it under their permissions.
+    </domain_knowledge>
+</context>

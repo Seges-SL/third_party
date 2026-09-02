@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ai_fx_source_tree" model="ir.ui.view">
+        <field name="name">ai.fx.source.tree</field>
+        <field name="model">ai.fx.source</field>
+        <field name="arch" type="xml">
+            <tree string="Currency rate sources" editable="bottom" class="o_pns_list">
+                <field name="sequence" widget="handle"/>
+                <field name="name" optional="show"/>
+                <field name="url" optional="show"/>
+                <field name="active" optional="show"/>
+                <field name="fail_count" optional="show"/>
+                <field name="last_success" optional="show"/>
+                <field name="last_fail" optional="show"/>
+                <field name="last_error" optional="show"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_ai_fx_source_form" model="ir.ui.view">
+        <field name="name">ai.fx.source.form</field>
+        <field name="model">ai.fx.source</field>
+        <field name="arch" type="xml">
+            <form string="Currency rate source">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="url"/>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="fail_count"/>
+                            <field name="last_success"/>
+                            <field name="last_fail"/>
+                            <field name="last_error"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ai_fx_source" model="ir.actions.act_window">
+        <field name="name">Currency rate sources</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">ai.fx.source</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Add a currency rate feed</p>
+            <p>HTTPS JSON feeds with a USD-based rates map. The first active
+               source that answers wins; the next is failover. Not the Safe Plan whitelist.</p>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    stacks/owl2/security/security_groups.xml (Odoo 15-19+)
+    Odoo 19: res.groups.category_id was replaced by privilege_id -> res.groups.privilege.
+    (Odoo 13-14 uses category_id directly — see the owl1 stack.)
+-->
+<odoo>
+    <data noupdate="0">
+
+        <record id="module_category_ai" model="ir.module.category">
+            <field name="name">Artificial Intelligence</field>
+            <field name="description">PNS AI ecosystem: providers, agents, skills, contexts, Chatboo.</field>
+            <field name="sequence">90</field>
+        </record>
+
+        <record id="privilege_ai" model="res.groups.privilege">
+            <field name="name">Artificial Intelligence</field>
+            <field name="category_id" ref="module_category_ai"/>
+        </record>
+
+        <record id="group_ai_writer" model="res.groups">
+            <field name="name">AI Writer</field>
+            <field name="comment">Create, edit, and delete AI records and Odoo data via supervised operations (propose_safe_operations CRUD steps).</field>
+            <field name="privilege_id" ref="privilege_ai"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        </record>
+
+        <record id="group_ai_external_url" model="res.groups">
+            <field name="name">AI External URL</field>
+            <field name="comment">Query external HTTP/HTTPS URLs via propose_safe_operations (fetch_url steps).</field>
+            <field name="privilege_id" ref="privilege_ai"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        </record>
+
+        <!-- xmlid renamed from group_ai_external_mcp (ai.api.server._auto_init
+             rewrites ir_model_data in place so memberships are preserved) -->
+        <record id="group_ai_external_api" model="res.groups">
+            <field name="name">AI External API</field>
+            <field name="comment">Call tools on configured external API servers (MCP or OpenAPI) via propose_safe_operations (api_call steps).</field>
+            <field name="privilege_id" ref="privilege_ai"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        </record>
+
+        <record id="group_ai_admin" model="res.groups">
+            <field name="name">AI Administrator</field>
+            <field name="comment">Full AI administration: providers, API keys, servers, users, logs, whitelist, system config.</field>
+            <field name="privilege_id" ref="privilege_ai"/>
+            <field name="implied_ids" eval="[(4, ref('group_ai_writer')), (4, ref('group_ai_external_url')), (4, ref('group_ai_external_api'))]"/>
+        </record>
+
+    </data>
+</odoo>

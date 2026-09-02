@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <metadata>
+        <code>dates</code>
+        <tipo>domain</tipo>
+        <description>ORM date/period composition: calendar Date/Datetime vs identifier text</description>
+        <version>1.0</version>
+    </metadata>
+
+    <domain_knowledge>
+        <module name="orm_dates">
+            <description>Calendar year and period of a record come from Date/Datetime fields. Identifier Char fields are a different question.</description>
+            <rules>
+                <rule severity="critical">Year, period, or “in YYYY”: filter, group and label with Date/Datetime fields. Probe Model._fields for type date or datetime. Prefer the model’s business date (date, date_end, date_deadline, date_order, invoice_date, …). Use create_date only when no business date exists. Skip write_date.</rule>
+                <rule severity="critical">When the user names years (e.g. 2025, 2026), use those integers as literals. Never compute them as date.today().year + N or any relative offset.</rule>
+                <rule>Digits in name, code, display_name or a customer reference are identifiers, not a calendar year.</rule>
+                <rule>When the user asks to search name, code or reference text: match those Char fields with ilike (or equivalent). That is identifier lookup, not a calendar period.</rule>
+            </rules>
+            <pattern name="year_from_date_field">
+                <description>Calendar year from a Date/Datetime field. Probe _fields; prefer business date over create_date.</description>
+                <code_snippet>
+year = 2026  # integer the user named
+fields = Model._fields
+date_names = [
+    n for n, f in fields.items()
+    if getattr(f, 'type', None) in ('date', 'datetime') and n != 'write_date'
+]
+preferred = ('date', 'date_end', 'date_deadline', 'date_order', 'invoice_date')
+name = next((n for n in preferred if n in date_names), None)
+if not name:
+    name = next((n for n in date_names if n != 'create_date'), None)
+    if not name and 'create_date' in date_names:
+        name = 'create_date'
+recs = Model.search([
+    (name, '>=', '%s-01-01' % year),
+    (name, '<=', '%s-12-31' % year),
+]) if name else Model.browse()
+# label: rec[name].year if rec[name] else None
+                </code_snippet>
+            </pattern>
+            <pattern name="search_identifier_text">
+                <description>Match identifier Char fields when the user asks to search name, code or reference.</description>
+                <code_snippet>
+needle = 'TEXT'  # identifier fragment the user gave
+name_f = 'name' if 'name' in Model._fields else 'display_name'
+recs = Model.search([(name_f, 'ilike', needle)])
+                </code_snippet>
+            </pattern>
+        </module>
+    </domain_knowledge>
+</context>

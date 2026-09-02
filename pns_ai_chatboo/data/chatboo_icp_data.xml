@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="icp_chatboo_download_max_bytes" model="ir.config_parameter">
+            <field name="key">pns_ai_chatboo.download_max_bytes</field>
+            <field name="value">15728640</field>
+        </record>
+        <record id="icp_chatboo_chart_engine" model="ir.config_parameter">
+            <field name="key">pns_ai_chatboo.chart_engine</field>
+            <field name="value">echarts</field>
+        </record>
+        <record id="icp_chatboo_default_show_mode" model="ir.config_parameter">
+            <field name="key">pns_ai_chatboo.default_show_mode</field>
+            <field name="value">show-table</field>
+        </record>
+    </data>
+</odoo>

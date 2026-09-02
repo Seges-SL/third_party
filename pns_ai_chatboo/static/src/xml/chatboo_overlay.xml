@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="pns_ai_chatboo.ChatbooOverlayHost">
+        <t t-if="state.chatMounted">
+            <div id="o_chatboo_persistent_overlay"
+                 t-attf-class="o_chatboo_persistent_overlay d-flex flex-column {{ state.visible ? '' : 'd-none' }}"
+                 t-att-style="overlayStyle">
+                <div class="o_chatboo_persistent_mount o_chatboo_container flex-grow-1 overflow-hidden d-flex flex-column">
+                    <ChatbooApp onAppReady.bind="onChatbooAppReady"/>
+                </div>
+            </div>
+        </t>
+    </t>
+
+</templates>

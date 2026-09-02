@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_module_form_pns_index" model="ir.ui.view">
+        <field name="name">ir.module.module.form.pns.index</field>
+        <field name="model">ir.module.module</field>
+        <field name="inherit_id" ref="base.module_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form[1]" position="attributes">
+                <attribute name="class" add="pns_module_index_form" separator=" "/>
+            </xpath>
+            <xpath expr="//field[@name='description_html']" position="replace">
+                <field name="description_html" invisible="1"/>
+                <field name="pns_index_url" nolabel="1" widget="pns_module_index"
+                       invisible="not pns_index_url"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

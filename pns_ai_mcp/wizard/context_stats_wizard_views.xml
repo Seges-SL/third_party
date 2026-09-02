@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="view_mcp_context_stats_wizard_form_v2" model="ir.ui.view">
+            <field name="name">pns_ai_mcp.context_stats_wizard.form.v2</field>
+            <field name="model">pns_ai_mcp.context_stats_wizard</field>
+            <field name="arch" type="xml">
+                <form string="Context Statistics" class="o_mcp_context_stats_form">
+                    <group col="2" class="o_mcp_context_stats_flags mb-0">
+                        <field name="agent_id" invisible="1"/>
+                        <field name="inject_enabled" readonly="1"/>
+                        <field name="show_ktokens"/>
+                    </group>
+                    <div class="o_mcp_context_stats_scroll">
+                        <field name="stats_html" nolabel="1" colspan="2"
+                                 widget="pns_html_readonly"
+                                 class="o_mcp_context_stats_html"/>
+                    </div>
+                    <footer>
+                        <button string="Close" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_mcp_context_stats" model="ir.actions.act_window">
+            <field name="name">Context Statistics</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">pns_ai_mcp.context_stats_wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+    </data>
+</odoo>

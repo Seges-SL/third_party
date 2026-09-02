@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_mcp" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.mcp.inherit</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority" eval="40"/>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app string="AI Engine" name="pns_ai_mcp" groups="pns_ai_mcp.group_ai_admin">
+                    <block title="External AI agents" name="mcp_external_agents">
+                        <div class="text-muted mb-2">
+                            Endpoint agents declared by installed modules
+                            (<code>data/ai_agent_data.xml</code>). Each module owns a card below.
+                            The LLM runs in the external client; Odoo serves context and tools.
+                            Bare entry <code>/mcp</code> uses the MCP Server agent.
+                        </div>
+                        <setting id="mcp_agent_pns_ai_mcp" string="MCP Server"
+                                 help="Module pns_ai_mcp · endpoint · code pns_ai_mcp · bare /mcp entry.">
+                            <div class="content-group">
+                                <h3 class="text-muted mt8 mb8 h5">Agent Protocol</h3>
+                                <button name="action_open_module_agent" type="object"
+                                        string="Configuration" class="btn-link" icon="fa-external-link"
+                                        context="{'agent_code': 'pns_ai_mcp'}"/>
+                            </div>
+                        </setting>
+                        <setting string="All external agents"
+                                 help="Open the full list of endpoint agents from installed modules.">
+                            <button name="action_open_module_endpoint_agents"
+                                    type="object" string="Browse all"
+                                    class="btn-link" icon="fa-list"/>
+                        </setting>
+                    </block>
+                    <block title="Internal AI agents" name="mcp_internal_agents">
+                        <div class="text-muted mb-2">
+                            Inference agents declared by installed modules
+                            (<code>data/ai_agent_data.xml</code>). Each module owns a card below
+                            (product preferences + Agent Protocol). Use Configuration for
+                            providers, contexts and skills.
+                        </div>
+                        <setting string="All internal agents"
+                                 help="Open the full list of inference agents from installed modules.">
+                            <button name="action_open_module_inference_agents"
+                                    type="object" string="Browse all"
+                                    class="btn-link" icon="fa-list"/>
+                        </setting>
+                    </block>
+                    <block title="Consumption costs" name="mcp_currency_rates">
+                        <div class="text-muted mb-2">
+                            How Chatboo shows token spend. Vendors bill in USD; one display currency applies to every provider in the thread. Quote feeds convert at open time. Not the Safe Plan URL whitelist.
+                        </div>
+                        <setting string="Display currency"
+                                 help="ISO currency for cost chips. Same for all providers in a conversation.">
+                            <field name="display_currency"/>
+                        </setting>
+                        <setting string="Quote sources"
+                                 help="HTTPS JSON feeds with a USD-based rates map. First success wins; the next is failover.">
+                            <button name="action_open_fx_sources"
+                                    type="object" string="Manage quote sources"
+                                    class="btn-link" icon="fa-external-link"/>
+                        </setting>
+                    </block>
+                    <block title="Domain knowledge" name="mcp_domain_index">
+                        <div class="text-muted mb-2">
+                            Keep the always-on agent bundle small: indexed domain
+                            packs load only on matching turns. Disable to restore
+                            the monolith (all linked domains in cache).
+                        </div>
+                        <setting string="Turn-scoped domain packs"
+                                 help="When on, indexed domains leave the always-on cache and are injected per matching turn. When off, linked domains stay in the cache. Saving a change rebuilds inference agent caches.">
+                            <field name="domain_index_inject"/>
+                        </setting>
+                    </block>
+                    <block title="Instance skills" name="mcp_instance_skills">
+                        <div class="text-muted mb-2">
+                            Prefixes for skills created on this instance
+                            (<code>/create-skill</code>). Code is snake_case;
+                            the slash is kebab-case. Empty = no prefix.
+                            A tenant pack may seed defaults. Prefixes must not
+                            equal an existing slash or a builtin.
+                        </div>
+                        <setting string="Skill code prefix"
+                                 help="Snake-case catalog prefix. Empty = none.">
+                            <field name="skill_code_prefix" placeholder=""/>
+                        </setting>
+                        <setting string="Skill command prefix"
+                                 help="Kebab-case slash prefix. Empty = none. Must not equal an existing slash or a builtin.">
+                            <field name="skill_command_prefix" placeholder=""/>
+                        </setting>
+                    </block>
+                    <block title="Safe Plan" name="mcp_safe_plan">
+                        <div class="text-muted mb-2">
+                            Security settings for AI supervised operations (Safe Plan / Caja B).
+                        </div>
+                        <setting string="URL access policy"
+                                 help="Whitelist only: domains outside the list are blocked unless an AI Administrator approves adding them. Open: new domains are added to the whitelist automatically on access.">
+                            <field name="url_access_policy" widget="radio"/>
+                        </setting>
+                        <setting string="URL Whitelist"
+                                 help="Global list of allowed domains. Under Whitelist only, only listed domains are accessible to regular users.">
+                            <button name="action_open_url_whitelist"
+                                    type="object" string="Manage URL Whitelist"
+                                    class="btn-link" icon="fa-external-link"/>
+                        </setting>
+                    </block>
+                    <block title="Configuration backup" name="mcp_config_backup">
+                        <div class="text-muted mb-2">
+                            Save the full AI configuration (providers, agents, contexts, skills,
+                            external servers, whitelist and user API keys) to a JSON file, and
+                            restore it after an uninstall/reinstall or on another instance.
+                        </div>
+                        <div class="alert alert-warning" role="alert">
+                            The exported file contains secrets (API keys, tokens) in clear text. Keep it safe.
+                        </div>
+                        <setting string="Export configuration"
+                                 help="Download a complete JSON backup of the AI configuration (secrets included).">
+                            <button name="action_export_ai_config" type="object"
+                                    string="Export configuration" class="btn-primary" icon="fa-download"/>
+                        </setting>
+                        <setting string="Import configuration"
+                                 help="Restore the AI configuration from a JSON backup. Records are matched by business key and updated in place; nothing is deleted.">
+                            <button name="action_import_ai_config" type="object"
+                                    string="Import configuration" class="btn-secondary" icon="fa-upload"/>
+                        </setting>
+                    </block>
+                    <block title="Partial artifact bundle" name="mcp_artifact_bundle">
+                        <div class="text-muted mb-2">
+                            Export or import a subset of AI artifacts (skills, contexts,
+                            providers, agents, external servers, MCP users, URL whitelist,
+                            settings) by explicit selection. Import only applies what is in
+                            the bundle; enable replace to upsert records with the same
+                            business key (code, name, login, domain…).
+                        </div>
+                        <setting string="Export artifact bundle"
+                                 help="Download a ZIP with the selected portable artifacts.">
+                            <button name="action_export_artifact_bundle" type="object"
+                                    string="Export selection" class="btn-primary" icon="fa-download"/>
+                        </setting>
+                        <setting string="Import artifact bundle"
+                                 help="Import a partial bundle ZIP; other records in the database are left unchanged.">
+                            <button name="action_import_artifact_bundle" type="object"
+                                    string="Import bundle" class="btn-secondary" icon="fa-upload"/>
+                        </setting>
+                    </block>
+                    <block title="Module license" name="mcp_license">
+                        <setting string="License and copyright"
+                                 help="PNS AI Engine is distributed under the Apache License 2.0. See the LICENSE file included with the module."/>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_module_endpoint_agents" model="ir.actions.act_window">
+        <field name="name">External AI agents</field>
+        <field name="res_model">ai.agent</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('origin', '=', 'module'), ('active', '=', True), ('agent_type', '=', 'endpoint')]</field>
+        <field name="context">{'create': False, 'delete': False}</field>
+    </record>
+
+    <record id="action_module_inference_agents" model="ir.actions.act_window">
+        <field name="name">Internal AI agents</field>
+        <field name="res_model">ai.agent</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('origin', '=', 'module'), ('active', '=', True), ('agent_type', '=', 'inference')]</field>
+        <field name="context">{'create': False, 'delete': False}</field>
+    </record>
+
+    <record id="action_mcp_configuration" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">main</field>
+        <field name="context">{'module': 'pns_ai_mcp', 'bin_size': False}</field>
+        <field name="group_ids" eval="[(4, ref('pns_ai_mcp.group_ai_admin'))]"/>
+    </record>
+
+    <menuitem id="menu_mcp_settings"
+              name="Settings"
+              parent="pns_ai_mcp.menu_mcp_main"
+              action="action_mcp_configuration"
+              sequence="50"
+              groups="pns_ai_mcp.group_ai_admin"/>
+</odoo>

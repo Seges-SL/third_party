@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pns_operation_result_form" model="ir.ui.view">
+        <field name="name">pns.operation.result.form</field>
+        <field name="model">pns.operation.report.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Operation result">
+                <field name="show_result" invisible="1"/>
+                <field name="result_status" invisible="1"/>
+                <group name="result_subtitle"/>
+                <group name="result_alerts">
+                    <div name="alert_success" class="alert alert-success mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'success')]}">
+                        <i class="fa fa-check-circle"/> <strong>Operation completed successfully.</strong>
+                    </div>
+                    <div name="alert_warning" class="alert alert-warning mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'warning')]}">
+                        <i class="fa fa-exclamation-triangle"/> <strong>Operation completed with warnings.</strong>
+                    </div>
+                    <div name="alert_danger" class="alert alert-danger mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'danger')]}">
+                        <i class="fa fa-times-circle"/> <strong>Operation failed.</strong>
+                    </div>
+                </group>
+                <group name="result_counts">
+                    <field name="result_created"/>
+                    <field name="result_updated"/>
+                    <field name="result_skipped" attrs="{'invisible': [('result_skipped', '=', 0)]}"/>
+                    <field name="result_removed" attrs="{'invisible': [('result_removed', '=', 0)]}"/>
+                    <field name="result_linked" attrs="{'invisible': [('result_linked', '=', 0)]}"/>
+                    <field name="result_manifest" attrs="{'invisible': [('result_manifest', '=', False)]}"/>
+                </group>
+                <group name="result_messages">
+                    <field name="result_warnings" attrs="{'invisible': [('result_warnings', '=', False)]}"/>
+                    <field name="result_errors" attrs="{'invisible': [('result_errors', '=', False)]}"/>
+                    <field name="result_detail" attrs="{'invisible': [('result_detail', '=', False)]}"/>
+                </group>
+                <footer>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,509 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="pns_ai_chatboo.ChatbooApp">
+        <div class="o_content o_chatboo_container o_chatboo_app d-flex flex-column h-100 position-relative"
+             t-on-dragenter="(ev) => this._onDragOver(ev)"
+             t-on-dragover="(ev) => this._onDragOver(ev)"
+             t-on-dragleave="(ev) => this._onDragLeave(ev)"
+             t-on-drop="(ev) => this._onDrop(ev)">
+
+            <!-- Overlay al arrastrar ficheros sobre CUALQUIER zona del chat. Es
+                 solo visual (pointer-events:none): el 'drop' llega a la raíz. -->
+            <div t-if="state.dragActive"
+                 style="position:absolute;inset:0;z-index:2000;pointer-events:none;background:rgba(13,110,253,0.08);border:2px dashed #0d6efd;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                <div style="background:#fff;padding:14px 22px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.15);color:#0d6efd;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px;">
+                    <i class="fa fa-cloud-upload fa-2x"/>
+                    <span t-esc="dropHint"/>
+                </div>
+            </div>
+
+            <!-- Cabecera O14: enchufe + proveedor, sin logo redundante -->
+            <div class="o_chatboo_main_header px-3 py-2 border-bottom d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2 flex-grow-1" style="min-width:0;">
+                    <div class="o_chatboo_status text-muted opacity-75" style="white-space:nowrap;">
+                        <t t-if="state.providerModel">
+                            <i t-attf-class="fa fa-plug me-1 {{ state.connected ? 'text-success' : 'text-danger' }}"
+                               style="cursor:pointer;" t-att-title="tipTestConnection"
+                               t-on-click="() => this._testConnection()"/>
+                            <span class="o_chatboo_provider_pick"
+                                  t-attf-class="o_chatboo_provider_pick {{ state.providers.length > 1 ? 'o_chatboo_provider_clickable' : '' }}"
+                                  t-att-title="state.providers.length > 1 ? tipChangeProvider : undefined"
+                                  t-on-click="() => this._toggleProviderMenu()">
+                                <span t-if="state.providerHost" class="fw-normal opacity-75"><t t-esc="state.providerHost"/> → </span>
+                                <strong t-esc="state.providerModel"/>
+                                <i t-if="state.providers.length > 1" class="fa fa-caret-down ms-1 opacity-50"/>
+                                <t t-if="state.providerMenuOpen">
+                                    <div class="o_chatboo_provider_backdrop" t-on-click.stop="() => this._closeProviderMenu()"/>
+                                    <ul class="o_chatboo_provider_menu" t-on-click.stop="() => {}">
+                                        <t t-foreach="state.providers" t-as="prov" t-key="prov.id">
+                                            <li t-attf-class="o_chatboo_provider_item {{ prov.id === state.selectedProviderId ? 'active' : '' }}"
+                                                t-on-click.stop="() => this._selectProvider(prov.id)">
+                                                <t t-esc="prov.display || prov.name"/>
+                                            </li>
+                                        </t>
+                                    </ul>
+                                </t>
+                            </span>
+                        </t>
+                        <t t-elif="state.providerName">
+                            <i t-attf-class="fa fa-plug me-1 {{ state.connected ? 'text-success' : 'text-danger' }}"
+                               style="cursor:pointer;" t-att-title="tipTestConnection"
+                               t-on-click="() => this._testConnection()"/>
+                            <t t-esc="state.providerName"/>
+                        </t>
+                        <t t-else=""><t t-esc="tipConnecting"/></t>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-secondary" t-on-click="() => this._createNewSession(true)" t-att-title="tipNewChat">
+                        <i class="fa fa-plus"/> <t t-esc="tipNew"/>
+                    </button>
+                    <button class="btn btn-sm btn-secondary" t-on-click="() => this._showSessions()" t-att-title="tipHistory">
+                        <i class="fa fa-history"/> <t t-esc="tipHistory"/>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Mensajes -->
+            <div class="o_chatboo_messages flex-grow-1 p-3" t-ref="messages" style="overflow-y:auto;min-height:0;">
+
+                <t t-if="!state.messages.length &amp;&amp; !state.thinking">
+                    <div class="text-center text-muted mt-5">
+                        <p>How can I help you today?</p>
+                    </div>
+                </t>
+
+                <t t-foreach="state.messages" t-as="msg" t-key="msg_index">
+                    <div t-attf-class="d-flex mb-2 {{ msg.role === 'user' ? 'justify-content-end' : 'justify-content-start' }}{{ messageWantsWideCanvas(msg) ? ' o_chatboo_message_row--chart' : '' }}"
+                         t-att-data-msg-index="msg_index"
+                         t-att-data-turn-code="msg.contextInfo and msg.contextInfo.turnCode">
+                        <div t-attf-class="o_chatboo_message o_chatboo_bubble card border-0 shadow-sm p-2 {{ msg.role === 'user' ? 'bg-primary text-white o_chatboo_user' : 'bg-white o_chatboo_assistant' }}{{ messageWantsWideCanvas(msg) ? ' o_chatboo_message--chart' : '' }}"
+                             style="position:relative;">
+                            <div t-if="messageWantsWideCanvas(msg)"
+                                 class="o_chatboo_card_resize"
+                                 t-on-pointerdown="_onCardResizeStart"/>
+                            <t t-if="msg.role === 'assistant'">
+                                <div t-attf-class="d-flex mb-1 gap-1 o_chatboo_export_bar {{ messageWantsWideCanvas(msg) ? 'justify-content-between' : 'justify-content-end' }}">
+                                    <i t-if="messageWantsWideCanvas(msg)"
+                                       class="fa fa-compress o_chatboo_copy_btn text-muted o_chatboo_card_width_reset"
+                                       t-att-title="tipRestoreCardWidth"
+                                       t-on-click="_resetCardWidth"/>
+                                    <span class="d-flex gap-1">
+                                    <i class="fa fa-file-pdf-o o_chatboo_copy_btn text-danger"
+                                       t-att-title="tipDownloadPdf"
+                                       t-att-data-msg-index="msg_index"
+                                       t-on-click="_downloadAsPDF"/>
+                                    <i class="fa fa-file-excel-o o_chatboo_copy_btn text-success"
+                                       t-att-title="tipDownloadExcel"
+                                       t-att-data-msg-index="msg_index"
+                                       t-on-click="_downloadAsExcel"/>
+                                    <i class="fa fa-file-word-o o_chatboo_copy_btn text-primary"
+                                       t-att-title="tipDownloadWord"
+                                       t-att-data-msg-index="msg_index"
+                                       t-on-click="_downloadAsWord"/>
+                                    <i class="fa fa-copy o_chatboo_copy_btn text-muted"
+                                       t-att-title="tipCopyContent"
+                                       t-att-data-msg-index="msg_index"
+                                       data-copy-type="content"
+                                       t-on-click="_copyToClipboard"/>
+                                    <i class="fa fa-code o_chatboo_copy_btn text-muted"
+                                       t-att-title="tipCopyMarkdown"
+                                       t-att-data-msg-index="msg_index"
+                                       data-copy-type="markdown"
+                                       t-on-click="_copyToClipboard"/>
+                                    </span>
+                                </div>
+                                <div t-if="msg.files and msg.files.length" class="o_chatboo_file_banner_list">
+                                    <t t-foreach="msg.files" t-as="mfile" t-key="mfile_index">
+                                        <a t-if="mfile.url" t-att-href="_fileDownloadHref(mfile)"
+                                           t-att-download="_fileDownloadName(mfile)"
+                                           t-att-class="_fileBannerCardClass(mfile)"
+                                           t-att-title="mfile.name">
+                                            <span class="o_chatboo_file_banner_preview" aria-hidden="true">
+                                                <i t-att-class="'fa ' + _fileIcon(mfile)"/>
+                                            </span>
+                                            <span class="o_chatboo_file_banner_meta">
+                                                <span class="o_chatboo_file_banner_title" t-esc="mfile.name"/>
+                                                <span t-if="_fileSizeLabel(mfile)" class="o_chatboo_file_banner_size"
+                                                      t-esc="_fileSizeLabel(mfile)"/>
+                                                <span class="o_chatboo_file_banner_cta" t-esc="tipDownloadFile"/>
+                                            </span>
+                                        </a>
+                                        <span t-else=""
+                                              t-att-class="_fileBannerCardClass(mfile)"
+                                              t-att-title="mfile.name">
+                                            <span class="o_chatboo_file_banner_preview" aria-hidden="true">
+                                                <i t-att-class="'fa ' + _fileIcon(mfile)"/>
+                                            </span>
+                                            <span class="o_chatboo_file_banner_meta">
+                                                <span class="o_chatboo_file_banner_title" t-esc="mfile.name"/>
+                                                <span t-if="_fileSizeLabel(mfile)" class="o_chatboo_file_banner_size"
+                                                      t-esc="_fileSizeLabel(mfile)"/>
+                                            </span>
+                                        </span>
+                                    </t>
+                                </div>
+                            </t>
+                            <t t-if="msg.role === 'user'">
+                                <div class="d-flex justify-content-end mb-1">
+                                    <i class="fa fa-copy o_chatboo_copy_btn"
+                                       t-att-title="tipCopyClipboard"
+                                       t-att-data-msg-index="msg_index"
+                                       data-copy-type="content"
+                                       t-on-click="_copyToClipboard"/>
+                                </div>
+                            </t>
+                            <t t-if="msg.role === 'user'">
+                                <div t-if="msg.images and msg.images.length" class="mb-1 d-flex flex-wrap gap-1">
+                                    <t t-foreach="msg.images" t-as="mimg" t-key="mimg_index">
+                                        <span class="d-inline-flex flex-column align-items-start">
+                                            <a t-att-href="mimg.url or mimg" target="_blank" rel="noopener"
+                                               t-att-title="mimg.name or tipOpenImage">
+                                                <img t-att-src="mimg.url or mimg" t-att-alt="mimg.name or 'image'"
+                                                     style="max-width:100%;max-height:220px;border-radius:6px;cursor:zoom-in;"/>
+                                            </a>
+                                            <span t-if="mimg.name" class="text-truncate text-muted"
+                                                  style="font-size:0.72em;max-width:220px;" t-esc="mimg.name"/>
+                                        </span>
+                                    </t>
+                                </div>
+                                <div t-if="msg.files and msg.files.length" class="o_chatboo_file_banner_list">
+                                    <t t-foreach="msg.files" t-as="mfile" t-key="mfile_index">
+                                        <a t-if="mfile.url" t-att-href="_fileDownloadHref(mfile)"
+                                           t-att-download="_fileDownloadName(mfile)"
+                                           t-att-class="_fileBannerCardClass(mfile)"
+                                           t-att-title="mfile.name">
+                                            <span class="o_chatboo_file_banner_preview" aria-hidden="true">
+                                                <i t-att-class="'fa ' + _fileIcon(mfile)"/>
+                                            </span>
+                                            <span class="o_chatboo_file_banner_meta">
+                                                <span class="o_chatboo_file_banner_title" t-esc="mfile.name"/>
+                                                <span t-if="_fileSizeLabel(mfile)" class="o_chatboo_file_banner_size"
+                                                      t-esc="_fileSizeLabel(mfile)"/>
+                                                <span class="o_chatboo_file_banner_cta" t-esc="tipDownloadFile"/>
+                                            </span>
+                                        </a>
+                                        <span t-else=""
+                                              t-att-class="_fileBannerCardClass(mfile)"
+                                              t-att-title="mfile.name">
+                                            <span class="o_chatboo_file_banner_preview" aria-hidden="true">
+                                                <i t-att-class="'fa ' + _fileIcon(mfile)"/>
+                                            </span>
+                                            <span class="o_chatboo_file_banner_meta">
+                                                <span class="o_chatboo_file_banner_title" t-esc="mfile.name"/>
+                                                <span t-if="_fileSizeLabel(mfile)" class="o_chatboo_file_banner_size"
+                                                      t-esc="_fileSizeLabel(mfile)"/>
+                                            </span>
+                                        </span>
+                                    </t>
+                                </div>
+                                <div t-if="msg.raw" class="o_chatboo_content" t-esc="msg.raw"/>
+                            </t>
+                            <t t-elif="msg.htmlSrc">
+                                <ChatbooHtmlRenderer html="msg.htmlSrc"/>
+                            </t>
+                            <t t-else="">
+                                <div class="o_chatboo_content" t-out="msg.content"/>
+                            </t>
+                            <div class="o_chatboo_ts_row">
+                                <div t-attf-class="o_chatboo_ts {{ msg.role === 'user' ? 'text-white' : '' }}" t-esc="msg.ts"/>
+                                <div t-if="msg.role === 'assistant'" class="d-flex gap-1 o_chatboo_export_bar">
+                                    <i class="fa fa-file-pdf-o o_chatboo_copy_btn text-danger"
+                                       t-att-title="tipDownloadPdf"
+                                       t-att-data-msg-index="msg_index"
+                                       t-on-click="_downloadAsPDF"/>
+                                    <i class="fa fa-file-excel-o o_chatboo_copy_btn text-success"
+                                       t-att-title="tipDownloadExcel"
+                                       t-att-data-msg-index="msg_index"
+                                       t-on-click="_downloadAsExcel"/>
+                                    <i class="fa fa-file-word-o o_chatboo_copy_btn text-primary"
+                                       t-att-title="tipDownloadWord"
+                                       t-att-data-msg-index="msg_index"
+                                       t-on-click="_downloadAsWord"/>
+                                    <i class="fa fa-copy o_chatboo_copy_btn text-muted"
+                                       t-att-title="tipCopyContent"
+                                       t-att-data-msg-index="msg_index"
+                                       data-copy-type="content"
+                                       t-on-click="_copyToClipboard"/>
+                                    <i class="fa fa-code o_chatboo_copy_btn text-muted"
+                                       t-att-title="tipCopyMarkdown"
+                                       t-att-data-msg-index="msg_index"
+                                       data-copy-type="markdown"
+                                       t-on-click="_copyToClipboard"/>
+                                </div>
+                            </div>
+                            <t t-if="msg.meta and msg.meta.model">
+                                <div class="text-muted" style="font-size:0.85em;">
+                                    <i class="fa fa-microchip me-1"/>
+                                    <t t-esc="msg.meta.model"/>
+                                    <t t-if="msg.meta.provider"> · <t t-esc="msg.meta.provider"/></t>
+                                </div>
+                            </t>
+                            <t t-if="msg.meta and msg.meta.sources and msg.meta.sources.length">
+                                <div class="text-muted" style="font-size:0.85em;">
+                                    <i class="fa fa-link me-1"/>
+                                    Fuente: <t t-esc="msg.meta.sources.join(', ')"/>
+                                </div>
+                            </t>
+                            <t t-if="msg.meta and msg.meta.records and msg.meta.records.length">
+                                <div class="o_chatboo_ack_records">
+                                    <t t-foreach="msg.meta.records" t-as="mrec" t-key="mrec_index">
+                                        <a t-if="mrec.role === 'document'"
+                                           t-att-href="_recordUrl(mrec)" target="_blank" rel="noopener"
+                                           class="o_chatboo_ack_doc_card"
+                                           t-att-title="mrec.model + ' #' + mrec.id">
+                                            <span class="o_chatboo_ack_doc_icon">
+                                                <i class="fa fa-file-text-o"/>
+                                            </span>
+                                            <span class="o_chatboo_ack_doc_body">
+                                                <span class="o_chatboo_ack_doc_name" t-esc="mrec.name"/>
+                                                <span class="o_chatboo_ack_doc_meta" t-esc="mrec.model + ' #' + mrec.id"/>
+                                            </span>
+                                            <i class="fa fa-external-link o_chatboo_ack_doc_open"/>
+                                        </a>
+                                    </t>
+                                </div>
+                            </t>
+                            <t t-if="msg.contextInfo">
+                                <div class="o_chatboo_context_info d-flex justify-content-between align-items-center mt-1"
+                                     t-attf-style="cursor:pointer;"
+                                     t-on-click="() => this._showContextStats()">
+                                    <span class="o_chatboo_usage_chips">
+                                        <span t-if="msg.contextInfo.turnCode" class="o_chatboo_usage_chip"
+                                              t-att-title="msg.contextInfo.turnCodeTitle"
+                                              t-att-data-turn-code="msg.contextInfo.turnCode"
+                                              t-on-click.stop="(ev) => this._copyTurnCode(ev, msg.contextInfo.turnCode)">
+                                            <t t-esc="msg.contextInfo.turnCode"/>
+                                        </span>
+                                        <span t-if="msg.contextInfo.showBuffer" class="o_chatboo_usage_chip"
+                                              t-att-title="msg.contextInfo.bufferTitle"
+                                              t-attf-style="color:{{ msg.contextInfo.colorHex }};">
+                                            <i t-attf-class="fa {{ msg.contextInfo.icon }} me-1"/>
+                                            <t t-esc="msg.contextInfo.usedK"/>k / <t t-esc="msg.contextInfo.limitK"/>k (<t t-esc="msg.contextInfo.usagePercent"/>%)
+                                        </span>
+                                        <span class="o_chatboo_usage_chip"
+                                              t-att-title="msg.contextInfo.spendTitle">
+                                            <t t-esc="msg.contextInfo.spendLabel"/>
+                                        </span>
+                                    </span>
+                                    <span t-if="msg.contextInfo.speedTps" t-att-title="msg.contextInfo.speedTitle">
+                                        <i class="fa fa-bolt me-1"/>
+                                        <t t-esc="msg.contextInfo.speedTps"/> tok/s
+                                    </span>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+                </t>
+
+                <t t-if="state.thinking">
+                    <div class="d-flex justify-content-start mb-3">
+                        <div class="o_chatboo_bubble o_chatboo_assistant card border-0 shadow-sm p-3 bg-white">
+                            <div class="d-inline-flex align-items-center flex-wrap" style="gap:10px;">
+                                <span class="o_chatboo_typing"><span/><span/><span/></span>
+                                <span class="text-muted"><t t-esc="state.statusLabel || tipThinking"/></span>
+                                <button t-if="state.canCancel" class="btn btn-sm btn-link text-muted p-0 ms-1"
+                                        type="button"
+                                        t-on-click="() => this._cancelStream()"
+                                        style="text-decoration:none;" t-att-title="tipCancel">
+                                    <i class="fa fa-stop-circle-o"/> <t t-esc="tipCancel"/>
+                                </button>
+                            </div>
+                            <t t-if="state.streamingHtml">
+                                <div class="mt-2">
+                                    <ChatbooHtmlRenderer html="state.streamingHtml"/>
+                                </div>
+                            </t>
+                            <t t-elif="state.streamingPreview">
+                                <div class="o_chatboo_content mt-2" t-out="state.streamingPreview"/>
+                            </t>
+                        </div>
+                    </div>
+                </t>
+            </div>
+
+            <!-- Entrada (estilo O14) -->
+            <div class="o_chatboo_main_footer border-top px-3 py-2">
+                <div t-if="state.screenFocusLabel" class="o_chatboo_screen_focus mb-2 d-flex align-items-center flex-wrap gap-2">
+                    <span t-attf-class="badge rounded-pill {{ state.screenFocusEnabled ? 'bg-primary-subtle text-primary border border-primary-subtle' : 'bg-secondary-subtle text-muted border' }}"
+                          style="font-weight:500;font-size:0.78em;cursor:pointer;"
+                          t-on-click="() => this.toggleScreenFocus()"
+                          t-att-aria-label="screenFocusTitle">
+                        <i class="fa fa-crosshairs me-1"/>
+                        <t t-esc="state.screenFocusLabel"/>
+                    </span>
+                </div>
+                <div class="d-flex align-items-start gap-3">
+                    <button t-if="state.ttsSupported"
+                            type="button"
+                            t-attf-class="btn btn-light border o_chatboo_tts_toggle {{ state.ttsEnabled ? 'o_chatboo_tts_on' : '' }}"
+                            t-att-aria-label="ttsTitle"
+                            t-on-click="() => this._toggleTts()"
+                            t-att-disabled="state.thinking"
+                            style="border-radius: 8px;">
+                        <img t-att-src="state.ttsEnabled ? '/pns_ai_chatboo/static/src/img/chatboo_tts_volume_on.svg' : '/pns_ai_chatboo/static/src/img/chatboo_tts_volume_off.svg'"
+                             alt="" width="22" height="22"/>
+                    </button>
+                    <div class="position-relative flex-grow-1">
+                        <div t-if="state.slashOpen" class="o_chatboo_slash dropdown-menu show p-1"
+                             t-ref="slashMenu"
+                             style="position:absolute;bottom:100%;left:0;right:0;margin-bottom:4px;">
+                            <t t-foreach="state.slashItems" t-as="sk" t-key="sk.code">
+                                <button type="button"
+                                        t-attf-class="dropdown-item rounded {{ sk_index === state.slashIndex ? 'active' : '' }}"
+                                        t-on-mousedown.prevent="() => this._applySlashSelection(sk)">
+                                    <span class="fw-bold">/<t t-esc="sk.code"/></span>
+                                    <span t-if="sk.kind === 'builtin'" class="badge bg-secondary ms-2" style="font-size:.7em;">command</span>
+                                    <span t-if="sk.kind === 'skill' &amp;&amp; sk.badgeLabel"
+                                          t-attf-class="badge ms-2 {{ sk.mine ? 'bg-info o_chatboo_skill_mine' : 'bg-secondary' }}"
+                                          style="font-size:.7em;" t-esc="sk.badgeLabel"/>
+                                    <small t-attf-class="ms-2 o_chatboo_slash_desc {{ sk_index === state.slashIndex ? '' : 'text-muted' }}"
+                                           t-esc="sk.description"/>
+                                </button>
+                            </t>
+                        </div>
+                        <div t-if="state.pendingImages.length" class="d-flex flex-wrap gap-1 mb-1">
+                            <t t-foreach="state.pendingImages" t-as="pimg" t-key="pimg_index">
+                                <div class="o_chatboo_pending_image d-inline-flex align-items-center gap-1 p-1 border rounded bg-light">
+                                    <img t-att-src="pimg" alt="pasted image"
+                                         style="height:40px;width:auto;border-radius:4px;"/>
+                                    <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-1"
+                                            t-att-aria-label="tipRemoveImage" t-on-click="() => this._removePendingImage(pimg_index)">
+                                        <i class="fa fa-times"/>
+                                    </button>
+                                </div>
+                            </t>
+                        </div>
+                        <div t-if="state.pendingFiles.length" class="d-flex flex-wrap gap-1 mb-1">
+                            <t t-foreach="state.pendingFiles" t-as="pfile" t-key="pfile_index">
+                                <div class="o_chatboo_pending_file d-inline-flex align-items-center gap-1 px-2 py-1 border rounded"
+                                     style="font-size:0.8em;max-width:220px;background:#f1f3f5;color:#212529;border-color:#ced4da !important;">
+                                    <i t-att-class="'fa ' + _fileIcon(pfile)" style="color:#495057;"/>
+                                    <span class="text-truncate" t-esc="pfile.name"/>
+                                    <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-1"
+                                            t-att-aria-label="tipRemoveFile" t-on-click="() => this._removePendingFile(pfile_index)">
+                                        <i class="fa fa-times"/>
+                                    </button>
+                                </div>
+                            </t>
+                        </div>
+                        <input type="file" t-ref="fileInput" class="d-none" multiple="multiple"
+                               accept=".txt,.md,.csv,.tsv,.log,.json,.xlsx,.xlsm,.xls,.docx,.doc,.pdf,.png,.jpg,.jpeg,.gif,.bmp,.webp,.svg,.ico,image/*,application/pdf,text/csv,application/json,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                               t-on-change="onFilesSelected"/>
+                        <div t-attf-class="o_chatboo_prompt_wrap {{ state.promptMultiline ? 'o_chatboo_prompt_has_toggle' : '' }}"
+                             t-att-style="'--o-chatboo-prompt-max-lines:' + promptMaxLines">
+                            <textarea class="form-control o_chatboo_prompt" t-ref="input" rows="1"
+                                   t-att-placeholder="state.inputPlaceholder"
+                                   t-att-value="state.currentInput"
+                                   t-on-input="onInput"
+                                   t-on-keydown="onKeydown"
+                                   t-on-paste="onPaste"
+                                   t-att-disabled="state.thinking"/>
+                            <button t-if="state.promptMultiline"
+                                    type="button"
+                                    class="btn btn-light border o_chatboo_prompt_resize"
+                                    t-att-aria-label="tipPromptResize"
+                                    t-on-click="() => this._togglePromptCollapsed()">
+                                <i t-attf-class="fa {{ state.promptCollapsed ? 'fa-chevron-down' : 'fa-chevron-up' }}"/>
+                            </button>
+                        </div>
+                    </div>
+                    <button class="btn btn-light border o_chatboo_composer_btn" t-on-click="() => this.onClipClick()"
+                            t-att-aria-label="tipAttach" t-att-disabled="state.thinking">
+                        <i class="fa fa-paperclip"/>
+                    </button>
+                    <button class="btn btn-primary o_chatboo_composer_btn" t-on-click="() => this._sendMessage()"
+                            t-att-aria-label="tipSend"
+                            t-att-disabled="state.thinking || (!state.currentInput.trim() &amp;&amp; !state.pendingImages.length &amp;&amp; !state.pendingFiles.length)">
+                        <i class="fa fa-paper-plane"/>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal historial (O14) -->
+            <t t-if="state.showSessionModal">
+                <div class="o_chatboo_session_modal_backdrop" t-on-click.self="() => this._closeSessionsModal()">
+                    <div class="o_chatboo_session_modal" t-on-click.stop="">
+                        <div class="modal-header align-items-center border-bottom px-3 py-2">
+                            <h5 class="modal-title m-0">Session History</h5>
+                            <t t-if="state.sessions.length">
+                                <div class="ms-3 me-auto d-flex align-items-center gap-3 border-start ps-3">
+                                    <div class="form-check mb-0">
+                                        <input type="checkbox" class="form-check-input" id="checkAllSessions"
+                                               t-att-checked="state.selectedSessions.length === state.sessions.length"
+                                               t-on-change="_toggleAllSessions"/>
+                                        <label class="form-check-label" for="checkAllSessions">Select all</label>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            t-att-disabled="!state.selectedSessions.length"
+                                            t-on-click="() => this._bulkDeleteSessions()">
+                                        <i class="fa fa-trash me-1"/> Delete (<t t-esc="state.selectedSessions.length"/>)
+                                    </button>
+                                </div>
+                            </t>
+                            <button type="button" class="btn-close ms-2" t-on-click="() => this._closeSessionsModal()"/>
+                        </div>
+                        <div class="modal-body overflow-auto p-0">
+                            <div class="list-group list-group-flush">
+                                <t t-foreach="state.sessions" t-as="session" t-key="session.id">
+                                    <div class="list-group-item d-flex align-items-center"
+                                         style="cursor:pointer;" t-on-click="() => this._selectSession(session.id)">
+                                        <div class="me-3" t-on-click.stop="">
+                                            <input type="checkbox" class="form-check-input"
+                                                   t-att-checked="state.selectedSessions.includes(session.id)"
+                                                   t-on-change="() => this._toggleSessionSelection(session.id)"/>
+                                        </div>
+                                        <t t-if="state.editingSessionId === session.id">
+                                            <div class="d-flex flex-grow-1 gap-2" t-on-click.stop="">
+                                                <input type="text" class="form-control form-control-sm"
+                                                       t-att-value="state.editingSessionName"
+                                                       t-on-input="(ev) => this.state.editingSessionName = ev.target.value"
+                                                       t-on-keydown="_onRenameInputKeydown"/>
+                                                <button class="btn btn-sm btn-success" t-on-click.stop="() => this._saveRenameSession()">
+                                                    <i class="fa fa-check"/>
+                                                </button>
+                                                <button class="btn btn-sm btn-secondary" t-on-click.stop="() => this._cancelRenameSession()">
+                                                    <i class="fa fa-times"/>
+                                                </button>
+                                            </div>
+                                        </t>
+                                        <t t-else="">
+                                            <div class="flex-grow-1">
+                                                <div class="d-flex align-items-center">
+                                                    <strong t-esc="session.name"/>
+                                                    <span t-if="state.currentSessionId === session.id" class="badge bg-primary text-white ms-2">Current</span>
+                                                </div>
+                                                <small class="text-muted">
+                                                    <t t-esc="session.message_count || 0"/> messages
+                                                    <t t-if="session.formatted_date"> · <t t-esc="session.formatted_date"/></t>
+                                                </small>
+                                            </div>
+                                            <div class="btn-group" t-on-click.stop="">
+                                                <button class="btn btn-sm btn-link" t-on-click="() => this._startRenameSession(session.id, session.name)">
+                                                    <i class="fa fa-edit"/>
+                                                </button>
+                                                <button class="btn btn-sm btn-link text-danger" t-on-click="() => this._deleteSession(session.id)">
+                                                    <i class="fa fa-trash"/>
+                                                </button>
+                                            </div>
+                                        </t>
+                                    </div>
+                                </t>
+                                <t t-if="!state.sessions.length">
+                                    <div class="list-group-item text-muted text-center">
+                                        <small>No saved sessions yet.</small>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-top px-3 py-2">
+                            <button type="button" class="btn btn-secondary btn-sm" t-on-click="() => this._closeSessionsModal()">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </div>
+    </t>
+
+</templates>

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <metadata>
+        <code>trial_balance_es_ES</code>
+        <tipo>domain</tipo>
+        <locale_code>es_ES</locale_code>
+        <description>Trial balance - accounts with debits, credits and balance by date range (Spain)</description>
+        <created_at>2026-02-19</created_at>
+        <modified_at>2026-02-19</modified_at>
+    </metadata>
+    
+    <domain_knowledge>
+        <module name="trial_balance" model="account.move.line">
+            <description>Trial balance. Group journal items by account (account_id), sum debits and credits.</description>
+            <rules>
+                <rule>Filter only posted moves: move_id.state = 'posted'.</rule>
+                <rule>Use debit, credit fields in account.move.line. Balance = debit - credit.</rule>
+                <rule>Dates: date in account.move.line (or date in account.move if filtering by move).</rule>
+                <rule>Accounts: account_id (account.account). Exclude lines without account: ('account_id', '!=', False).</rule>
+                <rule>Sorting: sorted(result, key=operator.itemgetter('codigo')). operator is preloaded. Do NOT sort records directly.</rule>
+                <rule>Variables: define start_date and end_date (str 'YYYY-MM-DD') before the domain.</rule>
+                <rule severity="critical">OUTPUT COLUMNS: The final output MUST ALWAYS contain exactly these columns, regardless of the grouping level: 1. número de cuenta or dígitos al nivel requerido (codigo), 2. nombre de la cuenta o agrupación (cuenta), 3. debe, 4. haber, 5. saldo.</rule>
+            </rules>
+            <pattern name="trial_balance_basic">
+                <description>Basic trial balance by date range</description>
+                <code_snippet>
+# Trial balance (start_date, end_date in YYYY-MM-DD format)
+start_date = 'YYYY-MM-DD'
+end_date = 'YYYY-MM-DD'
+domain = [
+    ('move_id.state', '=', 'posted'),
+    ('date', '>=', start_date),
+    ('date', '<=', end_date),
+    ('account_id', '!=', False),
+]
+lines = env['account.move.line'].search(domain)
+by_account = {}
+for line in lines:
+    acc = line.account_id
+    if acc:
+        aid = acc.id
+        if aid not in by_account:
+            by_account[aid] = {'debit': 0, 'credit': 0, 'account': acc}
+        by_account[aid]['debit'] += line.debit
+        by_account[aid]['credit'] += line.credit
+result = []
+for data in by_account.values():
+    acc = data['account']
+    result.append({
+        'codigo': acc.code or '',
+        'cuenta': acc.name or '',
+        'debe': data['debit'],
+        'haber': data['credit'],
+        'saldo': data['debit'] - data['credit']
+    })
+result = sorted(result, key=operator.itemgetter('codigo'))
+                </code_snippet>
+            </pattern>
+            <pattern name="trial_balance_grouped_by_digits">
+                <description>Trial balance grouped by the first X digits of the account code</description>
+                <code_snippet>
+digits_level = 2
+start_date = 'YYYY-MM-DD'
+end_date = 'YYYY-MM-DD'
+domain = [
+    ('move_id.state', '=', 'posted'),
+    ('date', '>=', start_date),
+    ('date', '<=', end_date),
+    ('account_id', '!=', False),
+]
+lines = env['account.move.line'].search(domain)
+
+by_prefix = {}
+for line in lines:
+    acc = line.account_id
+    if acc and acc.code:
+        # Extraer el substring exacto por el nivel de dígitos
+        prefix = acc.code[:digits_level]
+        if prefix not in by_prefix:
+            by_prefix[prefix] = {'debit': 0, 'credit': 0}
+        
+        by_prefix[prefix]['debit'] += line.debit
+        by_prefix[prefix]['credit'] += line.credit
+
+result = []
+for prefix, data in by_prefix.items():
+    result.append({
+        'codigo': prefix,
+        'cuenta': 'Grupo ' + prefix,
+        'debe': data['debit'],
+        'haber': data['credit'],
+        'saldo': data['debit'] - data['credit']
+    })
+result = sorted(result, key=operator.itemgetter('codigo'))
+                </code_snippet>
+            </pattern>
+        </module>
+    </domain_knowledge>
+</context>

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <metadata>
+        <code>corporate_terms_es_ES</code>
+        <tipo>locale</tipo>
+        <locale_code>es_ES</locale_code>
+        <description>Spanish corporate terminology mapping - Odoo field and model translations</description>
+        <author>System</author>
+        <version>1.1</version>
+        <created_at>2025-01-25</created_at>
+        <created_by>Administrator</created_by>
+        <modified_at>2025-01-25</modified_at>
+        <modified_by>Administrator</modified_by>
+    </metadata>
+    
+    <term_mapping_definitions>
+        <formatting_conventions locale="es_ES">
+            <decimal_separator>,</decimal_separator>
+            <thousands_separator>.</thousands_separator>
+            <csv_field_separator>;</csv_field_separator>
+            <csv_quote_char>"</csv_quote_char>
+            <date_format>DD/MM/YYYY</date_format>
+            <time_format>HH:MM:SS</time_format>
+            <currency_symbol>€</currency_symbol>
+            <currency_position>suffix</currency_position>
+            <note>In Spain: CSV uses semicolon (;) as field separator because comma is decimal separator. Numbers: 1.234,56 € (thousands=dot, decimal=comma, currency after amount)</note>
+        </formatting_conventions>
+        
+        <mapping locale="es_ES">
+            <term key="Factura, Facturas, Bills, Factura proforma, Proforma">account.move (module: accounting, search by move_type)</term>
+            <term key="Nómina, Nóminas, Salario, Salarios, Sueldo, Sueldos">→ hr_payroll</term>
+            <term key="Contrato laboral, Contratos laborales, Contrato de trabajo, Contratos de trabajo, Contrato de empleado, Contratos de empleado">→ hr_contracts (hr.employee primero; hr.contract solo si está instalado; NUNCA contract.contract)</term>
+            <term key="Permisos, Roles, ACL, Derechos de acceso, AccessError, Descubrir roles">→ acl_security + Settings → ACL Manager (módulo pns_acl_manager; migrar luego podar; escrituras ad hoc con Confirm)</term>
+            <term key="Empleado, Empleados, Trabajador, Trabajadores">hr.employee (module: hr, NOT res.partner)</term>
+            <term key="NIF, CIF, DNI">Sinónimos de identificación fiscal. res.partner: campo vat. hr.employee: campo identification_id. Según el modelo usar el campo correspondiente.</term>
+            <term key="Cliente, Clientes, Socio Comercial, Socios Comerciales">res.partner with ≥1 posted sales invoice (account.move move_type in out_invoice/out_refund, state=posted) as invoice partner / commercial partner. NEVER customer_rank. NEVER calendar attendees (partner_ids) alone. NEVER hr.employee.</term>
+            <term key="Proveedor, Proveedores, Suministrador, Suministradores">res.partner with supplier_rank > 0</term>
+            <term key="Ubicación, Ubicaciones, Dirección, Direcciones">res.partner (use location_search pattern)</term>
+            <term key="Provincia, Provincias, País, Países, Estado, Comunidad Autónoma, Región, Regiones, Geografía, Geográfico">→ geography (modelo: provincia=state_id, país=country_id, embudo de resolución; y manejo HONESTO de datos ausentes: si el campo está vacío, reportarlo — nunca inventar ni inferir la provincia)</term>
+            <term key="Departamento, Departamentos">hr.department</term>
+            <term key="Equipo de Ventas, Equipos de Ventas, Área de Negocio, Áreas de Negocio">crm.team (module: sales/crm)</term>
+            <term key="Filtro, Filtros, Vista Personalizada, Vistas Personalizadas">ir.filters</term>
+            <term key="Centro de Coste, Centros de Coste, Analítica, Cuenta Analítica, Cuentas Analíticas">account.analytic.account (cost center)</term>
+            <term key="Grupo Analítico, Grupos Analíticos">account.analytic.group (aggregates analytic accounts)</term>
+            <term key="Apunte Analítico, Apuntes Analíticos, Línea Analítica, Líneas Analíticas">account.analytic.line (analytic entry)</term>
+            <term key="Ingreso, Ingresos">Positive amounts in analytic lines</term>
+            <term key="Gasto, Gastos">Negative amounts in analytic lines</term>
+            <term key="Base Imponible, Importe sin IVA">amount_untaxed (taxable base)</term>
+            <term key="Total de Factura, Total Factura">amount_total (invoice total)</term>
+            <term key="Impuesto, Impuestos, IVA">Tax amount (total - untaxed)</term>
+            <term key="Asiento Contable, Asientos Contables">account.move (journal entry)</term>
+            <term key="Apunte Contable, Apuntes Contables">account.move.line (accounting line)</term>
+            <term key="Impuesto (modelo), Impuestos (modelo), IVA (modelo)">account.tax</term>
+            <term key="Producto, Productos, Artículo, Artículos">product.product</term>
+            <term key="Pedido de Venta, Pedidos de Venta, Presupuesto, Presupuestos, Oferta, Ofertas">sale.order</term>
+            <term key="Pedido de Compra, Pedidos de Compra">purchase.order</term>
+            <term key="Albarán, Albaranes">stock.picking</term>
+            <term key="Factura Impagada, Facturas Impagadas, Factura Pendiente, Facturas Pendientes, Facturas por Cobrar, Pendiente de Cobro, Vencidas sin Pagar, Morosos, Deuda Pendiente, Saldo Pendiente de Clientes, Historial de Pagos, Buen Pagador, Mal Pagador, Riesgo de Cobro">→ invoice_concepts (query details, grouping conventions, risk analysis)</term>
+            <term key="Trimestre, Trimestral, Semestre, Semestral, Ejercicio, Año Fiscal, Mes, Mensual, YTD, Lo que va de año, Acumulado anual">→ invoice_concepts (accounting_periods convention: use natural calendar periods, not rolling days)</term>
+            <term key="Mejores, Principales, Top, Mayor, Mayores, Ranking, Los N más, Las N más, Los N primeros">ORDENACIÓN SEMÁNTICA: Cuando el usuario pide los N mejores/principales/top/mayores en cualquier dimensión (clientes, productos, proveedores, empleados, etc.), SIEMPRE ordenar por la métrica más relevante de mayor a menor (ORDER BY ... DESC) y limitar a N resultados. NUNCA usar orden alfabético (name) por defecto. Ejemplos: "10 mejores clientes" → ORDER BY sum(amount_untaxed) DESC LIMIT 10; "top 5 productos" → ORDER BY qty_sold DESC LIMIT 5; "principales proveedores" → ORDER BY sum(purchase_total) DESC. Si la métrica no está explícita en la pregunta, inferir facturación total (sum de amount_untaxed o amount_total sobre facturas en estado posted).</term>
+        </mapping>
+    </term_mapping_definitions>
+</context>

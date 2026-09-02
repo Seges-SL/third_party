@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Generic system trusted actions. Extra group = AI Administrator
+         (Writer is already the floor of any op=action). Args are closed:
+         model/field/views, module+operation, user+group — no domain literals. -->
+
+    <record id="trusted_action_field_set_required" model="ai.trusted.action">
+        <field name="code">field.set_required</field>
+        <field name="label">Set field required on the model</field>
+        <field name="danger">medium</field>
+        <field name="model_id" ref="model_ai_system_action"/>
+        <field name="preview_method">preview_field_set_required</field>
+        <field name="apply_method">apply_field_set_required</field>
+        <field name="group_ids" eval="[(4, ref('group_ai_admin'))]"/>
+    </record>
+
+    <record id="trusted_action_view_set_field_required" model="ai.trusted.action">
+        <field name="code">view.set_field_required</field>
+        <field name="label">Set field required on views</field>
+        <field name="danger">medium</field>
+        <field name="model_id" ref="model_ai_system_action"/>
+        <field name="preview_method">preview_view_set_field_required</field>
+        <field name="apply_method">apply_view_set_field_required</field>
+        <field name="group_ids" eval="[(4, ref('group_ai_admin'))]"/>
+    </record>
+
+    <record id="trusted_action_view_set_field_readonly" model="ai.trusted.action">
+        <field name="code">view.set_field_readonly</field>
+        <field name="label">Set field readonly on views</field>
+        <field name="danger">medium</field>
+        <field name="model_id" ref="model_ai_system_action"/>
+        <field name="preview_method">preview_view_set_field_readonly</field>
+        <field name="apply_method">apply_view_set_field_readonly</field>
+        <field name="group_ids" eval="[(4, ref('group_ai_admin'))]"/>
+    </record>
+
+    <record id="trusted_action_view_set_field_invisible" model="ai.trusted.action">
+        <field name="code">view.set_field_invisible</field>
+        <field name="label">Set field invisible on views</field>
+        <field name="danger">medium</field>
+        <field name="model_id" ref="model_ai_system_action"/>
+        <field name="preview_method">preview_view_set_field_invisible</field>
+        <field name="apply_method">apply_view_set_field_invisible</field>
+        <field name="group_ids" eval="[(4, ref('group_ai_admin'))]"/>
+    </record>
+
+    <record id="trusted_action_view_set_field_domain" model="ai.trusted.action">
+        <field name="code">view.set_field_domain</field>
+        <field name="label">Set field domain on views</field>
+        <field name="danger">medium</field>
+        <field name="model_id" ref="model_ai_system_action"/>
+        <field name="preview_method">preview_view_set_field_domain</field>
+        <field name="apply_method">apply_view_set_field_domain</field>
+        <field name="group_ids" eval="[(4, ref('group_ai_admin'))]"/>
+    </record>
+
+    <record id="trusted_action_view_reset_field_modifiers" model="ai.trusted.action">
+        <field name="code">view.reset_field_modifiers</field>
+        <field name="label">Reset view field modifiers</field>
+        <field name="danger">medium</field>
+        <field name="model_id" ref="model_ai_system_action"/>
+        <field name="preview_method">preview_view_reset_field_modifiers</field>
+        <field name="apply_method">apply_view_reset_field_modifiers</field>
+        <field name="group_ids" eval="[(4, ref('group_ai_admin'))]"/>
+    </record>
+
+    <record id="trusted_action_module_update" model="ai.trusted.action">
+        <field name="code">module.update</field>
+        <field name="label">Install, upgrade or uninstall a module</field>
+        <field name="danger">high</field>
+        <field name="model_id" ref="model_ai_system_action"/>
+        <field name="preview_method">preview_module_update</field>
+        <field name="apply_method">apply_module_update</field>
+        <field name="group_ids" eval="[(4, ref('group_ai_admin'))]"/>
+    </record>
+
+    <record id="trusted_action_user_add_group" model="ai.trusted.action">
+        <field name="code">user.add_group</field>
+        <field name="label">Add native security group to user</field>
+        <field name="danger">high</field>
+        <field name="model_id" ref="model_ai_system_action"/>
+        <field name="preview_method">preview_user_add_group</field>
+        <field name="apply_method">apply_user_add_group</field>
+        <field name="group_ids" eval="[(4, ref('group_ai_admin'))]"/>
+    </record>
+
+    <record id="trusted_action_user_remove_group" model="ai.trusted.action">
+        <field name="code">user.remove_group</field>
+        <field name="label">Remove native security group from user</field>
+        <field name="danger">high</field>
+        <field name="model_id" ref="model_ai_system_action"/>
+        <field name="preview_method">preview_user_remove_group</field>
+        <field name="apply_method">apply_user_remove_group</field>
+        <field name="group_ids" eval="[(4, ref('group_ai_admin'))]"/>
+    </record>
+</odoo>

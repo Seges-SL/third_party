@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_mcp_context_tools_wizard_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.context.tools.wizard.form</field>
+        <field name="model">pns_ai_mcp.context.tools.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Contexts Tools">
+                <group>
+                    <div class="alert alert-info mb-0" role="alert">
+                        <p>Select the operation to perform on system contexts:</p>
+                        <ul class="mb-0">
+                            <li>Statistics: Show the volume and usage of active contexts.</li>
+                            <li>Restore: Re-sync system contexts from module files into the database.</li>
+                            <li>Export Zip: Export all contexts (system + custom) to a ZIP with manifest.</li>
+                            <li>Import Zip: Import contexts from a previously exported ZIP.</li>
+                        </ul>
+                    </div>
+                </group>
+                <group>
+                    <field name="replace_existing"/>
+                </group>
+                <footer>
+                    <button name="action_stats" string="Statistics" type="object" class="btn-primary" icon="fa-bar-chart"/>
+                    <button name="action_restore" string="Restore" type="object" class="btn-warning" icon="fa-refresh" confirm="Restore module contexts? Contexts with matching code will only be overwritten if 'Overwrite matching contexts' is checked."/>
+                    <button name="action_export" string="Export ZIP" type="object" class="btn-secondary" icon="fa-download"/>
+                    <button name="action_import" string="Import ZIP" type="object" class="btn-secondary" icon="fa-upload"/>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_mcp_context_tools_wizard" model="ir.actions.act_window">
+        <field name="name">Contexts Tools</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">pns_ai_mcp.context.tools.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_mcp_context_tools_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+</odoo>

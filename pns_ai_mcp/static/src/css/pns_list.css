@@ -1,0 +1,83 @@
+/* Shared list grids: even columns, tags stay on one line. */
+
+.o_pns_list .o_list_table,
+.o_list_view.o_pns_list .o_list_table,
+.o_list_view .o_pns_list .o_list_table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.o_pns_list .o_list_table thead th,
+.o_pns_list .o_list_table tbody td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+}
+
+.o_pns_list .o_field_many2manytags,
+.o_pns_list .o_field_many2manytags > span,
+.o_pns_list .o_tag_list {
+    flex-wrap: nowrap !important;
+    white-space: nowrap;
+}
+
+.o_pns_list th[data-name="agent_ids"],
+.o_pns_list td[data-name="agent_ids"] {
+    overflow: visible;
+}
+
+/* Providers: short name, agents get the leftover width. */
+.o_pns_provider_list th[data-name="name"],
+.o_pns_provider_list td[data-name="name"] {
+    width: 8.5rem;
+    max-width: 8.5rem;
+}
+
+.o_pns_provider_list th[data-name="alias"],
+.o_pns_provider_list td[data-name="alias"] {
+    width: 16%;
+    max-width: 18rem;
+}
+
+.o_pns_provider_list th[data-name="protocol"],
+.o_pns_provider_list td[data-name="protocol"] {
+    width: 8.5rem;
+}
+
+.o_pns_provider_list th[data-name="model_name"],
+.o_pns_provider_list td[data-name="model_name"] {
+    width: 11rem;
+}
+
+.o_pns_provider_list th[data-name="context_window_display"],
+.o_pns_provider_list td[data-name="context_window_display"] {
+    width: 4.5rem;
+}
+
+.o_pns_provider_list th[data-name="agent_ids"],
+.o_pns_provider_list td[data-name="agent_ids"] {
+    width: auto;
+    min-width: 22rem;
+}
+
+.o_pns_skill_list th[data-name="code"],
+.o_pns_skill_list td[data-name="code"],
+.o_pns_context_list th[data-name="code"],
+.o_pns_context_list td[data-name="code"] {
+    width: 10rem;
+    max-width: 12rem;
+}
+
+.o_pns_skill_list th[data-name="name"],
+.o_pns_skill_list td[data-name="name"] {
+    width: 12rem;
+    max-width: 14rem;
+}
+
+.o_pns_skill_list th[data-name="agent_ids"],
+.o_pns_skill_list td[data-name="agent_ids"],
+.o_pns_context_list th[data-name="agent_ids"],
+.o_pns_context_list td[data-name="agent_ids"] {
+    width: auto;
+    min-width: 18rem;
+}

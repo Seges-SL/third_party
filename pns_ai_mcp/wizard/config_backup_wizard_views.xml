@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_config_backup_wizard_form" model="ir.ui.view">
+        <field name="name">pns.ai.mcp.config.backup.wizard.form</field>
+        <field name="model">pns_ai_mcp.config_backup_wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import AI configuration">
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        <p>
+                            Upload a configuration backup previously exported from
+                            <b>Settings → AI Engine → Export configuration</b>.
+                        </p>
+                        <p>
+                            Records are matched by their business key and updated in place
+                            (providers by name, agents by code, servers by code, whitelist
+                            by domain, user API keys by login). Nothing is deleted.
+                        </p>
+                    </div>
+                    <group>
+                        <field name="json_file" filename="filename"/>
+                        <field name="filename" invisible="1"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_import" string="Import configuration"
+                            type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_config_backup_wizard" model="ir.actions.act_window">
+        <field name="name">Import AI configuration</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">pns_ai_mcp.config_backup_wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

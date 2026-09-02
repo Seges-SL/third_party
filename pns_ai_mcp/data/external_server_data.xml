@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Pre-loaded external MCP server examples.
+    All inactive by default — the admin activates them after configuring
+    the required API keys and/or ensuring the runtime is available.
+-->
+<odoo noupdate="1">
+
+    <!-- ─── 1. MCP Test Server (Everything) ─────────────────────────────────
+         Official test server from Anthropic. Implements echo, add, longRunning,
+         sampleLLM tools. Perfect for testing the api_call flow end-to-end
+         without needing any API key.
+         Requires: Node.js / npx installed on the Odoo server.
+    -->
+    <record id="external_server_mcp_test" model="ai.api.server">
+        <field name="name">MCP Test Server (Everything)</field>
+        <field name="code">mcp_test</field>
+        <field name="server_type">stdio</field>
+        <field name="command">npx</field>
+        <field name="command_args">["-y", "@modelcontextprotocol/server-everything"]</field>
+        <field name="env_vars">{}</field>
+        <field name="auth_type">none</field>
+        <field name="timeout">15</field>
+        <field name="active" eval="False"/>
+        <field name="notes">Servidor de prueba oficial de Anthropic. Implementa herramientas de test: echo, add, longRunningOperation, sampleLLM.
+No necesita API key. Requiere Node.js / npx instalado en el servidor Odoo.
+Úsalo para verificar que el flujo api_call funciona de extremo a extremo.</field>
+        <field name="config_json">{
+  "mcp_test": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-everything"]
+  }
+}</field>
+    </record>
+
+    <!-- ─── 2. Brave Web Search ────────────────────────────────────────────
+         Web search via Brave Search API. Free tier: 2000 queries/month.
+         Get your API key at: https://brave.com/search/api/
+         Tools: brave_web_search, brave_local_search.
+         Requires: Node.js / npx + BRAVE_API_KEY env var.
+    -->
+    <record id="external_server_brave_search" model="ai.api.server">
+        <field name="name">Brave Web Search</field>
+        <field name="code">brave_search</field>
+        <field name="server_type">stdio</field>
+        <field name="command">npx</field>
+        <field name="command_args">["-y", "@modelcontextprotocol/server-brave-search"]</field>
+        <field name="env_vars">{"BRAVE_API_KEY": "YOUR_API_KEY_HERE"}</field>
+        <field name="auth_type">none</field>
+        <field name="timeout">30</field>
+        <field name="active" eval="False"/>
+        <field name="notes">Búsqueda web mediante Brave Search API. Tier gratuito: 2000 consultas/mes.
+Obtén tu API key en: https://brave.com/search/api/
+Herramientas: brave_web_search, brave_local_search.
+Requiere Node.js / npx en el servidor Odoo.
+Para activarlo: reemplaza YOUR_API_KEY_HERE por tu clave real.</field>
+        <field name="config_json">{
+  "brave_search": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+    "env": {
+      "BRAVE_API_KEY": "YOUR_API_KEY_HERE"
+    }
+  }
+}</field>
+    </record>
+
+    <!-- ─── 3. MCP Sequential Thinking ─────────────────────────────────────
+         Advanced reasoning server. Provides a "sequentialthinking" tool that
+         helps break down complex problems into step-by-step reasoning chains.
+         No API key needed.
+         Requires: Node.js / npx on the Odoo server.
+    -->
+    <record id="external_server_sequential_thinking" model="ai.api.server">
+        <field name="name">Sequential Thinking</field>
+        <field name="code">seq_thinking</field>
+        <field name="server_type">stdio</field>
+        <field name="command">npx</field>
+        <field name="command_args">["-y", "@modelcontextprotocol/server-sequential-thinking"]</field>
+        <field name="env_vars">{}</field>
+        <field name="auth_type">none</field>
+        <field name="timeout">60</field>
+        <field name="active" eval="False"/>
+        <field name="notes">Servidor de razonamiento secuencial. Proporciona una herramienta "sequentialthinking" que descompone problemas complejos en cadenas de razonamiento paso a paso.
+No necesita API key. Requiere Node.js / npx en el servidor Odoo.</field>
+        <field name="config_json">{
+  "seq_thinking": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+  }
+}</field>
+    </record>
+
+</odoo>

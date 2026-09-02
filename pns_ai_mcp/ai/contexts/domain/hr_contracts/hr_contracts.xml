@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <metadata>
+        <code>hr_contracts</code>
+        <tipo>domain</tipo>
+        <description>[RECOMMENDED] Employment contracts: employee master first, hr.contract only if installed, never contract.contract</description>
+        <author>System</author>
+        <version>1.0</version>
+        <created_at>2026-07-23</created_at>
+        <created_by>Administrator</created_by>
+        <modified_at>2026-07-23</modified_at>
+        <modified_by>Administrator</modified_by>
+        <is_fallback>true</is_fallback>
+    </metadata>
+
+    <domain_knowledge>
+# Employment Contracts (Generic)
+
+**Source cascade** (one factory pack; spoken Spanish lives in discovery
+`discovery_hr_contracts_es_ES`, not a cloned protocol):
+
+1. **hr.employee** — primary. Employment relationship is the employee master
+   (active/inactive, job, department, calendar, identification, company).
+2. **hr.contract** — only when `'hr.contract' in env` (module `hr_contract`)
+   **and** the user needs wage/type/dates that live on the contract model.
+3. **No data / missing module** — tell the user clearly; never invent contracts.
+
+## Critical disambiguation
+
+| User means | Correct model | Wrong model |
+|------------|---------------|-------------|
+| Employment / labour contract | `hr.employee` (+ optional `hr.contract`) | `contract.contract` |
+| Recurring commercial subscription | `contract.contract` (OCA/contract) | `hr.contract` |
+
+**Never** query `contract.contract` for “contrato de empleado / labour contract”.
+`KeyError: 'hr.contract'` means the HR Contracts app is not installed — fall back
+to step 1 and say so; do **not** switch to commercial contracts.
+
+## Step 1: Employee master (primary)
+
+Always start here. Prefer active employees unless the user asks for leavers.
+
+Typical columns (guard optional fields with `in emp._fields`):
+
+- name, identification_id
+- job_id / job_title, department_id
+- resource_calendar_id, company_id
+- work_email, work_phone
+- active (and departure fields if present in this Odoo version)
+
+Honest messaging: if the database has employees but no `hr.contract`, say that
+contract wage/type/dates are **not modelled** in this instance and show the
+employee profile instead.
+
+## Step 2: hr.contract fallback
+
+Only when step 1 is not enough **and** `'hr.contract' in env`. Search contracts
+linked to those employees (`employee_id`). Use open/running states when the
+user asks for “current” contracts. Do not mix salary figures from
+`hr.contract` with payroll accounting totals in the same table.
+
+## Step 3: Salary without hr.contract
+
+If the user asks for wage/sueldo/condiciones económicas and `hr.contract` is
+missing, either:
+
+- load **hr_payroll** (accounting payslips / 640…), or
+- answer that compensation is not stored as employment contracts here.
+
+## Step 4: Empty
+
+```python
+result = {'formatted_text': 'No employment / HR employee data is available for the request.'}
+```
+    </domain_knowledge>
+</context>

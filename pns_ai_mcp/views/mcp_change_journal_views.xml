@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_mcp_change_journal_search" model="ir.ui.view">
+        <field name="name">ai.change.journal.search</field>
+        <field name="model">ai.change.journal</field>
+        <field name="arch" type="xml">
+            <search string="Changes">
+                <field name="id"/>
+                <field name="summary"/>
+                <field name="user_id"/>
+                <field name="confirmed_by_uid"/>
+                <field name="model_name"/>
+                <field name="record_ids_display"/>
+                <field name="field_name"/>
+                <field name="verification_id"/>
+                <field name="correlation_id"/>
+                <field name="note"/>
+                <filter name="mine" string="Mine"
+                        domain="['|', ('user_id', '=', uid), ('confirmed_by_uid', '=', uid)]"/>
+                <filter name="applied" string="Applied" domain="[('state', '=', 'applied')]"/>
+                <filter name="failed" string="Failed" domain="[('state', '=', 'failed')]"/>
+                <filter name="reverted" string="Reverted" domain="[('state', '=', 'reverted')]"/>
+                <filter name="reversible_now" string="Reversible"
+                        domain="[('state', '=', 'applied'), ('reversible', '=', True), ('reverts_id', '=', False)]"/>
+                <separator/>
+                <filter name="group_user" string="Requested by" context="{'group_by': 'user_id'}"/>
+                <filter name="group_confirmed" string="Confirmed by" context="{'group_by': 'confirmed_by_uid'}"/>
+                <filter name="group_model" string="Model" context="{'group_by': 'model_name'}"/>
+                <filter name="group_op" string="Operation" context="{'group_by': 'op'}"/>
+                <filter name="group_kind" string="Kind" context="{'group_by': 'change_kind'}"/>
+                <filter name="group_auth" string="Authorization" context="{'group_by': 'safe_operation_id'}"/>
+                <filter name="group_corr" string="Request ID" context="{'group_by': 'correlation_id'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_mcp_change_journal_tree" model="ir.ui.view">
+        <field name="name">ai.change.journal.tree</field>
+        <field name="model">ai.change.journal</field>
+        <field name="arch" type="xml">
+            <tree create="0" delete="0" edit="0" string="Changes"
+                  class="o_pns_list"
+                  decoration-muted="state == 'reverted'"
+                  decoration-danger="state == 'failed'"
+                  decoration-success="state == 'applied' and reversible == True and reverts_id == False">
+                <field name="id" optional="show"/>
+                <field name="create_date" optional="show"/>
+                <field name="step_seq" optional="show"/>
+                <field name="op" optional="show"/>
+                <field name="change_kind" optional="show"/>
+                <field name="model_name" optional="show"/>
+                <field name="record_ids_display" optional="show"/>
+                <field name="summary" optional="show"/>
+                <field name="user_id" optional="show"/>
+                <field name="state" optional="show"/>
+                <field name="reversible" optional="show"/>
+                <field name="can_revert" invisible="1"/>
+                <field name="reverts_id" invisible="1"/>
+                <button name="action_revert" type="object" string="Revert"
+                        icon="fa-undo" class="btn-link"
+                        confirm="Revert this change? This journal undo cannot be reverted again."
+                        attrs="{'invisible': [('can_revert', '=', False)]}"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_mcp_change_journal_form" model="ir.ui.view">
+        <field name="name">ai.change.journal.form</field>
+        <field name="model">ai.change.journal</field>
+        <field name="arch" type="xml">
+            <form create="0" delete="0" edit="0" string="Change">
+                <header>
+                    <button name="action_revert" type="object" string="Revert"
+                            class="btn-primary"
+                            confirm="Revert this change? This journal undo cannot be reverted again."
+                            attrs="{'invisible': [('can_revert', '=', False)]}"/>
+                    <field name="state" widget="statusbar" statusbar_visible="applied,reverted"/>
+                    <field name="can_revert" invisible="1"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group string="Identifiers">
+                            <field name="id"/>
+                            <field name="safe_operation_id"/>
+                            <field name="verification_id"/>
+                            <field name="correlation_id"/>
+                            <field name="step_seq"/>
+                            <field name="reverts_id"/>
+                        </group>
+                        <group string="Who / when">
+                            <field name="create_date"/>
+                            <field name="user_id"/>
+                            <field name="confirmed_by_uid"/>
+                            <field name="origin"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="What">
+                            <field name="op"/>
+                            <field name="change_kind"/>
+                            <field name="action_code"/>
+                            <field name="summary"/>
+                            <field name="reversible"/>
+                            <field name="reversible_reason"/>
+                        </group>
+                        <group string="Target">
+                            <field name="model_name"/>
+                            <field name="record_ids_display"/>
+                            <field name="record_name"/>
+                            <field name="field_name"/>
+                            <field name="view_id"/>
+                            <field name="module_name"/>
+                        </group>
+                    </group>
+                    <group string="Notes">
+                        <field name="note" nolabel="1"/>
+                    </group>
+                    <notebook>
+                        <page string="Before (JSON)" name="before">
+                            <field name="before_json" nolabel="1" widget="text"/>
+                        </page>
+                        <page string="After (JSON)" name="after">
+                            <field name="after_json" nolabel="1" widget="text"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_mcp_change_journal" model="ir.actions.act_window">
+        <field name="name">Changes</field>
+        <field name="res_model">ai.change.journal</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_mcp_change_journal_search"/>
+        <field name="context">{}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No AI changes recorded</p>
+            <p>Permanent journal of ERP mutations applied after a Safe Plan confirmation. Independent from Activity (AI logs).</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_mcp_change_journal"
+              name="Changes"
+              parent="pns_ai_mcp.menu_ai_security"
+              action="action_mcp_change_journal"
+              sequence="25"
+              groups="pns_ai_mcp.group_ai_admin"/>
+    <!-- -u must rewrite groups: menuitem groups= is create-time on some majors. -->
+    <record id="menu_mcp_change_journal" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [ref('pns_ai_mcp.group_ai_admin')])]"/>
+    </record>
+</odoo>

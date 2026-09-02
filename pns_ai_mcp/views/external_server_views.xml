@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    External API Servers — CRUD for configuring external self-documented APIs
+    (MCP or OpenAPI) that the Odoo AI agent can call via Safe Plan (api_call verb).
+-->
+<odoo>
+    <record id="view_external_server_tree" model="ir.ui.view">
+        <field name="name">ai.api.server.tree</field>
+        <field name="model">ai.api.server</field>
+        <field name="arch" type="xml">
+            <tree string="External API Servers" class="o_pns_list">
+                <header>
+                    <button name="action_export_selected" type="object" string="Export selected" class="btn-secondary" icon="fa-download" groups="pns_ai_mcp.group_ai_admin"/>
+                    <button name="action_suggest_detection" type="object" string="Suggest triggers" class="btn-secondary" icon="fa-lightbulb-o" groups="pns_ai_mcp.group_ai_admin"/>
+                </header>
+                <field name="code" optional="show"/>
+                <field name="name" optional="show"/>
+                <field name="api_type" optional="show"/>
+                <field name="server_type" optional="hide"/>
+                <field name="url" optional="hide"/>
+                <field name="spec_url" optional="hide"/>
+                <field name="spec_manual" optional="hide"/>
+                <field name="command" optional="hide"/>
+                <field name="active" optional="show"/>
+                <field name="tools_count" string="Tools" optional="show"/>
+                <field name="last_discovery" optional="show"/>
+                <button name="action_test_connection" type="object" string="Test"
+                        icon="fa-plug"/>
+                <button name="action_discover_tools" type="object" string="Discover"
+                        icon="fa-search"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_external_server_form" model="ir.ui.view">
+        <field name="name">ai.api.server.form</field>
+        <field name="model">ai.api.server</field>
+        <field name="arch" type="xml">
+            <form string="External API Server">
+                <header>
+                    <button name="action_test_connection" type="object"
+                            string="Test Connection" class="btn-secondary"
+                            icon="fa-plug"/>
+                    <button name="action_discover_tools" type="object"
+                            string="Discover Tools" class="btn-primary"
+                            icon="fa-search"/>
+                    <button name="action_discover_auth" type="object"
+                            string="Auth from spec" class="btn-secondary"
+                            icon="fa-key"
+                            attrs="{'invisible': [('api_type', '!=', 'openapi')]}"/>
+                    <button name="action_suggest_detection" type="object"
+                            string="Suggest triggers" class="btn-secondary"
+                            icon="fa-lightbulb-o"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button" type="object"
+                                name="action_discover_tools" icon="fa-wrench">
+                            <field name="tools_count" widget="statinfo" string="Tools"/>
+                        </button>
+                        <button class="oe_stat_button" type="object"
+                                name="action_discover_tools" icon="fa-book"
+                                attrs="{'invisible': ['|', ('api_type', '!=', 'mcp'), ('resources_count', '=', 0)]}">
+                            <field name="resources_count" widget="statinfo" string="Resources"/>
+                        </button>
+                        <button class="oe_stat_button" type="object"
+                                name="action_discover_tools" icon="fa-comments-o"
+                                attrs="{'invisible': ['|', ('api_type', '!=', 'mcp'), ('prompts_count', '=', 0)]}">
+                            <field name="prompts_count" widget="statinfo" string="Prompts"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="Server name"/>
+                        </h1>
+                    </div>
+                    <notebook>
+                        <!-- Tab 1: Form fields -->
+                        <page string="Configuration" name="config">
+                            <group>
+                                <group string="Identity">
+                                    <field name="code" placeholder="web_search"/>
+                                    <field name="api_type"/>
+                                    <field name="server_type"
+                                           attrs="{'invisible': [('api_type', '!=', 'mcp')]}"/>
+                                    <field name="active"/>
+                                    <field name="trusted"/>
+                                    <field name="timeout"/>
+                                    <field name="last_discovery" readonly="1"/>
+                                </group>
+                                <group string="Connection"
+                                       attrs="{'invisible': ['|', ('api_type', '!=', 'mcp'), ('server_type', '!=', 'sse')]}">
+                                    <field name="url" placeholder="https://server.example.com/mcp"
+                                           attrs="{'required': [('api_type', '=', 'mcp'), ('server_type', '=', 'sse')]}"/>
+                                </group>
+                                <group string="OpenAPI"
+                                       attrs="{'invisible': [('api_type', '!=', 'openapi')]}">
+                                    <field name="spec_manual"/>
+                                    <field name="spec_url" placeholder="https://api.example.com/openapi.json"
+                                           attrs="{'required': [('api_type', '=', 'openapi'), ('spec_manual', '=', False)], 'invisible': [('spec_manual', '=', True)]}"/>
+                                    <field name="base_url" placeholder="https://api.example.com (optional, spec servers[] by default)"/>
+                                </group>
+                                <group string="Authentication"
+                                       attrs="{'invisible': [('api_type', '=', 'mcp'), ('server_type', '=', 'stdio')]}">
+                                    <field name="auth_type"/>
+                                    <field name="auth_token" password="True"
+                                           attrs="{'invisible': [('auth_type', '=', 'none')]}"/>
+                                    <field name="auth_header_name"
+                                           attrs="{'invisible': ['&amp;', ('auth_type', '!=', 'api_key'), ('auth_type', '!=', 'custom_header')]}"/>
+                                    <field name="auth_call_preview" nolabel="1" colspan="2"
+                                           attrs="{'invisible': [('auth_type', '=', 'none')]}"/>
+                                    <button name="action_discover_auth" type="object"
+                                            string="Auth from spec" icon="fa-key"
+                                            class="btn-secondary"
+                                            colspan="2"
+                                            attrs="{'invisible': [('api_type', '!=', 'openapi')]}"/>
+                                </group>
+                                <group string="Process"
+                                       attrs="{'invisible': ['|', ('api_type', '!=', 'mcp'), ('server_type', '!=', 'stdio')]}">
+                                    <field name="command" placeholder="python"
+                                           attrs="{'required': [('api_type', '=', 'mcp'), ('server_type', '=', 'stdio')]}"/>
+                                    <field name="command_args"
+                                           placeholder='["-m", "my_server"]'/>
+                                    <field name="env_vars"
+                                           placeholder='{"API_KEY": "sk-..."}' />
+                                </group>
+                            </group>
+                        </page>
+                        <!-- Per-user outbound credentials -->
+                        <page string="User Keys" name="user_keys">
+                            <div class="alert alert-info mb-2" role="alert">
+                                <strong>Outbound credentials.</strong>
+                                When a user runs <code>api_call</code>, their own key is used;
+                                without one, the server's default token applies.
+                            </div>
+                            <field name="key_ids" nolabel="1">
+                                <tree editable="bottom">
+                                    <field name="user_id" optional="show"/>
+                                    <field name="token" password="True" optional="show"/>
+                                    <field name="active" optional="show"/>
+                                    <field name="notes" optional="show"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <!-- Tab: Raw JSON config (MCP only) -->
+                        <page string="JSON Config" name="json"
+                              attrs="{'invisible': [('api_type', '!=', 'mcp')]}">
+                            <div class="alert alert-info mb-2" role="alert">
+                                <strong>Cursor / Antigravity format.</strong>
+                                Paste the full JSON config here. Changes sync with the form fields.
+                            </div>
+                            <field name="config_json" widget="ace" options="{'mode': 'javascript'}"
+                                   nolabel="1" placeholder='{"code": {"type": "sse", "url": "..."}}'/>
+                        </page>
+                        <!-- OpenAPI spec: cache from spec_url, or pasted source when spec_manual -->
+                        <page string="OpenAPI Spec" name="openapi_spec"
+                              attrs="{'invisible': [('api_type', '!=', 'openapi')]}">
+                            <div class="alert alert-info mb-2" role="alert"
+                                 attrs="{'invisible': [('spec_manual', '=', False)]}">
+                                <strong>Manual spec.</strong>
+                                Paste the OpenAPI JSON below. Discover Tools rebuilds the catalogue
+                                from this document and will not download Spec URL.
+                            </div>
+                            <div class="alert alert-info mb-2" role="alert"
+                                 attrs="{'invisible': [('spec_manual', '=', True)]}">
+                                Cached from Spec URL at last discovery. Enable Manual spec to paste
+                                or freeze this document.
+                            </div>
+                            <field name="spec_json" nolabel="1"
+                                   class="o_mcp_spec_json"
+                                   attrs="{'readonly': [('spec_manual', '=', False)]}"/>
+                        </page>
+                        <!-- Discovered catalogue: readable list first, raw JSON folded below -->
+                        <page string="Tools" name="discovered_tools"
+                              attrs="{'invisible': [('tools_json', '=', False)]}">
+                            <field name="tools_html" nolabel="1" readonly="1"/>
+                            <group string="Raw JSON" col="1">
+                                <field name="tools_json" widget="ace" options="{'mode': 'javascript'}"
+                                       nolabel="1" readonly="1"/>
+                            </group>
+                        </page>
+                        <page string="Resources" name="discovered_resources"
+                              attrs="{'invisible': ['|', ('api_type', '!=', 'mcp'), ('resources_count', '=', 0)]}">
+                            <field name="resources_html" nolabel="1" readonly="1"/>
+                            <group string="Raw JSON" col="1">
+                                <field name="resources_json" widget="ace" options="{'mode': 'javascript'}"
+                                       nolabel="1" readonly="1"/>
+                            </group>
+                        </page>
+                        <!-- usage_guide: editable text injected with discovered tools -->
+                        <page string="Context" name="server_context">
+                            <div class="alert alert-info mb-2" role="alert">
+                                <strong>usage_guide</strong> — free text injected into the agent prompt
+                                alongside the discovered tool catalogue for this server.
+                            </div>
+                            <group string="Usage guide">
+                                <field name="usage_guide" nolabel="1"
+                                       placeholder="When to use this server, argument conventions, examples… Injected into the agent prompt with the discovered tools."/>
+                            </group>
+                            <group string="Discovered prompts (MCP prompts/list)" col="1"
+                                   attrs="{'invisible': ['|', ('api_type', '!=', 'mcp'), ('prompts_count', '=', 0)]}">
+                                <field name="prompts_html" nolabel="1" readonly="1"/>
+                                <field name="prompts_json" widget="ace" options="{'mode': 'javascript'}"
+                                       nolabel="1" readonly="1"/>
+                            </group>
+                        </page>
+                        <page string="Detection" name="server_detection">
+                            <div class="alert alert-info mb-2" role="alert">
+                                <strong>Discovery routing.</strong>
+                                Locale-aware trigger rows. A match hints
+                                <code>api_call</code> with this server's code
+                                (after the tool catalogue). Rows are Discovery
+                                contexts — never injected as prose. Archiving or
+                                deleting this server deactivates or removes them.
+                                <strong>Suggest triggers</strong> uses the same
+                                short JSON extraction as skill parameters
+                                (identity tokens first; one cheap LLM call for
+                                locale synonyms).
+                            </div>
+                            <button name="action_suggest_detection" type="object"
+                                    string="Suggest triggers" class="btn-primary"
+                                    icon="fa-lightbulb-o"/>
+                            <field name="detection_context_ids" nolabel="1"
+                                   context="{'default_context_type': 'discovery', 'default_discovery_target_kind': 'api_server', 'default_content': '[discovery routing — not injected]'}">
+                                <tree editable="bottom">
+                                    <field name="locale" optional="show"/>
+                                    <field name="discovery_triggers" optional="show"/>
+                                    <field name="discovery_priority" optional="show"/>
+                                    <field name="active" optional="show"/>
+                                    <field name="code" optional="hide"/>
+                                    <field name="context_type" invisible="1"/>
+                                    <field name="discovery_target_kind" invisible="1"/>
+                                    <field name="content" invisible="1"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                    <group string="Notes">
+                        <field name="notes" nolabel="1"/>
+                        <field name="added_by"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_external_server_search" model="ir.ui.view">
+        <field name="name">ai.api.server.search</field>
+        <field name="model">ai.api.server</field>
+        <field name="arch" type="xml">
+            <search string="External API Servers">
+                <field name="code"/>
+                <field name="name"/>
+                <filter name="active" string="Active" domain="[('active', '=', True)]"/>
+                <filter name="inactive" string="Inactive" domain="[('active', '=', False)]"/>
+                <separator/>
+                <filter name="mcp" string="MCP" domain="[('api_type', '=', 'mcp')]"/>
+                <filter name="openapi" string="OpenAPI" domain="[('api_type', '=', 'openapi')]"/>
+                <separator/>
+                <filter name="sse" string="SSE (HTTP)" domain="[('server_type', '=', 'sse')]"/>
+                <filter name="stdio" string="stdio (local)" domain="[('server_type', '=', 'stdio')]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_external_server" model="ir.actions.act_window">
+        <field name="name">External Servers</field>
+        <field name="res_model">ai.api.server</field>
+        <field name="view_mode">tree,form</field>
+        <field name="context">{'search_default_active': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Configure an external API server</p>
+            <p>External API servers (MCP or OpenAPI) extend the AI's capabilities.
+               The AI proposes tool calls, the human confirms, and Odoo executes.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_external_server"
+              name="External Servers"
+              parent="pns_ai_mcp.menu_ai_connections"
+              action="action_external_server"
+              sequence="10"
+              groups="pns_ai_mcp.group_ai_admin"/>
+</odoo>

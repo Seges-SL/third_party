@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This addon only. Neighbors (Chatboo, Geo, ACL, tenant packs) seed
+     themselves. The engine never scans skills/custom/ nor other addons. -->
+<odoo>
+    <data noupdate="0">
+        <function model="ai.context" name="_import_all_from_module"
+                  eval="[True, 'pns_ai_mcp']"/>
+        <function model="ai.skill" name="import_from_module"
+                  eval="['pns_ai_mcp', ['system']]"/>
+        <function model="ai.api.server" name="_link_orphan_api_discovery"/>
+    </data>
+</odoo>

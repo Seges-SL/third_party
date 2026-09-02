@@ -1,0 +1,26 @@
+{
+  "code": "discovery_hr_payroll_es_ES",
+  "tipo": "discovery",
+  "locale": "es_ES",
+  "target": "hr_payroll",
+  "priority": 80,
+  "soft_depends": [
+    "hr_payroll_accounting_present"
+  ],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "nomina",
+    "nominas",
+    "nómina",
+    "nóminas",
+    "recibo de salario",
+    "recibos de salario",
+    "bruto",
+    "neto",
+    "irpf",
+    "ss empresa",
+    "seguridad social nomina",
+    "liquidacion de haberes",
+    "liquidación de haberes"
+  ]
+}

@@ -1,0 +1,2 @@
+# Tenant / instance skills are NOT shipped here.
+# Restore-from-module would plant them on every install.

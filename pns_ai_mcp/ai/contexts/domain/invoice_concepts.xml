@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <metadata>
+        <code>invoice_concepts</code>
+        <tipo>domain</tipo>
+        <description>Invoice field mappings, calculations and coding conventions</description>
+    </metadata>
+
+    <domain_knowledge>
+        <module name="invoices" model="account.move">
+            <mappings>
+                <mapping name="invoice">account.move record</mapping>
+                <mapping name="customer">res.partner where id = account.move.partner_id</mapping>
+                <mapping name="base_amount">account.move.amount_untaxed (Taxable base or amount without VAT)</mapping>
+                <mapping name="total">account.move.amount_total (Invoice total)</mapping>
+                <mapping name="tax_amount">account.move.amount_total - account.move.amount_untaxed (Tax or VAT amount)</mapping>
+                <mapping name="tax_percentage">(account.move.amount_total * 100 / account.move.amount_untaxed) - 100</mapping>
+                <mapping name="invoice_lines">account.move.invoice_line_ids (Product codes and descriptions)</mapping>
+                <mapping name="unpaid_invoice">account.move where move_type IN ('out_invoice','out_refund') AND payment_state IN ('not_paid','partial') AND state='posted'</mapping>
+                <mapping name="pending_amount">account.move.amount_residual (remaining amount to collect)</mapping>
+                <mapping name="date_field">ALWAYS use invoice_date for invoice emission date. Field 'date' is the accounting entry date, NOT the invoice date.</mapping>
+            </mappings>
+
+            <conventions>
+                <convention name="default_grouping">
+                    Unless the user explicitly requests 'detalle' or 'desglose por factura', ALWAYS aggregate by partner_id.
+                    Show per customer: name, count of invoices, sum(amount_residual) as total pending.
+                    Never show one row per invoice when the user asks for a customer list or summary.
+                </convention>
+                <convention name="risk_analysis">
+                    To assess customer payment risk: count invoices with payment_state='paid' in last 24 months for that partner.
+                    Good payer (green): paid_count >= 3 AND paid_ratio >= 70%.
+                    Bad payer / risk (red): paid_count less than 3 OR paid_ratio less than 70%.
+                    NEVER use total invoiced amount as proxy for payment behavior.
+                    NEVER use 'amount_total_signed' for historical payment analysis — it includes unpaid invoices.
+                </convention>
+                <convention name="historial_pagos">
+                    To calculate payment history: search account.move with payment_state='paid' AND partner_id=X.
+                    Do NOT search all invoices without payment_state filter — that includes unpaid invoices.
+                </convention>
+                <convention name="output_columns">
+                    Required columns for unpaid invoice reports (unless user asks for less detail).
+                    Use EXACTLY these dictionary key names (translate to user_lang if not es_ES):
+                    - 'Cliente'         → customer name
+                    - 'NIF'             → partner.vat (empty string if None)
+                    - 'Facturas Pend.'  → count of pending invoices
+                    - 'Importe Pend.'   → sum(amount_residual)
+                    - 'Hist. Pagado'    → sum(amount_total) of paid invoices in last 24 calendar months
+                    - 'Ratio Pago %'    → paid_count / (paid_count + pending_count) * 100, rounded 2 decimals
+                    - Risk color: green (_row_color='#e6f4ea') if ratio>=70% AND paid_count>=3, else red (_row_color='#fdecea')
+
+                    24 calendar months cutoff: date(today.year - 2, today.month, 1)
+                    NEVER use timedelta(days=730) — calendar months give consistent results across years.
+                </convention>
+                <convention name="accounting_periods">
+                    ALL accounting periods are NATURAL CALENDAR PERIODS, never rolling-day approximations.
+
+                    QUARTER (Q1-Q4) — last completed quarter before today:
+                      if month &lt;= 3:  Q4 prev year → (year-1, 10, 1) to (year-1, 12, 31)
+                      elif month &lt;= 6: Q1 → (year, 1, 1) to (year, 3, 31)
+                      elif month &lt;= 9: Q2 → (year, 4, 1) to (year, 6, 30)
+                      else:            Q3 → (year, 7, 1) to (year, 9, 30)
+                    NEVER use timedelta(days=90).
+
+                    HALF-YEAR (H1/H2) — last completed half-year:
+                      if month &lt;= 6: H2 prev year → (year-1, 7, 1) to (year-1, 12, 31)
+                      else:          H1 → (year, 1, 1) to (year, 6, 30)
+                    NEVER use timedelta(days=180).
+
+                    FISCAL YEAR — last completed calendar year:
+                      (year-1, 1, 1) to (year-1, 12, 31)
+                    NEVER use timedelta(days=365).
+
+                    MONTH — last completed calendar month:
+                      first_day = date(year, month-1, 1) if month &gt; 1 else date(year-1, 12, 1)
+                      last_day = date(year, month, 1) - timedelta(days=1)
+                    NEVER use timedelta(days=30).
+
+                    YTD (year to date): (year, 1, 1) to date.today()
+
+                    REFERENCE DATE: all "last period" calculations use date.today() by default.
+                    If the user specifies a date, replace today with that date in all calculations.
+                    Example: "last quarter before 2024-06-15" → use date(2024, 6, 15) as reference.
+
+                    NEXT / FUTURE PERIODS (use current date as reference, not last completed):
+                      Next quarter: from the START of the current ongoing quarter → end of next.
+                      Next half-year: from the START of the current half → end of next.
+                      Next year: (year+1, 1, 1) to (year+1, 12, 31).
+                      Current quarter (in progress): the quarter that contains today.
+                      Current half-year (in progress): the half-year that contains today.
+                </convention>
+            </conventions>
+        </module>
+    </domain_knowledge>
+</context>

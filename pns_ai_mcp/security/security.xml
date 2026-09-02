@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    security/security.xml
+    Module: pns_ai_mcp
+    Groups, record rules, and sequences for AI permission management.
+
+    Permission model v2:
+      - Users are implicit (API key + active Odoo user = read access)
+      - group_ai_writer: CRUD via propose_safe_operations (orthogonal)
+      - group_ai_external_url: fetch_url via propose_safe_operations (orthogonal)
+      - group_ai_external_api: api_call (MCP/OpenAPI) via propose_safe_operations (orthogonal)
+      - group_ai_admin: full AI administration (implies writer + external url + external api)
+-->
+<odoo>
+    <data noupdate="0">
+
+        <!-- Groups: stacks/owl1|owl2/security/security_groups.xml (category vs privilege) -->
+
+        <!-- ============================================================
+             RECORD RULES (ir.rule)
+             ============================================================ -->
+
+        <!-- Contexts: visibility for all users with read access -->
+        <record id="ai_context_user_read_rule" model="ir.rule">
+            <field name="name">AI Context: module or own</field>
+            <field name="model_id" ref="pns_ai_mcp.model_ai_context"/>
+            <field name="domain_force">['|', ('owner_id', '=', False), ('owner_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Contexts: writers read shared/module/own; write only own user-owned -->
+        <record id="ai_context_writer_read_rule" model="ir.rule">
+            <field name="name">AI Context: Writer read visibility</field>
+            <field name="model_id" ref="pns_ai_mcp.model_ai_context"/>
+            <field name="domain_force">['|', ('owner_id', '=', False), ('owner_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_ai_writer'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="ai_context_writer_write_rule" model="ir.rule">
+            <field name="name">AI Context: Writer edit own only</field>
+            <field name="model_id" ref="pns_ai_mcp.model_ai_context"/>
+            <field name="domain_force">[('owner_id', '=', user.id), ('context_type', '!=', 'core')]</field>
+            <field name="groups" eval="[(4, ref('group_ai_writer'))]"/>
+            <field name="perm_read" eval="False"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+        <record id="ai_context_admin_rule" model="ir.rule">
+            <field name="name">AI Context: Admin full access</field>
+            <field name="model_id" ref="pns_ai_mcp.model_ai_context"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_ai_admin'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Logs: users only see their own logs -->
+        <record id="mcp_log_user_rule" model="ir.rule">
+            <field name="name">AI Log: User only sees their own logs</field>
+            <field name="model_id" ref="pns_ai_mcp.model_ai_log"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Logs: admins see all logs -->
+        <record id="mcp_log_admin_rule" model="ir.rule">
+            <field name="name">AI Log: Admins see all logs</field>
+            <field name="model_id" ref="pns_ai_mcp.model_ai_log"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_ai_admin'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Safe operations: user only sees their own -->
+        <record id="mcp_safe_operation_user_rule" model="ir.rule">
+            <field name="name">AI Supervised Operation: user only sees their own</field>
+            <field name="model_id" ref="pns_ai_mcp.model_ai_safe_operation"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Safe operations: admins see all -->
+        <record id="mcp_safe_operation_admin_rule" model="ir.rule">
+            <field name="name">AI Supervised Operation: admins see all</field>
+            <field name="model_id" ref="pns_ai_mcp.model_ai_safe_operation"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_ai_admin'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Skills: visibility for all users with read access -->
+        <record id="ai_skill_user_read_rule" model="ir.rule">
+            <field name="name">AI Skill: module or own</field>
+            <field name="model_id" ref="model_ai_skill"/>
+            <field name="domain_force">['|', ('owner_id', '=', False), ('owner_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Skills: writers read shared/module/own; write only own non-system -->
+        <record id="ai_skill_writer_read_rule" model="ir.rule">
+            <field name="name">AI Skill: Writer read visibility</field>
+            <field name="model_id" ref="model_ai_skill"/>
+            <field name="domain_force">['|', ('owner_id', '=', False), ('owner_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_ai_writer'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="ai_skill_writer_write_rule" model="ir.rule">
+            <field name="name">AI Skill: Writer edit own only</field>
+            <field name="model_id" ref="model_ai_skill"/>
+            <field name="domain_force">[('owner_id', '=', user.id), ('is_system', '=', False)]</field>
+            <field name="groups" eval="[(4, ref('group_ai_writer'))]"/>
+            <field name="perm_read" eval="False"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+        <record id="ai_skill_admin_rule" model="ir.rule">
+            <field name="name">AI Skill: Admin full access</field>
+            <field name="model_id" ref="model_ai_skill"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_ai_admin'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- External API server keys: each user manages only their own -->
+        <record id="api_server_key_own_rule" model="ir.rule">
+            <field name="name">External API Server Key: own keys only</field>
+            <field name="model_id" ref="pns_ai_mcp.model_ai_api_server_key"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+        <record id="api_server_key_admin_rule" model="ir.rule">
+            <field name="name">External API Server Key: admin full access</field>
+            <field name="model_id" ref="pns_ai_mcp.model_ai_api_server_key"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_ai_admin'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- ============================================================
+             SEQUENCE — supervised operation IDs
+             ============================================================ -->
+        <record id="sequence_safe_operation" model="ir.sequence">
+            <field name="name">AI Supervised Operation ID</field>
+            <field name="code">pns_ai_mcp.safe_operation</field>
+            <field name="prefix">VERIF-</field>
+            <field name="padding">8</field>
+            <field name="number_increment">1</field>
+            <field name="number_next">1</field>
+        </record>
+
+    </data>
+</odoo>

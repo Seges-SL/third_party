@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <metadata>
+        <code>partners</code>
+        <tipo>domain</tipo>
+        <description>res.partner knowledge - customers, suppliers, location search</description>
+        <version>1.2</version>
+        <created_at>2025-01-25</created_at>
+        <created_by>Administrator</created_by>
+        <modified_at>2026-08-12</modified_at>
+        <modified_by>Administrator</modified_by>
+    </metadata>
+    
+    <domain_knowledge>
+        <module name="partners" model="res.partner">
+            <rules>
+                <rule>Clients: `res.partner` with at least one **posted** sales invoice (`account.move` `move_type` in `out_invoice`/`out_refund`, `state='posted'`) as invoice `partner_id` / commercial partner. NEVER `customer_rank`. NEVER `customer=True`. NEVER calendar attendees (`partner_ids`) alone. NEVER `hr.employee`.</rule>
+                <rule>Use `supplier_rank > 0` for Suppliers.</rule>
+                <rule>VAT/NIF is in `vat` field.</rule>
+                <rule>Postal address: prefer the computed field `contact_address` (single formatted string). Atomic parts: `street`, `street2`, `zip`, `city`, `state_id`, `country_id`. NEVER `contact_address_complete` (not a standard `res.partner` field; raises AttributeError). If unsure which address fields exist, check `Partner._fields` or assemble from the atomic parts.</rule>
+            </rules>
+            <patterns>
+                <pattern name="clients_via_posted_invoices">
+                    <description>Distinct partners that appear on posted customer invoices.</description>
+                    <code_snippet>
+                    Move = env['account.move']
+                    invs = Move.search([
+                        ('move_type', 'in', ('out_invoice', 'out_refund')),
+                        ('state', '=', 'posted'),
+                    ])
+                    clients = invs.mapped('partner_id').mapped('commercial_partner_id')
+                    # or: partner_ids = list(set(invs.mapped('partner_id').ids))
+                    </code_snippet>
+                </pattern>
+                <pattern name="clients_ranked_by_calendar_events_ytd">
+                    <description>Top-N clients by calendar events/visits YTD. Universe = posted-invoice clients; count via calendar.event.customer_id (event→client). Do not rank calendar.event.partner_ids attendees.</description>
+                    <code_snippet>
+                    from datetime import datetime
+                    year_start = datetime(datetime.now().year, 1, 1).strftime('%Y-%m-%d 00:00:00')
+                    N = 15  # or from user request
+                    Move = env['account.move']
+                    Ev = env['calendar.event']
+                    invs = Move.search([
+                        ('move_type', 'in', ('out_invoice', 'out_refund')),
+                        ('state', '=', 'posted'),
+                    ])
+                    client_ids = set(invs.mapped('partner_id').mapped('commercial_partner_id').ids)
+                    counts = {}
+                    for ev in Ev.search([('start', '>=', year_start), ('customer_id', '!=', False)]):
+                        cid = ev.customer_id.commercial_partner_id.id
+                        if cid in client_ids:
+                            counts[cid] = counts.get(cid, 0) + 1
+                    ranked = sorted(counts.items(), key=lambda x: (-x[1], x[0]))[:N]
+                    Partner = env['res.partner']
+                    rows = [
+                        {'partner_id': pid, 'name': Partner.browse(pid).display_name, 'events_ytd': n}
+                        for pid, n in ranked
+                    ]
+                    # result = rows
+                    </code_snippet>
+                </pattern>
+                <pattern name="location_search">
+                    <description>Funnel: 1. `res.country.state`, 2. `res.country`, 3. `city/zip`.</description>
+                    <code_snippet>
+                    # Hierarchy: State > Country > City
+                    loc = env['res.country.state'].search([('name', 'ilike', t)], limit=1)
+                    if loc: res = env['res.partner'].search([('state_id', '=', loc.id)])
+                    else:
+                        loc = env['res.country'].search([('name', 'ilike', t)], limit=1)
+                        if loc: res = env['res.partner'].search([('country_id', '=', loc.id)])
+                        else: res = env['res.partner'].search(['|', ('city', 'ilike', t), ('zip', '=like', f"{t}%")])
+                    </code_snippet>
+                </pattern>
+            </patterns>
+        </module>
+    </domain_knowledge>
+</context>

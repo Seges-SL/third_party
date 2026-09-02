@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OWL 2 templates for pns_ai_mcp field widgets (Odoo 17+) -->
+<templates>
+
+    <!-- API Key display widget: shows value + copy button -->
+    <t t-name="pns_ai_mcp.MCPApiKeyField">
+        <div class="d-flex align-items-center o_field_mcp_api_key">
+            <t t-if="value">
+                <button class="btn btn-sm btn-link p-0 me-2" title="Copiar al portapapeles" t-on-click.stop="copyToClipboard">
+                    <i class="fa fa-copy"/>
+                </button>
+            </t>
+            <span class="flex-grow-1 text-monospace" style="font-size: 0.85em; word-break: break-all;">
+                <t t-esc="value || 'Sin API Key'"/>
+            </span>
+        </div>
+    </t>
+
+    <!-- ISO datetime: fixed YYYY-MM-DDTHH:MM:SS, no locale / relative labels -->
+    <t t-name="pns_ai_mcp.McpIsoDatetimeField">
+        <span class="o_mcp_iso_datetime text-monospace">
+            <t t-esc="isoValue"/>
+        </span>
+    </t>
+
+    <!-- JSON Compressed widget: compressed single-line + expandable pretty-printed block -->
+    <t t-name="pns_ai_mcp.MCPJsonCompressedWidget">
+        <div class="mcp_json_container">
+            <!-- Compressed line -->
+            <div class="d-flex align-items-center" style="width: 100%;">
+                <span class="flex-grow-1 text-truncate"
+                      style="cursor: pointer; font-family: monospace; font-size: 12px;"
+                      t-on-click.stop="toggleExpanded"
+                      t-att-title="compressedValue">
+                    <t t-esc="compressedValue || ''"/>
+                </span>
+                <button class="btn btn-sm btn-link p-0 ms-1" title="Copiar al portapapeles"
+                        style="flex-shrink: 0;" t-on-click.stop="copyToClipboard">
+                    <i class="fa fa-copy"/>
+                </button>
+            </div>
+            <!-- Expanded block (toggled) -->
+            <div t-if="state.expanded" class="mt-1 p-2 position-relative"
+                 style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; max-width: 100%; overflow-x: auto;">
+                <button class="btn btn-sm btn-link position-absolute" style="top: 4px; right: 4px; font-size: 11px;"
+                        t-on-click.stop="copyToClipboard">
+                    <i class="fa fa-copy"/> Copiar
+                </button>
+                <pre style="margin: 0; white-space: pre-wrap; word-wrap: break-word; font-size: 12px; font-family: monospace;">
+                    <t t-esc="state.expandedValue || 'Cargando...'"/>
+                </pre>
+            </div>
+        </div>
+    </t>
+
+    <!-- Bundle cache: full-width readonly textarea + copy button -->
+    <t t-name="pns_ai_mcp.AgentCacheTextField">
+        <div class="o_field_agent_cache w-100">
+            <div t-if="value" class="d-flex justify-content-end mb-1">
+                <button type="button"
+                        class="btn btn-sm btn-link o_agent_cache_copy"
+                        t-att-title="copyTitle"
+                        t-on-click.stop="copyToClipboard">
+                    <i class="fa fa-copy"/>
+                </button>
+            </div>
+            <textarea class="o_input o_agent_cache_textarea"
+                      readonly="readonly"
+                      rows="24"
+                      t-att-value="value"/>
+        </div>
+    </t>
+
+    <!-- Context Window: plain dropdown (+25%/row) of token sizes -->
+    <t t-name="pns_ai_mcp.ContextWindowComboWidget">
+        <t t-if="props.readonly">
+            <span class="text-muted"><t t-esc="readonlyLabel"/></span>
+        </t>
+        <t t-else="">
+            <select class="o_input" t-att-id="props.id" t-on-change="onChange">
+                <t t-foreach="options" t-as="opt" t-key="opt.value">
+                    <option t-att-value="opt.value" t-att-selected="opt.value === value">
+                        <t t-esc="opt.label"/>
+                    </option>
+                </t>
+            </select>
+        </t>
+    </t>
+
+</templates>

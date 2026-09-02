@@ -1,0 +1,19 @@
+{
+  "code": "discovery_accounting_imbalances_es_ES",
+  "tipo": "discovery",
+  "locale": "es_ES",
+  "target": "accounting_imbalances",
+  "priority": 71,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "descuadre",
+    "descuadres",
+    "desbalanceado",
+    "desbalanceada",
+    "asiento descuadrado",
+    "asientos descuadrados",
+    "debe haber",
+    "imbalance contable"
+  ]
+}

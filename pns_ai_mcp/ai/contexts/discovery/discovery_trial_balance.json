@@ -1,0 +1,12 @@
+{
+  "code": "discovery_trial_balance",
+  "tipo": "discovery",
+  "target": "trial_balance",
+  "priority": 76,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "trial balance",
+    "trial_balance"
+  ]
+}

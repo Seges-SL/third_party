@@ -1,0 +1,16 @@
+{
+  "code": "discovery_fetch_url_recipe_es_ES",
+  "tipo": "discovery",
+  "locale": "es_ES",
+  "target": "fetch_url_recipe",
+  "priority": 68,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "acceso a internet",
+    "llamar a una api",
+    "http get externo",
+    "descargar de una url",
+    "consultar una url"
+  ]
+}

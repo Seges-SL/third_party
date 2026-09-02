@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OWL2 template for the Chatboo systray launcher (Odoo 17+). -->
+<templates xml:space="preserve">
+    <t t-name="pns_ai_chatboo.ChatbooSystrayItem">
+        <div t-if="state.visible"
+             class="o_chatboo_systray_item d-flex align-items-center"
+             t-on-click="onClick"
+             title="Chatboo"
+             aria-label="Open Chatboo AI"
+             role="button">
+            <div class="o_chatboo_icon_wrap">
+                <img src="/pns_ai_chatboo/static/description/icon.png"
+                     alt="Chatboo"
+                     style="height:22px; width:22px;"/>
+                <span class="o_chatboo_badge"
+                      style="display: none;"><i class="fa fa-bell-o"/></span>
+            </div>
+        </div>
+    </t>
+</templates>

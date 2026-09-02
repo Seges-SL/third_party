@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_agent_skill_import_wizard_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.agent.skill.import.wizard.form</field>
+        <field name="model">pns_ai_mcp.agent.skill.import.wizard</field>
+        <field name="arch" type="xml">
+            <form>
+                <field name="agent_id" invisible="1"/>
+                <group>
+                    <div class="oe_title"><h1>Import agent skills from ZIP</h1></div>
+                    <field name="import_file" filename="filename"/>
+                    <field name="filename" invisible="1"/>
+                    <field name="replace_existing"/>
+                </group>
+                <div class="alert alert-info mb-0" role="alert">
+                    <p>Upload a skills export ZIP (manifest.json + skill files).</p>
+                    <p>Imported skills are linked to this agent. Existing ones (same code) are skipped unless "Replace existing" is checked. Nothing is ever deleted.</p>
+                </div>
+                <footer>
+                    <button name="action_import" string="Import" type="object"
+                            class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

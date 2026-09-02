@@ -1,0 +1,537 @@
+/* Chatboo OWL2 — paridad visual con O14 (owl1 / chatboo_floating.css) */
+:root {
+    --chatboo-primary: #00A09D;
+    --chatboo-primary-dark: #007f7d;
+    --chatboo-primary-light: #e0f7f6;
+    --chatboo-bg: #f5f6f8;
+    --chatboo-surface: #ffffff;
+    --chatboo-border: #e0e0e0;
+    --chatboo-text: #1d1d1d;
+    --chatboo-font: system-ui, 'Segoe UI', Roboto, -apple-system, sans-serif;
+    --chatboo-font-mono: 'Courier New', Courier, ui-monospace, monospace;
+    --chatboo-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.o_chatboo_app,
+.o_chatboo_container {
+    background: var(--chatboo-bg);
+    font-family: var(--chatboo-font-mono);
+}
+
+.o_chatboo_main_header {
+    font-family: var(--chatboo-font);
+    background: var(--chatboo-surface) !important;
+    border-bottom: 1px solid var(--chatboo-border) !important;
+    flex-shrink: 0;
+    z-index: 30;
+}
+
+.o_chatboo_status {
+    font-size: 1.75em !important;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.o_chatboo_status strong {
+    font-family: var(--chatboo-font);
+    font-weight: 700;
+}
+
+.o_chatboo_status .fw-normal {
+    font-family: var(--chatboo-font);
+    font-weight: 400;
+}
+
+/* Provider picker: the styled "host → model" label is itself the selector.
+   Clicking it opens a CUSTOM dropdown (not a native <select>) so we fully
+   control padding/font/hover of the option list. The plug icon stays a
+   separate click target for the connection test. */
+.o_chatboo_provider_pick {
+    position: relative;
+    display: inline-block;
+    /* One step smaller than the label + the freed space as padding, so the
+       clickable selector breathes instead of sitting glued to the edge. */
+    font-size: 0.9em;
+    padding: 1px 6px;
+}
+.o_chatboo_provider_clickable {
+    cursor: pointer;
+    border-radius: 6px;
+}
+.o_chatboo_provider_clickable:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+.o_chatboo_provider_backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1039;
+    background: transparent;
+}
+.o_chatboo_provider_menu {
+    position: absolute;
+    top: 100%;
+    inset-inline-start: 0;
+    z-index: 1040;
+    margin: 4px 0 0;
+    padding: 4px;
+    list-style: none;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    min-width: 100%;
+    white-space: nowrap;
+    font-size: 0.9em;
+    font-family: var(--chatboo-font);
+}
+.o_chatboo_provider_item {
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #333;
+}
+.o_chatboo_provider_item:hover {
+    background: var(--chatboo-bg, #f2f5f7);
+}
+.o_chatboo_provider_item.active {
+    font-weight: 600;
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.o_chatboo_messages {
+    background: var(--chatboo-bg);
+    overflow-y: auto;
+    padding-bottom: 1.75rem;
+}
+
+/* User bubble — teal + texto blanco (O14) */
+.o_chatboo_message.bg-primary,
+.o_chatboo_user {
+    background: linear-gradient(135deg, var(--chatboo-primary), var(--chatboo-primary-dark)) !important;
+    color: #fff !important;
+    border-radius: 16px 16px 4px 16px !important;
+    box-shadow: var(--chatboo-shadow);
+    max-width: 85% !important;
+    border: none !important;
+}
+
+.o_chatboo_user .o_chatboo_content,
+.o_chatboo_user .o_chatboo_content *,
+.o_chatboo_message.bg-primary .o_chatboo_content,
+.o_chatboo_message.bg-primary .o_chatboo_content *,
+.o_chatboo_user .o_chatboo_ts,
+.o_chatboo_message.bg-primary .o_chatboo_ts {
+    color: #fff !important;
+}
+
+.o_chatboo_user .o_chatboo_copy_btn {
+    color: rgba(255, 255, 255, 0.85) !important;
+}
+
+/* Assistant bubble */
+.o_chatboo_assistant,
+.o_chatboo_message.bg-white {
+    background: var(--chatboo-surface) !important;
+    border: 1px solid var(--chatboo-border) !important;
+    color: var(--chatboo-text) !important;
+    border-radius: 16px 16px 16px 4px !important;
+    box-shadow: var(--chatboo-shadow);
+    max-width: 92% !important;
+}
+
+.o_chatboo_bubble {
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+    position: relative;
+}
+
+.o_chatboo_content {
+    font-family: var(--chatboo-font);
+    font-size: 1.15em;
+    line-height: 1.5;
+}
+
+.o_chatboo_assistant .o_chatboo_content {
+    font-family: var(--chatboo-font);
+    color: var(--chatboo-text);
+}
+
+.o_chatboo_content table,
+.o_chatboo_content pre,
+.o_chatboo_content code {
+    font-family: var(--chatboo-font-mono);
+}
+
+.o_chatboo_content p,
+.o_chatboo_content .o_chatboo_prose_p,
+.o_chatboo_content .o_chatboo_prose_li,
+.o_chatboo_content .o_chatboo_prose,
+.o_chatboo_content .pns-result-footer {
+    font-family: var(--chatboo-font);
+    letter-spacing: normal;
+    word-spacing: normal;
+    text-align: start;
+}
+
+.o_chatboo_content p {
+    margin: 0.45em 0;
+    line-height: 1.5;
+}
+
+.o_chatboo_content .o_chatboo_prose h1,
+.o_chatboo_content .o_chatboo_prose h2,
+.o_chatboo_content .o_chatboo_prose h3,
+.o_chatboo_content .o_chatboo_prose h4,
+.o_chatboo_content .o_chatboo_prose_h,
+.o_chatboo_content .pns-result-footer h1,
+.o_chatboo_content .pns-result-footer h2,
+.o_chatboo_content .pns-result-footer h3,
+.o_chatboo_content .pns-result-footer h4 {
+    font-family: var(--chatboo-font);
+    font-weight: 700;
+    line-height: 1.3;
+    margin-top: 0.85em;
+    margin-bottom: 0.35em;
+    color: var(--chatboo-text);
+}
+
+.o_chatboo_content .o_chatboo_prose h1,
+.o_chatboo_content .pns-result-footer h1 { font-size: 1.25em; }
+.o_chatboo_content .o_chatboo_prose h2,
+.o_chatboo_content .pns-result-footer h2 { font-size: 1.15em; }
+.o_chatboo_content .o_chatboo_prose h3,
+.o_chatboo_content .pns-result-footer h3 { font-size: 1.05em; }
+
+/* Título resumen: sin hueco superior; tipografía más grande */
+.o_chatboo_content h3.o_chatboo_result_title,
+.o_chatboo_content h3.pns-result-title.o_chatboo_result_title {
+    margin: 0 !important;
+    font-size: 1.65rem !important;
+    font-weight: 700 !important;
+    line-height: 1.2 !important;
+}
+
+.o_chatboo_content .o_chatboo_grouped_result {
+    margin-top: 0 !important;
+}
+
+.o_chatboo_content .o_chatboo_result_title + .o_chatboo_table_block.o_chatboo_titled_block,
+.o_chatboo_content .o_chatboo_grouped_result > .o_chatboo_table_block.o_chatboo_titled_block:first-of-type {
+    margin-top: 0 !important;
+    margin-bottom: 1.1em;
+}
+
+.o_chatboo_content .o_chatboo_ficha table,
+.o_chatboo_content table.o_chatboo_ficha_table {
+    margin: 0 !important;
+}
+
+.o_chatboo_content table {
+    font-family: var(--chatboo-font-mono) !important;
+    font-size: 1.05em !important;
+    width: 100% !important;
+    margin: 1em 0 !important;
+    border-collapse: collapse !important;
+}
+
+.o_chatboo_content table thead {
+    background-color: #f8f9fa;
+    font-weight: bold;
+}
+
+.o_chatboo_content table th,
+.o_chatboo_content table td {
+    border: 1px solid #d0d0d0;
+    padding: 0.3rem 0.5rem;
+    text-align: start;
+}
+
+.o_chatboo_content table th.o_chatboo_num,
+.o_chatboo_content table td.o_chatboo_num,
+.o_chatboo_content table th.text-end,
+.o_chatboo_content table td.text-end {
+    text-align: end !important;
+    font-variant-numeric: tabular-nums;
+}
+
+.o_chatboo_content pre {
+    background: #1e1e2e !important;
+    color: #cdd6f4 !important;
+    padding: 14px 16px !important;
+    border-radius: 8px !important;
+    font-family: var(--chatboo-font-mono);
+}
+
+/* Charts under server-rendered tables (Chart.js) */
+.o_chatboo_table_block {
+    margin: 0.5em 0 1em 0;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.o_chatboo_block_title {
+    margin: 0 0 0.45em 0 !important;
+}
+
+/* Ficha: título = 1ª fila del thead (pegada a columnas) */
+.o_chatboo_table_block.o_chatboo_titled_block {
+    margin: 0.85em 0 1.1em 0;
+    border: none;
+    background: transparent;
+}
+
+.o_chatboo_table_block .table-responsive.o_chatboo_ficha {
+    margin: 0 !important;
+    border: 1px solid #dde5ec;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.o_chatboo_ficha_table {
+    margin-bottom: 0 !important;
+}
+
+.o_chatboo_ficha_table thead tr.o_chatboo_ficha_title th {
+    border-top: 0;
+    border-bottom: 0;
+    vertical-align: middle;
+}
+
+.o_chatboo_ficha_table thead tr:not(.o_chatboo_ficha_title) th {
+    border-top: 0;
+}
+
+.o_chatboo_table_block .o_chatboo_chart_toolbar {
+    margin-top: 0;
+}
+
+.o_chatboo_chart_toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.35em 0 0.5em 0;
+}
+
+/* Contraste fijo: btn-outline-secondary se pierde sobre fondo blanco del chat. */
+.o_chatboo_chart_toolbar .o_chatboo_chart_toggle {
+    color: #1a1a1a !important;
+    background-color: #f1f3f5 !important;
+    border: 1px solid #6c757d !important;
+    font-weight: 600;
+    opacity: 1 !important;
+}
+
+.o_chatboo_chart_toolbar .o_chatboo_chart_toggle:hover,
+.o_chatboo_chart_toolbar .o_chatboo_chart_toggle:focus {
+    color: #fff !important;
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+}
+
+.o_chatboo_chart_toolbar .o_chatboo_chart_toggle[aria-pressed="true"] {
+    color: #fff !important;
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+}
+
+.o_chatboo_chart_toolbar .o_chatboo_chart_type {
+    width: auto;
+    min-width: 8rem;
+    max-width: 12rem;
+    display: inline-block;
+    color: #1a1a1a;
+    background-color: #fff;
+    border: 1px solid #6c757d;
+}
+
+.o_chatboo_chart_toolbar .o_chatboo_chart_rotate {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    padding: 0.25rem 0.4rem;
+    color: #1a1a1a !important;
+    background-color: #f1f3f5 !important;
+    border: 1px solid #6c757d !important;
+    line-height: 1;
+}
+
+.o_chatboo_chart_toolbar .o_chatboo_chart_rotate:hover,
+.o_chatboo_chart_toolbar .o_chatboo_chart_rotate:focus {
+    color: #fff !important;
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+}
+
+.o_chatboo_chart_toolbar .o_chatboo_chart_rotate svg {
+    display: block;
+}
+
+.o_chatboo_chart_host {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    /* Fallback; JS (applyChartHostHeight) fija altura según series/categorías. */
+    height: 360px;
+    max-height: 640px;
+    margin: 0 0 0.75em 0;
+}
+
+.o_chatboo_chart_host canvas {
+    display: block;
+    /* Chart.js controla el box; max-width:100% deja un init 0×0 aplastado. */
+}
+
+.o_chatboo_chart_host .o_chatboo_echarts_surface {
+    width: 100%;
+    height: 100%;
+    min-height: 280px;
+}
+
+.o_chatboo_table_block .table-responsive.o_chatboo_table_collapsed {
+    display: none;
+}
+
+.o_chatboo_table_block[data-chatboo-show-mode="chart-table"] .o_chatboo_chart_host {
+    margin-bottom: 0.35em;
+}
+
+.o_chatboo_series_stats {
+    margin: 0.35em 0 0.85em;
+    width: 100%;
+    overflow-x: auto;
+}
+.o_chatboo_series_stats table {
+    width: 100%;
+    font-size: 0.85em;
+    margin: 0;
+}
+.o_chatboo_series_stats caption {
+    caption-side: top;
+    text-align: left;
+    font-weight: 600;
+    padding: 0 0 0.35em;
+}
+
+.o_chatboo_ts {
+    font-size: 1.09375em;
+}
+
+.o_chatboo_assistant .o_chatboo_ts {
+    color: #007cba;
+}
+
+.o_chatboo_ts_row {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin-top: 0.5rem;
+}
+
+.o_chatboo_ts_row .o_chatboo_ts {
+    margin-top: 0;
+    min-width: 0;
+}
+
+.o_chatboo_ts_row .o_chatboo_export_bar {
+    margin-inline-start: auto;
+    flex-shrink: 0;
+}
+
+.o_chatboo_meta,
+.o_chatboo_typing,
+.o_chatboo_context_info {
+    font-family: var(--chatboo-font);
+    font-size: 0.85em;
+}
+
+.o_chatboo_export_bar .o_chatboo_copy_btn {
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.15s ease;
+}
+
+.o_chatboo_export_bar .o_chatboo_copy_btn:hover {
+    opacity: 1 !important;
+}
+
+.o_chatboo_main_footer {
+    background: var(--chatboo-surface) !important;
+    border-top: 1px solid var(--chatboo-border) !important;
+    flex-shrink: 0;
+    z-index: 40;
+}
+
+.o_chatboo_main_footer input.form-control,
+.o_chatboo_main_footer textarea.o_chatboo_prompt {
+    font-family: var(--chatboo-font-mono);
+    font-size: 1.25em;
+    border-radius: 8px;
+}
+
+.o_chatboo_persistent_overlay {
+    background: var(--chatboo-surface);
+}
+
+.o_chatboo_persistent_overlay .o_chatboo_app {
+    height: 100%;
+}
+
+.o_chatboo_session_modal_backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 1050;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 8vh;
+}
+
+.o_chatboo_session_modal {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+    width: min(720px, 92vw);
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ─── Indicador "pensando": tres puntos que laten (CSS puro, sin librería) ───
+   Tamaño fijo en px para que NO herede el font-size grande del contenido. */
+.o_chatboo_typing {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    vertical-align: middle;
+}
+.o_chatboo_typing > span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--chatboo-primary, #00A09D);
+    opacity: 0.35;
+    animation: o_chatboo_typing_bounce 1.2s infinite ease-in-out;
+}
+.o_chatboo_typing > span:nth-child(2) { animation-delay: 0.18s; }
+.o_chatboo_typing > span:nth-child(3) { animation-delay: 0.36s; }
+@keyframes o_chatboo_typing_bounce {
+    0%, 80%, 100% { opacity: 0.3; transform: translateY(0) scale(0.85); }
+    40%           { opacity: 1;   transform: translateY(-4px) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .o_chatboo_typing > span {
+        animation: o_chatboo_typing_fade 1.2s infinite ease-in-out;
+    }
+    @keyframes o_chatboo_typing_fade {
+        0%, 100% { opacity: 0.3; }
+        50%      { opacity: 1; }
+    }
+}

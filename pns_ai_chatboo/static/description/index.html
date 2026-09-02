@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<title>Chatboo</title>
+</head>
+<body>
+<style>
+  .pns-apps {
+    --apps-brand: #875A7B;
+    --apps-accent: #C4A35A;
+    --apps-ink: #2B2A29;
+    --apps-muted: #5c6570;
+    --apps-line: #d7deea;
+    --apps-paper: #f4f7fb;
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 28px 20px 40px;
+    color: var(--apps-ink);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    line-height: 1.55;
+  }
+  .pns-apps * { box-sizing: border-box; }
+  .pns-apps-hero {
+    text-align: center;
+    padding: 8px 0 28px;
+    border-bottom: 4px solid var(--apps-accent);
+  }
+  .pns-apps-hero img {
+    width: 112px;
+    height: 112px;
+    border-radius: 26px;
+    border: 3px solid var(--apps-brand);
+    background: #fff;
+    display: block;
+    margin: 0 auto 16px;
+  }
+  .pns-apps-hero h1 {
+    margin: 0 0 8px;
+    color: var(--apps-brand);
+    font-size: 1.85rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .pns-apps-hero p {
+    margin: 0 auto;
+    max-width: 36em;
+    color: var(--apps-muted);
+    font-size: 1.05rem;
+  }
+  .pns-apps-card {
+    margin-top: 22px;
+    padding: 20px 22px 18px;
+    background: #fff;
+    border: 1px solid var(--apps-line);
+    border-radius: 14px;
+  }
+  .pns-apps-card.alt { background: var(--apps-paper); }
+  .pns-apps-card h2 {
+    margin: 0 0 12px;
+    color: var(--apps-brand);
+    font-size: 1.15rem;
+  }
+  .pns-apps-card p { margin: 0 0 10px; }
+  .pns-apps-card p:last-child { margin-bottom: 0; }
+  .pns-apps-grid { display: block; }
+  .pns-apps-grid ul { margin: 0; padding-left: 1.15em; }
+  .pns-apps-grid li { margin: 0 0 10px; }
+  .pns-apps-grid li:last-child { margin-bottom: 0; }
+  .pns-apps-steps { margin: 0; padding-left: 1.2em; }
+  .pns-apps-steps li { margin: 0 0 8px; }
+  .pns-apps table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+  }
+  .pns-apps th, .pns-apps td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--apps-line);
+    vertical-align: top;
+  }
+  .pns-apps th { background: var(--apps-brand); color: #fff; font-weight: 600; }
+  .pns-apps tr:nth-child(even) td { background: #eef3f9; }
+  .pns-apps code {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 0.88em;
+    background: #e8eef6;
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  .pns-apps-foot { margin-top: 18px; color: var(--apps-muted); font-size: 0.92rem; }
+  .pns-apps-foot a { color: var(--apps-brand); }
+  @media (min-width: 700px) {
+    .pns-apps-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; }
+  }
+</style>
+<div class="pns-apps">
+  <header class="pns-apps-hero">
+    <img src="icon.png" alt="Chatboo"/>
+    <h1>Chatboo</h1>
+    <p>In-Odoo conversational assistant. Owns the chat; the AI Engine owns inference, tools and knowledge.</p>
+  </header>
+
+  <section class="pns-apps-card">
+    <h2>Where to configure</h2>
+    <p>
+      <strong>Chatboo</strong> app or the systray overlay &mdash; sessions and
+      the conversation. This module has no Settings page and no Technical menu
+      for keys.
+    </p>
+    <p>
+      Provider key and failover: <strong>AI Engine</strong> app &rarr; agent
+      <code>pns_ai_chatboo</code>. Map keys: <strong>Geo &rarr; Settings</strong>
+      (or Settings &rarr; Geo), not here.
+    </p>
+  </section>
+
+  <section class="pns-apps-card alt">
+    <h2>What it is</h2>
+    <p>
+      A <strong>product</strong> UI on top of <code>pns_ai_mcp</code>. It is
+      the backend app plus the systray overlay: sessions, turn history and
+      SSE streaming on the screen the user already has open. All providers,
+      skills, Safe Plan and the MCP protocol stay in the engine. Chatboo
+      does not re-implement them.
+    </p>
+    <p>
+      You can run the engine without Chatboo (Cursor talking MCP only). You
+      cannot run Chatboo without the engine. Customer packs such as
+      <code>occ_custom_ai</code> seed knowledge into the engine; Chatboo
+      just talks through the agent named <code>pns_ai_chatboo</code>.
+    </p>
+  </section>
+
+  <section class="pns-apps-card">
+    <h2>What it ships</h2>
+    <div class="pns-apps-grid">
+      <ul>
+        <li><strong>Systray chat</strong> &mdash; overlay on the current Odoo screen. The user does not leave the record they were looking at.</li>
+        <li><strong>Sessions and turns</strong> &mdash; history stored in Odoo so a conversation can be reopened, not only streamed once.</li>
+        <li><strong>SSE streaming</strong> &mdash; tokens arrive as the engine produces them. The UI does not wait for a full reply before painting.</li>
+      </ul>
+      <ul>
+        <li><strong>Confirm toasts</strong> &mdash; when the engine proposes a Safe Plan write, Chatboo surfaces the human Confirm in the same overlay.</li>
+        <li><strong>One product agent</strong> &mdash; conversations go through the engine agent <code>pns_ai_chatboo</code>. Failover, model and tools are on that agent.</li>
+        <li><strong>Voice / mute chrome</strong> &mdash; client controls for the overlay. They do not change which LLM or skill runs.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="pns-apps-card alt">
+    <h2>What it does not do</h2>
+    <ul>
+      <li><strong>No provider keys</strong> &mdash; paste those on the engine provider. Chatboo has no secret store of its own.</li>
+      <li><strong>No MCP protocol</strong> &mdash; Cursor and other clients hit <code>pns_ai_mcp</code> directly. This module is the in-Odoo conversation, not a second server.</li>
+      <li><strong>No failover chain</strong> &mdash; OpenRouter then OVH (or any other order) is configured on the agent in the engine, not here.</li>
+      <li><strong>No customer skills</strong> &mdash; Occidente procedures live in <code>occ_custom_ai</code>. Chatboo will use them once the engine has them.</li>
+    </ul>
+  </section>
+
+  <section class="pns-apps-card">
+    <h2>How to configure</h2>
+    <ol class="pns-apps-steps">
+      <li>Before Apps: in the Odoo Python, install the extras stock Odoo does not ship (<code>httpx</code>, <code>pydantic</code>; on Odoo 14 also <code>openpyxl&gt;=3.1.2</code>). Then install <code>pns_base</code> and <code>pns_ai_mcp</code>. Paste at least one provider API key in the AI Engine app.</li>
+      <li>Install this module. Open <strong>Chatboo</strong> from the systray or the app.</li>
+      <li>On the engine, open the agent <code>pns_ai_chatboo</code>. Set the primary provider and the failover order you want for in-Odoo chat.</li>
+      <li>If maps should appear in answers, install <code>pns_geo</code> and put the map keys under Settings &rarr; Geo. Chatboo will not ask for those keys.</li>
+      <li>Pilot: install <code>occ_custom_ai</code> so Occidente skills seed into the engine. Restart the conversation after that upgrade.</li>
+    </ol>
+  </section>
+
+  <section class="pns-apps-card alt">
+    <h2>Family</h2>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>Where</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>pns_ai_mcp</code></td>
+          <td>O14 and O19</td>
+          <td>Engine: providers, skills, MCP, Safe Plan</td>
+        </tr>
+        <tr>
+          <td><code>pns_ai_chatboo</code></td>
+          <td>O14 and O19</td>
+          <td>This UI: sessions, overlay, streaming</td>
+        </tr>
+        <tr>
+          <td><code>occ_custom_ai</code></td>
+          <td>O14 and O19</td>
+          <td>Optional pilot pack. Seeds the engine; Chatboo does not depend on it.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="pns-apps-foot">
+      UI source in English. Layout: <code>common/</code> plus OWL1 (O13&ndash;14) and OWL2 (O15&ndash;19+) stacks.
+    </p>
+    <p class="pns-apps-foot">
+      <a href="https://patanegra.com">PATANEGRA Soft</a>
+      &mdash; Apache License 2.0 (OSI approved). See <a href="LICENSE">LICENSE</a>.
+    </p>
+  </section>
+</div>
+</body>
+</html>

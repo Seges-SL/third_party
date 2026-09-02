@@ -1,0 +1,20 @@
+{
+  "code": "discovery_cost_accounting_es_ES",
+  "tipo": "discovery",
+  "locale": "es_ES",
+  "target": "cost_accounting",
+  "priority": 74,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "centro de coste",
+    "centros de coste",
+    "centro de costo",
+    "analitica",
+    "analítica",
+    "cuenta analitica",
+    "cuenta analítica",
+    "apunte analitico",
+    "apunte analítico"
+  ]
+}

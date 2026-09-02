@@ -1,0 +1,14 @@
+{
+  "code": "discovery_filters",
+  "tipo": "discovery",
+  "target": "filters",
+  "priority": 65,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "ir.filters",
+    "saved filter",
+    "saved filters",
+    "custom filter"
+  ]
+}

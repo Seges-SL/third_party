@@ -1,0 +1,3021 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* pns_ai_mcp
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-06-07 12:00+0000\n"
+"PO-Revision-Date: 2026-06-07 12:00+0000\n"
+"Last-Translator: PNS\n"
+"Language-Team: Arabic\n"
+"Language: ar_001\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5;\n"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.res_config_settings_view_form_mcp
+msgid "Module license"
+msgstr "ترخيص الوحدة"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.res_config_settings_view_form_mcp
+msgid "License and copyright"
+msgstr "الترخيص وحقوق النشر"
+
+#. module: pns_ai_mcp
+msgid "MCP Administrator"
+msgstr "مسؤول MCP"
+
+#. module: pns_ai_mcp
+msgid "AI Engine"
+msgstr "إطار عمل الذكاء الاصطناعي"
+
+#. module: pns_ai_mcp
+msgid "Users"
+msgstr "المستخدمون"
+
+#. module: pns_ai_mcp
+msgid "MCP Users"
+msgstr "مستخدمو MCP"
+
+#. module: pns_ai_mcp
+msgid "MCP User"
+msgstr "مستخدم MCP"
+
+#. module: pns_ai_mcp
+msgid "User"
+msgstr "المستخدم"
+
+#. module: pns_ai_mcp
+msgid "Name"
+msgstr "الاسم"
+
+#. module: pns_ai_mcp
+msgid "MCP API Key"
+msgstr "مفتاح API لـ MCP"
+
+#. module: pns_ai_mcp
+msgid "MCP API Key Status"
+msgstr "حالة مفتاح API لـ MCP"
+
+#. module: pns_ai_mcp
+msgid "Not generated"
+msgstr "غير مُنشأ"
+
+#. module: pns_ai_mcp
+msgid "Generated"
+msgstr "مُنشأ"
+
+#. module: pns_ai_mcp
+msgid "Generated on"
+msgstr "تاريخ الإنشاء"
+
+#. module: pns_ai_mcp
+msgid "MCP Manager"
+msgstr "مدير MCP"
+
+#. module: pns_ai_mcp
+msgid "Write Permission"
+msgstr "صلاحية الكتابة"
+
+#. module: pns_ai_mcp
+msgid "Generate API Key"
+msgstr "إنشاء مفتاح API"
+
+#. module: pns_ai_mcp
+msgid "Regenerate API Key"
+msgstr "إعادة إنشاء مفتاح API"
+
+#. module: pns_ai_mcp
+msgid "Import existing Key"
+msgstr "استيراد مفتاح موجود"
+
+#. module: pns_ai_mcp
+msgid "Delete API Key"
+msgstr "حذف مفتاح API"
+
+#. module: pns_ai_mcp
+msgid "Generate MCP API Key"
+msgstr "إنشاء مفتاح API لـ MCP"
+
+#. module: pns_ai_mcp
+msgid "Contexts"
+msgstr "السياقات"
+
+#. module: pns_ai_mcp
+msgid "MCP Logs"
+msgstr "سجلات MCP"
+
+#. module: pns_ai_mcp
+msgid "Settings"
+msgstr "الإعدادات"
+
+#. module: pns_ai_mcp
+msgid "Context Tools"
+msgstr "أدوات السياق"
+
+#. module: pns_ai_mcp
+msgid "Context Statistics"
+msgstr "إحصائيات السياق"
+
+#. module: pns_ai_mcp
+msgid "Relaxaicode Library"
+msgstr "مكتبة Relaxaicode"
+
+#. module: pns_ai_mcp
+msgid "Export MCP Users"
+msgstr "تصدير مستخدمي MCP"
+
+#. module: pns_ai_mcp
+msgid "Import MCP Users"
+msgstr "استيراد مستخدمي MCP"
+
+#. module: pns_ai_mcp
+msgid "Can manage MCP server API keys for all users"
+msgstr "يمكنه إدارة مفاتيح API لخادم MCP لجميع المستخدمين"
+
+#. module: pns_ai_mcp
+msgid "Can manage custom contexts (read/write/import/export) but read-only on system contexts"
+msgstr "يمكنه إدارة السياقات المخصصة (قراءة/كتابة/استيراد/تصدير) مع قراءة فقط للسياقات النظامية"
+
+#. module: pns_ai_mcp
+msgid "An MCP record already exists for this user"
+msgstr "يوجد سجل MCP لهذا المستخدم بالفعل"
+
+#. module: pns_ai_mcp
+msgid "Technical error while generating API key"
+msgstr "خطأ تقني أثناء إنشاء مفتاح API"
+
+#. module: pns_ai_mcp
+msgid "Export"
+msgstr "تصدير"
+
+#. module: pns_ai_mcp
+msgid "There are no users to export."
+msgstr "لا يوجد مستخدمون للتصدير."
+
+#. module: pns_ai_mcp
+msgid "Import MCP Users"
+msgstr "استيراد مستخدمي MCP"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider__provider_type
+msgid "Provider Type"
+msgstr "نوع المزود"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider__endpoint
+msgid "Endpoint URL"
+msgstr "رابط نقطة النهاية"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__endpoint
+msgid "Full URL of the provider. For local OpenAI-compatible servers (Ollama, Lemonade, LM Studio...) use their base URL, e.g. http://localhost:11434/v1. If left partial, the path is auto-completed on save."
+msgstr "الرابط الكامل للمزود. بالنسبة للخوادم المحلية المتوافقة مع OpenAI (Ollama، Lemonade، LM Studio...) استخدم رابطها الأساسي، مثل http://localhost:11434/v1. إذا تُرك ناقصاً، يُكمَّل المسار تلقائياً عند الحفظ."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider__router_api_key
+msgid "API Key"
+msgstr "مفتاح API"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__router_api_key
+msgid "Authentication key sent to the provider (or to your AI Router gateway if you use one)."
+msgstr "مفتاح المصادقة الذي يُرسَل إلى المزود (أو إلى بوابة AI Router إذا كنت تستخدم واحدة)."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider__mcp_callback_url
+msgid "Odoo MCP Callback URL"
+msgstr "رابط استدعاء MCP في Odoo"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__mcp_callback_url
+msgid "Internal Odoo URL reachable from the Router container. If empty, web.base.url is used. Only relevant in MCP-server mode with the Router."
+msgstr "رابط Odoo الداخلي الذي يمكن الوصول إليه من حاوية Router. إذا كان فارغاً، يُستخدم web.base.url. ذو صلة فقط في وضع خادم MCP مع Router."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider__model_name
+msgid "Manual Model Name (Fallback)"
+msgstr "اسم النموذج اليدوي (احتياطي)"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__model_name
+msgid "Manual entry used as fallback when no model is selected from the list."
+msgstr "إدخال يدوي يُستخدم كاحتياطي عند عدم اختيار أي نموذج من القائمة."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider__model_id
+msgid "Selected Model"
+msgstr "النموذج المحدد"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider__available_model_ids
+msgid "Available Models"
+msgstr "النماذج المتاحة"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider__temperature
+msgid "Temperature"
+msgstr "درجة الحرارة"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__temperature
+msgid "Model creativity control (0.0 - 1.0):\n- 0.0: Deterministic (always the same answer)\n- 0.1-0.3: Precise (code, SQL, data)\n- 0.4-0.7: Balanced (natural conversation) - Recommended\n- 0.8-1.0: Creative (brainstorming, writing)"
+msgstr "التحكم في إبداع النموذج (0.0 - 1.0):\n- 0.0: حتمي (نفس الإجابة دائماً)\n- 0.1-0.3: دقيق (كود، SQL، بيانات)\n- 0.4-0.7: متوازن (محادثة طبيعية) - موصى به\n- 0.8-1.0: إبداعي (عصف ذهني، كتابة)"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider__context_window
+msgid "Context Window (Tokens)"
+msgstr "نافذة السياق (Tokens)"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__context_window
+msgid "Maximum conversation memory (in tokens) sent to the model. Only applies in inference-client mode (e.g. Chatboo, OCR); it has no effect when an external MCP client like Cursor or Claude drives the model.\n\nWhen the limit is exceeded, the inference orchestrator drops the OLDEST conversation turns first. The system prompt and the role's context bundle are ALWAYS kept (never trimmed) - so a very large bundle leaves less room for history.\n\nRule of thumb: 1 token ~ 4 characters, so 32768 tokens ~ 130 KB of text. Mainly useful to protect GPU RAM on heavy local models. Leave 32768 by default."
+msgstr "أقصى ذاكرة محادثة (بالـ tokens) تُرسَل إلى النموذج. تنطبق فقط في وضع عميل الاستدلال (مثل Chatboo، OCR)؛ وليس لها أثر عندما يقود النموذجَ عميلُ MCP خارجي مثل Cursor أو Claude.\n\nعند تجاوز الحد، يُسقِط منسّق الاستدلال أقدمَ أدوار المحادثة أولاً. تُحفَظ دائماً تعليمات النظام وحزمة سياق الدور (لا تُقتطع أبداً) — لذا فإن الحزمة الكبيرة جداً تترك مساحة أقل للسجل.\n\nقاعدة تقريبية: 1 token ~ 4 أحرف، أي أن 32768 token ~ 130 كيلوبايت من النص. مفيد أساساً لحماية ذاكرة GPU في النماذج المحلية الثقيلة. اترك 32768 افتراضياً."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider__role_assignment_ids
+msgid "Role assignments"
+msgstr "تعيينات الأدوار"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider__role_ids
+msgid "Inference roles"
+msgstr "أدوار الاستدلال"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/static/src/js/mcp_skill_action_buttons.js:0
+#: code:addons/pns_ai_mcp/static/src/js/mcp_context_action_buttons.js:0
+#: code:addons/pns_ai_mcp/static/src/js/mcp_context_tree_v14.js:0
+#: code:addons/pns_ai_mcp/static/src/js/mcp_skill_tree_v14.js:0
+msgid "Tools"
+msgstr "أدوات"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/static/src/js/mcp_skill_action_buttons.js:0
+#: code:addons/pns_ai_mcp/static/src/js/mcp_skill_tree_v14.js:0
+msgid "Skills Tools"
+msgstr "أدوات المهارات"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/static/src/js/mcp_context_action_buttons.js:0
+#: code:addons/pns_ai_mcp/static/src/js/mcp_context_tree_v14.js:0
+msgid "Contexts Tools"
+msgstr "أدوات السياقات"
+
+#. module: pns_ai_mcp
+msgid "Statistics"
+msgstr "إحصائيات"
+
+#. module: pns_ai_mcp
+msgid "Close"
+msgstr "إغلاق"
+
+#. module: pns_ai_mcp
+msgid "Overwrite matching skills"
+msgstr "الكتابة فوق المهارات المتطابقة"
+
+#. module: pns_ai_mcp
+msgid "Overwrite matching contexts"
+msgstr "الكتابة فوق السياقات المتطابقة"
+
+#. module: pns_ai_mcp
+msgid "Write Confirmations"
+msgstr "تأكيدات الكتابة"
+
+#. module: pns_ai_mcp
+msgid "AI Write Confirmations"
+msgstr "تأكيدات كتابة الذكاء الاصطناعي"
+
+#. module: pns_ai_mcp
+msgid "Write Confirmation"
+msgstr "تأكيد الكتابة"
+
+#. module: pns_ai_mcp
+msgid "Pending"
+msgstr "قيد الانتظار"
+
+#. module: pns_ai_mcp
+msgid "Confirm"
+msgstr "تأكيد"
+
+#. module: pns_ai_mcp
+msgid "Cancel"
+msgstr "إلغاء"
+
+#. module: pns_ai_mcp
+msgid "Confirm and execute"
+msgstr "تأكيد وتنفيذ"
+
+#. module: pns_ai_mcp
+msgid "Plan / proposed changes"
+msgstr "الخطة / التغييرات المقترحة"
+
+#. module: pns_ai_mcp
+msgid "Execution result"
+msgstr "نتيجة التنفيذ"
+
+#. module: pns_ai_mcp
+msgid "There are no pending write operations"
+msgstr "لا توجد عمليات كتابة معلقة"
+
+#. module: pns_ai_mcp
+msgid "Here you will find the writes proposed by the AI that require your confirmation."
+msgstr "هنا تجد عمليات الكتابة التي يقترحها الذكاء الاصطناعي وتتطلب تأكيدك."
+
+#. module: pns_ai_mcp
+msgid "Providers Tools"
+msgstr "أدوات المزودين"
+
+#. module: pns_ai_mcp
+msgid "Import AI Providers"
+msgstr "استيراد مزودي الذكاء الاصطناعي"
+
+#. module: pns_ai_mcp
+msgid "Import AI Providers (JSON)"
+msgstr "استيراد مزودي الذكاء الاصطناعي (JSON)"
+
+#. module: pns_ai_mcp
+msgid "Import"
+msgstr "استيراد"
+
+#. module: pns_ai_mcp
+msgid "Import JSON"
+msgstr "استيراد JSON"
+
+#. module: pns_ai_mcp
+msgid "Export JSON"
+msgstr "تصدير JSON"
+
+#. module: pns_ai_mcp
+msgid "Import Result"
+msgstr "نتيجة الاستيراد"
+
+#. module: pns_ai_mcp
+msgid "Result details"
+msgstr "تفاصيل النتيجة"
+
+#. module: pns_ai_mcp
+msgid "AI Import Results"
+msgstr "نتائج استيراد الذكاء الاصطناعي"
+
+#. module: pns_ai_mcp
+msgid "JSON File"
+msgstr "ملف JSON"
+
+#. module: pns_ai_mcp
+msgid "File name"
+msgstr "اسم الملف"
+
+#. module: pns_ai_mcp
+msgid "Replace existing"
+msgstr "استبدال الموجود"
+
+#. module: pns_ai_mcp
+msgid "Please upload a JSON file."
+msgstr "يرجى رفع ملف JSON."
+
+#. module: pns_ai_mcp
+msgid "The JSON file must contain a list of providers."
+msgstr "يجب أن يحتوي ملف JSON على قائمة بالمزودين."
+
+#. module: pns_ai_mcp
+msgid "There are no providers to export."
+msgstr "لا يوجد مزودون للتصدير."
+
+#. module: pns_ai_mcp
+msgid "Import report:"
+msgstr "تقرير الاستيراد:"
+
+#. module: pns_ai_mcp
+msgid "New created: %s"
+msgstr "تم إنشاء جديد: %s"
+
+#. module: pns_ai_mcp
+msgid "Updated: %s"
+msgstr "تم التحديث: %s"
+
+#. module: pns_ai_mcp
+msgid "Skipped (already existed): %s"
+msgstr "تم التخطي (موجود مسبقاً): %s"
+
+#. module: pns_ai_mcp
+msgid "Errors (%s):"
+msgstr "أخطاء (%s):"
+
+#. module: pns_ai_mcp
+msgid "Error parsing the JSON file: %s"
+msgstr "خطأ في تحليل ملف JSON: %s"
+
+#. module: pns_ai_mcp
+msgid "Error processing the JSON file: %s"
+msgstr "خطأ في معالجة ملف JSON: %s"
+
+#. module: pns_ai_mcp
+msgid "Import AI Provider Roles"
+msgstr "استيراد أدوار مزود الذكاء الاصطناعي"
+
+#. module: pns_ai_mcp
+msgid "Import AI Provider Roles (JSON)"
+msgstr "استيراد أدوار مزود الذكاء الاصطناعي (JSON)"
+
+#. module: pns_ai_mcp
+msgid "There are no roles to export."
+msgstr "لا توجد أدوار للتصدير."
+
+#. module: pns_ai_mcp
+msgid "The JSON file must contain a list of roles."
+msgstr "يجب أن يحتوي ملف JSON على قائمة بالأدوار."
+
+#. module: pns_ai_mcp
+msgid "A role without 'code' was found."
+msgstr "تم العثور على دور بدون 'code'."
+
+#. module: pns_ai_mcp
+msgid "No code"
+msgstr "بدون رمز"
+
+#. module: pns_ai_mcp
+msgid "Missing providers (%s):"
+msgstr "مزودون مفقودون (%s):"
+
+#. module: pns_ai_mcp
+msgid "Verification ID"
+msgstr "معرّف التحقق"
+
+#. module: pns_ai_mcp
+msgid "Unique identifier of the verification"
+msgstr "معرّف فريد للتحقق"
+
+#. module: pns_ai_mcp
+msgid "Operation Type"
+msgstr "نوع العملية"
+
+#. module: pns_ai_mcp
+msgid "Name of the affected Odoo model (e.g.: calendar.event)"
+msgstr "اسم نموذج أودو المتأثر (مثال: calendar.event)"
+
+#. module: pns_ai_mcp
+msgid "Affected Records"
+msgstr "السجلات المتأثرة"
+
+#. module: pns_ai_mcp
+msgid "Number of records that will be affected by the operation"
+msgstr "عدد السجلات التي ستتأثر بالعملية"
+
+#. module: pns_ai_mcp
+msgid "Changes Info"
+msgstr "معلومات التغييرات"
+
+#. module: pns_ai_mcp
+msgid "Detailed information about the proposed changes (serialized JSON)"
+msgstr "معلومات مفصلة عن التغييرات المقترحة (JSON متسلسل)"
+
+#. module: pns_ai_mcp
+msgid "Confirmed by"
+msgstr "تم التأكيد بواسطة"
+
+#. module: pns_ai_mcp
+msgid "User (browser session) who confirmed the operation from the toast"
+msgstr "المستخدم (جلسة المتصفح) الذي أكد العملية من الإشعار"
+
+#. module: pns_ai_mcp
+msgid "Executed"
+msgstr "تم التنفيذ"
+
+#. module: pns_ai_mcp
+msgid "True when the confirmed operation has already been executed (prevents double execution)"
+msgstr "صحيح عندما تكون العملية المؤكدة قد نُفذت بالفعل (يمنع التنفيذ المزدوج)"
+
+#. module: pns_ai_mcp
+msgid "Result of executing the plan after human confirmation (serialized JSON)"
+msgstr "نتيجة تنفيذ الخطة بعد التأكيد البشري (JSON متسلسل)"
+
+#. module: pns_ai_mcp
+msgid "Expires at"
+msgstr "تنتهي في"
+
+#. module: pns_ai_mcp
+msgid "Date and time when this verification expires"
+msgstr "التاريخ والوقت الذي ينتهي فيه هذا التحقق"
+
+#. module: pns_ai_mcp
+msgid "Resolved at"
+msgstr "تم الحل في"
+
+#. module: pns_ai_mcp
+msgid "Date and time when the verification was confirmed or cancelled"
+msgstr "التاريخ والوقت الذي تم فيه تأكيد أو إلغاء التحقق"
+
+#. module: pns_ai_mcp
+msgid "MCP Tool"
+msgstr "أداة MCP"
+
+#. module: pns_ai_mcp
+msgid "Name of the MCP tool that requested the operation"
+msgstr "اسم أداة MCP التي طلبت العملية"
+
+#. module: pns_ai_mcp
+msgid "Operation Data"
+msgstr "بيانات العملية"
+
+#. module: pns_ai_mcp
+msgid "Complete data of the pending operation (serialized JSON)"
+msgstr "البيانات الكاملة للعملية المعلقة (JSON متسلسل)"
+
+#. module: pns_ai_mcp
+msgid "Only the user who requested the operation can confirm it."
+msgstr "يمكن فقط للمستخدم الذي طلب العملية تأكيدها."
+
+#. module: pns_ai_mcp
+msgid "This operation has already been executed."
+msgstr "تم تنفيذ هذه العملية بالفعل."
+
+#. module: pns_ai_mcp
+msgid "Error executing the operation: %s"
+msgstr "خطأ في تنفيذ العملية: %s"
+
+#. module: pns_ai_mcp
+msgid "Only the user who requested the operation can cancel it."
+msgstr "يمكن فقط للمستخدم الذي طلب العملية إلغاؤها."
+
+#. module: pns_ai_mcp
+msgid "**Available skills** (use `/<code> [arguments]`):"
+msgstr "**المهارات المتاحة** (استخدم `/<code> [arguments]`):"
+
+#. module: pns_ai_mcp
+msgid "Accept"
+msgstr "قبول"
+
+#. module: pns_ai_mcp
+msgid "All Languages"
+msgstr "كل اللغات"
+
+#. module: pns_ai_mcp
+msgid "API Key for MCP server access. Displayed in plain text to facilitate sending by email and other means."
+msgstr "مفتاح API للوصول إلى خادم MCP. يُعرض كنص عادي لتسهيل إرساله بالبريد ووسائل أخرى."
+
+#. module: pns_ai_mcp
+msgid "Category"
+msgstr "Category"
+
+#. module: pns_ai_mcp
+msgid "Clear all"
+msgstr "مسح الكل"
+
+#. module: pns_ai_mcp
+msgid "Clear History"
+msgstr "مسح السجل"
+
+#. module: pns_ai_mcp
+msgid "Clear history"
+msgstr "مسح السجل"
+
+#. module: pns_ai_mcp
+msgid "Clear Log History"
+msgstr "مسح سجل السجلات"
+
+#. module: pns_ai_mcp
+msgid "Clear log history"
+msgstr "مسح سجل السجلات"
+
+#. module: pns_ai_mcp
+msgid "Code"
+msgstr "Code"
+
+#. module: pns_ai_mcp
+msgid "Code category (e.g.:"
+msgstr "Code category (e.g.:"
+
+#. module: pns_ai_mcp
+msgid "Code category (e.g.: \"filtering\", \"calculations\", \"reports\")"
+msgstr "فئة الكود (مثال: \"filtering\", \"calculations\", \"reports\")"
+
+#. module: pns_ai_mcp
+msgid "Comma-separated tags for easier searching"
+msgstr "وسوم مفصولة بفواصل لتسهيل البحث"
+
+#. module: pns_ai_mcp
+msgid "Context Statistics (Filtered)"
+msgstr "إحصائيات السياق (مفلترة)"
+
+#. module: pns_ai_mcp
+msgid "Context version"
+msgstr "إصدار السياق"
+
+#. module: pns_ai_mcp
+msgid "Counter of times this code has been used"
+msgstr "عداد مرات استخدام هذا الكود"
+
+#. module: pns_ai_mcp
+msgid "Created On"
+msgstr "تاريخ الإنشاء"
+
+#. module: pns_ai_mcp
+msgid "Creation date"
+msgstr "تاريخ الإنشاء"
+
+#. module: pns_ai_mcp
+msgid "Date and time of last use"
+msgstr "تاريخ ووقت آخر استخدام"
+
+#. module: pns_ai_mcp
+msgid "Delete Key"
+msgstr "حذف المفتاح"
+
+#. module: pns_ai_mcp
+msgid "Deletes the oldest logs, keeping the most recent ones"
+msgstr "يحذف أقدم السجلات مع الاحتفاظ بالأحدث."
+
+#. module: pns_ai_mcp
+msgid "Description"
+msgstr "Description"
+
+#. module: pns_ai_mcp
+msgid "Description of what the code does and when to use it"
+msgstr "وصف ما يفعله الكود ومتى يُستخدم"
+
+#. module: pns_ai_mcp
+msgid "Descriptive name of the stored code"
+msgstr "اسم وصفي للكود المخزّن"
+
+#. module: pns_ai_mcp
+msgid "Direction"
+msgstr "الاتجاه"
+
+#. module: pns_ai_mcp
+msgid "Endpoint Name"
+msgstr "اسم نقطة النهاية"
+
+#. module: pns_ai_mcp
+msgid "Example context in JSON format to use with the code"
+msgstr "مثال سياق بصيغة JSON للاستخدام مع الكود"
+
+#. module: pns_ai_mcp
+msgid "File"
+msgstr "ملف"
+
+#. module: pns_ai_mcp
+msgid "Flow (who→who)"
+msgstr "التدفق (من→من)"
+
+#. module: pns_ai_mcp
+msgid "Flow description: who sends data to whom and what"
+msgstr "وصف التدفق: من يرسل البيانات إلى من وماذا"
+
+#. module: pns_ai_mcp
+msgid "Generating a new key will immediately invalidate the existing key."
+msgstr "إنشاء مفتاح جديد سيلغي المفتاح الحالي فوراً."
+
+#. module: pns_ai_mcp
+msgid "I understand and confirm this action"
+msgstr "أفهم وأؤكد هذا الإجراء"
+
+#. module: pns_ai_mcp
+msgid "Import Contexts"
+msgstr "استيراد السياقات"
+
+#. module: pns_ai_mcp
+msgid "Indicates whether an existing key is being imported instead of generating a new one"
+msgstr "يشير إلى ما إذا كان يتم استيراد مفتاح موجود بدلاً من إنشاء مفتاح جديد"
+
+#. module: pns_ai_mcp
+msgid "Indicates whether the API key is being deleted instead of generated"
+msgstr "يشير إلى ما إذا كان يتم حذف مفتاح API بدلاً من إنشائه"
+
+#. module: pns_ai_mcp
+msgid "Indicates whether the user belongs to the MCP Manager group"
+msgstr "يشير إلى ما إذا كان المستخدم ينتمي إلى مجموعة مدير MCP"
+
+#. module: pns_ai_mcp
+msgid "Indicates whether this code has been converted into an MCP endpoint"
+msgstr "يشير إلى ما إذا تم تحويل هذا الكود إلى نقطة نهاية MCP"
+
+#. module: pns_ai_mcp
+msgid "Invalid MCP User"
+msgstr "مستخدم MCP غير صالح"
+
+#. module: pns_ai_mcp
+msgid "Is deletion"
+msgstr "حذف"
+
+#. module: pns_ai_mcp
+msgid "Is import"
+msgstr "استيراد"
+
+#. module: pns_ai_mcp
+msgid "Keep the N most recent logs and delete the rest"
+msgstr "الاحتفاظ بـ N سجلات الأحدث وحذف الباقي"
+
+#. module: pns_ai_mcp
+msgid "Key/structure summary to create the template"
+msgstr "ملخص المفاتيح/البنية لإنشاء القالب"
+
+#. module: pns_ai_mcp
+msgid "Last Sync"
+msgstr "آخر مزامنة"
+
+#. module: pns_ai_mcp
+msgid "Last Used"
+msgstr "آخر استخدام"
+
+#. module: pns_ai_mcp
+msgid "Library Entry"
+msgstr "إدخال المكتبة"
+
+#. module: pns_ai_mcp
+msgid "MCP context statistics"
+msgstr "إحصائيات سياق MCP"
+
+#. module: pns_ai_mcp
+msgid "MCP endpoint name if converted"
+msgstr "اسم نقطة نهاية MCP إذا تم التحويل"
+
+#. module: pns_ai_mcp
+msgid "MCP Log: Managers see all logs"
+msgstr "سجل MCP: المديرون يرون كل السجلات"
+
+#. module: pns_ai_mcp
+msgid "MCP Log: User only sees their own logs"
+msgstr "سجل MCP: المستخدم يرى سجلاته فقط"
+
+#. module: pns_ai_mcp
+msgid "MCP Write Verification: managers see all"
+msgstr "التحقق من الكتابة MCP: المديرون يرون الكل"
+
+#. module: pns_ai_mcp
+msgid "MCP Write Verification: user only sees their own"
+msgstr "التحقق من الكتابة MCP: المستخدم يرى تأكيداته فقط"
+
+#. module: pns_ai_mcp
+msgid "Modification date"
+msgstr "تاريخ التعديل"
+
+#. module: pns_ai_mcp
+msgid "Modified On"
+msgstr "تاريخ التعديل"
+
+#. module: pns_ai_mcp
+msgid "No API key exists for this user."
+msgstr "لا يوجد مفتاح API لهذا المستخدم."
+
+#. module: pns_ai_mcp
+msgid "No skills available for this role."
+msgstr "لا توجد مهارات متاحة لهذا الدور."
+
+#. module: pns_ai_mcp
+msgid "Number of most recent logs to keep"
+msgstr "عدد أحدث السجلات للاحتفاظ بها"
+
+#. module: pns_ai_mcp
+msgid "Only MCP administrators can clear the log history."
+msgstr "يمكن لمديري MCP فقط مسح سجل السجلات."
+
+#. module: pns_ai_mcp
+msgid "Op. code"
+msgstr "رمز العملية"
+
+#. module: pns_ai_mcp
+msgid "Op. code (legacy)"
+msgstr "رمز العملية (قديم)"
+
+#. module: pns_ai_mcp
+msgid "Operation timestamp (same source as create_date: Odoo/UTC time)."
+msgstr "وقت العملية (نفس مصدر create_date: وقت Odoo/UTC)."
+
+#. module: pns_ai_mcp
+msgid "Paste an API key from another instance here to reuse it"
+msgstr "الصق مفتاح API من مثيل آخر هنا لإعادة استخدامه"
+
+#. module: pns_ai_mcp
+msgid "Paste the API key from another instance here..."
+msgstr "الصق مفتاح API من مثيل آخر هنا..."
+
+#. module: pns_ai_mcp
+msgid "Please upload a file (.txt, .md, .xml or .zip)."
+msgstr "يرجى رفع ملف (.txt أو .md أو .xml أو .zip)."
+
+#. module: pns_ai_mcp
+msgid "Provider failover"
+msgstr "تبديل المزود"
+
+#. module: pns_ai_mcp
+msgid "Python Code"
+msgstr "كود Python"
+
+#. module: pns_ai_mcp
+msgid "Python code to run with relaxaicode"
+msgstr "كود Python للتشغيل عبر relaxaicode"
+
+#. module: pns_ai_mcp
+msgid "Request ID"
+msgstr "معرف الطلب"
+
+#. module: pns_ai_mcp
+msgid "Request ID + step (e.g. A7K2-3) to follow a turn thread."
+msgstr "معرف الطلب + الخطوة (مثال A7K2-3) لمتابعة سلسلة الدورة."
+
+#. module: pns_ai_mcp
+msgid "Restore MCP contexts from module"
+msgstr "استعادة سياقات MCP من الوحدة"
+
+#. module: pns_ai_mcp
+msgid "Result"
+msgstr "Result"
+
+#. module: pns_ai_mcp
+msgid "Source result"
+msgstr "نتيجة المصدر"
+
+#. module: pns_ai_mcp
+msgid "Step number within the turn (1, 2, 3...). 0 = no sequence assigned."
+msgstr "رقم الخطوة ضمن الدورة (1، 2، 3...). 0 = بدون تسلسل."
+
+#. module: pns_ai_mcp
+msgid "Success"
+msgstr "نجاح"
+
+#. module: pns_ai_mcp
+msgid "Technical field to check whether the user already has an API key"
+msgstr "حقل تقني للتحقق مما إذا كان المستخدم يملك مفتاح API بالفعل"
+
+#. module: pns_ai_mcp
+msgid "Template created from this result (if any)"
+msgstr "قالب أُنشئ من هذه النتيجة (إن وُجد)"
+
+#. module: pns_ai_mcp
+msgid "Template description and usage"
+msgstr "وصف القالب واستخدامه"
+
+#. module: pns_ai_mcp
+msgid "Template name"
+msgstr "اسم القالب"
+
+#. module: pns_ai_mcp
+msgid "The API key for this user will be deleted."
+msgstr "سيتم حذف مفتاح API لهذا المستخدم."
+
+#. module: pns_ai_mcp
+msgid "The file is not a valid ZIP."
+msgstr "الملف ليس ZIP صالحاً."
+
+#. module: pns_ai_mcp
+msgid "The oldest logs will be deleted, keeping the most recent ones."
+msgstr "سيتم حذف أقدم السجلات مع الاحتفاظ بالأحدث."
+
+#. module: pns_ai_mcp
+msgid "The user must explicitly confirm to proceed"
+msgstr "يجب على المستخدم التأكيد صراحةً للمتابعة"
+
+#. module: pns_ai_mcp
+msgid "The user will not be able to use the MCP server until a new key is generated."
+msgstr "لن يتمكن المستخدم من استخدام خادم MCP حتى يُنشأ مفتاح جديد."
+
+#. module: pns_ai_mcp
+msgid "The user will not be able to use the MCP server until they update the new key."
+msgstr "لن يتمكن المستخدم من استخدام خادم MCP حتى يحدّث المفتاح الجديد."
+
+#. module: pns_ai_mcp
+msgid "This user already has an API key configured."
+msgstr "هذا المستخدم لديه مفتاح API مُعدّ بالفعل."
+
+#. module: pns_ai_mcp
+msgid "Unique ID (4 chars) grouping all rows of the same conversation turn"
+msgstr "معرف فريد (4 أحرف) يجمع كل صفوف نفس دورة المحادثة"
+
+#. module: pns_ai_mcp
+msgid "Unique identifier code in snake_case format (e.g.: glossary_accounting). Exception: allows _aa_AA pattern at the end for locale (e.g.: decimals_and_separators_es_ES)"
+msgstr "رمز معرف فريد بصيغة snake_case (مثال: glossary_accounting). استثناء: يسمح بنمط _aa_AA في النهاية للغة (مثال: decimals_and_separators_es_ES)"
+
+#. module: pns_ai_mcp
+msgid "Unsupported file format. Use .txt, .md, .xml or .zip"
+msgstr "صيغة ملف غير مدعومة. استخدم .txt أو .md أو .xml أو .zip"
+
+#. module: pns_ai_mcp
+msgid "Upload a .txt, .md, .xml or .zip file"
+msgstr "ارفع ملف .txt أو .md أو .xml أو .zip"
+
+#. module: pns_ai_mcp
+msgid "User question that generated the result"
+msgstr "سؤال المستخدم الذي أنتج النتيجة"
+
+#. module: pns_ai_mcp
+msgid "Version"
+msgstr "Version"
+
+#. module: pns_ai_mcp
+msgid "When checked, all logs will be deleted. Otherwise the N most recent will be kept per the selected option."
+msgstr "عند التحديد، تُحذف كل السجلات. وإلا يُحتفظ بـ N الأحدث حسب الخيار المحدد."
+
+#. module: pns_ai_mcp
+msgid "When checked, contexts with the same code and path will be updated. Otherwise they will be skipped."
+msgstr "عند التحديد، تُحدَّث السياقات ذات الكود والمسار نفسهما. وإلا تُتخطى."
+
+#. module: pns_ai_mcp
+msgid "When disabled, it will not appear in searches"
+msgstr "عند التعطيل، لن يظهر في عمليات البحث"
+
+#. module: pns_ai_mcp
+msgid "When enabled, the user can read and write. When disabled, read-only."
+msgstr "عند التفعيل، يمكن للمستخدم القراءة والكتابة. عند التعطيل، قراءة فقط."
+
+#. module: pns_ai_mcp
+msgid "You must confirm the action to proceed"
+msgstr "يجب تأكيد الإجراء للمتابعة"
+
+#. module: pns_ai_mcp
+msgid "You must paste a valid API key in the field"
+msgstr "يجب لصق مفتاح API صالح في الحقل"
+
+#. module: pns_ai_mcp
+msgid "ZIP File"
+msgstr "ملف ZIP"
+
+#. module: pns_ai_mcp
+msgid "ℹ️ Information"
+msgstr "ℹ️ معلومات"
+
+#. module: pns_ai_mcp
+msgid "⚫ Tool→ORCH (tool result)"
+msgstr "⚫ Tool→ORCH (نتيجة الأداة)"
+
+#. module: pns_ai_mcp
+msgid "✅ ZIP generated successfully (%s templates)."
+msgstr "✅ تم إنشاء ZIP بنجاح (%s قوالب)."
+
+#. module: pns_ai_mcp
+msgid "⬜ Turn completed (audit)"
+msgstr "⬜ اكتملت الدورة (تدقيق)"
+
+#. module: pns_ai_mcp
+msgid "🔴 Write (write operation)"
+msgstr "🔴 Write (عملية كتابة)"
+
+#. module: pns_ai_mcp
+msgid "🔵 ORCH→LLM (model request)"
+msgstr "🔵 ORCH→LLM (طلب للنموذج)"
+
+#. module: pns_ai_mcp
+msgid "🟠 ORCH→Tool (tool execution)"
+msgstr "🟠 ORCH→Tool (تنفيذ أداة)"
+
+#. module: pns_ai_mcp
+msgid "🟣 Failover (provider switch)"
+msgstr "🟣 Failover (تبديل المزود)"
+
+#. module: pns_ai_mcp
+msgid "Operation result"
+msgstr "نتيجة العملية"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/skill_tools_wizard.py:0
+msgid "Skills tools — operation result"
+msgstr "أدوات المهارات — نتيجة العملية"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/mcp_context_tools_wizard.py:0
+msgid "Contexts tools — operation result"
+msgstr "أدوات السياقات — نتيجة العملية"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Skills — reload from module files"
+msgstr "المهارات — إعادة التحميل من ملفات الوحدة"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Skills reload failed."
+msgstr "فشلت إعادة تحميل المهارات."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Skills reload completed with warnings."
+msgstr "اكتملت إعادة تحميل المهارات مع تحذيرات."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Skills reload completed."
+msgstr "اكتملت إعادة تحميل المهارات."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Skills created"
+msgstr "مهارات مُنشأة"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Skills updated"
+msgstr "مهارات مُحدَّثة"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Skills skipped (not overwritten)"
+msgstr "مهارات مُتخطاة (لم تُستبدَل)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Skills pruned (orphan system)"
+msgstr "مهارات مُحذوفة (نظام يتيم)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "System contexts — restore from module"
+msgstr "سياقات النظام — استعادة من الوحدة"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Contexts restore failed."
+msgstr "فشلت استعادة السياقات."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Contexts restore completed with warnings."
+msgstr "اكتملت استعادة السياقات مع تحذيرات."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Contexts restore completed."
+msgstr "اكتملت استعادة السياقات."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Contexts imported"
+msgstr "سياقات مُستوردة"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Contexts updated"
+msgstr "سياقات مُحدَّثة"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Contexts skipped (not overwritten)"
+msgstr "سياقات مُتخطاة (لم تُستبدَل)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Contexts deleted (obsolete system)"
+msgstr "سياقات مُحذوفة (نظام قديم)"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_skill_tools_wizard_form
+msgid "Select the operation to perform on skills:"
+msgstr "اختر العملية التي تريد تنفيذها على المهارات:"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_tools_wizard_form
+msgid "Select the operation to perform on system contexts:"
+msgstr "اختر العملية التي تريد تنفيذها على سياقات النظام:"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/mcp_context_tools_wizard.py:0
+msgid "Statistics: Show the volume and usage of active contexts."
+msgstr "إحصائيات: عرض حجم واستخدام السياقات النشطة."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/mcp_context_tools_wizard.py:0
+msgid "Restore: Re-sync system contexts from module files into the database."
+msgstr "استعادة: إعادة مزامنة سياقات النظام من ملفات الوحدة في قاعدة البيانات."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/mcp_context_tools_wizard.py:0
+msgid "Export Zip: Export all contexts (system + custom) to a ZIP with manifest."
+msgstr "تصدير Zip: تصدير جميع السياقات (النظام + المخصص) إلى ZIP مع البيان."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/mcp_context_tools_wizard.py:0
+msgid "Import Zip: Import contexts from a previously exported ZIP."
+msgstr "استيراد Zip: استيراد السياقات من ZIP مُصدَّر سابقًا."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/skill_tools_wizard.py:0
+msgid "Restore: Re-sync skills from module files (system & custom) into the database."
+msgstr "استعادة: إعادة مزامنة المهارات من ملفات الوحدة (النظام والمخصص) في قاعدة البيانات."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/skill_tools_wizard.py:0
+msgid "Export Zip: Export all skills to a ZIP with manifest."
+msgstr "تصدير Zip: تصدير جميع المهارات إلى ZIP مع البيان."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.res_config_settings_view_form_mcp
+msgid "External inference clients"
+msgstr "عملاء الاستدلال الخارجيون"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.res_config_settings_view_form_mcp
+msgid "Internal inference clients"
+msgstr "عملاء الاستدلال الداخليون"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/skill_tools_wizard.py:0
+msgid "Import Zip: Import skills from a previously exported ZIP."
+msgstr "استيراد Zip: استيراد المهارات من ZIP مُصدَّر سابقًا."
+
+#. module: pns_ai_mcp
+msgid "AI Skills"
+msgstr "مهارات الذكاء الاصطناعي"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_search
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_tree
+msgid "AI Providers"
+msgstr "مزودو الذكاء الاصطناعي"
+
+#. module: pns_ai_mcp
+msgid "Activity"
+msgstr "النشاط"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_api_key_wizard_form
+msgid "Generate Key"
+msgstr "إنشاء مفتاح"
+
+#. module: pns_ai_mcp
+#: model:ir.actions.act_window,name:pns_ai_mcp.action_import_users_wizard
+msgid "Import MCP Users (JSON)"
+msgstr "استيراد مستخدمي MCP (JSON)"
+
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+msgid "Copy to clipboard"
+msgstr "نسخ إلى الحافظة"
+
+#. module: pns_ai_mcp
+msgid "Copied to clipboard"
+msgstr "تم النسخ إلى الحافظة"
+
+#. module: pns_ai_mcp
+msgid "Could not copy to clipboard"
+msgstr "تعذر النسخ إلى الحافظة"
+
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Cache regenerated successfully."
+msgstr "تم إعادة إنشاء التخزين المؤقت بنجاح."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Cache refreshed (content was already up to date)."
+msgstr "تم تحديث التخزين المؤقت (المحتوى كان محدّثاً بالفعل)."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Agent"
+msgstr "حزمة"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Role"
+msgstr "دور"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_search
+msgid "Locale"
+msgstr "الإعدادات المحلية"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Contexts in composition"
+msgstr "السياقات في التركيب"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Resolved parts (locale)"
+msgstr "الأجزاء المحلّلة (الإعدادات المحلية)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Cache size (before)"
+msgstr "حجم التخزين المؤقت (قبل)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Cache size (after)"
+msgstr "حجم التخزين المؤقت (بعد)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Previous update"
+msgstr "التحديث السابق"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "New update"
+msgstr "تحديث جديد"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Signature changed"
+msgstr "تغيّرت التوقيع"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Yes"
+msgstr "نعم"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "No"
+msgstr "لا"
+
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+msgid "Export agent to ZIP"
+msgstr "تصدير الحزمة إلى ZIP"
+
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+msgid "Export role contexts to ZIP"
+msgstr "تصدير سياقات الدور إلى ZIP"
+
+#. module: pns_ai_mcp
+msgid "Replace existing contexts"
+msgstr "استبدال السياقات الموجودة"
+
+#. module: pns_ai_mcp
+msgid "Replace composition"
+msgstr "استبدال التركيب"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Import completed successfully."
+msgstr "اكتملت عملية الاستيراد بنجاح."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Import completed with warnings."
+msgstr "اكتملت عملية الاستيراد مع تحذيرات."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Import failed."
+msgstr "فشلت عملية الاستيراد."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Created"
+msgstr "تم الإنشاء"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Updated"
+msgstr "تم التحديث"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Skipped (already existed)"
+msgstr "تم التخطي (موجود مسبقاً)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Import skills from ZIP"
+msgstr "استيراد المهارات من ZIP"
+
+#. module: pns_ai_mcp
+msgid "ZIP file"
+msgstr "ملف ZIP"
+
+#. module: pns_ai_mcp
+msgid "Replace existing skills"
+msgstr "استبدال المهارات الموجودة"
+
+#. module: pns_ai_mcp
+msgid "Update skills that already exist with the same code."
+msgstr "تحديث المهارات الموجودة بنفس الرمز."
+
+#. module: pns_ai_mcp
+msgid "Upload a skills export ZIP (manifest.json + skills/*.md). New skills are created; existing ones (same code) are skipped unless \"Replace existing\" is checked. Referenced contexts are linked only if they already exist."
+msgstr "ارفع ملف ZIP لتصدير المهارات (manifest.json + skills/*.md). تُنشأ مهارات جديدة؛ الموجودة (بنفس الرمز) تُتخطى ما لم يكن \"استبدال الموجود\" مفعّلاً. تُربط السياقات المشار إليها فقط إذا كانت موجودة بالفعل."
+
+#. module: pns_ai_mcp
+msgid "Upload a .txt, .md, .xml or .zip file with contexts."
+msgstr "ارفع ملف .txt أو .md أو .xml أو .zip يحتوي على سياقات."
+
+#. module: pns_ai_mcp
+msgid "If \"Replace existing\" is checked, contexts with the same code and path will be updated."
+msgstr "إذا كان \"استبدال الموجود\" مفعّلاً، فسيتم تحديث السياقات ذات الرمز والمسار نفسهما."
+
+#. module: pns_ai_mcp
+msgid "Upload a contexts export ZIP (manifest.json + context files). Existing ones (same code and path) are skipped unless \"Replace existing\" is checked. Protocol contexts are never overwritten."
+msgstr "ارفع ملف ZIP لتصدير السياقات (manifest.json + ملفات السياق). الموجودة (بنفس الرمز والمسار) تُتخطى ما لم يكن \"استبدال الموجود\" مفعّلاً. سياقات البروتوكول لا تُكتب فوقها أبداً."
+
+#. module: pns_ai_mcp
+msgid "Upload a ZIP from \"Export selected contexts to ZIP\" (manifest scope sel-*). Only contexts listed in the manifest are imported. Protocol contexts are never overwritten."
+msgstr "ارفع ملف ZIP من \"تصدير السياقات المحددة إلى ZIP\" (نطاق sel-* في الملف التعريفي). تُستورد فقط السياقات المدرجة في الملف التعريفي. سياقات البروتوكول لا تُكتب فوقها أبداً."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/bundle_import_wizard.py:0
+#: code:addons/pns_ai_mcp/wizard/context_import_wizard.py:0
+#: code:addons/pns_ai_mcp/wizard/import_servers_wizard.py:0
+#: code:addons/pns_ai_mcp/wizard/import_users_wizard.py:0
+#: code:addons/pns_ai_mcp/wizard/role_context_import_wizard.py:0
+#: code:addons/pns_ai_mcp/wizard/skill_import_wizard.py:0
+msgid "Import result"
+msgstr "نتيجة الاستيراد"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Only administrators can restore contexts from the module."
+msgstr "يمكن فقط للمسؤولين استعادة السياقات من الوحدة."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/mcp_context_tools_wizard.py:0
+msgid "Only administrators can restore contexts from the module."
+msgstr "يمكن فقط للمسؤولين استعادة السياقات من الوحدة."
+
+#. module: pns_ai_mcp
+msgid "Export complete"
+msgstr "اكتمل التصدير"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+msgid "%s provider(s) exported."
+msgstr "%s مزود(ين) تم تصديرهم."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_user.py:0
+msgid "%s user(s) exported."
+msgstr "%s مستخدم(ين) تم تصديرهم."
+
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Summary"
+msgstr "ملخص"
+
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#: model:ir.ui.menu,name:pns_ai_mcp.menu_ai_provider
+msgid "AI Providers"
+msgstr "مزودو الذكاء الاصطناعي"
+
+#. module: pns_ai_mcp
+#: model:ir.actions.act_window,name:pns_ai_mcp.action_ai_provider
+msgid "AI Providers"
+msgstr "مزودو الذكاء الاصطناعي"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_skill__role_id
+msgid "AI Provider Role"
+msgstr "دور مزود الذكاء الاصطناعي"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_mcp_context_tools_wizard__replace_existing
+msgid "When restoring from the module: overwrite contexts whose code already exists in the database (and prune obsolete system contexts). Uncheck to only add new contexts and keep existing ones untouched."
+msgstr "عند الاستعادة من الوحدة: الكتابة فوق السياقات التي يوجد رمزها في قاعدة البيانات (وحذف سياقات النظام المهجورة). ألغِ التحديد لإضافة سياقات جديدة فقط وترك الموجودة كما هي."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_skill_tools_wizard__replace_existing
+msgid "When reloading from server: overwrite skills whose code already exists in the database (and prune orphan system skills). Uncheck to only add new skills and keep existing ones untouched."
+msgstr "عند إعادة التحميل من الخادم: الكتابة فوق المهارات التي يوجد رمزها في قاعدة البيانات (وحذف مهارات النظام اليتيمة). ألغِ التحديد لإضافة مهارات جديدة فقط وترك الموجودة كما هي."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_tools_wizard_form
+msgid "Restore contexts from the module? Contexts with a matching code are only overwritten when 'Overwrite matching contexts' is checked."
+msgstr "استعادة السياقات من الوحدة؟ تُكتب السياقات ذات الرمز المطابق فوقها فقط عند تحديد 'الكتابة فوق السياقات المتطابقة'."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_skill_tools_wizard_form
+msgid "Restore skills from module files? Skills whose code matches will be overwritten only if 'Overwrite matching skills' is checked."
+msgstr "استعادة المهارات من ملفات الوحدة؟ تُكتب المهارات ذات الرمز المطابق فوقها فقط عند تحديد 'الكتابة فوق المهارات المتطابقة'."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Export completed successfully."
+msgstr "اكتمل التصدير بنجاح."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Click \"Download JSON\" to choose where to save the file."
+msgstr "انقر \"تنزيل JSON\" لاختيار مكان حفظ الملف."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Records exported"
+msgstr "السجلات المُصدَّرة"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+#: code:addons/pns_ai_mcp/models/mcp_user.py:0
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_json_export_wizard_form
+msgid "Export result"
+msgstr "نتيجة التصدير"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_json_export_wizard_form
+msgid "Download JSON"
+msgstr "تنزيل JSON"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/json_export_wizard.py:0
+msgid "No file available for download."
+msgstr "لا يوجد ملف متاح للتنزيل."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Upload a JSON file exported from another instance (field <code>mcp_api_key</code>)."
+msgstr "ارفع ملف JSON مُصدَّر من مثيل آخر (الحقل <code>mcp_api_key</code>)."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "With \"Replace existing\" checked (default), users with the same login are updated including their API key."
+msgstr "مع تفعيل \"استبدال الموجود\" (افتراضي)، يتم تحديث المستخدمين بنفس تسجيل الدخول بما في ذلك مفتاح API الخاص بهم."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "If unchecked, existing users are skipped — except when they have no API key yet (key is merged)."
+msgstr "إذا لم يكن مفعّلاً، يتم تخطي المستخدمين الموجودين — إلا إذا لم يكن لديهم مفتاح API بعد (يتم دمج المفتاح)."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Upload a previously exported JSON file."
+msgstr "ارفع ملف JSON تم تصديره مسبقاً."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "If \"Replace existing\" is checked, providers with the same name will be updated."
+msgstr "إذا كان \"استبدال الموجود\" مفعّلاً، فسيتم تحديث المزودين بنفس الاسم."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "If \"Replace existing\" is checked, roles with the same code will be updated (including their provider chain)."
+msgstr "إذا كان \"استبدال الموجود\" مفعّلاً، فسيتم تحديث الأدوار بنفس الرمز (بما في ذلك سلسلة المزودين)."
+
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_form
+msgid "AI Provider"
+msgstr "مزود الذكاء الاصطناعي"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_form
+msgid "Fetch Models"
+msgstr "جلب النماذج"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_form
+msgid "Model"
+msgstr "نموذج"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_form
+msgid "Test Connection"
+msgstr "اختبار الاتصال"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_skill_form
+msgid "Code (relaxaicode)"
+msgstr "الرمز (relaxaicode)"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_skill_form
+msgid "Procedure"
+msgstr "إجراء"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_skill_form
+msgid "Referenced contexts"
+msgstr "السياقات المرجعية"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_skill_form
+msgid "Selection hint (shown in prompts/list)"
+msgstr "تلميح الاختيار (يظهر في القوائم/الحوارات)"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_api_key_wizard_form
+msgid "Genera una nueva clave o importa una existente de otra instancia."
+msgstr "أنشئ مفتاحاً جديداً أو استورد مفتاحاً موجوداً من مثيل آخر."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_tree
+msgid "MCP Contexts"
+msgstr "سياقات MCP"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_search
+msgid "Active"
+msgstr "نشط"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_search
+msgid "Inactive"
+msgstr "غير نشط"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_search
+msgid "My language (Locale)"
+msgstr "لغتي (الإعدادات المحلية)"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_form
+msgid "Content"
+msgstr "المحتوى"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_form
+msgid "Locale/Country"
+msgstr "الإعدادات المحلية/البلد"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_form
+msgid "MCP Context"
+msgstr "سياق MCP"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_form
+msgid "Metadata (Extracted)"
+msgstr "البيانات الوصفية (مستخرجة)"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_form
+msgid "Size Metrics (Token Optimization)"
+msgstr "مقاييس الحجم (تحسين الرموز)"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_form
+msgid "Size Sent to LLM"
+msgstr "الحجم المرسل إلى LLM"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_form
+msgid "Token Savings"
+msgstr "توفير الرموز"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_form
+msgid "Total Size"
+msgstr "الحجم الإجمالي"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_user_form
+msgid "API Key MCP"
+msgstr "مفتاح API لـ MCP"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_tools_wizard_form
+msgid "Select the operation to perform:"
+msgstr "اختر العملية المراد تنفيذها:"
+
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/static/src/js/ai_provider_tree_v14.js:0
+msgid "Export all AI providers to JSON"
+msgstr "تصدير جميع مزودي الذكاء الاصطناعي إلى JSON"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/static/src/js/ai_provider_tree_v14.js:0
+msgid "Import AI providers from JSON"
+msgstr "استيراد مزودي الذكاء الاصطناعي من JSON"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/static/src/js/mcp_user_tree_v14.js:0
+msgid "Export all MCP users to JSON"
+msgstr "تصدير جميع مستخدمي MCP إلى JSON"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/static/src/js/mcp_user_tree_v14.js:0
+msgid "Import MCP users from JSON"
+msgstr "استيراد مستخدمي MCP من JSON"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_execution_engine.py:0
+msgid "ORCH failover: %s failed → %s"
+msgstr "تجاوز فشل ORCH: %s فشل → %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+msgid "Unknown response format: %s"
+msgstr "تنسيق استجابة غير معروف: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+msgid "Remote Error %s: %s"
+msgstr "خطأ بعيد %s: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+msgid "No models found in the response."
+msgstr "لم يتم العثور على نماذج في الاستجابة."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+msgid "Models Refreshed"
+msgstr "تم تحديث النماذج"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+msgid "Found %s models."
+msgstr "تم العثور على %s نموذج."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+msgid "SSL Error: %s"
+msgstr "خطأ SSL: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+msgid "Failed to fetch models: %s"
+msgstr "فشل في جلب النماذج: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+msgid "Please select a model or enter a Model Name."
+msgstr "يرجى اختيار نموذج أو إدخال اسم النموذج."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+msgid "Connection Successful"
+msgstr "اتصال ناجح"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+msgid "Provider responded: %s"
+msgstr "استجاب المزود: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+msgid "Connection Failed: %s"
+msgstr "فشل الاتصال: %s"
+
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "No skills to export."
+msgstr "لا توجد مهارات للتصدير."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Download started (%s skill(s))."
+msgstr "بدأ التنزيل (%s مهارة/مهارات)."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Export all skills"
+msgstr "تصدير جميع المهارات"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Select at least one skill to export."
+msgstr "اختر مهارة واحدة على الأقل للتصدير."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Export selected skills"
+msgstr "تصدير المهارات المحددة"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Skill without code skipped."
+msgstr "تم تخطي مهارة بدون رمز."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Invalid ZIP: manifest.json not found."
+msgstr "ملف ZIP غير صالح: لم يتم العثور على manifest.json."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Could not read skills ZIP: %s"
+msgstr "تعذر قراءة ملف ZIP للمهارات: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Reload failed."
+msgstr "فشلت إعادة التحميل."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Reload completed with warnings."
+msgstr "اكتملت إعادة التحميل مع تحذيرات."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Reload completed."
+msgstr "اكتملت إعادة التحميل."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Reload completed"
+msgstr "اكتملت إعادة التحميل"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Skipped (not overwritten)"
+msgstr "تم التخطي (لم تتم الكتابة فوقه)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Pruned (orphan system)"
+msgstr "تم الحذف (نظام يتيم)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Reload from server"
+msgstr "إعادة التحميل من الخادم"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Missing contexts (not linked):"
+msgstr "سياقات مفقودة (غير مربوطة):"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Missing roles (skill set global):"
+msgstr "أدوار مفقودة (مجموعة المهارات العامة):"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Skipped (existing, not replaced)"
+msgstr "تم التخطي (موجود، لم يُستبدل)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_api_key_wizard.py:0
+msgid "API Key eliminada correctamente"
+msgstr "تم حذف مفتاح API بنجاح"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_api_key_wizard.py:0
+msgid "API Key importada correctamente"
+msgstr "تم استيراد مفتاح API بنجاح"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_api_key_wizard.py:0
+msgid "Error generando API key"
+msgstr "خطأ في إنشاء مفتاح API"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_api_key_wizard.py:0
+msgid "API Key generada correctamente"
+msgstr "تم إنشاء مفتاح API بنجاح"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Restore failed."
+msgstr "فشلت الاستعادة."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Restore completed with warnings."
+msgstr "اكتملت الاستعادة مع تحذيرات."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Restore completed."
+msgstr "اكتملت الاستعادة."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Restore completed"
+msgstr "اكتملت الاستعادة"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Imported"
+msgstr "تم الاستيراد"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Deleted (obsolete system)"
+msgstr "تم الحذف (نظام قديم)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Restore from module"
+msgstr "استعادة من الوحدة"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Export contexts"
+msgstr "تصدير السياقات"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Please select at least one context to export."
+msgstr "يرجى اختيار سياق واحد على الأقل للتصدير."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Export selected contexts"
+msgstr "تصدير السياقات المحددة"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "%s context(s) exported to ZIP."
+msgstr "%s سياق(ات) تم تصديرها إلى ZIP."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Imported from %s"
+msgstr "تم الاستيراد من %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Manifest lists no context codes."
+msgstr "الملف التعريفي لا يسرد أي رموز سياق."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_search
+msgid "Scope"
+msgstr "النطاق"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Contexts in manifest"
+msgstr "السياقات في الملف التعريفي"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Manifest"
+msgstr "الملف التعريفي"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Context files"
+msgstr "ملفات السياق"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Skipped (not in manifest)"
+msgstr "تم التخطي (ليس في الملف التعريفي)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Protocol (protected)"
+msgstr "البروتوكول (محمي)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Import contexts from ZIP"
+msgstr "استيراد السياقات من ZIP"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Import selected contexts from ZIP"
+msgstr "استيراد السياقات المحددة من ZIP"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Import contexts"
+msgstr "استيراد السياقات"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Invalid manifest.json: %s"
+msgstr "manifest.json غير صالح: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Composition from manifest was not applied (replace composition is off)."
+msgstr "لم يتم تطبيق التركيب من الملف التعريفي (استبدال التركيب معطّل)."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "No contexts to export."
+msgstr "لا توجد سياقات للتصدير."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Download started (%s context(s))."
+msgstr "بدأ التنزيل (%s سياق/سياقات)."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_context.py:0
+msgid "Select at least one context to export."
+msgstr "اختر سياقاً واحداً على الأقل للتصدير."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_log.py:0
+#: code:addons/pns_ai_mcp/models/mcp_user.py:0
+msgid "Information"
+msgstr "معلومات"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_user.py:0
+msgid "This user has no API key."
+msgstr "هذا المستخدم ليس لديه مفتاح API."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/bundle_import_wizard.py:0
+msgid "Please upload a context pack ZIP file."
+msgstr "يرجى رفع ملف ZIP لتصدير الحزمة."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/bundle_import_wizard.py:0
+msgid "The file must be a .zip context pack export."
+msgstr "يجب أن يكون الملف تصدير .zip من حزمة سياق."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/context_import_wizard.py:0
+msgid "Please upload a .zip export file."
+msgstr "يرجى رفع ملف تصدير .zip."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/context_import_wizard.py:0
+msgid "Error processing file: %s"
+msgstr "خطأ في معالجة الملف: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/import_users_wizard.py:0
+msgid "The JSON file must contain a list of users."
+msgstr "يجب أن يحتوي ملف JSON على قائمة بالمستخدمين."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/import_users_wizard.py:0
+msgid "User without login: %s"
+msgstr "مستخدم بدون تسجيل دخول: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/import_users_wizard.py:0
+msgid "Unnamed"
+msgstr "بدون اسم"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/import_users_wizard.py:0
+msgid "no login"
+msgstr "بدون تسجيل دخول"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/import_users_wizard.py:0
+msgid "Error parsing JSON file: %s"
+msgstr "خطأ في تحليل ملف JSON: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/import_users_wizard.py:0
+msgid "Error processing JSON file: %s"
+msgstr "خطأ في معالجة ملف JSON: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/role_context_import_wizard.py:0
+msgid "Please upload a role contexts export ZIP file."
+msgstr "يرجى رفع ملف ZIP لتصدير سياقات الدور."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/role_context_import_wizard.py:0
+msgid "The file must be a .zip export from a provider role."
+msgstr "يجب أن يكون الملف تصدير .zip من دور مزود."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/skill_import_wizard.py:0
+msgid "Please upload a skills export ZIP file."
+msgstr "يرجى رفع ملف ZIP لتصدير المهارات."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/skill_import_wizard.py:0
+msgid "The file must be a .zip export of skills."
+msgstr "يجب أن يكون الملف تصدير .zip للمهارات."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "No existe el skill `/%s`."
+msgstr "المهارة `/%s` غير موجودة."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Missing providers (%s)"
+msgstr "مزودون مفقودون (%s)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Odoo users not found (%s)"
+msgstr "لم يتم العثور على مستخدمي Odoo (%s)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Create missing users in Settings → Users, then re-import."
+msgstr "أنشئ المستخدمين المفقودين في الإعدادات → المستخدمون، ثم أعد الاستيراد."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "API keys applied"
+msgstr "تم تطبيق مفاتيح API"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Import completed."
+msgstr "اكتملت عملية الاستيراد."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Missing codes"
+msgstr "رموز مفقودة"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Agent composition"
+msgstr "تركيب الحزمة"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Manifest agent"
+msgstr "حزمة الملف التعريفي"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Contexts linked"
+msgstr "سياقات مربوطة"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Removed from agent"
+msgstr "تمت الإزالة من الحزمة"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "Tiempo máximo de respuesta superado (%ss). Inténtelo de nuevo."
+msgstr "تم تجاوز الحد الأقصى لوقت الاستجابة (%ss). يرجى المحاولة مرة أخرى."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "Turno %s superó %ss esperando al modelo."
+msgstr "تجاوز الدور %s مدة %ss في انتظار النموذج."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "Maximum response time exceeded (%ss). Please try again."
+msgstr "تم تجاوز الحد الأقصى لوقت الاستجابة (%ss). يرجى المحاولة مرة أخرى."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "Round %s exceeded %ss waiting for the model."
+msgstr "تجاوزت الجولة %s مدة %ss في انتظار النموذج."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.res_config_settings_view_form_mcp
+msgid "MCP"
+msgstr "MCP"
+
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "The model returned no text. Check the provider endpoint and role assignment."
+msgstr "لم يُرجع النموذج أي نص. تحقق من نقطة نهاية المزود وتعيين الدور."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "Provider %s (model %s) rejected the request: %s. If it is HTTP 400, the prompt likely exceeds the context size the model was loaded with on the inference server."
+msgstr "رفض المزود %s (النموذج %s) الطلب: %s. إذا كان HTTP 400، فمن المحتمل أن الأمر يتجاوز حجم السياق الذي تم تحميل النموذج به على خادم الاستدلال."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "Provider %s (model %s) returned no content. The model may have been loaded with a context size smaller than the prompt."
+msgstr "لم يُرجع المزود %s (النموذج %s) أي محتوى. ربما تم تحميل النموذج بحجم سياق أصغر من الأمر."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "I could not complete the request after several automatic attempts to fix the generated code."
+msgstr "لم أتمكن من إكمال الطلب بعد عدة محاولات تلقائية لإصلاح الرمز المُنشأ."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "Last technical error: %s"
+msgstr "آخر خطأ تقني: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+#: model:ir.actions.act_window,name:pns_ai_mcp.action_ai_skill_capture_wizard
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_skill_capture_wizard_form
+msgid "Capture skill from execution"
+msgstr "التقاط مهارة من التنفيذ"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_skill_capture_wizard_form
+msgid "Code (relaxaicode, source of truth)"
+msgstr "الرمز (relaxaicode، مصدر الحقيقة)"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_skill_capture_wizard_form
+msgid "Create draft skill"
+msgstr "إنشاء مسودة مهارة"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_skill_capture_wizard_form
+msgid "Procedure (orchestration prose)"
+msgstr "الإجراء (نص التنسيق)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/skill_capture_wizard.py:0
+msgid "Draft skill"
+msgstr "مسودة مهارة"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/mcp_ui.py:0
+msgid "Used by roles"
+msgstr "مستخدم بواسطة الأدوار"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_skill_tools_wizard_form
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_tools_wizard_form
+msgid "Export Zip"
+msgstr "تصدير ZIP"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_skill_tools_wizard_form
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_tools_wizard_form
+msgid "Import Zip"
+msgstr "استيراد ZIP"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_skill_tools_wizard_form
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_tools_wizard_form
+msgid "Restore"
+msgstr "استعادة"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+msgid "\nTemperature: %s"
+msgstr "\nدرجة الحرارة: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+msgid "supported"
+msgstr "مدعوم"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+msgid "not supported (omitted)"
+msgstr "غير مدعوم (تم حذفه)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+msgid "Provider responded: %s%s"
+msgstr "استجاب المزود: %s%s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "LLM requested tool: %(t)s"
+msgstr "طلب LLM الأداة: %(t)s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "Round %(t)s · %(m)s messages · %(k)s tools"
+msgstr "الجولة %(t)s · %(m)s رسالة · %(k)s أداة"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "Turn completed · %(n)s LLM round(s)"
+msgstr "اكتمل الدور · %(n)s جولة/جولات LLM"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "The file is ready to download."
+msgstr "الملف جاهز للتنزيل."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_form
+msgid "Cascade timeouts (failover)"
+msgstr "مهلات التتابع (تجاوز الفشل)"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_form
+msgid "These limits decide how long THIS provider is tried before the role's cascade moves on to the next provider. Use short values on slow LOCAL providers and generous ones on remote providers. Set any field to 0 or -1 to use the system default. A global cap of 300 s also covers the whole request."
+msgstr "هذه الحدود تحدد مدة تجربة هذا المزود قبل أن ينتقل تتابع الدور إلى المزود التالي. استخدم قيماً قصيرة للمزودين المحليين البطيئين وقيماً سخية للمزودين البعيدين. اضبط أي حقل على 0 أو -1 لاستخدام القيمة الافتراضية للنظام. حد أقصى عام يبلغ 300 ثانية يغطي الطلب بالكامل أيضاً."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_form
+msgid "Idle timeout: seconds with NO data coming from the model (silence between streaming chunks) before treating the link as hung and failing over. Suggested: local 20-30, remote 45-60. 0 or -1 = default (45)."
+msgstr "مهلة الخمول: ثوانٍ بدون بيانات من النموذج (صمت بين أجزاء التدفق) قبل اعتبار الرابط معلقاً والانتقال. مقترح: محلي 20-30، بعيد 45-60. 0 أو -1 = افتراضي (45)."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_form
+msgid "Turn timeout: maximum seconds for one full model round (a question and its answer) before cutting it off and failing over. Suggested: local 60-90, remote 120-180. 0 or -1 = default (120)."
+msgstr "مهلة الدور: أقصى ثوانٍ لجولة نموذج كاملة (سؤال وجوابه) قبل قطعها والانتقال. مقترح: محلي 60-90، بعيد 120-180. 0 أو -1 = افتراضي (120)."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_form
+msgid "Skip non-streaming fallback: when the stream returns no text, a non-streaming retry runs by default (adds 30-45 s). Enable it on slow LOCAL providers to skip that retry and fail over sooner."
+msgstr "تخطي الاحتياطي غير المتدفق: عندما لا يُرجع التدفق نصاً، تُجرى محاولة غير متدفقة افتراضياً (تضيف 30-45 ثانية). فعّله على المزودين المحليين البطيئين لتخطي تلك المحاولة والانتقال أسرع."
+
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#: model:ir.actions.act_window,name:pns_ai_mcp.action_ai_skill
+#: model:ir.ui.menu,name:pns_ai_mcp.menu_ai_skill
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_skill_tree
+msgid "Skills"
+msgstr "المهارات"
+
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#: model:ir.actions.act_window,name:pns_ai_mcp.action_mcp_write_verification
+#: model:ir.ui.menu,name:pns_ai_mcp.menu_mcp_write_verification
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_write_verification_search
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_write_verification_tree
+msgid "AI Requests"
+msgstr "طلبات الذكاء الاصطناعي"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_search
+msgid "Provider Role"
+msgstr "دور المزود"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_context__context_type__core
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_search
+msgid "core"
+msgstr "core"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_context__context_type__domain
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_search
+msgid "domain"
+msgstr "domain"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_context__context_type__locale
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_search
+msgid "locale"
+msgstr "locale"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_context__context_type__discovery
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_search
+msgid "discovery"
+msgstr "discovery"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_agent__default_context_codes
+msgid "Default context codes"
+msgstr "رموز السياق الافتراضية"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_agent__default_skill_codes
+msgid "Default skill codes"
+msgstr "رموز المهارات الافتراضية"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_agent__required_context_codes
+msgid "Required context codes"
+msgstr "رموز السياق المطلوبة"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_agent__required_context_codes
+msgid "Hard require list (CSV / newlines). Codes only (no @packs). If a required code exists in the catalog, it stays on this agent's Contexts list (cannot be removed). Defaults / apply raises if any required code is missing from the catalog. Depends of the module should already guarantee hard packs."
+msgstr "قائمة إلزامية (CSV / أسطر جديدة). رموز فقط (بدون @packs). إذا وُجد الرمز في المكتبة يبقى في قائمة Contexts لهذا الوكيل ولا يمكن إزالته. Defaults / apply يفشل إن نقص أي رمز في الفهرس."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/context_stats_wizard.py:0
+msgid "Optimized (discovery)"
+msgstr "محسّن (discovery)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/context_stats_wizard.py:0
+msgid "Optimized bundle (discovery)"
+msgstr "الحزمة المحسّنة (discovery)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/wizard/context_stats_wizard.py:0
+msgid "No discovery-indexed packs on this agent composition."
+msgstr "لا توجد حزم مفهرسة بـ discovery في هذه التركيبة."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_search
+msgid "Global"
+msgstr "عام"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_search
+msgid "Knowledge"
+msgstr "معرفة"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_search
+msgid "Regional"
+msgstr "إقليمي"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_search
+msgid "Rules"
+msgstr "قواعد"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_search
+msgid "Terms"
+msgstr "مصطلحات"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_search
+msgid "Type"
+msgstr "نوع"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_write_verification_form
+msgid "AI Request"
+msgstr "طلب الذكاء الاصطناعي"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.res_config_settings_view_form_mcp
+msgid "External AI agents"
+msgstr "وكلاء الذكاء الاصطناعي الخارجيون"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.res_config_settings_view_form_mcp
+msgid "Internal AI agents"
+msgstr "وكلاء الذكاء الاصطناعي الداخليون"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_skill_form
+msgid "Skill"
+msgstr "مهارة"
+
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.res_config_settings_view_form_mcp
+msgid "Default MCP role"
+msgstr "دور MCP الافتراضي"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.res_config_settings_view_form_mcp
+msgid "Fallback role"
+msgstr "الدور الاحتياطي"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.res_config_settings_view_form_mcp
+msgid "License and copyright"
+msgstr "الترخيص وحقوق النشر"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_api_server__spec_manual
+msgid "Manual spec"
+msgstr "مواصفات يدوية"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_external_server_form
+msgid "Manual spec."
+msgstr "مواصفات يدوية."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_api_server__spec_manual
+msgid ""
+"OpenAPI only. When set, spec_json is the source of truth (pasted or converted). Discover rebuilds tools from that JSON and never downloads spec_url, so a converted document is not overwritten or lost on a failed refresh."
+msgstr ""
+"OpenAPI فقط. عند التفعيل يكون spec_json هو المصدر (ملصوق أو محوّل). اكتشاف الأدوات يعيد بناء الأدوات من هذا JSON ولا ينزّل spec_url، حتى لا يُستبدل مستند محوّل أو يُفقد عند فشل التحديث."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_external_server_form
+msgid ""
+"Paste the OpenAPI JSON below. Discover Tools rebuilds the catalogue "
+"from this document and will not download Spec URL."
+msgstr ""
+"الصق JSON الخاص بـ OpenAPI أدناه. اكتشاف الأدوات يعيد بناء الكتالوج من هذا المستند ولن ينزّل عنوان المواصفات."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_external_server_form
+msgid ""
+"Cached from Spec URL at last discovery. Enable Manual spec to paste "
+"or freeze this document."
+msgstr ""
+"مُخزَّن من عنوان المواصفات عند آخر اكتشاف. فعّل المواصفات اليدوية للصق هذا المستند أو تثبيته."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_api_server__spec_url
+msgid ""
+"URL of the OpenAPI JSON document (e.g. https://api.example.com/openapi.json). Ignored when Manual spec is set. Otherwise Discover downloads this URL into spec_json."
+msgstr ""
+"عنوان مستند JSON لـ OpenAPI. يُتجاهل عند تفعيل المواصفات اليدوية. وإلا يحمّل اكتشاف الأدوات هذا العنوان إلى spec_json."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_api_server__spec_json
+msgid ""
+"OpenAPI document used at call time. Filled by Discover from spec_url, or pasted when Manual spec is set."
+msgstr ""
+"مستند OpenAPI المستخدم عند الاستدعاء. يملأه الاكتشاف من spec_url، أو يُلصق عند تفعيل المواصفات اليدوية."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_api_server__auth_header_name
+msgid "HTTP header name"
+msgstr "اسم ترويسة HTTP"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_api_server__auth_header_name
+msgid ""
+"HTTP request header that carries the token (e.g. apikey, X-API-Key, Authorization). Discover copies it from a unique OpenAPI apiKey scheme so it stays visible on this form."
+msgstr ""
+"ترويسة HTTP التي تحمل الرمز (مثل apikey أو X-API-Key أو Authorization). ينسخها الاكتشاف من مخطط apiKey وحيد في OpenAPI لتبقى ظاهرة في هذه البطاقة."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_api_server__auth_call_preview
+msgid "Outbound headers"
+msgstr "الترويسات الصادرة"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_api_server__auth_call_preview
+msgid "HTTP header this server will send. Same values as the fields above."
+msgstr "ترويسة HTTP التي سيرسلها هذا الخادم. نفس قيم الحقول أعلاه."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/external_server.py:0
+msgid "Outgoing HTTP header"
+msgstr "ترويسة HTTP الصادرة"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/external_server.py:0
+msgid "token set"
+msgstr "الرمز مُعدّ"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/external_server.py:0
+msgid "no token"
+msgstr "بلا رمز"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_external_server_form
+msgid "Auth from spec"
+msgstr "المصادقة من المواصفات"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/external_server.py:0
+msgid "%s (copy)"
+msgstr "%s (نسخة)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan.py:0
+msgid "Missing required property '%s' at %s (tool inputSchema)."
+msgstr "الخاصية المطلوبة '%s' ناقصة في %s (inputSchema للأداة)."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan.py:0
+msgid "Unknown or inactive server code '%s'. Use an exact code from the catalogue: %s"
+msgstr "رمز خادم غير معروف أو غير نشط '%s'. استخدم رمزاً دقيقاً من الكتالوج: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan.py:0
+msgid "Property at %s must be %s (tool inputSchema)."
+msgstr "يجب أن تكون الخاصية في %s من نوع %s (inputSchema للأداة)."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/external_server.py:0
+msgid "Auth from spec only applies to OpenAPI servers."
+msgstr "المصادقة من المواصفات تنطبق فقط على خوادم OpenAPI."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/external_server.py:0
+msgid "Outgoing header set to `%s` (from spec)."
+msgstr "تم ضبط ترويسة الخروج على `%s` (من المواصفات)."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/external_server.py:0
+msgid ""
+"The spec has no unique apiKey header. Fill Authentication by hand, or ask Chatboo to propose a write."
+msgstr ""
+"لا توجد ترويسة apiKey وحيدة في المواصفات. املأ المصادقة يدوياً، أو اطلب من Chatboo اقتراح كتابة."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/external_server.py:0
+msgid "The spec declares several apiKey headers: %s. Pick one on the form."
+msgstr "تعلن المواصفات عدة ترويسات apiKey: %s. اختر واحدة في البطاقة."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_api_server__detection_context_ids
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_external_server_form
+msgid "Detection"
+msgstr "اكتشاف"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_external_server_form
+msgid "Discovery routing."
+msgstr "توجيه الاكتشاف."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_external_server_form
+msgid "Chatboo can propose the rows from this server's"
+msgstr "يمكن لـ Chatboo اقتراح الصفوف من اسم هذا الخادم"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_external_server_form
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_external_server_tree
+msgid "Suggest triggers"
+msgstr "اقتراح المشغلات"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/external_server.py:0
+msgid "Detection suggested"
+msgstr "تم اقتراح الاكتشاف"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_context__discovery_target_kind
+msgid "Discovery target kind"
+msgstr "نوع هدف الاكتشاف"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_context__discovery_target
+msgid "Discovery target"
+msgstr "هدف الاكتشاف"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_context__discovery_triggers
+msgid "Discovery triggers"
+msgstr "محفزات الاكتشاف"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_context__discovery_priority
+msgid "Discovery priority"
+msgstr "أولوية الاكتشاف"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_context__discovery_soft_depends
+msgid "Discovery soft depends"
+msgstr "تبعيات الاكتشاف اللينة"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_context__discovery_target_kind__domain
+msgid "Domain pack"
+msgstr "حزمة نطاق"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_context__discovery_target_kind__api_server
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_context__api_server_id
+msgid "External API server"
+msgstr "خادم API خارجي"
+
+#. module: pns_ai_mcp
+#: model:ir.actions.act_window,name:pns_ai_mcp.action_mcp_change_journal
+#: model:ir.ui.menu,name:pns_ai_mcp.menu_mcp_change_journal
+msgid "Changes"
+msgstr "التغييرات"
+
+#. module: pns_ai_mcp
+#: model:ir.model,name:pns_ai_mcp.model_ai_change_journal
+msgid "Change"
+msgstr "تغيير"
+
+#. module: pns_ai_mcp
+msgid "Before (JSON)"
+msgstr "قبل (JSON)"
+
+#. module: pns_ai_mcp
+msgid "After (JSON)"
+msgstr "بعد (JSON)"
+
+#. module: pns_ai_mcp
+msgid "Revert"
+msgstr "تراجع"
+
+#. module: pns_ai_mcp
+msgid "Mine"
+msgstr "الخاصة بي"
+
+#. module: pns_ai_mcp
+msgid "Record IDs"
+msgstr "معرفات السجلات"
+
+#. module: pns_ai_mcp
+msgid "My Activity"
+msgstr "نشاطي"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_change_journal.py:0
+msgid "A revert row cannot be reverted again."
+msgstr "لا يمكن التراجع مرة أخرى عن صف تراجع."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_change_journal.py:0
+msgid "Only applied changes can be reverted."
+msgstr "لا يمكن التراجع إلا عن التغييرات المطبّقة."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_change_journal.py:0
+msgid "AI change journal rows cannot be deleted."
+msgstr "لا يمكن حذف صفوف دفتر تغييرات الذكاء الاصطناعي."
+
+#. module: pns_ai_mcp
+msgid "Failed"
+msgstr "فشل"
+
+#. module: pns_ai_mcp
+msgid "FAILED: %s"
+msgstr "فشل: %s"
+
+#. module: pns_ai_mcp
+msgid "Plan failed; nothing was applied"
+msgstr "فشلت الخطة؛ لم يُطبَّق شيء."
+
+#. module: pns_ai_mcp
+#: model:ir.model,name:pns_ai_mcp.model_ai_system_action
+msgid "AI System Trusted Action"
+msgstr "إجراء نظام موثوق للذكاء الاصطناعي"
+
+#. module: pns_ai_mcp
+#: model:ir.model,name:pns_ai_mcp.model_ai_view_policy
+msgid "AI View Modifier Policy"
+msgstr "سياسة معدلات العرض للذكاء الاصطناعي"
+
+#. module: pns_ai_mcp
+#: model:ai.trusted.action,label:pns_ai_mcp.trusted_action_view_set_field_required
+msgid "Set field required on views"
+msgstr "جعل الحقل إلزامياً في العروض"
+
+#. module: pns_ai_mcp
+#: model:ai.trusted.action,label:pns_ai_mcp.trusted_action_view_set_field_readonly
+msgid "Set field readonly on views"
+msgstr "جعل الحقل للقراءة فقط في العروض"
+
+#. module: pns_ai_mcp
+#: model:ai.trusted.action,label:pns_ai_mcp.trusted_action_view_set_field_invisible
+msgid "Set field invisible on views"
+msgstr "إخفاء الحقل في العروض"
+
+#. module: pns_ai_mcp
+#: model:ai.trusted.action,label:pns_ai_mcp.trusted_action_view_set_field_domain
+msgid "Set field domain on views"
+msgstr "تعيين نطاق الحقل في العروض"
+
+#. module: pns_ai_mcp
+#: model:ai.trusted.action,label:pns_ai_mcp.trusted_action_view_reset_field_modifiers
+msgid "Reset view field modifiers"
+msgstr "إعادة تعيين معدلات حقل العرض"
+
+#. module: pns_ai_mcp
+#: model:ai.trusted.action,label:pns_ai_mcp.trusted_action_module_update
+msgid "Install, upgrade or uninstall a module"
+msgstr "تثبيت وحدة أو ترقيتها أو إلغاء تثبيتها"
+
+#. module: pns_ai_mcp
+#: model:ai.trusted.action,label:pns_ai_mcp.trusted_action_user_add_group
+msgid "Add native security group to user"
+msgstr "إضافة مجموعة أمان أصلية إلى المستخدم"
+
+#. module: pns_ai_mcp
+#: model:ai.trusted.action,label:pns_ai_mcp.trusted_action_user_remove_group
+msgid "Remove native security group from user"
+msgstr "إزالة مجموعة الأمان الأصلية من المستخدم"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Invalid boolean value: %s"
+msgstr "قيمة منطقية غير صالحة: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "view_ids must be a list of view ids (or empty)."
+msgstr "يجب أن يكون view_ids قائمة معرّفات عرض (أو فارغاً)."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Unknown model: %s"
+msgstr "نموذج غير معروف: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Field %s does not exist on model %s"
+msgstr "الحقل %s غير موجود في النموذج %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Unknown view id(s): %s"
+msgstr "معرّف(ات) عرض غير معروفة: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "View %s does not belong to model %s"
+msgstr "العرض %s لا ينتمي إلى النموذج %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "View %s does not display field %s"
+msgstr "العرض %s لا يعرض الحقل %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "No form or list view of model %s already displays field %s"
+msgstr "لا توجد عرض نموذج أو قائمة للنموذج %s يعرض الحقل %s مسبقاً"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Unknown view modifier: %s"
+msgstr "معدل عرض غير معروف: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Invalid view type: %s"
+msgstr "نوع العرض غير صالح: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "View %s is type %s, not %s"
+msgstr "العرض %s من النوع %s وليس %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Clear domain on field %s of model %s in %s view(s)"
+msgstr "إزالة النطاق عن الحقل %s للنموذج %s في %s عرض(اً)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Set domain on field %s of model %s in %s view(s)"
+msgstr "تعيين النطاق للحقل %s للنموذج %s في %s عرض(اً)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Set %s=%s on field %s of model %s in %s view(s)"
+msgstr "تعيين %s=%s للحقل %s للنموذج %s في %s عرض(اً)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Remove AI view-modifier inherits for field %s of model %s (%s polic(y/ies))"
+msgstr "إزالة وراثة معدلات العرض للذكاء الاصطناعي للحقل %s للنموذج %s (%s سياسة)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Unknown module: %s"
+msgstr "وحدة غير معروفة: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Invalid module operation: %s (use install, upgrade or uninstall)"
+msgstr "عملية وحدة غير صالحة: %s (استخدم install أو upgrade أو uninstall)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Refusing to uninstall core module %s"
+msgstr "رفض إلغاء تثبيت وحدة النواة %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Cannot upgrade module %s (state: %s)"
+msgstr "تعذر ترقية الوحدة %s (الحالة: %s)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Will %s module '%s' (current state: %s)"
+msgstr "سيتم %s الوحدة «%s» (الحالة الحالية: %s)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Unknown user: %s"
+msgstr "مستخدم غير معروف: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Unknown group: %s"
+msgstr "مجموعة غير معروفة: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "This instance uses ACL roles; Unique Role Law may still apply after a native group change."
+msgstr "تستخدم هذه النسخة أدوار ACL؛ قد تظل Unique Role Law سارية بعد تغيير مجموعة أصلية."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Add group %s to user %s"
+msgstr "إضافة المجموعة %s إلى المستخدم %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Remove group %s from user %s"
+msgstr "إزالة المجموعة %s من المستخدم %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "Confirm in Odoo to continue."
+msgstr "أكّد في أودو للمتابعة."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "The download card is on this turn."
+msgstr "بطاقة التنزيل موجودة في هذا الدور."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "Could not build the download file."
+msgstr "تعذر إنشاء ملف التنزيل."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "That file type is not available as a session download. I can send PDF, Excel, Word, text, Markdown, or HTML."
+msgstr "هذا النوع من الملفات غير متاح كتنزيل للجلسة. يمكنني إرسال PDF أو Excel أو Word أو نص أو Markdown أو HTML."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "These file types are not available as a session download: %s. I can send PDF, Excel, Word, text, Markdown, or HTML."
+msgstr "أنواع الملفات هذه غير متاحة كتنزيل للجلسة: %s. يمكنني إرسال PDF أو Excel أو Word أو نص أو Markdown أو HTML."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "Pick the views in Chatboo."
+msgstr "اختر العروض في تشاتبو."
+
+#. module: pns_ai_mcp
+#: model:ir.model,name:pns_ai_mcp.model_ai_safe_choice
+msgid "AI Safe Plan — view choice (before Confirm)"
+msgstr "الخطة الخاضعة للإشراف — اختيار العروض (قبل التأكيد)"
+
+#. module: pns_ai_mcp
+#: model:ai.trusted.action,label:pns_ai_mcp.trusted_action_field_set_required
+msgid "Set field required on the model"
+msgstr "جعل الحقل إلزامياً في النموذج"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_change_journal__op__field_required
+#: code:addons/pns_ai_mcp/controllers/safe_plan.py:0
+#: code:addons/pns_ai_mcp/utils/field_required_plan.py:0
+msgid "Field required"
+msgstr "حقل إلزامي"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan.py:0
+msgid "No views selected"
+msgstr "لم يُحدد أي عرض"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan.py:0
+msgid "Field required on %s.%s"
+msgstr "حقل إلزامي في %s.%s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan.py:0
+#: code:addons/pns_ai_mcp/utils/field_required_plan.py:0
+msgid "view_only requires at least one selected view."
+msgstr "view_only يتطلب عرضاً واحداً على الأقل."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/field_required_plan.py:0
+msgid "view_ids must be a list of view ids (or empty)."
+msgstr "يجب أن يكون view_ids قائمة بمعرّفات العروض (أو فارغة)."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/field_required_plan.py:0
+msgid "Unknown action id: %s"
+msgstr "معرّف إجراء غير معروف: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/field_required_plan.py:0
+msgid "No %s view for action %s"
+msgstr "لا يوجد عرض %s للإجراء %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Set required=%s on field %s of model %s (ORM).%s"
+msgstr "تعيين required=%s للحقل %s في النموذج %s (ORM).%s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid " This field is defined by a module; an upgrade may revert the required flag."
+msgstr " يعرّف هذا الحقل وحدة؛ قد تعيد الترقية علامة الإلزام."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid " Registry of this worker is updated; other workers until restart."
+msgstr " تم تحديث سجل هذا العامل؛ الباقون حتى إعادة التشغيل."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_agent_form
+msgid "Re-add this agent's shipped default contexts? Links added by other modules are kept."
+msgstr "هل تريد إعادة إضافة سياقات المصنع لهذا الوكيل؟ تُحفظ الروابط التي أضافتها وحدات أخرى."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_agent_form
+msgid "Re-add this agent's shipped default skills? Links added by other modules are kept."
+msgstr "هل تريد إعادة إضافة مهارات المصنع لهذا الوكيل؟ تُحفظ الروابط التي أضافتها وحدات أخرى."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_agent_form
+msgid "Factory"
+msgstr "المصنع"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_agent_form
+msgid "This list is the live composition. Core contexts (context_type=core) are always injected. Defaults re-adds the module seed and does not drop links added by other modules."
+msgstr "هذه القائمة هي التركيب الحي. تُحقَن سياقات core دائماً. زر الافتراضي يعيد بذرة الوحدة ولا يحذف ما ربطته وحدات أخرى."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_agent_form
+msgid "Module seed for Defaults and import. Not the live composition (see Contexts / Skills)."
+msgstr "بذرة الوحدة لزر الافتراضي والاستيراد. ليست التركيب الحي (انظر السياقات / المهارات)."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "Skill %s requests engine capability \"%s\", which this engine does not provide. Change the skill or propose a nameless generic mechanism; do not patch the addon."
+msgstr "المهارة %s تطلب قدرة المحرك «%s» وهذا المحرك لا يوفّرها. غيّر المهارة أو اقترح آلية عامة بلا اسم؛ لا تُرقّع الإضافة."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_agent_form
+msgid "Re-add native, imported and pinned contexts? extra links are kept."
+msgstr "هل تعيد سياقات native و imported و pinned؟ تُحفظ روابط extra."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_agent_form
+msgid "Overwrite native and imported context content from this agent's seed? pinned and extra are not touched. Nothing is deleted."
+msgstr "هل تستبدل محتوى native و imported من بذرة هذا الوكيل؟ pinned و extra لا تُمَس. لا يُحذف شيء."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_agent_form
+msgid "Overwrite native and imported skill content from this agent's seed? pinned and extra are not touched. Nothing is deleted."
+msgstr "هل تستبدل محتوى مهارات native و imported من بذرة هذا الوكيل؟ pinned و extra لا تُمَس. لا يُحذف شيء."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_agent_form
+msgid "Re-add native, imported and pinned skills? extra links are kept."
+msgstr "هل تعيد مهارات native و imported و pinned؟ تُحفظ روابط extra."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_agent_form
+msgid "Live composition. Defaults re-adds native + imported + pinned; extra stays. Restore overwrites native + imported content only. Core contexts are always present. Locked rows cannot be removed."
+msgstr "التركيب الحي. الافتراضي يعيد native + imported + pinned؛ extra يبقى. الاستعادة تستبدل محتوى native + imported فقط. سياقات core حاضرة دائماً. الصفوف المقفلة لا تُزال."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_agent_form
+msgid "Live composition. Defaults re-adds native + imported + pinned; extra stays. Restore overwrites native + imported content only. Use Export/Import ZIP from the action menu to move this agent's skills."
+msgstr "التركيب الحي. الافتراضي يعيد native + imported + pinned؛ extra يبقى. الاستعادة تستبدل محتوى native + imported فقط. تصدير/استيراد ZIP من قائمة الإجراءات ينقل مهارات هذا الوكيل."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_context__composition_origin
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_skill__composition_origin
+msgid "Link origin"
+msgstr "أصل الربط"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_context__composition_origin
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_skill__composition_origin
+msgid "Why this row is on the current agent. native: this agent's file. imported: other module embarked in the XML seed. pinned: other module pinched onto this agent. extra: not in the recipe (user / slash). Empty source_module is extra."
+msgstr "سبب وجود هذا الصف على الوكيل الحالي. native: ملف هذا الوكيل. imported: وحدة أخرى في بذرة XML. pinned: وحدة أخرى ثبّتته على هذا الوكيل. extra: ليست في الوصفة (مستخدم / slash). source_module الفارغ extra."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_agent__link_show_native
+msgid "Show native rows (this agent's own factory files)."
+msgstr "إظهار صفوف native (ملفات مصنع هذا الوكيل)."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_agent__link_show_imported
+msgid "Show imported rows (other modules embarked in this agent's seed)."
+msgstr "إظهار صفوف imported (وحدات أخرى في بذرة هذا الوكيل)."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_agent__link_show_pinned
+msgid "Show pinned rows (other modules pinched onto this agent)."
+msgstr "إظهار صفوف pinned (وحدات أخرى ثبّتت الحزمة على هذا الوكيل)."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_agent__link_show_extra
+msgid "Show extra rows (user / slash; not in the recipe)."
+msgstr "إظهار صفوف extra (مستخدم / slash؛ ليست في الوصفة)."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_context__composition_locked
+msgid "Locked"
+msgstr "مقفل"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_context__composition_origin__native
+#: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_skill__composition_origin__native
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_agent__link_show_native
+msgid "native"
+msgstr "native"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_context__composition_origin__imported
+#: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_skill__composition_origin__imported
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_agent__link_show_imported
+msgid "imported"
+msgstr "imported"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_context__composition_origin__pinned
+#: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_skill__composition_origin__pinned
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_agent__link_show_pinned
+msgid "pinned"
+msgstr "pinned"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_context__composition_origin__extra
+#: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_skill__composition_origin__extra
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_agent__link_show_extra
+msgid "extra"
+msgstr "extra"
+

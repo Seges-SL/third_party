@@ -1,0 +1,46 @@
+/* Apps module form: embed static/description/index.html at full sheet width.
+ *
+ * Odoo 19 puts the XML <form class> on .o_form_renderer, not on .o_form_view.
+ * XXL sheets cap .o_form_sheet_bg with max-width and leave the rest empty.
+ * Do not change overflow or flex-flow of the form — that blanks the sheet.
+ */
+
+.o_form_renderer.pns_module_index_form {
+    max-width: none !important;
+    width: 100% !important;
+}
+
+.o_form_view:has(.pns_module_index_iframe) .o_form_renderer,
+.o_form_view.o_xxl_form_view:has(.pns_module_index_iframe) .o_form_sheet_bg,
+.o_form_renderer.pns_module_index_form .o_form_sheet_bg,
+.o_form_renderer.pns_module_index_form .o_form_sheet {
+    max-width: none !important;
+    width: 100% !important;
+    margin-right: 0 !important;
+}
+
+.o_form_view.o_xxl_form_view:has(.pns_module_index_iframe) .o_form_sheet_bg,
+.o_form_renderer.pns_module_index_form .o_form_sheet_bg {
+    flex: 1 1 auto !important;
+}
+
+/* Notebook must size to the index, not shrink the iframe to a strip. */
+.o_form_renderer.pns_module_index_form .o_notebook {
+    flex: 0 1 auto;
+}
+
+.pns_module_index,
+.o_field_widget.o_field_pns_module_index {
+    display: block;
+    width: 100%;
+    flex-shrink: 0;
+}
+
+.pns_module_index_iframe {
+    display: block;
+    width: 100%;
+    min-height: 80vh;
+    border: 0;
+    background: #fff;
+    flex-shrink: 0;
+}

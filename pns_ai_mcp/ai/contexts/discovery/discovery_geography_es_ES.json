@@ -1,0 +1,25 @@
+{
+  "code": "discovery_geography_es_ES",
+  "tipo": "discovery",
+  "locale": "es_ES",
+  "target": "geography",
+  "priority": 73,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "provincia",
+    "provincias",
+    "comunidad autonoma",
+    "comunidad autónoma",
+    "pais",
+    "país",
+    "paises",
+    "países",
+    "codigo postal",
+    "código postal",
+    "geografia",
+    "geografía",
+    "municipio",
+    "municipios"
+  ]
+}

@@ -1,0 +1,560 @@
+# Translation of pns_ai_chatboo.
+# English is the source/fallback language.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: pns_ai_chatboo\n"
+"Report-Msgid-Bugs-To: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: ar_001\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: \n"
+
+#. module: pns_ai_chatboo
+msgid "Module license"
+msgstr "ترخيص الوحدة"
+
+#. module: pns_ai_chatboo
+msgid "License and copyright"
+msgstr "الترخيص وحقوق النشر"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Chatboo Assistant"
+msgstr "مساعد Chatboo"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "New"
+msgstr "جديد"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "New chat"
+msgstr "محادثة جديدة"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "History"
+msgstr "السجل"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Sessions"
+msgstr "الجلسات"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "No sessions yet."
+msgstr "لا توجد جلسات بعد."
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Delete"
+msgstr "حذف"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "How can I help you today?"
+msgstr "كيف يمكنني مساعدتك اليوم؟"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Copy"
+msgstr "نسخ"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Thinking…"
+msgstr "جارٍ التفكير…"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Type your message… (Enter to send, Shift+Enter for newline)"
+msgstr "اكتب رسالتك… (Enter للإرسال، Shift+Enter لسطر جديد)"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Connecting…"
+msgstr "جارٍ الاتصال…"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Unknown"
+msgstr "غير معروف"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Offline"
+msgstr "غير متصل"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Could not load the session."
+msgstr "تعذّر تحميل الجلسة."
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Could not create the session."
+msgstr "تعذّر إنشاء الجلسة."
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Could not delete the session."
+msgstr "تعذّر حذف الجلسة."
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "*(no response)*"
+msgstr "*(لا توجد استجابة)*"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Copied to clipboard."
+msgstr "تم النسخ إلى الحافظة."
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Could not copy."
+msgstr "تعذّر النسخ."
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Name cannot be empty"
+msgstr "لا يمكن أن يكون الاسم فارغًا"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "A list of session IDs is required."
+msgstr "مطلوب قائمة بمعرّفات الجلسات."
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "The requested sessions were not found."
+msgstr "لم يتم العثور على الجلسات المطلوبة."
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Access denied to one or more sessions."
+msgstr "تم رفض الوصول إلى جلسة واحدة أو أكثر."
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Message cannot be empty"
+msgstr "لا يمكن أن تكون الرسالة فارغة"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "MCP engine error:"
+msgstr "خطأ في محرك MCP:"
+
+#. module: pns_ai_chatboo
+msgid ""
+"No AI provider is configured for the \"%s\" role. Assign at least one AI "
+"provider to this role before using the assistant."
+msgstr ""
+"لم يتم تكوين أي مزوّد ذكاء اصطناعي للدور «%s». عيّن مزوّد ذكاء اصطناعي "
+"واحدًا على الأقل لهذا الدور قبل استخدام المساعد."
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Request body is not valid JSON"
+msgstr "نص الطلب ليس JSON صالحًا"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Saved"
+msgstr "تم الحفظ"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Error"
+msgstr "خطأ"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Error while saving"
+msgstr "خطأ أثناء الحفظ"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "No context information available"
+msgstr "لا تتوفر معلومات السياق"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Copied to clipboard"
+msgstr "تم النسخ إلى الحافظة"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Error: jsPDF is not available"
+msgstr "خطأ: jsPDF غير متوفر"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Error: SheetJS is not available"
+msgstr "خطأ: SheetJS غير متوفر"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Error while generating PDF"
+msgstr "خطأ أثناء إنشاء PDF"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Nothing to export"
+msgstr "لا يوجد ما يمكن تصديره"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Error while generating Excel"
+msgstr "خطأ أثناء إنشاء Excel"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Error while generating Word"
+msgstr "خطأ أثناء إنشاء Word"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Error copying to clipboard"
+msgstr "خطأ أثناء النسخ إلى الحافظة"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+#, python-format
+msgid "Are you sure you want to delete the selected sessions (%s)?"
+msgstr "هل أنت متأكد من حذف الجلسات المحددة (%s)؟"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "New Chatboo response ready"
+msgstr "استجابة Chatboo جديدة جاهزة"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Send"
+msgstr "إرسال"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Session History"
+msgstr "سجل الجلسات"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Select all"
+msgstr "تحديد الكل"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Current"
+msgstr "الحالية"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "messages"
+msgstr "رسائل"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Close"
+msgstr "إغلاق"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Working tokens (K1):"
+msgstr "رموز العمل (K1):"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "K1: Tokens available to keep the conversational context"
+msgstr "K1: الرموز المتاحة للحفاظ على سياق المحادثة"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Generation speed"
+msgstr "سرعة التوليد"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Ask Chatboo... (↑↓ for history)"
+msgstr "اسأل Chatboo... (↑↓ للسجل)"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Send in the background — you will get a notification when it is ready"
+msgstr "الإرسال في الخلفية — ستصلك إشعار عند الجاهزية"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Save"
+msgstr "حفظ"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Cancel"
+msgstr "إلغاء"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Rename session"
+msgstr "إعادة تسمية الجلسة"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Delete session"
+msgstr "حذف الجلسة"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Download as PDF"
+msgstr "تنزيل بصيغة PDF"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Download as Excel"
+msgstr "تنزيل بصيغة Excel"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Download as Word"
+msgstr "تنزيل بصيغة Word"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Restore default width"
+msgstr "استعادة العرض الافتراضي"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_res_users__chatboo_card_width_ratio
+msgid "Chatboo card width"
+msgstr "عرض بطاقة Chatboo"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_users__chatboo_card_width_ratio
+msgid "0 = default (two thirds of the chat canvas). Else 0–1 of that canvas."
+msgstr "0 = الافتراضي (ثلثا لوحة المحادثة). وإلا 0–1 من تلك اللوحة."
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Download"
+msgstr "تنزيل"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Copy as plain text"
+msgstr "نسخ كنص عادي"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Copy with formatting (HTML/Markdown)"
+msgstr "نسخ مع التنسيق (HTML/Markdown)"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Copy to clipboard"
+msgstr "نسخ إلى الحافظة"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Arrow keys ↑↓ to navigate the prompt history"
+msgstr "مفاتيح الأسهم ↑↓ للتنقل في سجل الأوامر"
+
+#. module: pns_ai_chatboo
+msgid "Confirm AI write operation"
+msgstr "تأكيد كتابة الذكاء الاصطناعي"
+
+#. module: pns_ai_chatboo
+msgid "This operation will not run until you confirm it."
+msgstr "لن تُنفَّذ هذه العملية حتى تؤكدها."
+
+#. module: pns_ai_chatboo
+msgid "Confirm"
+msgstr "تأكيد"
+
+#. module: pns_ai_chatboo
+msgid "Executing..."
+msgstr "جارٍ التنفيذ..."
+
+#. module: pns_ai_chatboo
+msgid "Operation executed"
+msgstr "تم تنفيذ العملية"
+
+#. module: pns_ai_chatboo
+msgid "Operation cancelled"
+msgstr "تم إلغاء العملية"
+
+#. module: pns_ai_chatboo
+msgid "the operation"
+msgstr "العملية"
+
+#. module: pns_ai_chatboo
+msgid "unknown"
+msgstr "غير معروف"
+
+#. module: pns_ai_chatboo
+msgid "Session %s"
+msgstr "جلسة %s"
+
+#. module: pns_ai_chatboo
+msgid "Chat interface"
+msgstr "واجهة الدردشة"
+
+#. module: pns_ai_chatboo
+msgid "Systray mode"
+msgstr "وضع شريط النظام"
+
+#. module: pns_ai_chatboo
+msgid "How Chatboo opens when you click its icon in the top bar."
+msgstr "كيف يُفتح Chatboo عند النقر على أيقونته في الشريط العلوي."
+
+#. module: pns_ai_chatboo
+msgid "Floating popup"
+msgstr "نافذة منبثقة عائمة"
+
+#. module: pns_ai_chatboo
+msgid "Side drawer"
+msgstr "لوحة جانبية"
+
+#. module: pns_ai_chatboo
+msgid "Chatboo interface"
+msgstr "واجهة Chatboo"
+
+#. module: pns_ai_chatboo
+msgid "Show Chatboo in systray"
+msgstr "إظهار Chatboo في شريط النظام"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_ai_agent__chatboo_show_systray
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_show_systray
+msgid "Show the Chatboo launcher icon in the top navigation bar."
+msgstr "إظهار أيقونة Chatboo في شريط التنقل العلوي."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_ai_agent__chatboo_dataset_cache_max_mb
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_dataset_cache_max_mb
+msgid "Max size of the dataset cached from a data query so the NEXT turn can reformat/reorder the SAME list without re-querying (kernel-like reuse; data never enters the model context). Bigger datasets are not cached (the model just reuses the query code). 0 = no limit. Guards per-turn (de)serialization cost, not DB storage."
+msgstr "الحد الأقصى لحجم مجموعة البيانات المخزّنة من استعلام حتى يعيد الدور التالي تنسيق/ترتيب نفس القائمة دون إعادة الاستعلام. 0 = بلا حد."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_ai_agent__chatboo_query_data_ttl_hours
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_query_data_ttl_hours
+msgid "How long a cached dataset stays reusable. After this it is ignored and purged by the maintenance cron so blobs never pile up. 0 = never expires (only cleared by session retention)."
+msgstr "مدة إعادة استخدام مجموعة البيانات المخزّنة. بعدها تُتجاهل ويحذفها cron الصيانة. 0 = لا تنتهي."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_chart_engine
+msgid "Library used to render charts under server-built tables. ECharts is recommended for combined bar/line charts."
+msgstr "المكتبة المستخدمة لرسم المخططات تحت الجداول التي يبنيها الخادم. يُنصح بـ ECharts للمخططات المختلطة."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_default_show_mode
+msgid "Starting showmode for each new Chatboo conversation: show-table or show-chart. Stays until /show-table, /show-chart or phrasing (“show as chart” / “show as table”). Suspended under painter-free. Not a per-turn LLM choice."
+msgstr "وضع العرض الابتدائي لكل محادثة Chatboo جديدة: show-table أو show-chart. يبقى حتى /show-table أو /show-chart أو صياغة مماثلة."
+
+#. module: pns_ai_chatboo
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
+msgid ""
+"Chatboo is distributed under the Apache License 2.0. See the LICENSE file "
+"included with the module."
+msgstr "يتم توزيع Chatboo بموجب رخصة Apache License 2.0."
+
+#. module: pns_ai_chatboo
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
+msgid "Provider chain and context bundle for this inference client."
+msgstr "سلسلة المزود وحزمة السياق لعميل الاستدلال."
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Choose views"
+msgstr "اختر العروض"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Mark the screens that should receive this change. Confirm comes next."
+msgstr "حدد الشاشات التي يجب أن تتلقى هذا التغيير. التأكيد يأتي بعد ذلك."
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "All"
+msgstr "الكل"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "None"
+msgstr "لا شيء"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Accept"
+msgstr "قبول"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Saving…"
+msgstr "جارٍ الحفظ…"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Error: "
+msgstr "خطأ: "
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Series statistics"
+msgstr "إحصائيات السلاسل"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Statistics"
+msgstr "إحصائيات"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Table"
+msgstr "جدول"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Chart"
+msgstr "رسم بياني"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "n"
+msgstr "ن"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Min"
+msgstr "أدنى"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Max"
+msgstr "أعلى"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Mean"
+msgstr "المتوسط"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Median"
+msgstr "الوسيط"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Std. dev."
+msgstr "الانحراف المعياري"
+
+#. module: pns_ai_chatboo
+#. odoo-javascript
+msgid "Sum"
+msgstr "المجموع"

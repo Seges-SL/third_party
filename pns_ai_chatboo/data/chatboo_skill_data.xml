@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Re-seed this addon's skills on every install/-u. Scoped: do not scan
+     neighbor packs (Occ disk identity must not be overwritten). Apply path
+     is the module update, not a confirmation toast. -->
+<odoo>
+    <data noupdate="0">
+        <function model="ai.skill" name="import_from_module"
+                  eval="['pns_ai_chatboo']"/>
+        <function model="ai.skill" name="unlink_named_factory_skills"
+                  eval="[['flota', 'payroll']]"/>
+    </data>
+</odoo>

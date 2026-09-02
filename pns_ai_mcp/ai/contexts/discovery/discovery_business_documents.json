@@ -1,0 +1,28 @@
+{
+  "code": "discovery_business_documents",
+  "tipo": "discovery",
+  "target": "business_documents",
+  "priority": 74,
+  "soft_depends": [
+    "partners"
+  ],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "quotation",
+    "sales order",
+    "sale.order",
+    "sale.order.line",
+    "delivery note",
+    "picking",
+    "stock.picking",
+    "proforma",
+    "purchase order",
+    "purchase.order",
+    "order lines",
+    "create quotation",
+    "add line",
+    "discount",
+    "global discount",
+    "modify quotation"
+  ]
+}

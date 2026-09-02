@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    File: views/mcp_log_views.xml
+    Description: Views for the AI operation log (ai.log).
+-->
+<odoo>
+    <!-- Window action to open the clear-history wizard (defined before the views referencing it) -->
+    <record id="action_mcp_logs_delete_menu_window" model="ir.actions.act_window">
+        <field name="name">Clear history</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">pns_ai_mcp.log_delete_menu</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Simplified activity list (default for My Activity) -->
+    <record id="view_mcp_log_tree_simple" model="ir.ui.view">
+        <field name="name">ai.log.tree.simple</field>
+        <field name="model">ai.log</field>
+        <field name="arch" type="xml">
+            <tree string="My Activity" create="0" delete="0"
+                  decoration-warning="flow in ('tool_call', 'external')"
+                  decoration-danger="access_mode == 'write'"
+                  decoration-muted="flow == 'tool_result'"
+                  decoration-bf="flow == 'domain_index'"
+                  sample="1" class="o_mcp_log_tree o_pns_list" default_order="timestamp desc, step_seq desc">
+                <field name="timestamp" string="Date/Time" readonly="1" optional="show"/>
+                <field name="operation_code" string="Op. code" readonly="1" optional="show"/>
+                <field name="client_label" string="Client" readonly="1" optional="show"/>
+                <field name="flow_label" string="Flow" readonly="1" optional="show"/>
+                <field name="endpoint" string="Action" readonly="1" optional="show"/>
+                <field name="result_summary_compressed" string="Summary" readonly="1" optional="show"/>
+                <field name="remote_ip" string="IP" readonly="1" optional="show"/>
+                <field name="user_id" string="User" readonly="1" optional="hide" groups="pns_ai_mcp.group_ai_admin"/>
+                <field name="flow" invisible="1"/>
+                <field name="access_mode" invisible="1"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Full technical tree (admin / debug) -->
+    <record id="view_mcp_log_tree" model="ir.ui.view">
+        <field name="name">ai.log.tree</field>
+        <field name="model">ai.log</field>
+        <field name="arch" type="xml">
+            <tree string="AI Logs"
+                  decoration-info="flow == 'llm_request'"
+                  decoration-success="flow == 'llm_response'"
+                  decoration-warning="flow in ('tool_call', 'external')"
+                  decoration-muted="flow == 'tool_result'"
+                  decoration-primary="flow == 'turn_done'"
+                  decoration-it="flow == 'failover'"
+                  decoration-bf="flow == 'domain_index'"
+                  decoration-danger="access_mode == 'write'"
+                  sample="1" class="o_mcp_log_tree o_pns_list" default_order="timestamp desc, step_seq desc">
+                <field name="timestamp" string="Date/Time" readonly="1" optional="show"/>
+                <field name="correlation_id" string="Request ID" readonly="1" optional="show"/>
+                <field name="step_seq" string="Step" readonly="1" optional="show"/>
+                <field name="operation_code" string="Op. code" readonly="1" optional="hide"/>
+                <field name="origin" string="Origin" readonly="1" widget="badge"
+                       decoration-info="origin == 'chatboo'"
+                       decoration-warning="origin == 'mcp_client'"
+                       decoration-muted="origin == 'internal'"
+                       optional="hide"/>
+                <field name="client_label" string="Client" readonly="1" optional="show"/>
+                <field name="user_id" string="User" readonly="1" optional="show"/>
+                <field name="remote_ip" string="IP" readonly="1" optional="show"/>
+                <field name="flow_label" string="Flow (who -&gt; who)" readonly="1" optional="show"/>
+                <!-- Needed by decoration-* but not shown as a column -->
+                <field name="flow" invisible="1"/>
+                <field name="endpoint" string="Endpoint" readonly="1" optional="show"/>
+                <field name="model_name" readonly="1" optional="show"/>
+                <field name="prompt_tokens" string="Tok.Prompt" readonly="1" optional="show"/>
+                <field name="completion_tokens" string="Tok.Compl" readonly="1" optional="show"/>
+                <field name="request_size_bytes" readonly="1" optional="show"/>
+                <field name="response_size_bytes" readonly="1" optional="show"/>
+                <field name="prompt_data_compressed" string="Prompt/Args" readonly="1" widget="mcp_json_compressed" optional="show"/>
+                <field name="result_summary_compressed" string="Result" readonly="1" widget="mcp_json_compressed" optional="show"/>
+                <field name="primitive" string="Primitive" readonly="1" optional="hide"/>
+                <field name="category" string="Category" optional="hide"/>
+                <field name="access_mode" string="Access" readonly="1" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Operator actions: se definen ANTES de la vista formulario, cuyo botón
+         de cabecera referencia %(pns_ai_mcp.action_mcp_logs)d y debe resolverse
+         en tiempo de parseo (si no, falla en instalación desde cero). La vista
+         de búsqueda se auto-asocia por modelo, así que no hace falta ref. -->
+    <record id="action_mcp_logs" model="ir.actions.act_window">
+        <field name="name">My Activity</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">ai.log</field>
+        <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="view_mcp_log_tree"/>
+        <field name="domain">[]</field>
+        <field name="context">{
+            'create': False,
+            'no_create': True
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">AI operation log</p>
+            <p>Your AI interaction history with all step types and color coding.</p>
+        </field>
+    </record>
+
+    <record id="action_mcp_logs_technical" model="ir.actions.act_window">
+        <field name="name">Activity</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">ai.log</field>
+        <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="view_mcp_log_tree"/>
+        <field name="domain">[]</field>
+        <field name="context">{'create': False, 'no_create': True}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">AI operation log</p>
+            <p>Full technical audit trail of all AI interactions.</p>
+        </field>
+    </record>
+
+    <!-- Form view for AI logs -->
+    <record id="view_mcp_log_form" model="ir.ui.view">
+        <field name="name">ai.log.form</field>
+        <field name="model">ai.log</field>
+        <field name="arch" type="xml">
+            <form create="0" delete="0" string="AI Log">
+                <header>
+                    <button name="%(pns_ai_mcp.action_mcp_logs)d" 
+                            type="action" 
+                            string="Back to List" 
+                            class="oe_highlight"/>
+                </header>
+                <sheet>
+                    <!-- ══ COLOR LEGEND (single source: ai.log.render_flow_legend) ══ -->
+                    <field name="flow_legend_html" nolabel="1" readonly="1"/>
+                    <!-- ════════════════════════════════════════════════════════════════ -->
+                    <group>
+                        <group>
+                            <field name="user_id" readonly="1"/>
+                            <field name="client_label" readonly="1"/>
+                            <field name="origin" readonly="1"/>
+                            <field name="remote_ip" readonly="1"/>
+                            <field name="correlation_id" readonly="1"/>
+                            <field name="step_seq" readonly="1"/>
+                            <field name="operation_code" readonly="1" optional="hide"/>
+                            <field name="timestamp" readonly="1"/>
+                            <field name="create_date" string="Created (Odoo)" readonly="1" optional="hide"/>
+                            <field name="primitive" readonly="1"/>
+                            <field name="category" readonly="1"/>
+                            <field name="flow_label" readonly="1"/>
+                            <field name="access_mode" readonly="1"/>
+                            <field name="endpoint" readonly="1"/>
+                            <field name="model_name" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="request_size_bytes" readonly="1"/>
+                            <field name="response_size_bytes" readonly="1"/>
+                            <field name="result_summary" readonly="1" nolabel="1" placeholder="Result summary..."/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="User Prompt" name="user_prompt">
+                            <div class="o_field_text_copy_container" style="position: relative;">
+                                <a href="#" class="btn btn-sm btn-link o_field_text_copy_btn" 
+                                   role="button"
+                                   style="position: absolute; top: 5px; right: 5px; z-index: 10; text-decoration: none;"
+                                   title="Copy to clipboard">
+                                    <i class="fa fa-copy"></i> Copy
+                                </a>
+                                <field name="user_prompt" readonly="1" nolabel="1" widget="text" class="o_field_text_copy_target" placeholder="User prompt not available (captured from X-MCP-User-Prompt header)"/>
+                            </div>
+                        </page>
+                        <page string="Code to Execute" name="code">
+                            <div class="o_field_text_copy_container" style="position: relative;">
+                                <a href="#" class="btn btn-sm btn-link o_field_text_copy_btn" 
+                                   role="button"
+                                   style="position: absolute; top: 5px; right: 5px; z-index: 10; text-decoration: none;"
+                                   title="Copy to clipboard">
+                                    <i class="fa fa-copy"></i> Copy
+                                </a>
+                                <field name="code_to_execute" readonly="1" nolabel="1" widget="text" class="o_field_text_copy_target" placeholder="Code not available (only for relaxaicode)"/>
+                            </div>
+                        </page>
+                        <page string="Prompt/Args" name="prompt">
+                            <div class="o_field_text_copy_container" style="position: relative;">
+                                <a href="#" class="btn btn-sm btn-link o_field_text_copy_btn" 
+                                   role="button"
+                                   style="position: absolute; top: 5px; right: 5px; z-index: 10; text-decoration: none;"
+                                   title="Copy to clipboard">
+                                    <i class="fa fa-copy"></i> Copy
+                                </a>
+                                <field name="prompt_data" readonly="1" nolabel="1" widget="text" class="o_field_text_copy_target"/>
+                            </div>
+                        </page>
+                        <page string="Result" name="result">
+                            <div class="o_field_text_copy_container" style="position: relative;">
+                                <a href="#" class="btn btn-sm btn-link o_field_text_copy_btn" 
+                                   role="button"
+                                   style="position: absolute; top: 5px; right: 5px; z-index: 10; text-decoration: none;"
+                                   title="Copy to clipboard">
+                                    <i class="fa fa-copy"></i> Copy
+                                </a>
+                                <field name="result_data" readonly="1" nolabel="1" widget="text" class="o_field_text_copy_target"/>
+                            </div>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search view for AI logs -->
+    <record id="view_mcp_log_search" model="ir.ui.view">
+        <field name="name">ai.log.search</field>
+        <field name="model">ai.log</field>
+        <field name="arch" type="xml">
+            <search string="AI Logs">
+                <field name="operation_code" string="Op. code"/>
+                <field name="correlation_id" string="Request ID"/>
+                <field name="client_label" string="Client"/>
+                <field name="user_id"/>
+                <field name="origin" string="Origin"/>
+                <field name="remote_ip" string="IP"/>
+                <field name="primitive"/>
+                <field name="category"/>
+                <field name="endpoint"/>
+                <field name="access_mode"/>
+                <field name="model_name"/>
+                <field name="timestamp"/>
+                <field name="result_summary"/>
+                
+                <filter string="Only mine" name="only_mine"
+                        domain="[('user_id', '=', uid)]"/>
+                <separator/>
+                <filter string="Hide LLM plumbing" name="hide_llm_plumbing"
+                        domain="[('primitive', '!=', 'llm')]"/>
+                <separator/>
+                <filter string="From Chatboo" name="src_chatboo" domain="[('origin', '=', 'chatboo')]"/>
+                <filter string="From MCP Client" name="src_mcp" domain="[('origin', '=', 'mcp_client')]"/>
+                <filter string="Internal" name="src_internal" domain="[('origin', '=', 'internal')]"/>
+                <separator/>
+                <filter string="System" name="prim_system" domain="[('primitive', '=', 'system')]"/>
+                <filter string="Tool Executions" name="prim_tool" domain="[('primitive', '=', 'tool')]"/>
+                <filter string="Model (LLM)" name="prim_llm" domain="[('primitive', '=', 'llm')]"/>
+                <separator/>
+                <filter string="Read Only" name="filter_read" domain="[('access_mode', '=', 'read')]"/>
+                <filter string="Write Only" name="filter_write" domain="[('access_mode', '=', 'write')]"/>
+                <filter string="Provider failover" name="filter_failover" domain="[('flow', '=', 'failover')]"/>
+                <filter string="Domain Discovery" name="filter_domain_index" domain="[('flow', '=', 'domain_index')]"/>
+                <separator/>
+                <filter string="Code" name="cat_code" domain="[('category', '=', 'code')]"/>
+                <filter string="Context" name="cat_context" domain="[('category', '=', 'context')]"/>
+                <filter string="Query" name="cat_query" domain="[('category', '=', 'query')]"/>
+                <filter string="Verification" name="cat_verification" domain="[('category', '=', 'verification')]"/>
+                
+                <filter string="Last Hour" name="filter_last_hour" domain="[('timestamp', '>=', (datetime.datetime.now() - datetime.timedelta(hours=1)))]"/>
+                <filter string="Today" name="filter_today" domain="[('timestamp', '>=', datetime.datetime.now().replace(hour=0, minute=0, second=0))]"/>
+                
+                <separator/>
+                <filter string="Request ID" name="group_by_corr" context="{'group_by': 'correlation_id'}"/>
+                <filter string="Client" name="group_by_client" context="{'group_by': 'client_label'}"/>
+                <filter string="Op. code" name="group_by_operation_code" context="{'group_by': 'operation_code'}"/>
+                <filter string="Origin" name="group_source" context="{'group_by': 'origin'}"/>
+                <filter string="Primitive" name="group_by_primitive" context="{'group_by': 'primitive'}"/>
+                <filter string="Category" name="group_by_category" context="{'group_by': 'category'}"/>
+                <filter string="Flow" name="group_by_flow" context="{'group_by': 'flow'}"/>
+                <filter string="Endpoint" name="group_endpoint" context="{'group_by': 'endpoint'}"/>
+                <filter string="User" name="group_user" context="{'group_by': 'user_id'}"/>
+                <filter string="Access" name="group_access" context="{'group_by': 'access_mode'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- AI log menu: operators see own records; admins see all via ir.rule -->
+    <menuitem id="menu_mcp_logs"
+              name="My Activity"
+              parent="menu_ai_security"
+              action="action_mcp_logs"
+              sequence="30"
+              groups="pns_ai_mcp.group_ai_writer,pns_ai_mcp.group_ai_external_url,pns_ai_mcp.group_ai_external_api"/>
+
+    <menuitem id="menu_mcp_logs_admin"
+              name="Activity"
+              parent="menu_ai_security"
+              action="action_mcp_logs_technical"
+              sequence="40"
+              groups="pns_ai_mcp.group_ai_admin"/>
+
+</odoo>

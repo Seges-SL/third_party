@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Caduca pendientes vencidos: sin esto la cola de Autorizaciones acumula zombis
+         (status=pending + is_expired) y el toast de confirmación se vuelve inutilizable.
+         Stack owl2 (Odoo 15-19): sin numbercall/doall. -->
+    <record id="ir_cron_ai_safe_operation_expire" model="ir.cron">
+        <field name="name">AI: expire pending supervised operations</field>
+        <field name="model_id" ref="model_ai_safe_operation"/>
+        <field name="state">code</field>
+        <field name="code">model.cleanup_expired()</field>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+    <!-- Sin cron execute-confirmed (ver owl1 + migración 3.0.146). -->
+</odoo>

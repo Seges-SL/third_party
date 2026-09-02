@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Archivo: views/mcp_log_delete_menu_views.xml
+    Descripción: Wizard de borrado de logs MCP
+-->
+<odoo>
+    <record id="view_mcp_log_delete_menu_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.log_delete_menu.form</field>
+        <field name="model">pns_ai_mcp.log_delete_menu</field>
+        <field name="arch" type="xml">
+            <form string="Clear log history">
+                <div class="alert alert-info" role="alert">
+                    <p><strong>The oldest logs will be deleted, keeping the most recent ones.</strong></p>
+                </div>
+                <sheet>
+                    <group>
+                        <field name="delete_all" string="Clear all"/>
+                        <field name="keep_recent" string="Keep recent" attrs="{'invisible': [('delete_all', '=', True)]}"/>
+                        <field name="keep_count" attrs="{'invisible': [('keep_recent', '=', False)], 'required': [('keep_recent', '=', True)]}"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Accept"
+                            name="action_confirm"
+                            type="object"
+                            class="btn-primary"/>
+                    <button string="Cancel"
+                            class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

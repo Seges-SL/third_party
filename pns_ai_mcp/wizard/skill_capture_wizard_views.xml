@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ai_skill_capture_wizard_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.skill.capture.wizard.form</field>
+        <field name="model">pns_ai_mcp.skill.capture.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Create skill from chat">
+                <div class="alert alert-info" role="alert">
+                    The query <b>logic</b> from your Chatboo session is captured as
+                    the skill's deterministic <b>Code</b>. Review the
+                    <b>Procedure</b>, set the name, then create the skill — it will
+                    be available as <code>/&lt;code&gt;</code> in Chatboo.
+                    If it accepts arguments, fill <b>Argument hint</b> and
+                    <b>Param schema</b> (deterministic parse first; light LLM
+                    only when free text is unresolved).
+                </div>
+                <div class="alert alert-warning" role="alert"
+                     attrs="{'invisible': [('warn_hardcoded_rows', '=', False)]}">
+                    The captured Code may contain a static <code>data = [&#123;...&#125;, ...]</code>
+                    block: the LLM sometimes pastes the query result inline. Replace it with
+                    live <code>api_call</code> fetches (keep the scoring/formatting logic).
+                </div>
+                <group>
+                    <field name="from_chatboo" invisible="1"/>
+                    <field name="warn_hardcoded_rows" invisible="1"/>
+                    <field name="source_log_id" invisible="1"/>
+                    <field name="agent_ids" widget="many2many_tags"/>
+                    <field name="skill_code" placeholder="e.g. facturacion"/>
+                    <field name="skill_name" placeholder="e.g. Employee punctuality (Sesame)"/>
+                    <field name="description"/>
+                </group>
+                <group string="Parameters (hybrid: deterministic first)">
+                    <field name="arg_hint"
+                             placeholder="e.g. ytd | mes=2026-06 | Seville tomorrow"/>
+                    <field name="param_schema" nolabel="0"
+                             placeholder='{"periodo": {"type": "string", "desc": "..."}}'/>
+                </group>
+                <group string="Procedure (orchestration prose)">
+                    <field name="procedure" nolabel="1"/>
+                </group>
+                <group string="Code (relaxaicode, source of truth)">
+                    <field name="code_body" nolabel="1"/>
+                </group>
+                <footer>
+                    <button name="action_create_draft" string="Create skill"
+                            type="object" class="btn-primary" icon="fa-graduation-cap"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>
