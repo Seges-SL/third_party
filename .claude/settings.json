@@ -1,0 +1,46 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pylint *)",
+      "Bash(ruff check *)",
+      "Bash(git status)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git branch --show-current)",
+      "Bash(git merge-base *)",
+      "Bash(python3 -m py_compile *)",
+      "Bash(python3 ~/.claude/hooks/odoo_lint.py --revisar *)",
+      "Bash(xmllint --noout *)",
+      "Bash(odoo-dev *)",
+      "Bash(odoo-readme *)"
+    ],
+    "ask": [
+      "Bash(odoo-dev 14 bd-cargar *)",
+      "Bash(odoo-dev 17 bd-cargar *)",
+      "Bash(odoo-dev 14 bd-borrar *)",
+      "Bash(odoo-dev 17 bd-borrar *)",
+      "Bash(odoo-dev 14 bd-claves *)",
+      "Bash(odoo-dev 17 bd-claves *)",
+      "Bash(odoo-dev 14 bd-neutralizar*)",
+      "Bash(odoo-dev 17 bd-neutralizar*)",
+      "Bash(git stash *)",
+      "Bash(git stash)",
+      "Bash(git checkout *)",
+      "Bash(git reset *)",
+      "Bash(git restore *)",
+      "Bash(git switch *)",
+      "Bash(git clean *)"
+    ],
+    "deny": [
+      "Bash(git push *)",
+      "Bash(git commit *)",
+      "Read(./.env)",
+      "Read(./**/.env)"
+    ],
+    "additionalDirectories": [
+      "/opt/odoo-src/14.0"
+    ]
+  }
+}

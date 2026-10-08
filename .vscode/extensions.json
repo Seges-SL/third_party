@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "anthropic.claude-code",
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.pylint",
+    "charliermarsh.ruff",
+    "redhat.vscode-xml"
+  ]
+}

@@ -1,0 +1,43 @@
+# Configuración de pylint + pylint-odoo generada por claude-odoo-kit.
+# La versión válida se ajusta al repositorio; el hook de Claude la sobrescribe
+# con la del manifest de cada módulo.
+[MASTER]
+load-plugins=pylint_odoo
+score=n
+
+[ODOOLINT]
+valid-odoo-versions=14.0
+
+[MESSAGES CONTROL]
+# Ruido genérico de pylint que no aporta en código Odoo.
+# Formato e imports los revisa ruff: se desactivan aquí para no duplicar
+# (bad-indentation, trailing-whitespace, missing-final-newline, trailing-newlines,
+# unused-import, wrong-import-order).
+# manifest-required-author: por defecto exige "Odoo Community Association (OCA)";
+#   se desactiva para módulos privados. Actívalo en repos OCA.
+# missing-readme sigue ACTIVO: los módulos nuevos llevan README.rst (odoo-readme).
+# En módulos heredados sin README no molesta: el hook solo muestra lo cambiado.
+disable=
+    import-error,
+    missing-module-docstring,
+    missing-class-docstring,
+    missing-function-docstring,
+    too-few-public-methods,
+    too-many-arguments,
+    too-many-locals,
+    too-many-ancestors,
+    protected-access,
+    line-too-long,
+    invalid-name,
+    fixme,
+    duplicate-code,
+    unused-argument,
+    attribute-defined-outside-init,
+    no-member,
+    wrong-import-order,
+    bad-indentation,
+    trailing-whitespace,
+    missing-final-newline,
+    trailing-newlines,
+    unused-import,
+    manifest-required-author

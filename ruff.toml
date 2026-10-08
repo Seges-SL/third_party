@@ -1,0 +1,21 @@
+# Configuración de ruff generada por claude-odoo-kit (Odoo 14.0).
+target-version = "py37"
+line-length = 88
+
+[lint]
+select = ["E", "F", "W", "I", "B", "C90", "UP"]
+ignore = ["E501"]
+
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"__manifest__.py" = ["B018"]
+
+[lint.isort]
+section-order = ["future", "standard-library", "third-party", "odoo", "odoo-addons", "first-party", "local-folder"]
+
+[lint.isort.sections]
+"odoo" = ["odoo"]
+"odoo-addons" = ["odoo.addons"]
+
+[lint.mccabe]
+max-complexity = 16
