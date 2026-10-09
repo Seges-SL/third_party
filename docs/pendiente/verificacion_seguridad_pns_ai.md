@@ -280,6 +280,21 @@ admin):
 - **Conclusión: CONFIRMADO (lo esperado).** Los scripts de `migrations/` **no** se
   ejecutan en la actualización (coherente con [MAPA] §10.3). → **F18**; decisión **D2**.
 
+**Corrección (2026-10-09).** La prueba anterior **no es concluyente**. En `lab_pns_ai_14`
+`pns_ai_mcp` se instaló y se actualizó con la misma versión (3.1.486). En ese caso el
+cargador de Odoo no ejecuta ningún script de migración, tengan el formato de versión que
+tengan, así que la ausencia de `"Running migration"` en el log no prueba nada sobre F18.
+
+- **Conclusión (corregida): NO CONCLUYENTE** como prueba de ejecución. El hallazgo se
+  mantiene por el código.
+- **Evidencia:** verificado en código (`migration.py`). En el core de Odoo 14,
+  `odoo/modules/migration.py:108-111` (`convert_version` devuelve tal cual las versiones con
+  dos o más puntos, como `3.1.484`) y `:161` (compara `14.0.3.1.483 < 3.1.484`, que es falso).
+- **Para reproducirlo:** instalar una versión anterior de `pns_ai_mcp` (por ejemplo 3.1.483,
+  con una carpeta `migrations/3.1.484` pendiente), actualizar a 3.1.486 y buscar
+  `"Running migration"` en el log. Requiere una copia del módulo en esa versión anterior.
+- Cambio aplicado en el informe para el fabricante: §7.2 pasa a "Verificado en código".
+
 ### 7. Cron de purga de caché de `api_call` (F20)
 
 - **Qué se hizo:** cron `pns_ai_mcp.ir_cron_ai_api_result_cache_gc`

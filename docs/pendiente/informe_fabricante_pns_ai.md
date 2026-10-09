@@ -7,7 +7,7 @@
 | **Destinatario** | PATANEGRA Soft |
 | **Módulos** | `pns_base` 1.2.10 · `pns_ai_mcp` 3.1.486 ("AI Engine") · `pns_ai_chatboo` 2.1.322 ("Chatboo") |
 | **Plataforma** | Odoo 14.0 |
-| **Fecha** | 2026-10-08 (ampliado con `pns_ai_chatboo` y con una segunda ronda de reproducción el 2026-10-09) |
+| **Fecha** | 2026-10-08 (ampliado con `pns_ai_chatboo` y con una segunda ronda de reproducción el 2026-10-09; revisión de exactitud el 2026-10-09) |
 | **Entorno de análisis** | Odoo 14.0 oficial, Python 3.7, base de datos de pruebas con datos de demostración. Sin claves de proveedores de IA ni llamadas a servicios externos. |
 | **Método** | `pns_base` y `pns_ai_mcp`: revisión estática completa del código y reproducción controlada (pruebas A-D) de los hallazgos más graves mediante JSON-RPC. `pns_ai_chatboo`: revisión estática completa del código propio. Segunda ronda de reproducción (2026-10-09), con el mismo método, sobre ambos módulos: instalación de `pns_ai_chatboo`, aislamiento de sesiones, lecturas de un interno sin grupos de IA, métodos de `ai.system.action`/`ai.skill` con portal, migraciones, cron, tests y arranque con `hr`. |
 
@@ -16,23 +16,23 @@
 ## 1. Resumen ejecutivo
 
 1. Hemos revisado `pns_base`, `pns_ai_mcp` y `pns_ai_chatboo` con vistas a su uso en Odoo 14.0. Agradecemos el trabajo de los módulos; este informe busca ayudar a corregir lo encontrado antes de usarlos con usuarios reales.
-2. Se han reproducido cuatro problemas de control de acceso de `pns_ai_mcp` (pruebas A-D) en una base de datos de pruebas. Una segunda ronda ha reproducido además PNS-08, PNS-14 y PNS-55 (este último de `pns_ai_chatboo`), ha extendido al usuario de portal PNS-02 y PNS-11, y ha confirmado §7.2 (migraciones) y §7.4 (cron). PNS-69 no se reproduce en Odoo 14 con `hr` y se rebaja a Baja. El resto de hallazgos de `pns_ai_chatboo` procede de la revisión del código.
+2. Se han reproducido cuatro problemas de control de acceso de `pns_ai_mcp` (pruebas A-D) en una base de datos de pruebas. Una segunda ronda ha reproducido además PNS-08, PNS-14 y PNS-55 (este último de `pns_ai_chatboo`), ha extendido al usuario de portal PNS-02 y PNS-11, y ha confirmado §7.4 (cron). §7.2 (migraciones) queda verificado en el código del cargador de Odoo, sin reproducción en ejecución. PNS-69 no se reproduce en Odoo 14 con `hr` y se rebaja a Baja. El resto de hallazgos de `pns_ai_chatboo` procede de la revisión del código.
 3. **A:** cualquier usuario autenticado, **incluido un usuario de portal**, se añade `base.group_system` con una sola llamada a `ai.system.action.apply_user_add_group`.
 4. **B y C:** el mismo usuario sin permisos invoca `ai.system.action.preview_module_update` y `ai.skill.unlink_named_factory_skills`; la causa es la misma que en A. En la segunda ronda, un **usuario de portal** también invoca `preview_user_add_group`, `preview_module_update` y `unlink_named_factory_skills` (PNS-02, PNS-11).
 5. **D:** el propietario de una `ai.safe.operation` puede cambiar por `write` su `status` a `confirmed` y su `user_id`, saltándose la supervisión humana.
-6. La causa común de A-C son métodos públicos `@api.model` que trabajan con `sudo()` sin comprobar permisos: en un `AbstractModel` (o sin operación ORM sobre el propio modelo) el ACL no se evalúa al invocarlos por `call_kw`.
+6. La causa común de A-C son métodos públicos `@api.model` que trabajan con `sudo()` sin comprobar permisos: `call_kw` no comprueba el ACL del modelo; solo lo hacen los métodos ORM, y estos métodos usan `sudo()`. Por eso da igual que el modelo sea un `AbstractModel` o uno normal (PNS-11 lo muestra sobre `ai.skill`).
 7. La revisión del código señala otros tres críticos en `pns_ai_mcp` que siguen el mismo patrón (métodos públicos que aceptan el uid ejecutor, ejecución en `sudo` disparada por el LLM y código de skills ejecutado al guardar sin solo lectura).
-8. Entre los altos de `pns_ai_mcp` destacan: credenciales de servidores externos legibles por cualquier interno (reproducido: un interno sin grupos de IA lee `auth_token`, `env_vars` y `config_json`, ambas cachés y las `ai.safe.choice` de otro usuario; PNS-08, PNS-14), ausencia de saneado HTML (XSS), `fetch_url` sin protección SSRF y envío de datos al LLM sin controles de alcance.
-9. En `pns_ai_chatboo`, las sesiones del chat no tienen reglas de registro: cualquier interno puede leer, modificar y borrar conversaciones ajenas (reproducido en la segunda ronda; un usuario de portal no accede) y dejar en ellas HTML que se ejecuta al abrirlas la víctima (PNS-53, PNS-55). Además, el cliente web inserta el HTML del asistente sin sanear (PNS-60) y cualquier XSS en el chat puede confirmar y ejecutar operaciones de la Caja B sin el usuario (PNS-54) o sacar datos sin clic mediante imágenes externas (PNS-59).
-10. En Odoo 14 `pns_ai_mcp` no se instala con las dependencias declaradas sin añadir librerías que no usa; sus scripts de `migrations/` no se ejecutan por el formato de versión (reproducido al actualizar; probablemente lo mismo ocurre en `pns_ai_chatboo`), y el cron de purga de la caché de `api_call` se desactiva tras su primera ejecución (reproducido). La batería de tests de `pns_ai_mcp` da fallos, parte de ellos por depender de módulos o datos que no siempre existen (§6.1).
-11. Total: **9 críticos, 26 altos, 24 medios y 19 bajos** (78 hallazgos; 25 de ellos de `pns_ai_chatboo`). Recomendamos priorizar PNS-01 a PNS-07 y PNS-53 a PNS-55, y confirmar la corrección con las pruebas del §3.
+8. Entre los altos de `pns_ai_mcp` destacan: credenciales de servidores externos legibles por cualquier interno (reproducido: un interno sin grupos de IA lee `auth_token`, `env_vars` y `config_json`, tiene acceso de lectura a ambas cachés y lee las `ai.safe.choice` de otro usuario; PNS-08, PNS-14), ausencia de saneado HTML (XSS), `fetch_url` sin protección SSRF y envío de datos al LLM sin controles de alcance.
+9. En `pns_ai_chatboo`, las sesiones del chat no tienen reglas de registro: cualquier interno puede leer, modificar y borrar conversaciones ajenas (reproducido en la segunda ronda; un usuario de portal no accede a estos modelos por el ORM) y dejar en ellas HTML que se ejecuta al abrirlas la víctima (PNS-53, PNS-55). Por el mismo mecanismo de PNS-01, es probable que cualquier usuario autenticado, incluido uno de portal, pueda leer el progreso y la respuesta de turnos ajenos con `read_progress` (PNS-80; requiere prueba). Además, el cliente web inserta el HTML del asistente sin sanear (PNS-60) y cualquier XSS en el chat puede confirmar y ejecutar operaciones de la Caja B sin el usuario (PNS-54) o sacar datos sin clic mediante imágenes externas (PNS-59).
+10. En Odoo 14 `pns_ai_mcp` no se instala con las dependencias declaradas sin añadir librerías que no usa; sus scripts de `migrations/` no se ejecutan por el formato de versión (verificado en el código del cargador de migraciones de Odoo; probablemente lo mismo ocurre en `pns_ai_chatboo`), y el cron de purga de la caché de `api_call` se desactiva tras su primera ejecución (reproducido). La batería de tests de `pns_ai_mcp` da fallos, parte de ellos por depender de módulos o datos que no siempre existen (§6.1).
+11. Total: **9 críticos, 26 altos, 25 medios y 20 bajos** (80 hallazgos; 26 de ellos de `pns_ai_chatboo`). Tras la revisión de exactitud, PNS-22 pasa de Alta a Media y se añaden PNS-79 (Baja) y PNS-80 (Alta). Recomendamos priorizar PNS-01 a PNS-07, PNS-53 a PNS-55 y PNS-80, y confirmar la corrección con las pruebas del §3.
 
 ### 1.1 Tabla de hallazgos
 
 Estado: **Reproducido** (comprobado ejecutando en el entorno de pruebas) · **Verificado en código**
 (comportamiento leído en el código, sin ejecutar) · **Inferido del código** (deducción razonada
 que conviene confirmar) · **No reproducido** (se intentó en el entorno de pruebas y no se produjo).
-Los problemas de compatibilidad de §7 no llevan número; §7.2 y §7.4 están reproducidos.
+Los problemas de compatibilidad de §7 no llevan número; §7.4 está reproducido y §7.2, verificado en código.
 
 | ID | Gravedad | Estado | Módulo | Título |
 |---|---|---|---|---|
@@ -57,7 +57,7 @@ Los problemas de compatibilidad de §7 no llevan número; §7.2 y §7.4 están r
 | PNS-19 | Alta | Inferido del código | pns_ai_mcp | Secretos accesibles desde el sandbox mediante `sudo()` |
 | PNS-20 | Alta | Verificado en código | pns_ai_mcp, pns_base | Copias de configuración con secretos e importación que sobrescribe |
 | PNS-21 | Alta | Verificado en código | pns_ai_mcp | Exportaciones del chat descargables sin sesión; URL con token hacia el LLM |
-| PNS-22 | Alta | Verificado en código | pns_ai_mcp | La puerta `group_ai_writer` de `tools/call` no se aplica |
+| PNS-22 | Media (antes Alta) | Verificado en código | pns_ai_mcp | `is_write` no se aplica de forma centralizada; falta la puerta `group_ai_writer` en el `DummyController` del motor |
 | PNS-23 | Alta | Verificado en código | pns_ai_mcp | Skills activadas sin revisión (captura desde el chat, importación ZIP) |
 | PNS-24 | Alta | Verificado en código | pns_ai_mcp | `module.update`: `sudo`, commit y lista de vetos insuficiente |
 | PNS-25 | Alta | Inferido del código | pns_ai_mcp | Failover tras ejecutar herramientas: posible doble ejecución |
@@ -114,6 +114,8 @@ Los problemas de compatibilidad de §7 no llevan número; §7.2 y §7.4 están r
 | PNS-76 | Baja | Inferido del código | pns_ai_chatboo | Receta del agente distinta en bases actualizadas y nuevas; menú tras generar la clave |
 | PNS-77 | Baja | Verificado en código | pns_ai_chatboo | Sin tests |
 | PNS-78 | Baja | Reproducido | pns_ai_mcp | Dos pares de campos de `ai.agent` con la misma etiqueta (aviso al instalar) |
+| PNS-79 | Baja | Inferido del código; requiere prueba | pns_ai_mcp | `/mcp/message` usa `SUPERUSER_ID` si la sesión no tiene usuario |
+| PNS-80 | Alta | Inferido del código; requiere prueba | pns_ai_chatboo | `read_progress` devuelve el progreso y la respuesta de cualquier turno a cualquier usuario autenticado |
 
 ---
 
@@ -145,12 +147,15 @@ POST /web/session/authenticate
 - **Ubicación:** `pns_ai_mcp/models/ai_system_action.py:117-118` (`AbstractModel`),
   `:716` (`apply_user_add_group`, `@api.model`), `:672-680` (`_resolve_user`, `sudo`),
   `:682-696` (`_resolve_group`, `sudo`); `pns_base/utils/compat.py:113-116` (`user_add_group`);
-  `pns_ai_mcp/security/ir.model.access.csv:67` (ACL solo `group_ai_admin`).
+  `pns_ai_mcp/security/ir.model.access.csv:67` (ACL solo `group_ai_admin`). En el core de Odoo
+  14: `addons/web/controllers/main.py:1360-1362` y `odoo/api.py:395-409` (`call_kw`, que invoca
+  el método sin comprobar el ACL).
 
-**Descripción.** `apply_user_add_group` es un método público `@api.model` de un `AbstractModel`.
-Resuelve usuario y grupo con `sudo()` y escribe `groups_id` sobre el registro `sudo` sin
-comprobar quién llama. El ACL de `ai.system.action` (línea 67) no se evalúa porque el método no
-realiza ninguna operación ORM sobre su propio modelo.
+**Descripción.** `apply_user_add_group` es un método público `@api.model`. Resuelve usuario y
+grupo con `sudo()` y escribe `groups_id` sobre el registro `sudo` sin comprobar quién llama. El
+ACL de `ai.system.action` (línea 67) no lo protege: `call_kw` no comprueba el ACL del modelo;
+solo lo hacen los métodos ORM, y estos métodos usan `sudo()`. Que el modelo sea un
+`AbstractModel` no es la causa: PNS-11 muestra el mismo fallo en un modelo normal.
 
 **Reproducción.**
 
@@ -180,7 +185,7 @@ incluidos usuarios externos de portal. Ninguna configuración de grupos lo evita
 inicio y antes de cualquier `sudo()`, que el usuario real de la petición es administrador de Odoo
 (`base.group_system`) y AI Administrator, o bien no ser invocables por RPC (métodos privados con
 `_`, llamados solo desde el flujo supervisado tras su propia verificación). Conviene no confiar
-en el ACL de un `AbstractModel` como control de acceso. Un test negativo con un usuario interno
+en el ACL del modelo como control de acceso de un método público que trabaja con `sudo()`. Un test negativo con un usuario interno
 y otro de portal evitaría regresiones.
 
 ### PNS-02 — Resto de métodos `apply_*` de `ai.system.action` sin control de permisos
@@ -246,8 +251,9 @@ POST /web/dataset/call_kw   (sesión de INTERNO, uid=8)
 registro ya no le deja verlo): el problema no es el acceso a operaciones ajenas, sino que el dueño
 manipula el estado de supervisión de la suya.
 
-**Impacto.** Se salta la confirmación humana. Encadenado con PNS-04 o PNS-05, el plan
-auto-confirmado se ejecuta con otro usuario o como superusuario.
+**Impacto.** Se salta la confirmación humana. Encadenado con PNS-04, el plan auto-confirmado se
+ejecuta con el uid de otro usuario; encadenado con PNS-05, un usuario con los grupos que exige el
+plan lo ejecuta con `su=True`, sin ACL ni reglas.
 
 **Recomendación.** Impedir la escritura directa de los campos de control (`status`, `user_id`,
 `operation_data`, `executed`, `result_info`, `expires_at`, `confirmed_by`) salvo desde los
@@ -265,12 +271,14 @@ operando siempre a través de métodos que validen la transición de estado.
 
 **Descripción.** Los cuatro métodos son públicos, aceptan `confirmed_uid` y no comprueban ni la
 propiedad de la operación ni que ese uid sea el usuario de la sesión. El plan se ejecuta en un
-entorno con ese uid; con `confirmed_uid=1` Odoo 14 activa el modo superusuario. Las comprobaciones
-de permisos del plan se evalúan sobre el uid elegido.
+entorno con ese uid, y las comprobaciones de permisos del plan se evalúan sobre el uid elegido.
 
 **Impacto.** Un interno con una operación propia puede, combinando PNS-03 (escribir el plan y
-`status`) y `resolve_execute(confirmed_uid=1)`, ejecutar como superusuario un plan arbitrario
-(por ejemplo `user.add_group` con `base.group_system`).
+`status`) y `resolve_execute` con el uid de un usuario que tenga los grupos de IA del plan (por
+ejemplo, un administrador de Odoo que sea AI Administrator), ejecutar un plan arbitrario con los
+permisos de ese usuario (por ejemplo `user.add_group` con `base.group_system`). El caso con uid 1
+requiere prueba: Odoo 14 activa el modo superusuario para ese uid, pero las comprobaciones de
+grupos del plan consultan los grupos del propio uid, y si no tiene los de IA el plan se rechazaría.
 
 **Recomendación.** Que estos métodos no acepten el uid como parámetro desde RPC: deberían usar
 siempre `self.env.uid` de la petición y verificar que es el dueño (o un AI Administrator cuando el
@@ -289,8 +297,8 @@ superusuario, sin limitarla al usuario actual, y si está `confirmed` y sin ejec
 ese mismo entorno `sudo`: las escrituras del plan ignoran ACL y reglas. Los `verification_id` son
 secuenciales y predecibles.
 
-**Impacto.** Con PNS-03, cualquier usuario con acceso al chat ejecuta CRUD como superusuario
-pidiendo al LLM que consulte el estado. Además puede leer el `result_info` de operaciones ajenas y
+**Impacto.** Con PNS-03, un usuario con los grupos que exige el plan (AI Writer para CRUD) lo
+ejecuta con `su=True`, sin ACL ni reglas, pidiendo al LLM que consulte el estado. Además puede leer el `result_info` de operaciones ajenas y
 disparar su ejecución.
 
 **Recomendación.** Buscar con el entorno del usuario (o filtrar por `user_id = env.uid`) y no
@@ -599,18 +607,6 @@ y esa URL puede salir hacia el proveedor LLM.
 **Recomendación.** Servir las descargas con `auth='user'` y comprobación de dueño, no incluir la URL
 con token en el contexto del LLM y caducar o purgar los adjuntos.
 
-### PNS-22 — La puerta `group_ai_writer` de `tools/call` no se aplica
-
-- **Estado:** Verificado en código · **Módulo:** pns_ai_mcp
-- **Ubicación:** `pns_ai_mcp/controllers/main.py:1322-1393, 1403-1412` (la comprobación solo cubre
-  dos nombres no registrados; `is_write` no dispara nada); `pns_ai_mcp/utils/agent_engine.py:3381-3441`
-  (`DummyController` del motor sin la puerta).
-
-**Impacto.** `clean_system` (que borra) se puede ejecutar sin ser AI Writer.
-
-**Recomendación.** Comprobar `group_ai_writer` en `tools/call` y en el `DummyController` para toda
-herramienta con `is_write=True`.
-
 ### PNS-23 — Skills activadas sin revisión
 
 - **Estado:** Verificado en código · **Módulo:** pns_ai_mcp
@@ -654,8 +650,8 @@ turno con los resultados ya obtenidos.
 - **Estado:** Verificado en código · **Módulo:** pns_ai_mcp
 - **Ubicación:** `pns_ai_mcp/controllers/main.py:1436-1449` (toda excepción de herramienta se
   convierte en un resultado y la petición termina con commit); `pns_ai_mcp/models/mcp_safe_operation.py:1171,
-  1337` (commits sobre el cursor del llamador); cursores auxiliares con commit en proveedores, logs y
-  diario.
+  1380, 1684` (commits sobre el cursor del llamador; el de `:1171` es sobre un cursor propio,
+  abierto en `:1134`, ver PNS-07); cursores auxiliares con commit en proveedores, logs y diario.
 
 **Impacto.** Efectos parciales de una herramienta que falla quedan guardados.
 
@@ -676,6 +672,23 @@ turno con los resultados ya obtenidos.
 ---
 
 ## 5. Hallazgos de gravedad media (defectos de código)
+
+### PNS-22 — `is_write` no se aplica de forma centralizada; falta la puerta en el `DummyController` (antes Alta)
+- **Estado:** Verificado en código.
+- **Ubicación:** `pns_ai_mcp/controllers/main.py:1322-1393, 1403-1412` (la comprobación de
+  `tools/call` solo cubre dos nombres no registrados; `is_write` no dispara nada);
+  `pns_ai_mcp/controllers/tools_system.py:51` (`clean_system` pide el entorno de escritura, que
+  exige AI Writer); `pns_ai_mcp/utils/agent_engine.py:3381-3386` (`DummyController` del motor,
+  cuyo `_get_env_for_operation` devuelve el entorno sin comprobar el grupo).
+- **Descripción e impacto:** por MCP, `clean_system` sí exige AI Writer, porque la propia
+  herramienta pide el entorno de escritura. La puerta falta solo cuando la herramienta se ejecuta
+  desde el motor (`DummyController`). Aun así, el borrado usa el entorno del usuario y Odoo solo
+  deja borrar `ir.actions.act_window` a `base.group_system`, así que el efecto queda limitado. Es
+  un problema de defensa en profundidad: la marca `is_write` de las herramientas no se aplica en
+  un punto común, y cada herramienta depende de pedir el entorno correcto.
+- **Recomendación:** comprobar `group_ai_writer` de forma centralizada, en `tools/call` y en el
+  `DummyController`, para toda herramienta con `is_write=True`, y que el `_get_env_for_operation`
+  del `DummyController` aplique la misma comprobación que el del controlador.
 
 ### PNS-28 — CORS `*`, sin validación de `Origin` y registro de peticiones no autenticadas
 - **Ubicación:** `pns_ai_mcp/controllers/main.py:350, 517, 546, 562` (`Access-Control-Allow-Origin: *`),
@@ -788,8 +801,8 @@ turno con los resultados ya obtenidos.
 
 ### PNS-41 — `pns_base`: `website` de todos los módulos reescrito e `index.html` servido sin sanear
 - **Ubicación:** `pns_base/models/ir_module_module.py:75-105` (`_pns_localize_websites` en cada
-  arranque y en `update_list`); `pns_base/views/ir_module_views.xml:8-14` (iframe con la
-  descripción).
+  arranque y en `update_list`); `pns_base/views/ir_module_views.xml:8-14` (campo que muestra la
+  descripción); `pns_base/static/src/js/pns_module_index.js:17-19` (creación del iframe).
 - **Descripción e impacto:** afecta a todos los módulos con `index.html` (core, OCA y propios). El
   iframe sirve el HTML en el mismo origen y con la sesión del administrador, sin el saneado que
   aplica el core: un `index.html` con JavaScript se ejecutaría con sus privilegios.
@@ -811,7 +824,7 @@ turno con los resultados ya obtenidos.
 | ID | Ubicación | Descripción | Recomendación |
 |---|---|---|---|
 | PNS-43 | `pns_base/models/ir_translation.py:39-51` | Al cargar un idioma con sobrescritura, descarta en silencio (solo WARNING) filas duplicadas de cualquier módulo. | Limitarlo a módulos PNS o informar al usuario. |
-| PNS-44 | `pns_base/models/ir_module_module.py:75-85, 81, 90` | Escribe en `ir.module.module` durante `_register_hook`; si falla a nivel PostgreSQL la transacción queda abortada (excepción capturada). `get_module_path(display_warning=True)` avisa en cada arranque por módulos sin código. | Hacerlo en `update_list` solo, con savepoint, y sin avisos. |
+| PNS-44 | `pns_base/models/ir_module_module.py:75-85, 81` (escritura), `:41-44, 93` (aviso, a través de `get_module_path` del core, `odoo/modules/module.py:220`) | Escribe en `ir.module.module` durante `_register_hook`; si falla a nivel PostgreSQL la transacción queda abortada (excepción capturada). `get_module_resource` llama a `get_module_path` con `display_warning=True`, que avisa en cada arranque por módulos sin código. | Hacerlo en `update_list` solo, con savepoint, y sin avisos. |
 | PNS-45 | `pns_ai_mcp/controllers/__init__.py:13-22` | `try/except ImportError: pass` al importar las herramientas: si una falla, sus herramientas MCP desaparecen sin error. | Registrar el error en el log. |
 | PNS-46 | Composición del prompt (`ai.agent`) | Inferido: el glosario `es_ES` probablemente no llega a la parte fija del prompt tras normalizar; una caché por agente e idioma que se recompila a menudo. | Revisar la normalización del idioma. |
 | PNS-47 | Fuentes FX (`check_health`) | Sin salida a Internet, cada `check_health` espera los timeouts de las dos fuentes (hasta 8 s); el error no se cachea. | Cachear el fallo durante un tiempo. |
@@ -821,6 +834,7 @@ turno con los resultados ya obtenidos.
 | PNS-51 | `pns_ai_mcp/controllers/validators.py:92` | El módulo `platform` está permitido en el sandbox: datos del SO accesibles al código del LLM. | Quitarlo de la lista permitida. |
 | PNS-52 | `pns_base/utils/settings_io.py:113-114, 188-198`; `pns_base/utils/portable_io.py:157-158` | `field_default` llama a `default(None)`: un default `lambda self: self.env…` lanzaría `AttributeError` (no capturado en `read_settings_icp`); las selecciones definidas por método no se validan. | Llamar al default con un recordset vacío y validar selecciones dinámicas. |
 | PNS-78 | `pns_ai_mcp/models/ai_agent.py:138-176` | Reproducido: al instalar, Odoo avisa de que dos pares de campos de `ai.agent` tienen la misma etiqueta: `context_ids_shown` / `context_ids` ("Contexts") y `skill_ids_shown` / `skill_ids` ("Skills"). Cosmético, pero confunde en filtros, agrupaciones y exportaciones. | Dar etiquetas distintas a los campos calculados (por ejemplo "Contexts (shown)"). |
+| PNS-79 | `pns_ai_mcp/controllers/main.py:662` (relacionado con PNS-13) | Inferido del código; requiere prueba. Si la sesión MCP no tiene usuario asociado, la petición a `/mcp/message` se ejecuta como `SUPERUSER_ID`. Las dos rutas que crean sesiones (`:531` y `:988`) guardan hoy un usuario ya validado, por lo que no hemos encontrado un camino que llegue a ese valor por defecto; pero, si se diera, se sumaría a PNS-13 (la clave no se revalida) y la petición se ejecutaría sin ninguna restricción. Es un valor por defecto inseguro, no un fallo explotable demostrado. | Rechazar la petición cuando la sesión no tenga usuario, en lugar de usar el superusuario, y revalidar la clave y el usuario en cada mensaje (PNS-13). |
 
 ### 6.1 Resultado de la ejecución de los tests de `pns_ai_mcp` (relacionado con PNS-50)
 
@@ -866,8 +880,10 @@ la serie a versiones con menos de dos puntos, así que trata `3.1.484` como vers
 migración se ejecuta en 14** (incluida la migración de claves en claro) y las actualizaciones futuras
 que dependan de una migración no se aplicarán.
 
-**Estado: Reproducido.** Al actualizar `pns_ai_mcp` en el entorno de pruebas, el registro de Odoo no
-muestra la ejecución de ningún script de migración.
+**Estado: Verificado en código** (`odoo/modules/migration.py:108-111`, `convert_version`, y `:161`,
+la comparación). Para comprobarlo en ejecución habría que instalar una versión anterior del módulo
+(por ejemplo 3.1.483) y actualizar a 3.1.486: con la misma versión instalada y actualizada no se
+ejecuta ningún script, tengan el formato que tengan.
 
 **Recomendación:** publicar para 14 con versión `14.0.x.y.z` y carpetas de migración con ese mismo
 formato (o con la versión completa `14.0.3.1.x`).
@@ -916,7 +932,8 @@ toma los crons con `numbercall != 0`. Una vez corregido el XML, como el archivo 
 (agente `pns_ai_chatboo`) en un hilo con cursor propio, y el cliente web recibe la respuesta por
 SSE. Se ha revisado entero el código propio del módulo (Python, XML, JS y CSS); de las librerías
 de terceros solo se han leído cabecera y versión. En la segunda ronda se ha reproducido PNS-55
-(para `chatboo.session`) y se ha comprobado que PNS-69 no se produce con `hr`; para el resto, el
+(para `chatboo.session`) y se ha comprobado que PNS-69 no se produce con `hr`; PNS-80 se ha
+añadido tras la revisión de exactitud y requiere prueba; para el resto, el
 estado indica si el comportamiento se ha leído en el código o se deduce de él. La instalación de
 `pns_ai_chatboo` es limpia salvo el aviso de PNS-78.
 Rutas relativas a `pns_ai_chatboo/` salvo que se indique otro módulo; los archivos JS están en
@@ -952,7 +969,8 @@ operaciones supervisadas).
 - **Ubicación:** `chatboo_component_v2.js:2149-2169` (espera de 5 s solo en el botón y solo para
   `danger_level == 'high'`), `:2181-2234` (llamadas a confirmar y ejecutar);
   `pns_ai_mcp/controllers/verification_ui.py:16-64` (rutas `auth='user'`, sin comprobación de
-  tiempo en `:39-54`; un administrador MCP actúa sobre operaciones ajenas en `:29-31`).
+  tiempo en `:39-54`; un administrador MCP actúa sobre operaciones ajenas en `:29-31`) y `:108-109`
+  (ruta `/pns_ai_mcp/verification/pending`).
 
 **Descripción.** La única barrera entre una propuesta de escritura y su ejecución es la tarjeta
 del navegador. Las rutas `/pns_ai_mcp/verification/pending`, `/confirm` y `/execute` solo exigen
@@ -973,8 +991,8 @@ o reautenticación para riesgo alto) y aplicar en servidor la espera para operac
 
 - **Estado:** Reproducido para `chatboo.session` (segunda ronda: un interno sin grupos de IA lee,
   modifica y borra por RPC la sesión de otro; un usuario de portal recibe `AccessError`);
-  `chatboo.async.request`, adjuntos y `read_progress`, verificados en código · **Módulo:**
-  pns_ai_chatboo
+  `chatboo.async.request`, adjuntos y `read_progress`, verificados en código (sobre el alcance de
+  `read_progress`, que probablemente incluye al portal, ver PNS-80) · **Módulo:** pns_ai_chatboo
 - **Ubicación:** `security/ir.model.access.csv:2-3` (sin `ir.rule` en el módulo);
   `models/chatboo_session.py:458, 467` (método público que busca adjuntos y crea tokens con
   `sudo` sin comprobar dueño), `:1003-1033` (`unlink` que borra en `sudo` jobs y adjuntos);
@@ -1010,10 +1028,11 @@ reinyectarlos como instrucciones).
 
 - **Estado:** Inferido del código · **Módulo:** pns_ai_chatboo
 - **Ubicación:** `models/chatboo_async_request.py:230-253` (`spawn()` público que ejecuta el motor
-  con el `uid` del registro); ACL de creación en `security/ir.model.access.csv:3`.
+  con el uid de quien lo invoca, `:232, 252`); ACL de creación en `security/ir.model.access.csv:3`.
 
 **Descripción.** Un interno puede crear un `chatboo.async.request` con `session_id` y `user_id`
-ajenos (campos editables) y llamar a `spawn()`. El turno consume proveedor sin pasar por la
+ajenos (campos editables) y llamar a `spawn()`. El motor se ejecuta con el uid de quien lo
+invoca, no con el `user_id` del registro, pero el resultado se guarda en la sesión indicada. El turno consume proveedor sin pasar por la
 comprobación de la clave y `_save_to_session` lo escribe en la sesión de la víctima.
 
 **Impacto.** Coste no autorizado y contenido arbitrario en conversaciones de otros.
@@ -1069,7 +1088,7 @@ plataforma) al sanear, y documentar una CSP `img-src` recomendada para `/web`.
     del servidor, y lo vuelve a convertir en HTML).
   - `pns_ai_mcp/controllers/safe_plan.py:790-861` (`user_ack_message` con `title` y `name` sin
     escapar) pintado por `chatboo_component_v2.js:2592-2631`.
-  - `chatboo_formatters.js:100-104` (`_escapeHtml` no escapa comillas) usado en atributos en
+  - `chatboo_formatters.js:100-104` (`escapeHtml` no escapa comillas) usado en atributos en
     `chatboo_component_v2.js:3310, 5171`; `modelLabel` sin escapar en `:5074, 5202`; mensajes de
     error concatenados en `:1559, 1569, 1974, 2770, 3006, 3128`.
   - `chatboo_charts.js:2167, 2210, 2261-2262` (nombre de serie y clave de columna en la tabla de
@@ -1094,6 +1113,28 @@ DOM (lista blanca de etiquetas y atributos, sin manejadores de eventos, esquemas
 `enhanceHtmlProse`; escapar comillas en valores de atributo y escapar `title`, `name`, etiquetas de
 modelo, mensajes de error, nombres de serie y claves de columna; sustituir Showdown por un
 convertidor mantenido.
+
+### PNS-80 — `read_progress` devuelve el progreso y la respuesta de cualquier turno a cualquier usuario autenticado
+
+- **Estado:** Inferido del código; requiere prueba · **Módulo:** pns_ai_chatboo
+- **Ubicación:** `models/chatboo_async_request.py:1603-1626` (`read_progress`, `@api.model`, lee
+  por SQL en un cursor propio la fila del id recibido, sin filtrar por usuario).
+
+**Descripción.** `read_progress` es un método público que recibe el id de un job y devuelve su
+estado, el texto parcial, los eventos, los metadatos finales, la respuesta y el error. No hace
+ninguna operación ORM sobre el modelo ni comprueba quién llama, y lee la fila directamente por
+SQL. Por el mismo mecanismo de PNS-01 (`call_kw` no comprueba el ACL del modelo), es probable que
+lo pueda invocar cualquier usuario autenticado, incluido un usuario de portal, aunque ese usuario
+no tenga acceso a `chatboo.async.request` por el ORM. Esto matizaría lo dicho en PNS-55 sobre el
+portal. Los ids son secuenciales.
+
+**Impacto.** Lectura de respuestas del asistente de otros usuarios, que pueden contener datos de
+negocio obtenidos con los permisos de la víctima, también por usuarios externos de portal.
+
+**Recomendación.** Leer el job con el entorno del usuario o comprobar en el método que el job
+pertenece a quien llama antes de devolver nada, y no hacer la lectura por SQL directo cuando el
+dato va a salir hacia el cliente. Un test negativo con un usuario interno ajeno y otro de portal
+evitaría regresiones.
 
 ### 8.3 Hallazgos de gravedad media (defectos de código)
 
@@ -1189,11 +1230,11 @@ convertidor mantenido.
 | PNS-71 | `controllers/chatboo.py:66-148, 609-650, 945-950` | `/chatboo/check_health` devuelve proveedor (host y modelo) y `str(e)` a internos sin clave; `/chatboo/providers` lista con `sudo` todos los proveedores si el agente no tiene cadena; `_json_response` ignora `status` y responde 200 en los errores. | Exigir la clave, no devolver detalles de infraestructura ni excepciones y respetar el código de estado. |
 | PNS-72 | `views/assets.xml:4-34`; `chatboo_systray.js:32` | 7 librerías (3 duplicadas con `pns_ai_mcp` y SheetJS sin uso) en `web.assets_backend` para todos los internos; cada carga del cliente llama a `check_health`. | Cargar las librerías bajo demanda al abrir el chat, sin duplicados, y cachear el estado. |
 | PNS-73 | Bundle JS; `chatboo_systray.js:405` | Inferido: sintaxis ES2022 sin transpilar en un bundle compartido; uso de `setup()` y funciones flecha en `t-on` por verificar con OWL 1; capa con `z-index: 1050` y ocultación del panel de control que puede chocar con diálogos del core. | Transpilar al nivel soportado por Odoo 14 y revisar el apilamiento con los modales. |
-| PNS-74 | `chatboo_component_v2.js:3002, 4988-5007, 5169`; `chatboo_systray.js:130-131` | Código muerto o heredado: `chatboo_floating_transfer_history`, `_saveRawForTemplate`, rama `result.error` que nunca se activa, "#undefined" en el modal de contexto, manejador `o_chatboo_dismiss_btn` con `window.open` sin `noopener`, `mail_service` inexistente en 14, `chatboo_has_access` sin lectura. | Eliminarlo; añadir `noopener` donde se abran ventanas. |
+| PNS-74 | `chatboo_component_v2.js:628, 643, 3002, 4850, 4988-5007, 5169`; `chatboo_systray.js:38-49, 130-131, 190` | Código muerto o heredado: `chatboo_floating_transfer_history`, `_saveRawForTemplate`, rama `result.error` que nunca se activa, "#undefined" en el modal de contexto, manejador `o_chatboo_dismiss_btn` con `window.open` sin `noopener`, `mail_service` inexistente en 14, `chatboo_has_access` sin lectura. | Eliminarlo; añadir `noopener` donde se abran ventanas. |
 | PNS-75 | `chatboo_export.js:704-706, 2786-2796` | Inferido: la copia en TSV al portapapeles no neutraliza celdas que empiezan por `=`, `+`, `-` o `@`, que se evalúan al pegar en una hoja de cálculo. | Prefijar esas celdas como texto. |
 | PNS-76 | Migraciones 2.1.217 / 2.1.237 frente a `data/ai_agent_data.xml`; `models/ir_ui_menu.py` | Inferido: el agente queda con `acl_security` en `default_context_codes` en bases actualizadas y sin él en instalaciones nuevas; el menú Chatboo puede no aparecer tras generar la clave hasta recargar (caché de `load_menus`). | Igualar la receta en datos y migraciones; invalidar la caché de menús al generar la clave. |
 | PNS-69 | `models/res_users.py:30-36` | **Rebajado de Media a Baja: no reproducido en Odoo 14 con `hr`.** `SELF_READABLE_FIELDS` / `SELF_WRITEABLE_FIELDS` se redefinen como `property`, mientras que en Odoo 14 son listas de clase que otros módulos concatenan a nivel de clase (por ejemplo `hr`). Con `hr` y `pns_ai_chatboo` instalados, Odoo arranca y carga el registro sin errores ni avisos, porque `mail` (del que dependen ambos) vuelve a asignar las listas antes. El `TypeError` solo aparecería con otro orden de carga. | Extender las listas de clase como hace el core (en `__init__` del modelo, como `mail` y `hr`). |
-| PNS-77 | — | El módulo no tiene tests. | Añadir tests, en especial negativos de aislamiento entre usuarios (PNS-53, PNS-55, PNS-57) y de saneado (PNS-60). |
+| PNS-77 | — | El módulo no tiene tests. | Añadir tests, en especial negativos de aislamiento entre usuarios (PNS-53, PNS-55, PNS-57, PNS-80) y de saneado (PNS-60). |
 
 ### 8.5 Compatibilidad con Odoo 14
 

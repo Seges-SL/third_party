@@ -12,11 +12,11 @@ bloques C1-C3 de `pns_ai_chatboo`.
 
 1. `pns_ai_mcp` ("AI Engine", PATANEGRA Soft) es el motor de IA de la familia PNS: conecta Odoo con proveedores de IA, publica Odoo como servidor MCP y deja que la IA consulte datos y proponga cambios que un humano confirma. Necesita `pns_base`, que además cambia el comportamiento de módulos que no son PNS.
 2. `pns_ai_chatboo` 2.1.322 ("Chatboo") es el chat de IA dentro del backend: cada mensaje lo resuelve `pns_ai_mcp`, y lo ve quien tenga clave MCP generada (no tiene grupo propio).
-3. `pns_ai_mcp` se ha probado en un laboratorio local (base de datos de demostración, usuarios de prueba, sin claves de IA). En la fase 2 (2026-10-09) se instaló también Chatboo y se resolvieron F2, F8, F18, F19, F20, F23, F29 y F45 (ver el anexo). El resto de Chatboo solo se ha analizado leyendo el código.
+3. `pns_ai_mcp` se ha probado en un laboratorio local (base de datos de demostración, usuarios de prueba, sin claves de IA). En la fase 2 (2026-10-09) se instaló también Chatboo y se resolvieron F2, F8, F19, F20, F23, F29 y F45 (ver el anexo); la prueba de F18 resultó no concluyente. El resto de Chatboo solo se ha analizado leyendo el código.
 4. **Prueba A:** un usuario interno sin ningún permiso de IA **y un usuario de portal** se convirtieron en administradores de Odoo con una sola llamada.
 5. **Pruebas B y C:** el mismo usuario puede invocar las acciones de sistema (instalar o desinstalar módulos) y el borrado de las skills de fábrica (solo se probaron la vista previa y un nombre inexistente).
 6. **Prueba D:** quien propone una operación supervisada puede confirmársela a sí mismo o pasársela a otro usuario, sin el control humano previsto.
-7. **Fase 2, confirmado:** un usuario de portal también invoca las vistas previas de las acciones de sistema y el borrado de skills (F2); un interno sin grupos de IA lee los tokens de los servidores externos, las cachés y las elecciones de otros (F8); cualquier interno lee, cambia y borra las conversaciones de Chatboo de otro (F29); las migraciones no se ejecutan al actualizar (F18); el cron de purga de la caché de `api_call` deja de ejecutarse tras la primera vez (F20); los tests del módulo fallan, en parte por el entorno (F23). **Descartado:** que Odoo no arranque con `hr` y Chatboo (F45). Chatboo se instala sin errores (F19).
+7. **Fase 2, confirmado:** un usuario de portal también invoca las vistas previas de las acciones de sistema y el borrado de skills (F2); un interno sin grupos de IA lee los tokens de los servidores externos, las cachés y las elecciones de otros (F8); cualquier interno lee, cambia y borra las conversaciones de Chatboo de otro (F29); el cron de purga de la caché de `api_call` deja de ejecutarse tras la primera vez (F20); los tests del módulo fallan, en parte por el entorno (F23). **Descartado:** que Odoo no arranque con `hr` y Chatboo (F45). Chatboo se instala sin errores (F19). **No concluyente:** que las migraciones no se ejecuten al actualizar (F18); se instaló y actualizó con la misma versión, así que la prueba no lo demuestra. Sigue verificado en el código del cargador de Odoo.
 8. Ninguna asignación de grupos lo evita: los fallos están en el código del fabricante y solo él puede corregirlos (los módulos no se modifican).
 9. `pns_ai_mcp`: además, fugas de claves de servicios externos (confirmadas en la fase 2), posible XSS en el chat y envío de datos de negocio al proveedor de IA sin filtros (52 riesgos: 7 críticos, 20 altos).
 10. Chatboo añade 25 riesgos (2 críticos, 6 altos): cualquier interno lee, cambia y borra las conversaciones de otros (confirmado en la fase 2) y puede plantar en ellas código que se ejecuta al abrir el chat la víctima, y cualquier XSS del chat puede confirmar operaciones supervisadas sin el usuario.
@@ -735,7 +735,10 @@ Decisión: ____ / Fecha: ____
 **Contexto:** el código no se modifica; la corrección solo puede venir de PATANEGRA Soft. Hay un
 borrador de informe técnico en [informe_fabricante_pns_ai.md](informe_fabricante_pns_ai.md), ya
 ampliado con los hallazgos de `pns_ai_chatboo` (PNS-53 en adelante) y con los resultados de la
-fase 2 (reproducidos PNS-08, PNS-14, PNS-55, §7.2 y §7.4; PNS-69 rebajado; nuevo PNS-78).
+fase 2 (reproducidos PNS-08, PNS-14, PNS-55 y §7.4; PNS-69 rebajado; nuevo PNS-78). Tras la
+revisión de exactitud del 2026-10-09, §7.2 figura como verificado en código (no reproducido),
+PNS-22 baja de Alta a Media y se añaden PNS-79 (Baja) y PNS-80 (Alta), ambos pendientes de
+prueba. Totales: 9 críticos, 26 altos, 25 medios y 20 bajos (80 hallazgos).
 
 **Opciones:**
 1. **Solo los fallos confirmados A-D y los críticos.** — *Impacto:* corrección más rápida de lo
@@ -984,7 +987,7 @@ y de F29-F51 en el §6.1 del [consolidado de Chatboo](../specs/analisis_pns_ai_c
 | F15 | XSS en chat, celdas base64 y `author_html` | 15 | Laboratorio |
 | F16 | Inyección de fórmulas en Excel | 39 | Laboratorio |
 | F17 | Fallo en Python 3.7 con parámetro de fecha | 36 | Laboratorio |
-| F18 | Las migraciones no se ejecutan al actualizar | 29 | **Resuelta (fase 2): CONFIRMADO.** Ningún "Running migration" en el log al actualizar `pns_ai_mcp`. |
+| F18 | Las migraciones no se ejecutan al actualizar | 29 | **Fase 2: NO CONCLUYENTE** (corrige un primer "CONFIRMADO"). No hubo ningún "Running migration" en el log, pero se instaló y actualizó con la misma versión (3.1.486), y así no se ejecuta ningún script. Evidencia: verificado en código (`migration.py`). Para reproducirlo: instalar una versión anterior (por ejemplo 3.1.483) y actualizar a 3.1.486. Laboratorio |
 | F19 | Instalación limpia: hook, vistas, contextos, caché en español | 34, 47 | **Resuelta (fase 2): CONFIRMADO, instalación limpia** de Chatboo (0 bloqueantes; 3 contextos y 11 skills). Dos etiquetas duplicadas en `ai.agent` (PNS-78 del informe). |
 | F20 | Cron de caché inactivo tras su primera ejecución | 45 | **Resuelta (fase 2): CONFIRMADO** (corrige un primer "no se reproduce"). Una sola ejecución del programador; queda con `numbercall=0` y `nextcall` congelado. |
 | F21 | Usuario solo AI Administrator en Settings; grupos en la ficha | 49 | Laboratorio |
