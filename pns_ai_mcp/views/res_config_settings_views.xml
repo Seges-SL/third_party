@@ -44,6 +44,34 @@
                         Each module owns a card below (product preferences + Agent Protocol).
                         Use Configuration for providers, contexts and skills.
                     </div>
+                    <div class="row mt16 o_settings_container" name="mcp_internal_agents">
+                        <div class="col-12 col-lg-6 o_setting_box" id="mcp_agent_pns_ai_admin">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">AI Admin</div>
+                                <div class="text-muted">
+                                    Module pns_ai_mcp · inference · code pns_ai_admin · OpenAPI from docs, detection, skill authoring.
+                                </div>
+                                <div class="mt8">
+                                    <button name="action_open_module_agent" type="object"
+                                            string="Configuration" class="btn-link" icon="fa-external-link"
+                                            context="{'agent_code': 'pns_ai_admin'}"/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box" id="mcp_agent_pns_ai_decision">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">Decision</div>
+                                <div class="text-muted">
+                                    Module pns_ai_mcp · inference · code pns_ai_decision · closed Choice when a doubt needs a yes or a no. Providers with the Decision tick, in chain order.
+                                </div>
+                                <div class="mt8">
+                                    <button name="action_open_module_agent" type="object"
+                                            string="Configuration" class="btn-link" icon="fa-external-link"
+                                            context="{'agent_code': 'pns_ai_decision'}"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <div class="mt8">
                         <button name="action_open_module_inference_agents"
                                 type="object" string="Browse all internal agents"
@@ -133,6 +161,47 @@
                         </div>
                     </div>
 
+                    <h2>Temporary key PIN</h2>
+                    <div class="text-muted mb-2">
+                        A short PIN hands a user their existing API key while a browser
+                        tab on the user list is holding the key list. The list stays in
+                        that tab. Closing it stops the handoff. A paused address cannot
+                        redeem a PIN; pasting the API key still signs in.
+                    </div>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">PIN length</div>
+                                <div class="text-muted">Digits. From 4 to 12. Empty or out of range stays 8.</div>
+                                <div class="mt8"><field name="key_pin_length"/></div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">PIN attempts per IP</div>
+                                <div class="text-muted">Wrong PINs from the same address before that address is paused.</div>
+                                <div class="mt8"><field name="key_pin_attempts"/></div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">PIN block (hours)</div>
+                                <div class="text-muted">How long a paused address stays unable to redeem a PIN.</div>
+                                <div class="mt8"><field name="key_pin_block_hours"/></div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">Release PIN blocks</div>
+                                <div class="text-muted">Clear every paused address. PINs stay as they are.</div>
+                                <div class="mt8">
+                                    <button name="action_key_pin_release" type="object"
+                                            string="Release PIN blocks" class="btn-secondary" icon="fa-unlock"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <h2>Safe Plan</h2>
                     <div class="text-muted mb-2">
                         Security settings for AI supervised operations (Safe Plan / Caja B).
@@ -168,9 +237,6 @@
                     <div class="text-muted mb-2">
                         Save the full AI configuration to a JSON file and restore it after
                         an uninstall/reinstall or on another instance.
-                    </div>
-                    <div class="alert alert-warning" role="alert">
-                        The exported file contains secrets (API keys, tokens) in clear text. Keep it safe.
                     </div>
                     <div class="row mt16 o_settings_container">
                         <div class="col-12 col-lg-6 o_setting_box">
@@ -271,5 +337,5 @@
               parent="pns_ai_mcp.menu_mcp_main"
               action="action_mcp_configuration"
               sequence="50"
-              groups="pns_ai_mcp.group_ai_admin"/>
+              groups="base.group_system"/>
 </odoo>

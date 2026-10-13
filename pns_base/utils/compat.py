@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-# Archivo: utils/compat.py
-# Descripción: Utilidades de compatibilidad entre versiones de Odoo (13 a 19+).
-#   Capa GENÉRICA del ecosistema PNS. Las utilidades específicas de un módulo
-#   (que dependen de datos propios: grupos, assets, etc.) NO van aquí; viven en
-#   el módulo correspondiente y, si lo necesitan, importan estos helpers.
+"""Cross-version Odoo names (13–19+): JSON routes, groups, cache.
+
+Generic suite helpers only. Module-specific names (own groups, assets)
+stay in that module and import from here when needed.
+"""
 
 import odoo
 

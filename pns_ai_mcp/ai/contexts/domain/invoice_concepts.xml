@@ -23,7 +23,7 @@
 
             <conventions>
                 <convention name="default_grouping">
-                    Unless the user explicitly requests 'detalle' or 'desglose por factura', ALWAYS aggregate by partner_id.
+                    Unless the user explicitly requests 'detail' or 'breakdown by invoice', ALWAYS aggregate by partner_id.
                     Show per customer: name, count of invoices, sum(amount_residual) as total pending.
                     Never show one row per invoice when the user asks for a customer list or summary.
                 </convention>

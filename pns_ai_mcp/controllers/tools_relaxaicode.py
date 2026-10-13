@@ -102,6 +102,104 @@ _IMG_FIELD_HINTS = ('image', 'avatar', 'logo', 'foto', 'photo', 'picture')
 # base64 (el LLM a veces devuelve un booleano/placeholder). Solo estos nombres
 # para no arriesgar 404 con alias raros.
 _ODOO_IMAGE_FIELD_RE = re.compile(r'^(image|avatar|logo|photo|picture)(_\w+)?$', re.I)
+# Nombre técnico de modelo Odoo (res.partner). Un texto con espacios o mayúsculas
+# es una etiqueta de negocio (el modelo del coche), no el modelo del registro.
+_TECHNICAL_MODEL_RE = re.compile(r'^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$')
+
+
+def _is_technical_model(name, env=None):
+    """True si *name* es un modelo del registro (``fleet.vehicle``), no una etiqueta."""
+    if not isinstance(name, str) or not _TECHNICAL_MODEL_RE.match(name):
+        return False
+    if env is None:
+        return True
+    try:
+        return name in env
+    except Exception:
+        return False
+
+
+def _row_technical_model(item, env=None):
+    """Modelo técnico ya escrito en la fila (``__model`` o columna ``model``)."""
+    if not isinstance(item, dict):
+        return None
+    for key in ('__model', 'model'):
+        name = item.get(key)
+        if _is_technical_model(name, env):
+            return name
+    return None
+
+
+def _image_field_names(model_cls):
+    names = []
+    for name, field in (getattr(model_cls, '_fields', None) or {}).items():
+        if not _ODOO_IMAGE_FIELD_RE.match(name):
+            continue
+        if getattr(field, 'type', None) != 'binary':
+            continue
+        names.append(name)
+    return names
+
+
+def _record_has_image(record, fname):
+    try:
+        return bool(record[fname])
+    except Exception:
+        return False
+
+
+def _picture_target(env, model, rec_id, preferred):
+    """(modelo, id, campo) de una imagen que existe.
+
+    El campo pedido, si está en el modelo y tiene datos. Si no, otra imagen
+    del propio registro. Si tampoco, la de un many2one (y un salto más), para
+    no pintar una URL rota cuando la foto vive en el registro de al lado.
+    """
+    if not env or not _is_technical_model(model, env) or not rec_id:
+        return None
+    try:
+        rec = env[model].browse(rec_id)
+        if not rec.exists():
+            return None
+    except Exception:
+        return None
+    preferred = str(preferred or '')
+    if (
+        preferred in rec._fields
+        and _ODOO_IMAGE_FIELD_RE.match(preferred)
+        and _record_has_image(rec, preferred)
+    ):
+        return (model, int(rec_id), preferred)
+    for fname in _image_field_names(rec):
+        if fname != preferred and _record_has_image(rec, fname):
+            return (rec._name, int(rec.id), fname)
+    seen = set()
+
+    def walk(record, depth):
+        if depth > 2 or not record:
+            return None
+        key = (record._name, int(record.id))
+        if key in seen:
+            return None
+        seen.add(key)
+        for fname, field in record._fields.items():
+            if getattr(field, 'type', None) != 'many2one':
+                continue
+            try:
+                other = record[fname]
+            except Exception:
+                continue
+            if not other:
+                continue
+            for iname in _image_field_names(other):
+                if _record_has_image(other, iname):
+                    return (other._name, int(other.id), iname)
+            found = walk(other, depth + 1)
+            if found:
+                return found
+        return None
+
+    return walk(rec, 0)
 
 
 def _is_b64_img(value):
@@ -263,18 +361,26 @@ def _iter_all_tabular_row_lists(result):
             yield rows
 
 
-def _iter_result_rows(result):
-    """Primera lista de dicts (compat). Preferir ``_iter_all_tabular_row_lists``."""
-    for rows in _iter_all_tabular_row_lists(result):
-        return rows
-    return None
+
+def _web_image_model_segment(url):
+    """Trozo de modelo en ``/web/image/<modelo>/<id>/...``, o ''."""
+    if not isinstance(url, str) or not url.startswith('/web/image/'):
+        return ''
+    parts = url.split('/')
+    return parts[3] if len(parts) > 3 else ''
 
 
-def _postprocess_images(result, model_hint=None):
-    """Convierte campos binarios (base64) a URLs /web/image/<model>/<id>/<field>."""
+def _postprocess_images(result, model_hint=None, env=None):
+    """Convierte campos de imagen a URLs ``/web/image/<modelo técnico>/<id>/<campo>``.
+
+    Una columna llamada ``model`` con el nombre del coche no es el modelo del
+    registro. Si el campo pedido no existe, se usa una imagen que sí está
+    (en el registro o en un many2one), en vez de una URL que el navegador no abre.
+    """
     def _process_items(items, model_hint=None):
         if not items or not isinstance(items, list):
             return
+        hint = model_hint if _is_technical_model(model_hint, env) else None
         for item in items:
             if not isinstance(item, dict):
                 continue
@@ -284,13 +390,13 @@ def _postprocess_images(result, model_hint=None):
             # NO consumimos __model (antes .pop): lo dejamos en la fila para que
             # el render de tabla pinte el widget de enlace por fila. Como empieza
             # por '_' no aparece como columna de datos ni se exporta.
-            model = item.get('__model') or item.get('model') or model_hint
-            if not model or not isinstance(model, str):
+            model = _row_technical_model(item, env) or hint
+            if not model:
                 continue
 
             keys_to_process = [
                 k for k in list(item.keys())
-                if any(hint in k.lower() for hint in _IMG_FIELD_HINTS)
+                if any(hint_name in k.lower() for hint_name in _IMG_FIELD_HINTS)
                 and not k.startswith('_')
             ]
             for key in keys_to_process:
@@ -298,14 +404,25 @@ def _postprocess_images(result, model_hint=None):
                 if val is False or val is None or val == '':
                     continue
                 if isinstance(val, str) and (val.startswith('http') or val.startswith('/')):
+                    segment = _web_image_model_segment(val)
+                    if not segment or _is_technical_model(segment):
+                        continue
+                if not (_is_b64_img(val) or _ODOO_IMAGE_FIELD_RE.match(str(key))):
                     continue
-                # Con model+id conocidos servimos la imagen por URL (más ligero que
-                # el base64 y robusto): si el valor es base64 O el campo es un campo
-                # de imagen estándar de Odoo (aunque el valor sea booleano/placeholder).
-                if _is_b64_img(val) or _ODOO_IMAGE_FIELD_RE.match(str(key)):
+                target = _picture_target(env, model, rec_id, key) if env else None
+                if target:
+                    url = '/web/image/%s/%d/%s' % target
+                    item[key] = url
+                    _logger.debug('_postprocess_images: %s → URL', url)
+                    continue
+                if env is None and _ODOO_IMAGE_FIELD_RE.match(str(key)):
                     url = '/web/image/%s/%d/%s' % (model, rec_id, key)
                     item[key] = url
-                    _logger.debug('_postprocess_images: %s/%d/%s → URL', model, rec_id, key)
+                    continue
+                # Campo inventado (logo en un modelo que no lo tiene) y sin
+                # otra imagen: no dejar una ruta que pinta el icono roto.
+                if isinstance(val, str) and val.startswith('/web/image/'):
+                    item[key] = False
 
     for rows in _iter_all_tabular_row_lists(result):
         _process_items(rows, model_hint=model_hint)
@@ -353,19 +470,6 @@ def _models_from_code(code):
         return set()
     return set(_ENV_MODEL_RE.findall(code))
 
-
-def _infer_single_model_from_code(code):
-    """Modelo único referenciado como ``env['x']`` en el código, o None.
-
-    AGNÓSTICO: extrae el modelo del PROPIO código (no una lista fija). Solo se usa
-    como pista cuando hay EXACTAMENTE un modelo referenciado (caso típico de un
-    listado de una entidad, p.ej. comprehensions ``for e in env['hr.employee']...``
-    que no dejan el recordset en el namespace). Con varios modelos no adivina.
-    """
-    models = _models_from_code(code)
-    if len(models) == 1:
-        return next(iter(models))
-    return None
 
 
 def _related_models_from_code(code, env, base_models):
@@ -454,6 +558,12 @@ def _technical_key_bonus(model, row):
                 bonus += 8
                 break
     return bonus
+
+
+# Puntuación mínima para creer a la memoria del turno: una celda tiene que
+# decir el nombre del registro (100 display_name / 80 name). El bonus por
+# nombre de columna solo no basta.
+_TURN_MEMORY_MIN_FIT = 80
 
 
 def _score_record_fit(env, model, rid, row):
@@ -572,12 +682,17 @@ def _model_exists(env, model, rid):
         return False
 
 
-def _resolve_row_model(rid, row, id_model_map, candidate_models, env, single_model=None):
+def _resolve_row_model(
+    rid, row, id_model_map, candidate_models, env, single_model=None,
+    turn_models=None,
+):
     """Resuelve el modelo de una fila (fórmula universal).
 
     1. Un solo candidato con exists() → ese.
     2. Varios → el de mayor encaje (display_name + solape de valores).
     3. Si no hay env/candidatos: mapa id→model del namespace o single_model.
+    4. Último recurso: el modelo que este turno ya dio a ese id, y solo si la
+       fila sigue diciendo el nombre de ese registro.
     Sin diccionarios de dominio (partner/product/cliente…).
     """
     mapped = (id_model_map or {}).get(rid) if rid else None
@@ -604,27 +719,64 @@ def _resolve_row_model(rid, row, id_model_map, candidate_models, env, single_mod
         return single_model
     if single_model and not env:
         return single_model
+    # Memoria del turno: el id ya se leyó del ORM en un paso anterior. Se exige
+    # que la fila nombre a ese registro; un id repetido en otro modelo no
+    # hereda el enlace.
+    remembered = (turn_models or {}).get(rid)
+    if remembered:
+        if not env:
+            return remembered
+        if _score_record_fit(env, remembered, rid, row) >= _TURN_MEMORY_MIN_FIT:
+            return remembered
     return None
 
 
-def _stamp_models(result, id_model_map, single_model=None, env=None, candidate_models=None):
+def _turn_memory_models(controller):
+    """Ids que este turno ya colocó en un modelo, tal como los pasa el motor."""
+    memory = getattr(controller, 'turn_record_models', None)
+    if not isinstance(memory, dict):
+        return {}
+    out = {}
+    for rid, model in memory.items():
+        if not model or not isinstance(model, str):
+            continue
+        try:
+            rid = int(rid)
+        except (TypeError, ValueError):
+            continue
+        if rid > 0:
+            out[rid] = model
+    return out
+
+
+def _stamp_models(
+    result, id_model_map, single_model=None, env=None, candidate_models=None,
+    turn_models=None,
+):
     """Estampa ``__model`` en las filas de TODAS las listas tabulares.
 
     Determinista y agnóstico: recordsets del namespace, modelos env['x'] del código,
     comodeles many2one citados, y comprobación ``exists()`` cuando hay env.
-    No sobrescribe un ``__model``/``model`` ya presente.
+    No sobrescribe un modelo técnico ya presente. Una columna ``model`` con
+    texto libre (el nombre de un coche) no cuenta: no es ``fleet.vehicle``.
     """
     candidates = set(candidate_models or ())
     if single_model:
         candidates.add(single_model)
-    if not id_model_map and not single_model and not (env and candidates):
+    if (
+        not id_model_map and not single_model and not turn_models
+        and not (env and candidates)
+    ):
         return
 
     for rows in _iter_all_tabular_row_lists(result):
         for item in rows:
             if not isinstance(item, dict):
                 continue
-            if item.get('__model') or item.get('model'):
+            declared = _row_technical_model(item, env)
+            if declared:
+                if not _is_technical_model(item.get('__model'), env):
+                    item['__model'] = declared
                 continue
             # 0) XMLID en la fila → modelo+id inequívocos (p. ej. res.groups).
             if env:
@@ -638,6 +790,7 @@ def _stamp_models(result, id_model_map, single_model=None, env=None, candidate_m
                 continue
             model = _resolve_row_model(
                 rid, item, id_model_map, candidates, env, single_model=single_model,
+                turn_models=turn_models,
             )
             if model:
                 item['__model'] = model
@@ -753,7 +906,7 @@ def _backfill_missing_record_ids(
     def _apply(item, model, rid):
         nonlocal filled
         item['id'] = int(rid)
-        if not item.get('__model') and not item.get('model'):
+        if not _row_technical_model(item, env):
             item['__model'] = model
         filled += 1
 
@@ -830,7 +983,9 @@ def _collect_record_refs(result, model_hint=None, env=None):
             if not isinstance(item, dict):
                 continue
             rid = _row_record_id(item)
-            model = item.get('__model') or item.get('model') or model_hint
+            model = _row_technical_model(item, env) or (
+                model_hint if _is_technical_model(model_hint, env) else None
+            )
             if not rid or not model or not isinstance(model, str):
                 continue
             key = (model, rid)
@@ -1136,7 +1291,7 @@ def _attempt_syntax_repair(code):
                          '\nresult = {"__untrusted_html_preview__": formatted_text, '
                          '"__force_continue__": True, "__hint__": '
                          '"Do not assign bare formatted_text; return '
-                         '{\'data\': [rows]} or use propose_safe_operations."}'
+                         '{\'data\': [rows]} or use safe_plan_request."}'
                      )
                      was_repaired = True
 
@@ -1540,7 +1695,13 @@ def _strip_module_literals_or_reject(
             },
             "previous_result": {
                 "type": "object",
-                "description": "Optional result from previous execution (for Fase 2: presentation). Will be available as 'previous_result' and 'raw_data' in context."
+                "description": (
+                    "Optional. Fase 2 only, and only when a prior tool call "
+                    "in THIS turn already returned rows. Available as "
+                    "previous_result / raw_data. Do not start extraction with "
+                    "result = previous_result.get('data') or [] — empty prior "
+                    "data is [] and result['key'] crashes."
+                ),
             },
             "return_mode": {
                 "type": "string",
@@ -1757,7 +1918,9 @@ def tool_relaxaicode(
         from .validators import (
             repair_cr_dbname, repair_locals_dir_checks, repair_percent_format_strings,
             repair_registry_models, repair_unsafe_sort_keys,
+            strip_leaked_tool_markup,
         )
+        code, _xml_repaired = strip_leaked_tool_markup(code)
         code, _locals_repaired = repair_locals_dir_checks(code)
         code, _sk_repaired = repair_unsafe_sort_keys(code)
         code, _cr_repaired = repair_cr_dbname(code)
@@ -1817,7 +1980,7 @@ def tool_relaxaicode(
                     'syntax. [REQUIRED] Assign output to the result variable. '
                     'Follow the relaxaicode coding rules in your system context '
                     '(allowed imports, no network — external HTTP goes through '
-                    'propose_safe_operations op=fetch_url, never import '
+                    'safe_plan_request op=fetch_url, never import '
                     'urllib/requests/http).'
                 ) % enhanced_error
 
@@ -1895,7 +2058,7 @@ def tool_relaxaicode(
                 tool_name='relaxaicode',
                 prompt_data={'code': code[:5000] if len(code) > 5000 else code, 'context': context_data},
                 result_data=error_response,
-                result_summary=f"Error de permisos: not in group_ai_writer para relaxaicode",
+                result_summary="Permission error: not in group_ai_writer for relaxaicode",
                 additional_info=f"Usuario {user_name} (ID: {user_id}) intentó ejecutar código que requiere escritura sin permisos. Operación abortada inmediatamente."
             )
             
@@ -1907,7 +2070,7 @@ def tool_relaxaicode(
         if requires_write:
             # CAJA A: relaxaicode es SOLO LECTURA (se ejecuta sobre cursor READ ONLY).
             # Cualquier escritura se redirige a la caja B declarativa
-            # (propose_safe_operations): la IA NO escribe con código.
+            # (safe_plan_request): la IA NO escribe con código.
             return {
                 'content': [{'type': 'text', 'text': json.dumps({
                     'success': False,
@@ -1915,7 +2078,7 @@ def tool_relaxaicode(
                     'message': (
                         'relaxaicode es SOLO LECTURA. Para crear, modificar, '
                         'duplicar o borrar registros usa la herramienta '
-                        'propose_safe_operations con operaciones declarativas (no '
+                        'safe_plan_request con operaciones declarativas (no '
                         'código). No pidas ningún PIN; el usuario confirma en Odoo.'
                     ),
                 }, ensure_ascii=False, indent=2, default=str)}]
@@ -2102,6 +2265,26 @@ def tool_relaxaicode(
             error_msg = str(exec_error)
             error_type = type(exec_error).__name__
 
+            from odoo.addons.pns_ai_mcp.utils.error_ux import (
+                groupby_stored_field_retry_hint,
+                is_groupby_computed_field_error,
+            )
+            if is_groupby_computed_field_error(error_msg):
+                error_response = _format_error_response(
+                    -32603,
+                    groupby_stored_field_retry_hint(),
+                    {'error_type': error_type},
+                    retryable=True,
+                )
+                _log_relaxaicode_execution(
+                    controller, code, error_response,
+                    f"{error_type}: {error_msg}",
+                    operation_type='read', agent_llm=agent_llm,
+                    context_data=context_data,
+                    phase=phase, return_mode=return_mode,
+                )
+                return error_response
+
             # ACL / business denials are NOT code bugs — do not ReAct-retry;
             # show the (already translated) reason and stop.
             if isinstance(
@@ -2157,8 +2340,12 @@ def tool_relaxaicode(
 
             # TypeError: list/dict sobre field.selection callable (cualquier serie).
             if error_type == 'TypeError':
+                from ..utils.error_ux import format_join_sequence_hint
                 from ..utils.field_selection import format_selection_iterable_hint
-                sel_hint = format_selection_iterable_hint(error_msg)
+                sel_hint = (
+                    format_selection_iterable_hint(error_msg)
+                    or format_join_sequence_hint(error_msg)
+                )
                 if sel_hint:
                     error_response = _format_error_response(
                         -32603,
@@ -2215,6 +2402,24 @@ def tool_relaxaicode(
                     'is not a conversion. Write %% for a percent sign, or use '
                     '.format() / an f-string.'
                 )
+            if error_type == 'AttributeError':
+                from ..utils.error_ux import format_int_id_hint
+                id_hint = format_int_id_hint(error_msg)
+                if id_hint:
+                    error_response = _format_error_response(
+                        -32603,
+                        id_hint,
+                        {'error_type': 'AttributeError'},
+                        retryable=True,
+                    )
+                    _log_relaxaicode_execution(
+                        controller, code, error_response,
+                        id_hint,
+                        operation_type='read', agent_llm=agent_llm,
+                        context_data=context_data,
+                        phase=phase, return_mode=return_mode,
+                    )
+                    return error_response
             error_response = _format_error_response(
                 -32603,
                 f'Error executing code: {error_msg}',
@@ -2250,14 +2455,14 @@ def tool_relaxaicode(
             result = {"data": result}
         elif isinstance(result, str):
             # Bare strings are never a user-facing answer (tables need rows;
-            # writes need propose_safe_operations). Keep a preview for the LLM.
+            # writes need safe_plan_request). Keep a preview for the LLM.
             result = {
                 '__raw_text__': result[:8000],
                 '__force_continue__': True,
                 '__hint__': (
                     'String results are not shown to the user. Return '
                     '{\'data\': [row dicts…]} for tables, or use '
-                    'propose_safe_operations for creates/writes. Answer in prose.'
+                    'safe_plan_request for creates/writes. Answer in prose.'
                 ),
             }
 
@@ -2330,6 +2535,7 @@ def tool_relaxaicode(
                     single_model=_single_model,
                     env=_env,
                     candidate_models=_candidates,
+                    turn_models=_turn_memory_models(controller),
                 )
                 # Solo si hay filas cuya etiqueta encaja con un recordset del
                 # sandbox (omisión clara de id). Un índice no vacío por sí solo
@@ -2397,7 +2603,7 @@ def tool_relaxaicode(
                 except Exception as rr_err:
                     _logger.debug('_collect_record_refs: %s (no-op)', rr_err)
             try:
-                _postprocess_images(result, model_hint=_single_model)
+                _postprocess_images(result, model_hint=_single_model, env=_env)
             except Exception as pp_err:
                 _logger.debug('_postprocess_images: %s (no-op)', pp_err)
 
@@ -2514,7 +2720,7 @@ def tool_relaxaicode(
                 result['__extraction_complete__'] = True
                 # Tabla ya renderizada (maybe_attach) con summary → respuesta final.
                 # Sin esto el orquestador ocultaba el HTML mid-turn y el LLM
-                # describía la tabla en prosa sin mostrarla (Sesame/puntualidad).
+                # describía la tabla en prosa sin mostrarla.
                 if (
                     result.get('formatted_text')
                     and result.get('summary')
@@ -2660,7 +2866,7 @@ def tool_relaxaicode(
                         'This result is not user-facing (no tabulable rows / no '
                         'trusted server HTML). Do NOT paste it into chat. Return '
                         '{\'data\': [row dicts…]} for a server table, or use '
-                        'propose_safe_operations for writes. Use '
+                        'safe_plan_request for writes. Use '
                         'return_mode=inspect_result for probes.'
                     )
                     _logger.info(
@@ -2813,7 +3019,7 @@ def tool_relaxaicode(
             error_msg += (
                 ' [HINT] La consulta provocó una escritura colateral (mail, tracking, '
                 'método de negocio con efecto secundario). Usa search/read puros; '
-                'para cambiar datos usa propose_safe_operations.'
+                'para cambiar datos usa safe_plan_request.'
             )
 
         return _format_error_response(

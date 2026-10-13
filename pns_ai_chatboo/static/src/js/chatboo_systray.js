@@ -1,16 +1,22 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com> */
+/**
+ * Chatboo systray launcher (OWL1). Opens the floating overlay, not a client action.
+ */
 odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
     "use strict";
 
     var SystrayMenu = require('web.SystrayMenu');
     var Widget = require('web.Widget');
+    var ActionManager = require('web.ActionManager');
     var core = require('web.core');
     var _t = core._t;
 
-    function afterOverlayPaint(fn) {
-        window.requestAnimationFrame(function () {
-            window.requestAnimationFrame(fn);
-        });
-    }
+    var CHATBOO_CLIENT_TAGS = {
+        'chatboo.action': true,
+        'chatboo.history.action': true,
+        'chatboo.new.action': true,
+    };
 
     var ChatbooSystrayItem = Widget.extend({
         template: 'pns_ai_chatboo.chatboo_systray_item',
@@ -27,6 +33,12 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
             var self = this;
             this.el.style.display = 'none';
             this.$el.addClass('o_chatboo_systray_item');
+            // App click llega por ActionManager, no por el icono. El listener
+            // vive aquí (no solo en _enableSystray) para que el overlay abra
+            // aunque el flag del tray esté apagado.
+            core.bus.on('chatboo_overlay_show', this, function (context) {
+                self._showOverlay(context || {});
+            });
 
             return this._super.apply(this, arguments).then(function () {
                 return self._rpc({
@@ -128,7 +140,7 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
                 var isOnChatboo = !!document.querySelector('.o_chatboo_container');
                 if (!isOnChatboo) {
                     var btnHref = $(ev.target).closest('a').attr('href') || '/chatboo/dismiss_notification';
-                    window.open(btnHref, '_blank');
+                    window.open(btnHref, '_blank', 'noopener');
                 }
             });
         },
@@ -201,7 +213,9 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
 
         _isOverlayHidden: function () {
             var ov = document.getElementById('o_chatboo_persistent_overlay');
-            return !ov || ov.style.display === 'none';
+            return !ov
+                || ov.classList.contains('d-none')
+                || ov.style.display === 'none';
         },
 
         _showChatbooNotification: function () {
@@ -344,53 +358,66 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
             }
         },
 
-        _onClick: function (ev) {
-            ev.preventDefault();
-            var self = this;
-            // Clear badge on open
-            this._clearBadge();
-
-            // ── Singleton pattern: create once, toggle visibility ──
-            // The overlay and component persist in document.body across navigation.
-            // SSE streams and in-flight prompts survive toggle.
-
+        _hideOverlay: function () {
             var overlay = document.getElementById('o_chatboo_persistent_overlay');
-
             if (overlay) {
-                var isVisible = overlay.style.display !== 'none';
-                if (isVisible) {
-                    // Hide the overlay
-                    overlay.style.display = 'none';
-                    self._clearScreenFocusOnHide();
-                    self._cueAuthOnHide();
-                    // Only navigate to home if behind the overlay is a blank
-                    // ChatbooAction (opened via app menu). If the user was on
-                    // another page and just toggled the overlay, stay there.
-                    var currentHash = window.location.hash || '';
-                    if (currentHash.indexOf('pns_ai_chatboo') !== -1) {
-                        window.location.hash = '#home';
-                    }
-                } else {
-                    // Show the overlay — recapturar la vista/registro actual
-                    overlay.style.display = 'flex';
-                    afterOverlayPaint(function () {
-                        self._refreshChatbooScreenFocus();
-                        var comp = window.__chatboo_component;
-                        if (comp && comp._focusChatInput) {
-                            comp._focusChatInput();
-                        }
-                        if (comp && comp._restorePendingVerifications) {
-                            comp._restorePendingVerifications();
-                        }
-                    });
-                }
+                overlay.style.display = 'none';
+            }
+            window.pnsLayer.release('chatboo');
+            this._clearScreenFocusOnHide();
+            this._cueAuthOnHide();
+        },
+
+        _showOverlay: function (context) {
+            this._clearBadge();
+            window.pnsLayer.claim('chatboo', this._hideOverlay.bind(this));
+            var overlay = document.getElementById('o_chatboo_persistent_overlay');
+            if (!overlay) {
+                this._createPersistentOverlay(context || {});
                 return;
             }
+            overlay.classList.remove('d-none');
+            overlay.style.display = 'flex';
+            this._afterOverlayShown(context || {});
+        },
 
-            // ── First click: create persistent overlay ──
+        _afterOverlayShown: function (context) {
+            this._refreshChatbooScreenFocus();
+            var comp = window.__chatboo_component;
+            if (!comp) {
+                return;
+            }
+            if (context.new_chat && comp._createNewSession) {
+                comp._createNewSession(true);
+            } else if (context.show_history_modal && comp._showSessions) {
+                comp._showSessions();
+            }
+            if (comp._focusChatInput) {
+                comp._focusChatInput();
+            }
+            if (comp._restorePendingVerifications) {
+                comp._restorePendingVerifications();
+            }
+        },
+
+        _onClick: function (ev) {
+            ev.preventDefault();
+            var overlay = document.getElementById('o_chatboo_persistent_overlay');
+            var isVisible = overlay
+                && overlay.style.display !== 'none'
+                && !overlay.classList.contains('d-none');
+            if (isVisible) {
+                this._hideOverlay();
+                return;
+            }
+            this._showOverlay({});
+        },
+
+        _createPersistentOverlay: function (context) {
+            var self = this;
 
             // Build overlay container
-            overlay = document.createElement('div');
+            var overlay = document.createElement('div');
             overlay.id = 'o_chatboo_persistent_overlay';
             overlay.className = 'o_chatboo_persistent_overlay';
             // Position below Odoo's navbar — never cover system menus/icons
@@ -402,32 +429,11 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
                 'left: 0',
                 'right: 0',
                 'bottom: 0',
-                'z-index: 1050', /* Por encima del navbar/panel de control sticky de Odoo; el overlay se auto-oculta al pulsar el navbar */
+                'z-index: 1050', /* Por encima del navbar/panel de control sticky de Odoo; pns_base lo oculta al pulsar el navbar */
                 'display: flex',
                 'flex-direction: column',
                 'background-color: #fff',
             ].join(';');
-
-            // Auto-hide when user clicks any navbar item (except our systray icon)
-            if (navbar) {
-                navbar.addEventListener('click', function (navEv) {
-                    // Don't hide if the click is on our own systray item
-                    if (navEv.target.closest('.o_chatboo_systray_item')) return;
-                    var ov = document.getElementById('o_chatboo_persistent_overlay');
-                    if (ov && ov.style.display !== 'none') {
-                        ov.style.display = 'none';
-                        if (self._cueAuthOnHide) {
-                            self._cueAuthOnHide();
-                        }
-                        if (self._clearScreenFocusOnHide) {
-                            self._clearScreenFocusOnHide();
-                        } else if (window.__chatboo_component && window.__chatboo_component.state) {
-                            window.__chatboo_component.state.screenFocusLabel = '';
-                            window.__chatboo_component.state.screenContextSnapshot = null;
-                        }
-                    }
-                }, true);
-            }
 
             // Close bar (thin header with close button)
             var closeBar = document.createElement('div');
@@ -448,9 +454,7 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
             closeBtn.title = 'Cerrar (ocultar)';
             closeBtn.style.cssText = 'font-size: 18px; line-height: 1; padding: 2px 6px; text-decoration: none;';
             closeBtn.addEventListener('click', function () {
-                overlay.style.display = 'none';
-                self._clearScreenFocusOnHide();
-                self._cueAuthOnHide();
+                self._hideOverlay();
             });
             closeBar.appendChild(closeBtn);
             overlay.appendChild(closeBar);
@@ -485,17 +489,7 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
                     if (component._initSession) {
                         component._initSession();
                     }
-                    afterOverlayPaint(function () {
-                        if (component._refreshScreenFocus) {
-                            component._refreshScreenFocus();
-                        }
-                        if (component._focusChatInput) {
-                            component._focusChatInput();
-                        }
-                        if (component._restorePendingVerifications) {
-                            component._restorePendingVerifications();
-                        }
-                    });
+                    self._afterOverlayShown(context || {});
                 }).catch(function (err) {
                     console.error('Chatboo: failed to mount singleton component', err);
                 });
@@ -506,6 +500,49 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
     });
 
     SystrayMenu.Items.push(ChatbooSystrayItem);
+
+    function chatbooContextFromAction(action) {
+        var ctx = {};
+        if (!action) {
+            return ctx;
+        }
+        if (action.tag === 'chatboo.history.action') {
+            ctx.show_history_modal = true;
+        } else if (action.tag === 'chatboo.new.action') {
+            ctx.new_chat = true;
+        }
+        if (!action.context) {
+            return ctx;
+        }
+        if (typeof action.context === 'string') {
+            ctx.show_history_modal = ctx.show_history_modal
+                || action.context.indexOf("'show_history_modal': True") !== -1
+                || action.context.indexOf('"show_history_modal": True') !== -1;
+            ctx.new_chat = ctx.new_chat
+                || action.context.indexOf("'new_chat': True") !== -1
+                || action.context.indexOf('"new_chat": True') !== -1;
+            return ctx;
+        }
+        ctx.show_history_modal = ctx.show_history_modal
+            || action.context.show_history_modal === true
+            || action.context.show_history_modal === 'True';
+        ctx.new_chat = ctx.new_chat
+            || action.context.new_chat === true
+            || action.context.new_chat === 'True';
+        return ctx;
+    }
+
+    // App / menú: mostrar el overlay y NO empujar la client action
+    // (esa acción vacía es la página en blanco al retraer).
+    ActionManager.include({
+        _executeClientAction: function (action, options) {
+            if (action && CHATBOO_CLIENT_TAGS[action.tag]) {
+                core.bus.trigger('chatboo_overlay_show', chatbooContextFromAction(action));
+                return $.when();
+            }
+            return this._super.apply(this, arguments);
+        },
+    });
 
     return ChatbooSystrayItem;
 

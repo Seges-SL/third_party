@@ -3,7 +3,7 @@ skill: forecast
 name: Weather forecast
 description: Company-city forecast for the next 7 days by default; optional other cities; sky column uses weather emojis.
 agent_codes: pns_ai_chatboo
-version: 4.4
+version: 4.5
 param_schema: {"lugar": {"type": "string", "desc": "City or cities (comma / and). Empty = company city (or state). Never invent a city.", "default": "company city"}, "fecha": {"type": "string", "desc": "today, tomorrow, next N days, or ISO YYYY-MM-DD. Empty = next 7 days.", "default": "7 days"}}
 arg_hint: company city · 7 days
 args_policy: default
@@ -37,7 +37,7 @@ fetch_url) and returns bodies in `previous_result` until the table is ready:
 LLM FALLBACK (rare)
 - Geocode each city with fetch_url to
   `https://geocoding-api.open-meteo.com/v1/search?name=<city>&count=1&language=en`
-- ONE propose_safe_operations with one forecast fetch_url per city (always
+- ONE safe_plan_request with one forecast fetch_url per city (always
   include `city=<name>`).
 
 FORBIDDEN

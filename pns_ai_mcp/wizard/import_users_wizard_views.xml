@@ -2,7 +2,7 @@
 <odoo>
     <record id="view_import_users_wizard_form" model="ir.ui.view">
         <field name="name">pns.ai.mcp.import.users.wizard.form</field>
-        <field name="model">pns_ai_mcp.import_users_wizard</field>
+        <field name="model">ai.import.users.wizard</field>
         <field name="arch" type="xml">
             <form string="Import MCP Users">
                 <sheet>
@@ -30,7 +30,7 @@
     <record id="action_import_users_wizard" model="ir.actions.act_window">
         <field name="name">Import MCP Users (JSON)</field>
         <field name="type">ir.actions.act_window</field>
-        <field name="res_model">pns_ai_mcp.import_users_wizard</field>
+        <field name="res_model">ai.import.users.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
     </record>

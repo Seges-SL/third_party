@@ -2,17 +2,27 @@
 <odoo>
     <record id="view_ai_skill_capture_wizard_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.skill.capture.wizard.form</field>
-        <field name="model">pns_ai_mcp.skill.capture.wizard</field>
+        <field name="model">ai.skill.capture.wizard</field>
         <field name="arch" type="xml">
-            <form string="Create skill from chat">
-                <div class="alert alert-info" role="alert">
+            <form string="Create or edit skill">
+                <div class="alert alert-info" role="alert"
+                     attrs="{'invisible': ['|', ('existing_skill_id', '!=', False), ('show_advanced', '=', False)]}">
                     The query <b>logic</b> from your Chatboo session is captured as
                     the skill's deterministic <b>Code</b>. Review the
-                    <b>Procedure</b>, set the name, then create the skill — it will
-                    be available as <code>/&lt;code&gt;</code> in Chatboo.
-                    If it accepts arguments, fill <b>Argument hint</b> and
-                    <b>Param schema</b> (deterministic parse first; light LLM
-                    only when free text is unresolved).
+                    <b>Help</b> text and the parameter list, set the name, then
+                    create the skill — it will be available as
+                    <code>/&lt;code&gt;</code> in Chatboo.
+                    If the Code reads slash args, Argument hint and the list
+                    are filled for you. An empty list means the skill takes
+                    no parameters. Create or Save writes Help and parameter
+                    descriptions from Procedure and Code (short AI, current
+                    language) when those change.
+                </div>
+                <div class="alert alert-warning" role="alert"
+                     attrs="{'invisible': [('existing_skill_id', '=', False)]}">
+                    You already own this slash. Saving updates its
+                    <b>Code</b>, <b>Procedure</b>, help and parameters.
+                    The slash and owner stay the same.
                 </div>
                 <div class="alert alert-warning" role="alert"
                      attrs="{'invisible': [('warn_hardcoded_rows', '=', False)]}">
@@ -20,30 +30,87 @@
                     block: the LLM sometimes pastes the query result inline. Replace it with
                     live <code>api_call</code> fetches (keep the scoring/formatting logic).
                 </div>
+                <div class="alert alert-warning" role="alert"
+                     attrs="{'invisible': [('warn_incomplete_capture', '=', False)]}">
+                    This turn had several steps (fetch and/or multiple relaxaicode
+                    rounds). Review the <b>Code</b>: it must fetch live data and include
+                    every phase before publishing. Saving an incomplete skill is blocked.
+                </div>
                 <group>
                     <field name="from_chatboo" invisible="1"/>
                     <field name="warn_hardcoded_rows" invisible="1"/>
+                    <field name="warn_incomplete_capture" invisible="1"/>
+                    <field name="existing_skill_id" invisible="1"/>
                     <field name="source_log_id" invisible="1"/>
-                    <field name="agent_ids" widget="many2many_tags"/>
-                    <field name="skill_code" placeholder="e.g. facturacion"/>
-                    <field name="skill_name" placeholder="e.g. Employee punctuality (Sesame)"/>
-                    <field name="description"/>
+                    <field name="param_schema" invisible="1"/>
+                    <field name="param_prose" invisible="1"/>
+                    <field name="param_author_bundle" invisible="1"/>
+                    <field name="show_advanced" invisible="1"/>
+                    <field name="skill_code" placeholder="e.g. facturacion"
+                           attrs="{'readonly': [('existing_skill_id', '!=', False)]}"/>
+                    <field name="skill_name" placeholder="e.g. Employee punctuality"
+                           required="1"/>
+                    <field name="source_turn_id"
+                           attrs="{'invisible': ['|', ('source_turn_id', '=', False), ('show_advanced', '=', False)]}"/>
+                    <field name="agent_ids" widget="many2many_tags"
+                           attrs="{'invisible': [('show_advanced', '=', False)]}"/>
                 </group>
-                <group string="Parameters (hybrid: deterministic first)">
+                <group string="Parameters">
+                    <field name="param_line_ids" nolabel="1">
+                        <tree editable="bottom">
+                            <field name="sequence" widget="handle"/>
+                            <field name="label"/>
+                            <field name="desc"/>
+                            <field name="default"/>
+                            <field name="required"/>
+                            <field name="key" invisible="1"/>
+                        </tree>
+                    </field>
+                </group>
+                <group string="Help"
+                       attrs="{'invisible': [('show_advanced', '=', False)]}">
+                    <field name="description"
+                           placeholder="Leave empty for automatic generation."/>
                     <field name="arg_hint"
-                             placeholder="e.g. ytd | mes=2026-06 | Seville tomorrow"/>
-                    <field name="param_schema" nolabel="0"
-                             placeholder='{"periodo": {"type": "string", "desc": "..."}}'/>
+                           placeholder="filled from Code or the parameter list"/>
+                    <field name="args_policy"/>
                 </group>
-                <group string="Procedure (orchestration prose)">
+                <group string="Procedure (orchestration prose)"
+                       attrs="{'invisible': [('show_advanced', '=', False)]}">
                     <field name="procedure" nolabel="1"/>
                 </group>
-                <group string="Code (relaxaicode, source of truth)">
+                <group string="Code (relaxaicode, source of truth)"
+                       attrs="{'invisible': [('show_advanced', '=', False)]}">
                     <field name="code_body" nolabel="1"/>
                 </group>
                 <footer>
+                    <div class="o_ai_last_operation_usage text-muted small"
+                         style="display:none;"/>
+                    <div class="o_skill_capture_progress" style="display:none;"
+                         aria-live="polite">
+                        <span class="o_skill_capture_typing" aria-hidden="true">
+                            <span/><span/><span/>
+                        </span>
+                        <span class="o_skill_capture_progress_label"/>
+                        <span class="o_skill_capture_usage" style="display:none;"/>
+                        <button name="action_abort_author" type="button"
+                                class="btn btn-link text-muted p-0 o_skill_capture_stop">
+                            <i class="fa fa-stop-circle-o"/>
+                            <span class="o_skill_capture_stop_label">Cancel</span>
+                        </button>
+                    </div>
                     <button name="action_create_draft" string="Create skill"
-                            type="object" class="btn-primary" icon="fa-graduation-cap"/>
+                            type="object" class="btn-primary" icon="fa-graduation-cap"
+                            attrs="{'invisible': [('existing_skill_id', '!=', False)]}"/>
+                    <button name="action_create_draft" string="Save skill"
+                            type="object" class="btn-primary" icon="fa-graduation-cap"
+                            attrs="{'invisible': [('existing_skill_id', '=', False)]}"/>
+                    <button name="action_toggle_advanced" string="Advanced"
+                            type="object" class="btn-secondary"
+                            attrs="{'invisible': [('show_advanced', '=', True)]}"/>
+                    <button name="action_toggle_advanced" string="Hide advanced"
+                            type="object" class="btn-secondary"
+                            attrs="{'invisible': [('show_advanced', '=', False)]}"/>
                     <button string="Cancel" class="btn-secondary" special="cancel"/>
                 </footer>
             </form>

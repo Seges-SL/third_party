@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Knowledge ownership without creating res.users (O14 + website_slides hangs)."""
+
 import uuid
 
 from odoo.exceptions import AccessError

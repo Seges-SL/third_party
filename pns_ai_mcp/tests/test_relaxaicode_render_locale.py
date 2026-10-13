@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Regresión Odoo: render de tablas usa res.lang de la sesión del usuario.
+"""Odoo regression: table render uses the session user's res.lang.
 
-No crea res.users: en O14 los hooks (website_slides, digest, …) rompen el
-savepoint del TransactionCase y contagian el resto del suite.
+Does not create res.users: on O14 hooks (website_slides, digest, …) break
+the TransactionCase savepoint and poison the rest of the suite.
 """
 from odoo.tests import tagged, TransactionCase
 

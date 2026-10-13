@@ -4,7 +4,7 @@
         <code>ui_focus</code>
         <tipo>domain</tipo>
         <description>Chatboo screen focus — implicit reference to the Odoo view underneath the overlay</description>
-        <version>1.1</version>
+        <version>1.4</version>
     </metadata>
 
     <domain_knowledge>
@@ -21,7 +21,7 @@ screen (list, form, kanban, etc.).
   record, model or scope.
 - For **read** operations on that record: prefer `relaxaicode` or MCP
   tools scoped to the given `model` and `res_id` / `active_ids`.
-- For **write** operations on that record: use `propose_safe_operations` anchored
+- For **write** operations on that record: use `safe_plan_request` anchored
   to the same model and record id(s). Never bypass human confirmation.
 
 ## When NOT to use screen focus
@@ -40,5 +40,11 @@ screen (list, form, kanban, etc.).
   field-level facts, always query via tools; never invent values from memory.
 - Respect record rules: if enrichment says the record is unavailable, tell the
   user you cannot see it under their permissions.
+
+## Chat chrome
+Do not describe on-screen chat chrome (toolbar icons, download chips, session
+cards) by fetching resource URIs or by calling relaxaicode to decode,
+decompress, or parse image bytes. Stay in prose from the visible turn /
+history stub.
     </domain_knowledge>
 </context>

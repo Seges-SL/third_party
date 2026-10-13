@@ -128,7 +128,7 @@ def export_bundle(
                 json.dumps(rows, indent=2, ensure_ascii=False),
             )
         if include_settings:
-            settings = _export_settings(env)
+            settings = _export_settings(env, include_secrets)
             zf.writestr(
                 'settings.json',
                 json.dumps(settings, indent=2, ensure_ascii=False),
@@ -138,7 +138,7 @@ def export_bundle(
         tag = (export_tag or '').strip() or None
         from . import mcp_ui
         export_filename = mcp_ui.build_export_filename(
-            env, artifact_slug, 'zip', tag=tag,
+            env, artifact_slug, 'zip', tag=tag, secrets=include_secrets,
         )
 
         manifest = {

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Import MCP users from JSON."""
+
 import base64
 import json
 import logging
@@ -15,7 +17,7 @@ _logger = logging.getLogger(__name__)
 
 
 class ImportUsersWizard(models.TransientModel):
-    _name = 'pns_ai_mcp.import_users_wizard'
+    _name = 'ai.import.users.wizard'
     _inherit = ['pns.operation.report.wizard']
     _description = 'Wizard to import MCP Users from JSON'
 

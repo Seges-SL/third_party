@@ -1,8 +1,9 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com> */
 /**
  * Chatboo wide-card width — ratio of the messages canvas.
  * Persistence is the Odoo user row (RPC), not localStorage.
  * Viewport/device wins over the stored ratio (phone/tablet).
- * SPDX-License-Identifier: Apache-2.0
  */
 (function (global) {
     "use strict";
@@ -64,11 +65,10 @@
         var cap = canvasCapPx(root);
         var r = clampRatio(ratio, cap);
         root.style.setProperty("--o-chatboo-card-width", (r * 100) + "%");
-        root._chatbooCardWidthRatio = r;
         return r;
     }
 
-    function applyPx(root, px) {
+    function clampPx(root, px) {
         var cap = canvasCapPx(root);
         var floor = minPxForCap(cap);
         var n = Number(px);
@@ -78,15 +78,60 @@
         if (cap > 0) {
             n = Math.max(floor, Math.min(cap, n));
         }
+        return n;
+    }
+
+    function applyPx(root, px) {
+        var n = clampPx(root, px);
+        var cap = canvasCapPx(root);
         var r = cap > 0 ? n / cap : DEFAULT_RATIO;
         return applyRatio(root, r);
     }
 
-    function ratioFromRoot(root) {
-        if (root && typeof root._chatbooCardWidthRatio === "number") {
-            return root._chatbooCardWidthRatio;
+    function previewGuide(root, card, px) {
+        if (!root || !card || !root.appendChild) {
+            return clampPx(root, px);
         }
-        return 0;
+        var n = clampPx(root, px);
+        var guide = root._chatbooResizeGuide;
+        if (!guide) {
+            guide = global.document.createElement("div");
+            guide.className = "o_chatboo_card_resize_guide";
+            guide.setAttribute("aria-hidden", "true");
+            root.appendChild(guide);
+            root._chatbooResizeGuide = guide;
+            root.classList.add("o_chatboo_card_resizing");
+        }
+        var rootRect = root.getBoundingClientRect();
+        var cardRect = card.getBoundingClientRect();
+        var rtl = false;
+        try {
+            rtl = global.getComputedStyle(root).direction === "rtl";
+        } catch (eDir) { /* LTR */ }
+        var visH = root.clientHeight || 0;
+        if (visH > 0) {
+            guide.style.top = (root.scrollTop || 0) + "px";
+            guide.style.height = visH + "px";
+        }
+        var x = rtl
+            ? (cardRect.right - rootRect.left) - n + (root.scrollLeft || 0)
+            : (cardRect.left - rootRect.left) + n + (root.scrollLeft || 0);
+        guide.style.left = x + "px";
+        return n;
+    }
+
+    function hideGuide(root) {
+        if (!root) {
+            return;
+        }
+        var guide = root._chatbooResizeGuide;
+        if (guide && guide.parentNode) {
+            guide.parentNode.removeChild(guide);
+        }
+        root._chatbooResizeGuide = null;
+        if (root.classList) {
+            root.classList.remove("o_chatboo_card_resizing");
+        }
     }
 
     function relayoutCharts(root) {
@@ -103,15 +148,31 @@
         } catch (e) { /* chart not mounted yet */ }
     }
 
+    var _relayoutRaf = 0;
+    var _relayoutRoot = null;
+
+    function relayoutSoon(root) {
+        if (root) {
+            _relayoutRoot = root;
+        }
+        if (_relayoutRaf) {
+            return;
+        }
+        var kick = function () {
+            _relayoutRaf = 0;
+            var target = _relayoutRoot;
+            _relayoutRoot = null;
+            relayoutCharts(target);
+        };
+        _relayoutRaf = global.requestAnimationFrame(kick);
+    }
+
     global.ChatbooCardWidth = {
         DEFAULT_RATIO: DEFAULT_RATIO,
-        MIN_PX: MIN_PX,
-        deviceMaxPx: deviceMaxPx,
-        canvasCapPx: canvasCapPx,
-        clampRatio: clampRatio,
         applyRatio: applyRatio,
         applyPx: applyPx,
-        ratioFromRoot: ratioFromRoot,
-        relayoutCharts: relayoutCharts,
+        previewGuide: previewGuide,
+        hideGuide: hideGuide,
+        relayoutSoon: relayoutSoon,
     };
 })(typeof window !== "undefined" ? window : this);

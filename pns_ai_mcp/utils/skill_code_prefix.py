@@ -5,8 +5,9 @@
 
 Code is snake_case; the chat command is kebab-case. Both prefixes are
 optional (empty = none). No ``{company}`` / ``{user}`` interpolation.
-Factory first-install seeds ``custom_`` / ``custom-`` (ICP via post_init).
-A later ``-u`` does not rewrite existing ICPs. This module never names a tenant.
+Factory first-install seeds ``custom_`` / empty slash (ICP via post_init).
+A later ``-u`` does not rewrite existing ICPs. Uninstall drops the two
+ICP keys so a later install is clean. This module never names a tenant.
 """
 from __future__ import annotations
 
@@ -15,7 +16,7 @@ import re
 ICP_SKILL_CODE_PREFIX = 'pns_ai_mcp.skill_code_prefix'
 ICP_SKILL_COMMAND_PREFIX = 'pns_ai_mcp.skill_command_prefix'
 DEFAULT_SKILL_CODE_PREFIX = 'custom_'
-DEFAULT_SKILL_COMMAND_PREFIX = 'custom-'
+DEFAULT_SKILL_COMMAND_PREFIX = ''
 
 
 def normalize_skill_code_prefix(raw):
@@ -109,8 +110,8 @@ def invoke_lookup_tokens(token, code_prefix='', command_prefix=''):
 def instance_identity(slash_or_code, code_prefix='', command_prefix=''):
     """Return ``(catalog_code, command)`` for a user-authored skill.
 
-    ``facturacion`` + ``occ_custom_`` / ``occ-`` →
-    ``('occ_custom_facturacion', 'occ-facturacion')``.
+    ``facturacion`` + ``pack_`` / ``pack-`` →
+    ``('pack_facturacion', 'pack-facturacion')``.
     If the token already starts with a prefix, do not double it.
     """
     cmd_pfx = normalize_skill_command_prefix(command_prefix)
@@ -172,8 +173,10 @@ def reserved_slash_commands():
         'skill', 'skills', 'help', 'ayuda', '?',
         # Retired Chatboo slash: keep reserved so nobody recycles the name.
         'reload-skills',
-        'create-skill', 'delete-skill', 'rename-skill', 'mode',
-        'painter-local', 'painter-free', 'foot-verbose', 'foot-laconic',
+        'create-skill', 'delete-skill', 'rename-skill', 'edit-skill',
+        # Retired Chatboo slash: keep reserved so nobody recycles the name.
+        'set-skill-parameters', 'mode',
+        'compose-agent', 'compose-model', 'foot-verbose', 'foot-laconic',
         'show-table', 'show-chart',
     }
     try:
@@ -218,7 +221,7 @@ def stem_for_reapply(code, command, old_code_prefixes, old_command_prefixes):
 def unprefixed_twin_stems(factory_commands, command_prefix):
     """Bare slashes that duplicate a factory command already carrying the prefix.
 
-    ``('occ-polizas', 'payroll')`` + ``occ-`` → ``{'polizas'}``.
+    ``('pack-billing', 'payroll')`` + ``pack-`` → ``{'billing'}``.
     Empty prefix → no twins (nothing was stripped).
     """
     pfx = normalize_skill_command_prefix(command_prefix)
@@ -232,18 +235,6 @@ def unprefixed_twin_stems(factory_commands, command_prefix):
             if stem:
                 stems.add(stem)
     return frozenset(stems)
-
-
-def is_unprefixed_slash_twin(
-    command, factory_commands, command_prefix, is_system=False,
-):
-    """True when ``command`` is the stem of a prefixed factory slash."""
-    if is_system:
-        return False
-    token = slash_slug(command, default='')
-    if not token:
-        return False
-    return token in unprefixed_twin_stems(factory_commands, command_prefix)
 
 
 def leftover_twin_action(

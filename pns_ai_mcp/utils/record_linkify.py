@@ -18,14 +18,6 @@ _TABLE_MARKERS = (
 )
 
 
-def content_delivers_records(text):
-    """True si el contenido ya entrega tabla server-side o un deep-link Odoo."""
-    if not text or not isinstance(text, str):
-        return False
-    if _WEB_ID_RE.search(text):
-        return True
-    return any(m in text for m in _TABLE_MARKERS)
-
 
 def _record_form_md_url(model, rec_id):
     return '/web#id=%d&model=%s&view_type=form' % (int(rec_id), model)

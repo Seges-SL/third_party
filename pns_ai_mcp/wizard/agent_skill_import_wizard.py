@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Import agent skills from a ZIP export."""
+
 import base64
 
 from odoo import api, fields, models, _
@@ -10,7 +12,7 @@ from .operation_result import skill_zip_to_result
 
 
 class AIAgentSkillImportWizard(models.TransientModel):
-    _name = 'pns_ai_mcp.agent.skill.import.wizard'
+    _name = 'ai.agent.skill.import.wizard'
     _inherit = ['pns.operation.report.wizard']
     _description = 'Import agent skills from ZIP'
 

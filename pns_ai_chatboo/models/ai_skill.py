@@ -60,33 +60,82 @@ class AISkill(models.Model):
             return self.env['chatboo.session']
         return session
 
+    def _chatboo_skill_slash(self, rec):
+        slash = ''
+        if hasattr(rec, 'invoke_code'):
+            slash = (rec.invoke_code() or '').strip()
+        if not slash:
+            slash = (rec.code or '').strip()
+        return slash
+
+    def _chatboo_skill_card(self, rec, op, old=''):
+        """Markdown result card. Slash comes from the record, never invented."""
+        slash = self._chatboo_skill_slash(rec)
+        if not slash:
+            return '', ''
+        if op == 'created':
+            preamble = _('Skill /%s created.') % slash
+            prompt = '/create-skill %s' % slash
+        elif op == 'updated':
+            preamble = _('Skill /%s updated.') % slash
+            prompt = '/edit-skill %s' % slash
+        elif op == 'deleted':
+            return (
+                '# /%s\n\n**%s**\n' % (slash, _('Skill /%s deleted.') % slash),
+                '/delete-skill %s' % slash,
+            )
+        elif op == 'renamed':
+            if old:
+                preamble = _('Skill renamed: /%s → /%s') % (old, slash)
+                prompt = '/rename-skill %s %s' % (old, slash)
+            else:
+                preamble = _('Skill /%s renamed.') % slash
+                prompt = '/rename-skill %s' % slash
+        else:
+            return '', ''
+        body = '**%s**\n' % preamble
+        if op in ('created', 'updated', 'renamed'):
+            try:
+                from odoo.addons.pns_ai_mcp.utils.skill_help import (
+                    build_slash_help_markdown,
+                    skill_help_meta,
+                )
+                body = '%s\n%s' % (
+                    body, build_slash_help_markdown(skill_help_meta(rec)),
+                )
+            except Exception:
+                body = '%s\n# /%s\n' % (body, slash)
+        return body.strip() + '\n', prompt
+
     def _chatboo_append_catalog_note(self, op):
-        """Persist a local Chatboo note. Slash comes from the record, never invented."""
+        """Persist a result card. Slash comes from the record, never invented."""
         session = self._chatboo_confirm_session()
         if not session:
             return
         old = (self.env.context.get('chatboo_confirm_old') or '').strip()
-        lines = []
+        usage = self.env.context.get('skill_author_usage') or {}
+        if not isinstance(usage, dict):
+            usage = {}
+        provider = self.env.context.get('skill_author_provider') or {}
+        if not isinstance(provider, dict):
+            provider = {}
+        blocks = []
+        prompt = ''
         for rec in self:
-            slash = ''
-            if hasattr(rec, 'invoke_code'):
-                slash = (rec.invoke_code() or '').strip()
-            if not slash:
-                slash = (rec.code or '').strip()
-            if not slash:
+            card, user_line = self._chatboo_skill_card(rec, op, old)
+            if not card:
                 continue
-            if op == 'created':
-                lines.append(_('Skill /%s created.') % slash)
-            elif op == 'deleted':
-                lines.append(_('Skill /%s deleted.') % slash)
-            elif op == 'renamed':
-                if old:
-                    lines.append(_('Skill renamed: /%s → /%s') % (old, slash))
-                else:
-                    lines.append(_('Skill /%s renamed.') % slash)
-        if not lines:
+            blocks.append(card)
+            if user_line and not prompt:
+                prompt = user_line
+        if not blocks:
             return
-        session.append_local_ack('\n'.join(lines))
+        session.append_local_ack(
+            '\n'.join(blocks),
+            usage=usage,
+            provider_meta=provider,
+            user_prompt=prompt,
+        )
 
     def _chatboo_after_catalog_change(self, op=None):
         confirm = bool(op) and bool(self.env.context.get('chatboo_session_id'))
@@ -129,11 +178,13 @@ class AISkill(models.Model):
 
     def write(self, vals):
         res = super().write(vals)
-        op = (
-            'renamed'
-            if self.env.context.get('chatboo_confirm_op') == 'renamed'
-            else None
-        )
+        ctx_op = self.env.context.get('chatboo_confirm_op')
+        if ctx_op == 'renamed':
+            op = 'renamed'
+        elif ctx_op in ('created', 'updated'):
+            op = 'updated'
+        else:
+            op = None
         self._chatboo_after_catalog_change(op)
         return res
 

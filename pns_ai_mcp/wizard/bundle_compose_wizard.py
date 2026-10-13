@@ -9,9 +9,9 @@ After each change the agent's cached system prompt is rebuilt.
 
 Models
 ------
-``pns_ai_mcp.agent.compose.wizard``
+``ai.agent.compose.wizard``
     TransientModel — one wizard instance per compose session.
-``pns_ai_mcp.agent.compose.line``
+``ai.agent.compose.line``
     TransientModel — one line per candidate context.
 """
 from odoo import api, fields, models, _
@@ -32,7 +32,7 @@ class AIAgentComposeWizard(models.TransientModel):
     The wizard is reloaded after each action so the "in composition"
     column reflects the new state.
     """
-    _name = 'pns_ai_mcp.agent.compose.wizard'
+    _name = 'ai.agent.compose.wizard'
     _description = 'Compose agent context membership'
 
     agent_id = fields.Many2one(
@@ -41,7 +41,7 @@ class AIAgentComposeWizard(models.TransientModel):
         ondelete='cascade',
     )
     line_ids = fields.One2many(
-        'pns_ai_mcp.agent.compose.line',
+        'ai.agent.compose.line',
         'wizard_id',
         string='Candidate contexts',
     )
@@ -137,7 +137,7 @@ class AIAgentComposeLine(models.TransientModel):
         in_composition: read-only — True if any locale variant of this
             context is currently in the agent's context_ids.
     """
-    _name = 'pns_ai_mcp.agent.compose.line'
+    _name = 'ai.agent.compose.line'
     _description = 'Agent composition line'
     # Ordenamos por 'code' (almacenado abajo). El antiguo 'category' ya no existe
     # y en Odoo 19 un _order con un campo inexistente rompe cualquier search
@@ -145,7 +145,7 @@ class AIAgentComposeLine(models.TransientModel):
     _order = 'code'
 
     wizard_id = fields.Many2one(
-        'pns_ai_mcp.agent.compose.wizard',
+        'ai.agent.compose.wizard',
         required=True,
         ondelete='cascade',
     )

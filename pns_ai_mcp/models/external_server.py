@@ -1,24 +1,17 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""PNS AI MCP - External API Server. PATANEGRA Soft (https://patanegra.com).
+"""Registered external API (MCP or OpenAPI) for Safe Plan ``api_call``.
 
-Part of Patanegra Soft Suite (`pns_suite`), distributed via Patanegra Soft Hub.
-External-API access of the Patanegra Application Agent Protocol (PAAP): the AI
-proposes api_call in Safe Plan, the human confirms and Odoo executes with
-per-server trust.
-
-Each registered server is a SELF-DOCUMENTED external API. The ``api_type``
-selects the protocol driver (see ``lib/api/drivers``):
+The AI proposes the call; the human confirms; Odoo executes with per-server
+trust. ``api_type`` selects the protocol driver (see ``lib/api/drivers``):
   - mcp:     Anthropic Model Context Protocol. Transports:
              sse (HTTP JSON-RPC + SSE streams) or stdio (local subprocess).
-  - openapi: OpenAPI/Swagger described HTTP API (FastAPI, etc.); the catalogue
-             is derived from spec_url (remote) or from a pasted spec_json
-             when spec_manual is set.
+  - openapi: OpenAPI/Swagger HTTP API; catalogue from spec_url or pasted
+             spec_json when spec_manual is set.
 
-MCP servers keep the dual representation (form fields <-> config_json in
-Cursor/Antigravity format, kept in sync idempotently).
-Licensed under the Apache License 2.0 - see LICENSE.
+MCP servers keep form fields and config_json (Cursor/Antigravity format)
+in sync idempotently.
 """
 
 
@@ -33,7 +26,10 @@ from odoo.exceptions import UserError
 from ..utils import mcp_ui
 from ..utils.copy_code import next_copy_code
 from ..utils.import_export_guard import ensure_ai_admin
-from ..utils.portable_io import export_record_dict
+from ..utils.portable_io import (
+    export_record_dict,
+    keep_existing_secrets,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -83,6 +79,8 @@ class ExternalAPIServer(models.Model):
     _description = 'External API Server'
     _order = 'name'
     _rec_name = 'name'
+    # config_json repeats the token and env; the form fields rebuild it.
+    _pns_secret_fields = ('auth_token', 'env_vars', 'config_json')
 
     # ── Identity ──────────────────────────────────────────────────────────
     name = fields.Char(
@@ -152,6 +150,25 @@ class ExternalAPIServer(models.Model):
             'overwritten or lost on a failed refresh.'
         ),
     )
+    docs_url = fields.Char(
+        string='Documentation URL',
+        help=(
+            'OpenAPI manual only. Human-readable API docs (markdown/HTML) used '
+            'by Generate OpenAPI from documentation. The host must be on the '
+            'web URL whitelist.'
+        ),
+    )
+    openapi_gen_prompt = fields.Text(
+        string='Doc to OpenAPI prompt',
+        default=lambda self: self._default_openapi_gen_prompt(),
+        help=(
+            'System prompt sent to the AI when converting the documentation '
+            'page into OpenAPI JSON. The page text is the user message only — '
+            'no Odoo metadata is injected. Empty rows are filled with the '
+            'factory English default on module upgrade. Hidden when Manual '
+            'spec is off; the value is kept.'
+        ),
+    )
     base_url = fields.Char(
         string='Base URL',
         help=(
@@ -169,12 +186,13 @@ class ExternalAPIServer(models.Model):
     )
     auth_type = fields.Selection(
         [('none', 'None'), ('api_key', 'API Key'), ('bearer', 'Bearer Token'),
-         ('custom_header', 'Custom Header')],
+         ('basic', 'HTTP Basic'), ('custom_header', 'Custom Header')],
         string='Auth Type',
         default='none',
     )
     auth_token = fields.Char(
         string='Default Auth Token',
+        groups='pns_ai_mcp.group_ai_admin',
         help=(
             'Default API key or bearer token, used when the calling user has '
             'no personal credential (see the Credentials tab).'
@@ -208,6 +226,7 @@ class ExternalAPIServer(models.Model):
     )
     env_vars = fields.Text(
         string='Environment Variables (JSON)',
+        groups='pns_ai_mcp.group_ai_admin',
         default='{}',
         help='JSON object of env vars: {"API_KEY": "sk-..."}.',
     )
@@ -235,6 +254,7 @@ class ExternalAPIServer(models.Model):
     # ── Dual-representation: raw JSON config ──────────────────────────────
     config_json = fields.Text(
         string='JSON Config',
+        groups='pns_ai_mcp.group_ai_admin',
         help=(
             'Full server configuration in Cursor/Antigravity JSON format. '
             'Editing this field updates the form fields and vice versa.'
@@ -362,9 +382,11 @@ class ExternalAPIServer(models.Model):
         self.ensure_one()
         if self.auth_type in (False, 'none'):
             return False
-        token_state = _('token set') if self.auth_token else _('no token')
+        token_state = _('token set') if self.sudo().auth_token else _('no token')
         if self.auth_type == 'bearer':
             header, value = 'Authorization', 'Bearer …'
+        elif self.auth_type == 'basic':
+            header, value = 'Authorization', 'Basic …'
         elif self.auth_type in ('api_key', 'custom_header'):
             header = (self.auth_header_name or '').strip() or 'Authorization'
             value = '…'
@@ -523,14 +545,46 @@ class ExternalAPIServer(models.Model):
                     if k not in vals or not vals[k]:
                         vals[k] = v
             vals.pop('_from_fields', None)
+            self._check_may_set_stdio_command(vals)
         records = super().create(vals_list)
         # Ensure config_json is in sync with fields
         for rec in records:
             rec._sync_json_from_fields()
             rec._ensure_server_whitelisted()
+            try:
+                rec._ensure_identity_detection()
+            except Exception:
+                _logger.warning(
+                    'MCP: server %s created but detection row failed',
+                    rec.code,
+                    exc_info=True,
+                )
+            if rec.api_type == 'openapi' and (rec.spec_json or '').strip():
+                rec._sync_openapi_tools_from_spec()
         return records
 
+    @api.model
+    def _check_may_set_stdio_command(self, vals):
+        """The stdio command runs on the Odoo host: Settings admins only.
+
+        AI Administrator alone is not a shell on the server. Checked on the
+        real user, so a ``sudo()`` import does not lift it.
+        """
+        empty = (False, None, '', '[]', '{}')
+        if not (vals.get('server_type') == 'stdio' or any(
+                (vals.get(k) or '').strip() not in empty
+                for k in ('command', 'command_args', 'env_vars') if k in vals)):
+            return
+        user = self.env.user
+        if user._is_superuser() or user.has_group('base.group_system'):
+            return
+        raise UserError(_(
+            'Only a Settings administrator can set up a stdio server: '
+            'its command runs on the Odoo host.'
+        ))
+
     def write(self, vals):
+        self._check_may_set_stdio_command(vals)
         res = super().write(vals)
         if 'config_json' in vals and not self.env.context.get('_syncing_json'):
             # JSON changed → update fields
@@ -556,7 +610,29 @@ class ExternalAPIServer(models.Model):
             {'code', 'active'} & set(vals)
         ):
             self._sync_detection_contexts()
+        if not self.env.context.get('_syncing_json') and (
+            {'code', 'name'} & set(vals)
+        ):
+            self._ensure_identity_detection()
+        if (
+            not self.env.context.get('_syncing_openapi_tools')
+            and 'spec_json' in vals
+        ):
+            for rec in self:
+                if rec.api_type == 'openapi':
+                    rec._sync_openapi_tools_from_spec()
+        if not self.env.context.get('_syncing_json') and 'docs_url' in vals:
+            for rec in self:
+                if rec.api_type == 'openapi' and (rec.docs_url or '').strip():
+                    rec._ensure_docs_url_whitelisted()
         return res
+
+    def _ensure_identity_detection(self):
+        """Neutral Detection row from code + name. No LLM. Merge, never replace."""
+        from ..utils.domain_index import identity_detection_triggers
+        for srv in self:
+            triggers = identity_detection_triggers(srv.code, srv.name)
+            srv._upsert_detection_row('', triggers)
 
     def _sync_detection_contexts(self):
         """Keep server-owned discovery rows aligned (code / active / cascade)."""
@@ -585,27 +661,125 @@ class ExternalAPIServer(models.Model):
                 if updates:
                     ctx.write(updates)
 
+    @api.model
+    def _default_openapi_gen_prompt(self):
+        from ..services.openapi_spec_generator import (
+            DEFAULT_OPENAPI_GEN_SYSTEM_PROMPT,
+        )
+        return DEFAULT_OPENAPI_GEN_SYSTEM_PROMPT
+
+    @api.model
+    def _fill_empty_openapi_gen_prompts(self):
+        """Persist factory English prompt on OpenAPI rows that still have none
+        or still hold a prior factory text (unmodified).
+        """
+        from ..services.openapi_spec_generator import (
+            DEFAULT_OPENAPI_GEN_SYSTEM_PROMPT,
+            _LEGACY_OPENAPI_GEN_SYSTEM_PROMPTS,
+        )
+        Server = self.sudo()
+        empty = Server.search([
+            ('api_type', '=', 'openapi'),
+            '|',
+            ('openapi_gen_prompt', '=', False),
+            ('openapi_gen_prompt', '=', ''),
+        ])
+        legacy = Server.browse()
+        for old in _LEGACY_OPENAPI_GEN_SYSTEM_PROMPTS:
+            legacy |= Server.search([
+                ('api_type', '=', 'openapi'),
+                ('openapi_gen_prompt', '=', old),
+            ])
+        targets = empty | legacy
+        if targets:
+            targets.write({
+                'openapi_gen_prompt': DEFAULT_OPENAPI_GEN_SYSTEM_PROMPT,
+            })
+        return len(targets)
+
+    def action_restore_openapi_gen_prompt(self):
+        """Replace the Doc→OpenAPI prompt with the current factory English text."""
+        from ..services.openapi_spec_generator import (
+            DEFAULT_OPENAPI_GEN_SYSTEM_PROMPT,
+        )
+        for rec in self:
+            rec.openapi_gen_prompt = DEFAULT_OPENAPI_GEN_SYSTEM_PROMPT
+        # Return True so the form reloads the textarea from the database.
+        return True
+
+    def _factory_usage_guide(self):
+        """Return pack factory text for ``usage_guide``, or empty.
+
+        Plug: any installed addon may expose
+        ``hooks.factory_usage_guide_for_code(code) -> str``. The engine does
+        not hardcode pack names; packs that seed servers implement the hook.
+        """
+        self.ensure_one()
+        code = (self.code or '').strip()
+        if not code:
+            return ''
+        Module = self.env['ir.module.module'].sudo()
+        for mod in Module.search([('state', '=', 'installed')]):
+            name = mod.name
+            try:
+                hooks = __import__(
+                    'odoo.addons.%s.hooks' % name,
+                    fromlist=['factory_usage_guide_for_code'],
+                )
+            except ImportError:
+                continue
+            fn = getattr(hooks, 'factory_usage_guide_for_code', None)
+            if not callable(fn):
+                continue
+            try:
+                text = (fn(code) or '').strip()
+            except Exception:
+                _logger.debug(
+                    'MCP: factory_usage_guide_for_code failed in %s',
+                    name, exc_info=True,
+                )
+                continue
+            if text:
+                return text
+        return ''
+
+    def action_restore_usage_guide(self):
+        """Replace ``usage_guide`` with the pack factory text for this server."""
+        for rec in self:
+            text = (rec._factory_usage_guide() or '').strip()
+            if not text:
+                raise UserError(_(
+                    "No factory usage guide is defined for server '%s'. "
+                    "Only pack-seeded servers can restore this field."
+                ) % (rec.code or rec.name or rec.id))
+            rec.usage_guide = text
+        return True
+
     def _detection_llm_provider(self):
-        """Same provider resolution the skill hybrid uses."""
+        """First provider on the AI Admin inference chain (presence / chips)."""
         try:
-            engine = self.env['ai.execution.engine']
-            provs = engine.get_providers_for_agent('pns_ai_mcp')
+            from ..utils.agent_engine import resolve_providers_for_consumer
+            provs = resolve_providers_for_consumer(
+                self.env, consumer_key='admin',
+            )
             if provs:
-                return provs[0]
+                return provs[:1]
         except Exception:
-            _logger.debug('detection hybrid: no pns_ai_mcp provider', exc_info=True)
-        try:
-            return self.env['ai.provider'].search([], limit=1)
-        except Exception:
-            return self.env['ai.provider']
+            _logger.debug(
+                'detection hybrid: no pns_ai_admin provider', exc_info=True,
+            )
+        return self.env['ai.provider']
 
     def _hybrid_detection_triggers(self, locale):
-        """Deterministic identity tokens, then one ``llm_json_completion``.
+        """Deterministic identity tokens, then one admin-agent LLM fill.
 
         Same order as skill params: parse for free, LLM only to fill holes
         (spoken synonyms from name / usage_guide). Never browses spec_json.
         """
-        from ..utils.agent_engine import llm_json_completion
+        from ..utils.agent_engine import (
+            llm_json_completion_for_agent,
+            resolve_providers_for_consumer,
+        )
         from ..utils.domain_index import (
             DETECTION_TRIGGER_SCHEMA,
             build_detection_triggers_prompt,
@@ -616,10 +790,16 @@ class ExternalAPIServer(models.Model):
 
         self.ensure_one()
         det = identity_detection_triggers(self.code, self.name)
-        provider = self._detection_llm_provider()
         ai_list = []
         used_llm = False
-        if provider:
+        audit_ctx = None
+        try:
+            providers = resolve_providers_for_consumer(
+                self.env, consumer_key='admin',
+            )
+        except Exception:
+            providers = self.env['ai.provider']
+        if providers:
             system, user = build_detection_triggers_prompt(
                 locale=locale or '',
                 code=self.code or '',
@@ -627,7 +807,22 @@ class ExternalAPIServer(models.Model):
                 usage_guide=self.usage_guide or '',
                 already=det,
             )
-            text = llm_json_completion(provider, system, user, max_tokens=400)
+            from ..utils.inference_audit import inference_audit
+            with inference_audit(
+                self.env,
+                endpoint='server_detection',
+                source_channel='internal',
+                user_id=self.env.uid,
+                additional_info={
+                    'server_code': self.code or '',
+                    'locale': locale or '',
+                },
+            ) as audit_ctx:
+                result = llm_json_completion_for_agent(
+                    self.env, system, user,
+                    consumer_key='admin', max_tokens=400,
+                )
+                text = (result or {}).get('content') or ''
             used_llm = True
             parsed = parse_and_validate_params(text, DETECTION_TRIGGER_SCHEMA)
             if isinstance(parsed, dict) and not parsed.get('_skill_args_reject'):
@@ -635,16 +830,20 @@ class ExternalAPIServer(models.Model):
                 if isinstance(raw, (list, tuple)):
                     ai_list = [str(x).strip() for x in raw if str(x).strip()]
         merged = merge_trigger_lists(det, ai_list)
+        usage = {}
+        if used_llm and audit_ctx is not None:
+            usage = dict(audit_ctx.usage_acc or {})
         _logger.info(
             'detection hybrid: server=%s locale=%s det=%s ai=%s llm=%s',
             self.code, locale or '', det, ai_list, used_llm,
         )
-        return merged, used_llm
+        return merged, used_llm, usage
 
     def _upsert_detection_row(self, locale, triggers):
         """Create or merge the locale Detection row for this server."""
         from ..utils.domain_index import (
             TARGET_KIND_API_SERVER,
+            detection_row_code,
             merge_trigger_lists,
         )
         self.ensure_one()
@@ -664,6 +863,18 @@ class ExternalAPIServer(models.Model):
                 domain + ['|', ('locale', '=', False), ('locale', '=', '')],
                 limit=1,
             )
+        if not rec:
+            want = detection_row_code(self.code, locale)
+            orphan = Context.search([
+                ('code', '=', want),
+                '|',
+                ('api_server_id', '=', False),
+                ('api_server_id', '=', self.id),
+            ], limit=1)
+            if orphan:
+                if not orphan.api_server_id:
+                    orphan.write({'api_server_id': self.id})
+                rec = orphan
         existing = Context._discovery_parse_triggers(
             rec.discovery_triggers,
         ) if rec else []
@@ -689,14 +900,19 @@ class ExternalAPIServer(models.Model):
 
     def action_suggest_detection(self):
         """Fill Detection rows: identity tokens + one short JSON LLM call."""
+        from ..utils.llm_usage import add_usage
         from ..utils.mcp_ui import client_notification
+        from ..utils.usage_display import format_usage_chip
+
         locale = (self.env.user.lang or '').replace('-', '_')
         created = 0
         updated = 0
         llm_used = False
+        usage_acc = {}
         for srv in self:
-            triggers, used_llm = srv._hybrid_detection_triggers(locale)
+            triggers, used_llm, usage = srv._hybrid_detection_triggers(locale)
             llm_used = llm_used or used_llm
+            usage_acc = add_usage(usage_acc, usage)
             _rec, is_new = srv._upsert_detection_row(locale, triggers)
             if is_new:
                 created += 1
@@ -714,7 +930,13 @@ class ExternalAPIServer(models.Model):
                 'Identity tokens only (no LLM provider). '
                 '%s new row(s), %s updated. Locale %s.'
             ) % (created, updated, locale or 'neutral')
-        return client_notification(title, detail)
+        chip = format_usage_chip(self.env, usage_acc)
+        if chip:
+            detail = '%s\n%s: %s' % (detail, _('LLM usage'), chip)
+        action = client_notification(title, detail)
+        if usage_acc:
+            action['usage'] = usage_acc
+        return action
 
     def _sync_json_from_fields(self):
         """Regenerate config_json from form field values (MCP servers only)."""
@@ -748,46 +970,6 @@ class ExternalAPIServer(models.Model):
         return hosts
 
     @api.model
-    def _load_factory_spec_json(self, xmlid, filename):
-        """Fill ``spec_json`` from ``data/openapi/<filename>`` if the row is empty.
-
-        First-install helper for converted (non-upstream) OpenAPI documents.
-        Does not overwrite a pasted spec. Missing file is a no-op.
-        """
-        rec = self.env.ref(xmlid, raise_if_not_found=False)
-        if not rec or (rec.spec_json or '').strip():
-            return
-        import os
-        try:
-            from odoo.modules.module import get_module_path
-            base = get_module_path('pns_ai_mcp')
-        except Exception:
-            _logger.warning(
-                'MCP: could not resolve module path for factory spec %s',
-                filename, exc_info=True,
-            )
-            return
-        path = os.path.join(base or '', 'data', 'openapi', filename)
-        if not path or not os.path.isfile(path):
-            _logger.info(
-                'MCP: factory OpenAPI file %s not present; %s spec_json stays empty',
-                filename, xmlid,
-            )
-            return
-        try:
-            with open(path, 'r', encoding='utf-8') as handle:
-                payload = handle.read()
-        except OSError:
-            _logger.warning(
-                'MCP: could not read factory OpenAPI %s', path, exc_info=True,
-            )
-            return
-        if not (payload or '').strip():
-            return
-        rec.sudo().write({'spec_json': payload})
-        _logger.info('MCP: loaded factory OpenAPI spec into %s', xmlid)
-
-    @api.model
     def _link_orphan_api_discovery(self):
         """Attach factory ``api_server`` discovery rows that missed the server.
 
@@ -819,6 +1001,66 @@ class ExternalAPIServer(models.Model):
             linked += 1
         if linked:
             _logger.info('MCP: linked %s orphan API discovery row(s)', linked)
+
+    def _ensure_docs_url_whitelisted(self):
+        """Register the documentation host on the web whitelist when set."""
+        self.ensure_one()
+        from urllib.parse import urlparse
+
+        url = (self.docs_url or '').strip()
+        if not url:
+            return
+        parsed = urlparse(url)
+        host = parsed.hostname
+        if not host:
+            return
+        try:
+            self.env['ai.url.whitelist'].ensure_domain_whitelisted(
+                host,
+                notes='Documentation URL for external API server "%s"' % self.code,
+                kind='web',
+            )
+        except Exception:
+            _logger.warning(
+                'MCP: could not whitelist docs host %s for server %s',
+                host, self.code, exc_info=True,
+            )
+
+    def _openapi_tools_from_spec(self):
+        """Derive the normalized tool catalogue from ``spec_json``."""
+        self.ensure_one()
+        if self.api_type != 'openapi':
+            return []
+        from ..lib.api.drivers.openapi_driver import OpenAPIDriver, APIDriverError
+
+        driver = OpenAPIDriver()
+        try:
+            if self.spec_manual:
+                spec = driver._resolve_spec(self, fetch=False)
+            else:
+                spec = driver._load_cached_spec(self)
+                if not spec:
+                    return []
+                spec = driver._as_spec_dict(
+                    spec, "cached spec_json of server '%s'" % (self.code or '?'))
+        except APIDriverError:
+            return []
+        return driver._spec_to_tools(spec)
+
+    def _sync_openapi_tools_from_spec(self):
+        """Keep ``tools_json`` aligned with ``spec_json`` for OpenAPI servers."""
+        self.ensure_one()
+        if self.api_type != 'openapi':
+            return
+        tools = self._openapi_tools_from_spec()
+        payload = (
+            json.dumps(tools, indent=2, ensure_ascii=False) if tools else False
+        )
+        if payload == (self.tools_json or False):
+            return
+        self.with_context(_syncing_openapi_tools=True).write({
+            'tools_json': payload,
+        })
 
     def _ensure_server_whitelisted(self):
         """Register the server's domain(s) in the typed URL whitelist.
@@ -869,7 +1111,29 @@ class ExternalAPIServer(models.Model):
             ], limit=1)
             if key and key.token:
                 return key.token
-        return self.auth_token or None
+        return self.sudo().auth_token or None
+
+    def action_open_openapi_generate_wizard(self):
+        """Open the admin wizard that drafts OpenAPI from documentation."""
+        self.ensure_one()
+        if self.api_type != 'openapi':
+            raise UserError(_(
+                'OpenAPI generation only applies to OpenAPI servers.'))
+        if not self.spec_manual:
+            raise UserError(_(
+                'Enable Manual spec before generating OpenAPI from '
+                'documentation.'))
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Generate OpenAPI from documentation'),
+            'res_model': 'ai.openapi.spec.generate.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_server_id': self.id,
+                'default_docs_url': self.docs_url or '',
+            },
+        }
 
     def action_discover_tools(self):
         """Fetch the server's self-description via its protocol driver.
@@ -880,6 +1144,7 @@ class ExternalAPIServer(models.Model):
         ``spec_manual`` is set, in which case tools are rebuilt from the
         pasted ``spec_json`` and that document is never overwritten.
         """
+        ensure_ai_admin(self.env)
         self.ensure_one()
         try:
             catalog = self._get_driver().discover(self)
@@ -992,6 +1257,7 @@ class ExternalAPIServer(models.Model):
 
     def action_test_connection(self):
         """Quick connectivity test (no full discovery)."""
+        ensure_ai_admin(self.env)
         self.ensure_one()
         try:
             summary = self._get_driver().test_connection(self)
@@ -1009,6 +1275,10 @@ class ExternalAPIServer(models.Model):
     def get_tools_list(self):
         """Return the discovered tools as a Python list of dicts."""
         self.ensure_one()
+        if self.api_type == 'openapi':
+            derived = self._openapi_tools_from_spec()
+            if derived:
+                return derived
         try:
             return json.loads(self.tools_json or '[]')
         except (json.JSONDecodeError, TypeError):
@@ -1026,7 +1296,7 @@ class ExternalAPIServer(models.Model):
 
         Format (one server per group)::
 
-            External API servers callable via propose_safe_operations → api_call.
+            External API servers callable via safe_plan_request → api_call.
             Use ONLY these exact server codes and tool names; never invent tools.
 
             • server "produccion" (Producción):
@@ -1059,35 +1329,31 @@ class ExternalAPIServer(models.Model):
             compact_chunk=compact_chunk,
         )
 
-    @api.model
-    def get_active_servers_summary(self):
-        """Return a summary of active servers and their tools for prompt injection.
-
-        Returns a list of dicts: [{'code': ..., 'name': ..., 'tools': [...]}]
-        """
-        servers = self.sudo().search([('active', '=', True)])
-        result = []
-        for srv in servers:
-            tools = srv.get_tools_list()
-            tool_names = [t.get('name', '?') for t in tools] if tools else []
-            result.append({
-                'code': srv.code,
-                'name': srv.name,
-                'api_type': srv.api_type,
-                'type': srv.server_type,
-                'tools': tool_names,
-            })
-        return result
 
     # ── Export / Import ───────────────────────────────────────────
     # Dynamic via portable_io: every scalar/config field on the model is
     # exported (incl. trusted, discovery caches, usage_guide, …). No curated
     # allow-list — adding a field to the model is enough for it to travel.
 
-    def _export_server_row(self):
+    def _export_server_row(self, include_secrets=False):
         """Portable dict for one external API server (dynamic field dump)."""
         self.ensure_one()
-        return export_record_dict(self)
+        return export_record_dict(self, include_secrets=include_secrets)
+
+    def _keep_secrets_on_import(self, vals):
+        """Import *vals* for this server without blanking its token or env.
+
+        ``config_json`` is read into the fields first (on write it would
+        overwrite them), then dropped: the fields rebuild it.
+        """
+        if not self:
+            return vals
+        raw = vals.pop('config_json', None)
+        if raw:
+            for key, value in self._json_to_fields(raw).items():
+                if not vals.get(key):
+                    vals[key] = value
+        return keep_existing_secrets(self, vals)
 
     @api.model
     def _export_servers_summary(self, servers):
@@ -1106,37 +1372,22 @@ class ExternalAPIServer(models.Model):
 
     @api.model
     def action_export_external_servers(self, *args, **kwargs):
-        """Export all external API server configurations to a downloadable JSON file.
+        """Export all external API server configurations (asks for secrets first).
 
         Exports ALL servers (including inactive/archived) as a JSON array.
         Each element is a dynamic dump of every portable field on ``ai.api.server``
         (see ``portable_io.export_record_dict``). Relational fields are omitted;
         URL whitelist entries are a separate model and are never mixed in.
-
-        Returns:
-            dict: Odoo action opening the JSON export wizard with
-                  the generated ir.attachment.
         """
         ensure_ai_admin(self.env)
-        servers = self.with_context(active_test=False).search([])
-        if not servers:
+        if not self.with_context(active_test=False).search_count([]):
             return mcp_ui.open_json_export_empty_wizard(
                 self.env,
                 dialog_title=_('Export'),
                 message=_('There are no external API servers to export.'),
             )
-        export_data = [srv._export_server_row() for srv in servers]
-
-        filename = mcp_ui.build_export_filename(self.env, 'external_api_servers', 'json')
-        attachment = mcp_ui.write_json_attachment(
-            self.env, filename, export_data,
-        )
-        return mcp_ui.open_json_export_wizard(
-            self.env,
-            dialog_title=_('Export result'),
-            summary_text=self._export_servers_summary(servers),
-            count=len(export_data),
-            attachment=attachment,
+        return self.env['pns.export.secrets.wizard'].ask(
+            self.browse(), '_pns_export_all_servers',
         )
 
     def action_export_selected(self, *args, **kwargs):
@@ -1148,17 +1399,34 @@ class ExternalAPIServer(models.Model):
                 dialog_title=_('Export'),
                 message=_('No external servers selected for export.'),
             )
-        servers = self.with_context(active_test=False)
-        export_data = [srv._export_server_row() for srv in servers]
+        return self.env['pns.export.secrets.wizard'].ask(
+            self, '_pns_export_selected_servers',
+        )
 
-        filename = mcp_ui.build_export_filename(self.env, 'external_api_servers_selected', 'json')
+    def _pns_export_all_servers(self, include_secrets=False):
+        ensure_ai_admin(self.env)
+        servers = self.with_context(active_test=False).search([])
+        return servers._export_servers_file('external_api_servers', include_secrets)
+
+    def _pns_export_selected_servers(self, include_secrets=False):
+        ensure_ai_admin(self.env)
+        servers = self.with_context(active_test=False)
+        return servers._export_servers_file(
+            'external_api_servers_selected', include_secrets,
+        )
+
+    def _export_servers_file(self, artifact, include_secrets):
+        export_data = [srv._export_server_row(include_secrets) for srv in self]
+        filename = mcp_ui.build_export_filename(
+            self.env, artifact, 'json', secrets=include_secrets,
+        )
         attachment = mcp_ui.write_json_attachment(
             self.env, filename, export_data,
         )
         return mcp_ui.open_json_export_wizard(
             self.env,
             dialog_title=_('Export result'),
-            summary_text=self._export_servers_summary(servers),
+            summary_text=self._export_servers_summary(self),
             count=len(export_data),
             attachment=attachment,
         )
@@ -1173,13 +1441,13 @@ class ExternalAPIServer(models.Model):
         Match key: ``code``.
 
         Returns:
-            dict: Odoo action opening ``pns_ai_mcp.import_external_servers_wizard``.
+            dict: Odoo action opening ``ai.import.external.servers.wizard``.
         """
         ensure_ai_admin(self.env)
         return {
             'type': 'ir.actions.act_window',
             'name': _('Import External API Servers'),
-            'res_model': 'pns_ai_mcp.import_external_servers_wizard',
+            'res_model': 'ai.import.external.servers.wizard',
             'view_mode': 'form',
             'views': [[False, 'form']],
             'target': 'new',

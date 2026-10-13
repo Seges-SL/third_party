@@ -2,7 +2,7 @@
 <odoo>
     <record id="view_import_external_servers_wizard_form" model="ir.ui.view">
         <field name="name">pns.ai.mcp.import.external.servers.wizard.form</field>
-        <field name="model">pns_ai_mcp.import_external_servers_wizard</field>
+        <field name="model">ai.import.external.servers.wizard</field>
         <field name="arch" type="xml">
             <form string="Import External MCP Servers">
                 <sheet>
@@ -27,7 +27,7 @@
     <record id="action_import_external_servers_wizard" model="ir.actions.act_window">
         <field name="name">Import External MCP Servers (JSON)</field>
         <field name="type">ir.actions.act_window</field>
-        <field name="res_model">pns_ai_mcp.import_external_servers_wizard</field>
+        <field name="res_model">ai.import.external.servers.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
     </record>

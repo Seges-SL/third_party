@@ -19,6 +19,57 @@ def payload_marked_user_facing(payload):
     )
 
 
+def _has_summary(payload):
+    summary = payload.get('summary') if isinstance(payload, dict) else None
+    return isinstance(summary, str) and bool(summary.strip())
+
+
+def is_chat_deliverable(payload):
+    """True when the model marked this payload as the user-facing answer."""
+    if not isinstance(payload, dict):
+        return False
+    if payload_marked_user_facing(payload):
+        return True
+    if (
+        payload.get('__presentation_complete__')
+        or payload.get('__phase__') == 'presentation'
+        or payload.get('__satisfied__')
+    ):
+        return True
+    if (
+        payload.get('__extraction_complete__')
+        and payload.get('__ready_for_presentation__')
+        and _has_summary(payload)
+    ):
+        return True
+    return False
+
+
+def is_unmarked_multi_probe(payload):
+    """Two sibling row lists that were not marked as the answer.
+
+    A lookup that still mixes a catalogue and the records it found
+    (stages plus leads, fields plus rows) is not the deliverable.
+    A titled table, a presentation, or an explicit direct flag still is.
+    """
+    if not isinstance(payload, dict) or is_chat_deliverable(payload):
+        return False
+    from .relaxaicode_render import _sibling_tabular_lists
+    return len(_sibling_tabular_lists(payload)) >= 2
+
+
+CLOSING_AFTER_PROBE = (
+    'Tool rounds are finished. The last lookup was NOT shown to the user. '
+    'Reply in the user\'s language, in a few sentences, and do not call tools. '
+    'You did not create or change any record unless safe_plan_request in this '
+    'turn returned executed. Do not paste catalogues, stages, field lists, or '
+    'technical columns. If the lookup shows a record that already matches what '
+    'the user asked to create, name that record and say it already exists, and '
+    'ask whether to open it or propose a new one. Otherwise say you have not '
+    'done it yet.'
+)
+
+
 def should_show_direct_to_chat(
     payload, *, round_n, max_rounds, tool_name, force_retry=False,
     has_primary=False, user_message=None, user_lang=None,
@@ -29,7 +80,7 @@ def should_show_direct_to_chat(
     last-round fallback must not then dump a probe over that document.
 
     Delivery shape is the model's ``return_mode`` / ``__return_direct__``
-    (same idea as skill painter). ``user_message`` / ``user_lang`` kept for
+    (same idea as skill compose). ``user_message`` / ``user_lang`` kept for
     call-site compatibility; no lexical classifier.
     """
     del user_message, user_lang
@@ -51,8 +102,8 @@ def should_show_direct_to_chat(
         or payload.get('__satisfied__')
     ):
         return True
-    # Extracción final con tabla server-side + summary en result (p. ej. ranking
-    # Sesame): el LLM devuelve {data, summary} sin phase=presentation; maybe_attach
+    # Extracción final con tabla server-side + summary en result (p. ej. ranking):
+    # el LLM devuelve {data, summary} sin phase=presentation; maybe_attach
     # ya generó formatted_text pero el gating lo ocultaba mid-turn. Los probes
     # no suelen incluir summary en el dict result — siguen ocultos.
     if (
@@ -62,5 +113,9 @@ def should_show_direct_to_chat(
     ):
         return True
     if round_n >= max_rounds and not has_primary:
+        # A mash-up of sibling lists (catalogue + records) is still a probe
+        # when the rounds run out. Do not paint it as the answer.
+        if is_unmarked_multi_probe(payload):
+            return False
         return True
     return False

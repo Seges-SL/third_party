@@ -1,3 +1,8 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com> */
+/**
+ * Pure formatting utilities for Chatboo (content, markdown, tables).
+ */
 odoo.define('pns_ai_chatboo.formatters', function (require) {
     "use strict";
 
@@ -101,6 +106,243 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
         var div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    /**
+     * Assistant HTML is written by the model, and the model can be steered by
+     * the data it reads. Before it reaches the page nothing in it may run code
+     * or call out on its own: no scripts or embedded documents, no on* handlers,
+     * no javascript: links, no image or CSS url from another origin.
+     * Parsing happens in an inert document, where nothing loads or fires.
+     */
+    var _UNSAFE_TAGS = {
+        SCRIPT: 1, STYLE: 1, IFRAME: 1, FRAME: 1, FRAMESET: 1, OBJECT: 1,
+        EMBED: 1, APPLET: 1, BASE: 1, LINK: 1, META: 1, FORM: 1, INPUT: 1,
+        TEXTAREA: 1, SELECT: 1, OPTION: 1, NOSCRIPT: 1, TEMPLATE: 1, PORTAL: 1,
+        MATH: 1, FOREIGNOBJECT: 1, ANIMATE: 1, ANIMATEMOTION: 1,
+        ANIMATETRANSFORM: 1, SET: 1, DISCARD: 1,
+    };
+    var _DROPPED_ATTRS = {
+        srcdoc: 1, srcset: 1, imagesrcset: 1, action: 1, formaction: 1,
+        ping: 1, background: 1, codebase: 1, longdesc: 1, cite: 1, data: 1,
+        dynsrc: 1, lowsrc: 1,
+    };
+    var _LINK_PROTOCOLS = { 'http:': 1, 'https:': 1, 'mailto:': 1, 'tel:': 1 };
+    var _CSS_FETCHERS_RE = /(?:image-set|image|cross-fade|element|src)\s*\(|expression\s*\(|@import|behavior\s*:|binding\s*:|\\/i;
+    var _CSS_URL_RE = /url\s*\(\s*(['"]?)([^'")]*)\1\s*\)/gi;
+    var _REMOTE_IMAGE_PATH = '/pns_ai_mcp/remote_image';
+    var _SANITIZE_CACHE_CHARS = 4000000;
+    var _sanitizeCache = new Map();
+    var _sanitizeCacheChars = 0;
+    var _inertDoc = null;
+
+    function _inertContainer(html) {
+        if (!_inertDoc) {
+            _inertDoc = document.implementation.createHTMLDocument('');
+        }
+        var box = _inertDoc.createElement('div');
+        box.innerHTML = html;
+        return box;
+    }
+
+    function _resolveUrl(value) {
+        try {
+            return new URL(String(value).trim(), window.location.href);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function _isLocalResource(value) {
+        var raw = String(value || '').trim();
+        if (/^data:image\//i.test(raw)) {
+            return true;
+        }
+        var url = _resolveUrl(raw);
+        if (!url) {
+            return false;
+        }
+        if (url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'blob:') {
+            return url.origin === window.location.origin;
+        }
+        return false;
+    }
+
+    function _isSafeLink(value) {
+        var url = _resolveUrl(value);
+        if (!url) {
+            return false;
+        }
+        if (url.protocol === 'blob:') {
+            return url.origin === window.location.origin;
+        }
+        return !!_LINK_PROTOCOLS[url.protocol];
+    }
+
+    function _isLocalCss(value) {
+        var css = String(value || '');
+        if (_CSS_FETCHERS_RE.test(css)) {
+            return false;
+        }
+        var local = true;
+        var rest = css.replace(_CSS_URL_RE, function (all, quote, target) {
+            if (!_isLocalResource(target)) {
+                local = false;
+            }
+            return '';
+        });
+        return local && !/url\s*\(/i.test(rest);
+    }
+
+    function _cleanAttributes(el, tag) {
+        var attrs = Array.prototype.slice.call(el.attributes);
+        for (var i = 0; i < attrs.length; i++) {
+            var name = attrs[i].name.toLowerCase();
+            var value = attrs[i].value;
+            var keep = true;
+            if (name.indexOf('on') === 0 || _DROPPED_ATTRS[name]) {
+                keep = false;
+            } else if (name === 'href' || name === 'xlink:href') {
+                keep = (tag === 'A' || tag === 'AREA') ? _isSafeLink(value) : _isLocalResource(value);
+            } else if (name === 'src' || name === 'poster') {
+                keep = _isLocalResource(value);
+            } else if (name === 'style' || /url\s*\(/i.test(value)) {
+                keep = _isLocalCss(value);
+            }
+            if (!keep) {
+                el.removeAttribute(attrs[i].name);
+            }
+        }
+        if (tag === 'A' && (el.getAttribute('target') || '').toLowerCase() === '_blank') {
+            var rel = (el.getAttribute('rel') || '').toLowerCase();
+            if (rel.indexOf('noopener') < 0) {
+                el.setAttribute('rel', (rel + ' noopener noreferrer').trim());
+            }
+        }
+    }
+
+    /** An image that cannot be fetched stays as a link the user may open. */
+    function _imageAsLink(img) {
+        var src = img.getAttribute('src') || '';
+        var label = img.getAttribute('alt') || src;
+        if (img.parentNode && img.parentNode.closest && img.parentNode.closest('a')) {
+            return img.ownerDocument.createTextNode(label);
+        }
+        var link = img.ownerDocument.createElement('a');
+        if (_isSafeLink(src)) {
+            link.setAttribute('href', src);
+            link.setAttribute('target', '_blank');
+            link.setAttribute('rel', 'noopener noreferrer');
+        }
+        link.textContent = label;
+        return link;
+    }
+
+    /**
+     * An http(s) image from another origin is asked of Odoo, which fetches it only
+     * from a host the URL policy allows. Refused: the browser shows the alt (the address).
+     */
+    function _imageThroughOdoo(img) {
+        var url = _resolveUrl(img.getAttribute('src') || '');
+        if (!url || (url.protocol !== 'http:' && url.protocol !== 'https:')) {
+            return _imageAsLink(img);
+        }
+        var doc = img.ownerDocument;
+        var pic = doc.createElement('img');
+        pic.setAttribute('src', _REMOTE_IMAGE_PATH + '?url=' + encodeURIComponent(url.href));
+        pic.setAttribute('alt', img.getAttribute('alt') || url.href);
+        ['title', 'style', 'class', 'width', 'height'].forEach(function (name) {
+            if (img.hasAttribute(name)) {
+                pic.setAttribute(name, img.getAttribute(name));
+            }
+        });
+        _cleanAttributes(pic, 'IMG');
+        if (img.parentNode && img.parentNode.closest && img.parentNode.closest('a')) {
+            return pic;
+        }
+        var link = doc.createElement('a');
+        link.setAttribute('href', url.href);
+        link.setAttribute('target', '_blank');
+        link.setAttribute('rel', 'noopener noreferrer');
+        link.appendChild(pic);
+        return link;
+    }
+
+    function _sanitizePass(html) {
+        var box = _inertContainer(html);
+        var stack = [box];
+        while (stack.length) {
+            var node = stack.pop();
+            var child = node.firstChild;
+            while (child) {
+                var next = child.nextSibling;
+                if (child.nodeType === 8) {
+                    node.removeChild(child);
+                } else if (child.nodeType === 1) {
+                    var tag = child.nodeName.toUpperCase();
+                    if (_UNSAFE_TAGS[tag]) {
+                        node.removeChild(child);
+                    } else if (tag === 'IMG' && !_isLocalResource(child.getAttribute('src'))) {
+                        node.replaceChild(_imageThroughOdoo(child), child);
+                    } else {
+                        _cleanAttributes(child, tag);
+                        stack.push(child);
+                    }
+                }
+                child = next;
+            }
+        }
+        return box.innerHTML;
+    }
+
+    /**
+     * HTML safe to paint with innerHTML / t-raw / markup().
+     * Two passes: what the browser re-parses from the first one is cleaned too.
+     *
+     * @param {string} html
+     * @returns {string}
+     */
+    function sanitizeHtml(html) {
+        if (html === null || html === undefined) {
+            return '';
+        }
+        var src = String(html);
+        if (src.indexOf('<') === -1 || typeof document === 'undefined') {
+            return src;
+        }
+        var hit = _sanitizeCache.get(src);
+        if (hit !== undefined) {
+            return hit;
+        }
+        var clean = _sanitizePass(_sanitizePass(src));
+        _sanitizeCacheChars += src.length + clean.length;
+        if (_sanitizeCacheChars > _SANITIZE_CACHE_CHARS) {
+            _sanitizeCache.clear();
+            _sanitizeCacheChars = src.length + clean.length;
+        }
+        _sanitizeCache.set(src, clean);
+        _sanitizeCache.set(clean, clean);
+        return clean;
+    }
+
+    /**
+     * Text of an HTML fragment, read in the inert document.
+     *
+     * @param {string} html
+     * @returns {string}
+     */
+    function textOfHtml(html) {
+        if (html === null || html === undefined) {
+            return '';
+        }
+        var src = String(html);
+        if (src.indexOf('<') === -1 && src.indexOf('&') === -1) {
+            return src;
+        }
+        if (typeof document === 'undefined') {
+            return src.replace(/<[^>]+>/g, ' ');
+        }
+        return _inertContainer(src).textContent || '';
     }
 
     /**
@@ -280,7 +522,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
      * @param {string} content - Markdown source text
      * @returns {string} HTML string
      */
-    function formatMarkdown(content) {
+    function _formatMarkdown(content) {
         if (typeof ChatbooSse !== 'undefined' && ChatbooSse.prepareMarkdownForDisplay) {
             var prep = ChatbooSse.prepareMarkdownForDisplay(content || '');
             content = prep.markdown;
@@ -298,7 +540,9 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
                     openLinksInNewWindow: true,
                     emoji: false,
                     underline: false,
-                    headerLevelStart: 1
+                    headerLevelStart: 1,
+                    // snake_case (module/field ids): _word_ is italic unless mid-word
+                    literalMidWordUnderscores: true
                 });
 
                 var html = converter.makeHtml(content);
@@ -548,9 +792,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
         if (!html || typeof html !== 'string' || html.indexOf('<img') === -1) {
             return html;
         }
-        // Use a temporary container to manipulate DOM safely
-        var tmp = document.createElement('div');
-        tmp.innerHTML = html;
+        var tmp = _inertContainer(html);
         var images = tmp.querySelectorAll('img');
         for (var i = 0; i < images.length; i++) {
             var img = images[i];
@@ -562,6 +804,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
             if (!src) continue;
             // Skip data-URIs: browsers block data: navigation to new tabs (blank page)
             if (src.indexOf('data:') === 0) continue;
+            if (!_isLocalResource(src)) continue;
 
             // Derive full-size URL: only replace image_NNN variants (Image mixin).
             // Fields like 'logo' or 'avatar' (plain Binary) are already full-size.
@@ -667,8 +910,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
         if (typeof document === 'undefined') {
             return html;
         }
-        var root = document.createElement('div');
-        root.innerHTML = html;
+        var root = _inertContainer(html);
         _unwrapHtmlProseTables(root);
         // Full-bubble Markdown report (no Chatboo tables): re-parse as Showdown
         // instead of leaving literal "#" in plain nodes.
@@ -687,7 +929,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
                 mdAll = ChatbooSse.normalizeGluedMarkdown(mdAll);
             }
             if (mdAll) {
-                var renderedAll = formatMarkdown(mdAll);
+                var renderedAll = _formatMarkdown(mdAll);
                 if (renderedAll && renderedAll !== mdAll) {
                     return renderedAll;
                 }
@@ -738,7 +980,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
             if (!md) {
                 continue;
             }
-            var rendered = formatMarkdown(md);
+            var rendered = _formatMarkdown(md);
             if (!rendered || rendered === md) {
                 continue;
             }
@@ -775,7 +1017,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
      * @param {string} content - Raw content from the assistant
      * @returns {string} HTML string ready for innerHTML
      */
-    function formatContent(content) {
+    function _formatContent(content) {
         if (!content || typeof content !== 'string') {
             return content || '';
         }
@@ -788,7 +1030,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
         if (typeof ChatbooSse !== 'undefined' && ChatbooSse.splitHtmlAndMarkdownTail) {
             var split = ChatbooSse.splitHtmlAndMarkdownTail(trimmed);
             if (split) {
-                var foot = formatMarkdown(split.md);
+                var foot = _formatMarkdown(split.md);
                 return _wrapStandaloneImages(enhanceHtmlProse(ChatbooSse.mergeHtmlWithFooter(split.html, foot)));
             }
         }
@@ -812,7 +1054,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
                     );
                     var formattedHtml;
                     if (hasMarkdown && typeof showdown !== 'undefined') {
-                        formattedHtml = formatMarkdown(ft);
+                        formattedHtml = _formatMarkdown(ft);
                     } else {
                         formattedHtml = escapeHtml(ft).replace(/\n/g, '<br/>');
                     }
@@ -885,7 +1127,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
                 /^\|.+\|$/m.test(trimmed);          // table row: |col1|col2|
 
             if (looksLikeMarkdown) {
-                var markdownResult = formatMarkdown(content);
+                var markdownResult = _formatMarkdown(content);
                 if (markdownResult && markdownResult !== content) {
                     return _wrapStandaloneImages(markdownResult);
                 }
@@ -893,6 +1135,16 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
         }
 
         return escapeHtml(content).replace(/\n/g, '<br/>');
+    }
+
+    /** @see _formatContent; the result is safe to paint. */
+    function formatContent(content) {
+        return sanitizeHtml(_formatContent(content));
+    }
+
+    /** @see _formatMarkdown; the result is safe to paint. */
+    function formatMarkdown(content) {
+        return sanitizeHtml(_formatMarkdown(content));
     }
 
     // Public API
@@ -903,6 +1155,8 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
         formatWallclock: formatWallclock,
         isLikelyHtml: isLikelyHtml,
         escapeHtml: escapeHtml,
+        sanitizeHtml: sanitizeHtml,
+        textOfHtml: textOfHtml,
         formatContent: formatContent,
         formatMarkdown: formatMarkdown,
         enhanceHtmlProse: enhanceHtmlProse,

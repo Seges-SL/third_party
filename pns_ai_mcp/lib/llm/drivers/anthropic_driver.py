@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Anthropic Claude Messages API driver (OpenAI-shaped responses to the orchestrator)."""
+
 import json
 import logging
 import requests
@@ -111,7 +113,7 @@ class AnthropicDriver(LLMDriver):
         # capacidad (sonda) y la pasa aqui: si es False, no se envia el parametro.
         self.send_temperature = bool(config.get("send_temperature", True))
         self.extra_headers = config.get("extra_headers", {})
-        self._model_name_internal = config.get("model_name", "gpt-4o-mini")
+        self._model_name_internal = (config.get("model_name") or "").strip()
         self.context_window = int(config.get("context_window", 16384))
 
     @property
@@ -120,11 +122,8 @@ class AnthropicDriver(LLMDriver):
 
     @property
     def model_name(self) -> str:
-        return getattr(self, '_model_name_internal', 'gpt-4o-mini')
+        return getattr(self, '_model_name_internal', '')
 
-    @property
-    def _n_ctx(self) -> int:
-        return getattr(self, 'context_window', 16384)
 
     def is_loaded(self) -> bool:
         return True
@@ -171,11 +170,145 @@ class AnthropicDriver(LLMDriver):
         headers['anthropic-version'] = '2023-06-01'
         return headers
 
+    def iter_chat(self, messages, tools=None, **kwargs):
+        """Yield each text piece, then the finished message."""
+        return self._anthropic_chat(
+            messages, tools,
+            temperature=kwargs.get('temperature', self.temperature),
+            tool_choice=kwargs.get('tool_choice'),
+            timeout=kwargs.get('timeout', LLM_HTTP_DEFAULT),
+            max_tokens=kwargs.get('max_tokens'),
+            images=kwargs.get('images'),
+            stream=True,
+        )
+
+    def _iter_anthropic_response(self, headers, payload, timeout):
+        _logger.info("AnthropicDriver stream to %s model %s", self.endpoint, self.model_name)
+        response = requests.post(
+            self.endpoint, headers=headers, json=payload,
+            timeout=timeout, stream=True,
+        )
+        if response.status_code == 400 and 'temperature' in payload:
+            low = (response.text or '').lower()
+            if 'temperature' in low and (
+                'deprecated' in low or 'not supported' in low
+                or 'unsupported' in low or 'not allowed' in low
+            ):
+                payload.pop('temperature', None)
+                response.close()
+                response = requests.post(
+                    self.endpoint, headers=headers, json=payload,
+                    timeout=timeout, stream=True,
+                )
+        if response.status_code != 200:
+            err_msg = response.text
+            try:
+                err_body = response.json()
+                if isinstance(err_body, dict):
+                    err = err_body.get('error', err_body)
+                    if isinstance(err, dict):
+                        err_msg = err.get('message') or err_msg
+            except Exception:
+                pass
+            response.close()
+            raise RuntimeError(
+                'HTTP %s from %s: %s' % (response.status_code, self.endpoint, err_msg)
+            )
+        text = ''
+        calls = {}
+        usage = {}
+        try:
+            for raw in response.iter_lines():
+                if not raw:
+                    continue
+                line = raw.decode('utf-8', errors='replace').strip()
+                if line.startswith('data:'):
+                    line = line[5:].strip()
+                if not line or line == '[DONE]':
+                    continue
+                try:
+                    chunk = json.loads(line)
+                except ValueError:
+                    continue
+                kind = chunk.get('type')
+                if kind == 'content_block_delta':
+                    delta = chunk.get('delta') or {}
+                    if delta.get('type') == 'text_delta':
+                        piece = delta.get('text') or ''
+                        if piece:
+                            text += piece
+                            yield {'text': piece}
+                    elif delta.get('type') == 'input_json_delta':
+                        idx = chunk.get('index', 0)
+                        if idx in calls:
+                            calls[idx]['function']['arguments'] += delta.get('partial_json') or ''
+                elif kind == 'content_block_start':
+                    block = chunk.get('content_block') or {}
+                    if block.get('type') == 'tool_use':
+                        idx = chunk.get('index', 0)
+                        calls[idx] = {
+                            'id': block.get('id') or '',
+                            'type': 'function',
+                            'function': {
+                                'name': block.get('name') or '',
+                                'arguments': '',
+                            },
+                        }
+                elif kind == 'message_start':
+                    got = (chunk.get('message') or {}).get('usage') or {}
+                    if got.get('input_tokens'):
+                        usage['prompt_tokens'] = got.get('input_tokens')
+                elif kind == 'message_delta':
+                    got = chunk.get('usage') or {}
+                    if got.get('output_tokens'):
+                        usage['completion_tokens'] = got.get('output_tokens')
+        finally:
+            response.close()
+        message = {'role': 'assistant', 'content': text}
+        if calls:
+            message['tool_calls'] = [calls[i] for i in sorted(calls)]
+        if usage.get('prompt_tokens') or usage.get('completion_tokens'):
+            usage['total_tokens'] = (
+                int(usage.get('prompt_tokens') or 0)
+                + int(usage.get('completion_tokens') or 0)
+            )
+        yield {'done': True, 'message': message, 'usage': usage}
+
     def chat_completion(self, messages, tools=None, **kwargs):
         temp = kwargs.get('temperature', self.temperature)
         tool_choice = kwargs.get('tool_choice')
         timeout = kwargs.get('timeout', LLM_HTTP_DEFAULT)
-        return self._anthropic_chat(messages, tools, temperature=temp, tool_choice=tool_choice, timeout=timeout)
+        return self._anthropic_chat(
+            messages, tools,
+            temperature=temp, tool_choice=tool_choice, timeout=timeout,
+            max_tokens=kwargs.get('max_tokens'),
+            images=kwargs.get('images'),
+        )
+
+    def _user_blocks(self, content):
+        """Text and images in this protocol's message blocks."""
+        blocks = []
+        if isinstance(content, list):
+            for part in content:
+                if isinstance(part, dict) and part.get('type') == 'image_url':
+                    url = (part.get('image_url') or {}).get('url') or ''
+                    media, data = self.split_image(url)
+                    blocks.append({
+                        'type': 'image',
+                        'source': {
+                            'type': 'base64',
+                            'media_type': media,
+                            'data': data,
+                        },
+                    })
+                    continue
+                text = part.get('text') if isinstance(part, dict) else str(part)
+                if text and str(text).strip():
+                    blocks.append({'type': 'text', 'text': str(text)})
+            return blocks
+        if isinstance(content, str) and content.strip():
+            blocks.append({'type': 'text', 'text': content})
+        return blocks
 
     def probe_temperature(self, timeout=15):
         """Sonda mínima: ¿acepta este modelo el parámetro `temperature`?
@@ -224,7 +357,11 @@ class AnthropicDriver(LLMDriver):
             pass
         raise RuntimeError("HTTP %s: %s" % (response.status_code, err_msg))
 
-    def _anthropic_chat(self, messages, tools, temperature=None, tool_choice=None, timeout=LLM_HTTP_DEFAULT):
+    def _anthropic_chat(
+        self, messages, tools, temperature=None, tool_choice=None,
+        timeout=LLM_HTTP_DEFAULT, max_tokens=None, images=None,
+        stream=False,
+    ):
         headers = {
             "Content-Type": "application/json",
             "x-api-key": self.api_key,
@@ -243,15 +380,13 @@ class AnthropicDriver(LLMDriver):
                 system_prompt += msg.get("content", "") + "\n"
             elif role == "user":
                 content = msg.get("content", "")
-                # Anthropic rejects text blocks with only whitespace — skip empty user messages
-                if isinstance(content, str) and not content.strip():
+                blocks = self._user_blocks(content)
+                if not blocks:
                     continue
-                     
-                block = {"type": "text", "text": str(content)}
                 if anthropic_messages and anthropic_messages[-1]["role"] == "user":
-                    anthropic_messages[-1]["content"].append(block)
+                    anthropic_messages[-1]["content"].extend(blocks)
                 else:
-                    anthropic_messages.append({"role": "user", "content": [block]})
+                    anthropic_messages.append({"role": "user", "content": blocks})
             elif role == "assistant":
                 content_blocks = []
                 content = msg.get("content", "")
@@ -309,10 +444,32 @@ class AnthropicDriver(LLMDriver):
                 else:
                     anthropic_messages.append({"role": "user", "content": [block]})
                 
+        shots = [img for img in (images or []) if img]
+        if shots:
+            extra = []
+            for img in shots:
+                media, data = self.split_image(
+                    img if str(img).startswith('data:') else (
+                        'data:image/png;base64,%s' % img
+                    )
+                )
+                extra.append({
+                    'type': 'image',
+                    'source': {
+                        'type': 'base64',
+                        'media_type': media,
+                        'data': data,
+                    },
+                })
+            if anthropic_messages and anthropic_messages[-1]['role'] == 'user':
+                anthropic_messages[-1]['content'].extend(extra)
+            else:
+                anthropic_messages.append({'role': 'user', 'content': extra})
+
         payload = {
             "model": self.model_name,
             "messages": anthropic_messages,
-            "max_tokens": 4096,
+            "max_tokens": int(max_tokens or 4096),
         }
         if getattr(self, "send_temperature", True):
             payload["temperature"] = temperature if temperature is not None else self.temperature
@@ -365,6 +522,10 @@ class AnthropicDriver(LLMDriver):
                     elif isinstance(tool_choice, dict) and "function" in tool_choice:
                         payload["tool_choice"] = {"type": "tool", "name": tool_choice["function"]["name"]}
             
+        if stream:
+            payload['stream'] = True
+            return self._iter_anthropic_response(headers, payload, timeout)
+
         _logger.info("AnthropicDriver request to %s model %s", self.endpoint, self.model_name)
         response = requests.post(self.endpoint, headers=headers, json=payload, timeout=timeout)
 

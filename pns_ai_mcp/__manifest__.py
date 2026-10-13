@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+# Odoo reads this file with ast.literal_eval — no module docstring before `{`.
 
 {
     'name': 'AI Engine',
-    'version': '3.1.486',
+    'version': '3.1.782',
     'category': 'Patanegra AI',
     'summary': 'Agent engine for Odoo apps: PAAP roles, providers, skills, governed writes',
     'description': """
@@ -25,12 +26,11 @@
     'author': 'PATANEGRA Soft',
     'website': '/pns_ai_mcp/static/description/index.html',
     'license': 'Other OSI approved licence',
-    'depends': ['base', 'web', 'mail', 'bus', 'pns_base'],
+    'depends': ['web', 'pns_base'],
     'external_dependencies': {
         # LLM drivers (openai_driver.py / anthropic_driver.py) talk raw HTTP via
         # `requests`; the `openai` SDK is NOT used (there is no `import openai`).
-        # `pydantic` is used behind a v1/v2 shim -> requires Python 3.6 (real module floor).
-        'python': ['openpyxl', 'reportlab', 'requests', 'httpx', 'pydantic'],
+        'python': ['openpyxl', 'reportlab', 'requests'],
     },
     'assets': {
         'web.assets_backend': [
@@ -40,10 +40,8 @@
             'pns_ai_mcp/static/src/css/mcp_rtl.css',
             'pns_ai_mcp/static/src/css/mcp_context_list.css',
             'pns_ai_mcp/static/src/css/pns_list.css',
+            'pns_ai_mcp/static/src/css/skill_capture_wizard.css',
             # Vendor libs
-            'pns_ai_mcp/static/src/js/showdown.js',
-            'pns_ai_mcp/static/src/js/jspdf.umd.min.js',
-            'pns_ai_mcp/static/src/js/xlsx.full.min.js',
             # Widgets (v14)
             'pns_ai_mcp/static/src/js/mcp_api_key_widget_v14.js',
             'pns_ai_mcp/static/src/js/pns_html_readonly_widget_v14.js',
@@ -51,11 +49,18 @@
             'pns_ai_mcp/static/src/js/mcp_json_compressed_widget_v14.js',
             'pns_ai_mcp/static/src/js/context_window_combo_v14.js',
             'pns_ai_mcp/static/src/js/mcp_log_form_v14.js',
+            'pns_ai_mcp/static/src/js/ai_usage_chip_v14.js',
+            'pns_ai_mcp/static/src/js/skill_capture_wizard_v14.js',
+            'pns_ai_mcp/static/src/js/openapi_spec_generate_wizard_v14.js',
+            'pns_ai_mcp/static/src/js/external_server_usage_v14.js',
+            'pns_ai_mcp/static/src/js/mcp_log_usage_summary_v14.js',
             'pns_ai_mcp/static/src/js/ai_agent_origin_filter_v14.js',
             # Tree views with Operations button (v14)
             'pns_ai_mcp/static/src/js/ai_agent_tree_v14.js',
             'pns_ai_mcp/static/src/js/ai_provider_tree_v14.js',
+            'pns_ai_mcp/static/src/js/model_picker_dialog_v14.js',
             'pns_ai_mcp/static/src/js/mcp_user_tree_v14.js',
+            'pns_ai_mcp/static/src/js/key_pin_desk_v14.js',
             'pns_ai_mcp/static/src/js/mcp_context_tree_v14.js',
             'pns_ai_mcp/static/src/js/mcp_skill_tree_v14.js',
             'pns_ai_mcp/static/src/js/mcp_log_tree_v14.js',
@@ -73,7 +78,7 @@
         'security/ir.model.access.csv',
         'views/mcp_api_key_wizard_views.xml',
         'views/mcp_user_views.xml',
-        'views/mcp_safe_operation_views.xml',
+        'views/safe_operation_views.xml',
         'wizard/operation_result_views.xml',
         'wizard/config_backup_wizard_views.xml',
         'wizard/artifact_bundle_wizard_views.xml',
@@ -85,6 +90,7 @@
         'wizard/import_whitelist_wizard_views.xml',
         'wizard/import_external_servers_wizard_views.xml',
         'wizard/json_export_wizard_views.xml',
+        'wizard/ai_provider_catalogue_copy_views.xml',
         'wizard/context_stats_wizard_views.xml',
         'wizard/mcp_context_tools_wizard_views.xml',
         'wizard/bundle_compose_wizard_views.xml',
@@ -99,12 +105,13 @@
         'wizard/mcp_user_tools_wizard_views.xml',
         'wizard/whitelist_tools_wizard_views.xml',
         'wizard/external_server_tools_wizard_views.xml',
+        'wizard/openapi_spec_generate_wizard_views.xml',
         'wizard/mcp_log_tools_wizard_views.xml',
-        'wizard/safe_operation_tools_wizard_views.xml',
+        'wizard/safe_tools_wizard_views.xml',
         'views/ai_context_views.xml',
         'views/ai_domain_index_views.xml',
-        'views/mcp_change_journal_views.xml',
-        'views/mcp_log_views.xml',
+        'views/ai_change_journal_views.xml',
+        'views/ai_log_views.xml',
         'views/mcp_log_delete_menu_views.xml',
         'views/ai_provider_views.xml',
         'views/ai_agent_views.xml',
@@ -115,12 +122,13 @@
         'views/external_server_views.xml',
         'views/res_config_settings_views.xml',
         'data/ai_agent_data.xml',
+        'data/ai_agent_conversational.xml',
         'views/ai_menus.xml',
         'data/mcp_data.xml',
-        'data/external_server_data.xml',
         'data/fx_source_data.xml',
         'data/fetch_cache_cron.xml',
         'data/api_result_cache_cron.xml',
+        'data/ai_log_cron.xml',
         'data/safe_operation_cron.xml',
         'data/trusted_actions_system.xml',
     ],

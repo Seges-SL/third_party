@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Contrato HTML user-facing: rechazar formatted_text no confiable del sandbox."""
+"""User-facing HTML contract: reject untrusted sandbox formatted_text."""
 from __future__ import annotations
 
 import logging
@@ -51,7 +51,7 @@ def reject_untrusted_formatted_text(
     result.setdefault('__hint__', (
         'relaxaicode must not invent formatted_text for the user. '
         'Return {\'data\': [row dicts…]} so the SERVER renders the table, or '
-        'use propose_safe_operations for writes. Answer in prose.'
+        'use safe_plan_request for writes. Answer in prose.'
     ))
     _logger.info(
         '🛡️ [CONTRACT] Rejected untrusted formatted_text (no trusted '

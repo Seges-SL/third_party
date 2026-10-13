@@ -4,7 +4,7 @@
         <code>presentation_grids</code>
         <tipo>domain</tipo>
         <description>Chatboo table presentation — soft pastels, pijama, quartiles/terciles, readable text colours</description>
-        <version>1.35</version>
+        <version>1.40</version>
     </metadata>
 
     <domain_knowledge>
@@ -30,6 +30,22 @@ quartiles, terciles, bold highlights, …), keep **structured rows** and let the
   `result = {'data': raw_data}`). Prefer one relaxaicode that queries AND
   styles together.
 
+## Derived columns (xlsx formulas)
+Whenever a table column is arithmetic of other public columns on the **same
+sheet** (difference, ratio, %), set `result['__excel_formulas__']` — skill
+or free-form turn, whether or not the user named Excel. Map: public column
+key → `{other_key}` template. Chat / PDF / Word stay values; only xlsx
+writes `=`. The server does not infer. Tokens: `{key}`, numbers, `+ - * / ( )`.
+No VLOOKUP / INDIRECT / column SUM. A key missing on a given sheet falls
+back to the value. Example (generic keys — not a business rule):
+`result['__excel_formulas__'] = {'c': '={a}-{b}'}`.
+
+## formatted_text (Chatboo HTML)
+When you must emit custom HTML (empty-state, single-record card), use
+Bootstrap classes (`card`, `card-body`, `badge`, `text-muted`, `table-*`).
+Do not hand-build HTML tables for homogeneous rows — that stays structured
+`data`.
+
 ## Table vs list
 Tables only when each entity has two or more numeric/date/currency attributes.
 Each entity = one ROW, each attribute = one COLUMN. Max 5 columns.
@@ -39,11 +55,11 @@ WRONG: `| Item1 | Item2 | Item3 |` (entities as columns).
 RIGHT: `- Item A` / `- Item B` (one bullet per item).
 
 ## Presentation axes (Chatboo)
-Three tokens, slash = value. This block is the Chatboo painter contract.
+Three tokens, slash = value. This block is the Chatboo compose contract.
 
-**painter:** `painter-local` (Chatboo composes HTML tables/charts FROM structured
+**compose:** `compose-agent` (Chatboo composes HTML tables/charts FROM structured
 rows; AFTER a server table this turn, write at most a short footer) or
-`painter-free` (you own the entire bubble). Under painter-free: footmode and
+`compose-model` (you own the entire bubble). Under compose-model: footmode and
 showmode are suspended; narrative/greetings/captions are prose, never a pipe
 or HTML table; a drawing the user asked for is SVG markup (Chatboo files it —
 leftover text stays prose); native Chatboo table/chart blocks ONLY if THIS
@@ -54,41 +70,47 @@ use `result = {'card': {…}}` (`fact` / `link`).
 **footmode:** `foot-verbose` (warm footer after local tables) or `foot-laconic`
 (no footer).
 
-**showmode:** `show-table` or `show-chart` (session layout under painter-local;
+**showmode:** `show-table` or `show-chart` (session layout under compose-agent;
 optional result `show_mode` show-chart / table / dashboard). Do not use
 `laconic_mode`, `formatting_mode`, `/report`, `/table`, table-chart, or
 chart-table.
 
 **DATA PLOTS:** structured `data` rows; Chatboo hydrates ECharts (user clicks
-"Gráfico") under painter-local. Do not hand-draw bar/line/pie geometry. Do
+"Gráfico") under compose-agent. Do not hand-draw bar/line/pie geometry. Do
 not emit SVG paths for those plots. A drawing the user asked for is not a
 data plot: emit the SVG; Chatboo stores it as a session file. SINGLE-FACT
 CARD: `fact` / `link` via `result = {'card': {…}}`. SVG is eyes-only; asked
-facts must be text. Under painter-free you MAY embed `formatted_text` native
+facts must be text. Under compose-model you MAY embed `formatted_text` native
 blocks (`data-chatboo-dataset` / `data-chatboo-card`) only when THIS turn has
 real rows/series.
 
-**RENDERED DATA FOOTER:** when the tool result has `data_rendered=true`, the
-visible HTML table is the source of truth. Default closing prose: a warm
-sign-off (1–2 short sentences). Do not re-list every row.
+**RENDERED DATA FOOTER:** when the tool result has `data_rendered=true` and
+no `report_outline`, the visible HTML table is the source of truth. Default
+closing prose: a warm sign-off (1–2 short sentences). Do not re-list every
+row. Do not cite figures. When the result includes `report_outline`, write
+that prose now (those headings, in order) and cite the figures already in
+the tables. Do not paste the table again.
 
 **NO ECHO:** do not paste a previous assistant reply (HTML tables,
 `o_chatboo_table_block` / `data-chatboo-dataset`) into the new bubble.
 
-**DELIVERY under painter-local:** listing / ranking / chart / dashboard / map
-→ structured rows and `return_mode=direct_to_user` (or `__return_direct__`).
-Explanation / report → `return_mode=inspect_result` and a Markdown report;
-do not push a server table first unless the user also asked for the listing.
-Ambiguous table vs chart vs dashboard: pick `show_mode` yourself — do not
-ask the user.
+**DELIVERY under compose-agent:** listing / ranking / chart / dashboard / map
+and any report / profile / analysis that rests on instance figures
+→ structured rows (`data` or `tables` / `sections`) and
+`return_mode=direct_to_user` (or `__return_direct__`). The server paints
+the tables. A report also sets `report_outline` (list of section titles);
+the next reply is the prose, citing those tables. Do not use
+`inspect_result` for that final delivery. A definition or a mail draft
+with no instance figures stays prose. Ambiguous table vs chart vs
+dashboard: pick `show_mode` yourself — do not ask the user.
 
 ## Client file export
 When the user names a known download format (**PDF**, **Excel** / xlsx,
 **Word**, **txt**, **Markdown**, **HTML**), the server attaches a **download card**
-on the session (same box as a clipboard, a manual attach, or a Sesame
+on the session (same box as a clipboard, a manual attach, or a session
 file). Do not call tools to build the file.
 
-Never call `propose_safe_operations` and never create `ir.attachment`
+Never call `safe_plan_request` and never create `ir.attachment`
 for a named download — that is caja B, not the session history.
 Never import `reportlab` or `openpyxl` in RelaxAICode.
 
@@ -100,7 +122,8 @@ that title for the filename and uses it as the interior heading
 extension) if the title would make an ugly file name;
 `__sheet_caption__` (one line above a **single** Excel sheet; omit it
 when the document name is enough); `__column_labels__` (map column
-key → visible header). Column keys should already be human labels
+key → visible header). Derived columns MUST set `__excel_formulas__`
+(same map as any tabular turn). Column keys should already be human labels
 in Locale when you can.
 
 The server serializes Excel / txt / Markdown and pins the card.
@@ -181,9 +204,12 @@ text on a pink/green row of similar hue.
      `apply_pajama_coloring(rows, unique=True)`.
    - Otherwise alternating two soft tones is enough (`unique=False`).
 2. **Quartiles / terciles / by bands** — sort by the metric they name, then
-   either leave rows without `_row_color` so the **server** applies soft tier
-   pastels, or set explicit soft `_row_color` per band yourself. Do not use
-   loud traffic-light fills.
+   either set `'__row_tint__': 'quartile'` on the result (or `'tint'` on the
+   group) so the **server** applies soft tier pastels, or set explicit soft
+   `_row_color` per band yourself. Do not use loud traffic-light fills.
+   A ranking (peers sorted by one figure: top customers, sales per seller)
+   also gets `'__row_tint__': 'quartile'`: the server never guesses it from
+   the column name, and a plain label + figure table is grey zebra by default.
 3. **Business colours** (risk, status) — soft pastel row + dark accent on the
    score/status column only.
 
@@ -191,17 +217,16 @@ text on a pink/green row of similar hue.
 **showmode (session, not your choice each turn):** the session keeps
 show-table or show-chart until `/show-table`, `/show-chart`, or phrasing
 (“haz un gráfico…” / “muéstralo en tabla…”). Default for new chats is
-show-table (Chatboo Settings). Suspended under painter-free. Do **not**
+show-table (Chatboo Settings). Suspended under compose-model. Do **not**
 pick layout in prose or invent HTML chart chrome.
 
 | showmode | What the client does |
 |---|---|
-| **show-table** | Table visible. Toolbar/chart only when **X is temporal** and ≥1 **Y** column key looks like money, %/ratio, or a counter (structural key shape — not business entities). CP/coords/other codes are ignored. |
-| **show-chart** | Chart open + table collapsible (always with its table). Any analyzable numeric series (even odd ones) — user asked for a graphic view. |
+| **show-table** | Table visible. Toolbar **below** the table when ≥1 **Y** column key looks like money, %/ratio, or a counter (structural key shape — not business entities). Chart stays closed until they click. CP/coords/other codes are ignored. |
+| **show-chart** | Chart open + table collapsible (always with its table). Toolbar still **below** the table. Any analyzable numeric series (even odd ones) — user asked for a graphic view. |
 
-Categorical X (contacts, names, areas) does **not** auto-offer a chart under
-show-table — a bar of every partner duplicates the table; the user can still
-ask for a chart (showmode flips to show-chart).
+Categorical X (contacts, names, areas) still gets the bottom toolbar when Y
+is money/%/count. The chart does **not** open by itself.
 
 Do **not** hand-draw bar/line/pie geometry (ASCII, fenced “graphs”, custom
 plot HTML). Keep structured rows; the client hydrates Chart.js / ECharts.

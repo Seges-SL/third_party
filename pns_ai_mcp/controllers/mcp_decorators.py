@@ -5,7 +5,7 @@
 
 import inspect
 import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, get_type_hints
+from typing import Any, Callable, Dict, List, Optional, Type, get_type_hints
 from functools import wraps
 
 # Polyfill for Python < 3.8
@@ -166,7 +166,7 @@ def _extract_schema_from_function(func: Callable) -> Dict[str, Any]:
         }
 
 
-def _validate_arguments(schema: Dict[str, Any], arguments: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+def _validate_arguments(schema: Dict[str, Any], arguments: Dict[str, Any]) -> tuple[bool, Optional[str]]:
     """
     Valida los argumentos contra el esquema.
     Retorna (es_valido, mensaje_error)
@@ -212,7 +212,9 @@ def mcp_tool(
     description: Optional[str] = None,
     is_write: bool = False,
     validate_schema: bool = True,
-    input_schema: Optional[Dict[str, Any]] = None
+    input_schema: Optional[Dict[str, Any]] = None,
+    expose_mcp: bool = True,
+    groups: Optional[tuple] = None,
 ):
     """
     Decorador para registrar una función como herramienta MCP.
@@ -223,6 +225,12 @@ def mcp_tool(
         is_write: Si la herramienta requiere permisos de escritura
         validate_schema: Si se debe validar el esquema automáticamente
         input_schema: Esquema JSON explícito (opcional, si se omite se extrae de la función)
+        expose_mcp: Si False, la tool sigue en el saco (Chatboo / AgentEngine)
+            pero no se publica en tools/list de /mcp. tools/call sigue
+            ejecutándola si un host la pide.
+        groups: xmlids de grupo. Si hay alguno, el modelo solo ve la tool
+            cuando el usuario tiene al menos uno (``tool_visible_to``). La
+            tool sigue comprobando sus permisos al ejecutarse.
     
     Ejemplo:
         @mcp_tool(
@@ -252,7 +260,10 @@ def mcp_tool(
         # Registrar la tool
 
         
-        _logger.info(f"MCP: Tool registrada: {tool_name} (write={is_write})")
+        _logger.info(
+            "MCP: Tool registrada: %s (write=%s, expose_mcp=%s)",
+            tool_name, is_write, expose_mcp,
+        )
         
         # Wrapper que valida esquema si está habilitado
         @wraps(func)
@@ -302,6 +313,8 @@ def mcp_tool(
             'description': tool_description,
             'inputSchema': final_schema,
             'is_write': is_write,
+            'expose_mcp': bool(expose_mcp),
+            'groups': tuple(groups or ()),
             'function': wrapper, # [FIX] Register wrapper, NOT func
             'validate_schema': validate_schema
         }
@@ -322,9 +335,26 @@ def get_registered_tools() -> Dict[str, Dict[str, Any]]:
             'name': tool_data['name'],
             'description': tool_data['description'],
             'inputSchema': tool_data['inputSchema'],
-            'is_write': tool_data['is_write']
+            'is_write': tool_data['is_write'],
+            'expose_mcp': tool_data.get('expose_mcp', True),
+            'groups': tool_data.get('groups', ()),
         }
     return result
+
+
+def tool_visible_to(tool_data: Dict[str, Any], user) -> bool:
+    """True when *user* may be offered the tool (no groups = everyone)."""
+    groups = tool_data.get('groups') or ()
+    return not groups or any(user.has_group(g) for g in groups)
+
+
+def list_registered_tools_for_mcp() -> Dict[str, Dict[str, Any]]:
+    """Subset published on MCP ``tools/list``. Chatboo uses the full sack."""
+    return {
+        name: data
+        for name, data in get_registered_tools().items()
+        if data.get('expose_mcp', True)
+    }
 
 
 def get_tool_function(tool_name: str) -> Optional[Callable]:

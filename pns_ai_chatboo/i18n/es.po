@@ -116,10 +116,6 @@ msgid "*(no response)*"
 msgstr "*(sin respuesta)*"
 
 #. module: pns_ai_chatboo
-msgid "Copied to clipboard."
-msgstr "Copiado al portapapeles."
-
-#. module: pns_ai_chatboo
 #. openerp-web
 #: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
 msgid "Could not copy."
@@ -179,6 +175,11 @@ msgstr "La respuesta se interrumpió por un reinicio del servidor. Vuelve a envi
 #: code:addons/pns_ai_chatboo/models/chatboo_async_request.py:0
 msgid "The request could not be started. Please resend."
 msgstr "No se pudo iniciar la petición. Vuelve a enviarla."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_async_request.py:0
+msgid "A Chatboo turn can only run in your own session."
+msgstr "Un turno de Chatboo solo puede ejecutarse en tu propia sesión."
 
 #. module: pns_ai_chatboo
 msgid "No AI provider is configured for the \"%s\" role. Assign at least one AI provider to this role before using the assistant."
@@ -407,6 +408,28 @@ msgid "0 = default (two thirds of the chat canvas). Else 0–1 of that canvas."
 msgstr "0 = valor por defecto (dos tercios del lienzo del chat). Si no, 0–1 de ese lienzo."
 
 #. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_res_users__chatboo_show_series_stats
+msgid "Chatboo chart statistics"
+msgstr "Estadísticas de gráfico Chatboo"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_users__chatboo_show_series_stats
+msgid "Include the statistics table on the next Chatboo chart."
+msgstr "Incluir la tabla de estadísticas en el siguiente gráfico de Chatboo."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Statistics ON"
+msgstr "Estadísticas ON"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Statistics OFF"
+msgstr "Estadísticas OFF"
+
+#. module: pns_ai_chatboo
 #. openerp-web
 #: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
 msgid "Download"
@@ -423,6 +446,18 @@ msgstr "Copiar contenido"
 #: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
 msgid "Copy as Markdown"
 msgstr "Copiar como Markdown"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Go to end of turn"
+msgstr "Ir al final del turno"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Go to start of turn"
+msgstr "Ir al inicio del turno"
 
 #. module: pns_ai_chatboo
 #. openerp-web
@@ -504,8 +539,8 @@ msgstr "Listar las skills disponibles"
 #. module: pns_ai_chatboo
 #. openerp-web
 #: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
-msgid "Presentation modes (painter, footer, table/chart)"
-msgstr "Modos de presentación (painter, pie, tabla/gráfico)"
+msgid "Presentation modes (compose, footer, table/chart)"
+msgstr "Modos de presentación (compose, pie, tabla/gráfico)"
 
 #. module: pns_ai_chatboo
 #. openerp-web
@@ -542,6 +577,18 @@ msgstr "Propietario"
 #: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
 msgid "Parameters"
 msgstr "Parámetros"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Examples"
+msgstr "Ejemplos"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Other wording is mapped onto these parameters."
+msgstr "Cualquier otra prosa se mapea a estos parámetros."
 
 #. module: pns_ai_chatboo
 #. openerp-web
@@ -724,6 +771,11 @@ msgid "Dataset cache time"
 msgstr "Hora de caché del dataset"
 
 #. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__attached_documents
+msgid "Attached documents (text)"
+msgstr "Documentos adjuntos (texto)"
+
+#. module: pns_ai_chatboo
 #: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
 msgid "Conversation memory"
 msgstr "Memoria de conversación"
@@ -731,14 +783,58 @@ msgstr "Memoria de conversación"
 #. module: pns_ai_chatboo
 #: model:ir.model.fields,field_description:pns_ai_chatboo.field_ai_agent__chatboo_dataset_cache_max_mb
 #: model:ir.model.fields,field_description:pns_ai_chatboo.field_res_config_settings__chatboo_dataset_cache_max_mb
-msgid "Dataset reuse limit (MB)"
-msgstr "Límite de reutilización de datos (MB)"
+msgid "Hidden list copy (MB)"
+msgstr "Copia oculta de la lista (MB)"
 
 #. module: pns_ai_chatboo
 #: model:ir.model.fields,field_description:pns_ai_chatboo.field_ai_agent__chatboo_query_data_ttl_hours
 #: model:ir.model.fields,field_description:pns_ai_chatboo.field_res_config_settings__chatboo_query_data_ttl_hours
-msgid "Dataset reuse expiry (hours)"
-msgstr "Caducidad de reutilización de datos (horas)"
+msgid "Hours that copy lasts"
+msgstr "Horas que dura esa copia"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_ai_agent__chatboo_history_retention_days
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_res_config_settings__chatboo_history_retention_days
+msgid "Session retention (days)"
+msgstr "Retención de sesiones (días)"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_ai_agent__chatboo_history_retention_days
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_history_retention_days
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
+msgid "The chat you reopen: messages, tables on screen, and uploaded files. Deleted after this many days with no use. 0 = keep."
+msgstr "El chat que vuelves a abrir: mensajes, tablas en pantalla y ficheros subidos. Se borra tras estos días sin uso. 0 = no borrar."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_ai_agent__chatboo_download_max_mb
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_res_config_settings__chatboo_download_max_mb
+msgid "Download limit (MB)"
+msgstr "Límite de descarga (MB)"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_ai_agent__chatboo_download_max_mb
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_download_max_mb
+msgid "Max size of a session file chip (named PDF/Excel/Word). The bubble Excel icon does not use this limit. 0 = no limit."
+msgstr "Tamaño máximo del chip de fichero de sesión (PDF/Excel/Word pedido). El icono Excel de la burbuja no usa este tope. 0 = sin límite."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_ai_agent__chatboo_dataset_cache_max_mb
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_dataset_cache_max_mb
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
+msgid "Copy of the last table, kept aside so the next message can reorder it without a new query. Those rows stay out of the prompt: sending the whole table every turn used to fill it. A heavier list is skipped. 0 = no size cap."
+msgstr "Copia de la última tabla, guardada aparte para que el siguiente mensaje pueda reordenarla sin consultar otra vez. Esas filas se quedan fuera del prompt: antes se reenviaba la tabla entera en cada turno y se llenaba. Si la lista pesa más, no se copia. 0 = sin tope."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_ai_agent__chatboo_query_data_ttl_hours
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_query_data_ttl_hours
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
+msgid "After this the aside copy is dropped. Tables already on screen and files you uploaded stay in the session. A later \"same list, but…\" runs the query again. 0 = the copy lasts as long as the session."
+msgstr "Pasado este tiempo se tira esa copia. Las tablas que ya ves en pantalla y los ficheros que subiste siguen en la sesión. Un «la misma lista, pero…» más tarde vuelve a consultar. 0 = la copia dura lo que dure la sesión."
+
+#. module: pns_ai_chatboo
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
+msgid "Session file chips (named PDF/Excel/Word). Not the bubble Excel icon. 0 = no limit."
+msgstr "Chips de fichero de sesión (PDF/Excel/Word pedido). No es el icono Excel de la burbuja. 0 = sin límite."
 
 #. module: pns_ai_chatboo
 #: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
@@ -754,6 +850,36 @@ msgstr "Motor de gráficos"
 #: model:ir.model.fields,field_description:pns_ai_chatboo.field_res_config_settings__chatboo_default_show_mode
 msgid "Default showmode"
 msgstr "Showmode por defecto"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_res_config_settings__chatboo_xlsx_float_decimals
+msgid "Excel float decimals"
+msgstr "Decimales de Excel (coma flotante)"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_xlsx_float_decimals
+msgid "Decimal places for floating-point values and formula cells in Excel exports. Integers stay whole. 0–10."
+msgstr "Cifras decimales de los valores en coma flotante y de las celdas con fórmula en la exportación a Excel. Los enteros se quedan enteros. 0–10."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_res_config_settings__chatboo_xlsx_thousands
+msgid "Excel thousand separators"
+msgstr "Separador de millares en Excel"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_xlsx_thousands
+msgid "Show thousand separators on every numeric Excel cell (integers, floats, and formulas). Separators follow the spreadsheet locale."
+msgstr "Muestra el separador de millares en todas las celdas numéricas de Excel (enteros, flotantes y fórmulas). Los separadores siguen la región de la hoja."
+
+#. module: pns_ai_chatboo
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
+msgid "Decimals for floats and formula cells in Excel (integers stay whole)."
+msgstr "Decimales de flotantes y fórmulas en Excel (los enteros se quedan enteros)."
+
+#. module: pns_ai_chatboo
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
+msgid "Thousand separators on every numeric Excel cell. Locale of the spreadsheet."
+msgstr "Separador de millares en cada celda numérica de Excel. Región de la hoja."
 
 #. module: pns_ai_chatboo
 #: model:ir.model.fields.selection,name:pns_ai_chatboo.selection__res_config_settings__chatboo_chart_engine__echarts
@@ -867,6 +993,16 @@ msgid "Active skill params"
 msgstr "Parámetros del skill activo"
 
 #. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__last_domain_codes
+msgid "Last domain packs"
+msgstr "Packs de dominio del último turno"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__last_domain_codes
+msgid "JSON object of domain pack codes injected last Chatboo turn and how many turns each has been on the table ({code: n}). A legacy JSON list is still read. The next turn unions them with this sentence's discovery hits. A skill invoke adds the skill's domain context packs when it has any. Slashes never clear the list. Cleared on a new session. Not shown to the user."
+msgstr "Objeto JSON de códigos de pack de dominio inyectados en el último turno de Chatboo y cuántos turnos lleva cada uno ({code: n}). Una lista JSON antigua se sigue leyendo. El siguiente turno los une a los aciertos de discovery de esta frase. Invocar un skill añade sus packs de dominio si los tiene. Los slash no vacían la lista. Se limpia en una sesión nueva. No se muestra al usuario."
+
+#. module: pns_ai_chatboo
 #: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__staged_assistant_files
 msgid "Staged assistant downloads"
 msgstr "Descargas del asistente en espera"
@@ -883,8 +1019,8 @@ msgstr "Modo de presentación"
 
 #. module: pns_ai_chatboo
 #: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__presentation_show_mode
-msgid "Session showmode: show-table (table first) or show-chart (chart first). From Chatboo Settings at session start; updated by /show-table, /show-chart or phrasing. Suspended under painter-free. Not shown to the user; not an LLM selector."
-msgstr "Showmode de sesión: show-table (tabla primero) o show-chart (gráfico primero). Desde Ajustes de Chatboo al crear la sesión; lo actualizan /show-table, /show-chart o el phrasing. En suspenso bajo painter-free. No se muestra al usuario; no es un selector del LLM."
+msgid "Session showmode: show-table (table first) or show-chart (chart first). From Chatboo Settings at session start; updated by /show-table, /show-chart or phrasing. Suspended under compose-model. Not shown to the user; not an LLM selector."
+msgstr "Showmode de sesión: show-table (tabla primero) o show-chart (gráfico primero). Desde Ajustes de Chatboo al crear la sesión; lo actualizan /show-table, /show-chart o el phrasing. En suspenso bajo compose-model. No se muestra al usuario; no es un selector del LLM."
 
 #. module: pns_ai_chatboo
 #. openerp-web
@@ -950,6 +1086,11 @@ msgstr "Chatboo access denied. An MCP API key is required."
 
 #. module: pns_ai_chatboo
 #: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
+msgid "Chatboo could not complete that request."
+msgstr "Chatboo no ha podido completar esa petición."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
 msgid "No AI provider is configured for the \"%s\" agent. Assign at least one AI provider to this agent before using the assistant."
 msgstr "No hay ningún proveedor de IA configurado para el agente «%s». Asigna al menos un proveedor de IA a este agente antes de usar el asistente."
 
@@ -981,8 +1122,8 @@ msgstr "Configuración"
 #. module: pns_ai_chatboo
 #. openerp-web
 #: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
-msgid "Capture a turn as an instance skill (extra, with you as author). Typing /create-skill fills the last chip (you can change it), then the slash name. Settings prefixes apply. Help: /create-skill ?"
-msgstr "Captura un turno como skill de instancia (extra, con tu autoría). Al escribir /create-skill se rellena el último chip (se puede cambiar) y luego el slash. Se aplican los prefijos de Ajustes. Ayuda: /create-skill ?"
+msgid "Capture a turn as an instance skill (extra, with you as author). The line starts with the turn chip (filled from the last turn; you can change it). Then the slash name. Settings prefixes apply. If you already own that slash, the wizard replaces it. Words after the name fill the parameter description in the wizard. The turn chip is not a skill parameter. Help: /create-skill ?"
+msgstr "Captura un turno como skill de instancia (extra, con tu autoría). La línea empieza por el chip de turno (el último; lo puedes cambiar). Luego el slash. Se aplican los prefijos de Ajustes. Si ese slash ya es tuyo, el asistente lo reemplaza. Las palabras tras el nombre rellenan la descripción de parámetros del asistente. El chip de turno no es un parámetro del skill. Ayuda: /create-skill ?"
 
 #. module: pns_ai_chatboo
 #. openerp-web
@@ -1023,8 +1164,8 @@ msgstr "Pega o escribe el chip de 4 caracteres y luego el slash"
 #. module: pns_ai_chatboo
 #. openerp-web
 #: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
-msgid "4-character MCP turn id (chip). Required."
-msgstr "Id de turno MCP de 4 caracteres (chip). Obligatorio."
+msgid "4-character MCP turn chip. Required. Auto-filled from the last turn."
+msgstr "Chip de turno MCP de 4 caracteres. Obligatorio. Se rellena con el último turno."
 
 #. module: pns_ai_chatboo
 #. openerp-web
@@ -1037,6 +1178,12 @@ msgstr "último turno"
 #: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
 msgid "Slash name. Settings prefix is applied."
 msgstr "Nombre del slash. Se aplica el prefijo de Ajustes."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Parameter description in prose. Fills the wizard. Not the turn chip."
+msgstr "Descripción de parámetros en prosa. Rellena el asistente. No es el chip de turno."
 
 #. module: pns_ai_chatboo
 #. openerp-web
@@ -1085,6 +1232,18 @@ msgstr "No tienes skills que renombrar."
 #: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
 msgid "New slash name, then press Enter"
 msgstr "Nuevo slash y pulsa Intro"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Press Enter to delete /%s"
+msgstr "Pulsa Intro para borrar /%s"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Press Enter to edit /%s"
+msgstr "Pulsa Intro para editar /%s"
 
 #. module: pns_ai_chatboo
 #. openerp-web
@@ -1167,19 +1326,14 @@ msgid "The captured code may contain hardcoded rows. Replace them with live api_
 msgstr "El código capturado puede contener filas hardcodeadas. Sustitúyelas por api_call en vivo antes de publicar el skill."
 
 #. module: pns_ai_chatboo
-#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
-msgid "This skill will replay the turn fetch (auto-confirmable api_call / fetch_url), then the captured painter."
-msgstr "Este skill repetirá el fetch del turno (api_call / fetch_url auto-confirmable) y después el pintor capturado."
-
-#. module: pns_ai_chatboo
-#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
-msgid "The captured painter reads previous_result. The source turn had no auto-confirmable fetch plan, so the slash will paint empty until propose_steps are added."
-msgstr "El pintor capturado lee previous_result. El turno origen no tenía un plan de fetch auto-confirmable, así que el slash pintará vacío hasta que se añadan propose_steps."
-
-#. module: pns_ai_chatboo
 #: code:addons/pns_ai_chatboo/models/ai_skill.py:0
 msgid "Skill /%s created."
 msgstr "Skill /%s creado."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/ai_skill.py:0
+msgid "Skill /%s updated."
+msgstr "Skill /%s actualizado."
 
 #. module: pns_ai_chatboo
 #: code:addons/pns_ai_chatboo/models/ai_skill.py:0
@@ -1214,8 +1368,8 @@ msgstr "Se requiere permiso AI Writer para crear skills desde Chatboo."
 
 #. module: pns_ai_chatboo
 #: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
-msgid "Turn id is required. Use /create-skill VWVN slash-name (4-character code from the chip)."
-msgstr "El id de turno es obligatorio. Usa /create-skill VWVN slash (código de 4 caracteres del chip)."
+msgid "The turn chip is required: /create-skill VWVN slash-name"
+msgstr "El chip de turno es obligatorio: /create-skill VWVN slash-name"
 
 #. module: pns_ai_chatboo
 #: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
@@ -1231,6 +1385,21 @@ msgstr "No hay log MCP del turno %s (o no es tuyo)."
 #: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
 msgid "No capturable query code found for turn %s."
 msgstr "No hay código de consulta capturable en el turno %s."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "Turn %s ran /%s, but that skill is no longer in the catalog."
+msgstr "El turno %s ejecutó /%s, pero ese skill ya no está en el catálogo."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "Skill /%s has no capturable Code."
+msgstr "El skill /%s no tiene Code capturable."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "This turn ran /%s. The wizard has that skill's Code and Procedure (not a new query)."
+msgstr "Este turno ejecutó /%s. El asistente trae el Code y el Procedure de ese skill (no una consulta nueva)."
 
 #. module: pns_ai_chatboo
 #. openerp-web
@@ -1287,25 +1456,10 @@ msgid "Optional question…"
 msgstr "Pregunta opcional…"
 
 #. module: pns_ai_chatboo
-#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__llm_formatting_mode
-msgid "LLM formatting mode"
-msgstr "Modo de formateo LLM"
-
-#. module: pns_ai_chatboo
-#: model:ir.model.fields.selection,name:pns_ai_chatboo.selection__chatboo_session__llm_formatting_mode__report
-msgid "Report"
-msgstr "Report"
-
-#. module: pns_ai_chatboo
-#: model:ir.model.fields.selection,name:pns_ai_chatboo.selection__chatboo_session__llm_formatting_mode__table
-msgid "Table"
-msgstr "Tabla"
-
-#. module: pns_ai_chatboo
 #. openerp-web
 #: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
-msgid "Session context occupancy · provider cap"
-msgstr "Ocupación del contexto de la sesión · tope del proveedor"
+msgid "Model window · last call vs limit"
+msgstr "Ventana del modelo · última llamada vs tope"
 
 #. module: pns_ai_chatboo
 #. openerp-web
@@ -1346,14 +1500,14 @@ msgstr "Quitar imagen"
 #. module: pns_ai_chatboo
 #. openerp-web
 #: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
-msgid "Screen context active — click to ignore this chat"
-msgstr "Contexto de pantalla activo — clic para ignorar este chat"
+msgid "Covered view ON"
+msgstr "Vista tapada ON"
 
 #. module: pns_ai_chatboo
 #. openerp-web
 #: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
-msgid "Screen context off — click to re-enable"
-msgstr "Contexto de pantalla desactivado — clic para reactivar"
+msgid "Covered view OFF"
+msgstr "Vista tapada OFF"
 
 #. module: pns_ai_chatboo
 #. openerp-web
@@ -1424,26 +1578,86 @@ msgstr "esta sesión"
 #. module: pns_ai_chatboo
 #. openerp-web
 #: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
-msgid "Last turn · sent vs provider cap"
-msgstr "Último turno · enviado vs tope"
+msgid "Conversation analysis:"
+msgstr "Análisis de la conversación:"
 
 #. module: pns_ai_chatboo
 #. openerp-web
 #: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
-msgid "of the %s k cap"
-msgstr "del tope de %s k"
+msgid "Conversation analysis: %s"
+msgstr "Análisis de la conversación: %s"
 
 #. module: pns_ai_chatboo
 #. openerp-web
 #: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
-msgid "Occupancy this session"
-msgstr "Ocupación de esta sesión"
+msgid "Conversation"
+msgstr "Conversación"
 
 #. module: pns_ai_chatboo
 #. openerp-web
 #: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
-msgid "Context status"
-msgstr "Estado del contexto"
+msgid "TURNS"
+msgstr "Turnos"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Performed"
+msgstr "Realizadas"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Billed tokens sum every internal LLM call in each reply (tools, ReAct, etc.)."
+msgstr "Los tokens facturados suman cada llamada interna al LLM de cada respuesta (herramientas, ReAct, etc.)."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Model context limit"
+msgstr "Tope de contexto del modelo"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "maximum per LLM call"
+msgstr "máximo por llamada al LLM"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Each reply may use several internal calls. This cap is per call, not the chat stored on disk."
+msgstr "Cada respuesta puede usar varias llamadas internas. Este tope es por llamada, no el chat guardado en disco."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Detail per turn"
+msgstr "Detalle por turno"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Question"
+msgstr "Pregunta"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "% of model limit"
+msgstr "% del tope del modelo"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Billed"
+msgstr "Facturado"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Cost"
+msgstr "Coste"
 
 #. module: pns_ai_chatboo
 #. openerp-web
@@ -1534,6 +1748,96 @@ msgstr "Skill renombrado: /%s → /%s"
 #. module: pns_ai_chatboo
 #. openerp-web
 #: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Open the skill wizard on a skill you created. Empty opens the picker. Stem, prefixed slash, or a word from the name. Help text and parameters are edited in the wizard. Help: /edit-skill ?"
+msgstr "Abre el asistente de un skill que hayas creado. Vacío abre el selector. Stem, slash con prefijo o una palabra del nombre. La ayuda y los parámetros se editan en el asistente. Ayuda: /edit-skill ?"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Slash or name of a skill you created. Stem or prefixed."
+msgstr "Slash o nombre de un skill tuyo. Stem o con prefijo."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Parameter contract in prose. Same line or the next message."
+msgstr "Contrato de parámetros en prosa. Misma línea o el siguiente mensaje."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Describe the parameters for /%s, then press Enter"
+msgstr "Describe los parámetros de /%s y pulsa Intro"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "You have no skills to edit."
+msgstr "No tienes skills que editar."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Describe the parameters, then press Enter"
+msgstr "Describe los parámetros y pulsa Intro"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Skill to edit, e.g.: %s"
+msgstr "Skill a editar, p. ej.: %s"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Could not update the skill parameters."
+msgstr "No se pudieron actualizar los parámetros del skill."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Open a chat session first."
+msgstr "Abre primero una sesión de chat."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "Describe the parameters for /%s. The next message (no slash) is the contract."
+msgstr "Describe los parámetros de /%s. El siguiente mensaje (sin slash) es el contrato."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "Parameters updated for /%s."
+msgstr "Parámetros actualizados de /%s."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__pending_param_skill_id
+msgid "Pending parameter skill"
+msgstr "Skill pendiente de parámetros"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__pending_param_skill_id
+msgid "Unused. Kept so existing databases keep the column. Parameter prose lives in the skill wizard."
+msgstr "Sin uso. Se mantiene para no tocar la columna en bases ya instaladas. La prosa de parámetros vive en el asistente."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "AI Writer permission is required to edit skills from Chatboo."
+msgstr "Se requiere permiso AI Writer para editar skills desde Chatboo."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "Edit skill"
+msgstr "Editar skill"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "No turn in this session. Run a query first, or pass the 4-character chip."
+msgstr "No hay turno en esta sesión. Lanza una consulta primero, o pasa el chip de 4 caracteres."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
 msgid "Skill to delete, e.g.: %s"
 msgstr "Skill a borrar, p. ej.: %s"
 
@@ -1586,18 +1890,6 @@ msgid "Show the Chatboo launcher icon in the top navigation bar."
 msgstr "Mostrar el icono de Chatboo en la barra de navegación superior."
 
 #. module: pns_ai_chatboo
-#: model:ir.model.fields,help:pns_ai_chatboo.field_ai_agent__chatboo_dataset_cache_max_mb
-#: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_dataset_cache_max_mb
-msgid "Max size of the dataset cached from a data query so the NEXT turn can reformat/reorder the SAME list without re-querying (kernel-like reuse; data never enters the model context). Bigger datasets are not cached (the model just reuses the query code). 0 = no limit. Guards per-turn (de)serialization cost, not DB storage."
-msgstr "Tamaño máximo del conjunto de datos cacheado de una consulta para que el SIGUIENTE turno pueda reformatear o reordenar la MISMA lista sin volver a consultar (reutilización tipo kernel; los datos no entran en el contexto del modelo). Los conjuntos más grandes no se cachean (el modelo solo reutiliza el código de la consulta). 0 = sin límite. Protege el coste de (des)serialización por turno, no el almacenamiento en la base de datos."
-
-#. module: pns_ai_chatboo
-#: model:ir.model.fields,help:pns_ai_chatboo.field_ai_agent__chatboo_query_data_ttl_hours
-#: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_query_data_ttl_hours
-msgid "How long a cached dataset stays reusable. After this it is ignored and purged by the maintenance cron so blobs never pile up. 0 = never expires (only cleared by session retention)."
-msgstr "Cuánto tiempo permanece reutilizable un conjunto de datos cacheado. Después se ignora y el cron de mantenimiento lo elimina para que no se acumulen blobs. 0 = no caduca (solo se limpia por retención de sesión)."
-
-#. module: pns_ai_chatboo
 #: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__name
 msgid "Descriptive name to identify the session"
 msgstr "Nombre descriptivo para identificar la sesión"
@@ -1648,6 +1940,11 @@ msgid "When last_query_data was cached; used to expire it (freshness TTL) so sta
 msgstr "Cuándo se cacheó last_query_data; se usa para caducarlo (TTL de frescura) y que los conjuntos obsoletos no se reutilicen ni se conserven para siempre."
 
 #. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__attached_documents
+msgid "JSON with the text of the files the user attached in this session, page by page. Later turns get a short note and the model reads the part it needs with read_document. Not shown to the user."
+msgstr "JSON con el texto de los ficheros que el usuario adjuntó en esta sesión, página a página. Los turnos siguientes reciben una nota corta y el modelo lee la parte que necesita con read_document. No se muestra al usuario."
+
+#. module: pns_ai_chatboo
 #: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__active_skill_code
 msgid "Code of the skill kept 'sticky' for this session. While set, a follow-up (natural language or `/<same code> args`) is judged by the AI: if it refines the same task, the skill re-runs with merged params; if it's a new topic, this is cleared. A bare `/<code>` (no args) starts fresh. Not shown to the user."
 msgstr "Código de la habilidad que queda «pegada» en esta sesión. Mientras esté asignado, un seguimiento (lenguaje natural o `/<mismo código> args`) lo juzga la IA: si refina la misma tarea, la habilidad se reejecuta con los parámetros fusionados; si es un tema nuevo, se limpia. Un `/<código>` suelto (sin argumentos) empieza de cero. No se muestra al usuario."
@@ -1658,19 +1955,14 @@ msgid "JSON with the current parameters of active_skill_code. The AI merges each
 msgstr "JSON con los parámetros actuales de active_skill_code. La IA fusiona cada refinamiento (añadir/quitar/cambiar) para rotar parámetros sobre el estado anterior sin límite de turnos. No se muestra al usuario."
 
 #. module: pns_ai_chatboo
-#: model:ir.model.fields,help:pns_ai_chatboo.field_chatboo_session__llm_formatting_mode
-msgid "Deprecated leftover. Painter is one-shot per turn (/painter-local /painter-free); empty inherits the provider. Kept for schema compat and cleared automatically."
-msgstr "Resto obsoleto. El painter es de un solo uso por turno (/painter-local /painter-free); vacío hereda el del proveedor. Se mantiene por compatibilidad de esquema y se limpia automáticamente."
-
-#. module: pns_ai_chatboo
 #: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_chart_engine
 msgid "Library used to render charts under server-built tables. ECharts is recommended for combined bar/line charts."
 msgstr "Biblioteca usada para pintar gráficos bajo las tablas generadas en el servidor. Se recomienda ECharts para gráficos combinados de barras y líneas."
 
 #. module: pns_ai_chatboo
 #: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_default_show_mode
-msgid "Starting showmode for each new Chatboo conversation: show-table or show-chart. Stays until /show-table, /show-chart or phrasing (“show as chart” / “show as table”). Suspended under painter-free. Not a per-turn LLM choice."
-msgstr "Modo de presentación inicial de cada conversación nueva de Chatboo: show-table o show-chart. Se mantiene hasta /show-table, /show-chart o una frase («muéstralo como gráfico» / «muéstralo como tabla»). Se suspende con painter-free. No es una elección del LLM por turno."
+msgid "Starting showmode for each new Chatboo conversation: show-table or show-chart. Stays until /show-table, /show-chart or phrasing (“show as chart” / “show as table”). Suspended under compose-model. Not a per-turn LLM choice."
+msgstr "Modo de presentación inicial de cada conversación nueva de Chatboo: show-table o show-chart. Se mantiene hasta /show-table, /show-chart o una frase («muéstralo como gráfico» / «muéstralo como tabla»). Se suspende con compose-model. No es una elección del LLM por turno."
 
 #. module: pns_ai_chatboo
 #: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__last_screen_context
@@ -1745,3 +2037,31 @@ msgstr "Desv. típ."
 #: code:addons/pns_ai_chatboo/static/src/js/chatboo_charts.js:0
 msgid "Sum"
 msgstr "Suma"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_ai_agent__chatboo_upload_max_mb
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_res_config_settings__chatboo_upload_max_mb
+msgid "Upload limit (MB)"
+msgstr "Límite de subida (MB)"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_ai_agent__chatboo_upload_max_mb
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_upload_max_mb
+msgid "Max size of each picture or file sent to the chat. Bigger ones are refused before the turn starts. 0 = no limit."
+msgstr "Tamaño máximo de cada imagen o fichero que se envía al chat. Los mayores se rechazan antes de empezar el turno. 0 = sin límite."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
+#, python-format
+msgid "\"%(name)s\" is larger than the upload limit (%(mb)s MB)."
+msgstr "«%(name)s» supera el límite de subida (%(mb)s MB)."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
+#, python-format
+msgid "A file is larger than the upload limit (%s MB)."
+msgstr "Un fichero supera el límite de subida (%s MB)."
+#. module: pns_ai_chatboo
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
+msgid "Each picture or file sent to the chat. 0 = no limit."
+msgstr "Cada imagen o fichero que se envía al chat. 0 = sin límite."

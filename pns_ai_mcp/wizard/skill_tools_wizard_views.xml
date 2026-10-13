@@ -2,7 +2,7 @@
 <odoo>
     <record id="view_ai_skill_tools_wizard_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.skill.tools.wizard.form</field>
-        <field name="model">pns_ai_mcp.skill.tools.wizard</field>
+        <field name="model">ai.skill.tools.wizard</field>
         <field name="arch" type="xml">
             <form string="Skills Tools">
                 <group>
@@ -31,7 +31,7 @@
     <record id="action_ai_skill_tools_wizard" model="ir.actions.act_window">
         <field name="name">Skills Tools</field>
         <field name="type">ir.actions.act_window</field>
-        <field name="res_model">pns_ai_mcp.skill.tools.wizard</field>
+        <field name="res_model">ai.skill.tools.wizard</field>
         <field name="view_mode">form</field>
         <field name="view_id" ref="view_ai_skill_tools_wizard_form"/>
         <field name="target">new</field>

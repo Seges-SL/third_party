@@ -4,10 +4,10 @@
         <code>partners</code>
         <tipo>domain</tipo>
         <description>res.partner knowledge - customers, suppliers, location search</description>
-        <version>1.2</version>
+        <version>1.5</version>
         <created_at>2025-01-25</created_at>
         <created_by>Administrator</created_by>
-        <modified_at>2026-08-12</modified_at>
+        <modified_at>2026-09-20</modified_at>
         <modified_by>Administrator</modified_by>
     </metadata>
     
@@ -15,6 +15,8 @@
         <module name="partners" model="res.partner">
             <rules>
                 <rule>Clients: `res.partner` with at least one **posted** sales invoice (`account.move` `move_type` in `out_invoice`/`out_refund`, `state='posted'`) as invoice `partner_id` / commercial partner. NEVER `customer_rank`. NEVER `customer=True`. NEVER calendar attendees (`partner_ids`) alone. NEVER `hr.employee`.</rule>
+                <rule>Spoken, unsure or transposed names ("something like…"): call PRELOADED `search_by_affinity('res.partner', needles)` (optional `fields=['name','display_name','email','ref','vat']`). It hands back ranked **dicts** (`hit['id']`), not partners: `browse` those ids to read `city`, `vat`, `email` or any other column. Full-token `ilike` misses letter swaps. Do not say "no contact" until affinity returns empty.</rule>
+                <rule>A spoken name that returns SEVERAL plausible partners is the normal case (homonyms, branches, the parent and its contacts): return those candidates as rows (`id`, `display_name`, plus what separates them — `city`, `vat`, `email`, parent) and ask which one. Do not keep the first hit, do not pick by affinity score, and do not silently prefer the one with invoices. See the core rule on ambiguous records.</rule>
                 <rule>Use `supplier_rank > 0` for Suppliers.</rule>
                 <rule>VAT/NIF is in `vat` field.</rule>
                 <rule>Postal address: prefer the computed field `contact_address` (single formatted string). Atomic parts: `street`, `street2`, `zip`, `city`, `state_id`, `country_id`. NEVER `contact_address_complete` (not a standard `res.partner` field; raises AttributeError). If unsure which address fields exist, check `Partner._fields` or assemble from the atomic parts.</rule>
@@ -57,6 +59,45 @@
                         for pid, n in ranked
                     ]
                     # result = rows
+                    </code_snippet>
+                </pattern>
+                <pattern name="approx_partner_name">
+                    <description>Approximate contact name. Affinity first; then client = posted invoice.</description>
+                    <code_snippet>
+                    needles = []  # spoken tokens from this turn
+                    hits = search_by_affinity(
+                        'res.partner', needles,
+                        fields=['name', 'display_name', 'email', 'ref', 'vat'],
+                    )
+                    # hits are dicts: [{'id': .., 'name': .., 'score': ..}, ..]
+                    cands = env['res.partner'].browse([h['id'] for h in hits])
+                    rows = [{
+                        'id': p.id,
+                        'name': p.display_name,
+                        'city': p.city or '',
+                        'vat': p.vat or '',
+                        'email': p.email or '',
+                    } for p in cands]
+                    # result = rows
+                    # If the user asked for clients, keep ids that appear on posted
+                    # out_invoice / out_refund (see clients_via_posted_invoices).
+                    </code_snippet>
+                </pattern>
+                <pattern name="which_partner_did_you_mean">
+                    <description>More than one plausible partner for the spoken name: deliver the candidates and ask. Never act on a guessed one.</description>
+                    <code_snippet>
+                    Partner = env['res.partner']
+                    # ids from affinity dicts ([h['id'] for h in hits]) or ilike
+                    cands = Partner.browse(ids)
+                    rows = [{
+                        'id': p.id,
+                        'name': p.display_name,
+                        'city': p.city or '',
+                        'vat': p.vat or '',
+                        'email': p.email or '',
+                    } for p in cands[:10]]
+                    # result = {'data': rows}
+                    # Then ask, in one sentence, which of them it is.
                     </code_snippet>
                 </pattern>
                 <pattern name="location_search">

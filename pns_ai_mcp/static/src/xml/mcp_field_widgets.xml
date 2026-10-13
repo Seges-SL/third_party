@@ -36,8 +36,9 @@
             <div t-if="state.expanded" class="mt-1 p-2 position-relative"
                  style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; max-width: 100%; overflow-x: auto;">
                 <button class="btn btn-sm btn-link position-absolute" style="top: 4px; right: 4px; font-size: 11px;"
+                        title="Copy to clipboard"
                         t-on-click.stop="copyToClipboard">
-                    <i class="fa fa-copy"/> Copiar
+                    <i class="fa fa-copy"/>
                 </button>
                 <pre style="margin: 0; white-space: pre-wrap; word-wrap: break-word; font-size: 12px; font-family: monospace;">
                     <t t-esc="state.expandedValue || 'Cargando...'"/>

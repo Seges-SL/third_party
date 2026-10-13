@@ -9,6 +9,7 @@
                 <field name="name" optional="show"/>
                 <field name="code" optional="show"/>
                 <field name="agent_type" optional="show"/>
+                <field name="is_agent_conversational" optional="show" readonly="1"/>
                 <field name="origin" optional="show" decoration-info="origin == 'module'" decoration-muted="origin == 'user'"/>
                 <field name="cache_updated" optional="show"/>
                 <field name="active" optional="show"/>
@@ -45,6 +46,7 @@
                         <field name="name"/>
                         <field name="code" attrs="{'readonly': [('origin', '=', 'module')]}"/>
                         <field name="agent_type" attrs="{'readonly': [('origin', '=', 'module')]}"/>
+                        <field name="is_agent_conversational" readonly="1"/>
                         <field name="origin"/>
                         <field name="sequence"/>
                         <field name="max_agent_rounds"
@@ -53,36 +55,30 @@
                     </group>
                     <field name="description"/>
                     <field name="id" invisible="1"/>
-                    <field name="link_show_native" invisible="1"/>
+                    <field name="link_show_own" invisible="1"/>
                     <field name="link_show_imported" invisible="1"/>
-                    <field name="link_show_pinned" invisible="1"/>
+                    <field name="link_show_inserted" invisible="1"/>
                     <field name="link_show_extra" invisible="1"/>
                     <notebook>
                         <page string="Contexts" name="contexts">
                             <div>
                                 <div class="mb-2">
-                                    <button name="action_select_all_contexts" type="object"
-                                            string="✓ All" class="btn-sm btn-secondary mr-1"/>
-                                    <button name="action_select_none_contexts" type="object"
-                                            string="✗ None" class="btn-sm btn-secondary mr-1"/>
-                                    <button name="action_invert_contexts" type="object"
-                                            string="⇄ Invert" class="btn-sm btn-secondary mr-1"/>
                                     <button name="action_reset_contexts_to_default" type="object"
                                             string="⟳ Defaults" class="btn-sm btn-secondary mr-1"
-                                            confirm="Re-add native, imported and pinned contexts? extra rows are kept."/>
+                                            confirm="Re-add own, imported and inserted contexts? Extra rows are kept."/>
                                     <button name="action_restore_contexts_from_module" type="object"
                                             string="⤓ Restore from module" class="btn-sm btn-secondary"
-                                            confirm="Overwrite native and imported context content from this agent's seed? pinned and extra are not touched. Nothing is deleted."/>
+                                            confirm="Overwrite own and imported context content from this agent's seed? Inserted and extra rows are not touched. Nothing is deleted."/>
                                 </div>
                                 <div class="mb-2 o_pns_origin_filter_bar">
-                                    <a href="#" role="button" tabindex="0" data-token="native"
-                                          class="btn btn-sm btn-primary mr-1 o_pns_origin_filter o_pns_tok_native">native</a>
-                                    <a href="#" role="button" tabindex="0" data-token="imported"
-                                          class="btn btn-sm btn-primary mr-1 o_pns_origin_filter o_pns_tok_imported">imported</a>
-                                    <a href="#" role="button" tabindex="0" data-token="pinned"
-                                          class="btn btn-sm btn-primary mr-1 o_pns_origin_filter o_pns_tok_pinned">pinned</a>
-                                    <a href="#" role="button" tabindex="0" data-token="extra"
-                                          class="btn btn-sm btn-primary mr-1 o_pns_origin_filter o_pns_tok_extra">extra</a>
+                                    <a href="#" role="button" tabindex="0" data-token="own" title="From this agent's module."
+                                          class="btn btn-sm btn-primary mr-1 o_pns_origin_filter o_pns_tok_own">Own</a>
+                                    <a href="#" role="button" tabindex="0" data-token="imported" title="From another module; this agent asks for it."
+                                          class="btn btn-sm btn-primary mr-1 o_pns_origin_filter o_pns_tok_imported">Imported</a>
+                                    <a href="#" role="button" tabindex="0" data-token="inserted" title="From another module; that module puts it in this agent."
+                                          class="btn btn-sm btn-primary mr-1 o_pns_origin_filter o_pns_tok_inserted">Inserted</a>
+                                    <a href="#" role="button" tabindex="0" data-token="extra" title="No module manages it; a person added it."
+                                          class="btn btn-sm btn-primary mr-1 o_pns_origin_filter o_pns_tok_extra">Extra</a>
                                 </div>
                                 <field name="context_ids" nolabel="1"
                                        context="{'composition_agent_id': id}">
@@ -96,33 +92,27 @@
                                         <field name="active" optional="show"/>
                                     </tree>
                                 </field>
-                                <p class="text-muted">Live composition. Origin toggles filter this list without reloading; hidden rows stay on the agent. Defaults re-adds native + imported + pinned; extra stays. Restore overwrites native + imported content only. Core contexts are always present. Locked rows cannot be removed.</p>
+                                <p class="text-muted">Live composition. Origin toggles filter this list without reloading; hidden rows stay on the agent. Defaults re-adds own + imported + inserted; extra stays. Restore overwrites own + imported content only. Core contexts are always present. Locked rows cannot be removed.</p>
                             </div>
                         </page>
                         <page string="Skills" name="skills">
                             <div class="mb-2">
-                                <button name="action_select_all_skills" type="object"
-                                        string="✓ All" class="btn-sm btn-secondary mr-1"/>
-                                <button name="action_select_none_skills" type="object"
-                                        string="✗ None" class="btn-sm btn-secondary mr-1"/>
-                                <button name="action_invert_skills" type="object"
-                                        string="⇄ Invert" class="btn-sm btn-secondary mr-1"/>
                                 <button name="action_reset_skills_to_default" type="object"
                                         string="⟳ Defaults" class="btn-sm btn-secondary mr-1"
-                                        confirm="Re-add native, imported and pinned skills? extra rows are kept."/>
+                                        confirm="Re-add own, imported and inserted skills? Extra rows are kept."/>
                                 <button name="action_restore_skills_from_module" type="object"
                                         string="⤓ Restore from module" class="btn-sm btn-secondary"
-                                        confirm="Overwrite native and imported skill content from this agent's seed? pinned and extra are not touched. Nothing is deleted."/>
+                                        confirm="Overwrite own and imported skill content from this agent's seed? Inserted and extra rows are not touched. Nothing is deleted."/>
                             </div>
                             <div class="mb-2 o_pns_origin_filter_bar">
-                                <a href="#" role="button" tabindex="0" data-token="native"
-                                      class="btn btn-sm btn-primary mr-1 o_pns_origin_filter o_pns_tok_native">native</a>
-                                <a href="#" role="button" tabindex="0" data-token="imported"
-                                      class="btn btn-sm btn-primary mr-1 o_pns_origin_filter o_pns_tok_imported">imported</a>
-                                <a href="#" role="button" tabindex="0" data-token="pinned"
-                                      class="btn btn-sm btn-primary mr-1 o_pns_origin_filter o_pns_tok_pinned">pinned</a>
-                                <a href="#" role="button" tabindex="0" data-token="extra"
-                                      class="btn btn-sm btn-primary mr-1 o_pns_origin_filter o_pns_tok_extra">extra</a>
+                                <a href="#" role="button" tabindex="0" data-token="own" title="From this agent's module."
+                                      class="btn btn-sm btn-primary mr-1 o_pns_origin_filter o_pns_tok_own">Own</a>
+                                <a href="#" role="button" tabindex="0" data-token="imported" title="From another module; this agent asks for it."
+                                      class="btn btn-sm btn-primary mr-1 o_pns_origin_filter o_pns_tok_imported">Imported</a>
+                                <a href="#" role="button" tabindex="0" data-token="inserted" title="From another module; that module puts it in this agent."
+                                      class="btn btn-sm btn-primary mr-1 o_pns_origin_filter o_pns_tok_inserted">Inserted</a>
+                                <a href="#" role="button" tabindex="0" data-token="extra" title="No module manages it; a person added it."
+                                      class="btn btn-sm btn-primary mr-1 o_pns_origin_filter o_pns_tok_extra">Extra</a>
                             </div>
                                 <field name="skill_ids" nolabel="1"
                                        context="{'composition_agent_id': id}">
@@ -135,7 +125,7 @@
                                         <field name="active" optional="show"/>
                                     </tree>
                                 </field>
-                                <p class="text-muted">Live composition. Origin toggles filter this list without reloading; hidden rows stay on the agent. Defaults re-adds native + imported + pinned; extra stays. Restore overwrites native + imported content only. Use Export/Import ZIP from the action menu to move this agent's skills.</p>
+                                <p class="text-muted">Live composition. Origin toggles filter this list without reloading; hidden rows stay on the agent. Defaults re-adds own + imported + inserted; extra stays. Restore overwrites own + imported content only. Use Export/Import ZIP from the action menu to move this agent's skills.</p>
                         </page>
                         <page string="Providers" name="providers"
                               attrs="{'invisible': [('agent_type', '=', 'endpoint')]}">
@@ -144,9 +134,9 @@
                                     <field name="priority" widget="handle"/>
                                     <field name="ordinal" string="#" optional="show"/>
                                     <field name="provider_id" optional="show"/>
-                                    <field name="llm_idle_timeout" optional="hide"/>
-                                    <field name="llm_round_timeout" optional="hide"/>
-                                    <field name="skip_sync_fallback" optional="hide"/>
+                                    <field name="llm_idle_timeout" optional="show"/>
+                                    <field name="llm_round_timeout" optional="show"/>
+                                    <field name="skip_sync_fallback" optional="show"/>
                                     <field name="active" optional="show"/>
                                 </tree>
                             </field>

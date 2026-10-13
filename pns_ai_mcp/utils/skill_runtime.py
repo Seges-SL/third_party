@@ -1,41 +1,41 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Runtime genérico de skills: bootstrap, fast-path y presenters.
+"""Generic skill runtime: bootstrap, fast-path, and presenters.
 
-El motor es AGNÓSTICO de dominio: no sabe qué es la meteorología, la
-facturación ni nada concreto. Toda esa lógica vive en el ``code_body`` del
-skill (en su propio módulo). Aquí solo hay mecanismos genéricos.
+The engine is domain-agnostic. Domain logic lives in the skill's
+``code_body`` (in its own module). This file only has generic mechanisms.
 
-Contrato (cualquier skill)
---------------------------
-``code_body`` puede devolver un ``result`` dict con:
+Contract (any skill)
+--------------------
+``code_body`` may return a ``result`` dict with:
 
-- ``propose_steps``: lista Safe Plan. Si todos los pasos son auto-confirmables
-  (``fetch_url`` en whitelist **o** ``api_call`` a servidor ``trusted``), el
-  servidor los ejecuta sin ronda LLM ni toast intermedio.
-- ``continue``: si es verdadero y se ejecutaron ``propose_steps``, el motor
-  vuelve a llamar al ``code_body`` con los resultados en la global
-  ``previous_result``. Así un skill encadena fases dependientes (p. ej.
-  geocodificar → pronóstico → presentar) por sí mismo, en varias rondas.
-- ``presentation`` / flags ``__return_direct__`` + ``data``|``groups``|
-  ``sections``|``tables``|``formatted_text``: respuesta ya lista → HTML al chat
-  sin tools. El skill compone también su ``footer`` (el motor no inventa pies).
-- Espera de args (genérica): ficha de help markdown sin filas + invocación
-  sin args → el siguiente mensaje humano sin slash reanuda el skill. Flag
-  explícito ``__await_skill_args__`` True/False para forzar u optar por no
-  esperar. Help (``?``) nunca espera.
-- ``__skill_state__``: dict libre que el skill quiere recuperar en la ronda
-  siguiente. Vuelve como global ``skill_state`` del sandbox (``{}`` en una
-  invocación nueva). El motor lo transporta sin mirar dentro: qué slots
-  existen y cuándo están completos lo decide **el skill**, no el motor.
-- Metadatos libres para el LLM si no hay fast-path.
+- ``propose_steps``: Safe Plan list. If every step is auto-confirmable
+  (``fetch_url`` on the whitelist **or** ``api_call`` to a ``trusted``
+  server), the server runs them with no extra LLM round and no toast.
+- ``continue``: if true and ``propose_steps`` ran, the engine calls
+  ``code_body`` again with results in the ``previous_result`` global so
+  a skill can chain dependent phases across rounds.
+- ``presentation`` / ``__return_direct__`` plus ``data``|``groups``|
+  ``sections``|``tables``|``formatted_text``: ready reply → HTML to chat
+  without tools. The skill also composes its ``footer`` (the engine does
+  not invent footers).
+- Generic arg wait: help markdown card with no rows + invoke with no
+  args → the next human message without a slash resumes the skill.
+  Explicit ``__await_skill_args__`` True/False forces or skips the wait.
+  Help (``?``) never waits.
+- ``__skill_state__``: free dict the skill wants back next round. It
+  returns as the sandbox global ``skill_state`` (``{}`` on a new invoke).
+  The engine transports it without looking inside: slots and completeness
+  are the skill's decision, not the engine's.
+- Free metadata for the LLM when there is no fast-path.
 
-Presenters (opcional): registro genérico ``register_presenter`` para que un
-módulo aporte formateadores post-fetch. El motor NO trae ninguno de fábrica.
+Presenters (optional): generic ``register_presenter`` so a module can
+add post-fetch formatters. The engine ships none.
 """
 from __future__ import annotations
 
+import ast
 import json
 import logging
 import re
@@ -71,9 +71,29 @@ _CANONICAL_PARAM = {
 _RANGE_PARAM = re.compile(
     r'^\d{4}-\d{2}-\d{2}(\.\.\d{4}-\d{2}-\d{2})?$'
 )
+_CANONICAL_TEMPORAL_TOKEN = re.compile(
+    r'^('
+    r'\d{4}'
+    r'|\d{4}-\d{4}'
+    r'|\d{4}-\d{2}(-\d{2})?'
+    r'|\d{8}(-\d{8})?'
+    r'|\d{4}-\d{2}-\d{2}\.\.\d{4}-\d{2}-\d{2}'
+    r')$'
+)
 
 
-def _param_value_resolved(key, val):
+def _token_looks_canonical_temporal(val):
+    """True for year / ISO / compact range tokens (no locale words)."""
+    if val in (None, '', []):
+        return False
+    if isinstance(val, (list, tuple)):
+        return any(_token_looks_canonical_temporal(v) for v in val)
+    s = str(val).strip().replace(' ', '')
+    s = s.replace('/', '-').replace('–', '-').replace('—', '-')
+    return bool(_CANONICAL_TEMPORAL_TOKEN.match(s) or _RANGE_PARAM.match(s))
+
+
+def _param_value_resolved(key, val, spec=None):
     """True when ``val`` is a usable value for ``key`` (empty → False)."""
     if val in (None, '', []):
         return False
@@ -92,9 +112,25 @@ def _param_value_resolved(key, val):
                 ok += 1
         return ok > 0
     pat = _CANONICAL_PARAM.get(key)
-    if pat is None:
-        return True
-    return bool(pat.match(str(val).strip()))
+    if pat is not None:
+        return bool(pat.match(str(val).strip()))
+    if _schema_key_is_temporal(key, spec):
+        s = str(val).strip().replace(' ', '')
+        s = s.replace('/', '-').replace('–', '-').replace('—', '-')
+        if _CANONICAL_PARAM['fecha'].match(s):
+            return True
+        if _CANONICAL_PARAM['mes'].match(s):
+            return True
+        if _RANGE_PARAM.match(s):
+            return True
+        if re.fullmatch(r'\d{4}', s):
+            return True
+        if re.fullmatch(r'\d{4}-\d{4}', s):
+            return True
+        if re.fullmatch(r'\d{8}-\d{8}', s):
+            return True
+        return False
+    return True
 
 
 def _schema_key_is_temporal(key, spec):
@@ -106,63 +142,1164 @@ def _schema_key_is_temporal(key, spec):
     return 'YYYY-MM-DD' in desc or 'YYYY-MM' in desc
 
 
-def build_param_extraction_prompt(schema, raw, locale=None, arg_hint=''):
-    """Build (system, user) so the LLM maps free text → formal schema JSON.
+# Sandbox names that are never slash-arg keys (always injected or leftover).
+_SANDBOX_NON_PARAMS = frozenset({
+    'env', 'result', 'user', 'company', 'odoo_version', 'odoo_series',
+    'user_lang', 'lang', 'locale', 'previous_result', 'skill_state',
+    'arguments',
+})
+_INFERRED_SPEC = {
+    'fecha': {'type': 'string', 'desc': 'YYYY-MM-DD. Empty if absent.'},
+    'start_date': {'type': 'string', 'desc': 'YYYY-MM-DD. Empty if absent.'},
+    'end_date': {'type': 'string', 'desc': 'YYYY-MM-DD. Empty if absent.'},
+    'mes': {'type': 'string', 'desc': 'YYYY-MM. Empty if absent.'},
+    'anio': {'type': 'integer', 'desc': 'Calendar year. Empty if absent.'},
+    'year': {'type': 'integer', 'desc': 'Calendar year. Empty if absent.'},
+    'periodos': {'type': 'string', 'desc': 'Date range. Empty if absent.'},
+}
+_DEFAULT_INFERRED_SPEC = {'type': 'string', 'desc': 'Empty if absent.'}
 
-    ``schema`` is ``{key: {"type": ..., "desc": ...}}``. ``arg_hint`` is the
-    skill's formal examples. Short/cheap call: it picks a contract token,
-    never business data. ISO resolution only for temporal keys.
+
+def _handler_catches_nameerror(handler):
+    typ = handler.type
+    if typ is None:
+        return False
+    if isinstance(typ, ast.Name) and typ.id == 'NameError':
+        return True
+    if isinstance(typ, ast.Tuple):
+        return any(
+            isinstance(elt, ast.Name) and elt.id == 'NameError'
+            for elt in typ.elts
+        )
+    return False
+
+
+def _is_slash_param_key(name):
+    if not name or not name.isidentifier() or name.startswith('_'):
+        return False
+    if name in _SANDBOX_NON_PARAMS:
+        return False
+    if name.startswith('arg') and name[3:].isdigit():
+        return False
+    return True
+
+
+def infer_param_keys_from_code(code):
+    """Slash-arg names the code reads via ``try/except NameError``.
+
+    Only names that appear in the source (RHS of ``x = name`` inside a
+    NameError guard). Does not invent keys and does not scan local
+    assignments like ``fecha = '2025-01-01'``.
     """
+    code = (code or '').strip()
+    if not code:
+        return []
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return []
+    keys = []
+    seen = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Try):
+            continue
+        if not any(_handler_catches_nameerror(h) for h in node.handlers):
+            continue
+        for stmt in node.body:
+            if not isinstance(stmt, ast.Assign):
+                continue
+            if not isinstance(stmt.value, ast.Name):
+                continue
+            key = stmt.value.id
+            if key in seen or not _is_slash_param_key(key):
+                continue
+            seen.add(key)
+            keys.append(key)
+    return keys
+
+
+def infer_param_schema_from_code(code):
+    """Minimal ``param_schema`` dict from NameError globals in ``code``."""
+    keys = infer_param_keys_from_code(code)
+    return {
+        key: dict(_INFERRED_SPEC.get(key, _DEFAULT_INFERRED_SPEC))
+        for key in keys
+    }
+
+
+def param_schema_to_json(schema):
+    if not schema:
+        return ''
+    return json.dumps(schema, ensure_ascii=False, separators=(',', ':'))
+
+
+def infer_arg_hint_from_schema(schema):
+    """Placeholder from schema keys only — never invents example values."""
+    if not schema:
+        return ''
+    return ' '.join('%s=…' % key for key in schema)
+
+
+def fill_capture_params(code, schema_txt='', hint=''):
+    """Keep an authored schema; otherwise infer from the Code.
+
+    If ``schema_txt`` is already valid JSON, it wins (create-skill must
+    not overwrite a catalog skill). Hint is derived from keys when empty.
+    Invalid JSON is returned as-is so the wizard can raise.
+    """
+    schema_txt = (schema_txt or '').strip()
+    hint = (hint or '').strip()
+    if schema_txt:
+        try:
+            parsed = json.loads(schema_txt)
+        except Exception:
+            return schema_txt, hint
+        if not isinstance(parsed, dict):
+            return schema_txt, hint
+        dumped = json.dumps(parsed, ensure_ascii=False, separators=(',', ':'))
+        if not hint:
+            hint = infer_arg_hint_from_schema(parsed)
+        return dumped, hint
+    inferred = infer_param_schema_from_code(code)
+    if not inferred:
+        return '', hint
+    dumped = param_schema_to_json(inferred)
+    if not hint:
+        hint = infer_arg_hint_from_schema(inferred)
+    return dumped, hint
+
+
+_INT_DEFAULT = re.compile(r'^-?\d+$')
+_NUM_DEFAULT = re.compile(r'^-?\d+\.\d+$')
+
+
+def infer_type_from_default(default):
+    """``string`` unless the default is an integer or number literal."""
+    text = '' if default is None else str(default).strip()
+    if not text:
+        return 'string'
+    if _INT_DEFAULT.fullmatch(text):
+        return 'integer'
+    if _NUM_DEFAULT.fullmatch(text):
+        return 'number'
+    return 'string'
+
+
+def schema_to_param_rows(schema):
+    """JSON schema → ``[{key, label, desc, default, required}, ...]``."""
+    if isinstance(schema, str):
+        parsed = parse_param_schema_txt(schema)
+    elif isinstance(schema, dict):
+        parsed = schema
+    else:
+        parsed = {}
+    rows = []
+    for key, spec in parsed.items():
+        spec = spec if isinstance(spec, dict) else {}
+        label = (spec.get('label') or key or '').strip()
+        desc = (spec.get('desc') or spec.get('description') or '').strip()
+        default = spec.get('default')
+        if default is None:
+            default = ''
+        else:
+            default = str(default)
+        rows.append({
+            'key': key,
+            'label': label,
+            'desc': desc,
+            'default': default,
+            'required': bool(spec.get('required')),
+        })
+    return rows
+
+
+def param_rows_fingerprint(rows):
+    """Stable fingerprint of the human columns (not identifiers)."""
+    parts = []
+    for row in rows or []:
+        default = row.get('default')
+        parts.append((
+            (row.get('label') or '').strip(),
+            (row.get('desc') or '').strip(),
+            '' if default is None else str(default).strip(),
+            bool(row.get('required')),
+        ))
+    return json.dumps(parts, ensure_ascii=False)
+
+
+def is_placeholder_skill_help(text, *names):
+    """True when Help is empty or only repeats a name/code."""
+    raw = (text or '').strip().casefold()
+    if not raw:
+        return True
+    for name in names:
+        n = (name or '').strip().casefold()
+        if n and raw == n:
+            return True
+    return False
+
+
+def param_rows_need_author(rows):
+    """True when a concept exists without a schema key."""
+    for row in rows or []:
+        label = (row.get('label') or '').strip()
+        desc = (row.get('desc') or '').strip()
+        key = (row.get('key') or '').strip()
+        if (label or desc) and not key:
+            return True
+    return False
+
+
+def param_rows_to_prose(rows):
+    """Trainer text from the list (concept / desc / default)."""
+    lines = []
+    for row in rows or []:
+        label = (row.get('label') or row.get('key') or '').strip()
+        desc = (row.get('desc') or '').strip()
+        default = row.get('default')
+        default = '' if default is None else str(default).strip()
+        if not label and not desc:
+            continue
+        if label and desc:
+            chunk = '%s: %s' % (label, desc)
+        else:
+            chunk = label or desc
+        if default:
+            chunk = '%s Default: %s.' % (chunk.rstrip('.'), default)
+        if row.get('required'):
+            chunk = '%s Required.' % chunk.rstrip('.')
+        lines.append(chunk)
+    return '\n'.join(lines)
+
+
+def _looks_like_param_key(name):
+    """True for snake_case identifiers (not a Title Case concept)."""
+    if not name or not name.isidentifier() or name.startswith('_'):
+        return False
+    return name == name.lower()
+
+
+def apply_code_keys_to_rows(rows, code_keys):
+    """Assign identifiers from Code NameError keys; do not invent names.
+
+    Keeps a row key that is already snake_case. Else uses the label
+    when it is snake_case (not a human concept). Else the next unused
+    Code key. Rows still without a key stay empty for a later light IA.
+    """
+    used = set()
+    out = []
+    for raw in rows or []:
+        row = dict(raw)
+        key = (row.get('key') or '').strip()
+        if _looks_like_param_key(key):
+            row['key'] = key
+            used.add(key)
+            out.append(row)
+            continue
+        label = (row.get('label') or '').strip()
+        if _looks_like_param_key(label):
+            row['key'] = label
+            used.add(label)
+            out.append(row)
+            continue
+        row['key'] = ''
+        out.append(row)
+    unused = [k for k in (code_keys or []) if k not in used]
+    for row in out:
+        if row.get('key'):
+            continue
+        if unused:
+            row['key'] = unused.pop(0)
+    return out
+
+
+def assign_extracted_keys_to_rows(rows, extracted, code_keys=None):
+    """Give leftover IA identifiers to rows that still have no key."""
+    extracted = extracted if isinstance(extracted, dict) else {}
+    extracted_keys = [
+        k for k in extracted
+        if (
+            k != '_reject'
+            and isinstance(k, str)
+            and k.isidentifier()
+            and not k.startswith('_')
+        )
+    ]
+    used = {
+        (r.get('key') or '').strip()
+        for r in (rows or [])
+        if (r.get('key') or '').strip()
+    }
+    leftover = [k for k in extracted_keys if k not in used]
+    code_keys = list(code_keys or [])
+    leftover.sort(key=lambda k: (0 if k in code_keys else 1, extracted_keys.index(k)))
+    out = []
+    for raw in rows or []:
+        row = dict(raw)
+        if not (row.get('key') or '').strip() and leftover:
+            row['key'] = leftover.pop(0)
+        out.append(row)
+    return out
+
+
+def param_rows_to_schema(rows, existing_schema=None):
+    """Rows that already have keys → schema dict. Keeps ``choices_*``."""
+    if isinstance(existing_schema, str):
+        existing = parse_param_schema_txt(existing_schema)
+    elif isinstance(existing_schema, dict):
+        existing = existing_schema
+    else:
+        existing = {}
+    out = {}
+    for row in rows or []:
+        key = (row.get('key') or '').strip()
+        if not key.isidentifier() or key.startswith('_'):
+            continue
+        prev = existing.get(key) if isinstance(existing.get(key), dict) else {}
+        spec = dict(prev)
+        default = row.get('default')
+        inferred = infer_type_from_default(default)
+        if default not in (None, '') and inferred != 'string':
+            spec['type'] = inferred
+        else:
+            spec['type'] = spec.get('type') or inferred or 'string'
+        label = (row.get('label') or '').strip()
+        if label and label != key:
+            spec['label'] = label
+        else:
+            spec.pop('label', None)
+        desc = (row.get('desc') or '').strip()
+        if desc:
+            spec['desc'] = desc
+        if default not in (None, ''):
+            spec['default'] = str(default).strip()
+        else:
+            spec.pop('default', None)
+        if row.get('required'):
+            spec['required'] = True
+        else:
+            spec.pop('required', None)
+        out[key] = spec
+    return out
+
+
+def overlay_rows_on_schema(rows, schema):
+    """List wins for label/desc/default; leftover schema keys are kept."""
+    if isinstance(schema, str):
+        parsed = parse_param_schema_txt(schema)
+    elif isinstance(schema, dict):
+        parsed = dict(schema)
+    else:
+        parsed = {}
+    out = param_rows_to_schema(rows, parsed)
+    for key, spec in parsed.items():
+        if key not in out and isinstance(spec, dict):
+            out[key] = dict(spec)
+    return out
+
+
+def author_copy_locale(lang=None):
+    """Locale for generated Help / desc. Identifiers stay snake_case."""
+    code = (lang or '').strip() or 'en_US'
+    return (
+        ' Write "help" and human-facing desc in the language of locale %s. '
+        'Identifiers stay snake_case. Format tokens (YYYY, CSV) stay as-is.'
+        % code
+    )
+
+
+_PARAM_HELP_SYSTEM = (
+    'Write one short slash-help sentence: what the skill does '
+    '(JSON only, no markdown). '
+    'Shape: {"help": "<one sentence>"}. '
+    'Use only the Procedure and Code. '
+    'The parameter list is already shown on the card — do not list '
+    'parameters unless the sources name them as the purpose. '
+    'Do not invent a capability, model, or parameter that is not '
+    'in the sources. '
+    'Prefer Procedure when it says when/what. If Procedure is empty, '
+    'use the Code. '
+    'Return {"help": ""} if the sources are empty or only a template.'
+)
+_PROCEDURE_TEMPLATE_HEAD = (
+    'When to use: describe the user request this skill answers.'
+)
+# Same English block the capture wizard stores via ``_()``. Used only to
+# ignore that placeholder; a real Procedure starts with a different line.
+_PROCEDURE_TEMPLATE = (
+    "When to use: describe the user request this skill answers.\n"
+    "Parameters: describe them in Help if the slash takes args.\n"
+    "Output: explain how to present the result.\n"
+    "Run the Code with relaxaicode; do not recompute its logic.\n"
+    "\n"
+    "Code habits (sandbox AST — save will reject otherwise):\n"
+    "- sorted/min/max key=: only operator.itemgetter('field') or "
+    "lambda x: x['field']. Precompute complex sort keys as a field.\n"
+    "- Helpers: flat defs (nesting depth max 2). No classes.\n"
+    "- Params: try/except NameError; never invent dates if required.\n"
+    "- External data: propose_steps (fetch_url / api_call), never requests."
+)
+_CODE_HELP_LIMIT = 2500
+
+
+def _procedure_template_heads():
+    """First lines of the wizard Procedure placeholder (source + locale)."""
+    heads = [_PROCEDURE_TEMPLATE_HEAD]
+    try:
+        from odoo import _
+        for src in (_PROCEDURE_TEMPLATE_HEAD, _PROCEDURE_TEMPLATE):
+            trans = _(src)
+            if trans:
+                heads.append(trans.strip().split('\n', 1)[0])
+    except ImportError:
+        pass
+    seen = set()
+    out = []
+    for head in heads:
+        text = (head or '').strip()
+        if text and text not in seen:
+            seen.add(text)
+            out.append(text)
+    return out
+
+
+def procedure_for_help(text):
+    """Trainer Procedure, or empty when it is still the wizard template."""
+    raw = (text or '').strip()
+    if not raw:
+        return ''
+    for head in _procedure_template_heads():
+        if raw.startswith(head):
+            return ''
+    return raw
+
+
+def code_for_help(code, limit=_CODE_HELP_LIMIT):
+    raw = (code or '').strip()
+    if not raw:
+        return ''
+    if len(raw) <= limit:
+        return raw
+    return raw[:limit]
+
+
+def skill_help_fingerprint(procedure, code, rows=None):
+    """Stable fingerprint of the sources for the stored slash-help sentence."""
+    return json.dumps([
+        (procedure or '').strip(),
+        (code or '').strip(),
+        json.loads(param_rows_fingerprint(rows)),
+    ], ensure_ascii=False)
+
+
+def build_skill_help_user(procedure, code, rows=None):
+    """Trainer payload for the slash-help sentence. Empty if no source."""
+    parts = []
+    prose = procedure_for_help(procedure)
+    if prose:
+        parts.append('Procedure:\n%s' % prose)
+    body = code_for_help(code)
+    if body:
+        parts.append('Code:\n%s' % body)
+    listed = param_rows_to_prose(rows)
+    if listed:
+        parts.append('Parameters (already on the card):\n%s' % listed)
+    return '\n\n'.join(parts)
+
+
+def build_param_help_prompt(rows, procedure='', code_body='', lang=None):
+    """Light IA: one stored slash-help sentence from Procedure / Code."""
+    user = build_skill_help_user(procedure, code_body, rows)
+    return _PARAM_HELP_SYSTEM + author_copy_locale(lang), user
+
+
+_PARAM_AUTHOR_SYSTEM = (
+    'Convert the trainer description into JSON only (no prose, no markdown). '
+    'Shape: {"keys": {"<identifier>": {"type": "string"|"integer"|"number", '
+    '"desc": "output format only", "required": true}}, '
+    '"choices": {"<identifier>": {"model": "model.name", "code": "field", '
+    '"label": "field or related.path"}}}. '
+    'Each distinct thing the trainer asks for becomes one snake_case key. '
+    'Prefer a word they already used as an identifier; otherwise a short '
+    'English snake_case of that idea (geographic places → locations). '
+    'desc is the output contract (format and examples), not business copy. '
+    'Set required true only when the trainer marked that concept required. '
+    'Include choices only when the trainer wrote a model and field names. '
+    'Do not invent a model, field, or domain. '
+    'Also emit "help": one short slash-help sentence from the trainer text. '
+    'Return {"_reject": true} only when the text is empty, nonsense, '
+    'or not about parameters.'
+)
+_CHOICES_SPEC_KEYS = (
+    'choices_model', 'choices_code', 'choices_label',
+    'choices_domain', 'choices_exclude',
+)
+
+
+def build_param_author_prompt(trainer_text, code_keys=None, lang=None):
+    """Short JSON call: trainer prose → param_schema keys. No invented models."""
+    extra = ''
+    names = [k for k in (code_keys or []) if isinstance(k, str) and k.isidentifier()]
+    if names:
+        extra = (
+            ' The skill code already reads these names: %s. '
+            'Prefer those identifiers when the trainer describes them.'
+            % ', '.join(names)
+        )
+    return (
+        _PARAM_AUTHOR_SYSTEM + extra + author_copy_locale(lang),
+        trainer_text or '',
+    )
+
+
+def _extract_json_object(text):
+    if not text:
+        return None
+    s = str(text).strip()
+    s = re.sub(r'^```(?:json)?', '', s).strip()
+    s = re.sub(r'```$', '', s).strip()
+    start, end = s.find('{'), s.rfind('}')
+    if start == -1 or end == -1 or end <= start:
+        return None
+    try:
+        data = json.loads(s[start:end + 1])
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _param_author_key_spec(spec):
+    spec = spec if isinstance(spec, dict) else {}
+    typ = (spec.get('type') or 'string').strip().lower()
+    if typ not in ('string', 'integer', 'number'):
+        typ = 'string'
+    desc = (spec.get('desc') or spec.get('description') or '').strip()
+    row = {'type': typ}
+    if desc:
+        row['desc'] = desc
+    model = (spec.get('choices_model') or spec.get('model') or '').strip()
+    code = (spec.get('choices_code') or spec.get('code') or '').strip()
+    label = (spec.get('choices_label') or spec.get('label') or '').strip()
+    if model:
+        row['choices_model'] = model
+    if code:
+        row['choices_code'] = code
+    if label:
+        row['choices_label'] = label
+    domain = spec.get('choices_domain')
+    if domain is None:
+        domain = spec.get('domain')
+    if domain not in (None, False, ''):
+        row['choices_domain'] = domain
+    exclude = spec.get('choices_exclude')
+    if exclude not in (None, False, ''):
+        row['choices_exclude'] = exclude
+    if spec.get('required') in (True, 'true', 'True', 1, '1'):
+        row['required'] = True
+    return row
+
+
+def parse_param_author_json(text):
+    """LLM text → ``{key: spec}`` or ``{'_reject': True}`` or None."""
+    data = _extract_json_object(text)
+    if not data:
+        return None
+    if data.get('_reject') is True:
+        return {'_reject': True}
+    keys = data.get('keys')
+    extra_choices = data.get('choices') if isinstance(data.get('choices'), dict) else {}
+    if not isinstance(keys, dict):
+        skip = {'_reject', 'choices', 'arg_hint', 'keys', 'help', 'description'}
+        guessed = {
+            k: v for k, v in data.items()
+            if k not in skip and isinstance(v, dict)
+        }
+        keys = guessed or None
+    if not isinstance(keys, dict):
+        return None
+    out = {}
+    for key, spec in keys.items():
+        if not isinstance(key, str) or not key.isidentifier() or key.startswith('_'):
+            continue
+        row = _param_author_key_spec(spec)
+        ch = extra_choices.get(key)
+        if isinstance(ch, dict):
+            overlay = _param_author_key_spec(ch)
+            for ck in _CHOICES_SPEC_KEYS:
+                if ck in overlay:
+                    row[ck] = overlay[ck]
+        out[key] = row
+    return out or None
+
+
+def parse_param_author_help(text):
+    """Optional ``help`` sentence from the same author JSON (empty if none)."""
+    data = _extract_json_object(text)
+    if not data:
+        return ''
+    return (data.get('help') or '').strip()[:120]
+
+
+def ground_choices_on_spec(spec, trainer_text):
+    """Drop ``choices_*`` unless the trainer named the model and code field."""
+    spec = dict(spec or {})
+    blob = (trainer_text or '').lower()
+    model = (spec.get('choices_model') or '').strip()
+    code = (spec.get('choices_code') or '').strip()
+    if not model or model.lower() not in blob or not code or code.lower() not in blob:
+        for key in _CHOICES_SPEC_KEYS:
+            spec.pop(key, None)
+        return spec
+    label = (spec.get('choices_label') or '').strip()
+    if label and '.' in label and label.lower() not in blob:
+        spec.pop('choices_label', None)
+    if spec.get('choices_domain') is not None and '[' not in (trainer_text or ''):
+        spec.pop('choices_domain', None)
+    return spec
+
+
+def parse_param_schema_txt(schema_txt):
+    raw = (schema_txt or '').strip()
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    out = {}
+    for key, spec in data.items():
+        if isinstance(key, str) and key.isidentifier() and isinstance(spec, dict):
+            out[key] = dict(spec)
+    return out
+
+
+def merge_authored_param_schema(existing, extracted, trainer_text):
+    """Overlay extracted keys onto the current schema. Ground choices."""
+    out = {}
+    if isinstance(existing, dict):
+        for key, spec in existing.items():
+            if isinstance(key, str) and key.isidentifier() and isinstance(spec, dict):
+                out[key] = dict(spec)
+    if not isinstance(extracted, dict):
+        return out
+    for key, spec in extracted.items():
+        if key == '_reject' or not isinstance(key, str):
+            continue
+        if not key.isidentifier() or key.startswith('_') or not isinstance(spec, dict):
+            continue
+        grounded = ground_choices_on_spec(spec, trainer_text)
+        prev = out.get(key) if isinstance(out.get(key), dict) else {}
+        merged = dict(prev)
+        if grounded.get('type'):
+            merged['type'] = grounded['type']
+        if grounded.get('desc'):
+            merged['desc'] = grounded['desc']
+        if grounded.get('choices_model'):
+            for ck in _CHOICES_SPEC_KEYS:
+                if ck in grounded:
+                    merged[ck] = grounded[ck]
+                else:
+                    merged.pop(ck, None)
+        if grounded.get('required'):
+            merged['required'] = True
+        out[key] = merged
+    return out
+
+
+def schema_keys_unread_by_code(schema, code):
+    """Schema identifiers the Code does not read via ``try/except NameError``."""
+    if isinstance(schema, str):
+        schema = parse_param_schema_txt(schema)
+    if not isinstance(schema, dict):
+        return []
+    read = set(infer_param_keys_from_code(code))
+    unread = []
+    for key in schema:
+        if not isinstance(key, str) or not key.isidentifier() or key.startswith('_'):
+            continue
+        if key not in read:
+            unread.append(key)
+    return unread
+
+
+_CODE_PARAM_REWRITE_SYSTEM = (
+    'Rewrite the skill Python so it reads every listed parameter key. '
+    'Return Python only: no markdown fences, no prose, no JSON. '
+    'Keep the same models, searches, metrics and result shape. '
+    'Do not add a model, field, or filter that is not already in the Code '
+    'or named in the trainer description. '
+    'For each required key, the Code must read the sandbox global with:\n'
+    'try:\n'
+    '    name = name\n'
+    'except NameError:\n'
+    '    name = None\n'
+    'Move hardcoded place or date literals from the original turn into '
+    'those variables. When a key is missing or empty, skip that filter '
+    '(do not keep a hardcoded place or date as a permanent default).'
+)
+
+
+def build_code_param_rewrite_prompt(code, schema, trainer_text=''):
+    """Short Python call: schema keys the Code does not read yet."""
+    unread = schema_keys_unread_by_code(schema, code)
+    if isinstance(schema, str):
+        parsed = parse_param_schema_txt(schema)
+    elif isinstance(schema, dict):
+        parsed = schema
+    else:
+        parsed = {}
+    keys = [k for k in parsed if isinstance(k, str) and k.isidentifier()]
+    extra = ''
+    if unread:
+        extra = ' Required keys the Code does not read yet: %s.' % ', '.join(unread)
+    elif keys:
+        extra = ' Required keys: %s.' % ', '.join(keys)
+    parts = []
+    if keys:
+        parts.append('Parameter keys: %s' % ', '.join(keys))
+    desc = (trainer_text or '').strip()
+    if desc:
+        parts.append('Trainer description:\n%s' % desc)
+    parts.append('Code:\n%s' % (code or ''))
+    return _CODE_PARAM_REWRITE_SYSTEM + extra, '\n\n'.join(parts)
+
+
+def parse_rewritten_skill_code(text):
+    """Strip markdown fences; return Python source or empty."""
+    s = (text or '').strip()
+    if not s:
+        return ''
+    s = re.sub(r'^```(?:python|py)?\s*\n?', '', s, flags=re.IGNORECASE)
+    s = re.sub(r'\n?```\s*$', '', s)
+    return s.strip()
+
+
+def accept_rewritten_code(code, schema):
+    """Cleaned Python if it parses and reads every schema key; else empty."""
+    cleaned = parse_rewritten_skill_code(code)
+    if not cleaned:
+        return ''
+    try:
+        ast.parse(cleaned)
+    except SyntaxError:
+        return ''
+    if schema_keys_unread_by_code(schema, cleaned):
+        return ''
+    return cleaned
+
+
+def _token_looks_formal_period_range(val):
+    """YYYY / YYYY-YYYY / YYYYMMDD-YYYYMMDD / ISO day range — not ``ytd``."""
+    if val in (None, '', []):
+        return False
+    s = str(val).strip().replace(' ', '')
+    s = s.replace('/', '-').replace('–', '-').replace('—', '-')
+    if re.fullmatch(r'\d{4}', s):
+        return True
+    if re.fullmatch(r'\d{4}-\d{4}', s):
+        return True
+    if re.fullmatch(r'\d{8}-\d{8}', s):
+        return True
+    return bool(_RANGE_PARAM.match(s))
+
+
+def _token_looks_formal_integer(val):
+    """A bare integer (``30``), not a year / ISO token."""
+    if isinstance(val, bool):
+        return False
+    if isinstance(val, int):
+        return not _token_looks_canonical_temporal(str(val))
+    s = str(val or '').strip()
+    if not re.fullmatch(r'-?\d+', s):
+        return False
+    return not _token_looks_canonical_temporal(s)
+
+
+def _value_is_formal_token(val):
+    """Year, ISO, code CSV or bare integer. Not a word."""
+    return bool(
+        _token_looks_canonical_temporal(val)
+        or _token_looks_formal_code_csv(val)
+        or _token_looks_formal_integer(val)
+    )
+
+
+def _schema_key_is_integer(spec):
+    spec = spec if isinstance(spec, dict) else {}
+    return (spec.get('type') or '').lower() in ('integer', 'number')
+
+
+def _token_looks_formal_code_csv(val):
+    """Short codes: ``ABC`` / ``ABC,XYZ`` / ``abc,xyz``. Not ``ytd`` / ``Seville``."""
+    s = str(val or '').strip()
+    if not re.fullmatch(
+        r'[A-Za-z0-9]{2,8}(?:\s*,\s*[A-Za-z0-9]{2,8})*',
+        s,
+    ):
+        return False
+    if not re.search(r'[A-Za-z]', s):
+        return False
+    # A lone word (ytd, Seville, tomorrow) is not a code list.
+    if ',' in s:
+        return True
+    return s == s.upper()
+
+
+def _token_is_code_piece(val):
+    """One 2–8 alnum chunk with a letter (continuation after ``ABC,``)."""
+    s = str(val or '').strip().strip(',')
+    return bool(
+        s
+        and re.fullmatch(r'[A-Za-z0-9]{2,8}', s)
+        and re.search(r'[A-Za-z]', s)
+    )
+
+
+def _token_is_code_fragment(val):
+    """CSV, uppercase code, or a comma-tailed piece of a spaced CSV."""
+    s = str(val or '').strip()
+    trailed = s.endswith(',')
+    if trailed:
+        s = s[:-1].strip()
+    if not s:
+        return False
+    if _token_looks_formal_code_csv(s):
+        return True
+    return trailed and _token_is_code_piece(s)
+
+
+def _join_code_frags(parts):
+    codes = []
+    for part in parts:
+        for bit in re.split(r'\s*,\s*', str(part or '').strip()):
+            bit = bit.strip().strip(',')
+            if bit:
+                codes.append(bit)
+    return ','.join(codes)
+
+
+def _stem_is_upper_code(val):
+    """``COR`` / ``COR,`` — a sigla, not a lowercase word with a comma."""
+    s = str(val or '').strip().strip(',')
+    return bool(s) and s == s.upper() and _token_is_code_piece(s)
+
+
+def _utterance_is_only_formal_pieces(tokens):
+    """True for ``abc, xyz 2026``. False when the phrase also has words."""
+    if not tokens:
+        return False
+    for tok in tokens:
+        if _token_looks_canonical_temporal(tok) or _token_looks_formal_period_range(tok):
+            continue
+        if _token_looks_formal_integer(tok):
+            continue
+        if (
+            _token_looks_formal_code_csv(tok)
+            or _token_is_code_fragment(tok)
+            or _token_is_code_piece(tok)
+        ):
+            continue
+        return False
+    return True
+
+
+def _coalesce_formal_code_tokens(tokens):
+    """``ABC, DEF`` and ``abc, xyz`` are one CSV. A comma in a sentence is not.
+
+    ``pasado, solo COR`` keeps ``COR`` and leaves the words alone.
+    """
+    code_list = _utterance_is_only_formal_pieces(tokens)
+    out = []
+    i = 0
+    n = len(tokens)
+    while i < n:
+        tok = tokens[i]
+        if _token_looks_formal_period_range(tok):
+            out.append(tok)
+            i += 1
+            continue
+        trailed = str(tok).rstrip().endswith(',')
+        if trailed and _token_is_code_fragment(tok) and (
+            code_list or _stem_is_upper_code(tok)
+        ):
+            if not code_list:
+                out.append(str(tok).strip().rstrip(',').strip())
+                i += 1
+                continue
+            buf = [tok]
+            i += 1
+            while i < n:
+                nxt = tokens[i]
+                if _token_looks_formal_period_range(nxt):
+                    break
+                if not (
+                    _token_is_code_fragment(nxt) or _token_is_code_piece(nxt)
+                ):
+                    break
+                buf.append(nxt)
+                i += 1
+                if not str(nxt).rstrip().endswith(','):
+                    break
+            out.append(_join_code_frags(buf))
+            continue
+        out.append(tok)
+        i += 1
+    return out
+
+
+def _apply_schema_kv(params, schema, raw):
+    """Copy ``clave=valor`` onto matching schema keys."""
+    for part in _split_arg_tokens(raw):
+        if not _is_kv_token(part):
+            continue
+        key, val = part.split('=', 1)
+        key = key.strip()
+        if key in schema and key != 'arguments':
+            params[key] = _coerce_schema_value(schema.get(key), val)
+    return params
+
+
+def deterministic_schema_hits(params, schema, raw=None):
+    """Formal fills safe to keep when the hybrid LLM also runs.
+
+    A year/ISO token on a non-temporal key is a bad zip (``an=2025-2026``),
+    not a hit — leave that hole for the LLM. With ``raw``, a prose dump
+    (``lugar`` = the whole sentence) is not a hit either: only ``clave=valor``
+    and formal tokens override the JSON.
+    """
+    params = params or {}
+    schema = schema if isinstance(schema, dict) else {}
+    kv = kv_keys_from_raw(raw) if raw is not None else None
+    det = {}
+    for key in schema:
+        spec = schema.get(key)
+        val = params.get(key)
+        if not _param_value_resolved(key, val, spec):
+            continue
+        if (
+            not _schema_key_is_temporal(key, spec)
+            and _token_looks_canonical_temporal(val)
+        ):
+            continue
+        if kv is not None and key not in kv and not _value_is_formal_token(val):
+            continue
+        det[key] = val
+    return det
+
+
+_CHOICES_LIMIT = 200
+
+
+def _choice_field_text(record, path):
+    """Read a simple field or one-level related name. Empty if missing."""
+    path = (path or '').strip()
+    parts = path.split('.') if path else []
+    if not parts or not all(p.isidentifier() for p in parts):
+        return ''
+    cur = record
+    for part in parts:
+        if cur is None or cur is False:
+            return ''
+        try:
+            cur = cur[part]
+        except Exception:
+            return ''
+    if cur is None or cur is False:
+        return ''
+    name = getattr(cur, '_name', None)
+    if name:
+        try:
+            if not cur:
+                return ''
+        except Exception:
+            return ''
+        try:
+            return str(cur.name or '').strip()
+        except Exception:
+            return ''
+    return str(cur).strip()
+
+
+def _spec_label_paths(spec):
+    raw = spec.get('choices_label') or spec.get('choices_name') or 'name'
+    if isinstance(raw, (list, tuple)):
+        return [str(x).strip() for x in raw if str(x).strip()]
+    text = str(raw).strip()
+    return [text] if text else ['name']
+
+
+def _strip_code_bracket_prefix(code, label):
+    """Drop a leading ``[CODE]`` from a label (structural, not a lexicon)."""
+    label = (label or '').strip()
+    code = (code or '').strip()
+    if not label or not code:
+        return label
+    prefix = '[%s]' % code
+    while len(label) >= len(prefix) and label[:len(prefix)].upper() == prefix.upper():
+        label = label[len(prefix):].strip()
+    return label
+
+
+def _format_choice_row(code, labels):
+    """Code + distinct description, or None if only the code remains."""
+    seen = {code.casefold()}
+    extra = []
+    for label in labels:
+        label = _strip_code_bracket_prefix(code, label)
+        if not label or label.casefold() in seen:
+            continue
+        seen.add(label.casefold())
+        extra.append(label)
+    if not extra:
+        return None
+    return {'code': code, 'label': ' — '.join(extra)}
+
+
+def attach_schema_choices(schema, env):
+    """Fill ``spec['choices']`` from ``choices_model`` the skill named.
+
+    The engine does not invent rows. Missing model or field → that key
+    stays without choices (same prompt as today). Already-set ``choices``
+    win (authored list). Called only on the hybrid LLM path.
+    """
+    if not isinstance(schema, dict) or env is None:
+        return schema
+    for spec in schema.values():
+        if not isinstance(spec, dict):
+            continue
+        if spec.get('choices'):
+            continue
+        model = (spec.get('choices_model') or '').strip()
+        code_field = (spec.get('choices_code') or '').strip()
+        if not model or not code_field or not code_field.isidentifier():
+            continue
+        try:
+            if model not in env:
+                continue
+        except Exception:
+            continue
+        domain = spec.get('choices_domain')
+        if domain in (None, False, ''):
+            domain = []
+        if not isinstance(domain, list):
+            continue
+        try:
+            rows = env[model].search(domain, limit=_CHOICES_LIMIT)
+        except Exception:
+            _logger.debug(
+                'schema choices: search %s failed', model, exc_info=True,
+            )
+            continue
+        label_paths = _spec_label_paths(spec)
+        exclude = {
+            str(x).strip()
+            for x in (spec.get('choices_exclude') or [])
+            if str(x).strip()
+        }
+        choices = []
+        seen = set()
+        for rec in rows:
+            code = _choice_field_text(rec, code_field)
+            if not code or code in exclude or code in seen:
+                continue
+            seen.add(code)
+            labels = [_choice_field_text(rec, path) for path in label_paths]
+            row = _format_choice_row(code, labels)
+            if row:
+                choices.append(row)
+        if choices:
+            spec['choices'] = choices
+    return schema
+
+
+def _choice_prompt_lines(choices):
+    lines = []
+    for row in choices or []:
+        if isinstance(row, dict):
+            code = str(row.get('code') or row.get('id') or '').strip()
+            label = str(row.get('label') or row.get('name') or '').strip()
+            if not code:
+                continue
+            if label:
+                lines.append('  - %s — %s' % (code, label))
+            else:
+                lines.append('  - %s' % code)
+        else:
+            text = str(row).strip()
+            if text:
+                lines.append('  - %s' % text)
+    return lines
+
+
+def build_param_extraction_prompt(schema, leftover, locale=None, arg_hint=''):
+    """Build (system, leftover) so the LLM maps human text → rigid schema JSON.
+
+    ``schema`` is the output contract (``{key: {"type", "desc"}}``). The
+    skill owns the meaning of each key. The engine only demands that shape.
+    Live ``choices`` (code + label) are listed when the skill attached them.
+    ``arg_hint`` is unused (human placeholder, not an IA lexicon).
+    """
+    del arg_hint
     import datetime as _dt
     today = _dt.date.today().isoformat()
     lines = []
-    temporal = []
+    has_choices = False
+    required_keys = []
     for key, spec in (schema or {}).items():
         spec = spec if isinstance(spec, dict) else {}
         typ = spec.get('type') or 'string'
         desc = spec.get('desc') or spec.get('description') or ''
-        lines.append('- "%s" (%s): %s' % (key, typ, desc))
-        if _schema_key_is_temporal(key, spec):
-            temporal.append(key)
+        mark = ' required' if spec.get('required') else ''
+        lines.append('- "%s" (%s)%s: %s' % (key, typ, mark, desc))
+        if spec.get('required'):
+            required_keys.append(key)
+        choice_lines = _choice_prompt_lines(spec.get('choices'))
+        if choice_lines:
+            has_choices = True
+            lines.append('  Values (code — label):')
+            lines.extend(choice_lines)
     keys = ', '.join('"%s"' % k for k in (schema or {}).keys())
     locale_hint = (' Locale: %s.' % locale) if locale else ''
-    hint = (arg_hint or '').strip()
-    hint_block = (
-        'Formal examples (arg_hint): %s\n' % hint
-    ) if hint else ''
-    temporal_block = ''
-    if temporal:
-        temporal_block = (
-            'Temporal keys (%s): resolve relatives with Today '
-            '(day → YYYY-MM-DD, month → YYYY-MM). '
-            'For period arrays use "YYYY-MM-DD..YYYY-MM-DD" (same day twice '
-            'if single day). Weekend phrases → one range Saturday..Sunday of '
-            'that weekend (if Today is Sat/Sun, that weekend). Several ranges '
-            '→ several array items. Do NOT return a weekday-only day for a '
-            'weekend request. '
-        ) % (', '.join('"%s"' % k for k in temporal))
-    system = (
-        'You are a parameter-extraction function. From the user request, return '
-        'EXCLUSIVELY a valid JSON object (no prose, no markdown fences) with '
-        'EXACTLY these keys: %s.\n'
-        'Today is %s.%s\n'
-        'Key definitions:\n%s\n'
-        '%s'
-        'Rules: use null when a value is absent; do NOT invent keys or '
-        'business facts. Map informal prose onto this formal contract: if the '
-        'phrase is not an exact token, pick the closest accepted formal value '
-        'from the key definitions and the examples. Do not copy '
-        'natural-language phrases into a field. '
-        '%s'
-        'Return {"_reject": true} and nothing else only when the text is junk '
-        'and no formal value is a reasonable match. '
-        'For ambiguous place names add the country after a comma. '
-        'Reply with JSON only.'
-    ) % (
-        keys, today, locale_hint, '\n'.join(lines),
-        hint_block, temporal_block,
+    choice_rule = (
+        ' When Values are listed for a key, emit those codes (CSV), '
+        'not the labels.'
+        if has_choices else ''
     )
-    return system, (raw or '')
+    if required_keys:
+        req_rule = (
+            ' Required keys: %s. Leave null if the leftover does not '
+            'mention a required key; the engine will ask. Do not invent '
+            'a value.'
+            % ', '.join('"%s"' % k for k in required_keys)
+        )
+    else:
+        req_rule = (
+            ' Fill every key the leftover names. Use null only when the '
+            'leftover does not mention that key. Do not leave a named '
+            'key null. Keys the leftover never names stay null.'
+        )
+    system = (
+        'Convert leftover slash text into a JSON object. '
+        'Reply with JSON only (no prose, no markdown). '
+        'Exact keys: %s.\n'
+        'Today is %s.%s\n'
+        'Output contract:\n%s\n'
+        '%s If the leftover names something that belongs '
+        'to a key, fill that key in the contract format even if the '
+        'wording is informal. Do not invent keys.%s '
+        'If a filled value is not a stable identifier — it would '
+        'resolve to someone or something else later — also emit '
+        '"_relative": ["key", …] for those keys. That includes time '
+        'phrases (today, last year, next Wednesday) and live rankings '
+        '(the current top / most expensive / best by a metric). '
+        'Do not mark an ISO date, year, code or name the leftover '
+        'already wrote as a literal. '
+        'Return {"_reject": true} only when the text is junk '
+        'and no key can be filled.'
+    ) % (keys, today, locale_hint, '\n'.join(lines), req_rule, choice_rule)
+    return system, (leftover or '')
 
 
 def parse_and_validate_params(text, schema):
@@ -219,8 +1356,20 @@ def parse_and_validate_params(text, schema):
                 out[key] = None
         else:
             out[key] = (str(val).strip() or None)
-    if all(v is None for v in out.values()):
-        return None
+    relative = []
+    raw_rel = data.get('_relative')
+    if isinstance(raw_rel, (list, tuple)):
+        for item in raw_rel:
+            name = str(item or '').strip()
+            if name in schema and name not in relative:
+                relative.append(name)
+    if relative:
+        out['_relative'] = relative
+    values = [v for k, v in out.items() if not str(k).startswith('_')]
+    if all(v is None for v in values):
+        # The model read the sentence and named no key. That is not a
+        # failed parse (``None``): defaults may run.
+        out['_params_unset'] = True
     return out
 
 
@@ -278,7 +1427,7 @@ def schema_needs_ai_resolution(params, schema, raw, leftover=None):
     params = params or {}
     holes = [
         k for k in schema.keys()
-        if not _param_value_resolved(k, params.get(k))
+        if not _param_value_resolved(k, params.get(k), schema.get(k))
     ]
     # ``arguments`` mirrors the raw slash text — never a reason alone to call AI.
     holes = [k for k in holes if k != 'arguments']
@@ -331,15 +1480,143 @@ def leftover_free_text(raw):
     return ' '.join(leftovers).strip()
 
 
-def leftover_after_ordinals(raw, params, bound_map):
-    """Prose still unbound after ordinal assignment (empty → skip the LLM)."""
+def leftover_after_ordinals(raw, params, bound_map, schema=None):
+    """Positional tokens still unbound (empty → skip the LLM)."""
+    del params, schema
+    bound_vals = set()
+    for val in (bound_map or {}).values():
+        bound_vals.add(str(val).strip())
+    unbound = [
+        tok for tok in positional_tokens(raw)
+        if str(tok).strip() not in bound_vals
+    ]
+    if unbound:
+        return ' '.join(str(tok) for tok in unbound).strip()
     if bound_map:
-        bits = [
-            tok for key, tok in bound_map.items()
-            if not _param_value_resolved(key, (params or {}).get(key))
-        ]
-        return ' '.join(str(b) for b in bits if b).strip()
+        return ''
     return leftover_free_text(raw)
+
+
+def hybrid_unresolved_text(raw, leftover, bound_map):
+    """Phrase the short call should see.
+
+    Prose left over → the whole slash text, not the chopped tail. Formal
+    binds stay in the deterministic fill and win on merge. Nothing left
+    and something already bound → empty (no call).
+    """
+    if (leftover or '').strip():
+        return ' '.join(str(raw or '').split())
+    if bound_map:
+        return ''
+    return ' '.join(str(raw or '').split())
+
+
+def normalize_unresolved_key(text):
+    """Cache key for leftover slash prose: collapse spaces, NFC, casefold.
+
+    Structural only — no locale synonym list.
+    """
+    s = ' '.join(str(text or '').split())
+    if not s:
+        return ''
+    try:
+        import unicodedata
+        s = unicodedata.normalize('NFC', s)
+    except Exception:
+        pass
+    return s.casefold()
+
+
+def relative_param_keys(norm):
+    """Keys the IA marked as unstable (time phrase or live ranking)."""
+    if not isinstance(norm, dict):
+        return ()
+    raw = norm.get('_relative')
+    if not isinstance(raw, (list, tuple)):
+        return ()
+    out = []
+    for item in raw:
+        name = str(item or '').strip()
+        if name and not name.startswith('_') and name not in out:
+            out.append(name)
+    return tuple(out)
+
+
+def param_cache_payload(norm):
+    """IA-filled params worth storing. Relative keys are omitted.
+
+    A leftover whose referent is not stable (time phrase or live ranking)
+    must be re-read by IA on the next invoke (one call). Stable keys
+    (codes, names, ISO dates) stay cached.
+    """
+    if not isinstance(norm, dict) or norm.get('_skill_args_reject'):
+        return None
+    skip = set(relative_param_keys(norm))
+    out = {}
+    for key, val in norm.items():
+        if str(key).startswith('_') or val in (None, '', []):
+            continue
+        if key in skip:
+            continue
+        out[key] = val
+    return out or None
+
+
+def schema_required_keys(schema):
+    """Identifiers marked required in ``param_schema``."""
+    keys = []
+    for key, spec in (schema or {}).items():
+        if not isinstance(key, str) or key.startswith('_'):
+            continue
+        if isinstance(spec, dict) and spec.get('required'):
+            keys.append(key)
+    return keys
+
+
+def apply_schema_defaults(params, schema):
+    """Copy schema defaults onto empty keys. Does not invent values."""
+    out = dict(params or {})
+    for key, spec in (schema or {}).items():
+        if not isinstance(spec, dict):
+            continue
+        default = spec.get('default')
+        if default in (None, ''):
+            continue
+        if not _param_value_resolved(key, out.get(key), spec):
+            out[key] = default
+    return out
+
+
+def missing_required_params(params, schema):
+    """Required keys that still have no usable value (after defaults)."""
+    filled = apply_schema_defaults(params, schema)
+    missing = []
+    for key in schema_required_keys(schema):
+        spec = schema.get(key) if isinstance(schema.get(key), dict) else {}
+        if not _param_value_resolved(key, filled.get(key), spec):
+            missing.append(key)
+    return missing
+
+
+def empty_args_need_required_ask(schema):
+    """True when an empty slash cannot run because a required key has no default."""
+    return bool(missing_required_params({}, schema))
+
+
+def parse_param_cache_json(raw):
+    """JSON object from a cache row, or None if not an object."""
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return {}
+    try:
+        data = json.loads(text)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    return {k: v for k, v in data.items() if not str(k).startswith('_')}
 
 
 def _split_arg_tokens(raw):
@@ -369,7 +1646,8 @@ def kv_keys_from_raw(raw):
 
 def positional_tokens(raw):
     """Tokens that are not ``clave=valor`` (order preserved)."""
-    return [part for part in _split_arg_tokens(raw) if not _is_kv_token(part)]
+    tokens = [part for part in _split_arg_tokens(raw) if not _is_kv_token(part)]
+    return _coalesce_formal_code_tokens(tokens)
 
 
 def _coerce_schema_value(spec, token):
@@ -395,16 +1673,90 @@ def _coerce_schema_value(spec, token):
     return token
 
 
+def _classify_positional(tokens):
+    """Split positional tokens into period, code, integer, word.
+
+    A token lands in one bucket. Years and ISO stay periods, not integers.
+    """
+    period, code, integers, words = [], [], [], []
+    for tok in tokens:
+        if _token_looks_canonical_temporal(tok):
+            period.append(tok)
+        elif _token_looks_formal_code_csv(tok):
+            code.append(tok)
+        elif _token_looks_formal_integer(tok):
+            integers.append(tok)
+        else:
+            words.append(tok)
+    return period, code, integers, words
+
+
+def _bind_fitting_formal(params, schema, empty, period_toks, code_toks, int_toks):
+    """Bind formal tokens that fit their slot. Words are never bound.
+
+    Periods → temporal keys (or an integer year slot). Codes → the other
+    string keys. Bare integers → integer keys. Too many for the holes →
+    that bucket stays unbound so the short call sees them.
+    """
+    temporal_empty = [
+        k for k in empty
+        if _schema_key_is_temporal(k, schema.get(k))
+    ]
+    int_empty = [
+        k for k in empty
+        if k not in temporal_empty and _schema_key_is_integer(schema.get(k))
+    ]
+    # A 4-digit year on an integer key (``anio``) is still a period slot.
+    if period_toks and not temporal_empty:
+        temporal_empty = list(int_empty)
+        int_empty = []
+    other_empty = [
+        k for k in empty
+        if k not in temporal_empty and k not in int_empty
+    ]
+    bound = {}
+    if period_toks and len(period_toks) <= len(temporal_empty):
+        for key, tok in zip(temporal_empty, period_toks):
+            params[key] = _coerce_schema_value(schema.get(key), tok)
+            bound[key] = tok
+    if code_toks:
+        csv_keys = [
+            k for k in other_empty
+            if 'CSV' in str(
+                (schema.get(k) or {}).get('desc')
+                or (schema.get(k) or {}).get('description')
+                or ''
+            ).upper()
+        ]
+        if len(code_toks) > 1 and csv_keys:
+            key = csv_keys[0]
+            joined = ','.join(str(tok).strip() for tok in code_toks)
+            params[key] = _coerce_schema_value(schema.get(key), joined)
+            bound[key] = joined
+        elif len(code_toks) <= len(other_empty):
+            for key, tok in zip(other_empty, code_toks):
+                params[key] = _coerce_schema_value(schema.get(key), tok)
+                bound[key] = tok
+    if int_toks and len(int_toks) <= len(int_empty):
+        for key, tok in zip(int_empty, int_toks):
+            params[key] = _coerce_schema_value(schema.get(key), tok)
+            bound[key] = tok
+    return bound
+
+
 def apply_schema_ordinals(params, schema, raw):
-    """Bind leftover tokens to empty schema keys, in declaration order.
+    """Bind formal tokens onto empty schema keys. Words stay unbound.
 
     ``clave=valor`` wins. Catch-all ``lugar`` from ``parse_skill_arguments``
-    does not count as already set. Bind only when ``len(tokens) <=`` empty
-    keys (more tokens = prose → LLM). Returns ``(params, bound_map)``.
+    does not count as already set. Formal tokens (year, ISO, ``YYYY-MM``,
+    range, code CSV, a bare integer) bind by type when they fit. A word
+    is not zipped onto the next hole — the short call sees the phrase.
+    Returns ``(params, bound_map)``.
     """
     params = params if isinstance(params, dict) else {}
     if not isinstance(schema, dict) or not schema:
         return params, {}
+    _apply_schema_kv(params, schema, raw)
     tokens = positional_tokens(raw)
     if not tokens:
         return params, {}
@@ -416,16 +1768,15 @@ def apply_schema_ordinals(params, schema, raw):
         if key == 'lugar':
             empty.append(key)
             continue
-        if _param_value_resolved(key, params.get(key)):
+        if _param_value_resolved(key, params.get(key), schema.get(key)):
             continue
         empty.append(key)
-    if not empty or len(tokens) > len(empty):
+    if not empty:
         return params, {}
-    bound = {}
-    for key, tok in zip(empty, tokens):
-        params[key] = _coerce_schema_value(schema.get(key), tok)
-        bound[key] = tok
-    return params, bound
+    period_toks, code_toks, int_toks, _words = _classify_positional(tokens)
+    return params, _bind_fitting_formal(
+        params, schema, empty, period_toks, code_toks, int_toks,
+    )
 
 
 def skill_args_unmapped(raw, resolved_params, schema, args_policy='default'):
@@ -480,9 +1831,26 @@ def merge_hybrid_params(det, norm, schema, raw, args_policy='default'):
                     filled[key] = None
     merged = dict(filled or {})
     merged.update(det)
-    if skill_args_unmapped(raw, merged, schema, args_policy):
+    explicit_unset = bool(isinstance(filled, dict) and filled.get('_params_unset'))
+    merged.pop('_relative', None)
+    merged.pop('_params_unset', None)
+    # A failed parse must not fall through to the default (FWLD: 4→12).
+    # Explicit nulls mean the sentence named no key, so the default is right.
+    if not explicit_unset and skill_args_unmapped(raw, merged, schema, args_policy):
         return {'_skill_args_reject': True}
+    merged = apply_schema_defaults(merged, schema)
     return merged or None
+
+
+def finalize_skill_params(merged, schema):
+    """Defaults + required gate after the last fill (cache or IA)."""
+    if not isinstance(merged, dict) or merged.get('_skill_args_reject'):
+        return merged
+    out = apply_schema_defaults(merged, schema)
+    out.pop('_relative', None)
+    if missing_required_params(out, schema):
+        return {'_skill_args_reject': True, '_skill_args_missing': True}
+    return out
 
 
 def parse_skill_arguments(arguments):
@@ -584,16 +1952,70 @@ def parse_skill_arguments(arguments):
     return out
 
 
+def overlay_resolved_params(params, extra_params):
+    """Schema keys win. The raw sentence is not left for the skill to parse again.
+
+    Any skill reads ``desde_hasta`` / ``ba`` / … and uses its own default when
+    the value is empty. ``arguments`` and ``lugar`` stay only when this call
+    did not map a schema key (no schema, or the key itself is the text).
+    """
+    params = dict(params or {})
+    extra = {}
+    for key, val in (extra_params or {}).items():
+        if not isinstance(key, str) or key.startswith('_'):
+            continue
+        extra[key] = val
+        if val is not None:
+            params[key] = val
+        else:
+            params.setdefault(key, None)
+    mapped = [
+        key for key in extra
+        if key not in ('skill_state', 'arguments', 'lugar')
+    ]
+    if not mapped:
+        return params
+    if not str(extra.get('arguments') or '').strip():
+        params['arguments'] = None
+        for key in list(params):
+            if key.startswith('arg') and key[3:].isdigit():
+                params.pop(key, None)
+    if not str(extra.get('lugar') or '').strip():
+        params['lugar'] = None
+    return params
+
+
+def skill_code_refusal(code, skill_code='skill'):
+    """Why this code_body may not run, or empty.
+
+    Checked on save and again on every run: a row saved before a rule was
+    tightened still runs with the caller's rights.
+    """
+    from odoo import _
+    from ..controllers.validators import validate_relaxaicode_source_ast
+
+    ok, err, writes = validate_relaxaicode_source_ast(code)
+    if not ok:
+        return _(
+            'The code of skill «%s» breaks the sandbox rules:\n\n%s'
+        ) % (skill_code or '?', err)
+    if writes:
+        return _(
+            'The code of skill «%s» writes to the database. A skill only '
+            'reads; changes go in propose_steps and the user confirms them.'
+        ) % (skill_code or '?')
+    return ''
+
+
 def bootstrap_skill_code_body(env, code, arguments='', skill_code='skill',
                               extra_params=None, previous_result=None,
                               diag=None):
     """Ejecuta code_body en sandbox seguro. Devuelve ``result`` dict o None.
 
-    ``extra_params`` (opcional): dict de parámetros deterministas ya resueltos.
-    Se fusiona sobre el parse determinista: un valor no-None **sobrescribe** al
-    determinista; un valor None solo **asegura** que la clave exista en el
-    sandbox (no borra el determinista). Así el skill puede leer siempre las
-    claves del schema sin NameError.
+    ``extra_params`` (opcional): claves ya resueltas por el schema. Se fusionan
+    sobre el parse. Si hay alguna clave de schema, ``arguments`` y ``lugar``
+    dejan de llevar la frase: el skill no la vuelve a interpretar. Un valor
+    None solo asegura que la clave exista.
 
     ``previous_result`` (opcional): resultados de los ``fetch_url`` ejecutados en
     la ronda anterior (ver ``try_skill_fast_path``). Se inyecta como global
@@ -608,14 +2030,15 @@ def bootstrap_skill_code_body(env, code, arguments='', skill_code='skill',
     code = (code or '').strip()
     if not code:
         return None
+    refused = skill_code_refusal(code, skill_code)
+    if refused:
+        if isinstance(diag, dict):
+            diag['bootstrap_error'] = refused
+        _logger.warning('Skill bootstrap refused for %s: %s', skill_code, refused)
+        return None
     params = parse_skill_arguments(arguments)
     enrich_params_with_dates(params)
-    if extra_params:
-        for key, val in extra_params.items():
-            if val is not None:
-                params[key] = val
-            else:
-                params.setdefault(key, None)
+    params = overlay_resolved_params(params, extra_params)
     try:
         from ..controllers.context_builder import build_safe_context
 
@@ -690,18 +2113,6 @@ def bootstrap_skill_code_body(env, code, arguments='', skill_code='skill',
         )
         return None
 
-
-def is_fetch_url_only_plan(steps):
-    """True si todos los pasos son ``fetch_url`` (utilidad auxiliar).
-
-    El fast-path usa ``_all_steps_auto_confirmable`` (``fetch_url`` whitelist +
-    ``api_call`` trusted); no llama a esta función.
-    """
-    if not isinstance(steps, list) or not steps:
-        return False
-    return all(
-        isinstance(s, dict) and s.get('op') == 'fetch_url' for s in steps
-    )
 
 
 def collect_external_sources(steps):
@@ -895,7 +2306,7 @@ def render_presentation_html(presentation, env=None):
         render_ctx = render_context_from_env(env, result=presentation) if env is not None else None
         ft = presentation.get('formatted_text')
         if ft:
-            return wrap_bare_images_clickable(ft)
+            return wrap_bare_images_clickable(ft, env=env)
         rendered = render_for_direct_return(
             presentation,
             presentation.get('summary') or '',
@@ -916,7 +2327,7 @@ def render_presentation_html(presentation, env=None):
 
 def try_skill_fast_path(env, bootstrap, title='Skill', *, code=None,
                         arguments='', skill_code='skill', extra_params=None,
-                        max_rounds=5, diag=None):
+                        max_rounds=5, diag=None, probe=False):
     """Ejecuta el ciclo determinista de un skill sin recurrir al LLM.
 
     Genérico y agnóstico de dominio. En cada ronda el ``code_body`` (ya
@@ -944,6 +2355,10 @@ def try_skill_fast_path(env, bootstrap, title='Skill', *, code=None,
 
     ``diag`` (dict opcional): se rellena con ``reason`` (motivo de la degradación
     al LLM) y ``round`` para poder diagnosticar en el log SIN especular.
+
+    ``probe``: a plan that needs the toast returns ``needs_confirmation``
+    instead of creating the pending operation, which is committed on a cursor
+    of its own and would outlive the caller's rollback.
     """
     def _bail(reason):
         if isinstance(diag, dict):
@@ -959,7 +2374,7 @@ def try_skill_fast_path(env, bootstrap, title='Skill', *, code=None,
     try:
         from ..controllers.safe_plan import (
             _all_steps_auto_confirmable,
-            create_pending_safe_operation,
+            request_safe_plan,
             execute_safe_plan,
             validate_safe_plan,
         )
@@ -998,8 +2413,10 @@ def try_skill_fast_path(env, bootstrap, title='Skill', *, code=None,
         # 2) ¿Propone pasos?
         steps = bootstrap.get('propose_steps')
         if not isinstance(steps, list) or not steps:
-            return _bail('no_propose_steps(keys=%s)'
-                         % sorted(bootstrap.keys()))
+            keys = sorted(bootstrap.keys())
+            if not keys:
+                return _bail('empty_result')
+            return _bail('no_propose_steps(keys=%s)' % keys)
 
         ok, err = validate_safe_plan(steps, env)
         if not ok:
@@ -1008,7 +2425,9 @@ def try_skill_fast_path(env, bootstrap, title='Skill', *, code=None,
         # Planes no auto-confirmables (CRUD, URL/API no trusted) → toast.
         # Trusted fetch_url + trusted api_call se ejecutan aquí (multi-ronda).
         if not _all_steps_auto_confirmable(env, steps):
-            pending = create_pending_safe_operation(
+            if probe:
+                return {'needs_confirmation': True, 'verification_id': None}
+            pending = request_safe_plan(
                 env, steps,
                 title=bootstrap.get('title') or title,
                 tool_name='skill:%s' % skill_code,
@@ -1057,3 +2476,63 @@ def try_skill_fast_path(env, bootstrap, title='Skill', *, code=None,
             return _bail('no_continue_no_presentation')
 
     return _bail('max_rounds_exhausted')
+
+
+_FAST_PATH_PUBLISH_BLOCKERS = frozenset((
+    'presentation_no_html',
+    'empty_result',
+    'max_rounds_exhausted',
+    'no_continue_no_presentation',
+))
+
+
+def check_skill_fast_path_publishable(
+    env, code, arguments='', args_policy='default', param_schema='',
+    skill_code='skill',
+):
+    """Return a user-facing error when ``/slash`` would fail with empty args.
+
+    Returns ``None`` when publishable or when empty-args validation does not
+    apply (required parameters, bootstrap exception, install-time registry).
+    """
+    body = (code or '').strip()
+    if not body or env is None:
+        return None
+    if not getattr(env.registry, 'ready', False):
+        return None
+    policy = (args_policy or 'default').strip() or 'default'
+    if policy != 'none':
+        schema = parse_param_schema_txt(param_schema or '')
+        if schema_required_keys(schema):
+            return None
+    diag = {}
+    try:
+        bootstrap = bootstrap_skill_code_body(
+            env, body, arguments=arguments, skill_code=skill_code, diag=diag,
+        )
+    except Exception:
+        return None
+    if not isinstance(bootstrap, dict):
+        return None
+    fast = try_skill_fast_path(
+        env, bootstrap, code=body, arguments=arguments,
+        skill_code=skill_code, diag=diag, probe=True,
+    )
+    from odoo import _
+    label = skill_code or 'skill'
+    if isinstance(fast, dict) and fast.get('needs_confirmation'):
+        return _(
+            'Skill "%s" needs supervised safe-plan confirmation (toast). '
+            'Capture only auto-confirmable fetch_url or trusted api_call '
+            'steps, or edit the Code before publishing.'
+        ) % label
+    if fast is not None:
+        return None
+    reason = (diag or {}).get('reason') or ''
+    if reason in _FAST_PATH_PUBLISH_BLOCKERS:
+        return _(
+            'Skill "%s" would fail on /slash with no arguments (%s). '
+            'The Code must fetch live data on each run and include every '
+            'phase from the source turn (fetch, transform, present).'
+        ) % (label, reason)
+    return None

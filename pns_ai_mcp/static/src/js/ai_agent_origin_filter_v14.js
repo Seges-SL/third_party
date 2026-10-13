@@ -1,7 +1,13 @@
+/**
+ * Origin toggles on the agent form. Client-only filter of own/imported/inserted/extra rows.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+ */
 odoo.define('pns_ai_mcp.ai_agent_origin_filter', function (require) {
     "use strict";
 
-    var TOKENS = ['native', 'imported', 'pinned', 'extra'];
+    var TOKENS = ['own', 'imported', 'inserted', 'extra'];
     var STORE = 'pns_origin_filter_';
     var flagsByAgent = {};
 
@@ -16,8 +22,7 @@ odoo.define('pns_ai_mcp.ai_agent_origin_filter', function (require) {
                 return TOKENS[i];
             }
         }
-        var text = (btn.textContent || '').trim();
-        return TOKENS.indexOf(text) !== -1 ? text : '';
+        return '';
     }
 
     function formRoot(el) {
@@ -40,7 +45,7 @@ odoo.define('pns_ai_mcp.ai_agent_origin_filter', function (require) {
     }
 
     function flagsFromFields(form) {
-        var flags = {native: true, imported: true, pinned: true, extra: true};
+        var flags = {own: true, imported: true, inserted: true, extra: true};
         TOKENS.forEach(function (token) {
             var el = form.querySelector('[name="link_show_' + token + '"]');
             if (!el) {
@@ -78,19 +83,37 @@ odoo.define('pns_ai_mcp.ai_agent_origin_filter', function (require) {
         }
     }
 
+    /**
+     * The Origin cell shows the translated label; the filter chip with the
+     * same label carries the key in ``data-token``.
+     */
+    function tokenOfLabel(row, text) {
+        if (!text) {
+            return '';
+        }
+        var btns = formRoot(row).querySelectorAll('.o_pns_origin_filter');
+        var i;
+        for (i = 0; i < btns.length; i++) {
+            if ((btns[i].textContent || '').trim() === text) {
+                return tokenOf(btns[i]);
+            }
+        }
+        return '';
+    }
+
     function originFromRow(row) {
         var cell = row.querySelector(
             '[name="composition_origin"], [data-name="composition_origin"]',
         );
         if (cell) {
-            return (cell.textContent || '').trim();
+            return tokenOfLabel(row, (cell.textContent || '').trim());
         }
         var tds = row.querySelectorAll('td');
         var i;
         for (i = 0; i < tds.length; i++) {
-            var text = (tds[i].textContent || '').trim();
-            if (TOKENS.indexOf(text) !== -1) {
-                return text;
+            var token = tokenOfLabel(row, (tds[i].textContent || '').trim());
+            if (token) {
+                return token;
             }
         }
         return '';
@@ -266,6 +289,10 @@ odoo.define('pns_ai_mcp.ai_agent_origin_filter', function (require) {
                     'o_pns_origin_hidden',
                     Boolean(origin) && shown.indexOf(origin) === -1,
                 );
+                row.classList.toggle(
+                    'o_pns_origin_module',
+                    Boolean(origin) && origin !== 'extra',
+                );
             });
             if (lockHeight) {
                 keepListHeight(box, before);
@@ -346,8 +373,8 @@ odoo.define('pns_ai_mcp.ai_agent_origin_filter', function (require) {
     }, true);
 
     var observer = new MutationObserver(function () {
-        window.clearTimeout(paintVisibleForms._t);
-        paintVisibleForms._t = window.setTimeout(paintVisibleForms, 50);
+        paintVisibleForms();
+        observer.takeRecords();
     });
     observer.observe(document.documentElement, {childList: true, subtree: true});
 

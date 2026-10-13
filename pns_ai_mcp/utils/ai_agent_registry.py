@@ -13,6 +13,9 @@ AI Engine settings under Internal (inference) or External (endpoint).
 
 MCP_BARE_AGENT_CODE = 'pns_ai_mcp'
 CHATBOO_AGENT_CODE = 'pns_ai_chatboo'
+ADMIN_AGENT_CODE = 'pns_ai_admin'
+SECRETARY_AGENT_CODE = 'pns_secretary'
+DECISION_AGENT_CODE = 'pns_ai_decision'
 
 # Legacy aliases (tests / imports).
 MCP_BARE_AGENT_CODE_DEFAULT = MCP_BARE_AGENT_CODE
@@ -21,4 +24,6 @@ DEFAULT_INFERENCE_AGENT_CODE_DEFAULT = CHATBOO_AGENT_CODE
 # Feature key → fixed agent code (hard-bound at compile time per module).
 FEATURE_AGENT_CODES = {
     'chatboo': CHATBOO_AGENT_CODE,
+    'admin': ADMIN_AGENT_CODE,
+    'secretary': SECRETARY_AGENT_CODE,
 }

@@ -1,3 +1,9 @@
+/**
+ * Copy-to-clipboard buttons on log (and similar) forms (Odoo 14).
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+ */
 odoo.define('pns_ai_mcp.mcp_log_form', function (require) {
     "use strict";
 
@@ -22,7 +28,7 @@ odoo.define('pns_ai_mcp.mcp_log_form', function (require) {
             if (result && typeof result.then === 'function') {
                 result.then(scheduleCopy);
             } else {
-                setTimeout(scheduleCopy, 100);
+                scheduleCopy();
             }
             
             return result;

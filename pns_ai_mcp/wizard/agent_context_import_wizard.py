@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Import agent contexts from a ZIP export."""
+
 import base64
 
 from odoo import api, fields, models, _
@@ -10,7 +12,7 @@ from .operation_result import context_zip_files_to_result
 
 
 class AIAgentContextImportWizard(models.TransientModel):
-    _name = 'pns_ai_mcp.agent.context.import.wizard'
+    _name = 'ai.agent.context.import.wizard'
     _inherit = ['pns.operation.report.wizard']
     _description = 'Import agent contexts from ZIP'
 

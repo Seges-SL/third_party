@@ -6,9 +6,10 @@
 
     Permission model v2:
       - Users are implicit (API key + active Odoo user = read access)
-      - group_ai_writer: CRUD via propose_safe_operations (orthogonal)
-      - group_ai_external_url: fetch_url via propose_safe_operations (orthogonal)
-      - group_ai_external_api: api_call (MCP/OpenAPI) via propose_safe_operations (orthogonal)
+      - group_ai_writer: CRUD via safe_plan_request (orthogonal)
+      - group_ai_external_url: fetch_url via safe_plan_request (orthogonal)
+      - group_ai_external_api: api_call (MCP/OpenAPI) via safe_plan_request (orthogonal)
+      - group_ai_conversational: open-world dialogue (orthogonal; admin does not imply it)
       - group_ai_admin: full AI administration (implies writer + external url + external api)
 -->
 <odoo>
@@ -65,7 +66,7 @@
         </record>
 
         <!-- Logs: users only see their own logs -->
-        <record id="mcp_log_user_rule" model="ir.rule">
+        <record id="ai_log_user_rule" model="ir.rule">
             <field name="name">AI Log: User only sees their own logs</field>
             <field name="model_id" ref="pns_ai_mcp.model_ai_log"/>
             <field name="domain_force">[('user_id', '=', user.id)]</field>
@@ -77,7 +78,7 @@
         </record>
 
         <!-- Logs: admins see all logs -->
-        <record id="mcp_log_admin_rule" model="ir.rule">
+        <record id="ai_log_admin_rule" model="ir.rule">
             <field name="name">AI Log: Admins see all logs</field>
             <field name="model_id" ref="pns_ai_mcp.model_ai_log"/>
             <field name="domain_force">[(1, '=', 1)]</field>
@@ -89,7 +90,7 @@
         </record>
 
         <!-- Safe operations: user only sees their own -->
-        <record id="mcp_safe_operation_user_rule" model="ir.rule">
+        <record id="ai_safe_operation_user_rule" model="ir.rule">
             <field name="name">AI Supervised Operation: user only sees their own</field>
             <field name="model_id" ref="pns_ai_mcp.model_ai_safe_operation"/>
             <field name="domain_force">[('user_id', '=', user.id)]</field>
@@ -101,7 +102,7 @@
         </record>
 
         <!-- Safe operations: admins see all -->
-        <record id="mcp_safe_operation_admin_rule" model="ir.rule">
+        <record id="ai_safe_operation_admin_rule" model="ir.rule">
             <field name="name">AI Supervised Operation: admins see all</field>
             <field name="model_id" ref="pns_ai_mcp.model_ai_safe_operation"/>
             <field name="domain_force">[(1, '=', 1)]</field>
@@ -148,6 +149,40 @@
         <record id="ai_skill_admin_rule" model="ir.rule">
             <field name="name">AI Skill: Admin full access</field>
             <field name="model_id" ref="model_ai_skill"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_ai_admin'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Safe Plan choices: each user only sees their own draft -->
+        <record id="ai_safe_choice_user_rule" model="ir.rule">
+            <field name="name">AI Safe Choice: own rows</field>
+            <field name="model_id" ref="model_ai_safe_choice"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- api_call result cache: each user only reads bodies fetched with their own credential -->
+        <record id="ai_api_result_cache_user_rule" model="ir.rule">
+            <field name="name">AI api_call Result Cache: own rows</field>
+            <field name="model_id" ref="model_ai_api_result_cache"/>
+            <field name="domain_force">[('create_uid', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+        <record id="ai_api_result_cache_admin_rule" model="ir.rule">
+            <field name="name">AI api_call Result Cache: admins see all</field>
+            <field name="model_id" ref="model_ai_api_result_cache"/>
             <field name="domain_force">[(1, '=', 1)]</field>
             <field name="groups" eval="[(4, ref('group_ai_admin'))]"/>
             <field name="perm_read" eval="True"/>

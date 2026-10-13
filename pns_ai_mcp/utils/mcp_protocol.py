@@ -27,7 +27,7 @@ MCP_SUPPORTED_VERSIONS = (
     '2024-11-05',
 )
 
-MCP_LIST_METHODS = frozenset({'tools/list', 'prompts/list', 'resources/list'})
+MCP_LIST_METHODS = frozenset({'tools/list', 'prompts/list'})
 
 MCP_SERVER_INFO = {'name': 'pns_ai_mcp', 'version': '2.0.0'}
 
@@ -119,7 +119,6 @@ def discover_result():
         'capabilities': {
             'tools': {'listChanged': False},
             'prompts': {'listChanged': False},
-            'resources': {'listChanged': False},
         },
         '_meta': {
             MCP_META_SERVER_INFO: dict(MCP_SERVER_INFO),

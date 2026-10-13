@@ -109,16 +109,23 @@ class AiTrustedAction(models.Model):
             )
         return method
 
-    def preview(self, **args):
+    def _preview(self, **args):
         """Human-readable summary for the Confirm toast. Never mutates."""
         self.ensure_one()
         return self._resolve_method('preview_method')(**args)
 
-    def apply(self, **args):
+    def _apply(self, **args):
         """Perform the action. Runs in the SAME transaction/cursor as any
         other Safe Plan step, so the atomicity guarantee in
-        ``mcp_safe_operation.execute_plan_now`` covers it automatically."""
+        ``safe_operation.execute_plan_now`` covers it automatically.
+
+        The apply methods work in ``sudo``, so the group check lives here and
+        not in a caller: whoever reaches this method is checked."""
         self.ensure_one()
+        if not self.user_has_required_groups(self.env.user):
+            raise PermissionError(
+                'Missing required group for trusted action %r' % self.code
+            )
         return self._resolve_method('apply_method')(**args)
 
     def user_has_required_groups(self, user):

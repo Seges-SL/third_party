@@ -1,16 +1,11 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""PNS AI MCP - Agent. PATANEGRA Soft (https://patanegra.com).
-
-Part of Patanegra Soft Suite (`pns_suite`), distributed via Patanegra Soft Hub.
-Unified agent orchestrator of the Patanegra Application Agent Protocol (PAAP):
-resolves role -> bundle -> context and runs the agent turn.
-Licensed under the Apache License 2.0 - see LICENSE.
-"""
+"""Unified agent orchestrator: role → bundle → context, then the agent turn."""
 import logging
 
 from odoo import api, fields, models, _
+from odoo.addons.base.models.ir_model import MODULE_UNINSTALL_FLAG
 from odoo.exceptions import UserError
 
 from ..utils import mcp_ui
@@ -23,8 +18,7 @@ _logger = logging.getLogger(__name__)
 
 MCP_BARE_AGENT_CODE = MCP_BARE_AGENT_CODE_DEFAULT
 
-COMPOSITION_ORIGIN_TOKENS = ('native', 'imported', 'pinned', 'extra')
-COMPOSITION_ORIGIN_SELECTION = [(tok, tok) for tok in COMPOSITION_ORIGIN_TOKENS]
+COMPOSITION_ORIGIN_TOKENS = ('own', 'imported', 'inserted', 'extra')
 COMPOSITION_ORIGIN_RANK = {
     tok: i for i, tok in enumerate(COMPOSITION_ORIGIN_TOKENS)
 }
@@ -34,7 +28,7 @@ class AIAgent(models.Model):
     """AI Agent — unified orchestrator of the PNS AI framework.
 
     An agent is any AI-powered feature in Odoo: a chatbot (Chatboo),
-    an OCR pipeline, an MCP protocol endpoint, etc.
+    the Secretary voice host, an MCP protocol endpoint, etc.
 
     All agents share the same infrastructure (contexts, providers).
     The ``agent_type`` field captures the only meaningful difference:
@@ -56,7 +50,6 @@ class AIAgent(models.Model):
     Typical agents:
         code='pns_ai_chatboo'  →  inference (LLM via internal provider)
         code='pns_ai_mcp'      →  endpoint (context+tools served to external LLM)
-        code='pns_ocr'         →  inference (document OCR; shipped by the pns_ocr module)
     """
     _name = 'ai.agent'
     _description = 'AI Agent'
@@ -73,8 +66,14 @@ class AIAgent(models.Model):
         string='Type',
         default='inference',
         required=True,
-        help="inference: the agent runs the LLM via an internal provider (chatboo, ocr).\n"
+        help="inference: the agent runs the LLM via an internal provider (chatboo, secretary).\n"
              "endpoint: the agent serves contexts/tools to an external LLM client (MCP).",
+    )
+    is_agent_conversational = fields.Boolean(
+        string='Conversational',
+        default=False,
+        help='Open-world dialogue. The user needs the AI Conversational '
+             'permission. Closed jobs leave this off. Set by the owning module.',
     )
     sequence = fields.Integer(default=10)
     description = fields.Text()
@@ -163,7 +162,7 @@ class AIAgent(models.Model):
         'ai.context',
         compute='_compute_link_ids_shown',
         inverse='_inverse_context_ids_shown',
-        string='Contexts',
+        string='Contexts on the form',
         domain="[('active', '=', True), ('context_type', 'not in', %s)]"
                % (list(context_roles.AGENT_LINK_EXCLUDED_TYPES),),
     )
@@ -171,29 +170,29 @@ class AIAgent(models.Model):
         'ai.skill',
         compute='_compute_link_ids_shown',
         inverse='_inverse_skill_ids_shown',
-        string='Skills',
+        string='Skills on the form',
         domain="[('active', '=', True)]",
     )
-    link_show_native = fields.Boolean(
-        string='native',
+    link_show_own = fields.Boolean(
+        string='Own',
         default=True,
         copy=False,
-        help='Show native rows (this agent\'s own factory files).',
+        help="Show own rows (this agent's module).",
     )
     link_show_imported = fields.Boolean(
-        string='imported',
+        string='Imported',
         default=True,
         copy=False,
-        help='Show imported rows (other modules embarked in this agent\'s seed).',
+        help="Show imported rows (another module; this agent asks for them).",
     )
-    link_show_pinned = fields.Boolean(
-        string='pinned',
+    link_show_inserted = fields.Boolean(
+        string='Inserted',
         default=True,
         copy=False,
-        help='Show pinned rows (other modules pinched onto this agent).',
+        help='Show inserted rows (another module puts them in this agent).',
     )
     link_show_extra = fields.Boolean(
-        string='extra',
+        string='Extra',
         default=True,
         copy=False,
         help='Show extra rows (user / slash; not in the recipe).',
@@ -212,6 +211,101 @@ class AIAgent(models.Model):
     _sql_constraints = [
         ('code_uniq', 'unique(code)', 'Agent code must be unique.'),
     ]
+
+    def init(self):
+        """Odoo 14 skips migrations/3.1.*; fossils and factory stamps run on -u."""
+        super().init()
+        try:
+            self._clear_admin_auto_link_all_fossil()
+        except Exception:
+            _logger.debug(
+                'AI: Admin auto-link fossil clear skipped', exc_info=True,
+            )
+        try:
+            self._stamp_conversational_from_factory_seed()
+        except Exception:
+            _logger.warning(
+                'AI: conversational factory stamp skipped', exc_info=True,
+            )
+        try:
+            self._drop_acl_security_factory_fossil()
+        except Exception:
+            _logger.warning(
+                'AI: acl_security factory fossil skipped', exc_info=True,
+            )
+
+    def _stamp_conversational_from_factory_seed(self):
+        """noupdate=1 seed does not rewrite existing agents. Factory seed is the source."""
+        agents = self.sudo().with_context(active_test=False).search([
+            ('origin', '=', 'module'),
+        ])
+        for agent in agents:
+            seed = agent._module_factory_seed() or {}
+            if 'is_agent_conversational' not in seed:
+                continue
+            wanted = bool(seed['is_agent_conversational'])
+            if bool(agent.is_agent_conversational) != wanted:
+                agent.write({'is_agent_conversational': wanted})
+
+    @api.model
+    def _drop_acl_security_factory_fossil(self):
+        """Old 3.1.281 seed wrote ``acl_security`` on an empty factory agent.
+
+        The seed on disk is ``@pns_ai_mcp``. Drop that one token once, then
+        leave a later human edit alone.
+        """
+        icp = self.env['ir.config_parameter'].sudo()
+        stamp = 'pns_ai_mcp.fossil_acl_security_agent'
+        if icp.get_param(stamp):
+            return
+        agent = self.sudo().with_context(active_test=False).search(
+            [('code', '=', 'pns_ai_mcp')], limit=1,
+        )
+        if not agent:
+            return
+        lines = [
+            line.strip()
+            for line in (agent.default_context_codes or '').splitlines()
+            if line.strip()
+        ]
+        if 'acl_security' in lines:
+            kept = [line for line in lines if line != 'acl_security']
+            agent.write({'default_context_codes': '\n'.join(kept)})
+        icp.set_param(stamp, '1')
+
+    @api.model
+    def _clear_admin_auto_link_all_fossil(self):
+        """One-shot: deactivate leftover auto-link-all failovers on AI Admin.
+
+        Older builds created one ``ai.agent.provider`` row per ``ai.provider``
+        on ``pns_ai_admin``. That is not a curated chain. Clear active Admin
+        links once (ICP flag), then the human assigns providers on AI Admin
+        the same way as on any other inference agent. Does not read any other
+        agent's chain.
+        """
+        from ..utils.ai_agent_registry import ADMIN_AGENT_CODE
+
+        ICP = 'pns_ai_mcp.admin_auto_link_fossil_cleared'
+        Param = self.env['ir.config_parameter'].sudo()
+        if Param.get_param(ICP) == '1':
+            return
+        admin = self.search([
+            ('code', '=', ADMIN_AGENT_CODE),
+            ('active', '=', True),
+        ], limit=1)
+        if not admin:
+            Param.set_param(ICP, '1')
+            return
+        admin_links = admin.provider_ids.filtered('active')
+        n = len(admin_links)
+        if admin_links:
+            admin_links.write({'active': False})
+            _logger.info(
+                'AI: deactivated %d auto-link fossil failovers on agent %s; '
+                'assign providers on AI Admin under AI → Agents',
+                n, ADMIN_AGENT_CODE,
+            )
+        Param.set_param(ICP, '1')
 
     # ── Origin-based protections ──────────────────────────────────────
 
@@ -283,7 +377,9 @@ class AIAgent(models.Model):
             vals['agent_type'] = 'inference'
 
     def unlink(self):
-        """Prevent deletion of module-owned agents."""
+        """Prevent deletion of module-owned agents, except by their module's uninstall."""
+        if self.env.context.get(MODULE_UNINSTALL_FLAG):
+            return super().unlink()
         protected = self.filtered(lambda a: a.origin == 'module')
         if protected:
             names = ', '.join(protected.mapped('name'))
@@ -312,17 +408,6 @@ class AIAgent(models.Model):
             ('context_type', '=', 'core'),
         ])
 
-    def _build_content(self, user_locale=None, active_user=None):
-        self.ensure_one()
-        user_locale = self._resolve_locale(user_locale)
-        shared = self._build_shared_content(user_locale=user_locale)
-        user_part = self._build_user_owned_content(
-            user_locale=user_locale,
-            active_user=active_user,
-        )
-        if user_part:
-            return '%s\n\n%s' % (shared, user_part) if shared else user_part
-        return shared
 
     def _shared_contexts_for_cache(self):
         """Module/import contexts cached on the agent (not user-owned).
@@ -470,6 +555,7 @@ class AIAgent(models.Model):
             return {
                 'default_context_codes': '@pns_ai_mcp',
                 'required_context_codes': 'self_mcp',
+                'is_agent_conversational': True,
             }
         return {}
 
@@ -566,13 +652,13 @@ class AIAgent(models.Model):
         return agent if agent.exists() else self.browse()
 
     def composition_origin_for(self, code, source_module, kind='context'):
-        """Classify a live M2M row: native, imported, pinned, or extra.
+        """Classify a live M2M row: own, imported, inserted, or extra.
 
-        native — file of this agent (``source_module`` is ``module_name``/code).
+        own — file of this agent (``source_module`` is ``module_name``/code).
         imported — other module embarked in this agent's XML seed.
-        pinned — other module pinched onto the current recipe at install.
+        inserted — other module put it on this agent (current recipe).
         extra — not in the current recipe (user / slash). Empty
-        ``source_module`` cannot be native/imported.
+        ``source_module`` cannot be own/imported.
         """
         self.ensure_one()
         seed = self._module_factory_seed() or {}
@@ -605,7 +691,7 @@ class AIAgent(models.Model):
             (self.code or '').strip(),
         }
         if own:
-            return 'native'
+            return 'own'
         in_seed = (
             code in seed_codes
             or code in seed_req
@@ -613,18 +699,18 @@ class AIAgent(models.Model):
         )
         if in_seed:
             return 'imported'
-        return 'pinned'
+        return 'inserted'
 
     def _link_origins_shown(self):
         """Tokens currently checked on the agent form (empty = all)."""
         self.ensure_one()
         shown = []
-        if self.link_show_native:
-            shown.append('native')
+        if self.link_show_own:
+            shown.append('own')
         if self.link_show_imported:
             shown.append('imported')
-        if self.link_show_pinned:
-            shown.append('pinned')
+        if self.link_show_inserted:
+            shown.append('inserted')
         if self.link_show_extra:
             shown.append('extra')
         return shown or list(COMPOSITION_ORIGIN_TOKENS)
@@ -653,8 +739,8 @@ class AIAgent(models.Model):
         'context_ids', 'skill_ids',
         'context_ids.code', 'context_ids.source_module',
         'skill_ids.code', 'skill_ids.source_module',
-        'link_show_native', 'link_show_imported',
-        'link_show_pinned', 'link_show_extra',
+        'link_show_own', 'link_show_imported',
+        'link_show_inserted', 'link_show_extra',
         'default_context_codes', 'required_context_codes',
         'default_skill_codes', 'module_name', 'code',
     )
@@ -677,18 +763,8 @@ class AIAgent(models.Model):
                 'skill_ids': [(6, 0, (rec.skill_ids_shown | hidden).ids)],
             })
 
-    def action_toggle_link_show(self):
-        """Flip one origin toggle (tests / RPC). The form JS paints in place."""
-        self.ensure_one()
-        token = self.env.context.get('link_show_token')
-        if token not in COMPOSITION_ORIGIN_TOKENS:
-            return True
-        field = 'link_show_%s' % token
-        self.write({field: not bool(self[field])})
-        return True
-
     def _factory_restore_codes(self, kind='context'):
-        """Codes Restore may overwrite: native ∪ imported (XML seed only)."""
+        """Codes Restore may overwrite: own ∪ imported (XML seed only)."""
         self.ensure_one()
         seed = self._module_factory_seed() or {}
         if kind == 'skill':
@@ -736,7 +812,7 @@ class AIAgent(models.Model):
         return None
 
     def _sorted_composition_cells(self, cells, kind):
-        """M2M cells in native → imported → pinned → extra order, then code."""
+        """M2M cells in own → imported → inserted → extra order, then code."""
         self.ensure_one()
         if not cells:
             return cells
@@ -838,16 +914,6 @@ class AIAgent(models.Model):
             comodel, kind, 'in', list(hidden),
         )
 
-    @api.model
-    def fields_get(self, allfields=None, attributes=None):
-        """Keep origin filter checkbox labels as English tokens."""
-        res = super().fields_get(allfields=allfields, attributes=attributes)
-        for token in COMPOSITION_ORIGIN_TOKENS:
-            info = res.get('link_show_%s' % token)
-            if info:
-                info['string'] = token
-        return res
-
     def _assert_required_contexts_present(self, available_codes):
         """Raise if hard-required context codes are absent from ``available_codes``."""
         self.ensure_one()
@@ -885,30 +951,8 @@ class AIAgent(models.Model):
 
     # ── Context bulk selection ───────────────────────────────────────
 
-    def action_select_all_contexts(self):
-        """Add ALL active non-core contexts to the agent."""
-        all_ctx = self.env['ai.context'].search([
-            ('active', '=', True),
-            ('context_type', 'not in', context_roles.AGENT_LINK_EXCLUDED_TYPES),
-        ])
-        self.write({'context_ids': [(6, 0, all_ctx.ids)]})
-
-    def action_select_none_contexts(self):
-        """Remove all contexts from the agent."""
-        self.write({'context_ids': [(5, 0, 0)]})
-
-    def action_invert_contexts(self):
-        """Toggle: add missing contexts and remove existing ones."""
-        all_ctx = self.env['ai.context'].search([
-            ('active', '=', True),
-            ('context_type', 'not in', context_roles.AGENT_LINK_EXCLUDED_TYPES),
-        ])
-        current = self.context_ids
-        inverted = all_ctx - current
-        self.write({'context_ids': [(6, 0, inverted.ids)]})
-
     def action_reset_contexts_to_default(self):
-        """Re-add native + imported + pinned (current recipe).
+        """Re-add own + imported + inserted (current recipe).
 
         Does not unlink extra links. Does not edit context *content*.
         """
@@ -945,7 +989,7 @@ class AIAgent(models.Model):
     def action_restore_contexts_from_module(self):
         """Re-import THIS agent's shipped context files from disk (content).
 
-        Scope = native ∪ imported (this agent's XML seed). Pinned and extra
+        Scope = own ∪ imported (this agent's XML seed). Inserted and extra
         content is not overwritten. Distinct from Defaults (selection only).
         """
         self.ensure_one()
@@ -988,22 +1032,9 @@ class AIAgent(models.Model):
 
     # ── Skill bulk selection & module restore (symmetric to contexts) ──
 
-    def _all_agent_skills(self):
-        """Non-global skills selectable for an agent (global ones are auto)."""
-        return self.env['ai.skill'].search([('active', '=', True)])
-
-    def action_select_all_skills(self):
-        self.write({'skill_ids': [(6, 0, self._all_agent_skills().ids)]})
-
-    def action_select_none_skills(self):
-        self.write({'skill_ids': [(5, 0, 0)]})
-
-    def action_invert_skills(self):
-        all_sk = self._all_agent_skills()
-        self.write({'skill_ids': [(6, 0, (all_sk - self.skill_ids).ids)]})
 
     def action_reset_skills_to_default(self):
-        """Re-add native + imported + pinned (current recipe).
+        """Re-add own + imported + inserted (current recipe).
 
         Imports missing shipped skills from disk first (upsert), then links
         them. Does not unlink extra skills.
@@ -1063,7 +1094,7 @@ class AIAgent(models.Model):
     def action_restore_skills_from_module(self):
         """Re-import THIS agent's shipped skill files from disk (content).
 
-        Scope = native ∪ imported (this agent's XML seed). Pinned and extra
+        Scope = own ∪ imported (this agent's XML seed). Inserted and extra
         content is not overwritten. Distinct from Defaults (selection only).
         """
         self.ensure_one()
@@ -1131,7 +1162,7 @@ class AIAgent(models.Model):
         return {
             'type': 'ir.actions.act_window',
             'name': _('Import agent skills from ZIP'),
-            'res_model': 'pns_ai_mcp.agent.skill.import.wizard',
+            'res_model': 'ai.agent.skill.import.wizard',
             'view_mode': 'form',
             'target': 'new',
             'context': {'default_agent_id': self.id},
@@ -1357,17 +1388,16 @@ class AIAgent(models.Model):
     def action_show_stats(self):
         """Open statistics modal: monolithic vs optimized (discovery) for this agent."""
         self.ensure_one()
-        Wizard = self.env['pns_ai_mcp.context_stats_wizard']
+        Wizard = self.env['ai.context.stats.wizard']
         wiz = Wizard.create({
             'agent_id': self.id,
             'inject_enabled': self._domain_index_inject_enabled(),
             'show_ktokens': True,
-            'stats_html': Wizard._html_for_agent(self, as_ktokens=True),
         })
         return {
             'type': 'ir.actions.act_window',
             'name': _('Agent Statistics'),
-            'res_model': 'pns_ai_mcp.context_stats_wizard',
+            'res_model': 'ai.context.stats.wizard',
             'res_id': wiz.id,
             'view_mode': 'form',
             'target': 'new',
@@ -1386,8 +1416,6 @@ class AIAgent(models.Model):
             agent.get_content(force_rebuild=True)
         return True
 
-    def action_normalize_composition(self):
-        return self._sync_composition_and_cache()
 
     def action_export_contexts_zip(self):
         self.ensure_one()
@@ -1400,19 +1428,12 @@ class AIAgent(models.Model):
         return {
             'type': 'ir.actions.act_window',
             'name': _('Import agent contexts from ZIP'),
-            'res_model': 'pns_ai_mcp.agent.context.import.wizard',
+            'res_model': 'ai.agent.context.import.wizard',
             'view_mode': 'form',
             'target': 'new',
             'context': {'default_agent_id': self.id},
         }
 
-    def _build_agent_import_report_html(self, zip_bytes, replace_existing=False):
-        self.ensure_one()
-        Context = self.env['ai.context']
-        result = Context.import_agent_contexts_zip(
-            self, zip_bytes, replace_existing=replace_existing,
-        )
-        return Context._build_context_zip_import_report_html(result, title=None)
 
     def _export_agents_json(self, agents):
         """Shared helper: export given agents to JSON download action."""
@@ -1480,7 +1501,7 @@ class AIAgent(models.Model):
         return {
             'type': 'ir.actions.act_window',
             'name': _('Import Agents'),
-            'res_model': 'pns_ai_mcp.import_agents_wizard',
+            'res_model': 'ai.import.agents.wizard',
             'view_mode': 'form',
             'views': [[False, 'form']],
             'target': 'new',

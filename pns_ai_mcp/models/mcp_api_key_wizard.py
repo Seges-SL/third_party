@@ -14,7 +14,7 @@ _logger = logging.getLogger(__name__)
 
 
 class MCPApiKeyWizard(models.TransientModel):
-    _name = 'pns_ai_mcp.api_key_wizard'
+    _name = 'ai.api.key.wizard'
     _description = 'MCP API Key Regeneration Wizard'
 
     mcp_user_id = fields.Many2one(

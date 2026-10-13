@@ -178,18 +178,9 @@ def step_requested_view_ids(env, step):
 
 
 def chatboo_preselected_view_id(env, model):
-    """Primary view under Chatboo, if the session stored a screen."""
-    try:
-        from .session_download import resolve_chatboo_session_id
-    except Exception:
-        return None
-    sid = resolve_chatboo_session_id(env)
-    if not sid:
-        return None
-    if 'chatboo.session' not in env:
-        return None
-    session = env['chatboo.session'].sudo().browse(int(sid))
-    raw = session.last_screen_context if session.exists() else False
+    """Primary view under the chat, if the client put the screen in context."""
+    ctx = getattr(env, 'context', None) or {}
+    raw = ctx.get('screen_context') or ctx.get('last_screen_context')
     if not raw:
         return None
     try:

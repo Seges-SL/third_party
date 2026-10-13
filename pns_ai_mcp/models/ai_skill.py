@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-# ai.skill — selectable procedure exposed over MCP (distinct from context/bundle).
+"""ai.skill — selectable procedure exposed over MCP (distinct from context/bundle)."""
 
 import io
 import json
@@ -13,13 +13,13 @@ import zipfile
 from datetime import datetime
 
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError, ValidationError
-from odoo.addons.pns_base.utils import paths as pns_paths
+from odoo.exceptions import AccessError, UserError, ValidationError
 from ..utils import mcp_ui as pns_ui
 from ..utils.import_export_guard import ensure_ai_admin
 from ..utils.knowledge_ownership import (
     apply_create_ownership,
     assert_writer_can_write_records,
+    factory_lock_open,
     filter_visible_records,
 )
 from ..utils.portable_io import export_record_dict
@@ -42,6 +42,7 @@ from ..utils.skill_code_prefix import (
     uniquify_catalog_code,
     unprefixed_twin_stems,
 )
+from ..utils.skill_help import slash_list_sort_key
 
 _logger = logging.getLogger(__name__)
 
@@ -51,6 +52,10 @@ EXPORT_FORMAT_VERSION = 1
 # Operator slash-menu hides: durable across factory re-seed / i_restore.
 # The Boolean on ai.skill is the UI mirror; this ICP is the source of truth.
 ICP_SKILLS_SLASH_HIDDEN = 'pns_ai_mcp.skills_slash_hidden'
+
+
+class _RunUndone(Exception):
+    """Raised inside a savepoint so that it always rolls back."""
 
 
 class AISkill(models.Model):
@@ -154,8 +159,24 @@ class AISkill(models.Model):
         help='Optional JSON documenting skill params, e.g. '
              '{"fecha": {"type": "string", "desc": "YYYY-MM-DD"}}. Enables a '
              'short LLM extraction ONLY when deterministic parsing '
-             '(key=value, ISO, relative dates) leaves holes. Types: string, '
-             'array, integer, number.',
+            '(key=value, ISO, relative dates) leaves holes. Types: string, '
+            'array, integer, number. Hidden in the form; the parameter '
+            'list is the Settings UI.',
+    )
+    param_line_ids = fields.One2many(
+        'ai.skill.param.line',
+        'skill_id',
+        string='Parameters',
+        help='Concept, description and default. Empty = no parameters. '
+             'Serialized to Param schema.',
+    )
+    param_cache_ids = fields.One2many(
+        'ai.skill.param.cache',
+        'skill_id',
+        string='Learned phrases',
+        help='Unresolved slash text (spaces collapsed, case-folded) mapped to '
+             'the JSON the model produced. The same phrase later uses this row '
+             'and does not call the model. Edit or add rows here.',
     )
     arg_hint = fields.Char(
         string='Argument hint',
@@ -176,24 +197,25 @@ class AISkill(models.Model):
              'code_body default (e.g. last month with data). ask: show a '
              'card and wait. none: the skill takes no arguments.',
     )
-    painter = fields.Selection(
+    compose = fields.Selection(
         selection=[
-            ('painter-local', 'painter-local'),
-            ('painter-free', 'painter-free'),
+            ('compose-agent', 'compose-agent'),
+            ('compose-model', 'compose-model'),
         ],
-        string='Painter',
+        string='Compose',
         default=False,
-        help='Optional painter override when the skill is invoked via /slash. '
-             'Empty = inherit the provider painter. '
-             'painter-local: Chatboo composes HTML tables/charts. '
-             'painter-free: the model owns the entire bubble. '
+        help='Optional compose override when the skill is invoked via /slash. '
+             'Empty = inherit the provider compose. '
+             'compose-agent: the agent composes HTML tables/charts. '
+             'compose-model: the model owns the entire bubble. '
              'One-shot for that invocation; does not write the provider.',
     )
     triggers = fields.Char(
-        string='NL triggers (deprecated)',
-        help='DEPRECATED: natural-language routing was removed in explicit mode. '
-             'Skills are invoked only via /slash. Kept for backward '
-             'compatibility of existing data; it is no longer used for routing.',
+        string='NL triggers',
+        help='Phrases that run this skill from a normal sentence, '
+             'comma-separated. One matching skill runs as if the user had '
+             'typed the slash; the sentence is the arguments. Several '
+             'matches do not run. The slash still works.',
     )
     active = fields.Boolean(default=True)
     show_in_slash = fields.Boolean(
@@ -220,18 +242,19 @@ class AISkill(models.Model):
     )
     composition_origin = fields.Selection(
         selection=[
-            ('native', 'native'),
-            ('imported', 'imported'),
-            ('pinned', 'pinned'),
-            ('extra', 'extra'),
+            ('own', 'Own'),
+            ('imported', 'Imported'),
+            ('inserted', 'Inserted'),
+            ('extra', 'Extra'),
         ],
         string='Origin',
         compute='_compute_composition_origin',
         search='_search_composition_origin',
-        help='Why this row is on the current agent. native: this agent file. '
-             'imported: other module in the XML seed. pinned: other module '
-             'pinched onto this agent. extra: not in the recipe (user / slash). '
-             'Empty source_module is extra.',
+        help="Why this row is on the current agent. Own: from this agent's module. "
+             "Imported: from another module; this agent asks for it. "
+             "Inserted: from another module; that module puts it in this agent. "
+             "Extra: no module manages it; a person added it. "
+             "Empty source_module is extra.",
     )
     link_visible = fields.Boolean(
         compute='_compute_composition_origin',
@@ -279,24 +302,11 @@ class AISkill(models.Model):
             self, 'skill', operator, value,
         )
 
-    @api.model
-    def fields_get(self, allfields=None, attributes=None):
-        """Origin tokens stay English (same contract as context_type)."""
-        res = super().fields_get(allfields=allfields, attributes=attributes)
-        origin = res.get('composition_origin')
-        if origin and origin.get('selection'):
-            from .ai_agent import COMPOSITION_ORIGIN_SELECTION
-            origin['selection'] = list(COMPOSITION_ORIGIN_SELECTION)
-        return res
-
     @staticmethod
-    def _painter_from_meta(meta):
-        from ..utils.formatting_mode_policy import normalize_painter
-        raw = (
-            (meta.get('painter') or meta.get('formatting_mode') or '')
-            .strip().lower()
-        )
-        return normalize_painter(raw) or False
+    def _compose_from_meta(meta):
+        from ..utils.formatting_mode_policy import normalize_compose
+        raw = (meta.get('compose') or '').strip().lower()
+        return normalize_compose(raw) or False
 
     @staticmethod
     def _args_policy_from_meta(meta):
@@ -315,6 +325,24 @@ class AISkill(models.Model):
         """Slash / MCP short id: Command if set, otherwise Code."""
         self.ensure_one()
         return ((self.command or '').strip() or (self.code or '').strip())
+
+    def lookup_param_cache(self, leftover):
+        """Cached hybrid params for leftover prose, or None."""
+        self.ensure_one()
+        if not self.id:
+            return None
+        return self.env['ai.skill.param.cache'].lookup_for_skill(
+            self.id, leftover,
+        )
+
+    def remember_param_cache(self, leftover, norm):
+        """Store leftover → IA params if this phrase is new."""
+        self.ensure_one()
+        if not self.id:
+            return self.env['ai.skill.param.cache']
+        return self.env['ai.skill.param.cache'].remember_for_skill(
+            self.id, leftover, norm,
+        )
 
     @api.constrains('code', 'command')
     def _check_code(self):
@@ -368,20 +396,25 @@ class AISkill(models.Model):
         el skill de captura, import o edición manual. Tres capas:
 
         1. AST (bloqueante): mismas reglas del sandbox que en ejecución (imports
-           prohibidos, funciones peligrosas, asignación de `result`). Fuente única
-           reutilizada: ``validate_relaxaicode_source_ast``.
+           prohibidos, funciones peligrosas, asignación de `result`) y nada de
+           escrituras: un skill lee y propone (``propose_steps``). Fuente única
+           ``skill_code_refusal``, que también se mira en cada ejecución.
         2. Contrato publicado (bloqueante): ``requires`` / front-matter / dunders
            no listados en ``skill_engine_contract`` → error. El motor no se
            parchea por un skill concreto.
-        3. Smoke-run best-effort (solo con el registry listo, nunca en install):
+        3. Smoke-run best-effort (solo con el registry listo, nunca en install),
+           dentro de un savepoint que siempre se revierte:
            ejecuta el code_body con argumentos vacíos y, SOLO si corre limpio y
            devuelve algo que no es un dict, bloquea con el motivo exacto. Si lanza
            excepción (p. ej. depende de parámetros), NO bloquea: el AST ya cubrió
            lo importante y evitamos falsos positivos.
         """
-        from ..controllers.validators import validate_relaxaicode_source_ast
         from ..utils.skill_engine_contract import skill_contract_violations
-        from ..utils.skill_runtime import bootstrap_skill_code_body
+        from ..utils.skill_runtime import (
+            bootstrap_skill_code_body,
+            check_skill_fast_path_publishable,
+            skill_code_refusal,
+        )
         for skill in self:
             meta, _body = self._skill_parse_md(skill.content or '')
             code = (skill.code_body or '').strip()
@@ -392,12 +425,9 @@ class AISkill(models.Model):
                 )
             if not code:
                 continue  # skill solo-prompt: lo ejecuta el LLM, no hay contrato
-            ok, err, _requires_write = validate_relaxaicode_source_ast(code)
-            if not ok:
-                raise ValidationError(_(
-                    "El code_body del skill «%s» no cumple las reglas del "
-                    "sandbox:\n\n%s"
-                ) % (skill.code or skill.name or '?', err))
+            refused = skill_code_refusal(code, skill.code or skill.name)
+            if refused:
+                raise ValidationError(refused)
             if code_has_frozen_result_rows(code):
                 raise ValidationError(_(
                     "The code_body of skill «%s» looks like a frozen snapshot "
@@ -408,11 +438,24 @@ class AISkill(models.Model):
             if not self.env.registry.ready:
                 continue
             diag = {}
-            try:
+
+            def _smoke(skill=skill, code=code, diag=diag):
                 boot = bootstrap_skill_code_body(
                     self.env, code, arguments='',
                     skill_code=skill.code or 'skill', diag=diag,
                 )
+                publish_err = check_skill_fast_path_publishable(
+                    self.env,
+                    code,
+                    arguments='',
+                    args_policy=skill.args_policy,
+                    param_schema=skill.param_schema,
+                    skill_code=skill.code or skill.name,
+                )
+                return boot, publish_err
+
+            try:
+                boot, publish_err = self._run_and_undo(_smoke)
             except Exception:
                 # Ejecución con args vacíos falló: puede depender de parámetros.
                 # No bloqueamos (evita falsos positivos); el AST ya validó.
@@ -431,6 +474,23 @@ class AISkill(models.Model):
                     self._raise_unpublished_capability(
                         skill.code or skill.name, unknown,
                     )
+            if publish_err:
+                raise ValidationError(publish_err)
+
+    def _run_and_undo(self, fn):
+        """``fn()`` on this cursor; whatever it wrote is rolled back.
+
+        Saving a skill runs its code once to check the contract. That run is
+        the author's, inside the save, and must leave nothing behind.
+        """
+        out = {}
+        try:
+            with self.env.cr.savepoint():
+                out['value'] = fn()
+                raise _RunUndone()
+        except _RunUndone:
+            pass
+        return out['value']
 
     @api.model
     def _slash_hidden_codes(self):
@@ -486,6 +546,7 @@ class AISkill(models.Model):
     @api.model
     def sync_slash_hidden_from_field(self):
         """One-shot: seed ICP from existing show_in_slash=False rows."""
+        self._require_bootstrap()
         Skill = self.sudo().with_context(active_test=False)
         codes = Skill.search([('show_in_slash', '=', False)]).mapped('code')
         codes = [c.strip() for c in codes if c and c.strip()]
@@ -496,6 +557,198 @@ class AISkill(models.Model):
         hidden.update(codes)
         self._set_slash_hidden_codes(hidden)
         return len(hidden) - before
+
+    def _param_line_vals_from_schema(self, schema_txt):
+        from ..utils.skill_runtime import schema_to_param_rows
+
+        vals_list = []
+        for i, row in enumerate(schema_to_param_rows(schema_txt)):
+            vals_list.append({
+                'sequence': 10 * (i + 1),
+                'label': row.get('label') or row.get('key') or '',
+                'desc': row.get('desc') or '',
+                'default': row.get('default') or '',
+                'required': bool(row.get('required')),
+                'key': row.get('key') or '',
+            })
+        return vals_list
+
+    def _param_rows_from_lines(self):
+        rows = []
+        for line in self.param_line_ids.sorted(key=lambda l: (l.sequence, l.id)):
+            label = (line.label or '').strip()
+            desc = (line.desc or '').strip()
+            default = (line.default or '').strip()
+            key = (line.key or '').strip()
+            if not label and not desc and not key:
+                continue
+            rows.append({
+                'key': key,
+                'label': label or key,
+                'desc': desc,
+                'default': default,
+                'required': bool(line.required),
+            })
+        return rows
+
+    def _param_line_sync_allowed(self):
+        ctx = self.env.context
+        if ctx.get('skip_param_line_schema'):
+            return False
+        # Module install/-u XML functions: never nest a One2many replace
+        # inside each factory write (it closed the cursor on O14).
+        if ctx.get('install_mode'):
+            return False
+        return True
+
+    def _create_param_lines_from_schema(self):
+        """Insert UI rows from ``param_schema``. Does not write the skill."""
+        Line = self.env['ai.skill.param.line'].sudo()
+        for rec in self:
+            for vals in rec._param_line_vals_from_schema(rec.param_schema):
+                vals['skill_id'] = rec.id
+                Line.create(vals)
+
+    def _sync_param_lines_from_schema(self):
+        """Replace UI rows from ``param_schema`` without a nested skill.write."""
+        Line = self.env['ai.skill.param.line'].sudo()
+        for rec in self:
+            Line.search([('skill_id', '=', rec.id)]).unlink()
+            rec._create_param_lines_from_schema()
+
+    def _fill_missing_param_lines(self):
+        """Create rows for skills that have JSON and no list yet.
+
+        Used after factory import. Create-only: no unlink, no skill.write.
+        """
+        cr = self.env.cr
+        try:
+            cr.execute(
+                "SELECT s.id FROM ai_skill s "
+                "WHERE s.param_schema IS NOT NULL "
+                "AND TRIM(s.param_schema) != '' "
+                "AND NOT EXISTS ("
+                "    SELECT 1 FROM ai_skill_param_line l "
+                "    WHERE l.skill_id = s.id"
+                ")"
+            )
+            ids = [row[0] for row in cr.fetchall()]
+        except Exception:
+            _logger.debug('skill param line fill-missing skipped', exc_info=True)
+            return self.browse()
+        records = self.browse(ids)
+        if records:
+            records._create_param_lines_from_schema()
+        return records
+
+    def _write_schema_from_param_lines(self):
+        from ..utils.skill_runtime import (
+            apply_code_keys_to_rows,
+            infer_arg_hint_from_schema,
+            infer_param_keys_from_code,
+            param_rows_to_schema,
+            param_schema_to_json,
+        )
+
+        for rec in self:
+            rows = apply_code_keys_to_rows(
+                rec._param_rows_from_lines(),
+                infer_param_keys_from_code(rec.code_body),
+            )
+            schema = param_rows_to_schema(rows, rec.param_schema)
+            dumped = param_schema_to_json(schema) or False
+            vals = {'param_schema': dumped}
+            if not schema:
+                vals['args_policy'] = 'none'
+            elif not (rec.arg_hint or '').strip():
+                vals['arg_hint'] = infer_arg_hint_from_schema(schema) or False
+            rec.with_context(skip_param_line_schema=True).write(vals)
+
+    def _skill_form_author_allowed(self):
+        """IA on the IT form: not install, not wizard, not nested schema writes."""
+        ctx = self.env.context
+        if ctx.get('skip_skill_form_author'):
+            return False
+        if ctx.get('skill_capture_authored'):
+            return False
+        if ctx.get('install_mode'):
+            return False
+        if ctx.get('skip_param_line_schema'):
+            return False
+        return True
+
+    def _resolve_inference_provider(self):
+        try:
+            from ..utils.agent_engine import resolve_providers_for_consumer
+            providers = resolve_providers_for_consumer(
+                self.env, consumer_key='admin',
+            )
+            return providers[:1] if providers else self.env['ai.provider']
+        except Exception:
+            return self.env['ai.provider']
+
+    def _author_form_help_and_params(self):
+        """Fill empty Help and missing param keys. Never rewrites Code."""
+        from ..utils.skill_runtime import (
+            is_placeholder_skill_help,
+            param_rows_need_author,
+            param_rows_to_prose,
+            procedure_for_help,
+        )
+
+        for rec in self:
+            rows = rec._param_rows_from_lines()
+            need_params = param_rows_need_author(rows)
+            need_help = is_placeholder_skill_help(
+                rec.description, rec.name, rec.code, rec.command,
+            ) and bool(
+                procedure_for_help(rec.content)
+                or (rec.code_body or '').strip()
+                or rows
+            )
+            if not need_params and not need_help:
+                continue
+            provider = rec._resolve_inference_provider()
+            vals = {}
+            if need_params and provider:
+                try:
+                    schema, hint, _usage, _help = rec.author_param_schema(
+                        rec.param_schema or '',
+                        param_rows_to_prose(rows),
+                        code_body=rec.code_body or '',
+                        hint=rec.arg_hint or '',
+                        provider=provider,
+                    )
+                    if schema:
+                        vals['param_schema'] = schema
+                    if hint:
+                        vals['arg_hint'] = hint
+                except UserError:
+                    _logger.info(
+                        'skill form param author skipped for %s', rec.code,
+                    )
+                except Exception:
+                    _logger.debug(
+                        'skill form param author failed for %s',
+                        rec.code, exc_info=True,
+                    )
+            if need_help:
+                try:
+                    help_txt, _usage = rec.author_param_help(
+                        rows,
+                        provider=provider if provider else None,
+                        procedure=rec.content,
+                        code_body=rec.code_body,
+                    )
+                    if help_txt:
+                        vals['description'] = help_txt
+                except Exception:
+                    _logger.debug(
+                        'skill form help author failed for %s',
+                        rec.code, exc_info=True,
+                    )
+            if vals:
+                rec.with_context(skip_skill_form_author=True).write(vals)
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -509,10 +762,18 @@ class AISkill(models.Model):
         # Also persist explicit False from vals into ICP.
         if any(not v.get('show_in_slash', True) for v in prepared):
             records.filtered(lambda s: not s.show_in_slash)._sync_slash_hidden_icp()
+        if self._param_line_sync_allowed():
+            for rec, vals in zip(records, prepared):
+                if vals.get('param_line_ids'):
+                    rec._write_schema_from_param_lines()
+                elif vals.get('param_schema'):
+                    rec._create_param_lines_from_schema()
+        if self._skill_form_author_allowed():
+            records._author_form_help_and_params()
         return records
 
     def write(self, vals):
-        if not self.env.context.get('skip_hardcoded_restrictions'):
+        if not factory_lock_open(self.env):
             assert_writer_can_write_records(self, self.env)
             if not self.env.user.has_group('pns_ai_mcp.group_ai_admin'):
                 if vals.get('is_system'):
@@ -529,10 +790,18 @@ class AISkill(models.Model):
             and not self.env.context.get('skip_slash_icp_sync')
         ):
             self._sync_slash_hidden_icp()
+        if not self._param_line_sync_allowed():
+            return res
+        if 'param_line_ids' in vals and 'param_schema' not in vals:
+            self._write_schema_from_param_lines()
+        elif 'param_schema' in vals and 'param_line_ids' not in vals:
+            self._sync_param_lines_from_schema()
+        if self._skill_form_author_allowed():
+            self._author_form_help_and_params()
         return res
 
     def unlink(self):
-        if not self.env.context.get('skip_hardcoded_restrictions'):
+        if not factory_lock_open(self.env):
             assert_writer_can_write_records(self, self.env)
             system_skills = self.filtered('is_system')
             if system_skills:
@@ -548,10 +817,6 @@ class AISkill(models.Model):
     # ------------------------------------------------------------------
     # MCP exposure
     # ------------------------------------------------------------------
-    def mcp_prompt_name(self):
-        """Name used to expose this skill over MCP prompts/*."""
-        self.ensure_one()
-        return '%s%s' % (SKILL_PROMPT_PREFIX, self.invoke_code())
 
     @api.model
     def get_for_agent(self, agent_code, user=None):
@@ -567,19 +832,6 @@ class AISkill(models.Model):
             domain = [('agent_ids', '=', False)]
         return self.filter_visible_for_user(self.search(domain), user=user)
 
-    @api.model
-    def get_by_prompt_name(self, prompt_name, user=None):
-        """Resolve a skill from its MCP prompt name ("skill.<code>")."""
-        if not prompt_name or not prompt_name.startswith(SKILL_PROMPT_PREFIX):
-            return self.browse()
-        code = prompt_name[len(SKILL_PROMPT_PREFIX):]
-        skill = self.search([
-            '|', ('command', '=', code), ('code', '=', code),
-        ], limit=1)
-        if not skill:
-            return skill
-        user = user or self.env.user
-        return self.filter_visible_for_user(skill, user=user)
 
     def _resolve_context_text(self, user_locale=None):
         """Resolve referenced contexts to text, honouring locale when possible."""
@@ -661,15 +913,19 @@ class AISkill(models.Model):
             token = slash_slug(s.invoke_code(), default='')
             if twin_stems and token in twin_stems:
                 continue
+            mine = bool(s.owner_id and s.owner_id.id == uid)
+            factory = bool(s.source_module or s.is_system)
             rows.append({
                 'code': s.invoke_code(),
                 'name': s.name,
                 'description': s.description or s.name,
                 'arg_hint': s._arg_hint_text(),
                 'args_policy': s.args_policy or 'default',
-                'mine': bool(s.owner_id and s.owner_id.id == uid),
+                'mine': mine,
                 'is_system': bool(s.is_system),
+                'factory': factory,
             })
+        rows.sort(key=slash_list_sort_key)
         return rows
 
     @api.model
@@ -700,6 +956,23 @@ class AISkill(models.Model):
         return self.search(domain, limit=1)
 
     @api.model
+    def _find_invoke_token_on_instance(self, token):
+        """Same lookup as ``_find_by_invoke_token``, ignoring ownership ACL."""
+        return self.sudo()._find_by_invoke_token(token)
+
+    def _slash_in_use_holder(self, skill):
+        """Who holds a slash: person name, or the factory catalog."""
+        owner = skill.sudo().owner_id
+        if owner:
+            return owner.name or owner.display_name
+        return _('the catalog')
+
+    def _raise_slash_in_use(self, command, skill):
+        raise UserError(_(
+            'The slash "/%s" is already in use by %s. Choose another name.'
+        ) % (command, self._slash_in_use_holder(skill)))
+
+    @api.model
     def _owned_mutable_skill(self, token):
         """Resolve a skill the current Writer may delete or rename."""
         self._require_skill_author()
@@ -713,6 +986,306 @@ class AISkill(models.Model):
         if not skill.owner_id or skill.owner_id.id != self.env.uid:
             raise UserError(_('You can only change skills you created.'))
         return skill
+
+    def _owned_extra_skills(self):
+        """Skills the current Writer created (not system / factory)."""
+        return self.search([
+            ('owner_id', '=', self.env.uid),
+            ('is_system', '=', False),
+        ])
+
+    def _skill_matches_invoke_or_name(self, skill, token, lookup_tokens):
+        code_prefix = get_skill_code_prefix(self.env)
+        command_prefix = get_skill_command_prefix(self.env)
+        skill_tokens = set()
+        cmd = (skill.command or '').strip()
+        code = (skill.code or '').strip()
+        if cmd:
+            skill_tokens.update(invoke_lookup_tokens(
+                cmd, code_prefix, command_prefix,
+            ))
+        if code:
+            skill_tokens.update(invoke_lookup_tokens(
+                code, code_prefix, command_prefix,
+            ))
+        if skill_tokens & set(lookup_tokens):
+            return True
+        needle = (token or '').strip().lower().lstrip('/')
+        name = (skill.name or '').strip().lower()
+        return bool(needle and needle in name)
+
+    @api.model
+    def search_owned_for_token(self, token):
+        """Owned extras matching stem, prefixed slash, code, or name."""
+        self._require_skill_author()
+        owned = self._owned_extra_skills()
+        needle = (token or '').strip()
+        if not needle:
+            return owned
+        lookup = invoke_lookup_tokens(
+            needle,
+            get_skill_code_prefix(self.env),
+            get_skill_command_prefix(self.env),
+        )
+        hits = self.browse()
+        for skill in owned:
+            if self._skill_matches_invoke_or_name(skill, needle, lookup):
+                hits |= skill
+        return hits
+
+    @api.model
+    def resolve_owned_for_params(self, token):
+        """``(recordset, 'one'|'picks')``. Raises if the token is not yours."""
+        self._require_skill_author()
+        needle = (token or '').strip()
+        if not needle:
+            return self._owned_extra_skills(), 'picks'
+        hits = self.search_owned_for_token(needle)
+        if len(hits) > 1:
+            return hits, 'picks'
+        if len(hits) == 1:
+            return hits, 'one'
+        other = self._find_invoke_token_on_instance(needle)
+        if other:
+            if other.is_system:
+                raise UserError(_(
+                    'System skills cannot be changed from Chatboo.'
+                ))
+            raise UserError(_('You can only change skills you created.'))
+        raise UserError(_('There is no skill named "%s".') % needle)
+
+    @api.model
+    def author_param_schema(self, existing_txt, prose, code_body='', hint='',
+                            provider=None, extracted=None):
+        """Fill from Code, then merge trainer prose onto ``param_schema``.
+
+        Empty prose keeps the inferred / authored schema. ``extracted``
+        skips the LLM (tests and a wizard that already parsed).
+
+        Returns ``(schema, hint, usage, help)``. ``usage`` is the light
+        JSON call (empty when there was no call).
+        """
+        from ..utils.llm_usage import normalize_usage
+        from ..utils.skill_runtime import (
+            build_param_author_prompt,
+            fill_capture_params,
+            infer_arg_hint_from_schema,
+            infer_param_keys_from_code,
+            merge_authored_param_schema,
+            param_schema_to_json,
+            parse_param_author_help,
+            parse_param_author_json,
+            parse_param_schema_txt,
+        )
+
+        schema_txt, hint = fill_capture_params(code_body, existing_txt, hint)
+        text = (prose or '').strip()
+        empty = (schema_txt or False, hint or False, {}, '')
+        if not text:
+            return empty
+        usage = {}
+        help_txt = ''
+        if extracted is None:
+            if not provider:
+                raise UserError(_(
+                    'An AI provider is required to read the parameter description.'
+                ))
+            from ..utils.agent_engine import llm_json_completion_for_agent
+            from ..utils.inference_audit import inference_audit
+            code_keys = infer_param_keys_from_code(code_body)
+            lang = self.env.context.get('lang') or self.env.user.lang or 'en_US'
+            system, user = build_param_author_prompt(
+                text, code_keys, lang=lang,
+            )
+            with inference_audit(
+                self.env,
+                endpoint='skill_param_schema',
+                source_channel='internal',
+                user_id=self.env.uid,
+            ):
+                result = llm_json_completion_for_agent(
+                    self.env, system, user,
+                    consumer_key='admin', max_tokens=512,
+                )
+            usage = normalize_usage((result or {}).get('usage') or {})
+            raw = (result or {}).get('content') or ''
+            extracted = parse_param_author_json(raw)
+            help_txt = parse_param_author_help(raw)
+        existing = parse_param_schema_txt(schema_txt)
+        if not extracted or extracted.get('_reject'):
+            if existing:
+                return schema_txt or False, hint or False, usage, help_txt
+            raise UserError(_(
+                'Could not turn that description into parameters. '
+                'Say what is asked (e.g. cities or a date range).'
+            ))
+        merged = merge_authored_param_schema(existing, extracted, text)
+        if not merged:
+            raise UserError(_(
+                'Could not turn that description into parameters. '
+                'Say what is asked (e.g. cities or a date range).'
+            ))
+        hint = (hint or '').strip()
+        if set(existing) != set(merged) or not hint:
+            hint = infer_arg_hint_from_schema(merged)
+        return param_schema_to_json(merged), hint or False, usage, help_txt
+
+    @api.model
+    def author_param_help(self, rows, provider=None, extracted=None,
+                          procedure='', code_body=''):
+        """One short slash-help sentence from Procedure and Code.
+
+        Parameter rows are optional context (the card lists them apart).
+        No call when the sources are empty or there is no provider.
+        ``extracted`` skips the LLM (tests and a wizard that already parsed).
+        Returns ``(help, usage)``.
+        """
+        from ..utils.llm_usage import normalize_usage
+        from ..utils.skill_runtime import (
+            build_param_help_prompt,
+            build_skill_help_user,
+            parse_param_author_help,
+        )
+
+        user = build_skill_help_user(procedure, code_body, rows)
+        if not user:
+            return '', {}
+        if extracted is not None:
+            if isinstance(extracted, str):
+                return (extracted or '').strip()[:120], {}
+            if isinstance(extracted, dict):
+                return (extracted.get('help') or '').strip()[:120], {}
+            return '', {}
+        if not provider:
+            return '', {}
+        from ..utils.agent_engine import llm_json_completion_for_agent
+        from ..utils.inference_audit import inference_audit
+        lang = self.env.context.get('lang') or self.env.user.lang or 'en_US'
+        system, _user = build_param_help_prompt(
+            rows, procedure=procedure, code_body=code_body, lang=lang,
+        )
+        with inference_audit(
+            self.env,
+            endpoint='skill_param_help',
+            source_channel='internal',
+            user_id=self.env.uid,
+        ):
+            result = llm_json_completion_for_agent(
+                self.env, system, user,
+                consumer_key='admin', max_tokens=256,
+            )
+        usage = normalize_usage((result or {}).get('usage') or {})
+        help_txt = parse_param_author_help((result or {}).get('content') or '')
+        return help_txt, usage
+
+    @api.model
+    def rewrite_code_for_params(self, code_body, schema_txt, prose='',
+                                provider=None, rewritten=None):
+        """Adapt Code so it reads every ``param_schema`` key.
+
+        Returns ``(code, usage)``. ``rewritten`` skips the LLM (tests and a
+        wizard that already has the adapted Code). No call when the Code
+        already reads the keys.
+        """
+        from ..controllers.validators import validate_relaxaicode_source_ast
+        from ..utils.llm_usage import normalize_usage
+        from ..utils.skill_runtime import (
+            accept_rewritten_code,
+            build_code_param_rewrite_prompt,
+            parse_rewritten_skill_code,
+            schema_keys_unread_by_code,
+        )
+
+        code = code_body or ''
+        unread = schema_keys_unread_by_code(schema_txt, code)
+        if not unread:
+            return code, {}
+
+        def _accept(candidate, usage):
+            accepted = accept_rewritten_code(candidate, schema_txt)
+            if not accepted:
+                missing = (
+                    schema_keys_unread_by_code(schema_txt, candidate) or unread
+                )
+                raise UserError(_(
+                    'The Code does not read the parameter keys: %s.'
+                ) % ', '.join(missing))
+            ok, err, _requires_write = validate_relaxaicode_source_ast(accepted)
+            if not ok:
+                raise UserError(_(
+                    'The adapted Code is not valid: %s'
+                ) % (err or ''))
+            return accepted, usage
+
+        if rewritten is not None:
+            return _accept(rewritten, {})
+        if not provider:
+            raise UserError(_(
+                'The Code does not read the parameter keys: %s. '
+                'An AI provider is required to adapt the Code.'
+            ) % ', '.join(unread))
+        from ..utils.agent_engine import llm_json_completion_for_agent
+        from ..utils.inference_audit import inference_audit
+        system, user = build_code_param_rewrite_prompt(code, schema_txt, prose)
+        with inference_audit(
+            self.env,
+            endpoint='skill_code_param_rewrite',
+            source_channel='internal',
+            user_id=self.env.uid,
+        ):
+            result = llm_json_completion_for_agent(
+                self.env, system, user,
+                consumer_key='admin', max_tokens=4096,
+            )
+        usage = normalize_usage((result or {}).get('usage') or {})
+        raw = parse_rewritten_skill_code((result or {}).get('content') or '')
+        return _accept(raw, usage)
+
+    @api.model
+    def owned_skill_picks(self, skills):
+        rows = []
+        for rec in skills:
+            slash = ''
+            if hasattr(rec, 'invoke_code'):
+                slash = (rec.invoke_code() or '').strip()
+            if not slash:
+                slash = (rec.code or '').strip()
+            if not slash:
+                continue
+            rows.append({
+                'code': slash,
+                'name': (rec.name or '').strip() or slash,
+            })
+        rows.sort(key=lambda r: (r['code'] or '').casefold())
+        return rows
+
+    @api.model
+    def resolve_capture_identity(self, raw):
+        """Identity for ``/create-skill``: free slash or the caller's skill.
+
+        Returns ``(code, command, existing)``. ``existing`` is empty when
+        the slash is free. A factory, system, or other-owner clash raises
+        the same errors as delete/rename.
+        """
+        code_prefix = get_skill_code_prefix(self.env)
+        command_prefix = get_skill_command_prefix(self.env)
+        slug = slash_slug(raw, default='')
+        if not slug:
+            raise UserError(_(
+                'Enter a valid skill name (letters, numbers, hyphens).'
+            ))
+        code, command = instance_identity(slug, code_prefix, command_prefix)
+        if command in reserved_slash_commands():
+            raise UserError(_(
+                'The slash "/%s" is reserved. Choose another name.'
+            ) % command)
+        existing = self._find_invoke_token_on_instance(command)
+        if not existing:
+            return code, command, existing
+        if existing.owner_id and existing.owner_id.id == self.env.uid:
+            owned = self._owned_mutable_skill(command)
+            return owned.code, owned.command or command, owned
+        self._raise_slash_in_use(command, existing)
 
     @api.model
     def allocate_instance_identity(self, raw, exclude_id=None):
@@ -732,9 +1305,9 @@ class AISkill(models.Model):
         taken_domain = [('code', '=like', code + '%')]
         if exclude_id:
             taken_domain = [('id', '!=', exclude_id)] + taken_domain
-        taken = set(self.search(taken_domain).mapped('code'))
+        taken = set(self.sudo().search(taken_domain).mapped('code'))
         code = uniquify_catalog_code(code, taken)
-        clash = self.search([
+        clash = self.sudo().search([
             ('id', '!=', exclude_id or 0),
             '|', '|',
             ('command', '=', command),
@@ -742,10 +1315,7 @@ class AISkill(models.Model):
             ('command', '=', command.replace('-', '_')),
         ], limit=1)
         if clash:
-            raise UserError(_(
-                'The slash "/%s" is already used by skill "%s". '
-                'Choose another name.'
-            ) % (command, clash.invoke_code() or clash.code))
+            self._raise_slash_in_use(command, clash)
         return code, command
 
     @api.model
@@ -759,6 +1329,7 @@ class AISkill(models.Model):
         user-owned skills. Does not steal a slash from another pack or a
         builtin. Returns ``{updated, skipped, errors}``.
         """
+        self._require_bootstrap()
         source_module = (source_module or '').strip()
         stats = {'updated': 0, 'skipped': 0, 'errors': []}
         if not source_module:
@@ -845,6 +1416,18 @@ class AISkill(models.Model):
                         found.add('skills/%s/%s' % (scope, filename))
         return found
 
+    def _require_bootstrap(self):
+        """Module seed and ``-u`` only.
+
+        ``call_kw`` cannot set ``env.su`` or become the superuser. A context
+        flag is not checked here.
+        """
+        if self.env.su or self.env.user._is_superuser():
+            return
+        raise AccessError(_(
+            'Only the system can run this maintenance action.'
+        ))
+
     @api.model
     def hide_unprefixed_slash_twins(self):
         """Delete leftover slashes that duplicate a prefixed factory command.
@@ -853,6 +1436,7 @@ class AISkill(models.Model):
         (user, orphan, factory or system). No archive. Product slashes that
         are not a stem of a prefixed factory row stay.
         """
+        self._require_bootstrap()
         pfx = get_skill_command_prefix(self.env)
         if not pfx:
             return 0
@@ -916,7 +1500,7 @@ class AISkill(models.Model):
         else:
             command = new_slash
             code = skill.code
-            clash = self.search([
+            clash = self.sudo().search([
                 ('id', '!=', skill.id),
                 '|', '|',
                 ('command', '=', command),
@@ -924,10 +1508,7 @@ class AISkill(models.Model):
                 ('command', '=', command.replace('-', '_')),
             ], limit=1)
             if clash:
-                raise UserError(_(
-                    'The slash "/%s" is already used by skill "%s". '
-                    'Choose another name.'
-                ) % (command, clash.invoke_code() or clash.code))
+                self._raise_slash_in_use(command, clash)
         skill.write({
             'code': code,
             'command': command,
@@ -1015,6 +1596,7 @@ class AISkill(models.Model):
                 try:
                     meta = export_record_dict(skill, skip_fields={
                         'id', 'content', 'code_body', 'show_in_slash',
+                        'param_cache_ids', 'param_line_ids',
                     })
                 except Exception:
                     meta = {'code': skill.code, 'name': skill.name or '?'}
@@ -1089,7 +1671,7 @@ class AISkill(models.Model):
         return {
             'type': 'ir.actions.act_window',
             'name': _('Import skills from ZIP'),
-            'res_model': 'pns_ai_mcp.skill.import.wizard',
+            'res_model': 'ai.skill.import.wizard',
             'view_mode': 'form',
             'target': 'new',
         }
@@ -1319,13 +1901,14 @@ class AISkill(models.Model):
         skipped.
         """
         ensure_ai_admin(self.env)
-        # Siembra módulo→BD: vía autorizada (ensure_ai_admin ya validó). Las
-        # guardas de write() (is_system read-only, ownership) están pensadas para
-        # ediciones de AI Writers en la UI, no para el seeding; las saltamos con
-        # el mismo flag que usa el import de contextos. Sin esto, un restore por
-        # `odoo-bin shell` (env.user = superusuario, NO group_ai_admin) falla con
-        # "System skills are read-only for AI Writers".
-        self = self.with_context(skip_hardcoded_restrictions=True)
+        # Siembra módulo→BD: vía autorizada (ensure_ai_admin ya validó al
+        # usuario real). sudo() abre el candado de fábrica; el flag de
+        # contexto solo no basta, porque el RPC puede mandarlo.
+        self = self.sudo().with_context(
+            skip_hardcoded_restrictions=True,
+            skip_param_line_schema=True,
+            skip_skill_form_author=True,
+        )
         Agent = self.env['ai.agent']
         Context = self.env['ai.context']
         only_codes_set = set(only_codes) if only_codes else None
@@ -1424,7 +2007,7 @@ class AISkill(models.Model):
                             'param_schema': (meta.get('param_schema') or '').strip() or False,
                             'arg_hint': (meta.get('arg_hint') or '').strip() or False,
                             'args_policy': self._args_policy_from_meta(meta),
-                            'painter': self._painter_from_meta(meta),
+                            'compose': self._compose_from_meta(meta),
                             'triggers': (meta.get('triggers') or '').strip() or False,
                             'sequence': sequence,
                             'active': active,
@@ -1503,6 +2086,13 @@ class AISkill(models.Model):
         # was removed/renamed are kept (never deleted); remove leftovers by
         # hand if ever needed.
         _logger.info('MCP: skills import_from_files: %s', stats)
+        try:
+            self._fill_missing_param_lines()
+        except Exception:
+            _logger.debug(
+                'MCP: could not fill skill param lines after import',
+                exc_info=True,
+            )
         self._after_factory_skill_import(stats)
         return stats
 
@@ -1543,12 +2133,6 @@ class AISkill(models.Model):
         return rels, codes, commands
 
     @api.model
-    def _skill_rel_paths_for_module(self, module_name):
-        """``skills/<scope>/<file>.md`` paths shipped by one addon."""
-        rels, _codes, _commands = self._skill_disk_index_for_module(module_name)
-        return rels
-
-    @api.model
     def unlink_retired_from_module(self, module_name):
         """Unlink factory rows of this addon whose ``.md`` is gone from disk.
 
@@ -1557,6 +2141,7 @@ class AISkill(models.Model):
         leftover with a stale ``rel_path`` is kept if its code or slash
         still names a file on disk (import failed this pass ≠ retired).
         """
+        self._require_bootstrap()
         from ..utils.skill_files import factory_row_on_disk
         name = (module_name or '').strip()
         if not name:
@@ -1602,6 +2187,7 @@ class AISkill(models.Model):
         Used by an addon's XML seed so a ``-u`` drops product leftovers
         even when a one-shot migrate already ran.
         """
+        self._require_bootstrap()
         names = [n for n in (names or []) if n]
         if not names:
             return 0
@@ -1633,6 +2219,7 @@ class AISkill(models.Model):
         whose ``.md`` is gone. ``scopes`` defaults to system+custom (owner
         pack). The engine passes ``('system',)`` so it never plants ``custom/``.
         """
+        ensure_ai_admin(self.env)
         name = (module_name or '').strip()
         if not name:
             raise UserError(_('Skill import requires a module name.'))
@@ -1641,7 +2228,7 @@ class AISkill(models.Model):
             module_name=name,
             scopes=scopes,
         )
-        retired = self.unlink_retired_from_module(name)
+        retired = self.sudo().unlink_retired_from_module(name)
         if isinstance(stats, dict):
             stats['retired'] = retired
         return stats
@@ -1732,31 +2319,6 @@ class AISkill(models.Model):
                         codes.add(code)
         return codes
 
-    @api.model
-    def _build_module_reload_report_html(self, stats, title=None):
-        errors = stats.get('errors') or []
-        created = stats.get('created', 0)
-        updated = stats.get('updated', 0)
-        title = title or _('Skills — reload from module files')
-        status_class, status_icon, status_text, _ntype = pns_ui.derive_operation_status(
-            errors,
-            created + updated,
-            failed_text=_('Skills reload failed.'),
-            warnings_text=_('Skills reload completed with warnings.'),
-            success_text=_('Skills reload completed.'),
-        )
-        return pns_ui.build_operation_report_html(
-            title,
-            status_text,
-            status_class,
-            status_icon,
-            rows=[
-                (_('Skills created'), created),
-                (_('Skills updated'), updated),
-                (_('Skills skipped (not overwritten)'), stats.get('skipped', 0)),
-            ],
-            errors=errors,
-        )
 
     @api.model
     def reload_from_server(self, replace_existing=True):
@@ -1789,49 +2351,3 @@ class AISkill(models.Model):
             notification_type=ntype if ntype != 'danger' else 'warning',
         )
 
-    @api.model
-    def _build_skills_import_report_html(self, zip_bytes, replace_existing=False):
-        stats = self.import_skills_zip(zip_bytes, replace_existing=replace_existing)
-        extra_warnings = []
-        if stats['missing_contexts']:
-            extra_warnings.append(
-                '%s %s' % (
-                    _('Missing contexts (not linked):'),
-                    ', '.join(stats['missing_contexts']),
-                )
-            )
-        if stats['missing_agents']:
-            extra_warnings.append(
-                '%s %s' % (
-                    _('Missing agents (skill set global):'),
-                    ', '.join(stats['missing_agents']),
-                )
-            )
-        status_class, status_icon, status_text, _ntype = pns_ui.derive_operation_status(
-            stats['errors'],
-            stats['created'] + stats['updated'],
-            failed_text=_('Import failed.'),
-            warnings_text=_('Import completed with warnings.'),
-            success_text=_('Import completed successfully.'),
-            extra_warnings=extra_warnings,
-        )
-        footer = (
-            '<p class="text-muted" style="font-size:11px;margin-bottom:0;">'
-            + _('Existing skills (same code) are updated only if "Replace existing" '
-                'is checked. Referenced contexts are linked only if they already '
-                'exist; missing ones are reported, not created.')
-            + '</p>'
-        )
-        return pns_ui.build_operation_report_html(
-            None,
-            status_text,
-            status_class,
-            status_icon,
-            rows=[
-                (_('Created'), stats['created']),
-                (_('Updated'), stats['updated']),
-                (_('Skipped (existing, not replaced)'), stats['skipped']),
-            ],
-            errors=stats['errors'],
-            footer_html=footer,
-        )

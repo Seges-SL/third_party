@@ -1,3 +1,9 @@
+/**
+ * Field widget: show an API key and copy it to the clipboard (Odoo 14).
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+ */
 odoo.define('pns_ai_mcp.mcp_api_key_widget', function (require) {
     "use strict";
 

@@ -1,8 +1,12 @@
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+ *
+ * Deduplicate invalid-field names in the form/list error toast.
+ */
 odoo.define('pns_base.invalid_fields_dedupe', function (require) {
     "use strict";
 
     var BasicController = require('web.BasicController');
-    var ListController = require('web.ListController');
     var core = require('web.core');
     var _t = core._t;
 
@@ -89,66 +93,6 @@ odoo.define('pns_base.invalid_fields_dedupe', function (require) {
                 return;
             }
             return this._super(names);
-        },
-    });
-
-    ListController.include({
-        /**
-         * Multi-edit with no valid row: same toast as the form, not
-         * «No valid record to save».
-         */
-        _saveMultipleRecords: function (recordId, node, changes) {
-            var fieldName = Object.keys(changes)[0];
-            var value = Object.values(changes)[0];
-            var recordIds = _.union([recordId], this.selectedRecords);
-            var self = this;
-            var validRecordIds = recordIds.reduce(function (result, nextRecordId) {
-                var record = self.model.get(nextRecordId);
-                var modifiers = self.renderer._registerModifiers(node, record);
-                var fieldType = record.fields[fieldName].type;
-                if (!modifiers.readonly && (!modifiers.required || self._isValueSet(fieldType, value))) {
-                    result.push(nextRecordId);
-                }
-                return result;
-            }, []);
-            if (validRecordIds.length > 0) {
-                return this._super.apply(this, arguments);
-            }
-            var record = this.model.get(recordId);
-            var label = (node.attrs && node.attrs.string) ||
-                (record.fields[fieldName] && record.fields[fieldName].string) ||
-                fieldName;
-            this._pnsNotifyRequiredFields([label]);
-            return new Promise(function (resolve, reject) {
-                self.model.discardChanges(recordId);
-                self._confirmSave(recordId).then(function () {
-                    self.renderer.focusCell(recordId, node);
-                    reject();
-                });
-            });
-        },
-        _onSetDirty: function (ev) {
-            var recordId = ev.data.dataPointID;
-            if (!this.renderer.isInMultipleRecordEdition(recordId)) {
-                return this._super.apply(this, arguments);
-            }
-            ev.stopPropagation();
-            var node = ev.target && ev.target.__node;
-            var record = this.model.get(recordId);
-            var fieldName = node && node.attrs && node.attrs.name;
-            var label = (node && node.attrs && node.attrs.string) ||
-                (fieldName && record.fields[fieldName] && record.fields[fieldName].string) ||
-                fieldName;
-            if (label) {
-                this._pnsNotifyRequiredFields([label]);
-            }
-            var self = this;
-            this.model.discardChanges(recordId);
-            return this._confirmSave(recordId).then(function () {
-                if (node) {
-                    self.renderer.focusCell(recordId, node);
-                }
-            });
         },
     });
 });

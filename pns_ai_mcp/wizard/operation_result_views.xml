@@ -2,10 +2,10 @@
 <!-- Resultado de operación: textos en XML (i18n Odoo); Python solo escribe contadores. -->
 <odoo>
 
-    <!-- pns_ai_mcp.context_import_wizard -->
+    <!-- ai.context.import.wizard -->
     <record id="view_context_import_result_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.context_import.wizard.result</field>
-        <field name="model">pns_ai_mcp.context_import_wizard</field>
+        <field name="model">ai.context.import.wizard</field>
         <field name="arch" type="xml">
             <form string="Import result">
                 <field name="show_result" invisible="1"/>
@@ -45,10 +45,10 @@
         </field>
     </record>
 
-    <!-- pns_ai_mcp.agent.context.import.wizard -->
+    <!-- ai.agent.context.import.wizard -->
     <record id="view_agent_context_import_result_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.agent.context.import.wizard.result</field>
-        <field name="model">pns_ai_mcp.agent.context.import.wizard</field>
+        <field name="model">ai.agent.context.import.wizard</field>
         <field name="arch" type="xml">
             <form string="Import result">
                 <field name="show_result" invisible="1"/>
@@ -88,10 +88,10 @@
         </field>
     </record>
 
-    <!-- pns_ai_mcp.agent.skill.import.wizard -->
+    <!-- ai.agent.skill.import.wizard -->
     <record id="view_agent_skill_import_result_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.agent.skill.import.wizard.result</field>
-        <field name="model">pns_ai_mcp.agent.skill.import.wizard</field>
+        <field name="model">ai.agent.skill.import.wizard</field>
         <field name="arch" type="xml">
             <form string="Import result">
                 <field name="show_result" invisible="1"/>
@@ -127,10 +127,10 @@
         </field>
     </record>
 
-    <!-- pns_ai_mcp.skill.import.wizard -->
+    <!-- ai.skill.import.wizard -->
     <record id="view_skill_import_result_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.skill.import.wizard.result</field>
-        <field name="model">pns_ai_mcp.skill.import.wizard</field>
+        <field name="model">ai.skill.import.wizard</field>
         <field name="arch" type="xml">
             <form string="Import result">
                 <field name="show_result" invisible="1"/>
@@ -167,10 +167,10 @@
         </field>
     </record>
 
-    <!-- pns_ai_mcp.import_agents_wizard -->
+    <!-- ai.import.agents.wizard -->
     <record id="view_import_agents_result_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.import_agents.wizard.result</field>
-        <field name="model">pns_ai_mcp.import_agents_wizard</field>
+        <field name="model">ai.import.agents.wizard</field>
         <field name="arch" type="xml">
             <form string="Import result">
                 <field name="show_result" invisible="1"/>
@@ -207,10 +207,10 @@
         </field>
     </record>
 
-    <!-- pns_ai_mcp.import_users_wizard -->
+    <!-- ai.import.users.wizard -->
     <record id="view_import_users_result_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.import_users.wizard.result</field>
-        <field name="model">pns_ai_mcp.import_users_wizard</field>
+        <field name="model">ai.import.users.wizard</field>
         <field name="arch" type="xml">
             <form string="Import result">
                 <field name="show_result" invisible="1"/>
@@ -252,7 +252,7 @@
     <!-- JSON import wizards: servers, whitelist, external servers -->
     <record id="view_import_servers_result_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.import_servers.wizard.result</field>
-        <field name="model">pns_ai_mcp.import_servers_wizard</field>
+        <field name="model">ai.import.servers.wizard</field>
         <field name="arch" type="xml">
             <form string="Import result">
                 <field name="show_result" invisible="1"/>
@@ -290,7 +290,7 @@
 
     <record id="view_import_whitelist_result_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.import_whitelist.wizard.result</field>
-        <field name="model">pns_ai_mcp.import_whitelist_wizard</field>
+        <field name="model">ai.import.whitelist.wizard</field>
         <field name="arch" type="xml">
             <form string="Import result">
                 <field name="show_result" invisible="1"/>
@@ -327,7 +327,7 @@
 
     <record id="view_import_external_servers_result_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.import_external_servers.wizard.result</field>
-        <field name="model">pns_ai_mcp.import_external_servers_wizard</field>
+        <field name="model">ai.import.external.servers.wizard</field>
         <field name="arch" type="xml">
             <form string="Import result">
                 <field name="show_result" invisible="1"/>
@@ -362,10 +362,10 @@
         </field>
     </record>
 
-    <!-- pns_ai_mcp.context.tools.wizard — restore -->
+    <!-- ai.context.tools.wizard — restore -->
     <record id="view_mcp_context_tools_restore_result_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.context.tools.wizard.restore.result</field>
-        <field name="model">pns_ai_mcp.context.tools.wizard</field>
+        <field name="model">ai.context.tools.wizard</field>
         <field name="arch" type="xml">
             <form string="Contexts tools — operation result">
                 <field name="show_result" invisible="1"/>
@@ -401,10 +401,10 @@
         </field>
     </record>
 
-    <!-- pns_ai_mcp.skill.tools.wizard — reload -->
+    <!-- ai.skill.tools.wizard — reload -->
     <record id="view_skill_tools_reload_result_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.skill.tools.wizard.reload.result</field>
-        <field name="model">pns_ai_mcp.skill.tools.wizard</field>
+        <field name="model">ai.skill.tools.wizard</field>
         <field name="arch" type="xml">
             <form string="Skills tools — operation result">
                 <field name="show_result" invisible="1"/>
@@ -440,10 +440,10 @@
         </field>
     </record>
 
-    <!-- pns_ai_mcp.agent.import.wizard — context pack -->
+    <!-- ai.agent.import.wizard — context pack -->
     <record id="view_agent_pack_import_result_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.agent.import.wizard.result</field>
-        <field name="model">pns_ai_mcp.agent.import.wizard</field>
+        <field name="model">ai.agent.import.wizard</field>
         <field name="arch" type="xml">
             <form string="Import result">
                 <field name="show_result" invisible="1"/>
@@ -488,10 +488,10 @@
         </field>
     </record>
 
-    <!-- pns_ai_mcp.config_backup_wizard — full AI configuration restore -->
+    <!-- ai.config.backup.wizard — full AI configuration restore -->
     <record id="view_config_backup_result_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.config_backup.wizard.result</field>
-        <field name="model">pns_ai_mcp.config_backup_wizard</field>
+        <field name="model">ai.config.backup.wizard</field>
         <field name="arch" type="xml">
             <form string="Configuration import result">
                 <field name="show_result" invisible="1"/>
@@ -529,10 +529,10 @@
         </field>
     </record>
 
-    <!-- pns_ai_mcp.artifact_bundle.import.wizard -->
+    <!-- ai.artifact.bundle.import.wizard -->
     <record id="view_artifact_bundle_import_result_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.artifact.bundle.import.wizard.result</field>
-        <field name="model">pns_ai_mcp.artifact_bundle.import.wizard</field>
+        <field name="model">ai.artifact.bundle.import.wizard</field>
         <field name="arch" type="xml">
             <form string="Import result">
                 <field name="show_result" invisible="1"/>

@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
+# Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Import an AI artifacts bundle ZIP."""
+
 import base64
 
 from odoo import fields, models, _
@@ -21,7 +24,7 @@ _SECTION_LABELS = {
 
 
 class AIArtifactBundleImportWizard(models.TransientModel):
-    _name = 'pns_ai_mcp.artifact_bundle.import.wizard'
+    _name = 'ai.artifact.bundle.import.wizard'
     _inherit = ['pns.operation.report.wizard']
     _description = 'Import AI artifacts bundle'
 

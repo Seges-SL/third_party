@@ -1,6 +1,10 @@
+# -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-# SKILL: billing — period totals from posted out_invoice (no BA / local catalogs)
+"""Monthly billing slash skill.
+
+Posted out_invoice untaxed totals by month (N months, year, range, or YTD).
+"""
 from datetime import date
 import re
 
@@ -117,12 +121,19 @@ else:
                 y -= 1
             _sd = '%04d-%02d-01' % (y, m)
 
-    invoices = env['account.move'].search([
+    _bill_domain = [
         ('move_type', '=', 'out_invoice'),
         ('state', '=', 'posted'),
         ('invoice_date', '>=', _sd),
         ('invoice_date', '<=', _ed),
-    ])
+    ]
+    try:
+        _company_id = env.company.id
+    except Exception:
+        _company_id = False
+    if _company_id:
+        _bill_domain.append(('company_id', '=', _company_id))
+    invoices = env['account.move'].search(_bill_domain)
     by_month = {}
     for inv in invoices:
         if not inv.invoice_date:

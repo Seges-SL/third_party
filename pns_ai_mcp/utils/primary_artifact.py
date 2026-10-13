@@ -26,6 +26,7 @@ PRESENTATION_KEYS = (
     'map_url', 'map_pins', 'pins_url', 'summary', 'title', 'name',
     'geo_coords', 'geo_thumbs', 'notices', 'show_mode',
     '__model', '__subtle_zebra__', '__no_charts__', '__row_links__',
+    '__excel_formulas__',
 )
 
 _TAG_RE = re.compile(r'<[^>]+>')

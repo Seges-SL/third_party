@@ -4,7 +4,7 @@
 """One row per AI/MCP operation (read or write). Audit trail."""
 
 from odoo import models, fields, api, SUPERUSER_ID, _
-from odoo.tools import config
+from odoo.tools import config, html_escape
 from ..utils import mcp_ui
 from ..utils.import_export_guard import ensure_ai_admin
 from ..utils.portable_io import export_record_dict
@@ -13,6 +13,9 @@ import re
 import logging
 
 _logger = logging.getLogger(__name__)
+
+LOG_RETENTION_PARAM = 'pns_ai_mcp.log_retention_days'
+DEFAULT_LOG_RETENTION_DAYS = 30
 
 
 class AILog(models.Model):
@@ -25,7 +28,8 @@ class AILog(models.Model):
 
     The row carries three orthogonal axes so the history is easy to read:
 
-    * ``origin``    -- WHERE the request came from (Chatboo / MCP client / internal).
+    * ``origin``    -- door token (in-house UI / MCP client / internal).
+    * ``agent_id`` / ``agent_display`` -- the agent that owned the turn.
     * ``primitive`` + ``category`` -- WHAT kind of operation it was.
     * ``flow`` + ``flow_label``    -- the step's DIRECTION within the turn.
 
@@ -35,20 +39,19 @@ class AILog(models.Model):
     """
     _name = 'ai.log'
     _description = 'AI Operation Log'
-    # Desempate por step_seq: los pasos de un mismo turno comparten timestamp
+    # Desempate por turn_step: los pasos de un mismo turno comparten timestamp
     # (granularidad de segundo), así que sin este desempate Postgres los devuelve
     # en orden arbitrario y el turno se ve "descolocado" (8,7,2,6,5,...).
-    _order = 'timestamp desc, step_seq desc'
+    _order = 'timestamp desc, turn_step desc'
     _rec_name = 'display_name'
 
     # ── Who / where ──────────────────────────────────────────────────
     user_id = fields.Many2one(
         'res.users',
-        string='User',
-        required=True,
+        string='Log user',
         readonly=True,
         index=True,
-        ondelete='cascade',
+        ondelete='set null',
     )
     origin = fields.Selection(
         [
@@ -56,11 +59,24 @@ class AILog(models.Model):
             ('mcp_client', 'MCP Client'),
             ('internal', 'Internal'),
         ],
-        string='Origin',
+        string='Door',
         readonly=True,
         index=True,
-        help='Where the request came from: the in-house Chatboo UI, an external '
-             'MCP client (Cursor, Claude, Antigravity...), or an internal process.',
+        help='Which door the request used: Chatboo screen, an MCP client '
+             '(Cursor, Claude), or an internal process (walkie, cron).',
+    )
+    agent_id = fields.Many2one(
+        'ai.agent',
+        string='Agent',
+        readonly=True,
+        index=True,
+        ondelete='set null',
+        help='Agent that owned this turn. The Agent column shows this name.',
+    )
+    agent_display = fields.Char(
+        string='Agent',
+        compute='_compute_agent_display',
+        help='Agent that owned this turn. If no agent was bound, shows the door label.',
     )
     remote_ip = fields.Char(
         string='IP',
@@ -72,7 +88,8 @@ class AILog(models.Model):
         string='Client',
         readonly=True,
         index=True,
-        help='Who invoked the operation: Chatboo, Cursor, Claude Desktop, Internal…',
+        help='Program that called: Cursor, Claude, Chatboo, the walkie. '
+             'If the host sends no name, this copies the agent.',
     )
 
     # ── When ─────────────────────────────────────────────────────────
@@ -89,13 +106,13 @@ class AILog(models.Model):
     access_mode = fields.Selection(
         [
             ('read', 'Read'),
-            ('write', 'Write'),
+            ('write', 'Supervised'),
         ],
         string='Access',
         required=True,
         readonly=True,
         index=True,
-        help='Whether the operation reads or writes data.',
+        help='Read, or a supervised step (human confirm: write, action, API, URL…).',
     )
     primitive = fields.Selection(
         [
@@ -146,7 +163,7 @@ class AILog(models.Model):
         help='Functional category, derived from the primitive and endpoint.',
     )
     model_name = fields.Char(
-        string='Model',
+        string='LLM model',
         readonly=True,
         index=True,
         help='Model that processed the request (e.g. ollama/llama3.1_8B). For '
@@ -154,27 +171,18 @@ class AILog(models.Model):
     )
 
     # ── Turn threading ───────────────────────────────────────────────
-    correlation_id = fields.Char(
-        string='Request ID',
+    turn = fields.Char(
+        string='Turn',
         readonly=True,
         index=True,
         help='Short id (<=8 chars) grouping all rows of the same conversation turn.',
     )
-    step_seq = fields.Integer(
+    turn_step = fields.Integer(
         string='Step',
         readonly=True,
         default=0,
         help='Step number within the turn (1, 2, 3...). 0 = no sequence assigned.',
     )
-    operation_code = fields.Char(
-        string='Op. code',
-        compute='_compute_operation_code',
-        store=True,
-        readonly=True,
-        index=True,
-        help='Request ID + step (e.g. A7K2-3) to follow a turn thread.',
-    )
-
     # ── Flow (computed, honest per origin) ───────────────────────────
     flow = fields.Selection(
         [
@@ -182,7 +190,7 @@ class AILog(models.Model):
             ('llm_response', 'LLM -> AI Engine'),
             ('tool_call',    'AI Engine -> Tool'),
             ('tool_result',  'Tool -> AI Engine'),
-            ('domain_index', 'Domain Discovery'),
+            ('domain_index', 'Discovery'),
             ('turn_done',    'Turn completed'),
             ('failover',     'Provider failover'),
             ('external',     'MCP client -> Odoo'),
@@ -208,6 +216,14 @@ class AILog(models.Model):
         readonly=True,
         help='Color legend for the history (single source, shared with the '
              'list-view legend bar).',
+    )
+    flow_icon_html = fields.Html(
+        string='Icon',
+        compute='_compute_flow_icon_html',
+        sanitize=False,
+        readonly=True,
+        help='Negotiation-state icon (same drawings as the color legend). '
+             'Supervised steps use the flag, matching the red row.',
     )
 
     # ── Payloads ─────────────────────────────────────────────────────
@@ -280,6 +296,17 @@ class AILog(models.Model):
         readonly=True,
         help='Total tokens used in the request.',
     )
+    cost_usd = fields.Float(
+        string='Cost (USD)',
+        digits=(16, 8),
+        readonly=True,
+        help='USD cost reported by the provider for this LLM step (when available).',
+    )
+    cost_display = fields.Char(
+        string='Cost',
+        compute='_compute_cost_display',
+        help='Provider cost in the configured display currency.',
+    )
 
     # ── Display ──────────────────────────────────────────────────────
     display_name = fields.Char(
@@ -290,16 +317,14 @@ class AILog(models.Model):
 
     # ── Computes ─────────────────────────────────────────────────────
 
-    @api.depends('correlation_id', 'step_seq')
-    def _compute_operation_code(self):
+    @api.depends('cost_usd')
+    def _compute_cost_display(self):
+        from ..utils.usage_display import format_cost_label
         for rec in self:
-            # step_seq=0 is falsy in Python — treat 0 as a real index when set.
-            if rec.correlation_id and rec.step_seq not in (False, None):
-                rec.operation_code = '%s-%s' % (rec.correlation_id, rec.step_seq)
-            elif rec.correlation_id:
-                rec.operation_code = rec.correlation_id
+            if not rec.cost_usd:
+                rec.cost_display = ''
             else:
-                rec.operation_code = ''
+                rec.cost_display = format_cost_label(rec.env, rec.cost_usd)['label']
 
     @api.depends('user_id', 'timestamp', 'endpoint', 'access_mode')
     def _compute_display_name(self):
@@ -327,7 +352,9 @@ class AILog(models.Model):
             if endpoint == 'get_context':
                 return 'context'
             if endpoint in ('confirm_write_operation', 'cancel_write_operation',
-                            'test_write_confirmation'):
+                            'test_write_confirmation',
+                            'safe_plan_request', 'safe_plan_status',
+                            'propose_safe_operations', 'get_safe_operation_status'):
                 return 'verification'
             if endpoint == 'clean_system':
                 return 'maintenance'
@@ -349,10 +376,24 @@ class AILog(models.Model):
     def _humanize_endpoint(endpoint):
         return (endpoint.replace('relaxaicode', 'Python')
                         .replace('get_context', 'context')
+                        .replace('safe_plan_request', 'plan')
+                        .replace('safe_plan_status', 'plan status')
+                        .replace('propose_safe_operations', 'plan')
+                        .replace('get_safe_operation_status', 'plan status')
                         .replace('fetch_native_mcp_resource', 'resource')
+                        .replace('audit_translations', 'i18n')
                         .replace('get_corporative_terms', 'glossary')
+                        .replace('get_context_usage_stats', 'analytics')
+                        .replace('clean_system', 'maintenance')
                         .replace('search_memory', 'memory')
                         .replace('domain_index', 'domains'))
+
+    @api.depends('agent_id', 'agent_id.name', 'origin')
+    def _compute_agent_display(self):
+        labels = dict(self._fields['origin'].selection or [])
+        for rec in self:
+            name = (rec.agent_id.name or '').strip()
+            rec.agent_display = name or labels.get(rec.origin) or rec.origin or ''
 
     @api.depends('origin', 'primitive', 'endpoint', 'access_mode', 'category', 'result_summary')
     def _compute_flow(self):
@@ -367,107 +408,177 @@ class AILog(models.Model):
             # primitive call. Be honest: there is no local orchestrator here.
             if origin == 'mcp_client':
                 verb = {
-                    'tool': _('Tool'),
-                    'resource': _('Resource'),
-                    'prompt': _('Prompt'),
-                    'system': _('Protocol'),
-                    'llm': _('Model'),
+                    'tool': 'Tool',
+                    'resource': 'Resource',
+                    'prompt': 'Prompt',
+                    'system': 'Protocol',
+                    'llm': 'Model',
                 }.get(prim, prim)
                 rec.flow = 'external'
-                rec.flow_label = _('MCP client -> %s: %s') % (verb, ep)
+                rec.flow_label = 'MCP client -> %s: %s' % (verb, ep)
                 continue
 
             # Internal orchestration (Chatboo / internal processes).
             if ep == 'provider_failover':
                 rec.flow = 'failover'
-                rec.flow_label = rs or _('Provider failover')
+                rec.flow_label = rs or 'Provider failover'
             elif ep == 'domain_index':
                 rec.flow = 'domain_index'
                 # Keep English: debug terminology shared with AIs / logs.
-                rec.flow_label = rs or 'Domain Discovery'
+                rec.flow_label = rs or 'Discovery'
             elif ep == 'llm_tool_request':
                 rec.flow = 'llm_response'
-                rec.flow_label = _('LLM -> AI Engine (tool call)')
+                rec.flow_label = 'LLM -> AI Engine (tool call)'
             elif ep == 'llm_response_hdr':
                 rec.flow = 'llm_response'
-                rec.flow_label = _('LLM -> AI Engine (intro/outro)')
+                rec.flow_label = 'LLM -> AI Engine (intro/outro)'
             elif ep == 'orchestration_summary':
                 # Logged with primitive='llm'; must win over the generic llm branch.
                 rec.flow = 'turn_done'
-                rec.flow_label = _('Turn completed')
+                rec.flow_label = 'Turn completed'
             elif prim == 'llm':
                 if ep == 'llm_response':
                     rec.flow = 'llm_response'
-                    rec.flow_label = _('LLM -> AI Engine (response)')
+                    rec.flow_label = 'LLM -> AI Engine (response)'
                 elif ep == 'llm_orchestration':
                     rec.flow = 'llm_request'
-                    rec.flow_label = _('AI Engine -> LLM (request)')
+                    rec.flow_label = 'AI Engine -> LLM (request)'
                 else:
                     rec.flow = 'llm_request'
-                    rec.flow_label = _('AI Engine -> LLM (%s)') % ep
+                    rec.flow_label = 'AI Engine -> LLM (%s)' % ep
             elif prim == 'tool':
                 tl = self._humanize_endpoint(ep)
-                if rs.startswith('\u2190 Tool'):
-                    rec.flow = 'tool_result'
-                    rec.flow_label = _('Tool -> AI Engine: %s') % tl
-                elif cat == 'code':
-                    rec.flow = 'tool_call'
-                    rec.flow_label = _('AI Engine -> Tool: %s (code)') % tl
+                rec.flow = 'tool_call'
+                if cat == 'code':
+                    rec.flow_label = 'AI Engine -> Tool: %s (code)' % tl
                 elif rec.access_mode == 'write':
-                    rec.flow = 'tool_call'
-                    rec.flow_label = _('AI Engine -> Tool: %s (write)') % tl
+                    rec.flow_label = 'AI Engine -> Tool: %s (supervised)' % tl
                 else:
-                    rec.flow = 'tool_call'
-                    rec.flow_label = _('AI Engine -> Tool: %s') % tl
+                    rec.flow_label = 'AI Engine -> Tool: %s' % tl
             elif prim in ('resource', 'prompt', 'system'):
                 rec.flow = 'tool_call'
-                rec.flow_label = _('AI Engine -> %s (context)') % ep
+                rec.flow_label = 'AI Engine -> %s (context)' % ep
             else:
                 rec.flow = 'other'
                 rec.flow_label = '%s / %s' % (prim, ep)
 
     # ── Color legend (SINGLE SOURCE) ─────────────────────────────────
     # Canonical legend for the history colors. This is the ONLY place the
-    # chips (color + label) are defined; both the list-view legend bar (JS)
-    # and the form-view banner render from here (via ``render_flow_legend``),
-    # so grid and form never drift again.
-    #   (background, text_color, label, italic)
+    # chips (color + label + icon) are defined; both the list-view legend
+    # bar (JS) and the form-view banner render from here (via
+    # ``render_flow_legend``), so grid and form never drift again.
+    #   (background, text_color, label, italic, icon_key)
+    # Icons: clean paths from pns_suite/design/AI/icons (no C2PA metadata).
+    # Order = Chatboo negotiation start → end, then outliers (failover, MCP).
+    _FLOW_WRENCH = (
+        '<path d="M20.6 3.9a5.4 5.4 0 0 0-7.2 7.0L5.1 19.2a2.1 2.1 0 0 0 '
+        '3.0 3.0l8.3-8.3a5.4 5.4 0 0 0 7.0-7.2l-3.3 3.3-2.8-2.8 3.3-3.3z" '
+        'fill="currentColor" stroke="none"/>'
+    )
+    _FLOW_ICON_INNER = {
+        'discovery': (
+            '<circle cx="10" cy="10" r="6.4"/>'
+            '<line x1="14.9" y1="14.9" x2="21" y2="21"/>'
+        ),
+        'engine_to_llm_request': (
+            '<line x1="4" y1="20" x2="19" y2="5"/>'
+            '<polyline points="10,5 19,5 19,14"/>'
+        ),
+        'llm_to_engine_response': (
+            '<line x1="20" y1="4" x2="5" y2="19"/>'
+            '<polyline points="14,19 5,19 5,10"/>'
+        ),
+        'engine_to_tool': _FLOW_WRENCH,
+        'safe_plan': (
+            '<line x1="6.5" y1="3" x2="6.5" y2="21"/>'
+            '<polygon points="6.5,4.5 18.5,8.2 6.5,11.9"/>'
+        ),
+        'turn_completed': (
+            '<polyline points="4,13 9.5,18.5 20,6"/>'
+        ),
+        'provider_failover': (
+            '<line x1="3" y1="9" x2="21" y2="9"/>'
+            '<polyline points="17,5 21,9 17,13"/>'
+            '<line x1="21" y1="16" x2="3" y2="16"/>'
+            '<polyline points="7,12 3,16 7,20"/>'
+        ),
+        'mcp_client_to_odoo': (
+            # Same silhouette as Chatboo's fa-plug, rotated 90° CW so
+            # the prongs do not read as cat ears at 15px.
+            '<g transform="rotate(90 12 12)">'
+            '<line x1="9" y1="3" x2="9" y2="8"/>'
+            '<line x1="15" y1="3" x2="15" y2="8"/>'
+            '<rect x="6" y="8" width="12" height="8" rx="1.8"/>'
+            '<path d="M12 16v2.2c0 2 2.4 2 2.4 4.2"/>'
+            '</g>'
+        ),
+    }
+    # flow selection → icon key. 'other' has no drawing (do not invent).
+    _FLOW_ICON_BY_TYPE = {
+        'llm_request': 'engine_to_llm_request',
+        'llm_response': 'llm_to_engine_response',
+        'tool_call': 'engine_to_tool',
+        'tool_result': 'engine_to_tool',
+        'domain_index': 'discovery',
+        'turn_done': 'turn_completed',
+        'failover': 'provider_failover',
+        'external': 'mcp_client_to_odoo',
+    }
     _FLOW_LEGEND = [
-        ('#00a09d', '#ffffff', 'AI Engine \u2192 LLM (request)', False),
-        ('#1e7e34', '#ffffff', 'LLM \u2192 AI Engine (response)', False),
-        ('#e67e00', '#ffffff', 'AI Engine \u2192 Tool', False),
-        ('#546e7a', '#eceff1', 'Tool \u2192 AI Engine', False),
-        ('#1565c0', '#ffffff', 'Domain Discovery', False),
-        ('#c0392b', '#ffffff', 'Safe Plan', False),
-        ('#37474f', '#b0bec5', 'Turn completed', True),
-        ('#7b1fa2', '#ffffff', 'Provider failover', False),
-        ('#e67e00', '#ffffff', 'MCP client \u2192 Odoo', False),
+        ('#1565c0', '#ffffff', 'Discovery', False, 'discovery'),
+        ('#00a09d', '#ffffff', 'AI Engine \u2192 LLM (request)', False,
+         'engine_to_llm_request'),
+        ('#1e7e34', '#ffffff', 'LLM \u2192 AI Engine (response)', False,
+         'llm_to_engine_response'),
+        ('#e67e00', '#ffffff', 'AI Engine \u2192 Tool', False, 'engine_to_tool'),
+        ('#c0392b', '#ffffff', 'Supervised', False, 'safe_plan'),
+        ('#37474f', '#ffffff', 'Turn completed', False, 'turn_completed'),
+        ('#7b1fa2', '#ffffff', 'Provider failover', False, 'provider_failover'),
+        ('#039BE5', '#ffffff', 'MCP client \u2192 Odoo', False,
+         'mcp_client_to_odoo'),
     ]
+
+    @classmethod
+    def _flow_chip_icon_html(cls, icon_key):
+        inner = cls._FLOW_ICON_INNER.get(icon_key)
+        if not inner:
+            return ''
+        return (
+            '<svg class="o_mcp_flow_chip_icon" width="15" height="15" '
+            'viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+            'stroke-width="2.35" stroke-linecap="round" '
+            'stroke-linejoin="round" aria-hidden="true">%s</svg>' % inner
+        )
 
     @api.model
     def render_flow_legend(self, layout='form'):
         """Build the color-legend HTML from the single source ``_FLOW_LEGEND``.
 
-        ``layout='grid'`` returns the list-view bar (control-panel width, with a
-        "Colors:" prefix and the ``o_mcp_log_legend_bar`` class the CSS targets);
+        ``layout='grid'`` returns the list-view bar (control-panel width, spend
+        chip slot on the right, ``o_mcp_log_legend_bar`` for CSS);
         ``layout='form'`` returns the in-sheet banner. Both share the same chips.
         """
         chips = []
-        for bg, fg, label, italic in self._FLOW_LEGEND:
+        for bg, fg, label, italic, icon_key in self._FLOW_LEGEND:
             style = (
-                'background:%s;color:%s;padding:2px 8px;border-radius:3px;'
-                'white-space:nowrap;' % (bg, fg)
+                'background:%s;color:%s;padding:3px 8px;border-radius:3px;'
+                'white-space:nowrap;display:inline-flex;align-items:center;'
+                'gap:4px;' % (bg, fg)
             )
             if italic:
                 style += 'font-style:italic;'
-            chips.append('<span style="%s">%s</span>' % (style, label))
+            chips.append(
+                '<span class="o_mcp_flow_chip" style="%s">%s%s</span>'
+                % (style, self._flow_chip_icon_html(icon_key), label)
+            )
         chips_html = ''.join(chips)
         if layout == 'grid':
             return (
-                '<div class="o_mcp_log_legend_bar" style="display:flex;'
-                'flex-wrap:wrap;gap:6px;padding:4px 8px 8px 8px;font-size:11px;'
-                'line-height:1.4;width:100%%;">'
-                '<strong style="margin-right:4px;">Colors:</strong>%s</div>'
+                '<div class="o_mcp_log_legend_bar">'
+                '<div class="o_mcp_log_legend_chips">%s</div>'
+                '<span class="o_mcp_log_usage_chip" hidden="hidden" '
+                'role="status"></span>'
+                '</div>'
                 % chips_html
             )
         return (
@@ -480,6 +591,25 @@ class AILog(models.Model):
         legend = self.env['ai.log'].render_flow_legend(layout='form')
         for rec in self:
             rec.flow_legend_html = legend
+
+    @classmethod
+    def _icon_key_for_row(cls, flow, access_mode):
+        if access_mode == 'write':
+            return 'safe_plan'
+        return cls._FLOW_ICON_BY_TYPE.get(flow or '')
+
+    @api.depends('flow', 'access_mode', 'flow_label')
+    def _compute_flow_icon_html(self):
+        for rec in self:
+            key = rec._icon_key_for_row(rec.flow, rec.access_mode)
+            icon = rec._flow_chip_icon_html(key) if key else ''
+            if not icon:
+                rec.flow_icon_html = False
+                continue
+            rec.flow_icon_html = (
+                '<span class="o_mcp_flow_row_icon" title="%s">%s</span>'
+                % (html_escape(rec.flow_label or ''), icon)
+            )
 
     @api.depends('prompt_data', 'result_summary')
     def _compute_compressed_fields(self):
@@ -541,8 +671,10 @@ class AILog(models.Model):
                          user_prompt=None, code_to_execute=None, agent_llm=None,
                          request_size_bytes=None, response_size_bytes=None,
                          request_type=None, prompt_tokens=None, completion_tokens=None,
-                         total_tokens=None, correlation_id=None, step_seq=None,
+                         total_tokens=None, cost_usd=None, usage=None,
+                         turn=None, turn_step=None,
                          source_channel=None, remote_ip=None, client_label=None,
+                         agent_code=None,
                          **legacy):
         """Create a log entry safely, on its own cursor, committing immediately.
 
@@ -557,7 +689,8 @@ class AILog(models.Model):
             operation_type: 'read' or 'write'.
             tool_name: MCP tool name, resource URI or prompt.
             request_type: MCP primitive ('system'/'tool'/'resource'/'prompt'/'llm').
-            source_channel: 'chatboo', 'mcp_client' or 'internal'.
+            source_channel: 'chatboo', 'mcp_client' or 'internal' (door).
+            agent_code: ``ai.agent.code`` for the Origin column (agent name).
             agent_llm: Model that processed the request.
 
         Returns:
@@ -622,12 +755,55 @@ class AILog(models.Model):
                 if code_to_execute:
                     code_to_execute_limited = code_to_execute[:max_length] if len(code_to_execute) > max_length else code_to_execute
 
+                if usage:
+                    from ..utils.llm_usage import usage_log_fields
+                    _pt, _ct, _tt, _cost = usage_log_fields(usage)
+                    if prompt_tokens is None:
+                        prompt_tokens = _pt
+                    if completion_tokens is None:
+                        completion_tokens = _ct
+                    if total_tokens is None:
+                        total_tokens = _tt
+                    if cost_usd is None:
+                        cost_usd = _cost
+
                 # Capture remote IP centrally when the caller did not provide it.
-                from ..utils.mcp_logging import normalize_remote_ip, resolve_client_label
+                from ..utils.mcp_logging import (
+                    normalize_remote_ip,
+                    request_log_stamp,
+                    resolve_client_label,
+                    resolve_log_agent,
+                )
                 remote_ip = normalize_remote_ip(remote_ip)
+                ctx = self.env.context or {}
+                stamp = request_log_stamp()
+                if not source_channel:
+                    source_channel = (
+                        ctx.get('mcp_source_channel')
+                        or stamp.get('source_channel')
+                    )
+                if not client_label:
+                    client_label = (
+                        ctx.get('mcp_client_label')
+                        or stamp.get('client_label')
+                    )
                 origin = source_channel or 'internal'
+                if origin not in ('chatboo', 'mcp_client', 'internal'):
+                    origin = 'internal'
+                # Isolated cursor has empty context — take the code from the
+                # caller env / request stamp / prompt before searching ai.agent.
+                if not agent_code:
+                    agent_code = (
+                        ctx.get('mcp_agent_code')
+                        or stamp.get('agent_code')
+                    )
+                if not agent_code and isinstance(prompt_data, dict):
+                    agent_code = prompt_data.get('agent_code')
+                agent = resolve_log_agent(env_log, agent_code)
                 client_label = resolve_client_label(
-                    env_log, user_id, origin, explicit=client_label)
+                    env_log, user_id, origin,
+                    explicit=client_label, agent_code=agent_code,
+                )
 
                 log_entry = env_log['ai.log'].create({
                     'user_id': user_id,
@@ -647,9 +823,11 @@ class AILog(models.Model):
                     'prompt_tokens': prompt_tokens,
                     'completion_tokens': completion_tokens,
                     'total_tokens': total_tokens,
-                    'correlation_id': correlation_id[:8] if correlation_id else None,
-                    'step_seq': step_seq or 0,
+                    'cost_usd': cost_usd,
+                    'turn': turn[:8] if turn else None,
+                    'turn_step': turn_step or 0,
                     'origin': origin,
+                    'agent_id': agent.id if agent else False,
                     'remote_ip': remote_ip,
                     'client_label': client_label[:255] if client_label else None,
                 })
@@ -711,12 +889,101 @@ class AILog(models.Model):
             reload=True,
         )
 
+    @api.model
+    def _cron_purge_old_logs(self):
+        """Delete rows older than ``pns_ai_mcp.log_retention_days`` (0 = keep)."""
+        from datetime import timedelta
+        raw = self.env['ir.config_parameter'].sudo().get_param(
+            LOG_RETENTION_PARAM, DEFAULT_LOG_RETENTION_DAYS,
+        )
+        try:
+            days = int(raw)
+        except (TypeError, ValueError):
+            days = DEFAULT_LOG_RETENTION_DAYS
+        if days <= 0:
+            return 0
+        cutoff = fields.Datetime.now() - timedelta(days=days)
+        old = self.sudo().search([('timestamp', '<', cutoff)])
+        count = len(old)
+        if count:
+            old.unlink()
+            _logger.info('ai.log: purged %d row(s) older than %d days', count, days)
+        return count
+
+    # Round-level endpoints already rolled into ``orchestration_summary``.
+    # Counting them again would double Chatboo turn spend.
+    _USAGE_SUMMARY_EXCLUDE_ENDPOINTS = (
+        'llm_orchestration',
+        'llm_response',
+        'llm_tool_request',
+        'llm_response_hdr',
+        'provider_failover',
+    )
+
+    @api.model
+    def get_user_usage_summary(self, domain=None, days=30):
+        """Aggregate LLM spend for rows matching ``domain`` (Activity list filter).
+
+        When ``domain`` is passed (from the list search model), totals reflect
+        the current filter plus ``ir.rule``. Round-level endpoints are still
+        excluded to avoid double-counting turn spend — see
+        ``docs/llm_usage_metering.md``.
+
+        Legacy callers without ``domain`` keep the old 30-day / own-user window.
+        """
+        from datetime import timedelta
+
+        from odoo.osv import expression
+
+        from ..utils.display_currency import get_display_currency
+        from ..utils.usage_display import format_usage_chip
+
+        exclude = [
+            ('endpoint', 'not in', list(self._USAGE_SUMMARY_EXCLUDE_ENDPOINTS)),
+        ]
+        window = None
+        if domain is not None:
+            base = list(domain)
+        else:
+            try:
+                window = max(1, min(int(days or 30), 366))
+            except (TypeError, ValueError):
+                window = 30
+            since = fields.Datetime.now() - timedelta(days=window)
+            base = [
+                ('user_id', '=', self.env.uid),
+                ('primitive', '=', 'llm'),
+                ('timestamp', '>=', since),
+            ]
+        merged = expression.AND([base, exclude])
+        groups = self.read_group(merged, ['total_tokens', 'cost_usd'], [])
+        total_tokens = 0
+        cost_usd = 0.0
+        if groups:
+            row = groups[0]
+            total_tokens = int(row.get('total_tokens') or 0)
+            cost_usd = float(row.get('cost_usd') or 0.0)
+        usage = {}
+        if total_tokens:
+            usage['total_tokens'] = total_tokens
+        if cost_usd:
+            usage['cost'] = cost_usd
+        chip = format_usage_chip(self.env, usage) if usage else ''
+        return {
+            'days': window,
+            'total_tokens': total_tokens,
+            'cost_usd': cost_usd,
+            'display_currency': get_display_currency(self.env),
+            'spend_label': chip,
+            'filtered': domain is not None,
+        }
+
     # ── Export ───────────────────────────────────────────────────────
 
     _LOG_EXPORT_ONLY = (
-        'timestamp', 'origin', 'access_mode', 'primitive', 'endpoint',
-        'category', 'flow', 'flow_label', 'correlation_id', 'step_seq',
-        'operation_code', 'model_name', 'result_summary',
+        'timestamp', 'origin', 'agent_id', 'access_mode', 'primitive', 'endpoint',
+        'category', 'flow', 'flow_label', 'turn', 'turn_step',
+        'model_name', 'result_summary',
     )
 
     @api.model

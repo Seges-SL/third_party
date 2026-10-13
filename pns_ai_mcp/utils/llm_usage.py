@@ -48,19 +48,11 @@ def extract_cost(usage):
     return n / 1e10
 
 
-def advertise_cost(usage, on_premise=False):
-    """Return a usage dict that Chatboo can price.
-
-    Cloud / unknown (default): leave cost as reported (or absent → UI "-").
-    On premises: if the gateway omitted cost, advertise ``cost=0.0`` so the
-    chip shows 0. If it did report a cost (tokens, electricity, …), keep it.
-    """
+def advertise_cost(usage):
+    """Return a usage dict. Missing cost stays missing; a reported 0 stays 0."""
     if not isinstance(usage, dict):
         usage = {}
-    out = dict(usage)
-    if on_premise and extract_cost(out) is None:
-        out['cost'] = 0.0
-    return out
+    return dict(usage)
 
 
 def usage_has_tokens(usage):
@@ -133,3 +125,15 @@ def add_usage(acc, usage):
     if 'cost' in piece:
         acc['cost'] = float(acc.get('cost') or 0.0) + float(piece['cost'])
     return acc
+
+
+def usage_log_fields(usage):
+    """Token + USD fields for ``ai.log.create_log_entry``."""
+    piece = advertise_cost(normalize_usage(usage or {}))
+    ptok = piece.get('prompt_tokens')
+    ctok = piece.get('completion_tokens')
+    ttok = piece.get('total_tokens') or (
+        ((ptok or 0) + (ctok or 0)) or None
+    )
+    cost_usd = extract_cost(piece)
+    return ptok, ctok, ttok, cost_usd

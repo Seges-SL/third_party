@@ -1,27 +1,28 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""PNS AI Chatboo - Session. PATANEGRA Soft (https://patanegra.com).
-
-Part of Patanegra Soft Suite (`pns_suite`), distributed via Patanegra Soft Hub.
-Session persistence (message and prompt history) for the chat that consumes the
-Patanegra Application Agent Protocol (PAAP).
-Licensed under the Apache License 2.0 - see LICENSE.
-"""
+"""chatboo.session — conversation persistence (messages and prompt history)."""
 
 import json
 import logging
 import re
-import uuid
 from datetime import timedelta
 
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 
+from odoo.addons.pns_ai_mcp.utils import record_marks
+
+from ..utils import turn_documents
+from ..utils.chatboo_product_icp import (
+    DEFAULT_HISTORY_RETENTION_DAYS,
+    ICP_HISTORY_RETENTION_DAYS,
+)
+
 _logger = logging.getLogger(__name__)
 
 # Parámetro de retención (días). Propio de Chatboo (antes vivía en pns_ai_mcp).
-RETENTION_PARAM = 'pns_ai_chatboo.history_retention_days'
+RETENTION_PARAM = ICP_HISTORY_RETENTION_DAYS
 
 # Frescura (horas) del dataset cacheado para reutilización (Nivel 2). Un dataset
 # solo es útil para reformateos INMEDIATOS del mismo listado; pasado este umbral
@@ -30,6 +31,9 @@ RETENTION_PARAM = 'pns_ai_chatboo.history_retention_days'
 QUERY_DATA_TTL_HOURS_PARAM = 'pns_ai_chatboo.query_data_ttl_hours'
 DEFAULT_QUERY_DATA_TTL_HOURS = 12
 
+_ATTACHMENT_ID_IN_URL = re.compile(
+    r'/(?:web/content|web/image|pns_ai_mcp/session_file)/(\d+)')
+
 
 class ChatbooSession(models.Model):
     """Sesión de Chatboo: historial de mensajes y de prompts (readline) por usuario."""
@@ -37,6 +41,7 @@ class ChatbooSession(models.Model):
     _description = 'Chatboo Session'
     _order = 'last_used_date desc, create_date desc'
     _rec_name = 'name'
+    _sandbox_helper_provider = True
 
     name = fields.Char(
         string='Session Name',
@@ -47,9 +52,8 @@ class ChatbooSession(models.Model):
     user_id = fields.Many2one(
         'res.users',
         string='User',
-        required=True,
         default=lambda self: self.env.user,
-        ondelete='cascade',
+        ondelete='set null',
         index=True,
         help="Owner of the session",
     )
@@ -98,6 +102,14 @@ class ChatbooSession(models.Model):
         help="When last_query_data was cached; used to expire it (freshness "
              "TTL) so stale datasets are not reused nor kept forever.",
     )
+    attached_documents = fields.Text(
+        string='Attached documents (text)',
+        copy=False,
+        help="JSON with the text of the files the user attached in this "
+             "session, page by page. Later turns get a short note and the "
+             "model reads the part it needs with read_document. Not shown "
+             "to the user.",
+    )
     active_skill_code = fields.Char(
         string='Active skill',
         help="Code of the skill kept 'sticky' for this session. While set, a "
@@ -113,10 +125,34 @@ class ChatbooSession(models.Model):
              "conversation can rotate params over the previous state without a "
              "turn limit. Not shown to the user.",
     )
+    last_domain_codes = fields.Text(
+        string='Last domain packs',
+        help="JSON object of domain pack codes injected last Chatboo turn "
+             "and how many turns each has been on the table ({code: n}). "
+             "A legacy JSON list is still read. The next turn unions them "
+             "with this sentence's discovery hits. A skill invoke adds "
+             "the skill's domain context packs when it has any. "
+             "Slashes never clear the list. Cleared on a new session. "
+             "Not shown to the user.",
+    )
+    pending_param_skill_id = fields.Many2one(
+        'ai.skill',
+        string='Pending parameter skill',
+        ondelete='set null',
+        help="Unused. Kept so existing databases keep the column. "
+             "Parameter prose lives in the skill wizard.",
+    )
     staged_assistant_files = fields.Text(
         string='Staged assistant downloads',
         help="Temporary JSON list of download chips until the assistant "
              "message of the current turn is saved. Not shown to the user.",
+    )
+    marked_refs = fields.Text(
+        string='Marked records',
+        help="JSON list of {model, id, label} for the rows the user ticked "
+             "in the last answer. They travel with the next sentence so the "
+             "model takes them as its subject instead of searching the name "
+             "again. Spent by the turn that carries them. Not shown.",
     )
     @api.model
     def _default_presentation_show_mode(self):
@@ -131,21 +167,9 @@ class ChatbooSession(models.Model):
         default=_default_presentation_show_mode,
         help="Session showmode: show-table (table first) or show-chart (chart "
              "first). From Chatboo Settings at session start; updated by "
-             "/show-table, /show-chart or phrasing. Suspended under painter-free. "
+             "/show-table, /show-chart or phrasing. Suspended under compose-model. "
              "Not shown to the user; not an LLM selector.",
     )
-    llm_formatting_mode = fields.Selection(
-        selection=[
-            ('report', 'Report'),
-            ('table', 'Table'),
-        ],
-        string='LLM formatting mode',
-        default=False,
-        help="Deprecated leftover. Painter is one-shot per turn "
-             "(/painter-local /painter-free); empty inherits the provider. "
-             "Kept for schema compat and cleared automatically.",
-    )
-
     @api.model
     def format_display_datetime(self, utc_dt=None):
         """Wall clock for Chatboo UI (user tz, else company, else UTC)."""
@@ -176,12 +200,12 @@ class ChatbooSession(models.Model):
         return self._annotate_turn_user_prompts(self.get_messages())
 
     @staticmethod
-    def _message_correlation_id(msg):
+    def _message_turn(msg):
         if not isinstance(msg, dict):
             return ''
         meta = msg.get('meta') if isinstance(msg.get('meta'), dict) else {}
         return (
-            (msg.get('correlation_id') or meta.get('correlation_id') or '')
+            (msg.get('turn') or meta.get('turn') or '')
             .strip()
         )
 
@@ -201,16 +225,16 @@ class ChatbooSession(models.Model):
                 continue
             if self._message_user_prompt(msg):
                 continue
-            corr = self._message_correlation_id(msg)
-            if corr:
-                missing.append((msg, corr))
+            turn = self._message_turn(msg)
+            if turn:
+                missing.append((msg, turn))
         if not missing or 'ai.log' not in self.env:
             return messages
         corr_ids = list({corr for _msg, corr in missing})
         try:
             logs = self.env['ai.log'].search([
                 ('user_id', '=', self.env.user.id),
-                ('correlation_id', 'in', corr_ids),
+                ('turn', 'in', corr_ids),
                 ('user_prompt', '!=', False),
             ], order='id asc')
         except Exception:
@@ -221,7 +245,7 @@ class ChatbooSession(models.Model):
             return messages
         by_corr = {}
         for log in logs:
-            cid = (log.correlation_id or '').strip()
+            cid = (log.turn or '').strip()
             prompt = (log.user_prompt or '').strip()
             if cid and prompt and cid not in by_corr:
                 by_corr[cid] = prompt
@@ -252,7 +276,7 @@ class ChatbooSession(models.Model):
         'backend_history',
         'original_content',
         'clip_data',
-        'correlation_id',
+        'turn',
         'local_ack',
         'user_prompt',
     )
@@ -335,6 +359,7 @@ class ChatbooSession(models.Model):
         self.ensure_one()
         if not chips:
             return
+        self.claim_turn_file_chips(chips)
         existing = []
         if self.staged_assistant_files:
             try:
@@ -378,6 +403,7 @@ class ChatbooSession(models.Model):
         self.ensure_one()
         if not chips:
             return
+        self.claim_turn_file_chips(chips)
         messages = self.get_messages()
         if messages and messages[-1].get('role') == 'assistant':
             existing = list(messages[-1].get('files') or [])
@@ -385,6 +411,62 @@ class ChatbooSession(models.Model):
             self.set_messages(messages)
         else:
             self.stage_assistant_download_chips(chips)
+
+    def claim_turn_file_chips(self, chips):
+        """Hang engine-created attachments on this session."""
+        self.ensure_one()
+        Attachment = self.env['ir.attachment'].sudo()
+        for chip in chips or []:
+            if not isinstance(chip, dict):
+                continue
+            att_id = chip.get('attachment_id')
+            if not att_id:
+                url = chip.get('url') or ''
+                match = re.search(
+                    r'/(?:web/content|pns_ai_mcp/session_file)/(\d+)',
+                    url,
+                )
+                if match:
+                    att_id = int(match.group(1))
+            if not att_id:
+                continue
+            att = Attachment.browse(int(att_id))
+            if not att.exists():
+                continue
+            if att.res_model and att.res_id:
+                continue
+            att.write({
+                'res_model': self._name,
+                'res_id': self.id,
+            })
+
+    def notify_files_updated(self):
+        """Ask open Chatboo clients to reload this session's messages."""
+        self.ensure_one()
+        try:
+            partner = self.user_id.partner_id
+            if not partner:
+                return
+            payload = {
+                'type': 'pns_chatboo_sync',
+                'action': 'message_received',
+                'session_id': self.id,
+            }
+            bus = self.env['bus.bus']
+            sendone = getattr(bus, '_sendone', None)
+            if sendone:
+                sendone(partner, 'pns_chatboo_sync', payload)
+                return
+            import json as _json
+            channel = (self.env.cr.dbname, 'res.partner', partner.id)
+            legacy = getattr(bus, 'sendone', None)
+            if legacy:
+                legacy(channel, _json.dumps(payload, ensure_ascii=False))
+        except Exception:
+            _logger.debug(
+                'Chatboo: could not notify session files update (session %s)',
+                self.id, exc_info=True,
+            )
 
     def fulfill_client_export(self, filename, mimetype, datas, kind=None):
         """Replace a pending Word/PDF/HTML chip with client-assembled bytes."""
@@ -397,16 +479,16 @@ class ChatbooSession(models.Model):
         kind = (kind or '').strip().lower()
         try:
             from odoo.addons.pns_ai_mcp.utils.session_download import (
-                persist_chatboo_session_file,
-                notify_chatboo_session_files_updated,
+                persist_turn_file,
             )
         except ImportError:
             return False
-        chip = persist_chatboo_session_file(
+        chip = persist_turn_file(
             self.env, self.id, raw, name, mimetype=mimetype,
         )
         if not chip:
             return False
+        self.claim_turn_file_chips([chip])
         messages = self.get_messages()
         patched = False
         for msg in reversed(messages or []):
@@ -433,21 +515,24 @@ class ChatbooSession(models.Model):
             self.set_messages(messages)
         else:
             self.apply_assistant_download_chips([chip])
-        try:
-            notify_chatboo_session_files_updated(self.env, self.id)
-        except Exception:
-            pass
+        self.notify_files_updated()
         return chip
 
     def recover_orphan_download_chips(self, messages=None, since=None):
         """Build download chips from session attachments not yet in message history."""
         self.ensure_one()
         messages = messages if messages is not None else self.get_messages()
+        from odoo.addons.pns_ai_mcp.utils.session_download import (
+            content_download_url,
+        )
+        # Older history keeps token URLs: the attachment id is what matches.
         referenced = set()
         for msg in messages or []:
             for f in msg.get('files') or []:
                 if isinstance(f, dict) and f.get('url'):
-                    referenced.add(f['url'])
+                    found = _ATTACHMENT_ID_IN_URL.search(f['url'])
+                    if found:
+                        referenced.add(int(found.group(1)))
         domain = [
             ('res_model', '=', 'chatboo.session'),
             ('res_id', '=', self.id),
@@ -456,38 +541,20 @@ class ChatbooSession(models.Model):
             domain.append(('create_date', '>=', since))
         chips = []
         for att in self.env['ir.attachment'].sudo().search(domain, order='id asc'):
-            token = att.access_token
-            if not token:
-                gen = getattr(att, 'generate_access_token', None)
-                if callable(gen):
-                    tokens = gen()
-                    token = tokens[0] if tokens else None
-                if not token:
-                    token = str(uuid.uuid4())
-                    att.write({'access_token': token})
-            url = '/web/content/%s?access_token=%s' % (att.id, token)
-            try:
-                from odoo.addons.pns_ai_mcp.utils.session_download import (
-                    content_download_url,
-                )
-                url = content_download_url(
-                    att.id, token, att.name, att.mimetype,
-                )
-            except Exception:
-                pass
-            if url in referenced:
+            if att.id in referenced:
                 continue
             chips.append({
                 'name': att.name or 'download',
-                'url': url,
+                'url': content_download_url(att.id, att.name, att.mimetype),
                 'mimetype': (att.mimetype or 'application/octet-stream').split(';', 1)[0].strip(),
                 'size': att.file_size or 0,
                 'source': 'download',
             })
         return chips
 
-    def append_local_ack(self, text):
-        """Append a Chatboo-local note (no LLM turn). Empty text is a no-op."""
+    def append_local_ack(self, text, usage=None, provider_meta=None,
+                         user_prompt=None):
+        """Append a Chatboo-local note. ``usage`` is a light IA call, if any."""
         self.ensure_one()
         body = (text or '').strip()
         if not body:
@@ -500,18 +567,48 @@ class ChatbooSession(models.Model):
             and (last.get('content') or '').strip() == body
         ):
             return False
-        messages.append({
+        prompt = (user_prompt or '').strip()
+        if prompt:
+            prev_user = None
+            for msg in reversed(messages):
+                if isinstance(msg, dict) and msg.get('role') == 'user':
+                    prev_user = msg
+                    break
+            if not (
+                prev_user
+                and (prev_user.get('content') or '').strip() == prompt
+            ):
+                messages.append({
+                    'role': 'user',
+                    'content': prompt,
+                    'timestamp': self.format_display_datetime(),
+                    'local_ack': True,
+                    'offtopic': True,
+                })
+        chip = provider_meta if isinstance(provider_meta, dict) else {}
+        usage = usage if isinstance(usage, dict) else {}
+        meta = {
+            'model': (chip.get('model') or '').strip() or 'Chatboo',
+            'provider': (chip.get('provider') or '').strip() or 'local',
+            'local_ack': True,
+        }
+        if usage:
+            meta['usage'] = usage
+        if prompt:
+            meta['user_prompt'] = prompt
+        msg = {
             'role': 'assistant',
             'content': body,
             'timestamp': self.format_display_datetime(),
             'local_ack': True,
             'offtopic': True,
-            'meta': {
-                'model': 'Chatboo',
-                'provider': 'local',
-                'local_ack': True,
-            },
-        })
+            'meta': meta,
+        }
+        if usage:
+            msg['usage'] = usage
+        if prompt:
+            msg['user_prompt'] = prompt
+        messages.append(msg)
         self.set_messages(messages)
         self.last_used_date = fields.Datetime.now()
         return True
@@ -584,6 +681,21 @@ class ChatbooSession(models.Model):
         except Exception:
             return DEFAULT_QUERY_DATA_TTL_HOURS
 
+    def get_last_domain_payload(self):
+        """Ages ``{code: n}`` when stored; otherwise the code list."""
+        self.ensure_one()
+        try:
+            from odoo.addons.pns_ai_mcp.utils.domain_index import (
+                parse_domain_ages,
+                parse_domain_codes,
+            )
+            ages = parse_domain_ages(self.last_domain_codes)
+            if ages:
+                return ages
+            return parse_domain_codes(self.last_domain_codes)
+        except Exception:
+            return []
+
     def get_fresh_query_data(self):
         """Devuelve las filas cacheadas del último dataset SOLO si siguen frescas
         (dentro del TTL); si no, None. Nunca lanza: ante cualquier problema
@@ -600,6 +712,85 @@ class ChatbooSession(models.Model):
             return json.loads(self.last_query_data)
         except (json.JSONDecodeError, TypeError):
             return None
+
+    # ── Documentos adjuntos (texto, como las filas de una tabla) ──────────
+
+    def get_documents(self):
+        self.ensure_one()
+        try:
+            return turn_documents.clean(json.loads(self.attached_documents or '[]'))
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def remember_documents(self, documents):
+        """Keep the text of this turn's files for the next turns."""
+        self.ensure_one()
+        if not documents:
+            return
+        kept = turn_documents.merge(self.get_documents(), documents)
+        self.write({
+            'attached_documents': json.dumps(kept, ensure_ascii=False) if kept else False,
+        })
+
+    @api.model
+    def sandbox_helpers(self):
+        """``read_document`` for the sandbox of a Chatboo turn."""
+        sessions = self
+
+        def read_document(name, page=None, find=None):
+            return sessions._read_document(name, page=page, find=find)
+
+        return {'read_document': read_document}
+
+    @api.model
+    def _read_document(self, name, page=None, find=None):
+        session_id = self.env.context.get('chatboo_session_id')
+        session = self.sudo().browse(int(session_id)).exists() if session_id else None
+        if not session or session.user_id.id != self.env.uid:
+            return turn_documents.read([], name)
+        return turn_documents.read(session.get_documents(), name, page=page, find=find)
+
+    # ── Registros marcados en la respuesta ────────────────────────────────
+    # Marcar una fila es nombrar un registro sin deletrearlo. El motor solo
+    # lee texto, así que la marca sale como frase junto al mensaje; estrechar
+    # el dataset por sí solo dejaba al modelo libre para buscar el nombre.
+
+    def get_marks(self):
+        """Records the user ticked, as ``{model, id, label}``."""
+        self.ensure_one()
+        try:
+            marks = json.loads(self.marked_refs or '[]')
+        except (json.JSONDecodeError, TypeError):
+            return []
+        return marks if isinstance(marks, list) else []
+
+    def remember_marks(self, refs):
+        """Keep what the user pointed at. ``None`` leaves the marks alone."""
+        self.ensure_one()
+        if refs is None:
+            return self.get_marks()
+        marks = record_marks.clean_marks(refs)
+        self.write({
+            'marked_refs': json.dumps(marks, ensure_ascii=False) if marks else False,
+        })
+        return marks
+
+    def forget_marks(self):
+        """The tick belonged to the sentence it went out with: it is spent."""
+        self.ensure_one()
+        if self.marked_refs:
+            self.write({'marked_refs': False})
+        return True
+
+    def marks_sentence(self):
+        """The tick, said out loud for the engine. Empty when nothing is marked."""
+        self.ensure_one()
+        return record_marks.marks_sentence(self.get_marks())
+
+    def narrow_query_data(self, rows):
+        """The marked rows of the cached dataset, or all of them."""
+        self.ensure_one()
+        return record_marks.narrow_rows(self.get_marks(), rows)
 
     @api.model
     def _gc_stale_query_data(self):
@@ -623,19 +814,12 @@ class ChatbooSession(models.Model):
 
     @api.model
     def get_user_sessions(self, limit=50):
-        self._cleanup_old_sessions()
         return self.search(
             [('user_id', '=', self.env.user.id)],
             limit=limit, order='last_used_date desc, create_date desc',
         )
 
     # -- Skill capture from chat (/create-skill) --
-
-    @staticmethod
-    def _slugify_skill_code(text):
-        text = (text or '').strip().lower()
-        text = re.sub(r'[^a-z0-9]+', '-', text)
-        return text.strip('-')[:48] or 'captured-skill'
 
     @classmethod
     def _looks_like_probe_code(cls, code):
@@ -673,10 +857,13 @@ class ChatbooSession(models.Model):
                 candidates.append(lc)
         if not candidates:
             return ''
+        from odoo.addons.pns_ai_chatboo.utils.skill_capture_compose import (
+            score_capture_snippet,
+        )
         best = candidates[0]
         best_score = -9999
         for code in candidates:
-            score = 0
+            score = score_capture_snippet(code)
             if cls._looks_like_probe_code(code):
                 score -= 90
             if cls._code_has_hardcoded_rows(code):
@@ -685,22 +872,20 @@ class ChatbooSession(models.Model):
                 score += 40
             if 'api_call' in code:
                 score += 20
-            if any(tok in code for tok in (
-                'previous_result', 'get_safe_plan_steps', 'formatted_text',
-            )):
-                score += 30
-            score += min(len(code) // 120, 25)
             if score > best_score:
                 best_score = score
                 best = code
         return best
 
     @classmethod
-    def _score_relaxaicode_log(cls, log, session_code):
+    def _score_relaxaicode_log(cls, log, session_code, relaxaicode_count=1):
+        from odoo.addons.pns_ai_chatboo.utils.skill_capture_compose import (
+            score_capture_snippet,
+        )
         code = (log.code_to_execute or '').strip()
         if not code:
             return -999
-        score = 0
+        score = score_capture_snippet(code, relaxaicode_count=relaxaicode_count)
         session_code = (session_code or '').strip()
         if session_code and code == session_code:
             score += 120
@@ -708,36 +893,14 @@ class ChatbooSession(models.Model):
             score -= 90
         if cls._code_has_hardcoded_rows(code):
             score -= 35
-        if any(tok in code for tok in (
-            'previous_result', 'get_safe_plan_steps', 'formatted_text',
-        )):
-            score += 30
         summary = (log.result_summary or '').lower()
         if summary.startswith('error') or 'traceback' in summary:
             score -= 80
-        score += min(len(code) // 120, 25)
         return score
-
-    def _find_best_capture_log(self, session_code):
-        Log = self.env['ai.log']
-        logs = Log.search([
-            ('user_id', '=', self.user_id.id),
-            ('origin', '=', 'chatboo'),
-            ('endpoint', '=', 'relaxaicode'),
-            ('code_to_execute', '!=', False),
-        ], limit=80, order='timestamp desc, id desc')
-        best = Log.browse()
-        best_score = -9999
-        for log in logs:
-            score = self._score_relaxaicode_log(log, session_code)
-            if score > best_score:
-                best_score = score
-                best = log
-        return best if best_score > 0 else Log.browse()
 
     @staticmethod
     def _normalize_turn_id(turn_id):
-        """4-char MCP correlation id. Accepts ``VWVN`` or a step like ``VWVN-3``."""
+        """4-char MCP turn id. Accepts ``VWVN`` or a step like ``VWVN-3``."""
         raw = (turn_id or '').strip()
         if not raw:
             return ''
@@ -746,20 +909,42 @@ class ChatbooSession(models.Model):
             return ''
         return raw.upper()
 
+    def _relaxaicode_codes_for_turn(self, corr_id):
+        """Substantive relaxaicode snippets for a turn, chronological order."""
+        from odoo.addons.pns_ai_chatboo.utils.skill_capture_compose import (
+            snippet_is_probe_code,
+        )
+        Log = self.env['ai.log'].sudo()
+        logs = Log.search([
+            ('user_id', '=', self.env.user.id),
+            ('turn', '=ilike', corr_id),
+            ('endpoint', '=', 'relaxaicode'),
+            ('code_to_execute', '!=', False),
+        ], order='id asc', limit=80)
+        codes = []
+        for log in logs:
+            code = (log.code_to_execute or '').strip()
+            if code and not snippet_is_probe_code(code):
+                codes.append(code)
+        return codes
+
     def _find_best_capture_log_for_turn(self, corr_id):
         """Best own ``ai.log`` of a turn (any session), preferring relaxaicode."""
         Log = self.env['ai.log']
         logs = Log.search([
             ('user_id', '=', self.env.user.id),
-            ('correlation_id', '=ilike', corr_id),
+            ('turn', '=ilike', corr_id),
             ('code_to_execute', '!=', False),
         ], limit=80, order='timestamp desc, id desc')
         if not logs:
             return Log.browse()
+        relaxaicode_count = len(self._relaxaicode_codes_for_turn(corr_id))
         best = logs[0]
         best_score = -9999
         for log in logs:
-            score = self._score_relaxaicode_log(log, '')
+            score = self._score_relaxaicode_log(
+                log, '', relaxaicode_count=relaxaicode_count,
+            )
             if (log.endpoint or '') == 'relaxaicode':
                 score += 40
             if score > best_score:
@@ -767,61 +952,76 @@ class ChatbooSession(models.Model):
                 best = log
         return best
 
+    def _catalog_slash_for_turn(self, corr_id):
+        """Slash of a catalog-skill execution on this turn, or ``''``."""
+        from odoo.addons.pns_ai_chatboo.utils.skill_capture_compose import (
+            slash_from_skill_turn_logs,
+        )
+        logs = self.env['ai.log'].search([
+            ('user_id', '=', self.env.user.id),
+            ('turn', '=ilike', corr_id),
+        ], limit=80, order='timestamp desc, id desc')
+        return slash_from_skill_turn_logs(
+            [(log.tool_name, log.prompt_data) for log in logs],
+        )
+
     @api.model
     def compose_capture_code(self, code_body, corr):
-        """Wrap a painter snippet with the turn fetch plan, if any.
+        """Compose fetch + multi-phase relaxaicode into one capturable body.
 
-        Returns ``(code, note)``. The note is a user-facing warning or None.
-        Safe to call again: already-wrapped code is left unchanged.
+        Returns ``(code, incomplete)``. Safe to call again on wizard edits.
         """
         from odoo.addons.pns_ai_chatboo.utils.skill_capture_compose import (
-            code_needs_prior_plan,
-            sanitize_fetch_steps,
-            wrap_presentation_with_turn_fetch,
+            capture_is_incomplete,
+            compose_capture_pipeline,
         )
-        body = code_body or ''
-        if not code_needs_prior_plan(body):
-            return body, None
         turn = self._normalize_turn_id(corr) or (corr or '').strip().upper()
-        fetch_steps = self._fetch_steps_for_turn(turn) if turn else []
-        clean_steps = sanitize_fetch_steps(fetch_steps)
-        if clean_steps:
-            return wrap_presentation_with_turn_fetch(body, clean_steps), _(
-                'This skill will replay the turn fetch '
-                '(auto-confirmable api_call / fetch_url), then the '
-                'captured painter.'
-            )
-        return body, _(
-            'The captured painter reads previous_result. The source '
-            'turn had no auto-confirmable fetch plan, so the slash '
-            'will paint empty until propose_steps are added.'
+        relaxaicode_codes = (
+            self._relaxaicode_codes_for_turn(turn) if turn else []
         )
+        if not relaxaicode_codes and (code_body or '').strip():
+            relaxaicode_codes = [(code_body or '').strip()]
+        fetch_steps = self._fetch_steps_for_turn(turn) if turn else []
+        composed, pipeline_incomplete = compose_capture_pipeline(
+            relaxaicode_codes, fetch_steps,
+        )
+        if not composed:
+            composed = code_body or ''
+        incomplete = pipeline_incomplete or capture_is_incomplete(
+            composed, fetch_steps,
+        )
+        return composed, incomplete
 
     def _fetch_steps_for_turn(self, corr):
-        """Auto-confirmable ``plan_steps`` stored for this MCP turn, if any."""
+        """Auto-confirmable fetch steps from every safe plan in this turn."""
         from odoo.addons.pns_ai_chatboo.utils.skill_capture_compose import (
+            merge_fetch_steps,
             plan_steps_from_operation_data,
             sanitize_fetch_steps,
         )
         domain = [
-            ('correlation_id', '=ilike', corr),
+            ('turn', '=ilike', corr),
             ('user_id', '=', self.env.user.id),
         ]
         ops = self.env['ai.safe.operation'].sudo().search(
-            domain, order='id desc', limit=20,
+            domain, order='id asc', limit=20,
         )
+        step_lists = []
         for op in ops:
             raw = {}
             try:
                 raw = op.get_operation_data() or {}
             except Exception:
                 raw = op.operation_data
-            clean = sanitize_fetch_steps(plan_steps_from_operation_data(raw))
-            if clean:
-                return clean
+            steps = plan_steps_from_operation_data(raw)
+            if steps:
+                step_lists.append(steps)
+        merged = merge_fetch_steps(step_lists)
+        if merged:
+            return merged
         logs = self.env['ai.log'].sudo().search([
             ('user_id', '=', self.env.user.id),
-            ('correlation_id', '=ilike', corr),
+            ('turn', '=ilike', corr),
         ], order='id desc', limit=40)
         for log in logs:
             for blob in (log.result_data, log.additional_info, log.prompt_data):
@@ -831,14 +1031,6 @@ class ChatbooSession(models.Model):
                 if clean:
                     return clean
         return []
-
-    def _last_user_prompt_text(self):
-        for msg in reversed(self.get_messages() or []):
-            if isinstance(msg, dict) and msg.get('role') == 'user':
-                raw = (msg.get('raw') or msg.get('content') or '').strip()
-                if raw:
-                    return re.sub(r'<[^>]+>', '', raw).strip()
-        return ''
 
     def _default_capture_procedure(self, has_hardcoded_rows=False):
         lines = [
@@ -863,15 +1055,17 @@ class ChatbooSession(models.Model):
             )
         return '\n'.join(lines)
 
-    def prepare_skill_capture_action(self, skill_code_hint=None, turn_id=None):
+    def prepare_skill_capture_action(self, skill_code_hint=None, turn_id=None,
+                                     param_prose=None):
         """Open the skill capture wizard pre-filled from a turn.
 
-        Captures query *logic* (relaxaicode log for ``turn_id``), never the
+        If the turn already ran a catalog skill, prefills that record's
+        Code/Procedure (no fetch wrap, no template). Otherwise captures
+        query *logic* (relaxaicode log for ``turn_id``), never the
         session row cache (``last_query_data``).
 
-        ``turn_id`` is required: the 4-char MCP ``correlation_id`` of a log
-        owned by the current user. The slash name is formatted with the
-        instance prefixes from Settings.
+        ``turn_id`` is required (the 4-character chip on the line).
+        The slash name is formatted with the instance prefixes from Settings.
         """
         self.ensure_one()
         if self.user_id.id != self.env.user.id:
@@ -886,59 +1080,102 @@ class ChatbooSession(models.Model):
         corr = self._normalize_turn_id(raw_turn)
         if not corr:
             raise UserError(_(
-                'Turn id is required. Use /create-skill VWVN slash-name '
-                '(4-character code from the chip).'
+                'The turn chip is required: /create-skill VWVN slash-name'
             ))
 
-        source_log = self._find_best_capture_log_for_turn(corr)
-        if not source_log:
-            raise UserError(_(
-                'No MCP log found for turn %s (or it is not yours).'
-            ) % corr)
-        code_body = self._pick_capture_code(
-            source_log.code_to_execute, source_log,
-        )
-        if not code_body:
-            raise UserError(_(
-                'No capturable query code found for turn %s.'
-            ) % corr)
-        code_body, fetch_wrap_note = self.compose_capture_code(code_body, corr)
-        user_prompt = (source_log.user_prompt or '').strip()
+        Skill = self.env['ai.skill']
+        catalog_slash = self._catalog_slash_for_turn(corr)
+        catalog_skill = Skill.browse()
+        source_log = self.env['ai.log'].browse()
+        user_prompt = ''
+        param_schema = ''
+        arg_hint = ''
+        capture_incomplete = False
 
-        if name_hint:
-            from odoo.addons.pns_ai_mcp.utils.skill_code_prefix import (
-                get_skill_code_prefix,
-                get_skill_command_prefix,
-                instance_identity,
-                slash_slug,
+        if catalog_slash:
+            catalog_skill = Skill._find_by_invoke_token(catalog_slash)
+            if not catalog_skill:
+                raise UserError(_(
+                    'Turn %s ran /%s, but that skill is no longer '
+                    'in the catalog.'
+                ) % (corr, catalog_slash))
+            code_body = (catalog_skill.code_body or '').strip()
+            if not code_body:
+                raise UserError(_(
+                    'Skill /%s has no capturable Code.'
+                ) % (catalog_skill.invoke_code() or catalog_slash))
+            param_schema = catalog_skill.param_schema or ''
+            arg_hint = catalog_skill.arg_hint or ''
+        else:
+            source_log = self._find_best_capture_log_for_turn(corr)
+            if not source_log:
+                raise UserError(_(
+                    'No MCP log found for turn %s (or it is not yours).'
+                ) % corr)
+            code_body = self._pick_capture_code(
+                source_log.code_to_execute, source_log,
             )
-            slug = slash_slug(name_hint)
-            _code, command = instance_identity(
-                slug,
-                get_skill_code_prefix(self.env),
-                get_skill_command_prefix(self.env),
+            if not code_body:
+                raise UserError(_(
+                    'No capturable query code found for turn %s.'
+                ) % corr)
+            code_body, capture_incomplete = self.compose_capture_code(
+                code_body, corr,
+            )
+            user_prompt = (source_log.user_prompt or '').strip()
+
+        if code_body:
+            from odoo.addons.pns_ai_mcp.utils.skill_runtime import (
+                fill_capture_params,
+            )
+            param_schema, arg_hint = fill_capture_params(
+                code_body, param_schema, arg_hint,
+            )
+
+        existing_skill = Skill.browse()
+        if name_hint:
+            _code, command, existing_skill = (
+                Skill.resolve_capture_identity(name_hint)
             )
             skill_code = command
             skill_name = name_hint.strip()[:48]
+        elif catalog_skill:
+            token = catalog_skill.invoke_code() or catalog_slash
+            _code, command, existing_skill = (
+                Skill.resolve_capture_identity(token)
+            )
+            skill_code = command
+            skill_name = (catalog_skill.name or token)[:48]
         else:
             skill_code = ''
             skill_name = ''
 
-        description = (user_prompt or name_hint or '')[:120]
+        description = (
+            (catalog_skill.description if catalog_skill else '')
+            or user_prompt
+            or name_hint
+            or ''
+        )[:120]
         has_hardcoded = self._code_has_hardcoded_rows(code_body)
-        procedure = self._default_capture_procedure(has_hardcoded)
-        if fetch_wrap_note:
-            procedure = '%s\n%s' % (procedure, fetch_wrap_note)
+        if catalog_skill:
+            procedure = (catalog_skill.content or '').strip() or (
+                self._default_capture_procedure(has_hardcoded)
+            )
+        else:
+            procedure = self._default_capture_procedure(has_hardcoded)
 
         warning = None
         notes = []
+        if catalog_skill:
+            notes.append(_(
+                'This turn ran /%s. The wizard has that skill\'s Code '
+                'and Procedure (not a new query).'
+            ) % (catalog_skill.invoke_code() or catalog_slash))
         if has_hardcoded:
             notes.append(_(
                 'The captured code contains pasted row literals (e.g. data = [{...}, ...]). '
                 'Replace that block with live api_call fetches before publishing the skill.'
             ))
-        if fetch_wrap_note:
-            notes.append(fetch_wrap_note)
         if notes:
             warning = '\n'.join(notes)
 
@@ -951,8 +1188,21 @@ class ChatbooSession(models.Model):
             'default_description': description,
             'default_procedure': procedure,
             'default_code_body': code_body,
+            'default_param_schema': param_schema or False,
+            'default_arg_hint': arg_hint or False,
+            'default_args_policy': (
+                (catalog_skill.args_policy if catalog_skill else 'default')
+                or 'default'
+            ),
             'default_from_chatboo': True,
             'default_warn_hardcoded_rows': has_hardcoded,
+            'default_warn_incomplete_capture': capture_incomplete,
+            'default_existing_skill_id': existing_skill.id if existing_skill else False,
+            'default_param_prose': ' '.join(
+                part for part in (param_prose or '').split()
+                if not self._normalize_turn_id(part)
+            ).strip(),
+            'default_source_turn_id': corr,
             'chatboo_session_id': self.id,
             'default_chatboo_session_id': self.id,
         }
@@ -965,7 +1215,7 @@ class ChatbooSession(models.Model):
         action = {
             'type': 'ir.actions.act_window',
             'name': _('Capture skill from chat'),
-            'res_model': 'pns_ai_mcp.skill.capture.wizard',
+            'res_model': 'ai.skill.capture.wizard',
             'view_mode': 'form',
             'views': [[False, 'form']],
             'target': 'new',
@@ -973,10 +1223,59 @@ class ChatbooSession(models.Model):
         }
         return action, warning
 
-    @api.model_create_multi
-    def create(self, vals_list):
-        self._cleanup_old_sessions()
-        return super().create(vals_list)
+    def prepare_skill_edit_action(self, token=None, param_prose=None):
+        """Open the capture wizard on an owned extra, or return picker rows."""
+        self.ensure_one()
+        if self.user_id.id != self.env.user.id:
+            raise UserError(_('Access denied to this session.'))
+        if not self.env.user.has_group('pns_ai_mcp.group_ai_writer'):
+            raise UserError(_(
+                'AI Writer permission is required to edit skills from Chatboo.'
+            ))
+        Skill = self.env['ai.skill']
+        hits, kind = Skill.resolve_owned_for_params(token)
+        if kind == 'picks' or len(hits) != 1:
+            return None, Skill.owned_skill_picks(hits)
+        skill = hits
+        slash = ''
+        if hasattr(skill, 'invoke_code'):
+            slash = (skill.invoke_code() or '').strip()
+        if not slash:
+            slash = (skill.command or skill.code or '').strip()
+        ctx = {
+            'form_view_initial_mode': 'edit',
+            'capture_from_chatboo': True,
+            'default_skill_code': slash,
+            'default_skill_name': skill.name or slash,
+            'default_description': skill.description or '',
+            'default_procedure': skill.content or '',
+            'default_code_body': skill.code_body or '',
+            'default_param_schema': skill.param_schema or False,
+            'default_arg_hint': skill.arg_hint or False,
+            'default_args_policy': skill.args_policy or 'default',
+            'default_from_chatboo': True,
+            'default_existing_skill_id': skill.id,
+            'default_param_prose': (param_prose or '').strip() or '',
+            'chatboo_session_id': self.id,
+            'default_chatboo_session_id': self.id,
+        }
+        chatboo_agent = self.env['ai.agent'].search(
+            [('code', '=', 'pns_ai_chatboo')], limit=1,
+        )
+        if chatboo_agent:
+            ctx['default_agent_ids'] = [(6, 0, chatboo_agent.ids)]
+        elif skill.agent_ids:
+            ctx['default_agent_ids'] = [(6, 0, skill.agent_ids.ids)]
+        action = {
+            'type': 'ir.actions.act_window',
+            'name': _('Edit skill'),
+            'res_model': 'ai.skill.capture.wizard',
+            'view_mode': 'form',
+            'views': [[False, 'form']],
+            'target': 'new',
+            'context': ctx,
+        }
+        return action, None
 
     def unlink(self):
         """Borra en cascada los adjuntos del chat al eliminar la sesión.
@@ -1059,20 +1358,24 @@ class ChatbooSession(models.Model):
 
     @api.model
     def _cleanup_old_sessions(self):
-        """Delete the current user's sessions older than the configured retention."""
+        """Cron: delete every user's sessions older than the configured retention.
+
+        Sessions whose user was deleted (``user_id`` empty) go the same way.
+        """
         try:
-            retention_days = int(self.env['ir.config_parameter'].sudo().get_param(RETENTION_PARAM, 30))
+            retention_days = int(self.env['ir.config_parameter'].sudo().get_param(
+                RETENTION_PARAM, DEFAULT_HISTORY_RETENTION_DAYS,
+            ))
             if retention_days <= 0:
                 return
             cutoff_date = fields.Datetime.now() - timedelta(days=retention_days)
-            old_sessions = self.search([
-                ('user_id', '=', self.env.user.id),
+            old_sessions = self.sudo().search([
                 ('last_used_date', '<', cutoff_date),
             ])
             if old_sessions:
                 _logger.info(
-                    "Cleaning %s old Chatboo sessions for user %s",
-                    len(old_sessions), self.env.user.name,
+                    "Cleaning %s Chatboo session(s) older than %s days",
+                    len(old_sessions), retention_days,
                 )
                 old_sessions.unlink()
         except Exception as e:

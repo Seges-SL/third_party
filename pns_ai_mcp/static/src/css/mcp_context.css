@@ -117,6 +117,12 @@ field[name="content"],
 .o_field_x2many tr.o_pns_origin_hidden {
     display: none !important;
 }
+.o_field_x2many tr.o_pns_origin_module .o_list_record_remove {
+    pointer-events: none;
+}
+.o_field_x2many tr.o_pns_origin_module .o_list_record_remove > * {
+    visibility: hidden;
+}
 .o_form_view th[data-name="composition_origin"],
 .o_form_view th[data-id="composition_origin"],
 .o_form_view th.o_pns_origin_sortable {

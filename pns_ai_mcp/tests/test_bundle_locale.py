@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Locale variants when assembling an agent's context parts."""
+
 from odoo.tests import tagged, TransactionCase
 
 from odoo.addons.pns_ai_mcp.tests._helpers import (
@@ -73,7 +75,7 @@ class TestAgentLocale(TransactionCase):
             + len(strip_xml_metadata(es.content).encode('utf-8'))
         )
         self.assertLess(len(parts[0].encode('utf-8')), two_stripped)
-        content = agent._build_content(user_locale='es_ES')
+        content = agent._build_shared_content(user_locale='es_ES')
         self.assertIn('demo_balance_es_ES', content)
         self.assertNotIn('demo_balance_de_DE', content)
 
@@ -100,7 +102,7 @@ class TestAgentLocale(TransactionCase):
         })
         agent = create_test_agent(self.env, 'test_xcut_agent', name='No members')
         self.assertFalse(agent.context_ids)
-        content = agent._build_content(user_locale='en_US')
+        content = agent._build_shared_content(user_locale='en_US')
         self.assertIn('demo_sys_rule', content)
         self.assertIn(str(sys_ctx.id), agent._context_signature())
 

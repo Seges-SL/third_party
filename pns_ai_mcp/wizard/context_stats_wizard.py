@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""MCP context statistics (linked bundle size vs discovery-optimized)."""
+
+from html import escape as _esc
+
 from odoo import models, fields, api, _
 
 from ..utils import context_roles
@@ -11,7 +15,7 @@ _BYTES_PER_TOKEN = 4
 
 
 class AIContextStatsWizard(models.TransientModel):
-    _name = 'pns_ai_mcp.context_stats_wizard'
+    _name = 'ai.context.stats.wizard'
     _description = 'MCP Context Statistics'
 
     agent_id = fields.Many2one(
@@ -30,7 +34,9 @@ class AIContextStatsWizard(models.TransientModel):
         help='When checked, sizes use approximate kTok '
              '(bytes ÷ 4 ÷ 1000). Uncheck to show kilobytes.',
     )
-    stats_html = fields.Html(string='', readonly=True, sanitize=False)
+    stats_html = fields.Html(
+        string='', compute='_compute_stats_html', sanitize=False,
+    )
 
     @api.model
     def default_get(self, fields_list):
@@ -39,34 +45,34 @@ class AIContextStatsWizard(models.TransientModel):
         agent = Agent.search(
             [('code', '=', MCP_BARE_AGENT_CODE)], limit=1,
         )
-        as_ktokens = bool(res.get('show_ktokens'))
         if agent:
             res['agent_id'] = agent.id
             res['inject_enabled'] = agent._domain_index_inject_enabled()
-            res['stats_html'] = self._html_for_agent(
-                agent, as_ktokens=as_ktokens,
-            )
         else:
             Context = self.env['ai.context']
             res['inject_enabled'] = Context._domain_index_inject_enabled()
-            res['stats_html'] = self._html_catalog_fallback(
-                as_ktokens=as_ktokens,
-            )
         return res
+
+    @api.depends('agent_id', 'show_ktokens')
+    def _compute_stats_html(self):
+        for wiz in self:
+            as_ktokens = bool(wiz.show_ktokens)
+            if wiz.agent_id:
+                wiz.stats_html = self._html_for_agent(
+                    wiz.agent_id, as_ktokens=as_ktokens,
+                )
+            else:
+                wiz.stats_html = self._html_catalog_fallback(
+                    as_ktokens=as_ktokens,
+                )
 
     @api.onchange('show_ktokens')
     def _onchange_show_ktokens(self):
         if self.agent_id:
             self.inject_enabled = self.agent_id._domain_index_inject_enabled()
-            self.stats_html = self._html_for_agent(
-                self.agent_id, as_ktokens=bool(self.show_ktokens),
-            )
         else:
             self.inject_enabled = (
                 self.env['ai.context']._domain_index_inject_enabled()
-            )
-            self.stats_html = self._html_catalog_fallback(
-                as_ktokens=bool(self.show_ktokens),
             )
 
     @api.model
@@ -280,9 +286,9 @@ class AIContextStatsWizard(models.TransientModel):
         ]
         meta = []
         if title:
-            meta.append(title)
-        meta.append(_('Locale: %s') % user_locale)
-        meta.append(unit_hint)
+            meta.append(_esc(title))
+        meta.append(_esc(_('Locale: %s') % user_locale))
+        meta.append(_esc(unit_hint))
         html.append(
             '<p class="text-muted" style="margin:0 0 6px 0;">'
             + ' · '.join(meta) + '</p>'
@@ -309,7 +315,7 @@ class AIContextStatsWizard(models.TransientModel):
         if cache_error:
             html.append(
                 f'<div class="alert alert-danger py-2">'
-                f'<strong>{_("Error:")}</strong> {cache_error}</div></div>'
+                f'<strong>{_("Error:")}</strong> {_esc(cache_error)}</div></div>'
             )
             return ''.join(html)
 
@@ -346,7 +352,7 @@ class AIContextStatsWizard(models.TransientModel):
                 opt_comp, _('TOTAL (optimized)'), as_ktokens=as_ktokens,
             )
         if turn_scoped_codes:
-            codes = ', '.join(turn_scoped_codes)
+            codes = _esc(', '.join(turn_scoped_codes))
             opt_body += (
                 '<details style="margin-top:6px;font-size:11px;">'
                 f'<summary class="text-muted" style="cursor:pointer;">'

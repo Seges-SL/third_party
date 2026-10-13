@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
+# Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Export selected AI artifacts as a bundle ZIP."""
+
 from odoo import fields, models, _
 from odoo.exceptions import UserError
 
@@ -7,16 +10,58 @@ from ..utils import artifact_bundle, mcp_ui
 
 
 class AIArtifactBundleExportWizard(models.TransientModel):
-    _name = 'pns_ai_mcp.artifact_bundle.export.wizard'
+    _name = 'ai.artifact.bundle.export.wizard'
     _description = 'Export selected AI artifacts bundle'
 
-    skill_ids = fields.Many2many('ai.skill', string='Skills')
-    context_ids = fields.Many2many('ai.context', string='Contexts')
-    provider_ids = fields.Many2many('ai.provider', string='Providers')
-    agent_ids = fields.Many2many('ai.agent', string='Agents')
-    server_ids = fields.Many2many('ai.api.server', string='External servers')
-    user_ids = fields.Many2many('ai.mcp.user', string='MCP users')
-    whitelist_ids = fields.Many2many('ai.url.whitelist', string='URL whitelist')
+    skill_ids = fields.Many2many(
+        'ai.skill',
+        relation='ai_artifact_bundle_export_wizard_skill_rel',
+        column1='wizard_id',
+        column2='skill_id',
+        string='Skills',
+    )
+    context_ids = fields.Many2many(
+        'ai.context',
+        relation='ai_artifact_bundle_export_wizard_context_rel',
+        column1='wizard_id',
+        column2='context_id',
+        string='Contexts',
+    )
+    provider_ids = fields.Many2many(
+        'ai.provider',
+        relation='ai_artifact_bundle_export_wizard_provider_rel',
+        column1='wizard_id',
+        column2='provider_id',
+        string='Providers',
+    )
+    agent_ids = fields.Many2many(
+        'ai.agent',
+        relation='ai_artifact_bundle_export_wizard_agent_rel',
+        column1='wizard_id',
+        column2='agent_id',
+        string='Agents',
+    )
+    server_ids = fields.Many2many(
+        'ai.api.server',
+        relation='ai_artifact_bundle_export_wizard_server_rel',
+        column1='wizard_id',
+        column2='server_id',
+        string='External servers',
+    )
+    user_ids = fields.Many2many(
+        'ai.mcp.user',
+        relation='ai_artifact_bundle_export_wizard_user_rel',
+        column1='wizard_id',
+        column2='user_id',
+        string='MCP users',
+    )
+    whitelist_ids = fields.Many2many(
+        'ai.url.whitelist',
+        relation='ai_artifact_bundle_export_wizard_whitelist_rel',
+        column1='wizard_id',
+        column2='whitelist_id',
+        string='URL whitelist',
+    )
     include_secrets = fields.Boolean(
         string='Include secrets',
         default=False,

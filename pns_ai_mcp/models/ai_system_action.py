@@ -35,9 +35,6 @@ _MODULE_OPS = {
     'upgrade': 'button_immediate_upgrade',
     'uninstall': 'button_immediate_uninstall',
 }
-_CORE_UNINSTALL_BLOCK = frozenset({
-    'base', 'web', 'pns_base', 'pns_ai_mcp',
-})
 _XMLID_MODULE = 'pns_ai_mcp'
 
 
@@ -334,7 +331,7 @@ class AiSystemAction(models.AbstractModel):
     # ── view.set_field_required ───────────────────────────────────────────
 
     @api.model
-    def preview_view_set_field_required(
+    def _preview_view_set_field_required(
             self, model=None, field=None, required=True, view_ids=None,
             view_types=None, **kw):
         return self._preview_view_modifier(
@@ -344,7 +341,7 @@ class AiSystemAction(models.AbstractModel):
         )
 
     @api.model
-    def apply_view_set_field_required(
+    def _apply_view_set_field_required(
             self, model=None, field=None, required=True, view_ids=None,
             view_types=None, uniform=False, **kw):
         return self._apply_view_modifier(
@@ -357,7 +354,7 @@ class AiSystemAction(models.AbstractModel):
     # ── field.set_required (ORM + registry; called by op=field_required) ──
 
     @api.model
-    def preview_field_set_required(
+    def _preview_field_set_required(
             self, model=None, field=None, required=True, **_kw):
         self._ensure_model_field(model, field)
         flag = _as_bool(required)
@@ -378,7 +375,7 @@ class AiSystemAction(models.AbstractModel):
         ) % ('1' if flag else '0', field, model, extra)
 
     @api.model
-    def apply_field_set_required(
+    def _apply_field_set_required(
             self, model=None, field=None, required=True, **_kw):
         self._ensure_model_field(model, field)
         required = _as_bool(required)
@@ -415,7 +412,7 @@ class AiSystemAction(models.AbstractModel):
     # ── view.set_field_readonly ───────────────────────────────────────────
 
     @api.model
-    def preview_view_set_field_readonly(
+    def _preview_view_set_field_readonly(
             self, model=None, field=None, readonly=True, view_ids=None,
             view_types=None, **kw):
         return self._preview_view_modifier(
@@ -425,7 +422,7 @@ class AiSystemAction(models.AbstractModel):
         )
 
     @api.model
-    def apply_view_set_field_readonly(
+    def _apply_view_set_field_readonly(
             self, model=None, field=None, readonly=True, view_ids=None,
             view_types=None, **kw):
         return self._apply_view_modifier(
@@ -437,7 +434,7 @@ class AiSystemAction(models.AbstractModel):
     # ── view.set_field_invisible ──────────────────────────────────────────
 
     @api.model
-    def preview_view_set_field_invisible(
+    def _preview_view_set_field_invisible(
             self, model=None, field=None, invisible=True, view_ids=None,
             view_types=None, **kw):
         return self._preview_view_modifier(
@@ -447,7 +444,7 @@ class AiSystemAction(models.AbstractModel):
         )
 
     @api.model
-    def apply_view_set_field_invisible(
+    def _apply_view_set_field_invisible(
             self, model=None, field=None, invisible=True, view_ids=None,
             view_types=None, **kw):
         return self._apply_view_modifier(
@@ -459,7 +456,7 @@ class AiSystemAction(models.AbstractModel):
     # ── view.set_field_domain ─────────────────────────────────────────────
 
     @api.model
-    def preview_view_set_field_domain(
+    def _preview_view_set_field_domain(
             self, model=None, field=None, domain=None, view_ids=None,
             view_types=None, **kw):
         return self._preview_view_modifier(
@@ -469,7 +466,7 @@ class AiSystemAction(models.AbstractModel):
         )
 
     @api.model
-    def apply_view_set_field_domain(
+    def _apply_view_set_field_domain(
             self, model=None, field=None, domain=None, view_ids=None,
             view_types=None, **kw):
         return self._apply_view_modifier(
@@ -481,7 +478,7 @@ class AiSystemAction(models.AbstractModel):
     # ── view.reset_field_modifiers ────────────────────────────────────────
 
     @api.model
-    def preview_view_reset_field_modifiers(
+    def _preview_view_reset_field_modifiers(
             self, model=None, field=None, **_kw):
         self._ensure_model_field(model, field)
         n = self.env['ai.view.policy'].sudo().search_count([
@@ -494,7 +491,7 @@ class AiSystemAction(models.AbstractModel):
         ) % (field, model, n)
 
     @api.model
-    def apply_view_reset_field_modifiers(
+    def _apply_view_reset_field_modifiers(
             self, model=None, field=None, **_kw):
         self._ensure_model_field(model, field)
         policies = self.env['ai.view.policy'].sudo().search([
@@ -558,20 +555,6 @@ class AiSystemAction(models.AbstractModel):
             return None
         return name in loaded
 
-    def _get_module(self, name):
-        if not name or not isinstance(name, str):
-            raise UserError(_('Unknown module: %s') % name)
-        try:
-            check_ident(name, 'model')
-        except ValueError:
-            raise UserError(_('Unknown module: %s') % name)
-        mod = self.env['ir.module.module'].sudo().search(
-            [('name', '=', name)], limit=1,
-        )
-        if not mod:
-            raise UserError(_('Unknown module: %s') % name)
-        return mod
-
     def _coerce_module_update_args(self, module=None, operation=None, **kw):
         """Canonical ``(technical_name, install|upgrade|uninstall)``.
 
@@ -602,17 +585,32 @@ class AiSystemAction(models.AbstractModel):
             raise UserError(_('Unknown module: %s') % module)
         return name, op
 
+    def _uninstall_cascade(self, mod):
+        """Names an uninstall of ``mod`` takes with it; refuses if this engine is one.
+
+        Odoo removes every installed module that depends on ``mod``. The
+        engine running the plan cannot be among them.
+        """
+        gone = mod.downstream_dependencies(
+            exclude_states=('uninstalled', 'uninstallable', 'to remove'),
+        )
+        names = set(gone.mapped('name')) | {mod.name}
+        if _XMLID_MODULE in names:
+            raise UserError(_(
+                'Refusing to uninstall %s: it would also uninstall %s.'
+            ) % (mod.name, _XMLID_MODULE))
+        return sorted(gone.mapped('name'))
+
     @api.model
-    def preview_module_update(self, module=None, operation=None, **kw):
+    def _preview_module_update(self, module=None, operation=None, **kw):
         module, op = self._coerce_module_update_args(
             module=module, operation=operation, **kw
         )
-        if op == 'uninstall' and module in _CORE_UNINSTALL_BLOCK:
-            raise UserError(_('Refusing to uninstall core module %s') % module)
         _mid, sql_state = self._sql_module_state(module)
         if not _mid:
             raise UserError(_('Unknown module: %s') % module)
         mod = self.env['ir.module.module'].sudo().browse(_mid)
+        cascade = self._uninstall_cascade(mod) if op == 'uninstall' else []
         loaded = self._module_loaded(module)
         if op == 'upgrade' and sql_state not in ('installed', 'to upgrade'):
             raise UserError(
@@ -622,21 +620,25 @@ class AiSystemAction(models.AbstractModel):
         state_note = sql_state or '?'
         if op == 'install' and sql_state == 'installed' and loaded is False:
             state_note = '%s, not loaded' % sql_state
-        return _(
+        preview = _(
             "Will %s module '%s' (current state: %s)"
         ) % (op, label, state_note)
+        if cascade:
+            preview += '. ' + _('Also uninstalls: %s') % ', '.join(cascade)
+        return preview
 
     @api.model
-    def apply_module_update(self, module=None, operation=None, **kw):
+    def _apply_module_update(self, module=None, operation=None, **kw):
         module, op = self._coerce_module_update_args(
             module=module, operation=operation, **kw
         )
-        if op == 'uninstall' and module in _CORE_UNINSTALL_BLOCK:
-            raise UserError(_('Refusing to uninstall core module %s') % module)
         _mid, sql_state = self._sql_module_state(module)
         if not _mid:
             raise UserError(_('Unknown module: %s') % module)
-        mod = self.env['ir.module.module'].sudo().browse(_mid)
+        # The real user: Odoo's own admin check on module buttons must run.
+        mod = self.env['ir.module.module'].with_user(self.env.uid).browse(_mid)
+        if op == 'uninstall':
+            self._uninstall_cascade(mod.sudo())
         loaded = self._module_loaded(module)
         if should_skip_module_op(op, sql_state, loaded):
             return {
@@ -704,7 +706,7 @@ class AiSystemAction(models.AbstractModel):
         return ''
 
     @api.model
-    def preview_user_add_group(self, user_id=None, group=None, **_kw):
+    def _preview_user_add_group(self, user_id=None, group=None, **_kw):
         user = self._resolve_user(user_id)
         grp = self._resolve_group(group)
         return (
@@ -713,7 +715,7 @@ class AiSystemAction(models.AbstractModel):
         )
 
     @api.model
-    def apply_user_add_group(self, user_id=None, group=None, **_kw):
+    def _apply_user_add_group(self, user_id=None, group=None, **_kw):
         user = self._resolve_user(user_id)
         grp = self._resolve_group(group)
         user_add_group(user, grp)
@@ -733,7 +735,7 @@ class AiSystemAction(models.AbstractModel):
         }
 
     @api.model
-    def preview_user_remove_group(self, user_id=None, group=None, **_kw):
+    def _preview_user_remove_group(self, user_id=None, group=None, **_kw):
         user = self._resolve_user(user_id)
         grp = self._resolve_group(group)
         return (
@@ -743,7 +745,7 @@ class AiSystemAction(models.AbstractModel):
         )
 
     @api.model
-    def apply_user_remove_group(self, user_id=None, group=None, **_kw):
+    def _apply_user_remove_group(self, user_id=None, group=None, **_kw):
         user = self._resolve_user(user_id)
         grp = self._resolve_group(group)
         user_remove_group(user, grp)

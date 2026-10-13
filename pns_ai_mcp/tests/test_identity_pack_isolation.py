@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2026 Patanegra Soft <https://patanegra.com>
+"""A leftover foreign self_* pack must not enter another agent's bundle."""
+
 import uuid
 
 from odoo.tests import tagged, TransactionCase

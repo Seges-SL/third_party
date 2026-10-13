@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Helpers compartidos por tests Odoo del addon (O14 + O19)."""
+"""Shared helpers for this addon's Odoo tests (O14 + O19)."""
 import re
 import uuid
 
@@ -140,26 +140,43 @@ def _clear_registry_caches(registry):
         registry.clear_caches()
 
 
+_ADMIN_KEY_FIELDS = (
+    'mcp_api_key_hash', 'mcp_api_key_state', 'mcp_api_key_generated_date',
+)
+
+
 def _write_mcp_http_fixtures(fix_env, api_key):
-    """Crea/actualiza usuario MCP de prueba; devuelve el modelo sudo."""
+    """Put ``api_key`` on admin's MCP row; return admin's previous key values."""
     from odoo.addons.pns_ai_mcp.utils.api_key import hash_api_key
     ensure_test_agents(fix_env)
     test_user = fix_env.ref('base.user_admin')
     test_user.write({'active': True})
     key_hash = hash_api_key(api_key)
     mcp_user_model = fix_env['ai.mcp.user'].sudo()
-    mcp_user_model.search([('mcp_api_key_hash', '=', key_hash)]).write({
-        'mcp_api_key_hash': False,
-        'mcp_api_key_state': 'not_generated',
-    })
     mcp_user = mcp_user_model.search([('user_id', '=', test_user.id)], limit=1)
-    if not mcp_user:
+    if mcp_user:
+        previous = {f: mcp_user[f] for f in _ADMIN_KEY_FIELDS}
+    else:
+        previous = None
         mcp_user = mcp_user_model.create({'user_id': test_user.id})
     mcp_user.write({
         'mcp_api_key_hash': key_hash,
         'mcp_api_key_state': 'generated',
     })
-    return mcp_user_model
+    return previous
+
+
+def _restore_admin_key(fix_env, previous):
+    test_user = fix_env.ref('base.user_admin')
+    mcp_user = fix_env['ai.mcp.user'].sudo().search(
+        [('user_id', '=', test_user.id)], limit=1,
+    )
+    if not mcp_user:
+        return
+    if previous is None:
+        mcp_user.unlink()
+    else:
+        mcp_user.write(previous)
 
 
 def _count_active_mcp_key(env, api_key):
@@ -171,25 +188,33 @@ def _count_active_mcp_key(env, api_key):
 
 
 def setup_http_mcp_fixtures(cls, env):
-    """API key MCP para HttpCase: commit según versión Odoo."""
+    """API key MCP para HttpCase: commit según versión Odoo.
+
+    The key is committed (the HTTP worker reads it on another cursor), so it
+    is random per class and ``teardown_http_mcp_fixtures`` gives admin back
+    the key it had.
+    """
+    import secrets
     from odoo import api, SUPERUSER_ID
     from odoo.addons.pns_ai_mcp.utils.compat import NEEDS_ROOT_GET_REQUEST_PATCH
 
     if not getattr(cls, 'test_api_key', None):
-        cls.test_api_key = 'pns-http-test-%s' % env.cr.dbname
+        cls.test_api_key = 'pns-http-test-%s' % secrets.token_urlsafe(24)
     api_key = cls.test_api_key
 
     if NEEDS_ROOT_GET_REQUEST_PATCH:
         # O14: mismo cursor que enter_test_mode / url_open.
         fix_env = env(user=SUPERUSER_ID)
-        _write_mcp_http_fixtures(fix_env, api_key)
+        previous = _write_mcp_http_fixtures(fix_env, api_key)
         env.cr.commit()
     else:
         # O16+: commit en cursor de test prohibido — cursor aparte con commit.
         with env.registry.cursor() as cr:
             fix_env = api.Environment(cr, SUPERUSER_ID, {})
-            _write_mcp_http_fixtures(fix_env, api_key)
+            previous = _write_mcp_http_fixtures(fix_env, api_key)
             cr.commit()
+    if not hasattr(cls, '_pns_admin_key_backup'):
+        cls._pns_admin_key_backup = previous
 
     _clear_registry_caches(env.registry)
     found = _count_active_mcp_key(env(user=SUPERUSER_ID), api_key)
@@ -199,6 +224,22 @@ def setup_http_mcp_fixtures(cls, env):
             'Check ai.mcp.user for admin on db %s.' % (api_key, env.cr.dbname)
         )
     cls._pns_http_fixtures_done = True
+
+
+def teardown_http_mcp_fixtures(cls):
+    """Give admin back the MCP key it had before ``setup_http_mcp_fixtures``."""
+    from odoo import api, SUPERUSER_ID
+    from odoo.modules.registry import Registry
+    from odoo.tests.common import get_db_name
+    if not hasattr(cls, '_pns_admin_key_backup'):
+        return
+    previous = cls._pns_admin_key_backup
+    del cls._pns_admin_key_backup
+    registry = Registry(get_db_name())
+    with registry.cursor() as cr:
+        _restore_admin_key(api.Environment(cr, SUPERUSER_ID, {}), previous)
+        cr.commit()
+    _clear_registry_caches(registry)
 
 
 def http_status_code(response):

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Import URL whitelist entries from JSON."""
+
 import base64
 import json
 import logging
@@ -26,7 +28,7 @@ class ImportWhitelistWizard(models.TransientModel):
     With 'Replace existing' checked (default), entries with the same domain
     are updated.  Otherwise existing domains are skipped.
     """
-    _name = 'pns_ai_mcp.import_whitelist_wizard'
+    _name = 'ai.import.whitelist.wizard'
     _inherit = ['pns.operation.report.wizard']
     _description = 'Wizard to import URL Whitelist from JSON'
 

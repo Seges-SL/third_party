@@ -26,6 +26,7 @@
     max-width: 100%;
     overflow-x: hidden;
     box-sizing: border-box;
+    position: relative;
 }
 
 .o_chatboo_messages .o_chatboo_message_row--chart {
@@ -59,6 +60,28 @@
     touch-action: none;
     user-select: none;
     background: transparent;
+}
+
+.o_chatboo_card_resize.is-dragging {
+    background: rgba(0, 124, 186, 0.18);
+}
+
+.o_chatboo_card_resize_guide {
+    position: absolute;
+    top: 0;
+    width: 2px;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: #007cba;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7);
+    pointer-events: none;
+    z-index: 30;
+}
+
+.o_chatboo_messages.o_chatboo_card_resizing {
+    cursor: col-resize;
+    user-select: none;
 }
 
 .o_chatboo_message--chart .o_chatboo_chart_host {

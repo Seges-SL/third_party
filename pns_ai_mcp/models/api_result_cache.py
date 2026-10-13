@@ -30,7 +30,7 @@ class AIApiResultCache(models.Model):
         string='Cache key',
         required=True,
         index=True,
-        help='SHA-256 of server + tool + canonical arguments JSON.',
+        help='SHA-256 of user + server + tool + canonical arguments JSON.',
     )
     server_code = fields.Char(string='Server code', index=True)
     tool_name = fields.Char(string='Tool')
@@ -48,9 +48,40 @@ class AIApiResultCache(models.Model):
         ('cache_key_unique', 'UNIQUE(cache_key)', 'A cache entry for this api_call already exists.'),
     ]
 
+    def init(self):
+        super().init()
+        self._revive_spent_gc_cron()
+
+    @api.model
+    def _revive_spent_gc_cron(self):
+        """Leftover: the purge cron shipped without ``numbercall=-1``.
+
+        Odoo 14 created it with ``numbercall=1``; after its first run it hit 0,
+        switched itself off and was never picked again. The data file is
+        ``noupdate``, so the fixed XML alone does not reach installed DBs.
+        Stacks whose ``ir.cron`` has no ``numbercall`` have nothing to fix.
+        """
+        if 'numbercall' not in self.env['ir.cron']._fields:
+            return 0
+        self.env.cr.execute(
+            """
+            UPDATE ir_cron
+               SET numbercall = -1,
+                   active = (active OR numbercall = 0)
+             WHERE numbercall >= 0
+               AND id IN (
+                   SELECT res_id FROM ir_model_data
+                    WHERE module = 'pns_ai_mcp'
+                      AND model = 'ir.cron'
+                      AND name = 'ir_cron_ai_api_result_cache_gc'
+               )
+            """
+        )
+        return self.env.cr.rowcount
+
     @api.model
     def _hash_key(self, server, tool, arguments):
-        return cache_key_for_api_call(server, tool, arguments)
+        return cache_key_for_api_call(server, tool, arguments, uid=self.env.uid)
 
     @api.model
     def get_cached(self, server, tool, arguments):

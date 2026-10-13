@@ -2,7 +2,7 @@
 <odoo>
     <record id="view_import_whitelist_wizard_form" model="ir.ui.view">
         <field name="name">pns.ai.mcp.import.whitelist.wizard.form</field>
-        <field name="model">pns_ai_mcp.import_whitelist_wizard</field>
+        <field name="model">ai.import.whitelist.wizard</field>
         <field name="arch" type="xml">
             <form string="Import URL Whitelist">
                 <sheet>
@@ -27,7 +27,7 @@
     <record id="action_import_whitelist_wizard" model="ir.actions.act_window">
         <field name="name">Import URL Whitelist (JSON)</field>
         <field name="type">ir.actions.act_window</field>
-        <field name="res_model">pns_ai_mcp.import_whitelist_wizard</field>
+        <field name="res_model">ai.import.whitelist.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
     </record>

@@ -10,14 +10,14 @@ active: true
 context_codes:
 ---
 [SYS-INFO]
-Úsalo cuando el usuario pida información del sistema, versión de Odoo, estado del
-servidor, hora del servidor o un resumen del entorno.
+Use when the user asks for system information, the Odoo version, server
+status, server time or an environment summary.
 
-QUÉ HACE
-Ejecuta el código del skill y devuelve una tabla Propiedad/Valor con los datos del
-sistema (solo lectura).
+WHAT IT DOES
+Runs the skill code and returns a Property/Value table with read-only
+system facts.
 
-CÓMO PRESENTAR EL RESULTADO
-- Muestra la tabla tal cual la devuelve el código.
-- Opcional: 1-2 frases de resumen (versión y usuario/compañía actuales).
-- No inventes valores que no estén en la tabla.
+HOW TO PRESENT THE RESULT
+- Show the table exactly as the code returns it.
+- Optional: 1–2 summary sentences (version and current user/company).
+- Do not invent values that are not in the table.

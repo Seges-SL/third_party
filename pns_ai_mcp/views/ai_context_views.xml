@@ -7,7 +7,7 @@
 -->
 <odoo>
     <!-- Vista tree para contextos MCP -->
-    <record id="view_mcp_context_tree" model="ir.ui.view">
+    <record id="view_ai_context_tree" model="ir.ui.view">
         <field name="name">pns_ai_mcp.context.tree</field>
         <field name="model">ai.context</field>
         <field name="arch" type="xml">
@@ -32,7 +32,7 @@
     </record>
     
     <!-- Vista search para filtrar contextos -->
-    <record id="view_mcp_context_search" model="ir.ui.view">
+    <record id="view_ai_context_search" model="ir.ui.view">
         <field name="name">pns_ai_mcp.context.search</field>
         <field name="model">ai.context</field>
         <field name="arch" type="xml">
@@ -87,7 +87,7 @@
     </record>
 
     <!-- Vista form para contextos MCP -->
-    <record id="view_mcp_context_form" model="ir.ui.view">
+    <record id="view_ai_context_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.context.form</field>
         <field name="model">ai.context</field>
         <field name="arch" type="xml">
@@ -172,13 +172,13 @@
     </record>
 
     <!-- Acción para abrir contextos MCP -->
-    <record id="action_mcp_contexts" model="ir.actions.act_window">
+    <record id="action_ai_context" model="ir.actions.act_window">
         <field name="name">Contexts</field>
         <field name="type">ir.actions.act_window</field>
         <field name="res_model">ai.context</field>
         <field name="view_mode">tree,form</field>
-        <field name="view_id" ref="view_mcp_context_tree"/>
-        <field name="search_view_id" ref="view_mcp_context_search"/>
+        <field name="view_id" ref="view_ai_context_tree"/>
+        <field name="search_view_id" ref="view_ai_context_search"/>
         <field name="domain">[]</field>
         <field name="context">{
             'active_test': False,
@@ -196,20 +196,20 @@
     </record>
 
     <!-- Menú de contextos MCP. Visible para AI Administrator. -->
-    <menuitem id="menu_mcp_contexts"
+    <menuitem id="menu_ai_context"
               name="Contexts"
               parent="menu_ai_knowledge"
-              action="action_mcp_contexts"
+              action="action_ai_context"
               sequence="10"
               groups="pns_ai_mcp.group_ai_admin"/>
 
-    <record id="action_mcp_contexts_writer" model="ir.actions.act_window">
+    <record id="action_ai_context_writer" model="ir.actions.act_window">
         <field name="name">My Contexts</field>
         <field name="type">ir.actions.act_window</field>
         <field name="res_model">ai.context</field>
         <field name="view_mode">tree,form</field>
-        <field name="view_id" ref="view_mcp_context_tree"/>
-        <field name="search_view_id" ref="view_mcp_context_search"/>
+        <field name="view_id" ref="view_ai_context_tree"/>
+        <field name="search_view_id" ref="view_ai_context_search"/>
         <field name="domain">[('owner_id', '=', uid)]</field>
         <field name="context">{
             'default_owner_id': uid,

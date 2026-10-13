@@ -225,7 +225,13 @@ class LLMDriver(ABC):
 
     Non-OpenAI drivers (like Anthropic) must convert their native response
     to this shape before returning.
+
+    ``chats`` and ``chooses`` say which turns this protocol can serve.
+    A provider tick the driver cannot honour fails on save.
     """
+
+    chats = True
+    chooses = False
 
     @property
     @abstractmethod
@@ -367,6 +373,49 @@ class LLMDriver(ABC):
         )
         return self.parse_response(raw_response)
 
+    def iter_chat(self, messages, tools=None, **kwargs):
+        """Yield text as it arrives, then one ``done`` with the full message.
+
+        The default waits for the whole reply and yields it once. A driver
+        that can read the reply as it is written overrides this.
+        Each piece is ``{'text': '...'}`` or
+        ``{'done': True, 'message': {...}, 'usage': {...}}``.
+        """
+        body = self.chat_completion(messages, tools=tools, **kwargs)
+        choices = (body or {}).get('choices') or []
+        message = (choices[0].get('message') or {}) if choices else {}
+        text = message.get('content') or ''
+        if isinstance(text, str) and text:
+            yield {'text': text}
+        yield {
+            'done': True,
+            'message': message if isinstance(message, dict) else {},
+            'usage': (body or {}).get('usage') or {},
+        }
+
+    @staticmethod
+    def split_image(img):
+        """``(media_type, base64)`` from a data URL or raw base64. No vendor body."""
+        raw = str(img or '')
+        media = 'image/png'
+        data = raw
+        if raw.startswith('data:'):
+            head, _, data = raw.partition(',')
+            media = (head[5:].split(';')[0] or media)
+        return media, data
+
+    def transcribe(self, audio, filename='', mime='', language='', prompt=''):
+        """Audio to text. Protocols that cannot transcribe return ``no_transcribe``.
+
+        Success is ``{body: dict}`` (the provider JSON, including ``usage``
+        when it sent one) or ``{error: ...}``. A timeout is not a second call.
+        """
+        return {'error': 'no_transcribe'}
+
+    def choose(self, state, criteria, instructions, timeout=3):
+        """Closed choice. Only a protocol with ``chooses`` implements this."""
+        raise RuntimeError('this protocol does not choose')
+
     def get_stop_tokens(self) -> List[str]:
         """Return default stop sequences for prompt-based generation.
 
@@ -378,7 +427,7 @@ class LLMDriver(ABC):
     def models_url(self, endpoint: str) -> str:
         """Derive the ``GET /models`` URL from the chat completions endpoint.
 
-        Used by ``ai.provider.action_fetch_models()`` to discover available
+        Used by ``ai.provider._refresh_model_catalogue()`` to discover available
         models. Each driver family knows how to map its chat URL to the
         models listing URL.
 
@@ -398,7 +447,10 @@ class LLMDriver(ABC):
         if not endpoint:
             return 'https://api.openai.com/v1/models'
         base = endpoint.rstrip('/')
-        for path in ('/api/v1/chat/completions', '/v1/chat/completions', '/chat/completions'):
+        for path in (
+            '/api/v1/chat/completions', '/v1/chat/completions', '/chat/completions',
+            '/api/v1/systemone', '/v1/systemone', '/api/alpha/decisions',
+        ):
             if path in base:
                 base = base.split(path)[0].rstrip('/')
                 break

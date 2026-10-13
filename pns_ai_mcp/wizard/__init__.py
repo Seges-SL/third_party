@@ -1,15 +1,20 @@
+# -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Transient wizards for import, export, tools, and artifact bundles."""
+
 from . import tools_wizard_mixin
 from . import config_backup_wizard
 from . import ai_agent_tools_wizard
 from . import ai_provider_tools_wizard
+from . import ai_provider_catalogue_copy
 from . import bundle_cache_rebuild_wizard
 from . import bundle_compose_wizard
 from . import bundle_import_wizard
 from . import context_import_wizard
 from . import context_stats_wizard
 from . import external_server_tools_wizard
+from . import openapi_spec_generate_wizard
 from . import import_external_servers_wizard
 from . import import_agents_wizard
 from . import import_servers_wizard
@@ -26,5 +31,5 @@ from . import agent_skill_import_wizard
 from . import skill_capture_wizard
 from . import skill_import_wizard
 from . import skill_tools_wizard
-from . import safe_operation_tools_wizard
+from . import safe_tools_wizard
 from . import whitelist_tools_wizard

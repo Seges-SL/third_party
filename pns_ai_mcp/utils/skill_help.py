@@ -44,11 +44,13 @@ def _schema_rows(schema_txt):
             default = ''
         rows.append({
             'name': str(key),
+            'label': str(spec.get('label') or key),
             'type': str(spec.get('type') or 'string'),
             'desc': str(
                 spec.get('desc') or spec.get('description') or ''
             ),
             'default': default if default == '' else str(default),
+            'required': bool(spec.get('required')),
         })
     return rows
 
@@ -59,6 +61,45 @@ def _owner_line(meta):
     if kind == 'user' and name:
         return name
     return _label('Common')
+
+
+def _example_slashes(code, hint, policy):
+    """One ``/code …`` line per ``arg_hint`` piece (``|`` separates cases)."""
+    lines = []
+    seen = set()
+
+    def add(token):
+        token = (token or '').strip()
+        line = ('/%s %s' % (code, token)).rstrip() if token else '/%s' % code
+        if line in seen:
+            return
+        seen.add(line)
+        lines.append(line)
+
+    if policy == 'default':
+        add('')
+    for part in (hint or '').split('|'):
+        add(part)
+    return lines
+
+
+def _param_bullet(row):
+    bits = []
+    if row.get('desc'):
+        bits.append(row['desc'])
+    default = row.get('default')
+    if default:
+        bits.append('%s: %s' % (_label('Default'), default))
+    if row.get('required'):
+        bits.append(_label('Required'))
+    tail = (' — %s' % '. '.join(bits)) if bits else ''
+    concept = (row.get('label') or '').strip()
+    name = row['name']
+    if concept and concept != name:
+        head = '%s (`%s`, %s)' % (concept, name, row['type'])
+    else:
+        head = '`%s` (%s)' % (name, row['type'])
+    return '- %s%s' % (head, tail)
 
 
 def _policy_line(policy):
@@ -112,26 +153,23 @@ def build_slash_help_markdown(meta, *, rejected=False, reject_reason='',
         '',
     ])
     if rows:
-        lines.append(
-            '| %s | %s | %s | %s |' % (
-                _label('Name'), _label('Type'),
-                _label('Description'), _label('Default'),
-            )
-        )
-        lines.append('| --- | --- | --- | --- |')
         for row in rows:
-            lines.append(
-                '| `%s` | %s | %s | %s |' % (
-                    row['name'], row['type'],
-                    row['desc'] or '—', row['default'] or '—',
-                )
-            )
+            lines.append(_param_bullet(row))
         lines.append('')
     else:
         lines.append(_label('No formal parameters.'))
         lines.append('')
-    if hint:
-        lines.extend(['`/%s %s`' % (code, hint), ''])
+    examples = _example_slashes(code, hint, policy)
+    if examples:
+        lines.extend(['**%s:**' % _label('Examples'), ''])
+        for ex in examples:
+            lines.append('- `%s`' % ex)
+        lines.append('')
+    if rows:
+        lines.extend([
+            _label('Other wording is mapped onto these parameters.'),
+            '',
+        ])
     lines.append(_policy_line(policy))
     return '\n'.join(lines).rstrip() + '\n'
 
@@ -188,7 +226,7 @@ BUILTIN_SLASH_META = {
     'mode': {
         'code': 'mode',
         'name': 'Mode',
-        'description': 'List presentation modes (painter, footer, table/chart).',
+        'description': 'List presentation modes (compose, footer, table/chart).',
         'args_policy': 'none',
         'owner_kind': 'common',
     },
@@ -197,17 +235,22 @@ BUILTIN_SLASH_META = {
         'name': 'Create skill',
         'description': (
             'Capture a turn as an instance skill (extra, with you as author). '
-            'Typing /create-skill fills the last chip (you can change it), '
-            'then the slash name. Settings prefixes apply to the slash and '
-            'the catalog code. Other users do not see it unless an admin '
-            'publishes it. Help is /create-skill ?'
+            'The line always starts with the turn chip (filled from the last '
+            'turn; you can change it). Then the slash name. Settings prefixes '
+            'apply to the slash and the catalog code. If you already own that '
+            'slash, the wizard replaces it. Other users do not see it unless '
+            'an admin publishes it. Words after the name fill the parameter '
+            'description in the wizard. The turn chip is not a skill '
+            'parameter. Help is /create-skill ?'
         ),
-        'arg_hint': 'VWVN slash-name  |  ? help',
+        'arg_hint': 'VWVN slash-name [description…]  |  ? help',
         'param_schema': (
-            '{"turn_id":{"type":"string","desc":"4-character MCP turn id '
-            '(chip). Required.","default":"last turn"},'
+            '{"turn_id":{"type":"string","desc":"4-character MCP turn chip. '
+            'Required. Auto-filled from the last turn."},'
             '"name":{"type":"string","desc":"Slash name (kebab). Instance '
-            'prefix from Settings is applied. Required."}}'
+            'prefix from Settings is applied."},'
+            '"description":{"type":"string","desc":"Parameter description '
+            'in prose. Fills the wizard. Not the turn chip."}}'
         ),
         'args_policy': 'ask',
         'owner_kind': 'common',
@@ -243,17 +286,35 @@ BUILTIN_SLASH_META = {
         'args_policy': 'ask',
         'owner_kind': 'common',
     },
-    'painter-local': {
-        'code': 'painter-local',
-        'name': 'Painter local',
+    'edit-skill': {
+        'code': 'edit-skill',
+        'name': 'Edit skill',
+        'description': (
+            'Open the skill wizard on a skill you created. '
+            'Empty opens the picker. Stem, prefixed slash, or a word '
+            'from the skill name all resolve; if several match, pick one. '
+            'Help text and parameters are edited in the wizard. '
+            'Help is /edit-skill ?'
+        ),
+        'arg_hint': 'slash-or-name  |  ? help',
+        'param_schema': (
+            '{"name":{"type":"string","desc":"Slash or name of a skill you '
+            'created. Stem or prefixed.","default":"opens picker"}}'
+        ),
+        'args_policy': 'ask',
+        'owner_kind': 'common',
+    },
+    'compose-agent': {
+        'code': 'compose-agent',
+        'name': 'Compose Chatboo',
         'description': 'Chatboo composes tables and charts for this turn.',
         'args_policy': 'none',
         'arg_hint': 'optional question…',
         'owner_kind': 'common',
     },
-    'painter-free': {
-        'code': 'painter-free',
-        'name': 'Painter free',
+    'compose-model': {
+        'code': 'compose-model',
+        'name': 'Compose model',
         'description': 'The model owns the whole bubble for this turn.',
         'args_policy': 'none',
         'arg_hint': 'optional question…',
@@ -278,7 +339,7 @@ BUILTIN_SLASH_META = {
     'show-table': {
         'code': 'show-table',
         'name': 'Show table',
-        'description': 'Table first for this session (painter-local).',
+        'description': 'Table first for this session (compose-agent).',
         'args_policy': 'none',
         'arg_hint': 'optional question…',
         'owner_kind': 'common',
@@ -286,7 +347,7 @@ BUILTIN_SLASH_META = {
     'show-chart': {
         'code': 'show-chart',
         'name': 'Show chart',
-        'description': 'Chart first for this session (painter-local).',
+        'description': 'Chart first for this session (compose-agent).',
         'args_policy': 'none',
         'arg_hint': 'optional question…',
         'owner_kind': 'common',
@@ -301,3 +362,45 @@ def builtin_slash_help_meta(code):
         key = 'skills'
     meta = BUILTIN_SLASH_META.get(key)
     return dict(meta) if meta else None
+
+
+_ORIGIN_RANK = {'mine': 0, 'extra': 1, 'injected': 2, 'native': 3}
+
+
+def slash_list_origin(mine, factory, is_system=False):
+    """Menu group: mine, extra (published), injected (custom/), native (system/)."""
+    if mine:
+        return 'mine'
+    if is_system:
+        return 'native'
+    if factory:
+        return 'injected'
+    return 'extra'
+
+
+def slash_list_sort_key(row):
+    """Sort key: mine, extra, injected, native; A–Z within each group."""
+    origin = slash_list_origin(
+        bool(row.get('mine')),
+        bool(row.get('factory')),
+        bool(row.get('is_system')),
+    )
+    return (_ORIGIN_RANK[origin], (row.get('code') or '').casefold())
+
+
+def build_builtin_commands_markdown():
+    """Slash-command catalog from ``BUILTIN_SLASH_META``. No skill inventory."""
+    lines = [
+        _label('**Slash commands** (use `/<code>`):'),
+        '',
+    ]
+    for key, meta in BUILTIN_SLASH_META.items():
+        code = (meta.get('code') or key or '').strip()
+        if not code:
+            continue
+        desc = (meta.get('description') or meta.get('name') or '').strip()
+        if desc:
+            lines.append('- `/%s` — %s' % (code, desc))
+        else:
+            lines.append('- `/%s`' % code)
+    return '\n'.join(lines).rstrip() + '\n'

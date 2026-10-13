@@ -3,7 +3,7 @@ skill: credit-facility
 name: Credit facilities
 description: Month-end drawn (creditor balance) on facility journals; configurable period; PDF-safe month blocks.
 agent_codes: pns_ai_chatboo
-version: 2.4
+version: 2.5
 arg_hint: ytd | 12 | 2025 | 2024-2025 | 2025-03 | ?
 args_policy: ask
 sequence: 47
@@ -11,7 +11,7 @@ active: true
 context_codes:
 ---
 [CREDIT-FACILITY]
-Use with /credit-facility (Occidente Spanish twin lives in occ_custom_ai: /occ-polizas).
+Use with /credit-facility.
 
 ARGS
 Slash text must reach `periodo` and/or `arguments` unchanged.

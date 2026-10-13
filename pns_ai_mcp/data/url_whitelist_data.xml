@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- First-install web whitelist for weather (Open-Meteo).
-     OpenAPI hosts are added when those servers are activated.
      Loaded from post_init_hook only (not manifest data:). noupdate=1. -->
 <odoo noupdate="1">
 

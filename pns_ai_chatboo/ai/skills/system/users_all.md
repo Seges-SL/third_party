@@ -10,14 +10,14 @@ active: true
 context_codes:
 ---
 [USERS-ALL]
-Úsalo cuando el usuario pida la lista de usuarios, todos los usuarios del sistema,
-el censo de usuarios o un inventario de cuentas.
+Use when the user asks for the user list, every system user, a user census or
+an account inventory.
 
-QUÉ HACE
-Ejecuta el código del skill y devuelve una tabla con todos los usuarios (incluye
-archivados), ordenada por login.
+WHAT IT DOES
+Runs the skill code and returns a table of every user (including archived),
+sorted by login.
 
-CÓMO PRESENTAR EL RESULTADO
-- Muestra la tabla tal cual la devuelve el código.
-- Puedes resumir el total y cuántos están activos vs. archivados.
-- No inventes usuarios ni datos.
+HOW TO PRESENT THE RESULT
+- Show the table exactly as the code returns it.
+- You may summarise the total and how many are active vs archived.
+- Do not invent users or fields.

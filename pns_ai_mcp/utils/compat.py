@@ -22,28 +22,6 @@ from odoo.addons.pns_base.utils.compat import (  # noqa: F401
 )
 
 
-def grant_mcp_manager_to_odoo_admins(env, users=None):
-    """Asigna MCP Administrator a usuarios con Ajustes que aún no lo tengan."""
-    mcp_group = env.ref('pns_ai_mcp.group_ai_admin', raise_if_not_found=False)
-    admin_groups = get_odoo_admin_groups(env)
-    if not mcp_group or not admin_groups:
-        return 0
-
-    if users is None:
-        domain = ['|'] * max(0, len(admin_groups) - 1)
-        for group in admin_groups:
-            domain.append((USER_ALL_GROUPS_FIELD, 'in', group.id))
-        users = env['res.users'].sudo().search(domain)
-
-    added = 0
-    for user in users:
-        if not user_is_odoo_admin(user, env):
-            continue
-        if not user_has_group_direct(user, mcp_group):
-            user_add_group(user, mcp_group)
-            added += 1
-    return added
-
 
 def load_odoo14_assets_if_needed(env):
     """

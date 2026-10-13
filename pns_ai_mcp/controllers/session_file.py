@@ -1,56 +1,74 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Serve session SVG chips inline in the browser (like PDF, not download)."""
+"""Serve the files a turn produced to the user who may see them.
+
+SVG drawings open in the tab (sanitized); every other file downloads.
+"""
 from __future__ import annotations
 
 import base64
 import logging
 
 from odoo import http
-from odoo.http import request
+from odoo.exceptions import AccessError
+from odoo.http import request, content_disposition
 
 _logger = logging.getLogger(__name__)
 
 
+def _may_read(env, att):
+    """The creator, a system user, or whoever may read the record it hangs on."""
+    if env.is_system() or att.create_uid.id == env.uid:
+        return True
+    if not (att.res_model and att.res_id) or att.res_model not in env:
+        return False
+    try:
+        record = env[att.res_model].browse(att.res_id)
+        record.check_access_rights('read')
+        record.check_access_rule('read')
+    except AccessError:
+        return False
+    return record.exists()
+
+
 class ChatbooSessionFile(http.Controller):
 
-    @http.route(
+    @http.route([
         '/pns_ai_mcp/session_file/<int:attachment_id>',
-        type='http',
-        auth='public',
-    )
-    def session_file(self, attachment_id, access_token=None, **kwargs):
-        token = (access_token or '').strip()
-        if not token:
-            return request.not_found()
+        '/pns_ai_mcp/session_file/<int:attachment_id>/<string:filename>',
+    ], type='http', auth='user')
+    def session_file(self, attachment_id, filename=None, **kwargs):
         att = request.env['ir.attachment'].sudo().browse(int(attachment_id))
-        if not att.exists():
-            return request.not_found()
-        stored = (getattr(att, 'access_token', None) or '').strip()
-        if not stored or stored != token:
-            return request.not_found()
-        mime = (att.mimetype or '').split(';', 1)[0].strip().lower()
-        name = att.name or 'drawing.svg'
-        if mime != 'image/svg+xml' and not name.lower().endswith('.svg'):
+        if not att.exists() or att.res_field or not _may_read(request.env, att):
             return request.not_found()
         try:
             raw = base64.b64decode(att.datas or b'')
         except Exception:
             _logger.warning('session_file: could not decode attachment %s', att.id)
             return request.not_found()
-        from ..utils.svg_download import sanitize_svg
+        mime = (att.mimetype or '').split(';', 1)[0].strip().lower()
+        name = att.name or 'download'
+        if mime == 'image/svg+xml' or name.lower().endswith('.svg'):
+            from ..utils.svg_download import sanitize_svg
 
-        text = raw.decode('utf-8', errors='replace')
-        clean = sanitize_svg(text)
-        if not clean:
-            return request.not_found()
-        payload = clean.encode('utf-8')
-        filename = name.replace('"', '').replace('\r', '').replace('\n', '')
-        headers = [
-            ('Content-Type', 'image/svg+xml; charset=utf-8'),
+            clean = sanitize_svg(raw.decode('utf-8', errors='replace'))
+            if not clean:
+                return request.not_found()
+            payload = clean.encode('utf-8')
+            safe_name = name.replace('"', '').replace('\r', '').replace('\n', '')
+            headers = [
+                ('Content-Type', 'image/svg+xml; charset=utf-8'),
+                ('Content-Disposition', 'inline; filename="%s"' % safe_name),
+            ]
+        else:
+            payload = raw
+            headers = [
+                ('Content-Type', mime or 'application/octet-stream'),
+                ('Content-Disposition', content_disposition(name)),
+            ]
+        headers += [
             ('Content-Length', str(len(payload))),
-            ('Content-Disposition', 'inline; filename="%s"' % filename),
             ('X-Content-Type-Options', 'nosniff'),
         ]
         return request.make_response(payload, headers=headers)

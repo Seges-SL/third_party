@@ -14,31 +14,6 @@ UNKNOWN_SERVER_MSG = (
 )
 
 
-def format_unknown_api_server_error(server_code, active_codes, limit=20):
-    """English error when api_call uses a code not in the active catalogue."""
-    listed = ', '.join(list(active_codes)[:limit]) or '(none)'
-    return UNKNOWN_SERVER_MSG % (server_code, listed)
-
-
-def validate_tool_arguments(schema, arguments):
-    """Return an English error string, or None when the payload may proceed.
-
-    ``arguments`` is the api_call ``arguments`` dict (root of ``inputSchema``).
-    """
-    issue = check_tool_arguments(schema, arguments)
-    if not issue:
-        return None
-    if issue['kind'] == 'missing':
-        return (
-            "Missing required property '%s' at %s (tool inputSchema)."
-            % (issue['name'], issue['path'])
-        )
-    return (
-        "Property at %s must be %s (tool inputSchema)."
-        % (issue['path'], issue['expected'])
-    )
-
-
 def check_tool_arguments(schema, arguments):
     """Return ``{'kind', 'path', ...}`` or None. Pure; used for i18n at the hook."""
     if not isinstance(schema, dict):

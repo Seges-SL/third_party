@@ -1,7 +1,12 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com> */
+/**
+ * Chatboo conversational client (OWL1 / Odoo 14).
+ * Sessions, SSE /chatboo/stream, and the floating chat widget.
+ */
 odoo.define('pns_ai_chatboo.Chatboo', function (require) {
     "use strict";
 
-    const AbstractAction = require('web.AbstractAction');
     const core = require('web.core');
     const _t = core._t;
     const formatters = require('pns_ai_chatboo.formatters');
@@ -53,6 +58,10 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         const n = turnTokensValue(usage);
         if (n == null) {
             return '-';
+        }
+        const stats = window.ChatbooContextStats;
+        if (stats && stats.formatTokensK) {
+            return stats.formatTokensK(n);
         }
         if (n > 0) {
             return (n / 1024).toFixed(2) + 'k';
@@ -125,7 +134,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
      * ChatbooComponent — OWL 1 chat overlay for the PNS AI suite.
      *
      * This is the main UI component for AI conversations in Odoo. It renders
-     * as a persistent overlay (systray singleton) or as an action-mounted panel.
+     * as the persistent systray overlay (one instance). The Apps icon opens
+     * that same overlay; it does not mount a second Chatboo.
      *
      * ═══════════════════════════════════════════════════════════════════════
      * ARCHITECTURE MAP (for AI readers)
@@ -163,10 +173,10 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
      *   - Odoo Bus (pns_chatboo_sync) for multi-tab sync
      *   - Safe Plan verification via /pns_ai_mcp/verification/* routes
      *
-     * PROPS (injected by ChatbooAction):
+     * PROPS (injected by the systray overlay host):
      *   - rpc:          Odoo JSON-RPC function
      *   - notification: Odoo notification service
-     *   - context:      Action context ({new_chat, show_history_modal, ...})
+     *   - context:      optional ({new_chat, show_history_modal, ...})
      */
     class ChatbooComponent extends Component {
         // Constante configurable: número de decimales para formateo de números
@@ -289,6 +299,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 screenFocusLabel: '',
                 screenFocusEnabled: true,
                 screenContextSnapshot: null,
+                showSeriesStats: false,
                 pendingImages: [],       // imágenes pegadas (data URLs) a enviar en el turno
                 pendingImageNames: [],   // nombres alineados por índice (null si es pegado del portapapeles)
                 pendingFiles: [],        // ficheros de texto/datos adjuntos con el clip
@@ -301,6 +312,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             this.messages = useState([]);
             this.messagesRef = useRef("messages");
             this.chatInputRef = useRef("chatInput");
+            this._paintQueue = [];
+            this._isMounted = false;
             this.promptMaxLines = CHATBOO_PROMPT_MAX_LINES;
 
             // Input history (like readline)
@@ -333,6 +346,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             this.tipDownloadFile = _t('Download');
             this.tipCopyContent = _t('Copy content');
             this.tipCopyMarkdown = _t('Copy as Markdown');
+            this.tipGoToEnd = _t('Go to end of turn');
+            this.tipGoToStart = _t('Go to start of turn');
             this.tipCopyClipboard = _t('Copy to clipboard');
             this.tipOpenImage = _t('Open image');
             this.tipCancel = _t('Cancel');
@@ -348,7 +363,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             this.skillCommandPrefix = '';
             this.skillCodePrefix = '';
             // Built-in "/" palette. Axis toggles live under /mode (like skills)
-            // under /skills). Typing /painter-… still finds them via prefix filter.
+            // under /skills). Typing /compose-… still finds them via prefix filter.
             this.builtinCommands = [
                 { code: 'skills', name: 'Skills', description: _t('List the available skills'), kind: 'builtin', argsPolicy: 'none' },
                 {
@@ -356,21 +371,30 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     name: 'Create skill',
                     description: _t(
                         'Capture a turn as an instance skill (extra, with you as author). '
-                        + 'Typing /create-skill fills the last chip (you can change it), then the slash name. '
-                        + 'Settings prefixes apply. Help: /create-skill ?'
+                        + 'The line starts with the turn chip (filled from the last turn; '
+                        + 'you can change it). Then the slash name. Settings prefixes apply. '
+                        + 'If you already own that slash, the wizard replaces it. '
+                        + 'Words after the name fill the parameter description in the wizard. '
+                        + 'The turn chip is not a skill parameter. Help: /create-skill ?'
                     ),
-                    argHint: 'VWVN slash-name  |  ? help',
+                    argHint: 'VWVN slash-name [description…]  |  ? help',
                     params: [
                         {
                             name: 'turn_id',
                             type: 'string',
-                            desc: _t('4-character MCP turn id (chip). Required.'),
-                            default: _t('last turn'),
+                            desc: _t('4-character MCP turn chip. Required. Auto-filled from the last turn.'),
+                            default: '',
                         },
                         {
                             name: 'name',
                             type: 'string',
                             desc: _t('Slash name. Settings prefix is applied.'),
+                            default: '',
+                        },
+                        {
+                            name: 'description',
+                            type: 'string',
+                            desc: _t('Parameter description in prose. Fills the wizard. Not the turn chip.'),
                             default: '',
                         },
                     ],
@@ -426,9 +450,32 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     argsPolicy: 'ask',
                 },
                 {
+                    code: 'edit-skill',
+                    name: 'Edit skill',
+                    description: _t(
+                        'Open the skill wizard on a skill you created. '
+                        + 'Empty opens the picker. Stem, prefixed slash, or a word '
+                        + 'from the name. Help text and parameters are edited in the wizard. '
+                        + 'Help: /edit-skill ?'
+                    ),
+                    argHint: 'slash-or-name  |  ? help',
+                    params: [
+                        {
+                            name: 'name',
+                            type: 'string',
+                            desc: _t('Slash or name of a skill you created. Stem or prefixed.'),
+                            default: _t('opens picker'),
+                        },
+                    ],
+                    kind: 'builtin',
+                    deferArg: true,
+                    writerOnly: true,
+                    argsPolicy: 'ask',
+                },
+                {
                     code: 'mode',
                     name: 'Mode',
-                    description: _t('Presentation modes (painter, footer, table/chart)'),
+                    description: _t('Presentation modes (compose, footer, table/chart)'),
                     kind: 'builtin',
                     argsPolicy: 'none',
                 },
@@ -473,8 +520,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     folder: 'mode',
                 },
                 {
-                    code: 'painter-free',
-                    name: 'Painter free',
+                    code: 'compose-model',
+                    name: 'Compose model',
                     description: _t('The model owns the whole bubble this turn'),
                     placeholder: _t('Optional question…'),
                     kind: 'builtin',
@@ -483,8 +530,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     folder: 'mode',
                 },
                 {
-                    code: 'painter-local',
-                    name: 'Painter local',
+                    code: 'compose-agent',
+                    name: 'Compose Chatboo',
                     description: _t('Chatboo composes tables this turn'),
                     placeholder: _t('Optional question…'),
                     kind: 'builtin',
@@ -505,12 +552,32 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
          * because OWL 1's mounted() is unreliable with async operations.
          */
         async mounted() {
+            this._isMounted = true;
             this.scrollToBottom();
             this._setupContextClickHandling();
             this._setupRefLinkHandler();
             this._setupTtsClickAnchoring();
-            // Session loading (_initSession) is called from ChatbooAction.start()
-            // because OWL 1 mounted() is unreliable with async operations
+            this._drainPaintQueue();
+            // Session loading (_initSession) is called from the systray after
+            // mount: OWL 1 mounted() is unreliable with async operations.
+        }
+
+        patched() {
+            this._drainPaintQueue();
+        }
+
+        /** Run fn once OWL has patched this component (or mounted it). */
+        _afterPaint(fn) {
+            this._paintQueue.push(fn);
+            if (this._isMounted) {
+                this.render();
+            }
+        }
+
+        _drainPaintQueue() {
+            for (const fn of this._paintQueue.splice(0)) {
+                fn();
+            }
         }
 
         // Abre en pestaña nueva CUALQUIER enlace de contenido del chat: imágenes y
@@ -532,12 +599,15 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             }
             this._refLinkEl = el;
             this._refLinkHandler = (ev) => {
+                if (this._openViewer(ev)) {
+                    return;
+                }
                 const a = ev.target && ev.target.closest ? ev.target.closest('a[href]') : null;
                 if (!a || !el.contains(a)) {
                     return;
                 }
                 const href = a.getAttribute('href') || '';
-                if (!/^(https?:|\/web|\/odoo)/.test(href)) {
+                if (!/^(https?:|\/web|\/odoo|\/pns_ai_mcp\/session_file\/)/.test(href)) {
                     return;
                 }
                 ev.preventDefault();
@@ -547,18 +617,44 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             el.addEventListener('click', this._refLinkHandler, true);
         }
 
+        // Una imagen del chat se abre a pantalla completa con zoom (pns_base);
+        // un PDF (tarjeta o enlace), en el visor de Chatboo. Ctrl/Mayús/botón
+        // central siguen abriendo la pestaña.
+        _openViewer(ev) {
+            if (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button) {
+                return false;
+            }
+            if (!ev.target.closest || !ev.target.closest('.o_chatboo_messages')) {
+                return false;
+            }
+            let viewer = window.pnsImageViewer;
+            let shot = viewer && viewer.optionsFor(ev.target);
+            if (!shot) {
+                viewer = window.chatbooPdfViewer;
+                shot = viewer && viewer.optionsFor(ev.target);
+            }
+            if (!shot) {
+                return false;
+            }
+            ev.preventDefault();
+            ev.stopPropagation();
+            viewer.open(shot);
+            return true;
+        }
+
         /**
          * Initialize the chat session on mount.
          *
          * Phases:
-         *   0. If context.new_chat → create fresh session (skip loading previous)
-         *   1-3. Otherwise → load session list, find active session, load its messages
-         *   4. Fallback: restore from sessionStorage (floating chat transfer)
-         *   5. Start Odoo Bus listener for multi-tab sync
-         *   6. Open history modal if action context requests it
-         *   7. Run health check
+         *   0. Health check (prefs before any chart hydrate)
+         *   1. If context.new_chat → create fresh session (skip loading previous)
+         *   2-4. Otherwise → load session list, find active session, load its messages
+         *   5. Fallback: restore from sessionStorage (floating chat transfer)
+         *   6. Start Odoo Bus listener for multi-tab sync
+         *   7. Open history modal if action context requests it
          */
         async _initSession() {
+            await this._checkHealth();
             let sessionLoaded = false;
             try {
                 // FASE 0: Si el contexto pide una sesión nueva, crearla directamente
@@ -649,9 +745,6 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             if (this.props.context && this.props.context.show_history_modal) {
                 await this._showSessions();
             }
-
-            // After session is loaded, check health
-            this._checkHealth();
 
             // Catch-up: turnos asíncronos que terminaron mientras no mirábamos
             // (p.ej. tras un F5). La fuente de verdad es la BD; recargamos.
@@ -790,12 +883,20 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                         } catch (e) { }
                     }
                     // If payload has embedded 'type' field (our sendone format), use that as type.
+                    if (typeof payload === 'object' && payload && payload.type === 'pns_safe_plan') {
+                        type = 'pns_safe_plan';
+                    }
                     if (typeof payload === 'object' && payload && payload.type === 'pns_chatboo_sync') {
                         type = 'pns_chatboo_sync';
                     }
                 } else if (notif && notif.type) {
                     type = notif.type;
                     payload = notif.payload;
+                }
+
+                if (type === 'pns_safe_plan' && payload) {
+                    this._dropSafePlanCard(payload.verification_id, payload.status);
+                    continue;
                 }
 
                 if (type === 'pns_chatboo_sync' && payload) {
@@ -948,10 +1049,9 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
          * Open session history modal and reload sessions
          */
         _focusChatInput() {
-            // Foco diferido a la caja de prompt: tras el repintado (cierre del
-            // modal de histórico o carga de sesión) el foco se iría al body; lo
-            // devolvemos al input para escribir sin tener que clicar antes.
-            requestAnimationFrame(() => {
+            // Foco tras el repintado (cierre del modal de histórico o carga de
+            // sesión): si no, el foco se iría al body.
+            this._afterPaint(() => {
                 const overlay = document.getElementById('o_chatboo_persistent_overlay');
                 if (overlay && (
                     overlay.style.display === 'none'
@@ -1088,6 +1188,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                                 : [];
                         }
                         this._rebuildContextInfo(msg);
+                        msg.wideCanvas = this.messageWantsWideCanvas(msg);
                     });
                     // Mutate existing proxy to preserve Owl reactivity
                     this.messages.splice(0, this.messages.length);
@@ -1224,7 +1325,17 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                         }
                         return { url: String(it || ''), name: null };
                     }).filter((it) => it.url && it.url.indexOf('data:') !== 0);
-                    const files = (m.files || []).filter((f) => f && (f.url || f.name));
+                    const files = (m.files || []).filter((f) => f && (f.url || f.name))
+                        .map((f) => {
+                            const url = f.url || '';
+                            if (/^(blob:|data:)/i.test(url)) {
+                                return {
+                                    name: f.name, mimetype: f.mimetype,
+                                    size: f.size, url: '',
+                                };
+                            }
+                            return f;
+                        });
                     if (imgs.length) {
                         out.images = imgs;
                     }
@@ -1262,8 +1373,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 if (m.offtopic) {
                     out.offtopic = true;
                 }
-                if (m.correlation_id) {
-                    out.correlation_id = m.correlation_id;
+                if (m.turn) {
+                    out.turn = m.turn;
                 }
                 const userPrompt = m.user_prompt
                     || (m.meta && m.meta.user_prompt)
@@ -1547,6 +1658,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 this._fx = (result && result.fx) ? result.fx : null;
                 this._defaultDisplayCurrency = (result && result.display_currency) || 'USD';
                 this._applyCardWidthRatio(result && result.card_width_ratio);
+                this._applyShowSeriesStats(result && result.show_series_stats);
                 this._refreshUsageChips();
 
                 if (result.status === 'error') {
@@ -1708,15 +1820,14 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 this._currencyForProvider(providerName, displayCurrency),
                 this._fx,
             );
-            const turnTitle = _t('Tokens billed this turn (all LLM rounds)');
+            const turnTokensTitle = _t('Tokens billed this turn (all LLM rounds)');
             const spendLabel = turnLabel + ' · ' + cost.label;
-            const spendTitle = [turnLabel !== '-' ? turnTitle : '', cost.title].filter(Boolean).join(' · ');
+            const spendTitle = [turnLabel !== '-' ? turnTokensTitle : '', cost.title].filter(Boolean).join(' · ');
             return {
-                turnCodeTitle: _t('Turn id (MCP log). Click to copy. Use with /create-skill.'),
-                bufferTitle: _t('Session context occupancy · provider cap'),
+                turnTitle: _t('Turn id (MCP log). Click to copy. Use with /create-skill.'),
+                bufferTitle: _t('Model window · last call vs limit'),
                 turnTokensK: turnK,
                 turnLabel,
-                turnTitle,
                 costLabel: cost.label,
                 costTitle: cost.title,
                 spendLabel,
@@ -1735,6 +1846,11 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             const used = occupied.used;
             const limit = occupied.limit;
             const showBuffer = Boolean(used && limit);
+            const pct = showBuffer ? (used / limit) * 100 : 0;
+            const stats = window.ChatbooContextStats;
+            const bufferLevel = showBuffer && stats && stats.bufferLevelOf
+                ? stats.bufferLevelOf(pct)
+                : (showBuffer ? (pct > 80 ? 'danger' : pct > 60 ? 'warn' : 'ok') : null);
             let usageColor = 'text-success';
             let usageColorHex = '#28a745';
             let usageIcon = 'fa-bell-o';
@@ -1744,12 +1860,12 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             if (showBuffer) {
                 usedK = (used / 1024).toFixed(2);
                 limitK = (limit / 1024).toFixed(2);
-                usagePercent = ((used / limit) * 100).toFixed(1);
-                if (usagePercent > 80) {
+                usagePercent = pct.toFixed(1);
+                if (bufferLevel === 'danger') {
                     usageColor = 'text-danger';
                     usageColorHex = '#dc3545';
                     usageIcon = 'fa-exclamation-triangle';
-                } else if (usagePercent > 60) {
+                } else if (bufferLevel === 'warn') {
                     usageColor = 'text-warning';
                     usageColorHex = '#ffc107';
                     usageIcon = 'fa-bomb';
@@ -1757,14 +1873,15 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             }
             const speedTps = extras.speedTps || 0;
             const promptSpeedTps = extras.promptSpeedTps || 0;
-            const turnCode = (extras.turnCode || '').trim();
+            const turn = (extras.turn || '').trim();
             return {
-                turnCode,
+                turn,
                 showBuffer,
                 usedK,
                 limitK,
                 freeK: showBuffer ? ((limit - used) / 1024).toFixed(2) : null,
                 usagePercent,
+                bufferLevel,
                 usageColor,
                 usageColorHex,
                 usageIcon,
@@ -1795,8 +1912,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 promptSpeedTps: msg.prompt_speed_tps || 0,
                 provider: (msg.model_details && msg.model_details.provider) || '',
                 currency: (msg.model_details && msg.model_details.display_currency) || '',
-                turnCode: msg.correlation_id
-                    || (msg.meta && msg.meta.correlation_id)
+                turn: msg.turn
+                    || (msg.meta && msg.meta.turn)
                     || '',
             });
         }
@@ -1832,9 +1949,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 if (m.role === 'user') {
                     let text = m.content;
                     if (typeof text === 'string' && text.includes('<')) {
-                        const tempDiv = document.createElement('div');
-                        tempDiv.innerHTML = text;
-                        text = tempDiv.textContent || tempDiv.innerText || text;
+                        text = formatters.textOfHtml(text) || text;
                     }
                     return { role: 'user', content: this._clipForLlm(text, 4000) };
                 }
@@ -1863,9 +1978,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 || s.indexOf('data-chatboo-dataset') >= 0;
             if (!fat) {
                 if (typeof s === 'string' && s.includes('<')) {
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = s;
-                    return (tempDiv.textContent || tempDiv.innerText || s).trim();
+                    return (formatters.textOfHtml(s) || s).trim();
                 }
                 return s;
             }
@@ -2051,7 +2164,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
          * Render the Safe Plan verification card (fixed-position overlay).
          *
          * This is the human-in-the-loop confirmation UI. When the AI proposes
-         * a write operation (via propose_safe_operations), the server sends a
+         * a write operation (via safe_plan_request), the server sends a
          * bus notification that triggers this method.
          *
          * Flow:
@@ -2087,6 +2200,16 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     }
                 },
             });
+        }
+
+        _dropSafePlanCard(verificationId, status) {
+            if (!verificationId || status === 'pending') {
+                return;
+            }
+            const card = document.getElementById('pns_verif_' + verificationId);
+            if (card) {
+                card.remove();
+            }
         }
 
         _showVerificationUI(evt) {
@@ -2333,8 +2456,14 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
 
         _screenFocusTitle() {
             return this.state.screenFocusEnabled
-                ? _t('Screen context active — click to ignore this chat')
-                : _t('Screen context off — click to re-enable');
+                ? _t('Covered view ON')
+                : _t('Covered view OFF');
+        }
+
+        _seriesStatsTitle() {
+            return this.state.showSeriesStats
+                ? _t('Statistics ON')
+                : _t('Statistics OFF');
         }
 
         _ttsTitle() {
@@ -2416,6 +2545,13 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 if (screenContext) {
                     payload.screen_context = screenContext;
                 }
+                // Rows ticked in the answer: they go out with this sentence
+                // and are spent by it.
+                const marks = window.ChatbooRowMarks;
+                const refs = marks ? marks.take() : [];
+                if (refs.length) {
+                    payload.refs = refs;
+                }
                 if (images && images.length) {
                     payload.images = images;
                 }
@@ -2425,7 +2561,10 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 if (files && files.length) {
                     payload.files = files;
                 }
-                const resp = await fetch('/chatboo/stream', {
+                // The body is not a form: Odoo reads csrf_token from the query.
+                const streamUrl = '/chatboo/stream?csrf_token='
+                    + encodeURIComponent(odoo.csrf_token || '');
+                const resp = await fetch(streamUrl, {
                     // Odoo 14 enruta por Content-Type: 'application/json' fuerza un
                     // JsonRequest que choca con la ruta type='http' (BadRequest, body
                     // sin SSE). Con text/plain O14 lo trata como http; el controller
@@ -2488,9 +2627,9 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                             // Metadatos del cierre: modelo/proveedor que respondió y
                             // tokens reales (contexto usado). Los consume el llamador.
                             this._lastStreamMeta = evt;
-                            if (evt.painter === 'painter-free'
-                                    || evt.painter === 'painter-local') {
-                                this.state.effectiveFormattingMode = evt.painter;
+                            if (evt.compose === 'compose-model'
+                                    || evt.compose === 'compose-agent') {
+                                this.state.effectiveFormattingMode = evt.compose;
                             }
                         } else if (evt.event === 'choice' && evt.choice_id) {
                             this._showChoiceList(evt);
@@ -2697,10 +2836,10 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     promptSpeedTps: __promptSpeedTps,
                     provider: __meta.provider || '',
                     currency: __meta.display_currency || '',
-                    turnCode: __meta.correlation_id || '',
+                    turn: __meta.turn || '',
                 },
             );
-            return {
+            const payload = {
                 role: 'assistant',
                 content: formatted,
                 original_content: txt || '',
@@ -2708,7 +2847,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 timestamp: this._formatTimestamp(startTime, endTime),
                 usage: localAck ? null : (__meta.usage || null),
                 context_limit: localAck ? null : (__meta.context_limit || null),
-                correlation_id: localAck ? '' : (__meta.correlation_id || ''),
+                turn: localAck ? '' : (__meta.turn || ''),
                 user_prompt: __meta.user_prompt || this._lastUserPromptText(),
                 local_ack: localAck,
                 offtopic: localAck,
@@ -2716,7 +2855,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     ? {
                         model: __meta.model || '',
                         provider: __meta.provider || '',
-                        painter: __meta.painter || '',
+                        compose: __meta.compose || '',
                         display_currency: __meta.display_currency || '',
                     }
                     : null,
@@ -2727,6 +2866,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 prompt_speed_tps: localAck ? 0 : __promptSpeedTps,
                 backend_history: localAck ? null : (__meta.history || null),
             };
+            payload.wideCanvas = this.messageWantsWideCanvas(payload);
+            return payload;
         }
 
         /**
@@ -2805,7 +2946,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
          */
         async _sendMessage() {
             if (this.state.disabled) return;
-            const text = this.state.currentInput.trim();
+            const text = this._promptText().trim();
             const images = (this.state.pendingImages || []).slice();
             const imageNames = (this.state.pendingImageNames || []).slice();
             const files = (this.state.pendingFiles || []).slice();
@@ -2816,6 +2957,11 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             if (!images.length && !files.length) {
                 const builtin = this._matchBuiltinCommand(text);
                 if (builtin) {
+                    if (this._isDeferredSlash(builtin.code)
+                        && !this._slashLineReadyToSend(builtin)) {
+                        this._holdIncompleteSlash(builtin);
+                        return;
+                    }
                     this.state.currentInput = '';
                     this._syncInputEl();
                     await this._runBuiltinCommand(builtin);
@@ -2851,7 +2997,12 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 role: "user",
                 content: _textHtml,
                 images: images.map((u, i) => ({ url: u, name: imageNames[i] || null })),
-                files: files.map((f) => ({ name: f.name, mimetype: f.mimetype || null, url: null })),
+                files: files.map((f) => ({
+                    name: f.name,
+                    mimetype: f.mimetype || null,
+                    url: f.url || null,
+                    size: f.size,
+                })),
                 timestamp: userTimestamp.replace(' (0 segundos)', ''), // Remove duration for user messages
                 startTime: startTime, // Store for duration calculation in assistant response
                 usage: null // No usage for user messages
@@ -2939,7 +3090,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                         : __sseText,
                     usage: __meta.local_ack ? null : (__meta.usage || null),
                     context_limit: __meta.local_ack ? null : (__meta.context_limit || null),
-                    correlation_id: __meta.local_ack ? '' : (__meta.correlation_id || ''),
+                    turn: __meta.local_ack ? '' : (__meta.turn || ''),
                     local_ack: !!__meta.local_ack,
                     speed_tps: __speedTps,
                     prompt_speed_tps: __promptSpeedTps,
@@ -2976,23 +3127,31 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                         }
                     }
                 }
+                // The worker writes the session row. A client save of the
+                // live chips (blob / empty url) used to overwrite the
+                // attachment links the worker had just stored.
+                this._skipTurnSave = true;
                 if (__meta.authored) {
                     const sid = __meta.session_id || this._lastStreamSessionId || this.state.currentSessionId;
                     if (sid) {
                         // El worker ya persistió las imágenes del turno como
                         // ir.attachment; al recargar, _loadSession las deja en
                         // msg.images / msg.files (URLs). No hace falta recordarlas aquí.
+                        const kept = this.messages.slice();
                         this.state.currentSessionId = sid;
                         await this._loadSession(sid);
-                        this._maybeSpeakLastAssistant();
+                        // Job done is not the same as the bubbles being in
+                        // the row. Reloading an empty session ate the live
+                        // turn (prompt, file card and answer). Keep the live
+                        // bubbles; do not write them over the row.
+                        if (!(kept.length && this.messages.length < kept.length)) {
+                            this._lastLiveRequestId = this._lastStreamRequestId || null;
+                            this._lastSendWasError = !!__meta.is_error;
+                            this._maybeSpeakLastAssistant();
+                            return;
+                        }
+                        this.messages.splice(0, this.messages.length, ...kept);
                     }
-                    // Este turno se ha visto en vivo aquí: recordamos su request_id
-                    // para que el aviso de bus no lo recargue por encima y borre el
-                    // contenido al cambiar de ventana.
-                    this._lastLiveRequestId = this._lastStreamRequestId || null;
-                    this._lastSendWasError = !!__meta.is_error;
-                    this._skipTurnSave = true;  // el worker ya guardó; no re-guardar
-                    return;  // el bloque finally hace badge + foco
                 }
 
                 // 3. Add Assistant Response
@@ -3053,7 +3212,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                             promptSpeedTps: result.prompt_speed_tps || 0,
                             provider: (result.model_details && result.model_details.provider) || '',
                             currency: (result.model_details && result.model_details.display_currency) || '',
-                            turnCode: result.correlation_id || '',
+                            turn: result.turn || '',
                         },
                     );
 
@@ -3068,7 +3227,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                         timestamp: timestamp,
                         usage: localAck ? null : (result.usage || null),
                         context_limit: localAck ? null : (result.context_limit || null),
-                        correlation_id: localAck ? '' : (result.correlation_id || ''),
+                        turn: localAck ? '' : (result.turn || ''),
                         user_prompt: text || '',
                         local_ack: localAck,
                         offtopic: localAck,
@@ -3155,12 +3314,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 }
                 this._lastSendWasError = false;
 
-                // Focus chat input after render completes (no setTimeout)
-                requestAnimationFrame(() => {
-                    if (this.chatInputRef && this.chatInputRef.el) {
-                        this.chatInputRef.el.focus();
-                    }
-                });
+                this._focusChatInput();
             }
         }
 
@@ -3326,6 +3480,14 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
          * Synchronize the textarea value with state (OWL1 has no reliable t-att-value).
          * Also refreshes multiline height.
          */
+        _promptText() {
+            const el = this.chatInputRef && this.chatInputRef.el;
+            if (el && el.value != null) {
+                return el.value;
+            }
+            return this.state.currentInput || '';
+        }
+
         _syncInputEl() {
             // OWL 1: t-att-value no siempre actualiza el DOM al cambiar state desde JS.
             if (this.chatInputRef && this.chatInputRef.el) {
@@ -3427,8 +3589,10 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             const text = el.value != null ? el.value : (this.state.currentInput || '');
             const lines = this._promptNewlineCount(text);
             const multiline = lines > 1;
-            this.state.promptMultiline = multiline;
-            if (!multiline) {
+            if (this.state.promptMultiline !== multiline) {
+                this.state.promptMultiline = multiline;
+            }
+            if (!multiline && this.state.promptCollapsed) {
                 this.state.promptCollapsed = false;
             }
             const cs = window.getComputedStyle(el);
@@ -3552,6 +3716,25 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             return this.messagesRef && this.messagesRef.el;
         }
 
+        _applyShowSeriesStats(value) {
+            const on = !!value;
+            this.state.showSeriesStats = on;
+            if (window.ChatbooCharts && typeof window.ChatbooCharts.setShowSeriesStats === 'function') {
+                window.ChatbooCharts.setShowSeriesStats(on);
+            }
+        }
+
+        async _toggleShowSeriesStats() {
+            const on = !this.state.showSeriesStats;
+            this._applyShowSeriesStats(on);
+            try {
+                await this.props.rpc({
+                    route: '/chatboo/prefs',
+                    params: { show_series_stats: on },
+                });
+            } catch (e) { /* keep in-memory flag */ }
+        }
+
         _applyCardWidthRatio(ratio) {
             const api = window.ChatbooCardWidth;
             const root = this._messagesCanvas();
@@ -3561,7 +3744,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 return;
             }
             api.applyRatio(root, this._cardWidthRatio || api.DEFAULT_RATIO);
-            api.relayoutCharts(root);
+            api.relayoutSoon(root);
         }
 
         async _saveCardWidth(ratio) {
@@ -3570,7 +3753,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             const stored = (api && root) ? api.applyRatio(root, ratio) : ratio;
             this._cardWidthRatio = stored;
             if (api) {
-                api.relayoutCharts(root);
+                api.relayoutSoon(root);
             }
             try {
                 await this.props.rpc({
@@ -3589,7 +3772,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             const root = this._messagesCanvas();
             if (api && root) {
                 api.applyRatio(root, api.DEFAULT_RATIO);
-                api.relayoutCharts(root);
+                api.relayoutSoon(root);
             }
             this._cardWidthRatio = 0;
             this.props.rpc({
@@ -3611,40 +3794,51 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             handle.classList.add('is-dragging');
             const startX = ev.clientX;
             const startW = card.getBoundingClientRect().width;
+            let preview = api.previewGuide(root, card, startW);
             const onMove = (e) => {
-                api.applyPx(root, startW + (e.clientX - startX));
-                api.relayoutCharts(root);
+                preview = api.previewGuide(root, card, startW + (e.clientX - startX));
             };
             const onUp = () => {
                 handle.classList.remove('is-dragging');
                 document.removeEventListener('pointermove', onMove);
                 document.removeEventListener('pointerup', onUp);
-                this._saveCardWidth(api.ratioFromRoot(root));
+                document.removeEventListener('pointercancel', onUp);
+                api.hideGuide(root);
+                this._saveCardWidth(api.applyPx(root, preview));
             };
             document.addEventListener('pointermove', onMove);
             document.addEventListener('pointerup', onUp);
+            document.addEventListener('pointercancel', onUp);
         }
 
         messageWantsWideCanvas(msg) {
             if (!msg || msg.role === 'user') {
                 return false;
             }
+            if (typeof msg.wideCanvas === 'boolean') {
+                return msg.wideCanvas;
+            }
             var clip = msg.clip_data;
-            if (clip && (clip.include_chart || clip.include_table
-                || (clip.rows && clip.rows.length))) {
+            var flag = !!(clip && (clip.include_chart || clip.include_table
+                || (clip.rows && clip.rows.length)));
+            if (flag) {
+                msg.wideCanvas = true;
                 return true;
             }
             var html = String(msg.formatted_html || msg.content || '');
-            if (/data-chatboo-show-mode="(?:show-table|show-chart|chart-table|dashboard)"/.test(html)) {
-                return true;
-            }
-            return html.indexOf('o_chatboo_table_block') !== -1
+            msg.wideCanvas = /data-chatboo-show-mode="(?:show-table|show-chart|chart-table|dashboard)"/.test(html)
+                || html.indexOf('o_chatboo_table_block') !== -1
                 || html.indexOf('o_chatboo_dashboard') !== -1
                 || /<table[\s>]/i.test(html);
+            return msg.wideCanvas;
         }
 
         _fileBannerCardClass(mfile) {
             return 'o_chatboo_file_banner_card o_chatboo_file_banner_' + this._fileBannerTone(mfile);
+        }
+
+        _fileLinkType(mfile) {
+            return this._fileBannerTone(mfile) === 'pdf' ? 'application/pdf' : false;
         }
 
         _fileSizeLabel(mfile) {
@@ -3793,11 +3987,14 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             }
             try {
                 const dataUrl = await this._readFileAsDataUrl(file);
+                const isPdf = (file.type || '').toLowerCase() === 'application/pdf'
+                    || /\.pdf$/i.test(file.name || '');
                 this.state.pendingFiles.push({
                     name: file.name,
                     mimetype: file.type || '',
                     size: file.size,
                     data: dataUrl,
+                    url: isPdf ? URL.createObjectURL(file) : null,
                 });
             } catch (e) {
                 if (this.props.notification) {
@@ -3872,7 +4069,20 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             }
         }
 
-        // Ítems de skill (kebab) para el menú flotante.
+        _skillOriginRank(s) {
+            if (s && s.mine) {
+                return 0;
+            }
+            if (s && s.is_system) {
+                return 3;
+            }
+            if (s && s.factory) {
+                return 2;
+            }
+            return 1;
+        }
+
+        // Ítems de skill: míos, extras, inyectados, nativos; A–Z dentro de cada grupo.
         /**
          * Map raw skill records to slash-menu item format.
          * @param {Array} skills - Skill records from the server.
@@ -3880,6 +4090,11 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
          */
         _skillItems(skills) {
             const sorted = (skills || []).slice().sort((a, b) => {
+                const ra = this._skillOriginRank(a);
+                const rb = this._skillOriginRank(b);
+                if (ra !== rb) {
+                    return ra - rb;
+                }
                 const ac = (a.code || '').toLowerCase();
                 const bc = (b.code || '').toLowerCase();
                 return ac.localeCompare(bc, undefined, { sensitivity: 'base' });
@@ -3896,6 +4111,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     argHint: s.arg_hint || '', argsPolicy: s.args_policy || '',
                     kind: 'skill',
                     mine: !!s.mine, is_system: !!s.is_system,
+                    factory: !!(s.factory || s.is_system),
                     badgeLabel: badgeLabel,
                 };
             });
@@ -3907,7 +4123,10 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         }
 
         _resetInputPlaceholder() {
-            this.state.inputPlaceholder = this._defaultInputPlaceholder();
+            const next = this._defaultInputPlaceholder();
+            if (this.state.inputPlaceholder !== next) {
+                this.state.inputPlaceholder = next;
+            }
         }
 
         // Pista de argumentos (arg_hint) del skill cuyo "/<code>" se teclea.
@@ -3920,9 +4139,12 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             const code = m[1].toLowerCase();
             const skills = this.skillsCache || [];
             const s = skills.find((x) => (x.code || '').toLowerCase() === code);
-            this.state.inputPlaceholder = (s && s.arg_hint)
+            const next = (s && s.arg_hint)
                 ? _t('Arguments, e.g.: %s').replace('%s', s.arg_hint)
                 : this._defaultInputPlaceholder();
+            if (this.state.inputPlaceholder !== next) {
+                this.state.inputPlaceholder = next;
+            }
         }
 
         // Comandos built-in + skills filtrados por fragmento (autocompletado al teclear).
@@ -3933,7 +4155,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
          * @returns {Array} Filtered items.
          */
         _filterSlashItems(skills, q) {
-            const all = [...this._allBuiltinCommands(), ...this._skillItems(skills)];
+            const all = [...this._skillItems(skills), ...this._allBuiltinCommands()];
             if (!q) return all;
             return all.filter(
                 (c) =>
@@ -3954,18 +4176,20 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                         (c.name || '').toLowerCase().includes(q)
                 );
             }
-            this.state.slashMode = mode === 'rename' ? 'rename' : 'delete';
+            this.state.slashMode = mode === 'rename'
+                ? 'rename'
+                : (mode === 'edit' ? 'edit' : 'delete');
             this.state.slashItems = items.slice(0, 50);
             this.state.slashIndex = 0;
             this.state.slashOpen = items.length > 0;
             this._syncSlashMenu();
             if (!items.length && !q) {
-                this._notifySlash(
-                    mode === 'rename'
-                        ? _t('You have no skills to rename.')
-                        : _t('You have no skills to delete.'),
-                    'warning',
-                );
+                const emptyMsg = mode === 'rename'
+                    ? _t('You have no skills to rename.')
+                    : (mode === 'edit'
+                        ? _t('You have no skills to edit.')
+                        : _t('You have no skills to delete.'));
+                this._notifySlash(emptyMsg, 'warning');
             }
         }
 
@@ -3975,8 +4199,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
          * @param {InputEvent} ev
          */
         _onSlashInput(ev) {
-            const text = ev && ev.target ? ev.target.value : this.state.currentInput;
-            this.state.currentInput = text;
+            const text = ev && ev.target ? ev.target.value : this._promptText();
             this._syncArgPlaceholder(text);
             this._syncPromptHeight();
             this._updateSlashSuggestions(text);
@@ -4005,12 +4228,22 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     return;
                 }
             }
+            const editPick = /^\/edit-skill(?:\s+(\S*))?\s*$/i.exec(text || '');
+            if (editPick && (text || '').includes(' ')) {
+                await this._ensureSkills();
+                if (this.canWriteSkills) {
+                    await this._fillOwnedSkillPicker(editPick[1] || '', 'edit');
+                    return;
+                }
+            }
             const m = /^\/(\S*)$/.exec(text || '');
             if (!m) {
-                this.state.slashOpen = false;
-                this.state.slashItems = [];
-                this.state.slashMode = 'commands';
-                this._syncSlashMenu();
+                if (this.state.slashOpen || (this.state.slashItems && this.state.slashItems.length)) {
+                    this.state.slashOpen = false;
+                    this.state.slashItems = [];
+                    this.state.slashMode = 'commands';
+                    this._syncSlashMenu();
+                }
                 return;
             }
             const token = m[1].toLowerCase();
@@ -4036,89 +4269,182 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         }
 
         /**
+         * Fill the prompt with a slash line and wait. Selection never runs
+         * the command: Enter (or typing args, then Enter) does.
+         */
+        _stageSlashInput(text, placeholder) {
+            let line = String(text || '');
+            if (line && !line.endsWith(' ')) {
+                line += ' ';
+            }
+            this.state.slashOpen = false;
+            this.state.slashItems = [];
+            this.state.slashMode = 'commands';
+            this.state.currentInput = line;
+            this.state.inputPlaceholder = placeholder || this._defaultInputPlaceholder();
+            this._syncInputEl();
+            this._syncSlashMenu();
+            if (this.chatInputRef && this.chatInputRef.el) {
+                this.chatInputRef.el.focus();
+            }
+        }
+
+        _argPlaceholder(item) {
+            if (!item) {
+                return this._defaultInputPlaceholder();
+            }
+            if (item.placeholder) {
+                return item.placeholder;
+            }
+            if (item.argHint) {
+                return _t('Arguments, e.g.: %s').replace('%s', item.argHint);
+            }
+            return this._defaultInputPlaceholder();
+        }
+
+        /** True when the typed line already has what the command needs to run. */
+        _slashLineReadyToSend(builtin) {
+            if (!builtin) {
+                return false;
+            }
+            if (builtin.help || this._isHelpArg(builtin.arg)) {
+                return true;
+            }
+            if (builtin.code === 'create-skill') {
+                return Boolean(builtin.skillCode && builtin.turnId);
+            }
+            if (builtin.code === 'delete-skill') {
+                return Boolean(builtin.arg);
+            }
+            if (builtin.code === 'rename-skill') {
+                return Boolean(builtin.arg && builtin.arg2);
+            }
+            if (builtin.code === 'edit-skill') {
+                return Boolean(builtin.arg);
+            }
+            return false;
+        }
+
+        _isDeferredSlash(code) {
+            return (
+                code === 'create-skill'
+                || code === 'delete-skill'
+                || code === 'rename-skill'
+                || code === 'edit-skill'
+            );
+        }
+
+        _holdIncompleteSlash(builtin) {
+            const code = builtin && builtin.code;
+            if (code === 'create-skill') {
+                this._beginCreateSkillInput(builtin.skillCode, builtin.paramProse);
+                return;
+            }
+            if (code === 'delete-skill') {
+                this._stageSlashInput(
+                    builtin.arg ? '/delete-skill ' + builtin.arg : '/delete-skill',
+                    _t('Skill to delete, e.g.: %s').replace('%s', 'slash-name'),
+                );
+                if (!builtin.arg) {
+                    this._fillOwnedSkillPicker('');
+                }
+                return;
+            }
+            if (code === 'rename-skill') {
+                const line = builtin.arg
+                    ? '/rename-skill ' + builtin.arg
+                    : '/rename-skill';
+                this._stageSlashInput(
+                    line,
+                    builtin.arg
+                        ? _t('New slash name, then press Enter')
+                        : _t('Skill to rename, e.g.: %s').replace('%s', 'old-name new-name'),
+                );
+                if (!builtin.arg) {
+                    this._fillOwnedSkillPicker('', 'rename');
+                }
+                return;
+            }
+            if (code === 'edit-skill') {
+                this._stageSlashInput(
+                    builtin.arg ? '/edit-skill ' + builtin.arg : '/edit-skill',
+                    _t('Skill to edit, e.g.: %s').replace('%s', 'slash-or-name'),
+                );
+                if (!builtin.arg) {
+                    this._fillOwnedSkillPicker('', 'edit');
+                }
+            }
+        }
+
+        /**
          * Apply a selected slash-command item: replace input text and close menu.
+         * Never executes the command.
          * @param {Object} item - The selected slash item ({code, label}).
          */
         _applySlashSelection(item) {
             if (!item) return;
             if (this.state.slashMode === 'delete' && item.kind === 'skill') {
-                this.state.slashOpen = false;
-                this.state.slashItems = [];
-                this.state.currentInput = '';
-                this._resetInputPlaceholder();
-                this._syncInputEl();
-                this._syncSlashMenu();
-                this._confirmDeleteSkill(item.code);
+                this._stageSlashInput(
+                    '/delete-skill ' + item.code,
+                    _t('Press Enter to delete /%s').replace('%s', item.code),
+                );
                 return;
             }
             if (this.state.slashMode === 'rename' && item.kind === 'skill') {
-                this.state.slashOpen = false;
-                this.state.slashItems = [];
-                this.state.slashMode = 'commands';
-                this.state.currentInput = '/rename-skill ' + item.code + ' ';
-                this.state.inputPlaceholder = _t('New slash name, then press Enter');
-                this._syncInputEl();
-                this._syncSlashMenu();
-                if (this.chatInputRef && this.chatInputRef.el) {
-                    this.chatInputRef.el.focus();
-                }
+                this._stageSlashInput(
+                    '/rename-skill ' + item.code,
+                    _t('New slash name, then press Enter'),
+                );
                 return;
             }
-            this.state.slashOpen = false;
-            this.state.slashItems = [];
-            this._syncSlashMenu();
+            if (this.state.slashMode === 'edit' && item.kind === 'skill') {
+                this._stageSlashInput(
+                    '/edit-skill ' + item.code,
+                    _t('Press Enter to edit /%s').replace('%s', item.code),
+                );
+                return;
+            }
             if (item.kind === 'builtin') {
+                if (item.code === 'skills') {
+                    this._openSkillsMenu();
+                    return;
+                }
+                if (item.code === 'mode') {
+                    this._openModeMenu();
+                    return;
+                }
                 if (item.code === 'create-skill') {
                     this._beginCreateSkillInput();
                     return;
                 }
                 if (item.code === 'delete-skill') {
-                    this.state.currentInput = '/delete-skill ';
-                    this.state.inputPlaceholder = _t('Skill to delete, e.g.: %s').replace('%s', item.argHint);
-                    this._syncInputEl();
+                    this._stageSlashInput(
+                        '/delete-skill',
+                        _t('Skill to delete, e.g.: %s').replace('%s', item.argHint),
+                    );
                     this._fillOwnedSkillPicker('');
-                    if (this.chatInputRef && this.chatInputRef.el) {
-                        this.chatInputRef.el.focus();
-                    }
                     return;
                 }
                 if (item.code === 'rename-skill') {
-                    this.state.currentInput = '/rename-skill ';
-                    this.state.inputPlaceholder = _t('Skill to rename, e.g.: %s').replace('%s', item.argHint);
-                    this._syncInputEl();
+                    this._stageSlashInput(
+                        '/rename-skill',
+                        _t('Skill to rename, e.g.: %s').replace('%s', item.argHint),
+                    );
                     this._fillOwnedSkillPicker('', 'rename');
-                    if (this.chatInputRef && this.chatInputRef.el) {
-                        this.chatInputRef.el.focus();
-                    }
                     return;
                 }
-                if (item.deferArg) {
-                    this.state.slashMode = 'commands';
-                    this.state.currentInput = '/' + item.code + ' ';
-                    this.state.inputPlaceholder = item.placeholder
-                        || (item.argHint
-                            ? _t('Arguments, e.g.: %s').replace('%s', item.argHint)
-                            : this._defaultInputPlaceholder());
-                    this._syncInputEl();
-                    if (this.chatInputRef && this.chatInputRef.el) {
-                        this.chatInputRef.el.focus();
-                    }
+                if (item.code === 'edit-skill') {
+                    this._stageSlashInput(
+                        '/edit-skill',
+                        _t('Skill to edit, e.g.: %s').replace('%s', item.argHint),
+                    );
+                    this._fillOwnedSkillPicker('', 'edit');
                     return;
                 }
-                this.state.currentInput = '';
-                this._syncInputEl();
-                this._runBuiltinCommand(item.code);
+                this._stageSlashInput('/' + item.code, this._argPlaceholder(item));
                 return;
             }
-            this.state.slashMode = 'commands';
-            this.state.currentInput = '/' + item.code + ' ';
-            this.state.inputPlaceholder = item.argHint
-                ? _t('Arguments, e.g.: %s').replace('%s', item.argHint)
-                : this._defaultInputPlaceholder();
-            this._syncInputEl();
-            if (this.chatInputRef && this.chatInputRef.el) {
-                this.chatInputRef.el.focus();
-            }
+            this._stageSlashInput('/' + item.code, this._argPlaceholder(item));
         }
 
         _isHelpArg(arg) {
@@ -4131,14 +4457,6 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 || ['help', 'ayuda', 'options', 'opciones', 'usage', 'uso',
                     '/?', '/help', '/ayuda'].includes(t)
             );
-        }
-
-        _escSlash(text) {
-            return String(text || '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;');
         }
 
         _slashHelpMarkdown(meta) {
@@ -4164,24 +4482,48 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             md += '**' + _t('Parameters') + ':**\n\n';
             const params = (meta && meta.params) || [];
             if (params.length) {
-                md += '| ' + _t('Name') + ' | ' + _t('Type') + ' | ' + _t('Description') + ' | ' + _t('Default') + ' |\n';
-                md += '| --- | --- | --- | --- |\n';
                 params.forEach((row) => {
-                    md += '| `' + row.name + '` | ' + (row.type || 'string') + ' | ' + (row.desc || '—') + ' | ' + (row.default || '—') + ' |\n';
+                    const bits = [];
+                    if (row.desc) {
+                        bits.push(row.desc);
+                    }
+                    if (row.default) {
+                        bits.push(_t('Default') + ': ' + row.default);
+                    }
+                    const tail = bits.length ? (' — ' + bits.join('. ')) : '';
+                    md += '- `' + row.name + '` (' + (row.type || 'string') + ')' + tail + '\n';
                 });
                 md += '\n';
             } else {
                 md += _t('No formal parameters.') + '\n\n';
             }
-            if (hint) {
-                md += '`/' + code + ' ' + hint + '`\n\n';
+            const examples = [];
+            const seen = {};
+            const addEx = (token) => {
+                const t = String(token || '').trim();
+                const line = t ? ('/' + code + ' ' + t) : ('/' + code);
+                if (seen[line]) {
+                    return;
+                }
+                seen[line] = true;
+                examples.push(line);
+            };
+            if (policy === 'default') {
+                addEx('');
+            }
+            String(hint || '').split('|').forEach((part) => addEx(part));
+            if (examples.length) {
+                md += '**' + _t('Examples') + ':**\n\n';
+                examples.forEach((ex) => {
+                    md += '- `' + ex + '`\n';
+                });
+                md += '\n';
+            }
+            if (params.length) {
+                md += _t('Other wording is mapped onto these parameters.') + '\n\n';
             }
             md += policyLine + '\n';
             return md;
-        }
-
-        _slashHelpHtml(meta) {
-            return this._formatMarkdown(this._slashHelpMarkdown(meta));
         }
 
         _showBuiltinHelp(code) {
@@ -4211,7 +4553,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             const helpMatch = /^\/(\S+)\s+(\S+)\s*$/.exec(trimmed);
             if (helpMatch && this._isHelpArg(helpMatch[2])) {
                 const code = helpMatch[1].toLowerCase();
-                if (/^(painter-local|painter-free|foot-verbose|foot-laconic|show-table|show-chart)$/.test(code)) {
+                if (/^(compose-agent|compose-model|foot-verbose|foot-laconic|show-table|show-chart)$/.test(code)) {
                     return null;
                 }
                 if (['skills', 'skill', 'help', 'ayuda', '?'].includes(code)) {
@@ -4221,12 +4563,15 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     return { code: code, arg: helpMatch[2], help: true };
                 }
             }
-            const createMatch = /^\/create-skill(?:\s+(\S+)(?:\s+(\S+))?)?\s*$/i.exec(trimmed);
+            const createMatch = /^\/create-skill(?:\s+([\s\S]+))?$/i.exec(trimmed);
             if (createMatch) {
+                const parsed = this._parseCreateSkillLine(createMatch[1] || '');
                 return {
                     code: 'create-skill',
-                    arg: createMatch[1] || null,
-                    arg2: createMatch[2] || null,
+                    arg: parsed.skillCode || parsed.turnId || parsed.paramProse || null,
+                    skillCode: parsed.skillCode,
+                    turnId: parsed.turnId,
+                    paramProse: parsed.paramProse,
                 };
             }
             const deleteMatch = /^\/delete-skill(?:\s+([a-z0-9][a-z0-9-]{0,47}))?\s*$/i.exec(trimmed);
@@ -4244,11 +4589,20 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     arg2: renameMatch[2] ? renameMatch[2].toLowerCase() : null,
                 };
             }
+            const editMatch = /^\/edit-skill(?:\s+([\s\S]+))?$/i.exec(trimmed);
+            if (editMatch) {
+                const parsed = this._parseEditSkillLine(editMatch[1] || '');
+                return {
+                    code: 'edit-skill',
+                    arg: parsed.token || null,
+                    paramProse: parsed.paramProse,
+                };
+            }
             const m = /^\/(\S+)\s*$/.exec(trimmed);
             if (!m) return null;
             const code = m[1].toLowerCase();
             // Axis slashes go to the server (one-shot confirm / strip+query).
-            if (/^(painter-local|painter-free|foot-verbose|foot-laconic|show-table|show-chart)$/.test(code)) {
+            if (/^(compose-agent|compose-model|foot-verbose|foot-laconic|show-table|show-chart)$/.test(code)) {
                 return null;
             }
             if (['skills', 'skill', 'help', 'ayuda', '?'].includes(code)) {
@@ -4267,7 +4621,12 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 this._showBuiltinHelp(code);
                 return;
             }
-            if (code === 'create-skill' || code === 'delete-skill' || code === 'rename-skill') {
+            if (
+                code === 'create-skill'
+                || code === 'delete-skill'
+                || code === 'rename-skill'
+                || code === 'edit-skill'
+            ) {
                 await this._ensureSkills();
                 if (!this.canWriteSkills) {
                     this._notifySlash(
@@ -4278,7 +4637,18 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 }
             }
             if (code === 'create-skill') {
-                await this._runCreateSkillCommand(arg, arg2);
+                if (!(builtin && builtin.skillCode && builtin.turnId)) {
+                    this._beginCreateSkillInput(
+                        builtin && builtin.skillCode,
+                        builtin && builtin.paramProse,
+                    );
+                    return;
+                }
+                await this._runCreateSkillCommand({
+                    skillCode: builtin.skillCode,
+                    turnId: builtin.turnId,
+                    paramProse: builtin.paramProse,
+                });
                 return;
             }
             if (code === 'delete-skill') {
@@ -4311,6 +4681,16 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 this._resetInputPlaceholder();
                 this._syncInputEl();
                 await this._runRenameSkill(arg, arg2);
+                return;
+            }
+            if (code === 'edit-skill') {
+                this.state.slashOpen = false;
+                this.state.slashItems = [];
+                this._syncSlashMenu();
+                this.state.currentInput = '';
+                this._resetInputPlaceholder();
+                this._syncInputEl();
+                await this._runEditSkill(arg, builtin && builtin.paramProse);
                 return;
             }
             if (code === 'mode') {
@@ -4348,6 +4728,60 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 }
             } catch (e) {
                 this._notifySlash((e && e.message) || _t('Could not delete the skill.'), 'danger');
+            }
+        }
+
+        async _runEditSkill(token, paramProse) {
+            if (!this.state.currentSessionId) {
+                this._notifySlash(_t('Open a chat session first.'), 'warning');
+                return;
+            }
+            try {
+                const res = await this._callJsonRoute('/chatboo/edit-skill', {
+                    token: token || '',
+                    param_prose: paramProse || '',
+                    session_id: this.state.currentSessionId,
+                });
+                if (!res || res.status !== 'ok') {
+                    this._notifySlash(
+                        (res && res.message) || _t('Could not open the skill wizard.'),
+                        'danger',
+                    );
+                    return;
+                }
+                if (res.picks) {
+                    const items = (res.picks || []).map((s) => ({
+                        code: s.code, name: s.name, kind: 'skill',
+                    }));
+                    this.state.currentInput = '/edit-skill '
+                        + (token ? (token + ' ') : '');
+                    this.state.slashMode = 'edit';
+                    this.state.slashItems = items.slice(0, 50);
+                    this.state.slashIndex = 0;
+                    this.state.slashOpen = items.length > 0;
+                    this._syncInputEl();
+                    this._syncSlashMenu();
+                    if (!items.length) {
+                        this._notifySlash(
+                            _t('You have no skills to edit.'),
+                            'warning',
+                        );
+                    }
+                    return;
+                }
+                if (!res.action) {
+                    this._notifySlash(_t('Could not open the skill wizard.'), 'danger');
+                    return;
+                }
+                this.state.currentInput = '';
+                this._resetInputPlaceholder();
+                this._syncInputEl();
+                await this._openSkillWizard(res.action);
+            } catch (e) {
+                this._notifySlash(
+                    (e && e.message) || _t('Could not open the skill wizard.'),
+                    'danger',
+                );
             }
         }
 
@@ -4390,27 +4824,59 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             return raw.toUpperCase();
         }
 
-        _parseCreateSkillArgs(arg, arg2) {
-            const t1 = (arg || '').trim();
-            const t2 = (arg2 || '').trim();
-            if (!t1) {
-                return { skillCode: null, turnId: null };
+        _looksLikeSkillName(token) {
+            return /^[a-z0-9][a-z0-9-]{0,47}$/i.test(token || '');
+        }
+
+        _proseWithoutTurnChips(text) {
+            return String(text || '')
+                .split(/\s+/)
+                .filter((part) => (
+                    part
+                    && !this._looksLikeTurnId(part)
+                    && !part.startsWith('/')
+                ))
+                .join(' ')
+                .trim();
+        }
+
+        _parseCreateSkillLine(rest) {
+            const parts = (rest || '').trim().split(/\s+/).filter(Boolean);
+            if (!parts.length) {
+                return { skillCode: null, turnId: null, paramProse: '' };
             }
-            const t1id = this._looksLikeTurnId(t1);
-            const t2id = Boolean(t2) && this._looksLikeTurnId(t2);
-            if (!t2) {
-                if (t1id) {
-                    return { skillCode: null, turnId: t1 };
-                }
-                return { skillCode: t1, turnId: null };
+            let i = 0;
+            let turnId = null;
+            if (this._looksLikeTurnId(parts[0])) {
+                turnId = this._normalizeTurnIdToken(parts[0]);
+                i = 1;
             }
-            if (t1id && !t2id) {
-                return { skillCode: t2, turnId: t1 };
+            let skillCode = null;
+            if (
+                i < parts.length
+                && this._looksLikeSkillName(parts[i])
+                && !this._looksLikeTurnId(parts[i])
+            ) {
+                skillCode = parts[i];
+                i += 1;
             }
-            if (!t1id && t2id) {
-                return { skillCode: t1, turnId: t2 };
+            return {
+                skillCode: skillCode,
+                turnId: turnId,
+                paramProse: this._proseWithoutTurnChips(parts.slice(i).join(' ')),
+            };
+        }
+
+        _parseEditSkillLine(rest) {
+            const raw = (rest || '').trim();
+            if (!raw) {
+                return { token: null, paramProse: '' };
             }
-            return { skillCode: t2, turnId: t1 };
+            const parts = raw.split(/\s+/);
+            return {
+                token: parts[0] || null,
+                paramProse: parts.slice(1).join(' ').trim(),
+            };
         }
 
         _formatInstanceSlash(name) {
@@ -4431,31 +4897,35 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             return (pfx + slug) || slug;
         }
 
-        _beginCreateSkillInput() {
-            const turn = this._lastTurnId();
-            this.state.slashOpen = false;
-            this.state.slashItems = [];
-            this.state.slashMode = 'commands';
+        _beginCreateSkillInput(name, prose) {
+            const raw = String(this._promptText() || '').trim();
+            const createMatch = /^\/create-skill(?:\s+([\s\S]*))?$/i.exec(raw);
+            const parsed = createMatch
+                ? this._parseCreateSkillLine(createMatch[1] || '')
+                : { skillCode: null, turnId: null, paramProse: '' };
+            const turn = parsed.turnId || this._lastTurnId();
+            const slash = this._cleanCreateSkillName(name || parsed.skillCode || '');
+            const extra = this._proseWithoutTurnChips(prose || parsed.paramProse || '');
+            let line = '/create-skill';
             if (turn) {
-                this.state.currentInput = '/create-skill ' + turn + ' ';
-                this.state.inputPlaceholder = _t(
-                    'Slash name (instance prefix is applied), then press Enter'
-                );
-            } else {
-                this.state.currentInput = '/create-skill ';
-                this.state.inputPlaceholder = _t(
-                    'Paste or type the 4-character chip, then the slash name'
-                );
-                this._notifySlash(
-                    _t('Turn id is required. Paste or type the 4-character chip, then the slash name.'),
-                    'warning',
-                );
+                line += ' ' + turn;
             }
-            this._syncInputEl();
-            this._syncSlashMenu();
-            if (this.chatInputRef && this.chatInputRef.el) {
-                this.chatInputRef.el.focus();
+            if (slash) {
+                line += ' ' + slash;
             }
+            if (extra) {
+                line += ' ' + extra;
+            }
+            const item = (this.builtinCommands || []).find((c) => c.code === 'create-skill');
+            this._stageSlashInput(line, this._argPlaceholder(item));
+        }
+
+        _cleanCreateSkillName(name) {
+            const token = String(name || '').trim();
+            if (!token || token.startsWith('/') || !this._looksLikeSkillName(token)) {
+                return '';
+            }
+            return token;
         }
 
         _slugifySkillCode(text) {
@@ -4468,27 +4938,14 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             return slug || 'captured-skill';
         }
 
-        _plainTextFromChatMessage(msg) {
-            const raw = (msg && (msg.raw || msg.content)) || '';
-            if (!raw) {
-                return '';
-            }
-            if (typeof document !== 'undefined') {
-                const tmp = document.createElement('div');
-                tmp.innerHTML = String(raw);
-                return (tmp.textContent || tmp.innerText || '').trim();
-            }
-            return String(raw).replace(/<[^>]+>/g, ' ').trim();
-        }
-
         _messageTurnId(msg) {
             if (!msg) {
                 return '';
             }
             return this._normalizeTurnIdToken(
-                msg.correlation_id
-                || (msg.meta && msg.meta.correlation_id)
-                || (msg.context_info && msg.context_info.turnCode)
+                msg.turn
+                || (msg.meta && msg.meta.turn)
+                || (msg.context_info && msg.context_info.turn)
                 || ''
             );
         }
@@ -4507,88 +4964,6 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             return '';
         }
 
-        _proposeSkillNameForTurn(turnId) {
-            const want = this._normalizeTurnIdToken(turnId);
-            const msgs = this.messages || [];
-            let assistantIdx = -1;
-            if (want) {
-                for (let i = msgs.length - 1; i >= 0; i--) {
-                    if (msgs[i].role !== 'assistant') {
-                        continue;
-                    }
-                    if (this._messageTurnId(msgs[i]) === want) {
-                        assistantIdx = i;
-                        break;
-                    }
-                }
-            }
-            const start = assistantIdx >= 0 ? assistantIdx - 1 : msgs.length - 1;
-            for (let i = start; i >= 0; i--) {
-                if (msgs[i].role !== 'user') {
-                    continue;
-                }
-                const plain = this._plainTextFromChatMessage(msgs[i]);
-                if (plain && !plain.startsWith('/')) {
-                    return this._slugifySkillCode(plain.slice(0, 64));
-                }
-            }
-            return 'captured-skill';
-        }
-
-        _promptCreateSkillConfirm(skillCode, turnId, reason) {
-            const name = this._formatInstanceSlash(
-                skillCode || this._proposeSkillNameForTurn(turnId)
-            );
-            const turn = this._normalizeTurnIdToken(turnId) || this._lastTurnId();
-            const line = turn
-                ? ('/create-skill ' + turn + ' ' + name)
-                : (name ? ('/create-skill ' + name) : '/create-skill ');
-            this.state.currentInput = line;
-            this.state.slashOpen = false;
-            this.state.slashItems = [];
-            this.state.inputPlaceholder = turn
-                ? _t('Edit turn id and slash name if needed, then press Enter')
-                : _t('Paste or type the 4-character chip, then the slash name');
-            this._syncInputEl();
-            this._syncSlashMenu();
-            let msg;
-            if (!turn) {
-                msg = _t(
-                    'Turn id is required. Paste or type the 4-character chip, then the slash name.'
-                );
-            } else if (reason === 'need_name') {
-                msg = _t(
-                    'Proposed slash name from that turn (instance prefix applied). '
-                    + 'Edit if needed, then press Enter to open the wizard.'
-                );
-            } else {
-                msg = _t(
-                    'Confirm turn id and slash name. Edit if needed, then press Enter '
-                    + 'to open the wizard.'
-                );
-            }
-            const html = (
-                '<div class="card border-0 shadow-sm o_chatboo_slash_help"><div class="card-body">'
-                + '<p class="mb-2">' + this._escSlash(msg) + '</p>'
-                + '<p class="mb-0 small"><code>' + this._escSlash(line) + '</code></p>'
-                + '</div></div>'
-            );
-            this.messages.push({
-                role: 'assistant',
-                content: html,
-                timestamp: formatters.formatWallclock(new Date()),
-                local_ack: true,
-                offtopic: true,
-                model_details: { model: 'Chatboo', provider: 'local' },
-            });
-            if (this.scrollToBottom) {
-                this.scrollToBottom();
-            }
-            if (this.chatInputRef && this.chatInputRef.el) {
-                this.chatInputRef.el.focus();
-            }
-        }
-
         _restoreChatbooOverlayZ(overlay, prevZ) {
             if (!overlay) {
                 return;
@@ -4596,35 +4971,67 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             overlay.style.zIndex = prevZ || '1050';
         }
 
-        async _runCreateSkillCommand(skillCodeHint, turnId) {
+        async _openSkillWizard(action) {
+            const overlay = document.getElementById('o_chatboo_persistent_overlay');
+            const prevZ = overlay ? overlay.style.zIndex : '';
+            if (overlay) {
+                overlay.style.zIndex = '1000';
+            }
+            let restored = false;
+            const restore = () => {
+                if (restored) {
+                    return;
+                }
+                restored = true;
+                this._restoreChatbooOverlayZ(overlay, prevZ);
+                this._invalidateSkillsCache();
+                if (this.state.currentSessionId) {
+                    this._loadSession(this.state.currentSessionId);
+                }
+            };
+            const actionOpts = { on_close: restore, onClose: restore };
+            try {
+                if (this.props.doAction) {
+                    await this.props.doAction(action, actionOpts);
+                } else if (this.env && this.env.services && this.env.services.action) {
+                    await this.env.services.action.doAction(action, actionOpts);
+                } else if (this.props.notification) {
+                    restore();
+                    this.props.notification({
+                        message: _t('Could not open the skill wizard from here. Use AI Skills menu.'),
+                        type: 'warning',
+                        sticky: true,
+                    });
+                }
+            } catch (eAct) {
+                restore();
+                throw eAct;
+            }
+        }
+
+        async _runCreateSkillCommand(opts) {
             if (!this.state.currentSessionId) {
                 if (this.props.notification) {
                     this.props.notification({ message: _t('No active session.'), type: 'warning' });
                 }
                 return;
             }
-            const parsed = this._parseCreateSkillArgs(skillCodeHint, turnId);
-            if (!parsed.turnId && !parsed.skillCode) {
-                this._beginCreateSkillInput();
-                return;
-            }
-            if (!parsed.turnId) {
-                this._promptCreateSkillConfirm(
-                    parsed.skillCode,
-                    this._lastTurnId(),
-                    'need_turn',
-                );
-                return;
-            }
-            if (!parsed.skillCode) {
-                this._promptCreateSkillConfirm(null, parsed.turnId, 'need_name');
+            const incoming = opts && typeof opts === 'object' ? opts : {};
+            const skillCode = incoming.skillCode || '';
+            const turn = this._normalizeTurnIdToken(incoming.turnId);
+            const paramProse = this._proseWithoutTurnChips(incoming.paramProse || '');
+            if (!skillCode || !turn) {
+                this._beginCreateSkillInput(skillCode, paramProse);
                 return;
             }
             try {
                 const params = {
                     session_id: this.state.currentSessionId,
-                    skill_code: this._formatInstanceSlash(parsed.skillCode),
-                    turn_id: parsed.turnId,
+                    skill_code: skillCode
+                        ? this._formatInstanceSlash(skillCode)
+                        : '',
+                    turn_id: turn,
+                    param_prose: paramProse,
                 };
                 const res = await this._callJsonRoute('/chatboo/create-skill', params);
                 if (!res || res.status !== 'ok' || !res.action) {
@@ -4640,41 +5047,10 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 if (res.warning && this.props.notification) {
                     this.props.notification({ message: res.warning, type: 'warning', sticky: false });
                 }
-                const overlay = document.getElementById('o_chatboo_persistent_overlay');
-                const prevZ = overlay ? overlay.style.zIndex : '';
-                if (overlay) {
-                    overlay.style.zIndex = '1000';
-                }
-                let restored = false;
-                const restore = () => {
-                    if (restored) {
-                        return;
-                    }
-                    restored = true;
-                    this._restoreChatbooOverlayZ(overlay, prevZ);
-                    this._invalidateSkillsCache();
-                    if (this.state.currentSessionId) {
-                        this._loadSession(this.state.currentSessionId);
-                    }
-                };
-                const actionOpts = { on_close: restore, onClose: restore };
-                try {
-                    if (this.props.doAction) {
-                        await this.props.doAction(res.action, actionOpts);
-                    } else if (this.env && this.env.services && this.env.services.action) {
-                        await this.env.services.action.doAction(res.action, actionOpts);
-                    } else if (this.props.notification) {
-                        restore();
-                        this.props.notification({
-                            message: _t('Could not open the skill wizard from here. Use AI Skills menu.'),
-                            type: 'warning',
-                            sticky: true,
-                        });
-                    }
-                } catch (eAct) {
-                    restore();
-                    throw eAct;
-                }
+                this.state.currentInput = '';
+                this._resetInputPlaceholder();
+                this._syncInputEl();
+                await this._openSkillWizard(res.action);
             } catch (e) {
                 if (this.props.notification) {
                     this.props.notification({
@@ -4757,13 +5133,11 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 }
                 if (ev.which === 13 || ev.which === 9) { // Enter / Tab
                     ev.preventDefault();
+                    // Menu Enter selects (fills "/code "). Send only when the
+                    // line already has the args that command needs.
                     if (ev.which === 13) {
-                        const builtin = this._matchBuiltinCommand(this.state.currentInput);
-                        if (builtin && (
-                            builtin.code === 'create-skill'
-                            || builtin.help
-                            || this._isHelpArg(builtin.arg)
-                        )) {
+                        const builtin = this._matchBuiltinCommand(this._promptText());
+                        if (this._slashLineReadyToSend(builtin)) {
                             this.state.slashOpen = false;
                             this.state.slashItems = [];
                             this._syncSlashMenu();
@@ -4799,7 +5173,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             if (ev.which === 38 && this.inputHistory.length
                     && this._promptCaretOnFirstLine(ev.target)) {
                 if (this.historyIndex === -1) {
-                    this.currentInputBeforeHistory = this.state.currentInput;
+                    this.currentInputBeforeHistory = this._promptText();
                 }
                 if (this.historyIndex < this.inputHistory.length - 1) {
                     this.historyIndex++;
@@ -4869,10 +5243,10 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         // 9. CONTENT FORMATTING — delegated to pns_ai_chatboo.formatters
         // ══════════════════════════════════════════════════════════════════════
 
-        /** @see formatters.isLikelyHtml */
-        _isLikelyHtml(content) { return formatters.isLikelyHtml(content); }
         /** @see formatters.formatContent */
         _formatContent(content) { return formatters.formatContent(content); }
+        /** @see formatters.sanitizeHtml */
+        _safeHtml(html) { return formatters.sanitizeHtml(html); }
         /** @see formatters.formatMarkdown */
         _formatMarkdown(content) { return formatters.formatMarkdown(content); }
         /** @see formatters.formatCSV */
@@ -4957,15 +5331,6 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 const limit = assistantMsg.context_limit;
                 const percent = limit > 0 ? ((used / limit) * 100).toFixed(1) : 0;
 
-                const _usage = assistantMsg.usage || {};
-                let _cached = _usage.cached_tokens;
-                if (_cached == null && _usage.prompt_tokens_details) {
-                    _cached = _usage.prompt_tokens_details.cached_tokens;
-                }
-                _cached = _cached || 0;
-                const _promptTok = _usage.prompt_tokens || 0;
-                const _cachedPct = _promptTok > 0 ? (_cached / _promptTok) * 100 : 0;
-
                 totalUsed += used;
                 maxLimit = Math.max(maxLimit, limit);
 
@@ -4979,10 +5344,10 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     : String(questionText || '').replace(/<[^>]*>/g, ' ').trim();
                 const displayText = questionText.length > 50 ? questionText.substring(0, 50) + '...' : questionText;
 
-                const turnCode = (
-                    assistantMsg.correlation_id
-                    || (assistantMsg.meta && assistantMsg.meta.correlation_id)
-                    || (assistantMsg.context_info && assistantMsg.context_info.turnCode)
+                const turn = (
+                    assistantMsg.turn
+                    || (assistantMsg.meta && assistantMsg.meta.turn)
+                    || (assistantMsg.context_info && assistantMsg.context_info.turn)
                     || ''
                 ).trim();
                 usageData.push({
@@ -4997,11 +5362,9 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     turnTokens: turnTokens,
                     turnK: turnTokens > 0 ? (turnTokens / 1024).toFixed(2) : null,
                     turnLabel: turnLabel,
-                    turnCode: turnCode,
+                    turn: turn,
                     costUsd: costUsd,
                     costLabel: cost.label,
-                    cached: _cached,
-                    cachedPct: _cachedPct,
                     messageIndex: i,
                     userMessageIndex: i
                 });
@@ -5020,27 +5383,16 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 return;
             }
 
-            // Calculate global statistics (last occupying turn vs its own cap)
             const latestData = occupying[occupying.length - 1];
-            const latestUsed = latestData.used;
-            const latestUsedK = latestData.usedK;
-            const latestLimitK = latestData.limitK;
-            const latestPercentNum = latestData.percent;
-            const latestPercent = latestPercentNum.toFixed(1);
-
-            // Caché de prompt del proveedor (prefix/prompt caching): solo se pinta
-            // si algún turno la reporta.
-            const anyCached = occupying.some(d => (d.cached || 0) > 0);
-            const latestCached = latestData.cached || 0;
-            const latestCachedPct = latestData.cachedPct || 0;
+            const limitKInt = latestData.limit > 0 ? Math.round(latestData.limit / 1024) : 0;
             const anyTurn = occupying.some(d => d.turnLabel && d.turnLabel !== '-');
-            const anyTurnCode = occupying.some(d => d.turnCode);
+            const anyTurnId = occupying.some(d => d.turn);
             const anyCost = occupying.some(d => d.costLabel && d.costLabel !== '-');
-            const latestTurnK = latestData.turnK;
-            const latestCostLabel = latestData.costLabel;
             const sessionTurnTokens = occupying.reduce((sum, d) => sum + (d.turnTokens || 0), 0);
             const sessionCostUsd = occupying.reduce((sum, d) => sum + (d.costUsd || 0), 0);
-            const sessionTurnK = sessionTurnTokens > 0 ? (sessionTurnTokens / 1024).toFixed(2) : null;
+            const sessionTurnLabel = (sessionTurnTokens > 0 && stats && stats.formatTokensK)
+                ? stats.formatTokensK(sessionTurnTokens)
+                : null;
             const sessionCost = formatCostLabel(
                 sessionCostUsd,
                 this._currencyForProvider(
@@ -5051,61 +5403,36 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             );
             const sessionCostLabel = sessionCost.label;
 
-            // Trend
-            let trend = '';
-            let trendColor = '';
-            if (occupying.length >= 2) {
-                const diff = occupying[occupying.length - 1].used - occupying[occupying.length - 2].used;
-                const diffK = (diff / 1024).toFixed(2);
-                if (diff > 0) {
-                    trend = `↑ +${diffK}k tokens vs previous`;
-                    trendColor = 'text-warning';
-                } else {
-                    trend = '→ Stable';
-                    trendColor = 'text-muted';
-                }
-            }
-
             let chartHtml = `
                 <div class="modal fade show" id="contextChartModal" tabindex="-1" style="display: block; background: rgba(0,0,0,0.5);">
                     <div class="modal-dialog modal-xl">
                         <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
                             <div class="modal-header bg-light">
-                                <h5 class="modal-title"><i class="fa fa-microchip mr-2"></i> Context analysis: <span class="text-primary font-weight-bold">${modelLabel}</span></h5>
+                                <h5 class="modal-title"><i class="fa fa-microchip mr-2"></i> ${_t('Conversation analysis:')} <span class="text-primary font-weight-bold">${modelLabel}</span></h5>
                                 <button type="button" class="close" onclick="document.getElementById('contextChartModal').remove()">
                                     <span>×</span>
                                 </button>
                             </div>
                             <div class="modal-body p-4">
                                 <div class="mb-4">
-                                    <h6 class="font-weight-bold mb-3"><i class="fa fa-chart-line text-primary"></i> Session status</h6>
+                                    <h6 class="font-weight-bold mb-3"><i class="fa fa-comments text-primary"></i> ${_t('Conversation')}</h6>
                                     <div class="row">
                                         <div class="col">
                                             <div class="card border-0 bg-light shadow-sm h-100">
                                                 <div class="card-body text-center p-3">
-                                                    <p class="text-muted small mb-1">INTERACTIONS</p>
+                                                    <p class="text-muted small mb-1">${_t('TURNS')}</p>
                                                     <h4 class="font-weight-bold text-primary mb-0">${occupying.length}</h4>
-                                                    <p class="small mb-0">Performed</p>
+                                                    <p class="small mb-0">${_t('Performed')}</p>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col">
-                                            <div class="card border-0 bg-light shadow-sm h-100">
-                                                <div class="card-body text-center p-3">
-                                                    <p class="text-muted small mb-1">SENT / PROVIDER CAP</p>
-                                                    <h4 class="font-weight-bold ${latestPercentNum > 80 ? 'text-danger' : latestPercentNum > 60 ? 'text-warning' : 'text-success'} mb-0">${latestPercent}%</h4>
-                                                    <p class="small mb-0">${latestUsedK}k / ${latestLimitK}k</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        ${sessionTurnK ? `
+                                        ${sessionTurnLabel ? `
                                         <div class="col">
                                             <div class="card border-0 bg-light shadow-sm h-100">
                                                 <div class="card-body text-center p-3">
                                                     <p class="text-muted small mb-1">${_t('SESSION')}</p>
-                                                    <h4 class="font-weight-bold mb-0">${sessionTurnK}k</h4>
+                                                    <h4 class="font-weight-bold mb-0">${this._escapeHtml(sessionTurnLabel)}</h4>
                                                     <p class="small mb-0">${_t('tokens billed')}</p>
-                                                    ${latestTurnK ? `<p class="small text-muted mb-0">${_t('last turn')} ${latestTurnK}k</p>` : ''}
                                                 </div>
                                             </div>
                                         </div>` : ''}
@@ -5116,82 +5443,72 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                                                     <p class="text-muted small mb-1">${_t('COST')}</p>
                                                     <h4 class="font-weight-bold mb-0">${this._escapeHtml(sessionCostLabel)}</h4>
                                                     <p class="small mb-0">${_t('this session')}</p>
-                                                    ${latestCostLabel ? `<p class="small text-muted mb-0">${_t('last turn')} ${this._escapeHtml(latestCostLabel)}</p>` : ''}
                                                 </div>
                                             </div>
                                         </div>` : ''}
                                     </div>
-                                    <div class="mt-4">
-                                        <div class="d-flex justify-content-between mb-1 small">
-                                            <span>${_t('Last turn · sent vs provider cap')}</span>
-                                            <span class="font-weight-bold">${latestPercent}% ${_t('of the %s k cap').replace('%s', latestLimitK)}</span>
-                                        </div>
-                                        ${stats ? stats.occupancyBarHtml(latestPercentNum, 14) : ''}
-                                        <div class="small text-muted mt-2 mb-1">${_t('Occupancy this session')}</div>
-                                        ${stats ? stats.sparklineSvg(occupying) : ''}
-                                        <div class="d-flex justify-content-between mt-1 small text-muted">
-                                            <span>${_t('Context status')}</span>
-                                            ${trend ? `<span class="${trendColor}">${trend}</span>` : ''}
-                                        </div>
-                                        ${anyCached ? `
-                                        <div class="d-flex justify-content-between mt-2 small">
-                                            <span style="color:#0ea5e9;"><i class="fa fa-bolt"></i> Prompt cache (last turn)</span>
-                                            <span class="font-weight-bold" style="color:#0ea5e9;">${latestCachedPct.toFixed(0)}% · ${(latestCached / 1024).toFixed(2)}k tokens reused</span>
-                                        </div>` : ''}
-                                    </div>
+                                    <p class="small text-muted mt-2 mb-0">${_t('Billed tokens sum every internal LLM call in each reply (tools, ReAct, etc.).')}</p>
                                 </div>
-                                
+
+                                ${limitKInt > 0 ? `
+                                <div class="mb-3 p-3 rounded" style="background:#f0fdf4;font-size:12px;">
+                                    <div class="mb-1"><span style="font-size:22px;font-weight:700;color:#15803d;">${limitKInt}k</span><span style="margin-left:0.35em;">${_t('maximum per LLM call')}</span></div>
+                                    <div class="text-muted">${_t('Each reply may use several internal calls. This cap is per call, not the chat stored on disk.')}</div>
+                                </div>` : ''}
+
                                 <div class="mt-4">
-                                    <h6 class="font-weight-bold mb-3"><i class="fa fa-history text-primary"></i> Detail per Interaction</h6>
+                                    <h6 class="font-weight-bold mb-3"><i class="fa fa-history text-primary"></i> ${_t('Detail per turn')}</h6>
                                     <div class="table-responsive">
-                                        <table class="table table-hover border">
+                                        <table class="table table-hover border" style="table-layout:fixed;">
+                                            <colgroup>
+                                                <col style="width:4%;">
+                                                ${anyTurnId ? '<col style="width:8%;">' : ''}
+                                                <col>
+                                                <col style="width:17%;">
+                                                ${anyTurn ? '<col style="width:14%;">' : ''}
+                                                ${anyCost ? '<col style="width:13%;">' : ''}
+                                            </colgroup>
                                             <thead class="bg-light">
                                                 <tr>
-                                                    <th style="width: 5%;">#</th>
-                                                    ${anyTurnCode ? '<th style="width: 8%;">Id</th>' : ''}
-                                                    <th style="width: 32%;">Question</th>
-                                                    <th style="width: 12%;">Sent</th>
-                                                    <th style="width: 8%;">%</th>
-                                                    ${anyTurn ? '<th style="width: 10%;">Turn</th>' : ''}
-                                                    ${anyCost ? '<th style="width: 12%;">Cost</th>' : ''}
-                                                    ${anyCached ? '<th style="width: 8%;">Cache</th>' : ''}
-                                                    <th style="width: 18%;">Total Visual Impact</th>
+                                                    <th class="pl-3">#</th>
+                                                    ${anyTurnId ? '<th>Id</th>' : ''}
+                                                    <th class="pl-2">${_t('Question')}</th>
+                                                    <th class="text-right pr-3">${_t('% of model limit')}</th>
+                                                    ${anyTurn ? `<th class="text-right px-3">${_t('Billed')}</th>` : ''}
+                                                    ${anyCost ? `<th class="text-right pr-3">${_t('Cost')}</th>` : ''}
                                                 </tr>
                                             </thead>
                                             <tbody>`;
 
             occupying.forEach(data => {
                 const turnTok = stats && stats.safeTurnToken
-                    ? stats.safeTurnToken(data.turnCode)
-                    : String(data.turnCode || '').replace(/[^A-Za-z0-9_-]/g, '');
+                    ? stats.safeTurnToken(data.turn)
+                    : String(data.turn || '').replace(/[^A-Za-z0-9_-]/g, '');
                 chartHtml += `
-                                                <tr class="o_ctx_turn_row" data-turn-code="${this._escapeHtml(turnTok)}" data-msg-index="${data.messageIndex}">
+                                                <tr class="o_ctx_turn_row" data-turn="${this._escapeHtml(turnTok)}" data-msg-index="${data.messageIndex}">
                                                     <td><strong>#${data.n}</strong></td>
-                                                    ${anyTurnCode ? `<td style="font-family:monospace;">${this._escapeHtml(data.turnCode || '—')}</td>` : ''}
-                                                    <td class="o_ctx_turn_q" style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor:pointer; color:#007cba;" title="${this._escapeHtml(data.questionTextFull || data.questionText)}">
+                                                    ${anyTurnId ? `<td style="font-family:monospace;">${this._escapeHtml(data.turn || '—')}</td>` : ''}
+                                                    <td class="o_ctx_turn_q pl-2" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor:pointer; color:#007cba;" title="${this._escapeHtml(data.questionTextFull || data.questionText)}">
                                                         ${this._escapeHtml(data.questionText)}
                                                     </td>
-                                                    <td>${data.usedK}k</td>
-                                                    <td>${data.percent}%</td>
-                                                    ${anyTurn ? `<td>${this._escapeHtml(data.turnLabel || '0')}</td>` : ''}
-                                                    ${anyCost ? `<td>${data.costLabel && data.costLabel !== '-' ? this._escapeHtml(data.costLabel) : '—'}</td>` : ''}
-                                                    ${anyCached ? `<td style="color:#0ea5e9;">${(data.cached || 0) > 0 ? (data.cachedPct.toFixed(0) + '%') : '—'}</td>` : ''}
-                                                    <td>${stats ? stats.rowBarHtml(data.percent) : ''}</td>
+                                                    <td class="text-right pr-3">
+                                                        <div class="font-weight-bold mb-1">${data.percent.toFixed(1)}%</div>
+                                                        ${stats ? stats.rowBarHtml(data.percent) : ''}
+                                                    </td>
+                                                    ${anyTurn ? `<td class="text-right px-3 text-nowrap" style="font-variant-numeric:tabular-nums;">${this._escapeHtml(data.turnLabel || '0')}</td>` : ''}
+                                                    ${anyCost ? `<td class="text-right pr-3 text-nowrap" style="font-variant-numeric:tabular-nums;">${data.costLabel && data.costLabel !== '-' ? this._escapeHtml(data.costLabel) : '—'}</td>` : ''}
                                                 </tr>`;
             });
 
             chartHtml += `
                                             </tbody>
-                                            ${(sessionTurnK || sessionCostLabel) ? `
+                                            ${(sessionTurnLabel || sessionCostLabel) ? `
                                             <tfoot class="bg-light">
                                                 <tr>
-                                                    <td colspan="${anyTurnCode ? 3 : 2}"><strong>${_t('Session')}</strong></td>
+                                                    <td colspan="${anyTurnId ? 3 : 2}"><strong>${_t('Session')}</strong></td>
                                                     <td></td>
-                                                    <td></td>
-                                                    ${anyTurn ? `<td><strong>${sessionTurnK ? sessionTurnK + 'k' : '0'}</strong></td>` : ''}
-                                                    ${anyCost ? `<td><strong>${sessionCostLabel ? this._escapeHtml(sessionCostLabel) : '—'}</strong></td>` : ''}
-                                                    ${anyCached ? '<td></td>' : ''}
-                                                    <td></td>
+                                                    ${anyTurn ? `<td class="text-right px-3 text-nowrap" style="font-variant-numeric:tabular-nums;"><strong>${this._escapeHtml(sessionTurnLabel || '0')}</strong></td>` : ''}
+                                                    ${anyCost ? `<td class="text-right pr-3 text-nowrap" style="font-variant-numeric:tabular-nums;"><strong>${sessionCostLabel ? this._escapeHtml(sessionCostLabel) : '—'}</strong></td>` : ''}
                                                 </tr>
                                             </tfoot>` : ''}
                                         </table>
@@ -5219,43 +5536,39 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             document.body.insertAdjacentHTML('beforeend', chartHtml);
 
             const self = this;
-            setTimeout(() => {
-                document.querySelectorAll('#contextChartModal tr.o_ctx_turn_row').forEach((row) => {
-                    const questionCell = row.querySelector('.o_ctx_turn_q');
-                    if (questionCell) {
-                        questionCell.addEventListener('mouseenter', () => {
-                            questionCell.style.textDecoration = 'underline';
-                        });
-                        questionCell.addEventListener('mouseleave', () => {
-                            questionCell.style.textDecoration = 'none';
-                        });
-                    }
-                    row.addEventListener('click', function (e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const modal = document.getElementById('contextChartModal');
-                        if (modal) {
-                            modal.remove();
-                        }
-                        const backdrop = document.querySelector('.modal-backdrop');
-                        if (backdrop) {
-                            backdrop.remove();
-                        }
-                        const code = row.getAttribute('data-turn-code') || '';
-                        const idx = parseInt(row.getAttribute('data-msg-index'), 10);
-                        setTimeout(() => {
-                            self._scrollToContextTurn(code, idx);
-                        }, 100);
+            document.querySelectorAll('#contextChartModal tr.o_ctx_turn_row').forEach((row) => {
+                const questionCell = row.querySelector('.o_ctx_turn_q');
+                if (questionCell) {
+                    questionCell.addEventListener('mouseenter', () => {
+                        questionCell.style.textDecoration = 'underline';
                     });
+                    questionCell.addEventListener('mouseleave', () => {
+                        questionCell.style.textDecoration = 'none';
+                    });
+                }
+                row.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const modal = document.getElementById('contextChartModal');
+                    if (modal) {
+                        modal.remove();
+                    }
+                    const backdrop = document.querySelector('.modal-backdrop');
+                    if (backdrop) {
+                        backdrop.remove();
+                    }
+                    const code = row.getAttribute('data-turn') || '';
+                    const idx = parseInt(row.getAttribute('data-msg-index'), 10);
+                    self._scrollToContextTurn(code, idx);
                 });
-            }, 200);
+            });
         }
 
-        _scrollToContextTurn(turnCode, messageIndex) {
+        _scrollToContextTurn(turn, messageIndex) {
             const root = this.messagesRef && this.messagesRef.el;
             const stats = window.ChatbooContextStats;
             const bubble = stats && stats.findTurnBubble
-                ? stats.findTurnBubble(root, turnCode, messageIndex)
+                ? stats.findTurnBubble(root, turn, messageIndex)
                 : null;
             if (stats && stats.flashTurnBubble) {
                 stats.flashTurnBubble(bubble);
@@ -5263,8 +5576,12 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         }
 
         scrollToBottom() {
-            // requestAnimationFrame fires after next paint — DOM is guaranteed to be updated
-            requestAnimationFrame(() => {
+            if (this._scrollPending) {
+                return;
+            }
+            this._scrollPending = true;
+            this._afterPaint(() => {
+                this._scrollPending = false;
                 const el = this.messagesRef.el;
                 if (el) {
                     if (window.ChatbooDashboard && typeof window.ChatbooDashboard.hydrateContent === 'function') {
@@ -5324,7 +5641,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 exportUtils.fulfillPendingSessionDocuments(msg, sourceEl, this._exportCtx())
                     .catch(() => {});
             };
-            setTimeout(run, 120);
+            this._afterPaint(run);
         }
 
         _fulfillPendingExportsInView() {
@@ -5347,6 +5664,27 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         _generateFilename(msgIndex, extension) { return exportUtils.generateFilename(msgIndex, extension, this._exportCtx()); }
         /** @see exportUtils.copyToClipboard */
         _copyToClipboard(ev) { return exportUtils.copyToClipboard(ev, this._exportCtx()); }
+        _scrollTurnEdge(ev) {
+            if (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+            }
+            const btn = ev && (ev.currentTarget || ev.target);
+            const bubble = btn && btn.closest ? btn.closest('.o_chatboo_message') : null;
+            const container = this.messagesRef && this.messagesRef.el;
+            if (!bubble || !container) {
+                return;
+            }
+            const edge = btn.getAttribute('data-edge') || 'start';
+            const cRect = container.getBoundingClientRect();
+            const tRect = bubble.getBoundingClientRect();
+            const delta = edge === 'end' ? tRect.bottom - cRect.bottom : tRect.top - cRect.top;
+            if (typeof container.scrollBy === 'function') {
+                container.scrollBy({top: delta, behavior: 'smooth'});
+            } else {
+                container.scrollTop += delta;
+            }
+        }
         /** Copy turn correlation id without opening the context modal. */
         async _copyTurnCode(ev) {
             if (ev) {
@@ -5357,7 +5695,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             }
             const el = ev && (ev.currentTarget || ev.target);
             const text = (
-                (el && el.getAttribute && el.getAttribute('data-turn-code'))
+                (el && el.getAttribute && el.getAttribute('data-turn'))
                 || ''
             ).trim();
             if (!text) {
@@ -5439,16 +5777,16 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             <!-- Message list: flex fill so the last card stays above the prompt. -->
             <div class="o_chatboo_messages p-3 bg-100" t-ref="messages" style="flex: 1 1 auto; min-height: 0; overflow-y: auto;">
                 <t t-foreach="messages" t-as="msg" t-key="msg_index">
-                    <div t-attf-class="d-flex mb-2 {{ msg.role === 'user' ? 'justify-content-end' : 'justify-content-start' }}{{ messageWantsWideCanvas(msg) ? ' o_chatboo_message_row--chart' : '' }}"
+                    <div t-attf-class="d-flex mb-2 {{ msg.role === 'user' ? 'justify-content-end' : 'justify-content-start' }}{{ msg.wideCanvas ? ' o_chatboo_message_row--chart' : '' }}"
                          t-att-data-msg-index="msg_index"
-                         t-att-data-turn-code="msg.context_info and msg.context_info.turnCode">
-                        <div t-attf-class="o_chatboo_message card border-0 shadow-sm p-2 {{ msg.role === 'user' ? 'bg-primary text-white' : 'bg-white' }}{{ messageWantsWideCanvas(msg) ? ' o_chatboo_message--chart' : '' }}" style="border-radius: 8px; position: relative;">
-                            <div t-if="messageWantsWideCanvas(msg)"
+                         t-att-data-turn="msg.context_info and msg.context_info.turn">
+                        <div t-attf-class="o_chatboo_message card border-0 shadow-sm p-2 {{ msg.role === 'user' ? 'bg-primary text-white' : 'bg-white' }}{{ msg.wideCanvas ? ' o_chatboo_message--chart' : '' }}" style="border-radius: 8px; position: relative;">
+                            <div t-if="msg.wideCanvas"
                                  class="o_chatboo_card_resize"
                                  t-on-pointerdown="_onCardResizeStart"/>
                             <t t-if="msg.role === 'assistant'">
-                                <div t-attf-class="d-flex mb-1 o_chatboo_export_bar {{ messageWantsWideCanvas(msg) ? 'justify-content-between' : 'justify-content-end' }}" style="gap: 4px;">
-                                    <i t-if="messageWantsWideCanvas(msg)"
+                                <div t-attf-class="d-flex mb-1 o_chatboo_export_bar {{ msg.wideCanvas ? 'justify-content-between' : 'justify-content-end' }}" style="gap: 4px;">
+                                    <i t-if="msg.wideCanvas"
                                        class="fa fa-compress o_chatboo_copy_btn text-muted o_chatboo_card_width_reset"
                                        t-att-title="tipRestoreCardWidth"
                                        t-on-click="_resetCardWidth"/>
@@ -5474,12 +5812,19 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                                        t-att-data-msg-index="msg_index"
                                        t-att-data-copy-type="'content'"
                                        t-on-click="_copyToClipboard"/>
+                                    <span class="o_chatboo_md_col">
                                     <i t-attf-class="fa fa-code o_chatboo_copy_btn text-muted" 
                                        style="cursor: pointer; font-size: 1.09375em; opacity: 0.7; transition: opacity 0.2s;"
                                        t-att-title="tipCopyMarkdown"
                                        t-att-data-msg-index="msg_index"
                                        t-att-data-copy-type="'markdown'"
                                        t-on-click="_copyToClipboard"/>
+                                    <i class="fa fa-chevron-down o_chatboo_copy_btn text-muted o_chatboo_turn_jump"
+                                       style="cursor: pointer; font-size: 1.09375em; opacity: 0.7; transition: opacity 0.2s;"
+                                       t-att-title="tipGoToEnd"
+                                       t-att-data-edge="'end'"
+                                       t-on-click="_scrollTurnEdge"/>
+                                    </span>
                                     </span>
                                 </div>
                                 <t t-if="msg.files and msg.files.length">
@@ -5487,7 +5832,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                                         <t t-foreach="msg.files" t-as="mfile" t-key="mfile_index">
                                             <a t-if="mfile.url" t-att-href="_fileDownloadHref(mfile)"
                                                t-att-download="_fileDownloadName(mfile)"
-                                               t-att-class="_fileBannerCardClass(mfile)"
+                                               t-att-class="_fileBannerCardClass(mfile)" t-att-type="_fileLinkType(mfile)"
                                                t-att-title="mfile.name">
                                                 <span class="o_chatboo_file_banner_preview" aria-hidden="true">
                                                     <i t-att-class="_fileIconClass(mfile.name, mfile.mimetype)"/>
@@ -5534,7 +5879,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                                         <t t-foreach="msg.files" t-as="mfile" t-key="mfile_index">
                                             <a t-if="mfile.url" t-att-href="_fileDownloadHref(mfile)"
                                                t-att-download="_fileDownloadName(mfile)"
-                                               t-att-class="_fileBannerCardClass(mfile)"
+                                               t-att-class="_fileBannerCardClass(mfile)" t-att-type="_fileLinkType(mfile)"
                                                t-att-title="mfile.name">
                                                 <span class="o_chatboo_file_banner_preview" aria-hidden="true">
                                                     <i t-att-class="_fileIconClass(mfile.name, mfile.mimetype)"/>
@@ -5561,7 +5906,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                                     </div>
                                 </t>
                             </t>
-                            <div class="o_chatboo_content" t-raw="msg.content"/>
+                            <div class="o_chatboo_content" t-raw="_safeHtml(msg.content)"/>
                             <div class="o_chatboo_ts_row">
                                 <div class="o_chatboo_ts" t-attf-style="font-size: 1.09375em; color: {{ msg.role === 'user' ? '#ffffff' : '#007cba' }};" t-esc="msg.timestamp"/>
                                 <t t-if="msg.role === 'assistant'">
@@ -5587,12 +5932,19 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                                            t-att-data-msg-index="msg_index"
                                            t-att-data-copy-type="'content'"
                                            t-on-click="_copyToClipboard"/>
+                                        <span class="o_chatboo_md_col">
                                         <i t-attf-class="fa fa-code o_chatboo_copy_btn text-muted"
                                            style="cursor: pointer; font-size: 1.09375em; opacity: 0.7; transition: opacity 0.2s;"
                                            t-att-title="tipCopyMarkdown"
                                            t-att-data-msg-index="msg_index"
                                            t-att-data-copy-type="'markdown'"
                                            t-on-click="_copyToClipboard"/>
+                                        <i class="fa fa-chevron-up o_chatboo_copy_btn text-muted o_chatboo_turn_jump"
+                                           style="cursor: pointer; font-size: 1.09375em; opacity: 0.7; transition: opacity 0.2s;"
+                                           t-att-title="tipGoToStart"
+                                           t-att-data-edge="'start'"
+                                           t-on-click="_scrollTurnEdge"/>
+                                        </span>
                                     </div>
                                 </t>
                             </div>
@@ -5635,25 +5987,24 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                                 </div>
                             </t>
                             <t t-if="msg.context_info">
-                                <t t-set="ctxColor" t-value="msg.context_info.usageColorHex ? msg.context_info.usageColorHex : '#28a745'"/>
                                 <t t-set="ctxIcon" t-value="msg.context_info.usageIcon ? msg.context_info.usageIcon : 'fa-bell-o'"/>
                                 <div class="o_chatboo_context_info d-flex justify-content-between align-items-center"
                                      style="font-size: 0.85em; cursor: pointer;"
                                      t-on-click="_showContextChart">
                                     <div class="o_chatboo_usage_chips">
-                                        <span t-if="msg.context_info.turnCode" class="o_chatboo_usage_chip"
-                                              t-att-title="msg.context_info.turnCodeTitle"
-                                              t-att-data-turn-code="msg.context_info.turnCode"
+                                        <span t-if="msg.context_info.turn" class="o_chatboo_usage_chip o_chatboo_usage_chip--turn"
+                                              t-att-title="msg.context_info.turnTitle"
+                                              t-att-data-turn="msg.context_info.turn"
                                               t-on-click.stop="_copyTurnCode">
-                                            <t t-esc="msg.context_info.turnCode"/>
+                                            <t t-esc="msg.context_info.turn"/>
                                         </span>
-                                        <span t-if="msg.context_info.showBuffer" class="o_chatboo_usage_chip"
-                                              t-att-title="msg.context_info.bufferTitle"
-                                              t-attf-style="color: {{ ctxColor }};">
+                                        <span t-if="msg.context_info.showBuffer"
+                                              t-attf-class="o_chatboo_usage_chip o_chatboo_usage_chip--buffer o_chatboo_usage_chip--buffer-{{ msg.context_info.bufferLevel }}"
+                                              t-att-title="msg.context_info.bufferTitle">
                                             <i t-attf-class="fa {{ ctxIcon }}" style="margin-right: 4px;"></i>
                                             <t t-esc="msg.context_info.usedK"/>k / <t t-esc="msg.context_info.limitK"/>k (<t t-esc="msg.context_info.usagePercent"/>%)
                                         </span>
-                                        <span class="o_chatboo_usage_chip"
+                                        <span class="o_chatboo_usage_chip o_chatboo_usage_chip--spend"
                                               t-att-title="msg.context_info.spendTitle">
                                             <t t-esc="msg.context_info.spendLabel"/>
                                         </span>
@@ -5680,7 +6031,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                                 </button>
                             </div>
                             <t t-if="state.streamingPreview">
-                                <div class="o_chatboo_content" t-raw="state.streamingPreview"/>
+                                <div class="o_chatboo_content" t-raw="_safeHtml(state.streamingPreview)"/>
                             </t>
                          </div>
                     </div>
@@ -5690,12 +6041,21 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             <!-- Input Area: Absolute Bottom (Zero Margins) -->
             <div class="o_chatboo_main_footer bg-white border-top" style="flex-shrink: 0; padding: 12px 16px !important; margin: 0 !important; z-index: 40; overflow: visible;">
 
-                <div t-if="state.screenFocusLabel" class="o_chatboo_screen_focus mb-2">
-                    <span t-attf-class="badge {{ state.screenFocusEnabled ? 'badge-primary' : 'badge-secondary' }}"
+                <div class="o_chatboo_footer_prefs mb-2">
+                    <span t-if="state.screenFocusLabel"
+                          t-attf-class="o_chatboo_directive_chip badge {{ state.screenFocusEnabled ? 'badge-primary' : 'o_chatboo_directive_chip--off' }}"
                           style="font-weight:500;font-size:0.78em;cursor:pointer;"
                           t-on-click="toggleScreenFocus"
+                          t-att-data-tip="_screenFocusTitle()"
                           t-att-aria-label="_screenFocusTitle()">
                         <i class="fa fa-crosshairs"/> <t t-esc="state.screenFocusLabel"/>
+                    </span>
+                    <span t-attf-class="o_chatboo_show_series_stats o_chatboo_directive_chip badge {{ state.showSeriesStats ? 'badge-primary' : 'o_chatboo_directive_chip--off' }}"
+                          style="font-weight:500;font-size:0.78em;cursor:pointer;"
+                          t-on-click="_toggleShowSeriesStats"
+                          t-att-data-tip="_seriesStatsTitle()"
+                          t-att-aria-label="_seriesStatsTitle()">
+                        <i class="fa fa-bar-chart"/> stats
                     </span>
                 </div>
 
@@ -5886,158 +6246,5 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         </div>
     `;
 
-    // --- AbstractAction Wrapper (Odoo 14 Standard) ---
-    const ChatbooAction = AbstractAction.extend({
-        hasControlPanel: false,
-        contentTemplate: null, // We use OWL
-        isHistoryActive: false,
-        isNewChatActive: false,
-
-        start: function () {
-            var self = this;
-            return this._super.apply(this, arguments).then(function () {
-                // Ensure el is ready
-                if (!self.el) {
-                    return;
-                }
-
-                // FIX ODOO 14 LAYOUT BUGS
-                // 1. Force the Action container to occupy full height relative bounds
-                $(self.el).css({
-                    'height': '100%',
-                    'position': 'relative',
-                    'display': 'flex',
-                    'flex-direction': 'column',
-                    'margin-bottom': '0',
-                    'padding-bottom': '0'
-                });
-
-                // 2. Hard-hide any phantom Control Panel injected by Odoo Action Manager (the cause of the 400px white space)
-                var $cp = $(self.el).closest('.o_action_manager').find('.o_control_panel');
-                if ($cp.length) {
-                    $cp.css('display', 'none', 'important');
-                    $cp.hide();
-                }
-
-                // Configurar acción por defecto, pero se pueden sobrescribir desde subclases
-                var actionContext = {};
-
-                // Extraer el Action Context para el routing basado estrictamente en el tipo de Acción enlazado al submenú
-                if (self.isHistoryActive) {
-                    actionContext.show_history_modal = true;
-                } else if (self.isNewChatActive) {
-                    actionContext.new_chat = true;
-                } else if (self.action && self.action.context) {
-                    // Cuidado con eval checks
-                    if (typeof self.action.context === 'string') {
-                        actionContext.show_history_modal = self.action.context.indexOf("'show_history_modal': True") !== -1 || self.action.context.indexOf('"show_history_modal": True') !== -1;
-                        actionContext.new_chat = self.action.context.indexOf("'new_chat': True") !== -1 || self.action.context.indexOf('"new_chat": True') !== -1;
-                    } else {
-                        actionContext.show_history_modal = self.action.context.show_history_modal === true || self.action.context.show_history_modal === 'True';
-                        actionContext.new_chat = self.action.context.new_chat === true || self.action.context.new_chat === 'True';
-                    }
-                }
-
-                // ── ALWAYS use singleton: show existing overlay or trigger
-                // systray to create it. Menu access = same as systray click. ──
-
-                // Clear badge dot
-                var badge = document.querySelector('.o_chatboo_badge');
-                if (badge) { badge.classList.add('d-none'); }
-
-                var overlay = document.getElementById('o_chatboo_persistent_overlay');
-
-                if (overlay) {
-                    // Singleton already exists — just show it
-                    overlay.style.display = 'flex';
-                    self._usingSingleton = true;
-
-                    // Dispatch context commands to the living singleton
-                    var comp = window.__chatboo_component;
-                    if (comp) {
-                        if (actionContext.new_chat && comp._createNewSession) {
-                            comp._createNewSession(true); // true = clear UI
-                        } else if (actionContext.show_history_modal && comp._showSessions) {
-                            comp._showSessions();
-                        }
-                        window.requestAnimationFrame(function () {
-                            window.requestAnimationFrame(function () {
-                                if (comp._focusChatInput) {
-                                    comp._focusChatInput();
-                                }
-                            });
-                        });
-                        if (comp._restorePendingVerifications) {
-                            comp._restorePendingVerifications();
-                        }
-                    }
-                    return Promise.resolve();
-                }
-
-                // Singleton doesn't exist yet — simulate systray click to create it
-                var systrayBtn = document.querySelector('.o_chatboo_systray_item');
-                if (systrayBtn) {
-                    systrayBtn.click();
-                    self._usingSingleton = true;
-                    return Promise.resolve();
-                }
-
-                // Fallback: no systray available (shouldn't happen), mount inline
-                var chatbooRpc = function (params) {
-                    return self._rpc(params, {shadow: true});
-                };
-                self.component = new ChatbooComponent(null, {
-                    rpc: chatbooRpc,
-                    notification: self.displayNotification.bind(self),
-                    doAction: self.do_action.bind(self),
-                    context: actionContext
-                });
-                return self.component.mount(self.el).then(function () {
-                    if (self.component && self.component._initSession) {
-                        self.component._initSession();
-                    }
-                    if (self.component && self.component._restorePendingVerifications) {
-                        self.component._restorePendingVerifications();
-                    }
-                });
-            });
-        },
-
-        destroy: function () {
-            // NEVER destroy the singleton — only hide the overlay if present
-            if (this._usingSingleton) {
-                var overlay = document.getElementById('o_chatboo_persistent_overlay');
-                if (overlay) {
-                    overlay.style.display = 'none';
-                    try {
-                        core.bus.trigger('chatboo_auth_cue', { notify: false });
-                    } catch (_) {}
-                }
-            } else if (this.component) {
-                // Action-mounted component (not singleton): destroy normally
-                this.component.destroy();
-            }
-            this._super.apply(this, arguments);
-        }
-    });
-
-    // Subclases estables que no dependen del context de Python
-    const ChatbooHistoryAction = ChatbooAction.extend({
-        isHistoryActive: true,
-        // No polling, no setTimeout. The context flag show_history_modal
-        // is checked inside mounted() AFTER the session is loaded.
-        // This avoids the race condition where the polling reopens the modal.
-    });
-    const ChatbooNewAction = ChatbooAction.extend({
-        isNewChatActive: true,
-        // El contexto new_chat:true es pasado como prop al componente.
-        // _initSession lo detecta y crea la sesión directamente, sin cargar la anterior.
-        // No hace falta llamar _createNewSession por fuera (eliminaba la condición de carrera).
-    });
-
-    core.action_registry.add('chatboo.action', ChatbooAction);
-    core.action_registry.add('chatboo.history.action', ChatbooHistoryAction);
-    core.action_registry.add('chatboo.new.action', ChatbooNewAction);
-
-    return { ChatbooAction: ChatbooAction, ChatbooComponent: ChatbooComponent };
+    return { ChatbooComponent: ChatbooComponent };
 });

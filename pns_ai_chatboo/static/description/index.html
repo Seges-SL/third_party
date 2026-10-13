@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta name="tdm-reservation" content="0"/>
 <title>Chatboo</title>
 </head>
 <body>
@@ -127,10 +128,10 @@
       does not re-implement them.
     </p>
     <p>
-      You can run the engine without Chatboo (Cursor talking MCP only). You
-      cannot run Chatboo without the engine. Customer packs such as
-      <code>occ_custom_ai</code> seed knowledge into the engine; Chatboo
-      just talks through the agent named <code>pns_ai_chatboo</code>.
+      You can run the engine without Chatboo (an MCP client talking to the
+      engine only). You cannot run Chatboo without the engine. An optional
+      domain module may seed knowledge into the engine; Chatboo talks
+      through the agent named <code>pns_ai_chatboo</code>.
     </p>
   </section>
 
@@ -155,8 +156,8 @@
     <ul>
       <li><strong>No provider keys</strong> &mdash; paste those on the engine provider. Chatboo has no secret store of its own.</li>
       <li><strong>No MCP protocol</strong> &mdash; Cursor and other clients hit <code>pns_ai_mcp</code> directly. This module is the in-Odoo conversation, not a second server.</li>
-      <li><strong>No failover chain</strong> &mdash; OpenRouter then OVH (or any other order) is configured on the agent in the engine, not here.</li>
-      <li><strong>No customer skills</strong> &mdash; Occidente procedures live in <code>occ_custom_ai</code>. Chatboo will use them once the engine has them.</li>
+      <li><strong>No failover chain</strong> &mdash; provider order is configured on the agent in the engine, not here.</li>
+      <li><strong>No customer skills</strong> &mdash; tenant procedures live in an optional domain module. Chatboo uses them once the engine has them.</li>
     </ul>
   </section>
 
@@ -167,7 +168,7 @@
       <li>Install this module. Open <strong>Chatboo</strong> from the systray or the app.</li>
       <li>On the engine, open the agent <code>pns_ai_chatboo</code>. Set the primary provider and the failover order you want for in-Odoo chat.</li>
       <li>If maps should appear in answers, install <code>pns_geo</code> and put the map keys under Settings &rarr; Geo. Chatboo will not ask for those keys.</li>
-      <li>Pilot: install <code>occ_custom_ai</code> so Occidente skills seed into the engine. Restart the conversation after that upgrade.</li>
+      <li>If a customer pack exists, install it so those skills seed into the engine. Restart the conversation after that upgrade.</li>
     </ol>
   </section>
 
@@ -189,9 +190,9 @@
           <td>This UI: sessions, overlay, streaming</td>
         </tr>
         <tr>
-          <td><code>occ_custom_ai</code></td>
-          <td>O14 and O19</td>
-          <td>Optional pilot pack. Seeds the engine; Chatboo does not depend on it.</td>
+          <td>Optional domain module</td>
+          <td>Same majors as that pack</td>
+          <td>Seeds the engine; Chatboo does not depend on it.</td>
         </tr>
       </tbody>
     </table>
@@ -199,8 +200,12 @@
       UI source in English. Layout: <code>common/</code> plus OWL1 (O13&ndash;14) and OWL2 (O15&ndash;19+) stacks.
     </p>
     <p class="pns-apps-foot">
-      <a href="https://patanegra.com">PATANEGRA Soft</a>
-      &mdash; Apache License 2.0 (OSI approved). See <a href="LICENSE">LICENSE</a>.
+      <a href="https://patanegra.com">PATANEGRA Soft</a>&trade;
+      &mdash; Apache License 2.0 (OSI approved). See <a href="LICENSE">LICENSE</a>
+      and <a href="NOTICE">NOTICE</a>.
+      Chatboo&trade;, the elephant-and-speech-bubble device, PATANEGRA Soft
+      and PAAP are trademarks of PATANEGRA Soft SL. The Apache license
+      does not grant trademark rights.
     </p>
   </section>
 </div>

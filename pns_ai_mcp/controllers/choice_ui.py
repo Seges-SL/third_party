@@ -16,12 +16,12 @@ class MCPChoiceUI(http.Controller):
 
     @http.route('/pns_ai_mcp/choice/accept', type=JSON_ROUTE_TYPE, auth='user')
     def accept(self, choice_id=None, selected_ids=None, **kwargs):
-        from .safe_plan import create_pending_safe_operation
+        from .safe_plan import request_safe_plan
         return accept_choice(
             request.env,
             choice_id,
             selected_ids or [],
-            create_pending_safe_operation,
+            request_safe_plan,
         )
 
     @http.route('/pns_ai_mcp/choice/cancel', type=JSON_ROUTE_TYPE, auth='user')

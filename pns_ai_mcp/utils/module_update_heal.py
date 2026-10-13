@@ -98,16 +98,6 @@ def module_update_args_from_steps(steps):
     return None, None, []
 
 
-def module_update_from_steps(steps):
-    """First ``module.update`` ``(technical_name, operation)``; ids resolved later."""
-    name, op, _ids = module_update_args_from_steps(steps)
-    if name and op:
-        return name, op
-    if op or name or _ids:
-        return name, op
-    return None, None
-
-
 def plan_has_module_update(steps):
     for step in steps or []:
         if isinstance(step, dict) and step.get('action_code') == MODULE_UPDATE_CODE:

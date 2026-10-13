@@ -32,12 +32,18 @@ _SECTION_LABELS = {
 
 
 class ConfigBackupWizard(models.TransientModel):
-    _name = 'pns_ai_mcp.config_backup_wizard'
+    _name = 'ai.config.backup.wizard'
     _inherit = ['pns.operation.report.wizard']
     _description = 'AI configuration backup import wizard'
 
     json_file = fields.Binary(string='Backup file (.json)', required=True, attachment=True)
     filename = fields.Char(string='File name')
+    replace_existing = fields.Boolean(
+        string='Overwrite existing records',
+        default=True,
+        help='Unchecked: records that already exist here are left as they are '
+             'and only the missing ones are created.',
+    )
 
     def action_import(self):
         """Parse the uploaded backup and restore the whole AI configuration."""
@@ -53,7 +59,9 @@ class ConfigBackupWizard(models.TransientModel):
         except (ValueError, Exception) as e:
             raise UserError(_("Error reading the file: %s") % e)
 
-        report = config_backup.import_config(self.env, data)
+        report = config_backup.import_config(
+            self.env, data, replace_existing=self.replace_existing,
+        )
         warnings = list(extract_warnings or []) + (report.get('warnings') or [])
         errors = report.get('errors') or []
 

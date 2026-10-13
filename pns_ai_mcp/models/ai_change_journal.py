@@ -23,7 +23,7 @@ _logger = logging.getLogger(__name__)
 _SKIP_FIELD_TYPES = frozenset({'binary', 'image'})
 _JOURNAL_CTX = {
     'safe_operation_id': 'ai_journal_safe_operation_id',
-    'correlation_id': 'ai_journal_correlation_id',
+    'turn': 'ai_journal_turn',
     'user_id': 'ai_journal_user_id',
     'confirmed_by_uid': 'ai_journal_confirmed_by_uid',
     'origin': 'ai_journal_origin',
@@ -45,7 +45,7 @@ class AiChangeJournal(models.Model):
     """One row per applied Safe Plan step (sequence: correlation + step_seq)."""
     _name = 'ai.change.journal'
     _description = 'AI Change'
-    _order = 'create_date desc, step_seq desc, id desc'
+    _order = 'create_date desc, turn_step desc, id desc'
     _rec_name = 'summary'
 
     user_id = fields.Many2one(
@@ -75,8 +75,8 @@ class AiChangeJournal(models.Model):
         related='safe_operation_id.verification_id', string='Verification ID',
         readonly=True, store=True, index=True,
     )
-    correlation_id = fields.Char(string='Request ID', readonly=True, index=True)
-    step_seq = fields.Integer(string='Step', readonly=True, default=1)
+    turn = fields.Char(string='Turn', readonly=True, index=True)
+    turn_step = fields.Integer(string='Step', readonly=True, default=1)
 
     op = fields.Selection(
         [
@@ -318,8 +318,8 @@ class AiChangeJournal(models.Model):
             'confirmed_by_uid': confirmed,
             'origin': origin,
             'safe_operation_id': safe_op or False,
-            'correlation_id': ctx.get(_JOURNAL_CTX['correlation_id']) or False,
-            'step_seq': int(step_seq or 1),
+            'turn': ctx.get(_JOURNAL_CTX['turn']) or False,
+            'turn_step': int(step_seq or 1),
             'op': op,
             'change_kind': kind,
             'action_code': action_code or False,
@@ -387,8 +387,8 @@ class AiChangeJournal(models.Model):
                         ) else 'internal'
                     ),
                     'safe_operation_id': ctx.get(_JOURNAL_CTX['safe_operation_id']) or False,
-                    'correlation_id': ctx.get(_JOURNAL_CTX['correlation_id']) or False,
-                    'step_seq': step_seq,
+                    'turn': ctx.get(_JOURNAL_CTX['turn']) or False,
+                    'turn_step': step_seq,
                     'op': op,
                     'change_kind': kind,
                     'action_code': action_code or False,
@@ -460,8 +460,8 @@ class AiChangeJournal(models.Model):
             'confirmed_by_uid': self.env.uid,
             'origin': 'revert',
             'safe_operation_id': False,
-            'correlation_id': self.correlation_id or False,
-            'step_seq': (self.step_seq or 0) + 1,
+            'turn': self.turn or False,
+            'turn_step': (self.turn_step or 0) + 1,
             'op': self.op,
             'change_kind': self.change_kind,
             'action_code': self.action_code,

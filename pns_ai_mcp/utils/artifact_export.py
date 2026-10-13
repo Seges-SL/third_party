@@ -9,18 +9,19 @@ Host-testable without Odoo.
 """
 from __future__ import annotations
 
+import ast
 import base64
+import functools
 import html as html_lib
 import importlib.util
 import io
+import json
 import logging
 import re
 import zipfile
 from pathlib import Path
 
 _logger = logging.getLogger(__name__)
-
-DOWNLOAD_CTA = 'Download'
 
 _XLSX_MIME = (
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -29,6 +30,13 @@ _XLSX_MIME = (
 # Chatboo client assembles these (table + ECharts PNG). Excel/md stay here
 # (icon Excel uses this same writer).
 CLIENT_ASSEMBLED_KINDS = frozenset(('doc', 'pdf', 'html'))
+
+# Chatboo Settings (ICP). Engine reads keys; it does not import Chatboo.
+ICP_XLSX_FLOAT_DECIMALS = 'pns_ai_chatboo.xlsx_float_decimals'
+ICP_XLSX_THOUSANDS = 'pns_ai_chatboo.xlsx_thousands'
+DEFAULT_XLSX_FLOAT_DECIMALS = 2
+DEFAULT_XLSX_THOUSANDS = True
+XLSX_FLOAT_DECIMALS_MAX = 10
 
 # Canonical kind → extension + mimetype. excel/xls still emit xlsx.
 FORMAT_SPECS = {
@@ -70,11 +78,15 @@ SESSION_FILE_PROTOCOL = (
     'the content (not a copy of the user prompt). Optional: '
     '__filename_stem__ (slug, no extension), __sheet_caption__ (one '
     'line on a single Excel sheet), __column_labels__ (key to visible '
-    'header). The server serializes the file and pins a session '
+    'header). Derived columns (difference, ratio, %) MUST set '
+    '__excel_formulas__ (xlsx-only map of public column key to '
+    '{other_key} arithmetic; chat, PDF, and Word keep values) — same '
+    'map as any tabular turn, not only this named download. The '
+    'server serializes the file and pins a session '
     'download card (same box as a clipboard, a manual attach, or a '
-    'Sesame file). The user may name one or more formats; the server '
+    'session file). The user may name one or more formats; the server '
     'pins one card per format. FORBIDDEN this turn: reportlab, '
-    'openpyxl, ir.attachment, and propose_safe_operations for files. '
+    'openpyxl, ir.attachment, and safe_plan_request for files. '
     'Do not paint a listing unless __show_table__ or show_mode '
     'show-table / chart-table / table. show-chart without '
     '__show_table__ keeps the chart and hides the listing. Word, PDF, '
@@ -91,15 +103,17 @@ SESSION_FILE_PROTOCOL = (
 SESSION_FILE_META_PROTOCOL = (
     'The rows are ready. Return the SAME data and set __title__ '
     '(Locale: what the file contains). Optional __filename_stem__, '
-    '__sheet_caption__, __column_labels__. Word, PDF, and HTML with a '
+    '__sheet_caption__, __column_labels__. Derived columns MUST keep '
+    '__excel_formulas__. Word, '
+    'PDF, and HTML with a '
     'chart are assembled by the Chatboo client. Do not rebuild the '
-    'file in Python. Do not call propose_safe_operations.'
+    'file in Python. Do not call safe_plan_request.'
 )
 
 SESSION_FILE_PROPOSE_ERROR = (
     'Session files are not caja B. Return structured rows (data); '
     'the server will serialize and attach a session download chip. '
-    'Do not call propose_safe_operations for ir.attachment.'
+    'Do not call safe_plan_request for ir.attachment.'
 )
 
 SESSION_FILE_ATTACHED_NOTE = (
@@ -107,12 +121,12 @@ SESSION_FILE_ATTACHED_NOTE = (
     'ir.attachment. Point the user to the card in one sentence.'
 )
 
-# Report / painter-free: named format still keeps the narrative in the bubble.
+# Report / compose-model: named format still keeps the narrative in the bubble.
 SESSION_FILE_REPORT_NOTE = (
     'The user also named a download format. Write the FULL report in the '
     'bubble (every outline heading). The server attaches the session '
     'download card under the prose. Do not replace the narrative with a '
-    'pointer to the card. Do not call propose_safe_operations for files.'
+    'pointer to the card. Do not call safe_plan_request for files.'
 )
 
 REFUSED_EXPORT_REPLY = (
@@ -125,7 +139,6 @@ REFUSED_PARTIAL_REPLY = (
     'I can send PDF, Excel, Word, text, Markdown, or HTML.'
 )
 
-_CHATBOO_SESSION_MODEL = 'chatboo.session'
 _FILE_VALUE_KEYS = ('datas', 'datas_fname', 'db_datas')
 
 
@@ -254,14 +267,6 @@ def parse_requested_export(user_message):
 # Shape heuristic: many columns (or a very wide header row) need A4 landscape.
 PDF_LANDSCAPE_MIN_COLS = 6
 PDF_LANDSCAPE_MIN_HEADER_CHARS = 48
-
-
-def pdf_column_count(payload=None, rows=None):
-    """Public column count for the landscape heuristic, or None if unknown."""
-    public = public_rows(tabular_rows(payload, rows) or [])
-    if not public:
-        return None
-    return len(public_columns(public))
 
 
 def _payload_landscape_flag(payload):
@@ -509,6 +514,573 @@ def column_labels(payload=None, rows=None):
     return out
 
 
+# xlsx-only: declared templates. Placeholders ``{public column key}`` +
+# ``+ - * / ( )`` and numbers. The key is the sheet column (spaces and
+# punctuation allowed); outside braces stay arithmetic. Invalid → value.
+_EXCEL_FORMULA_KEY_RE = re.compile(r'\{([^{}]+)\}')
+_EXCEL_FORMULA_REST_RE = re.compile(r'^[0-9.+\-*/()\s]*$')
+_EXCEL_COMPILED_FORMULA_RE = re.compile(
+    r'^=(?:[A-Z]{1,3}[1-9][0-9]*|\d+(?:\.\d+)?|[+\-*/()])+$'
+)
+
+
+def _formula_placeholders(template):
+    return [
+        key.strip()
+        for key in _EXCEL_FORMULA_KEY_RE.findall(template or '')
+        if key.strip()
+    ]
+
+
+def formula_template_ok(template):
+    """True when *template* is ``{key}`` arithmetic (optional leading ``=``)."""
+    text = (template or '').strip()
+    if text.startswith('='):
+        text = text[1:].strip()
+    if not text:
+        return False
+    if not _formula_placeholders(text):
+        return False
+    stripped = _EXCEL_FORMULA_KEY_RE.sub('0', text)
+    return bool(_EXCEL_FORMULA_REST_RE.match(stripped))
+
+
+def excel_formulas_from_mapping(raw):
+    """Sanitize a column→template map. Skip invalid templates."""
+    if raw is None:
+        return {}
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return {}
+        try:
+            raw = json.loads(text)
+        except (TypeError, ValueError):
+            return {}
+    if not isinstance(raw, dict):
+        return {}
+    out = {}
+    for key, tmpl in raw.items():
+        name = str(key or '').strip()
+        if not name or name.startswith('_') or not isinstance(tmpl, str):
+            continue
+        text = tmpl.strip()
+        if not formula_template_ok(text):
+            continue
+        refs = _formula_placeholders(
+            text[1:].strip() if text.startswith('=') else text
+        )
+        if name in refs:
+            continue
+        out[name] = text if text.startswith('=') else ('=' + text)
+    return out
+
+
+def excel_formulas_from_payload(payload):
+    """``__excel_formulas__`` on a skill result (clip may copy ``excel_formulas``)."""
+    if not isinstance(payload, dict):
+        return {}
+    raw = payload.get('__excel_formulas__')
+    if raw is None:
+        raw = payload.get('excel_formulas')
+    return excel_formulas_from_mapping(raw)
+
+
+def excel_formulas_from_section(spec):
+    """Icon / sheet envelope: ``formulas`` / ``excel_formulas`` / dunder."""
+    if not isinstance(spec, dict):
+        return {}
+    for key in ('__excel_formulas__', 'excel_formulas', 'formulas'):
+        if spec.get(key) is not None:
+            return excel_formulas_from_mapping(spec.get(key))
+    return {}
+
+
+def compile_excel_formula(template, keys, excel_row, col0=1, target_key=None):
+    """``={a}-{b}`` + keys ``[a, b]`` + row 2 → ``=A2-B2``. Else None."""
+    if not formula_template_ok(template):
+        return None
+    try:
+        excel_row = int(excel_row)
+        col0 = int(col0)
+    except (TypeError, ValueError):
+        return None
+    if excel_row < 1 or col0 < 1:
+        return None
+    text = (template or '').strip()
+    if text.startswith('='):
+        text = text[1:].strip()
+    refs = _formula_placeholders(text)
+    if target_key is not None and str(target_key) in refs:
+        return None
+    index = {str(k): i for i, k in enumerate(keys or [])}
+    for ref in refs:
+        if ref not in index:
+            return None
+
+    def _repl(match):
+        letter = _xlsx_col_letter(col0 + index[match.group(1).strip()])
+        return '%s%d' % (letter, excel_row)
+
+    compiled = '=' + _EXCEL_FORMULA_KEY_RE.sub(_repl, text)
+    compiled = ''.join(compiled.split())
+    if not _EXCEL_COMPILED_FORMULA_RE.match(compiled):
+        return None
+    return compiled
+
+
+def _xlsx_is_number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+# ── Formulas read from the numbers ─────────────────────────────────────────
+# The rows are the truth. A column that is the same arithmetic of columns to
+# its left on every row, a subtotal row that is the sum of its block, and a
+# last row that is the sum of everything above become live formulas. Each
+# cell keeps its value: the formula is written only when it gives that value.
+
+_INFER_MIN_ROWS = 3
+_INFER_MAX_COLS = 40
+_INFER_MAX_DECIMALS = 6
+_FOOTER_FLAGS = ('_tfoot', '_tsub')
+
+
+def _is_footer(row):
+    return isinstance(row, dict) and any(row.get(f) for f in _FOOTER_FLAGS)
+
+
+def _decimals_of(value):
+    if not isinstance(value, float):
+        return 0
+    text = repr(value)
+    if 'e' in text or 'E' in text or '.' not in text:
+        return _INFER_MAX_DECIMALS
+    return min(len(text.split('.', 1)[1].rstrip('0')), _INFER_MAX_DECIMALS)
+
+
+def _column_tolerance(values):
+    """Half a unit of the finest decimal the column shows."""
+    places = max([_decimals_of(v) for v in values] or [0])
+    return 0.5 * (10 ** -places)
+
+
+def _matches(expected, actual, tol):
+    if expected is None or actual is None:
+        return False
+    return abs(expected - actual) <= tol + 1e-9 * max(1.0, abs(actual))
+
+
+def _numeric_keys(rows, keys):
+    out = []
+    for key in keys:
+        values = [_excel_number(r.get(key)) for r in rows]
+        if any(v is not None for v in values):
+            out.append(key)
+    return out[:_INFER_MAX_COLS]
+
+
+def _formula_candidates(left):
+    """``(template, operand keys)`` over columns left of the target."""
+    out = []
+    for i, a in enumerate(left):
+        for j, b in enumerate(left):
+            if a == b:
+                continue
+            if i < j:
+                out.append(('={%s}+{%s}' % (a, b), (a, b)))
+                out.append(('={%s}*{%s}' % (a, b), (a, b)))
+            out.append(('={%s}-{%s}' % (a, b), (a, b)))
+            out.append(('={%s}/{%s}' % (a, b), (a, b)))
+            out.append(('={%s}/{%s}*100' % (a, b), (a, b)))
+    return out
+
+
+def _run_candidates(keys, numeric, target):
+    """Sums of 3+ adjacent numeric columns left of *target*."""
+    numeric = set(numeric)
+    pos = keys.index(target)
+    out = []
+    start = 0
+    while start < pos:
+        if keys[start] not in numeric:
+            start += 1
+            continue
+        end = start
+        while end < pos and keys[end] in numeric:
+            end += 1
+        block = keys[start:end]
+        for i in range(len(block)):
+            for j in range(i + 3, len(block) + 1):
+                run = block[i:j]
+                out.append(('=' + '+'.join('{%s}' % k for k in run), tuple(run)))
+        start = end
+    return out
+
+
+@functools.lru_cache(maxsize=4096)
+def _arith_program(template):
+    """``(tree, {name: key})`` for a ``{key}`` template, or None."""
+    text = (template or '').strip()
+    if text.startswith('='):
+        text = text[1:]
+    names = {}
+
+    def _name(match):
+        name = '_v%d' % len(names)
+        names[name] = match.group(1).strip()
+        return name
+
+    try:
+        tree = ast.parse(_EXCEL_FORMULA_KEY_RE.sub(_name, text), mode='eval')
+    except SyntaxError:
+        return None
+    return tree.body, names
+
+
+def _eval_arith(template, values):
+    """Value of a ``{key}`` arithmetic template, or None."""
+    program = _arith_program(template)
+    if not program:
+        return None
+    tree, names = program
+    env = {}
+    for name, key in names.items():
+        number = _excel_number(values.get(key))
+        if number is None:
+            return None
+        env[name] = float(number)
+    return _eval_node(tree, env)
+
+
+def _eval_node(node, env):
+    if isinstance(node, ast.Name):
+        return env.get(node.id)
+    if type(node).__name__ in ('Constant', 'Num'):
+        value = getattr(node, 'value', getattr(node, 'n', None))
+        return float(value) if _xlsx_is_number(value) else None
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.USub, ast.UAdd)):
+        inner = _eval_node(node.operand, env)
+        if inner is None:
+            return None
+        return -inner if isinstance(node.op, ast.USub) else inner
+    if isinstance(node, ast.BinOp):
+        left = _eval_node(node.left, env)
+        right = _eval_node(node.right, env)
+        if left is None or right is None:
+            return None
+        if isinstance(node.op, ast.Add):
+            return left + right
+        if isinstance(node.op, ast.Sub):
+            return left - right
+        if isinstance(node.op, ast.Mult):
+            return left * right
+        if isinstance(node.op, ast.Div):
+            return left / right if right else None
+    return None
+
+
+def _candidate_holds(rows, target, template, operands, tol):
+    hits = 0
+    for row in rows:
+        actual = _excel_number(row.get(target))
+        if actual is None:
+            continue
+        values = {}
+        for key in operands:
+            number = _excel_number(row.get(key))
+            if number is None:
+                return False
+            values[key] = number
+        if not _matches(_eval_arith(template, values), actual, tol):
+            return False
+        if actual:
+            hits += 1
+    return hits >= _INFER_MIN_ROWS
+
+
+def _duplicates_a_column(rows, target, others, tol):
+    targets = [(r, _excel_number(r.get(target))) for r in rows]
+    targets = [(r, t) for r, t in targets if t is not None]
+    if not targets:
+        return False
+    for other in others:
+        if all(_matches(_excel_number(r.get(other)), t, tol) for r, t in targets):
+            return True
+    return False
+
+
+def infer_excel_formulas(rows, keys, declared=None):
+    """Column → ``{key}`` template read from the numbers of the data rows.
+
+    Operands sit left of the target, so formulas never loop. A column with
+    two different explanations, or fewer than three non-zero rows, keeps its
+    values. *declared* columns are left alone.
+    """
+    declared = declared or {}
+    data = [r for r in (rows or []) if isinstance(r, dict) and not _is_footer(r)]
+    keys = list(keys or [])
+    numeric = _numeric_keys(data, keys)
+    out = {}
+    for target in numeric:
+        if target in declared:
+            continue
+        values = [_excel_number(r.get(target)) for r in data]
+        values = [v for v in values if v is not None]
+        if len([v for v in values if v]) < _INFER_MIN_ROWS:
+            continue
+        tol = _column_tolerance(values)
+        left = [k for k in numeric if keys.index(k) < keys.index(target)]
+        if not left or _duplicates_a_column(data, target, left, tol):
+            continue
+        found = [
+            template
+            for template, operands in (
+                _formula_candidates(left) + _run_candidates(keys, numeric, target)
+            )
+            if _candidate_holds(data, target, template, operands, tol)
+        ]
+        if len(found) == 1:
+            out[target] = found[0]
+    return out
+
+
+def _sums_new():
+    """Running column sums of a block of rows: ``[row count, {key: (sum, n)}]``."""
+    return [0, {}]
+
+
+def _sums_copy(sums):
+    return [sums[0], dict(sums[1])]
+
+
+def _sums_add(sums, row, numeric):
+    sums[0] += 1
+    for key in numeric:
+        number = _excel_number(row.get(key))
+        if number is not None:
+            total, count = sums[1].get(key, (0.0, 0))
+            sums[1][key] = (total + number, count + 1)
+
+
+def _is_sum_row(row, sums, numeric, tols):
+    """Keys where *row* equals the block sum, when they outnumber the rest."""
+    if sums[0] < 2:
+        return None
+    hit, miss, nonzero = [], [], False
+    for key in numeric:
+        actual = _excel_number(row.get(key))
+        if actual is None:
+            continue
+        total, count = sums[1].get(key, (0.0, 0))
+        if count and _matches(total, actual, tols[key]):
+            hit.append(key)
+            nonzero = nonzero or bool(actual)
+        else:
+            miss.append(key)
+    if hit and nonzero and len(hit) > len(miss):
+        return hit
+    return None
+
+
+def infer_footer_rows(rows, keys):
+    """Mark subtotal rows ``_tsub`` and a grand total ``_tfoot`` from the numbers.
+
+    Subtotals count only when the whole list agrees: a grand total that sums
+    the data rows, or two or more subtotals with the list ending on one.
+    Rows the skill already flagged are left as they are.
+    """
+    rows = [r for r in (rows or []) if isinstance(r, dict)]
+    if len(rows) < 3 or any(_is_footer(r) for r in rows):
+        return
+    numeric = _numeric_keys(rows, keys)
+    if not numeric:
+        return
+    tols = {
+        k: _column_tolerance([_excel_number(r.get(k)) for r in rows])
+        for k in numeric
+    }
+    found = _footer_layout(
+        rows, numeric, tols, 0, _sums_new(), _sums_new(), [],
+        [_FOOTER_MAX_BRANCHES],
+    )
+    if not found:
+        return
+    subs, total = found
+    for row, hit in subs:
+        row['_tsub'] = True
+        row['_tsum'] = hit
+    if total:
+        rows[-1]['_tfoot'] = True
+        rows[-1]['_tsum'] = total
+
+
+_FOOTER_MAX_BRANCHES = 200
+
+
+def _footer_layout(rows, numeric, tols, start, block, data, subs, budget):
+    """First layout where every subtotal and the grand total add up.
+
+    A row that could be a subtotal is tried as data first, so the plainest
+    reading wins and a row that only happens to add up stays data.
+    """
+    block = _sums_copy(block)
+    data = _sums_copy(data)
+    last = len(rows) - 1
+    for i in range(start, len(rows)):
+        row = rows[i]
+        if i == last:
+            total = _is_sum_row(row, data, numeric, tols)
+            if total:
+                return subs, total
+        hit = _is_sum_row(row, block, numeric, tols)
+        if hit:
+            budget[0] -= 1
+            if budget[0] < 0:
+                return None
+            if i < last:
+                as_data = (_sums_copy(block), _sums_copy(data))
+                _sums_add(as_data[0], row, numeric)
+                _sums_add(as_data[1], row, numeric)
+                found = _footer_layout(
+                    rows, numeric, tols, i + 1,
+                    as_data[0], as_data[1], subs, budget,
+                )
+                if found:
+                    return found
+            with_sub = subs + [(row, hit)]
+            if i == last:
+                return (with_sub, None) if len(with_sub) >= 2 else None
+            return _footer_layout(
+                rows, numeric, tols, i + 1, _sums_new(), data, with_sub, budget,
+            )
+        _sums_add(block, row, numeric)
+        _sums_add(data, row, numeric)
+    return None
+
+
+def _plan_xlsx_cells(spec):
+    """``{(excel_row, col): (formula, cached)}`` for every live cell of a sheet."""
+    keys = spec['keys']
+    rows = spec['rows']
+    header_row = 2 if spec.get('caption') else 1
+    declared = spec.get('formulas') or {}
+    inferred = infer_excel_formulas(rows, keys, declared)
+    formulas = dict(inferred)
+    formulas.update(declared)
+    nested = any(isinstance(r, dict) and r.get('_tsub') for r in rows)
+    first = header_row + 1
+    plan = {}
+    block_start = first
+    for offset, row in enumerate(rows):
+        ridx = first + offset
+        if not isinstance(row, dict):
+            continue
+        cached = {}
+        for col, key in enumerate(keys, 1):
+            template = formulas.get(key)
+            compiled = compile_excel_formula(
+                template, keys, ridx, target_key=key,
+            ) if template else None
+            if compiled:
+                operands = (_arith_program(template) or (None, {}))[1].values()
+                values = {
+                    k: cached.get(k, _excel_number(row.get(k))) for k in operands
+                }
+                result = _eval_arith(template, values)
+                actual = _excel_number(row.get(key))
+                if key in declared:
+                    value = result if result is not None else actual
+                elif _matches(result, actual, _column_tolerance([actual])):
+                    value = result
+                else:
+                    compiled = None
+                if compiled:
+                    plan[(ridx, col)] = (compiled, value)
+                    if value is not None:
+                        cached[key] = value
+                    continue
+            footer = _xlsx_footer_formula(
+                rows, row, key, col, ridx, first, block_start, nested,
+            )
+            if footer:
+                plan[(ridx, col)] = footer
+                cached[key] = footer[1]
+        if row.get('_tsub'):
+            block_start = ridx + 1
+    return plan
+
+
+def _xlsx_footer_formula(rows, row, key, col, ridx, first, block_start, nested):
+    """``SUM`` / ``SUBTOTAL(9, …)`` for a footer cell that equals it, else None."""
+    if not _is_footer(row):
+        return None
+    actual = _excel_number(row.get(key))
+    if actual is None:
+        return None
+    sums = row.get('_tsum')
+    if sums is not None and key not in sums:
+        return None
+    top = block_start if row.get('_tsub') else first
+    if ridx - 1 < top:
+        return None
+    above = rows[top - first:ridx - first]
+    numbers = [
+        _excel_number(r.get(key)) for r in above
+        if isinstance(r, dict) and not (nested and r.get('_tsub'))
+    ]
+    numbers = [n for n in numbers if n is not None]
+    if not numbers:
+        return None
+    total = float(sum(numbers))
+    if not _matches(total, actual, _column_tolerance([actual])):
+        return None
+    letter = _xlsx_col_letter(col)
+    span = '%s%d:%s%d' % (letter, top, letter, ridx - 1)
+    if nested:
+        return '=SUBTOTAL(9,%s)' % span, total
+    return '=SUM(%s)' % span, total
+
+
+_XLSX_EMPTY_CACHE_RE = re.compile(
+    r'<c r="([A-Z]{1,3}[0-9]+)"([^>]*)><f>([^<]*)</f><v\s*/?>(?:</v>)?</c>'
+)
+
+
+def _xlsx_fill_cached(raw, specs):
+    """Write the planned result into each formula cell an openpyxl book left empty."""
+    if not raw:
+        return raw
+    try:
+        src = zipfile.ZipFile(io.BytesIO(raw))
+    except zipfile.BadZipFile:
+        return raw
+    out = io.BytesIO()
+    with src, zipfile.ZipFile(out, 'w', compression=zipfile.ZIP_DEFLATED) as dst:
+        for info in src.infolist():
+            data = src.read(info.filename)
+            match = re.match(r'xl/worksheets/sheet(\d+)\.xml$', info.filename)
+            if match and int(match.group(1)) <= len(specs):
+                plan = specs[int(match.group(1)) - 1].get('cells') or {}
+                by_ref = {
+                    '%s%d' % (_xlsx_col_letter(col), r): value
+                    for (r, col), (_f, value) in plan.items()
+                }
+                data = _XLSX_EMPTY_CACHE_RE.sub(
+                    lambda m: _xlsx_cached_cell(m, by_ref), data.decode('utf-8'),
+                ).encode('utf-8')
+            dst.writestr(info, data)
+    return out.getvalue()
+
+
+def _xlsx_cached_cell(match, by_ref):
+    number = _excel_number(by_ref.get(match.group(1)))
+    if number is None:
+        return match.group(0)
+    return '<c r="%s"%s><f>%s</f><v>%s</v></c>' % (
+        match.group(1), match.group(2), match.group(3), repr(float(number)),
+    )
+
+
 def column_widths(rows, labels=None):
     """Excel column widths from header + sampled cell text. No locale list."""
     keys = public_columns(rows)
@@ -558,11 +1130,6 @@ def export_result_chips(result):
     return []
 
 
-def has_export_chip(result):
-    """True when persist returned a download chip the bubble can paint."""
-    return bool(export_result_chips(result))
-
-
 def is_session_file_propose(steps):
     """True when a Safe Plan dumps a file onto orphan ``ir.attachment``.
 
@@ -583,7 +1150,7 @@ def is_session_file_propose(steps):
         res_model = values.get('res_model')
         if isinstance(res_model, str):
             res_model = res_model.strip()
-        if res_model and res_model != _CHATBOO_SESSION_MODEL:
+        if res_model:
             continue
         if op == 'create':
             return True
@@ -621,7 +1188,10 @@ def public_rows(rows):
     for row in rows or []:
         if not isinstance(row, dict):
             continue
-        out.append({k: row.get(k) for k in keys})
+        item = {k: row.get(k) for k in keys}
+        if row.get('_tfoot'):
+            item['_tfoot'] = True
+        out.append(item)
     return out
 
 
@@ -660,6 +1230,21 @@ def clip_data_from_payload(payload=None, rows=None):
     }
     if title and title != 'Export':
         out['title'] = title
+    formulas = excel_formulas_from_payload(payload)
+    if formulas:
+        out['excel_formulas'] = formulas
+    if isinstance(payload, dict):
+        src = payload.get('__column_labels__')
+        if isinstance(src, dict) and src:
+            labels = {}
+            for key in public_columns(rows_out):
+                lab = src.get(key)
+                if lab is None:
+                    lab = src.get(str(key))
+                if lab not in (None, ''):
+                    labels[key] = str(lab).strip()
+            if labels:
+                out['column_labels'] = labels
     return out
 
 
@@ -856,8 +1441,67 @@ def pdf_chart_series(rows, labels=None):
     }
 
 
+def xlsx_number_format(decimals, thousands, kind):
+    """Excel format code. ``kind`` is ``int`` or ``float`` (formulas use float)."""
+    try:
+        n = int(decimals)
+    except (TypeError, ValueError):
+        n = DEFAULT_XLSX_FLOAT_DECIMALS
+    n = max(0, min(XLSX_FLOAT_DECIMALS_MAX, n))
+    prefix = '#,##0' if thousands else '0'
+    if kind == 'int':
+        return prefix
+    return prefix if n == 0 else '%s.%s' % (prefix, '0' * n)
+
+
+def xlsx_number_style(env=None):
+    """``int_format`` / ``float_format`` from Chatboo ICP, or product defaults."""
+    decimals = DEFAULT_XLSX_FLOAT_DECIMALS
+    thousands = DEFAULT_XLSX_THOUSANDS
+    if env is not None:
+        try:
+            icp = env['ir.config_parameter'].sudo()
+            raw_d = icp.get_param(
+                ICP_XLSX_FLOAT_DECIMALS, DEFAULT_XLSX_FLOAT_DECIMALS,
+            )
+            try:
+                decimals = int(raw_d)
+            except (TypeError, ValueError):
+                decimals = DEFAULT_XLSX_FLOAT_DECIMALS
+            raw_t = icp.get_param(
+                ICP_XLSX_THOUSANDS,
+                'True' if DEFAULT_XLSX_THOUSANDS else 'False',
+            )
+            thousands = str(raw_t) not in ('False', 'false', '0', '')
+        except Exception:
+            decimals = DEFAULT_XLSX_FLOAT_DECIMALS
+            thousands = DEFAULT_XLSX_THOUSANDS
+    decimals = max(0, min(XLSX_FLOAT_DECIMALS_MAX, int(decimals)))
+    thousands = bool(thousands)
+    return {
+        'decimals': decimals,
+        'thousands': thousands,
+        'int_format': xlsx_number_format(decimals, thousands, 'int'),
+        'float_format': xlsx_number_format(decimals, thousands, 'float'),
+    }
+
+
+def _xlsx_cell_number_format(value, formula=None, style=None):
+    style = style or xlsx_number_style()
+    if formula:
+        return style['float_format']
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return style['int_format']
+    if isinstance(value, float):
+        return style['float_format']
+    return None
+
+
 def serialize_rows(rows, kind, title='Export', landscape=True, labels=None,
-                   caption=None, env=None, html=None, charts=True):
+                   caption=None, env=None, html=None, charts=True,
+                   formulas=None):
     """Return bytes for ``kind`` (txt/md/html/xlsx/pdf/doc), or None."""
     public = public_rows(rows)
     kind = (kind or '').lower()
@@ -875,7 +1519,10 @@ def serialize_rows(rows, kind, title='Export', landscape=True, labels=None,
     if kind == 'html':
         return _as_html(public, title, labels=labels).encode('utf-8')
     if kind == 'xlsx':
-        return _as_xlsx(public, title, labels=labels, caption=caption)
+        return _as_xlsx(
+            public, title, labels=labels, caption=caption, formulas=formulas,
+            number_style=xlsx_number_style(env),
+        )
     if kind == 'pdf':
         return _as_pdf(
             public, title, landscape=landscape, labels=labels, env=env,
@@ -920,92 +1567,6 @@ def export_filename(prompt, ext, fallback='export', payload=None, title=None):
     except Exception:
         _logger.debug('artifact_export: utterance_filename fallback', exc_info=True)
     return '%s.%s' % ((fallback or 'export'), ext)
-
-
-def file_banner_tone(chip):
-    """CSS suffix: pdf / excel / text / code / other."""
-    chip = chip or {}
-    mt = (chip.get('mimetype') or '').split(';', 1)[0].strip().lower()
-    name = (chip.get('name') or '').lower()
-    ext = name.rsplit('.', 1)[-1] if '.' in name else ''
-    if mt == 'application/pdf' or ext == 'pdf':
-        return 'pdf'
-    if (
-        mt == 'application/msword'
-        or 'wordprocessing' in mt
-        or ext in ('doc', 'docx')
-    ):
-        return 'word'
-    if (
-        'spreadsheet' in mt
-        or 'excel' in mt
-        or mt == 'text/csv'
-        or ext in ('xls', 'xlsx', 'ods', 'csv')
-    ):
-        return 'excel'
-    if (
-        'json' in mt
-        or 'xml' in mt
-        or 'javascript' in mt
-        or 'html' in mt
-        or ext in ('json', 'xml', 'js', 'html', 'css', 'py')
-    ):
-        return 'code'
-    if mt.startswith('text/') or ext in ('txt', 'md', 'log', 'markdown'):
-        return 'text'
-    return 'other'
-
-
-def file_icon_class(chip):
-    tone = file_banner_tone(chip)
-    mapping = {
-        'pdf': 'fa fa-file-pdf-o',
-        'excel': 'fa fa-file-excel-o',
-        'word': 'fa fa-file-word-o',
-        'code': 'fa fa-file-code-o',
-        'text': 'fa fa-file-text-o',
-    }
-    return mapping.get(tone, 'fa fa-file-o')
-
-
-def format_file_size(n):
-    if n is None or n == '':
-        return ''
-    try:
-        n = int(n)
-    except (TypeError, ValueError):
-        return ''
-    if n < 1024:
-        return '%d B' % n
-    if n < 1024 * 1024:
-        return '%.1f KB' % (n / 1024.0)
-    return '%.1f MB' % (n / (1024.0 * 1024.0))
-
-
-def file_banner_html(chip, cta=DOWNLOAD_CTA):
-    """Markup matching ``.o_chatboo_file_banner_*`` (tests + server fallback)."""
-    chip = chip or {}
-    href = html_lib.escape(str(chip.get('url') or '#'), quote=True)
-    name = html_lib.escape(str(chip.get('name') or 'download'))
-    tone = file_banner_tone(chip)
-    icon = file_icon_class(chip)
-    size = format_file_size(chip.get('size'))
-    size_html = (
-        '<span class="o_chatboo_file_banner_size">%s</span>' % html_lib.escape(size)
-        if size else ''
-    )
-    cta_txt = html_lib.escape(cta or DOWNLOAD_CTA)
-    return (
-        '<a class="o_chatboo_file_banner_card o_chatboo_file_banner_%s" '
-        'href="%s" target="_blank" rel="noopener" download="%s">'
-        '<span class="o_chatboo_file_banner_preview" aria-hidden="true">'
-        '<i class="%s"></i></span>'
-        '<span class="o_chatboo_file_banner_meta">'
-        '<span class="o_chatboo_file_banner_title">%s</span>'
-        '%s'
-        '<span class="o_chatboo_file_banner_cta">%s</span>'
-        '</span></a>'
-    ) % (tone, href, name, icon, name, size_html, cta_txt)
 
 
 def _parsed_format_specs(parsed):
@@ -1068,6 +1629,7 @@ def apply_requested_exports(
     title = export_title(payload, fallback='Export')
     labels = column_labels(payload, public)
     caption = sheet_caption(payload)
+    formulas = excel_formulas_from_payload(payload)
     landscape = pdf_landscape(
         payload,
         col_count=len(public_columns(public)) if public else None,
@@ -1099,6 +1661,7 @@ def apply_requested_exports(
             landscape=landscape, labels=labels, caption=caption, env=env,
             html=extra_html,
             charts=payload_allows_charts(payload),
+            formulas=formulas if spec.get('kind') == 'xlsx' else None,
         )
         if not raw:
             continue
@@ -1128,34 +1691,6 @@ def apply_requested_exports(
         'filename': last_filename,
         'refused_tokens': list(parsed.get('refused_tokens') or []),
     }
-
-
-def apply_requested_export(
-    user_message,
-    rows=None,
-    payload=None,
-    persist=None,
-    prompt=None,
-    env=None,
-    client_fulfill=False,
-):
-    """Parse + serialize + optional persist. Never raises for bad utterances.
-
-    Table vs card is the engine (``export_hides_on_screen_table``). PPT
-    does not serialize. One card per unique kind when several are named.
-    ``persist(raw, filename, mimetype) -> chip|None``. When omitted
-    (host tests), a synthetic chip is returned. When provided and every
-    persist returns None, ``acted`` stays False.
-    """
-    return apply_requested_exports(
-        user_message,
-        rows=rows,
-        payload=payload,
-        persist=persist,
-        prompt=prompt,
-        env=env,
-        client_fulfill=client_fulfill,
-    )
 
 
 def _as_tsv(rows):
@@ -1345,21 +1880,26 @@ _MAX_XLSX_ROWS = 20000
 _MAX_XLSX_COLS = 256
 
 
-def _as_xlsx(rows, title, labels=None, caption=None):
+def _as_xlsx(rows, title, labels=None, caption=None, formulas=None,
+             number_style=None):
     """Prefer styled openpyxl; always fall back to stdlib OOXML."""
     return serialize_xlsx_sheets([{
         'title': title,
         'rows': rows,
         'labels': labels,
         'caption': caption,
-    }])
+        'formulas': formulas,
+    }], number_style=number_style)
 
 
-def serialize_xlsx_sheets(sheets):
+def serialize_xlsx_sheets(sheets, number_style=None, env=None):
     """One workbook from ``[{title, rows, labels, caption}]``."""
     specs = _normalize_xlsx_sheets(sheets)
     if not specs:
         return None
+    style = number_style or xlsx_number_style(env)
+    for spec in specs:
+        spec['number_style'] = spec.get('number_style') or style
     fmt = _load_formatters()
     if fmt is not None and hasattr(fmt, 'format_excel_workbook'):
         try:
@@ -1371,12 +1911,14 @@ def serialize_xlsx_sheets(sheets):
                     'include_row_index': False,
                     'caption': spec['caption'] or None,
                     'widths': spec['widths'],
+                    'cell_formulas': _cell_formulas(spec),
+                    'number_style': spec.get('number_style') or style,
                 }
                 for spec in specs
             ])
             coerced = _coerce_xlsx_bytes(raw)
             if coerced:
-                return coerced
+                return _xlsx_fill_cached(coerced, specs)
         except Exception:
             _logger.debug(
                 'artifact_export: format_excel_workbook failed', exc_info=True,
@@ -1388,10 +1930,12 @@ def serialize_xlsx_sheets(sheets):
                 spec['rows'], spec['cfg'], title=spec['title'],
                 include_row_index=False, caption=spec['caption'] or None,
                 widths=spec['widths'],
+                cell_formulas=_cell_formulas(spec),
+                number_style=spec.get('number_style') or style,
             )
             coerced = _coerce_xlsx_bytes(raw)
             if coerced:
-                return coerced
+                return _xlsx_fill_cached(coerced, specs)
         except Exception:
             _logger.debug(
                 'artifact_export: format_data_as_excel failed', exc_info=True,
@@ -1400,7 +1944,7 @@ def serialize_xlsx_sheets(sheets):
         raw = _as_xlsx_openpyxl_book(specs)
         coerced = _coerce_xlsx_bytes(raw)
         if coerced:
-            return coerced
+            return _xlsx_fill_cached(coerced, specs)
     except ImportError:
         _logger.info(
             'artifact_export: openpyxl not installed; using stdlib xlsx',
@@ -1412,6 +1956,10 @@ def serialize_xlsx_sheets(sheets):
     except Exception:
         _logger.warning('artifact_export: stdlib xlsx failed', exc_info=True)
         return None
+
+
+def _cell_formulas(spec):
+    return {pos: formula for pos, (formula, _v) in (spec.get('cells') or {}).items()}
 
 
 def sheets_from_aoa_sections(sections):
@@ -1433,24 +1981,33 @@ def sheets_from_aoa_sections(sections):
             }
             if not (rows or labels):
                 continue
-            out.append({
+            item = {
                 'title': _unique_sheet_title(spec.get('title'), used),
                 'rows': rows,
                 'labels': labels,
                 'caption': (spec.get('caption') or '').strip(),
-            })
+            }
+            formulas = excel_formulas_from_section(spec)
+            if formulas:
+                item['formulas'] = formulas
+            out.append(item)
             continue
         aoa = spec.get('aoa')
         parsed = _sheet_from_aoa(aoa, spec.get('title'), used)
         if parsed:
             parsed['caption'] = (spec.get('caption') or '').strip()
+            formulas = excel_formulas_from_section(spec)
+            if formulas:
+                parsed['formulas'] = formulas
             out.append(parsed)
     return out
 
 
-def icon_xlsx_payload(sections, filename=None):
+def icon_xlsx_payload(sections, filename=None, env=None):
     """Base64 download dict for the Chatboo Excel icon, or None."""
-    raw = serialize_xlsx_sheets(sheets_from_aoa_sections(sections))
+    raw = serialize_xlsx_sheets(
+        sheets_from_aoa_sections(sections), env=env,
+    )
     if not raw:
         return None
     return {
@@ -1532,11 +2089,18 @@ def _normalize_xlsx_sheets(sheets):
         widths = spec.get('widths') or column_widths(
             rows or [{k: labels[k] for k in keys}], labels,
         )
-        typed = [
-            {k: _excel_typed(row.get(k)) for k in keys}
-            for row in rows
-        ]
-        specs.append({
+        typed = []
+        for row in rows:
+            item = {k: _excel_typed(row.get(k)) for k in keys}
+            for flag in _FOOTER_FLAGS:
+                if row.get(flag):
+                    item[flag] = True
+            typed.append(item)
+        infer_footer_rows(typed, keys)
+        formulas = excel_formulas_from_section(spec)
+        if formulas:
+            formulas = {k: formulas[k] for k in keys if k in formulas}
+        item = {
             'title': _unique_sheet_title(spec.get('title'), used),
             'rows': typed,
             'labels': labels,
@@ -1544,7 +2108,10 @@ def _normalize_xlsx_sheets(sheets):
             'widths': widths,
             'keys': keys,
             'cfg': columns_config(typed or [{k: '' for k in keys}], labels),
-        })
+            'formulas': formulas,
+        }
+        item['cells'] = _plan_xlsx_cells(item)
+        specs.append(item)
     return specs
 
 
@@ -1576,12 +2143,19 @@ def _as_xlsx_openpyxl_book(specs):
                 row=header_row, column=col,
                 value=str(labels.get(key) or key),
             )
+        plan = spec.get('cells') or {}
+        style = spec.get('number_style') or xlsx_number_style()
         for ridx, row in enumerate(spec['rows'], header_row + 1):
             for col, key in enumerate(keys, 1):
-                ws.cell(
-                    row=ridx, column=col,
-                    value=_excel_value(row.get(key)),
+                compiled = (plan.get((ridx, col)) or (None,))[0]
+                value = compiled if compiled else _excel_value(row.get(key))
+                cell = ws.cell(row=ridx, column=col, value=value)
+                fmt = _xlsx_cell_number_format(
+                    value if not compiled else None,
+                    formula=compiled, style=style,
                 )
+                if fmt:
+                    cell.number_format = fmt
         for col, width in enumerate(spec['widths'], 1):
             ws.column_dimensions[get_column_letter(col)].width = width
         ws.freeze_panes = 'A%d' % (header_row + 1)
@@ -1743,17 +2317,63 @@ def _xlsx_xml_text(value):
     return html_lib.escape(_xlsx_plain_text(value), quote=True)
 
 
-def _xlsx_cell_xml(col, row, value):
-    ref = '%s%s' % (_xlsx_col_letter(col), row)
+def _xlsx_num_style_index(value, formula=None, number_style=None):
+    """0 general, 1 integer, 2 float/formula."""
+    if not number_style:
+        return 0
+    if formula:
+        return 2
     if isinstance(value, bool):
-        return '<c r="%s" t="b"><v>%d</v></c>' % (ref, 1 if value else 0)
+        return 0
+    if isinstance(value, int):
+        return 1
+    if isinstance(value, float):
+        return 2
+    return 0
+
+
+def _xlsx_style_attr(index):
+    return ' s="%d"' % index if index else ''
+
+
+def _xlsx_formula_cell_xml(col, row, formula, cached=None, style=0):
+    ref = '%s%s' % (_xlsx_col_letter(col), row)
+    body = formula[1:] if str(formula).startswith('=') else str(formula)
+    fxml = html_lib.escape(body, quote=True)
+    s_attr = _xlsx_style_attr(style)
+    number = _excel_number(cached)
+    if number is not None:
+        if isinstance(number, float):
+            cached_xml = repr(number)
+        else:
+            cached_xml = '%d' % number
+        return '<c r="%s"%s><f>%s</f><v>%s</v></c>' % (
+            ref, s_attr, fxml, cached_xml,
+        )
+    return '<c r="%s"%s><f>%s</f></c>' % (ref, s_attr, fxml)
+
+
+def _xlsx_cell_xml(col, row, value, formula=None, number_style=None):
+    style = _xlsx_num_style_index(
+        value, formula=formula, number_style=number_style,
+    )
+    if formula:
+        return _xlsx_formula_cell_xml(
+            col, row, formula, cached=value, style=style,
+        )
+    ref = '%s%s' % (_xlsx_col_letter(col), row)
+    s_attr = _xlsx_style_attr(style)
+    if isinstance(value, bool):
+        return '<c r="%s"%s t="b"><v>%d</v></c>' % (
+            ref, s_attr, 1 if value else 0,
+        )
     if isinstance(value, int) and not isinstance(value, bool):
-        return '<c r="%s"><v>%d</v></c>' % (ref, value)
+        return '<c r="%s"%s><v>%d</v></c>' % (ref, s_attr, value)
     if isinstance(value, float):
         if value != value or value in (float('inf'), float('-inf')):
             value = ''
         else:
-            return '<c r="%s"><v>%s</v></c>' % (ref, repr(value))
+            return '<c r="%s"%s><v>%s</v></c>' % (ref, s_attr, repr(value))
     text = _xlsx_xml_text(value)
     return (
         '<c r="%s" t="inlineStr"><is><t xml:space="preserve">%s</t></is></c>'
@@ -1761,18 +2381,35 @@ def _xlsx_cell_xml(col, row, value):
     )
 
 
-def _as_xlsx_ooxml(rows, title='Export', labels=None, caption=None, widths=None):
-    """Minimal xlsx via zipfile (no openpyxl). Host- and worker-safe."""
-    specs = _normalize_xlsx_sheets([{
-        'title': title,
-        'rows': rows,
-        'labels': labels,
-        'caption': caption,
-        'widths': widths,
-    }])
-    if not specs:
-        return None
-    return _as_xlsx_ooxml_book(specs)
+def _xlsx_styles_xml(number_style=None):
+    style = number_style or xlsx_number_style()
+    int_fmt = html_lib.escape(style['int_format'], quote=True)
+    float_fmt = html_lib.escape(style['float_format'], quote=True)
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<styleSheet xmlns="%s">'
+        '<numFmts count="2">'
+        '<numFmt numFmtId="164" formatCode="%s"/>'
+        '<numFmt numFmtId="165" formatCode="%s"/>'
+        '</numFmts>'
+        '<fonts count="1"><font/></fonts>'
+        '<fills count="2">'
+        '<fill><patternFill patternType="none"/></fill>'
+        '<fill><patternFill patternType="gray125"/></fill>'
+        '</fills>'
+        '<borders count="1"><border/></borders>'
+        '<cellStyleXfs count="1">'
+        '<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>'
+        '</cellStyleXfs>'
+        '<cellXfs count="3">'
+        '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+        '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0"'
+        ' applyNumberFormat="1"/>'
+        '<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0"'
+        ' applyNumberFormat="1"/>'
+        '</cellXfs>'
+        '</styleSheet>'
+    ) % (_XLSX_NS_MAIN, int_fmt, float_fmt)
 
 
 def _xlsx_sheet_xml(spec):
@@ -1781,6 +2418,8 @@ def _xlsx_sheet_xml(spec):
     caption = spec['caption']
     widths = spec['widths']
     rows = spec['rows']
+    plan = spec.get('cells') or {}
+    number_style = spec.get('number_style') or xlsx_number_style()
     header_row = 2 if caption else 1
     col_bits = []
     for idx, width in enumerate(widths, 1):
@@ -1810,7 +2449,12 @@ def _xlsx_sheet_xml(spec):
         if not isinstance(row, dict):
             continue
         cells = ''.join(
-            _xlsx_cell_xml(col, ridx, row.get(key))
+            _xlsx_cell_xml(
+                col, ridx,
+                (plan.get((ridx, col)) or (None, row.get(key)))[1],
+                formula=(plan.get((ridx, col)) or (None,))[0],
+                number_style=number_style,
+            )
             for col, key in enumerate(keys, 1)
         )
         body.append('<row r="%d">%s</row>' % (ridx, cells))
@@ -1845,6 +2489,18 @@ def _as_xlsx_ooxml_book(specs):
         files.append(
             ('xl/worksheets/sheet%d.xml' % idx, _xlsx_sheet_xml(spec))
         )
+    style = specs[0].get('number_style') or xlsx_number_style()
+    style_rid = len(specs) + 1
+    rel_tags.append(
+        '<Relationship Id="rId%d" Type="%s/styles" Target="styles.xml"/>'
+        % (style_rid, _XLSX_NS_OD_REL)
+    )
+    override_tags.append(
+        '<Override PartName="/xl/styles.xml" ContentType="'
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.'
+        'styles+xml"/>'
+    )
+    files.append(('xl/styles.xml', _xlsx_styles_xml(style)))
     workbook_xml = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<workbook xmlns="%s" xmlns:r="%s"><sheets>%s</sheets></workbook>'

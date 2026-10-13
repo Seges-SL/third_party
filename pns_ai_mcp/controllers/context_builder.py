@@ -4,6 +4,8 @@
 """Build a safe execution context for relaxaicode code."""
 
 import builtins as _builtins
+import operator as _operator
+import types as _types
 
 # Denylist ÚNICA de atributos peligrosos, compartida con el AST (validators.py).
 # Un solo sitio para que la capa estática (AST) y la dinámica (guarded_getattr)
@@ -16,8 +18,11 @@ try:  # pragma: no cover - camino de runtime Odoo
         RELAXAICODE_DANGEROUS_MODULES,
         RELAXAICODE_FORBIDDEN_ORM_ATTRS,
         RELAXAICODE_ORM_WRITE_ATTRS,
+        RELAXAICODE_PRIVILEGE_ATTRS,
+        RELAXAICODE_PRIVILEGE_HINT,
         RELAXAICODE_SAFE_INTERNAL_MODULES,
         RELAXAICODE_SAFE_MODULES,
+        RELAXAICODE_SIDE_EFFECT_METHODS,
         _unsafe_import_error,
         catalogue_inspect_error,
     )
@@ -31,9 +36,12 @@ except Exception:  # pragma: no cover - camino unit test / standalone
     DANGEROUS_ATTR_NAMES = _vm.DANGEROUS_ATTR_NAMES
     RELAXAICODE_FORBIDDEN_ORM_ATTRS = _vm.RELAXAICODE_FORBIDDEN_ORM_ATTRS
     RELAXAICODE_ORM_WRITE_ATTRS = _vm.RELAXAICODE_ORM_WRITE_ATTRS
+    RELAXAICODE_PRIVILEGE_ATTRS = _vm.RELAXAICODE_PRIVILEGE_ATTRS
+    RELAXAICODE_PRIVILEGE_HINT = _vm.RELAXAICODE_PRIVILEGE_HINT
     RELAXAICODE_DANGEROUS_MODULES = _vm.RELAXAICODE_DANGEROUS_MODULES
     RELAXAICODE_SAFE_MODULES = _vm.RELAXAICODE_SAFE_MODULES
     RELAXAICODE_SAFE_INTERNAL_MODULES = _vm.RELAXAICODE_SAFE_INTERNAL_MODULES
+    RELAXAICODE_SIDE_EFFECT_METHODS = _vm.RELAXAICODE_SIDE_EFFECT_METHODS
     _unsafe_import_error = _vm._unsafe_import_error
     catalogue_inspect_error = _vm.catalogue_inspect_error
 
@@ -56,15 +64,15 @@ except Exception:  # pragma: no cover - host unit test / standalone
 class GuardedSandboxEnv(object):
     """Sandbox ``env``: catalogue models stay off ORM (AST + runtime).
 
-    ``ai.api.server`` / ``ai.context`` are injected catalogues. List/load
-    knowledge via ``get_context``; external calls via ``api_call``.
-    ``sudo`` / ``with_context`` chains return another wrapper so
-    ``env.sudo()['ai.context']`` cannot skip the gate.
+    ``ai.api.server`` / ``ai.context`` / ``ai.skill`` are catalogues.
+    List/load knowledge via ``get_context``; skills via ``/`` in Chatboo;
+    external calls via ``api_call``. ``with_context`` / ``with_company``
+    return another wrapper so the gate holds down the chain. Nothing here
+    changes the identity: ``sudo``, ``with_user``, ``with_env`` and
+    ``env(user=…, su=…)`` raise.
     """
 
-    _WRAP_METHODS = (
-        'sudo', 'with_context', 'with_user', 'with_env', 'with_company',
-    )
+    _WRAP_METHODS = ('with_context', 'with_company')
 
     def __init__(self, env):
         object.__setattr__(self, '_env', env)
@@ -91,6 +99,8 @@ class GuardedSandboxEnv(object):
         return model in self._env
 
     def __getattr__(self, name):
+        if name in RELAXAICODE_PRIVILEGE_ATTRS:
+            raise AttributeError(RELAXAICODE_PRIVILEGE_HINT % (name,))
         attr = getattr(self._env, name)
         if name in self._WRAP_METHODS and callable(attr):
             def _wrapped(*args, **kwargs):
@@ -99,7 +109,9 @@ class GuardedSandboxEnv(object):
         return attr
 
     def __call__(self, *args, **kwargs):
-        return GuardedSandboxEnv(self._env(*args, **kwargs))
+        if args or set(kwargs) - {'context'}:
+            raise AttributeError(RELAXAICODE_PRIVILEGE_HINT % ('env(...)',))
+        return GuardedSandboxEnv(self._env(**kwargs))
 
     def __bool__(self):
         return bool(self._env)
@@ -118,10 +130,13 @@ def guarded_getattr(obj, name, *default):
       · cualquier nombre de DANGEROUS_ATTR_NAMES (incl. frames: f_back, tb_frame…)
       · cualquier dunder `__x__` (introspección de tipos/código/globals)
       · mutadores ORM (`create`/`write`/`unlink`/`copy`) vía getattr dinámico
+      · métodos que escriben con cursor propio (`resolve_execute`, `cleanup_*`…)
     Se permiten atributos ORM normales y de UN guion (name, _name, _fields,
     __last_update —que NO termina en '__'—, etc.).
     """
     if isinstance(name, str):
+        if name in RELAXAICODE_PRIVILEGE_ATTRS:
+            raise AttributeError(RELAXAICODE_PRIVILEGE_HINT % (name,))
         if name in RELAXAICODE_FORBIDDEN_ORM_ATTRS:
             raise AttributeError(
                 "Access to attribute %r is not allowed in RelaxAICode "
@@ -130,7 +145,12 @@ def guarded_getattr(obj, name, *default):
         if name in RELAXAICODE_ORM_WRITE_ATTRS:
             raise AttributeError(
                 "Access to ORM mutator %r via getattr is not allowed in RelaxAICode "
-                "(use propose_safe_operations for writes)." % (name,)
+                "(use safe_plan_request for writes)." % (name,)
+            )
+        if name in RELAXAICODE_SIDE_EFFECT_METHODS:
+            raise AttributeError(
+                "Method %r writes outside RelaxAICode's rollback and is not "
+                "allowed here (use safe_plan_request for writes)." % (name,)
             )
         if name in DANGEROUS_ATTR_NAMES:
             raise AttributeError(
@@ -140,7 +160,12 @@ def guarded_getattr(obj, name, *default):
             raise AttributeError(
                 "Access to dunder attribute %r is not allowed in RelaxAICode (sandbox)." % (name,)
             )
-    return getattr(obj, name, *default)
+    value = getattr(obj, name, *default)
+    if isinstance(value, _types.ModuleType):
+        raise AttributeError(
+            "Access to module %r is not allowed in RelaxAICode (sandbox)." % (name,)
+        )
+    return value
 
 
 def guarded_import(name, *args, **kwargs):
@@ -162,7 +187,7 @@ def guarded_import(name, *args, **kwargs):
         if fromlist is None and len(args) >= 3:
             fromlist = args[2]
         if fromlist:
-            return __import__(name, *args, **kwargs)
+            return safe_module(__import__(name, *args, **kwargs))
         raise ImportError(
             "Use 'from urllib.parse import quote, urlencode, urlparse'. "
             "'import urllib.parse' is not allowed (it would expose urllib)."
@@ -173,12 +198,124 @@ def guarded_import(name, *args, **kwargs):
 
     # Ayudantes internos de módulos seguros (imports perezosos de CPython).
     if module_name in RELAXAICODE_SAFE_INTERNAL_MODULES:
-        return __import__(name, *args, **kwargs)
+        return safe_module(__import__(name, *args, **kwargs))
 
     if module_name in RELAXAICODE_SAFE_MODULES:
-        return __import__(name, *args, **kwargs)
+        return safe_module(__import__(name, *args, **kwargs))
 
     raise ImportError(_unsafe_import_error(module_name))
+
+
+# Un módulo "seguro" (datetime, platform, uuid, random, calendar, io…) NO puede
+# ser una puerta hacia otro módulo: casi todos llevan dentro `os` / `sys` como
+# ayudante de CPython, y `platform.os.system(...)` sería ejecución de comandos.
+# El facade siguiente nunca devuelve un módulo, ni una llamada de fichero/proceso
+# (`open`, `popen`, `system`…). La denylist de atributos y dunders es la misma
+# que la del getattr endurecido: un solo criterio para las dos capas.
+_MODULE_FACADE_FORBIDDEN_CALLABLES = frozenset({
+    'open', 'fdopen', 'popen', 'system', 'exec', 'execv', 'spawn',
+    'FileIO', 'open_code', 'remove', 'unlink', 'rmdir', 'getenv', 'putenv',
+})
+
+
+def _module_facade_rejects(name, value):
+    """Shared policy: True when a module attribute must not be exposed."""
+    if name in DANGEROUS_ATTR_NAMES:
+        return True
+    if name in _MODULE_FACADE_FORBIDDEN_CALLABLES:
+        return True
+    if len(name) >= 5 and name.startswith('__') and name.endswith('__'):
+        return True
+    return isinstance(value, _types.ModuleType)
+
+
+class SafeModuleFacade(object):
+    """Read-only view over a safe stdlib module.
+
+    Exposes classes, functions and constants, but never another module nor a
+    file/process primitive, so `platform.os`, `datetime.sys` or `io.open`
+    cannot be reached by plain dot-access (the AST only sees literal names and
+    does not know an attribute resolves to a module).
+    """
+
+    __slots__ = ('_module', '_module_name')
+
+    def __init__(self, module):
+        object.__setattr__(self, '_module', module)
+        object.__setattr__(
+            self, '_module_name', getattr(module, '__name__', '?'))
+
+    def __getattr__(self, name):
+        value = getattr(self._module, name)  # AttributeError propagates as-is
+        if _module_facade_rejects(name, value):
+            raise AttributeError(
+                "Access to %r via module %r is not allowed in RelaxAICode "
+                "(sandbox)." % (name, self._module_name))
+        if value is _operator.attrgetter:
+            return guarded_attrgetter
+        if value is _operator.methodcaller:
+            return guarded_methodcaller
+        return value
+
+    def __setattr__(self, name, value):
+        raise AttributeError(
+            "RelaxAICode cannot set attributes on module %r." % (
+                self._module_name,))
+
+    def __dir__(self):
+        return [
+            n for n in dir(self._module)
+            if not _module_facade_rejects(n, getattr(self._module, n, None))
+        ]
+
+    def __repr__(self):
+        return "<SafeModuleFacade %r>" % (self._module_name,)
+
+
+def _check_attr_path(path):
+    """Run every dotted part of ``path`` through the guarded getattr policy."""
+    if not isinstance(path, str):
+        raise TypeError('attribute name must be a string')
+    for part in path.split('.'):
+        guarded_getattr(_ATTR_PROBE, part, None)
+
+
+class _AttrProbe(object):
+    """Has no attributes: the policy check raises before getattr matters."""
+    __slots__ = ()
+
+
+_ATTR_PROBE = _AttrProbe()
+
+
+def guarded_attrgetter(*paths):
+    """``operator.attrgetter`` whose names pass the same policy as getattr."""
+    for path in paths:
+        _check_attr_path(path)
+    return _operator.attrgetter(*paths)
+
+
+def guarded_methodcaller(name, *args, **kwargs):
+    """``operator.methodcaller`` whose name passes the same policy as getattr."""
+    _check_attr_path(name)
+    return _operator.methodcaller(name, *args, **kwargs)
+
+
+def safe_module(module):
+    """Wrap a stdlib module in its read-only facade (idempotent)."""
+    if isinstance(module, SafeModuleFacade):
+        return module
+    return SafeModuleFacade(module)
+
+
+def sandbox_print(*_args, **_kwargs):
+    """``print`` del modelo: se traga. No escribe en log ni en stdout.
+
+    El modelo lo mete para mirar un valor a mitad del script. Sin esto,
+    ``name 'print' is not defined`` tumba la consulta. La respuesta sigue
+    siendo ``result``; un ``print`` suelto al final ya se reescribe antes.
+    """
+    return None
 
 
 def build_safe_context(controller, operation_type='read', previous_result=None, env_override=None):
@@ -221,7 +358,18 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
     try:
         from zoneinfo import ZoneInfo as _ZoneInfo
     except Exception:
-        _ZoneInfo = None
+        # Python < 3.9 (Odoo 14): the prompt promises ZoneInfo. dateutil
+        # ships with Odoo and, unlike pytz, is safe as ``tzinfo=``.
+        try:
+            from dateutil import tz as _dateutil_tz
+
+            def _ZoneInfo(key):
+                zone = _dateutil_tz.gettz(key)
+                if zone is None:
+                    raise KeyError('No time zone found with key %s' % key)
+                return zone
+        except Exception:
+            _ZoneInfo = None
 
     # `string` RECORTADO: se expone sin Formatter/Template. string.Formatter()
     # .get_field()/.vformat() devuelven el OBJETO real (no su repr), permitiendo
@@ -259,6 +407,10 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
     # Añadir __import__ guardado
     ALLOWED_BUILTINS['__import__'] = guarded_import
 
+    # print mudo: el modelo depura con print() a mitad del script. El builtin
+    # real no está en la lista (escribiría en el log del worker).
+    ALLOWED_BUILTINS['print'] = sandbox_print
+
     # getattr ENDURECIDO: reemplaza el builtin crudo por guarded_getattr para
     # cerrar el acceso dinámico a atributos peligrosos con nombre construido en
     # runtime (H1). El AST cubre los literales; esto cubre los dinámicos.
@@ -284,6 +436,14 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
         _dbname = env.cr.dbname or ''
     except Exception:
         _dbname = ''
+
+    # Public URL of the instance: the sandbox cannot read ir.config_parameter
+    # (no sudo there), so the engine publishes this one non-secret fact.
+    try:
+        _web_base_url = env['ir.config_parameter'].sudo().get_param(
+            'web.base.url') or ''
+    except Exception:
+        _web_base_url = ''
     
     # Obtener información de locale del usuario/empresa
     user_lang = 'en_US'  # Base Default
@@ -390,6 +550,7 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
         'dbname': _dbname,
         'db_name': _dbname,
         'database': _dbname,
+        'web_base_url': _web_base_url,
         'company_name': company.name,
         'company_id': company.id,
         'today': _user_today,
@@ -406,34 +567,34 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
         'ImportError': ImportError,
         'Exception': Exception,
         
-        # Módulos seguros disponibles directamente
-        'datetime': _datetime,
+        # Módulos seguros disponibles directamente (siempre tras su facade)
+        'datetime': safe_module(_datetime),
         # Alias de datetime que el LLM usa sin import (date.today(), timedelta(…)).
         # Contextos/docs enseñan date.today(); sin estos nombres → NameError
         # "name 'date' is not defined" en código fresco.
         'date': _datetime.date,
         'timedelta': _datetime.timedelta,
         'timezone': _datetime.timezone,
-        'collections': _collections,
-        'itertools': _itertools,
-        'functools': _functools,
-        'math': _math,
-        'statistics': _statistics,
-        'decimal': _decimal,
-        'json': _json,  # Módulo JSON para serialización (disponible directamente)
-        'base64': _base64,
-        'hashlib': _hashlib,
-        're': _re,
+        'collections': safe_module(_collections),
+        'itertools': safe_module(_itertools),
+        'functools': safe_module(_functools),
+        'math': safe_module(_math),
+        'statistics': safe_module(_statistics),
+        'decimal': safe_module(_decimal),
+        'json': safe_module(_json),
+        'base64': safe_module(_base64),
+        'hashlib': safe_module(_hashlib),
+        're': safe_module(_re),
         'string': _safe_string,  # sin Formatter/Template (ver arriba)
-        'operator': _operator,
-        'csv': _csv,
-        'io': _io,
-        'copy': _copy,
-        'uuid': _uuid,
-        'random': _random,
-        'calendar': _calendar,
-        'textwrap': _textwrap,
-        'unicodedata': _unicodedata,
+        'operator': safe_module(_operator),
+        'csv': safe_module(_csv),
+        'io': safe_module(_io),
+        'copy': safe_module(_copy),
+        'uuid': safe_module(_uuid),
+        'random': safe_module(_random),
+        'calendar': safe_module(_calendar),
+        'textwrap': safe_module(_textwrap),
+        'unicodedata': safe_module(_unicodedata),
     }
     if _ZoneInfo is not None:
         safe_context['ZoneInfo'] = _ZoneInfo
@@ -495,6 +656,42 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
         safe_context['field_selection'] = field_selection
     except Exception:
         pass
+
+    # Spoken / transposed identifiers: ilike on the full token is not enough.
+    try:
+        from odoo.addons.pns_ai_mcp.utils.name_affinity import (
+            search_by_affinity as _search_by_affinity,
+        )
+
+        def search_by_affinity(model, needles, fields=None, domain=None,
+                               limit=15, min_score=None):
+            return _search_by_affinity(
+                env, model, needles, fields=fields, domain=domain,
+                limit=limit, min_score=min_score,
+            )
+
+        safe_context['search_by_affinity'] = search_by_affinity
+    except Exception:
+        try:
+            import importlib.util as _ilu_aff
+            import os as _os_aff
+            _ap = _os_aff.path.join(
+                _os_aff.path.dirname(__file__), '..', 'utils', 'name_affinity.py',
+            )
+            _asp = _ilu_aff.spec_from_file_location('_pns_name_affinity', _ap)
+            _am = _ilu_aff.module_from_spec(_asp)
+            _asp.loader.exec_module(_am)
+
+            def search_by_affinity(model, needles, fields=None, domain=None,
+                                   limit=15, min_score=None):
+                return _am.search_by_affinity(
+                    env, model, needles, fields=fields, domain=domain,
+                    limit=limit, min_score=min_score,
+                )
+
+            safe_context['search_by_affinity'] = search_by_affinity
+        except Exception:
+            pass
 
     # Siempre definidos (None si no hay dataset): evita `if 'x' in locals()/dir()`
     # que el AST rechaza y provocaba rondas improductivas.

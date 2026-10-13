@@ -1,5 +1,7 @@
+# -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Shared LLM helpers: tool-call parsing and MCP request extras."""
 
 from .tool_utils import extract_tool_calls_from_response, format_tool_result_for_model
 from .mcp_utils import (

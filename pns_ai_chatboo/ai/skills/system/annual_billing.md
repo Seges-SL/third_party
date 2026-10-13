@@ -3,7 +3,7 @@ skill: annual-billing
 name: Annual billing by week
 description: Customer invoicing (posted out_invoice) by ISO week for a year or date range; pastel bar chart by month.
 agent_codes: pns_ai_chatboo
-version: 2.2
+version: 2.3
 param_schema: {"year": {"type": "integer", "desc": "Calendar year (e.g. 2024). null if the user does not specify one or gives an explicit date range."}, "start_date": {"type": "string", "desc": "Start date YYYY-MM-DD only for an explicit range. null otherwise."}, "end_date": {"type": "string", "desc": "End date YYYY-MM-DD only for an explicit range. null otherwise."}}
 arg_hint: year=2024
 args_policy: default

@@ -26,18 +26,47 @@
     overflow: visible;
 }
 
-/* Providers: short name, agents get the leftover width. */
+/* Providers: short name and alias; the fit chips take that room. */
 .o_pns_provider_list th[data-name="name"],
 .o_pns_provider_list td[data-name="name"] {
-    width: 8.5rem;
-    max-width: 8.5rem;
+    width: 7rem;
+    max-width: 7rem;
 }
 
 .o_pns_provider_list th[data-name="alias"],
 .o_pns_provider_list td[data-name="alias"] {
-    width: 16%;
-    max-width: 18rem;
+    width: 9%;
+    max-width: 10rem;
 }
+
+.o_pns_provider_list th[data-name="fit_chips_html"],
+.o_pns_provider_list td[data-name="fit_chips_html"] {
+    width: 15rem;
+    overflow: visible;
+    white-space: nowrap;
+}
+
+.o_pns_fit_chip {
+    display: inline-block;
+    padding: 0 0.5rem;
+    margin-right: 0.25rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    line-height: 1.35rem;
+    border: 1px solid transparent;
+    color: #fff;
+    background: #6c757d;
+}
+.o_pns_fit_chip--text {
+    color: #495057;
+    background: transparent;
+    border-color: #ced4da;
+}
+.o_pns_fit_chip--conversation { background: #17a2b8; }
+.o_pns_fit_chip--audio { background: #6f42c1; }
+.o_pns_fit_chip--vision { background: #28a745; }
+.o_pns_fit_chip--video { background: #fd7e14; }
+.o_pns_fit_chip--decision { background: #343a40; }
 
 .o_pns_provider_list th[data-name="protocol"],
 .o_pns_provider_list td[data-name="protocol"] {
@@ -80,4 +109,53 @@
 .o_pns_context_list td[data-name="agent_ids"] {
     width: auto;
     min-width: 18rem;
+}
+
+/* Only the model catalogue sits above the Chatboo overlay (1050).
+   Every other dialog stays at Odoo's level, so many2one and date
+   popups (about 1100, appended to body) remain visible. */
+body > .modal-backdrop:has(+ .modal.o_pns_model_picker_modal),
+body > .modal-backdrop:has(+ .modal:has(.o_pns_model_picker)),
+body > .modal-backdrop:has(+ .o_dialog:has(.o_pns_model_picker)) {
+    z-index: 1990 !important;
+}
+body > .modal.o_pns_model_picker_modal,
+body > .modal:has(.o_pns_model_picker),
+body > .o_dialog:has(.o_pns_model_picker) {
+    z-index: 2000 !important;
+}
+
+/* Model catalogue dialog: use the screen, do not clip cells. */
+.modal:has(.o_pns_model_picker) .modal-dialog,
+.o_dialog:has(.o_pns_model_picker) .modal-dialog,
+.modal.o_pns_model_picker_modal .modal-dialog {
+    max-width: calc(100vw - 1.5rem) !important;
+    width: calc(100vw - 1.5rem) !important;
+    height: calc(100vh - 1.5rem);
+    margin: 0.75rem auto;
+}
+.modal:has(.o_pns_model_picker) .modal-content,
+.o_dialog:has(.o_pns_model_picker) .modal-content,
+.modal.o_pns_model_picker_modal .modal-content {
+    height: 100%;
+}
+.modal:has(.o_pns_model_picker) .modal-body,
+.o_dialog:has(.o_pns_model_picker) .modal-body,
+.modal.o_pns_model_picker_modal .modal-body {
+    max-height: none !important;
+    height: calc(100% - 4rem);
+    overflow: auto;
+}
+.o_pns_model_picker .o_list_table,
+.o_pns_model_picker .o_list_renderer table {
+    table-layout: auto;
+    width: max-content;
+    min-width: 100%;
+}
+.o_pns_model_picker .o_data_cell,
+.o_pns_model_picker th {
+    white-space: nowrap;
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
 }

@@ -1,9 +1,10 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com> */
 /**
  * Chatboo charts v2 — hydrate Chart.js or ECharts under server-rendered tables.
  * Engine: data-chatboo-chart-engine="echarts"|"chartjs" (default chartjs),
  * or window.CHATBOO_CHART_ENGINE for global override (spike / QA).
  * Source of truth: data-chatboo-dataset JSON (not formatted DOM cells).
- * SPDX-License-Identifier: Apache-2.0
  */
 (function (global) {
     "use strict";
@@ -31,6 +32,16 @@
         /amount|total|importe|monto|saldo|balance|revenue|ingreso|precio|price|coste|cost\b|debe|haber|beneficio|deuda|pend|subtotal|neto|gasto|expense|sales?|venta|factur|payroll|n[oó]mina|salary|sueldo|wage|pago|payment|cobro|recib|honor/i;
     var COUNT_KEY_RE =
         /\bcount\b|qty|cantidad|n[uú]mero|\bnum\b|n[º°]|uds?\b|units?|horas?|hours?|d[ií]as?|days?|\bitems?\b|\bn\b/i;
+
+    var showSeriesStats = false;
+
+    function setShowSeriesStats(value) {
+        showSeriesStats = !!value;
+    }
+
+    function getShowSeriesStats() {
+        return !!showSeriesStats;
+    }
 
     var TIME_KEY_RE = /^(year|año|ano|periodo|period|fecha|date|mes|month|trimestre|quarter|semana|week|h[12]|q[1-4]|m\d{1,2})$/i;
     var TIME_VAL_RE = /^(?:(?:19|20)\d{2}|h[12]|q[1-4]|m(?:0?[1-9]|1[0-2])|(?:19|20)\d{2}[-/]\d{1,2}(?:[-/]\d{1,2})?)$/i;
@@ -287,7 +298,7 @@
     }
 
     /**
-     * Métrica dominante = columna que ordena la tabla CON variación real.
+     * Métrica dominante = eje / título (no reordena series).
      * Pondera monotonía × log(rango) para no elegir columnas casi planas.
      */
     function pickDominantMetric(rows, seriesKeys) {
@@ -321,17 +332,7 @@
         if (seriesKeysArePeriodBuckets(seriesKeys)) {
             return orderPeriodSeriesKeys(seriesKeys);
         }
-        var dominant = pickDominantMetric(rows, seriesKeys);
-        if (!dominant) {
-            return seriesKeys.slice();
-        }
-        var ordered = [dominant];
-        seriesKeys.forEach(function (k) {
-            if (k !== dominant) {
-                ordered.push(k);
-            }
-        });
-        return ordered;
+        return seriesKeys.slice();
     }
 
     function isRatioLikeKey(key) {
@@ -498,6 +499,7 @@
                 values: seriesValues(rows, key),
             };
         });
+        var dominantKey = pickDominantMetric(rows, seriesKeys) || seriesKeys[0];
         var temporal =
             (isTimeLikeKey(categoryKey) || isTimeLikeValues(rows, categoryKey)) &&
             labels.length >= 3;
@@ -528,7 +530,7 @@
         return {
             categoryKey: categoryKey,
             seriesKeys: seriesKeys,
-            dominantKey: seriesKeys[0],
+            dominantKey: dominantKey,
             labels: labels,
             series: series,
             dualAxis: periodBuckets ? false : needsDualAxis(series),
@@ -1076,13 +1078,13 @@
             ticking = true;
             var kick = function () {
                 ticking = false;
-                resizeChartToHost(block);
+                if (block._chatbooChartLaidOut) {
+                    resizeChartToHost(block);
+                } else {
+                    relayoutChart(block);
+                }
             };
-            if (typeof global.requestAnimationFrame === "function") {
-                global.requestAnimationFrame(kick);
-            } else {
-                setTimeout(kick, 16);
-            }
+            global.requestAnimationFrame(kick);
         });
         try {
             ro.observe(host);
@@ -1297,11 +1299,23 @@
                 return "y";
             });
         }
-        var dom = meta.series.length ? meta.series[0] : null;
+        var dom = null;
+        var i;
+        if (meta.dominantKey) {
+            for (i = 0; i < meta.series.length; i++) {
+                if (meta.series[i].key === meta.dominantKey) {
+                    dom = meta.series[i];
+                    break;
+                }
+            }
+        }
+        if (!dom) {
+            dom = meta.series.length ? meta.series[0] : null;
+        }
         var domMax = dom ? absMax(dom.values) || 1 : 1;
         var domIsCount = dom ? isCountLikeKey(dom.key) : false;
-        return meta.series.map(function (s, idx) {
-            if (idx === 0) {
+        return meta.series.map(function (s) {
+            if (dom && s.key === dom.key) {
                 return "y";
             }
             if (isRatioLikeKey(s.key)) {
@@ -1772,31 +1786,24 @@
         }
     }
 
-    function scheduleChartResize(block) {
-        var run = function () {
-            var host = block.querySelector(".o_chatboo_chart_host");
-            var meta = block._chatbooChartMeta;
-            if (host && meta) {
-                applyChartHostHeight(
-                    host,
-                    meta,
-                    block._chatbooChartMode || meta.defaultMode,
-                    block
-                );
-            }
-            resizeChartToHost(block);
-        };
-        // rAF + timeouts: OWL/overlay a veces dan host 0×0 en el primer frame.
-        // El ResizeObserver cubre el caso en que el layout llega más tarde.
-        if (typeof global.requestAnimationFrame === "function") {
-            global.requestAnimationFrame(function () {
-                global.requestAnimationFrame(run);
-            });
+    /**
+     * Height and engine size from the host as laid out now. A host with no
+     * width yet (hidden overlay, card not placed) is measured again by the
+     * ResizeObserver when it gets one.
+     */
+    function relayoutChart(block) {
+        var host = block.querySelector(".o_chatboo_chart_host");
+        var meta = block._chatbooChartMeta;
+        if (host && meta) {
+            block._chatbooChartLaidOut = hostInnerSize(host).w >= MIN_HOST_PX;
+            applyChartHostHeight(
+                host,
+                meta,
+                block._chatbooChartMode || meta.defaultMode,
+                block
+            );
         }
-        setTimeout(run, 0);
-        setTimeout(run, 80);
-        setTimeout(run, 250);
-        setTimeout(run, 800);
+        resizeChartToHost(block);
     }
 
     /** Solo resize del motor; no cambia altura del host (evita bucles de RO). */
@@ -1811,11 +1818,131 @@
         }
     }
 
+    function headerCellLabel(th) {
+        if (!th) {
+            return "";
+        }
+        var t = (th.textContent || "").replace(/[↕▲▼]/g, "");
+        return t.replace(/\s+/g, " ").trim();
+    }
+
+    function tableCategoryColumnIndex(table, categoryKey) {
+        if (!table || !categoryKey) {
+            return -1;
+        }
+        var ths = table.querySelectorAll("thead tr:last-child th");
+        var want = String(categoryKey).replace(/\s+/g, " ").trim();
+        var i;
+        for (i = 0; i < ths.length; i++) {
+            if (ths[i].closest && ths[i].closest("tr.o_chatboo_ficha_title")) {
+                continue;
+            }
+            if (headerCellLabel(ths[i]) === want) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    function rowsInVisibleTableOrder(block, rows, categoryKey) {
+        if (!block || !rows || !rows.length || !categoryKey) {
+            return rows;
+        }
+        var table = block.querySelector("table.o_chatboo_data_table");
+        if (!table || !table.tBodies || !table.tBodies[0]) {
+            return rows;
+        }
+        var col = tableCategoryColumnIndex(table, categoryKey);
+        if (col < 0) {
+            return rows;
+        }
+        var leftover = rows.slice();
+        var out = [];
+        var trs = table.tBodies[0].rows;
+        var i;
+        var j;
+        for (i = 0; i < trs.length; i++) {
+            var cell = trs[i].cells[col];
+            if (!cell) {
+                continue;
+            }
+            var label = cell.getAttribute("data-chatboo-sort");
+            if (label == null || label === "") {
+                label = (cell.textContent || "").trim();
+            }
+            label = String(label);
+            for (j = 0; j < leftover.length; j++) {
+                var v = leftover[j][categoryKey];
+                var s = v === null || v === undefined ? "" : String(v);
+                if (s === label) {
+                    out.push(leftover[j]);
+                    leftover.splice(j, 1);
+                    break;
+                }
+            }
+        }
+        if (!out.length) {
+            return rows;
+        }
+        return out.concat(leftover);
+    }
+
+    function rowsForChart(rows) {
+        if (!Array.isArray(rows)) {
+            return [];
+        }
+        return rows.filter(function (r) { return !(r && r._tfoot); });
+    }
+
+    function applyVisibleRowOrder(block, meta) {
+        if (!meta || !meta.categoryKey || !meta.seriesKeys || !meta.seriesKeys.length) {
+            return meta;
+        }
+        var raw =
+            block && block.getAttribute && block.getAttribute("data-chatboo-dataset");
+        if (!raw) {
+            return meta;
+        }
+        var rows;
+        try {
+            rows = JSON.parse(raw);
+        } catch (e) {
+            return meta;
+        }
+        if (!Array.isArray(rows) || !rows.length) {
+            return meta;
+        }
+        rows = rowsForChart(rows);
+        if (!rows.length) {
+            return meta;
+        }
+        var ordered = rowsInVisibleTableOrder(block, rows, meta.categoryKey);
+        var next = {};
+        var k;
+        for (k in meta) {
+            if (Object.prototype.hasOwnProperty.call(meta, k)) {
+                next[k] = meta[k];
+            }
+        }
+        next.labels = ordered.map(function (r) {
+            var v = r[meta.categoryKey];
+            return v === null || v === undefined ? "" : String(v);
+        });
+        next.series = meta.seriesKeys.map(function (key) {
+            return {
+                key: key,
+                values: seriesValues(ordered, key),
+            };
+        });
+        return next;
+    }
+
     function renderChart(block, meta, mode) {
         var engine = blockChartEngine(block);
         if (!engine) {
             return;
         }
+        meta = applyVisibleRowOrder(block, meta);
         expandChartMessageCanvas(block);
         var host = block.querySelector(".o_chatboo_chart_host");
         if (!host) {
@@ -1869,7 +1996,7 @@
         );
         syncRotateControl(block, meta, mode);
         observeChartHost(block);
-        scheduleChartResize(block);
+        relayoutChart(block);
     }
 
     function hideChart(block) {
@@ -2035,43 +2162,13 @@
         toolbar.appendChild(select);
         toolbar.appendChild(rotate);
         toolbar.appendChild(axisBtn);
-        var ficha = block.querySelector(":scope > .o_chatboo_ficha");
-        var tableWrap =
-            (ficha && ficha.querySelector(".table-responsive")) ||
-            block.querySelector(":scope > .table-responsive") ||
-            block.querySelector(".table-responsive") ||
-            block.querySelector("table");
         var chartFirst = isChartTableMode(block);
-        // Nunca meter el toolbar entre título y tabla de la ficha.
-        if (ficha && ficha.parentNode === block) {
-            if (chartFirst) {
-                block.insertBefore(toolbar, ficha);
-                block.insertBefore(host, ficha);
-                setTableCollapsed(block, true);
-                updatePrimaryToggleLabel(block);
-            } else {
-                block.insertBefore(toolbar, ficha);
-                block.insertBefore(host, ficha);
-            }
-            return;
-        }
-        var insertBefore = tableWrap;
-        if (!insertBefore || insertBefore.parentNode !== block) {
-            insertBefore = block.firstElementChild;
-        }
-        if (insertBefore && insertBefore.parentNode === block) {
-            if (chartFirst) {
-                block.insertBefore(toolbar, insertBefore);
-                block.insertBefore(host, toolbar.nextSibling);
-                setTableCollapsed(block, true);
-                updatePrimaryToggleLabel(block);
-            } else {
-                block.insertBefore(toolbar, insertBefore.nextSibling);
-                block.insertBefore(host, toolbar.nextSibling);
-            }
-        } else {
-            block.appendChild(toolbar);
-            block.appendChild(host);
+        // Título / tabla primero; barra y lienzo al final del bloque.
+        block.appendChild(toolbar);
+        block.appendChild(host);
+        if (chartFirst) {
+            setTableCollapsed(block, true);
+            updatePrimaryToggleLabel(block);
         }
     }
 
@@ -2094,11 +2191,8 @@
         if (isChartTableMode(block)) {
             return true;
         }
-        // Default show-table: temporal X + money/%/count Y only.
-        // Categorical names/areas or code-like numerics (CP, lat…) → table only.
-        if (!categoryAxisIsTemporal(meta, rows)) {
-            return false;
-        }
+        // show-table: money / % / count Y. X may be time or a short
+        // category list (areas, codes). CP / coords stay out via key shape.
         if (!meta || !meta.seriesKeys || !meta.seriesKeys.length) {
             return false;
         }
@@ -2110,7 +2204,9 @@
         if (isChartTableMode(block)) {
             renderChart(block, meta, meta.defaultMode);
         }
-        mountSeriesStats(block, meta);
+        if (showSeriesStats) {
+            mountSeriesStats(block, meta);
+        }
     }
 
     function _t(msgid) {
@@ -2182,6 +2278,15 @@
         return String(Math.round(v * 100) / 100);
     }
 
+    function escapeText(value) {
+        return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
     function statsTableHtml(meta) {
         var model = seriesStatsModel(meta);
         if (!model.length) {
@@ -2207,7 +2312,7 @@
         }
         html += "</tr></thead><tbody>";
         for (i = 0; i < model.length; i++) {
-            html += "<tr><th>" + String(model[i].name || "") + "</th>";
+            html += "<tr><th>" + escapeText(model[i].name || "") + "</th>";
             for (j = 0; j < keys.length; j++) {
                 html += "<td>" + formatStatNumber(model[i].stats[keys[j]]) + "</td>";
             }
@@ -2246,6 +2351,17 @@
         return rows;
     }
 
+    function maybeMountSeriesStats(block, rows, chartMeta) {
+        if (!showSeriesStats) {
+            return;
+        }
+        var statsMeta = analyzeForStats(rows) || chartMeta;
+        if (!statsMeta) {
+            return;
+        }
+        mountSeriesStats(block, statsMeta);
+    }
+
     function mountSeriesStats(block, meta) {
         if (!block || !block.querySelector) {
             return;
@@ -2273,10 +2389,500 @@
         block.appendChild(node);
     }
 
+    function parseSortNumber(raw) {
+        var t = String(raw || "").trim();
+        if (!t) {
+            return null;
+        }
+        if (/^-?\d+(\.\d+)?$/.test(t)) {
+            return parseFloat(t);
+        }
+        var compact = t.replace(/\s/g, "");
+        if (/^-?[\d.]+,\d+$/.test(compact)) {
+            return parseFloat(compact.replace(/\./g, "").replace(",", "."));
+        }
+        return null;
+    }
+
+    function cellSortKey(td) {
+        if (!td) {
+            return { n: null, s: "" };
+        }
+        var raw = td.getAttribute("data-chatboo-sort");
+        if (raw == null || raw === "") {
+            raw = (td.textContent || "").trim();
+        }
+        return { n: parseSortNumber(raw), s: String(raw).toLowerCase() };
+    }
+
+    function compareSortKeys(a, b, dir) {
+        var sign = dir === "desc" ? -1 : 1;
+        if (a.n != null && b.n != null && !isNaN(a.n) && !isNaN(b.n)) {
+            if (a.n < b.n) {
+                return -1 * sign;
+            }
+            if (a.n > b.n) {
+                return 1 * sign;
+            }
+            return 0;
+        }
+        if (a.s < b.s) {
+            return -1 * sign;
+        }
+        if (a.s > b.s) {
+            return 1 * sign;
+        }
+        return 0;
+    }
+
+    function refreshOpenChart(table) {
+        var block = table && table.closest && table.closest(".o_chatboo_table_block");
+        if (
+            block &&
+            block.getAttribute("data-chatboo-chart-open") === "1" &&
+            block._chatbooChartMeta
+        ) {
+            renderChart(
+                block,
+                block._chatbooChartMeta,
+                block._chatbooChartMode || block._chatbooChartMeta.defaultMode
+            );
+        }
+    }
+
+    function applyTableSort(table, col, dir, secondary) {
+        var tbody = table.tBodies && table.tBodies[0];
+        if (!tbody) {
+            return;
+        }
+        var rows = Array.prototype.slice.call(tbody.rows || []);
+        rows.forEach(function (tr, i) {
+            if (tr.getAttribute("data-chatboo-ord") == null) {
+                tr.setAttribute("data-chatboo-ord", String(i));
+            }
+        });
+        if (dir === "none" || col < 0) {
+            rows.sort(function (a, b) {
+                return (
+                    Number(a.getAttribute("data-chatboo-ord") || 0) -
+                    Number(b.getAttribute("data-chatboo-ord") || 0)
+                );
+            });
+        } else {
+            rows.sort(function (a, b) {
+                var primary = compareSortKeys(
+                    cellSortKey(a.cells[col]),
+                    cellSortKey(b.cells[col]),
+                    dir
+                );
+                if (primary !== 0) {
+                    return primary;
+                }
+                if (
+                    secondary
+                    && secondary.dir
+                    && secondary.dir !== "none"
+                    && secondary.col >= 0
+                ) {
+                    var sec = compareSortKeys(
+                        cellSortKey(a.cells[secondary.col]),
+                        cellSortKey(b.cells[secondary.col]),
+                        secondary.dir
+                    );
+                    if (sec !== 0) {
+                        return sec;
+                    }
+                }
+                return (
+                    Number(a.getAttribute("data-chatboo-ord") || 0) -
+                    Number(b.getAttribute("data-chatboo-ord") || 0)
+                );
+            });
+        }
+        rows.forEach(function (tr) {
+            tbody.appendChild(tr);
+        });
+        var heads = table.querySelectorAll("thead th.o_chatboo_th_sort");
+        var i;
+        for (i = 0; i < heads.length; i++) {
+            var th = heads[i];
+            var idx = Number(th.getAttribute("data-chatboo-sort-col"));
+            if (idx === col && dir !== "none") {
+                th.setAttribute(
+                    "aria-sort",
+                    dir === "desc" ? "descending" : "ascending"
+                );
+            } else {
+                th.setAttribute("aria-sort", "none");
+            }
+        }
+        refreshOpenChart(table);
+    }
+
+    function cycleSortOnHeader(table, th) {
+        var col = Number(th.getAttribute("data-chatboo-sort-col"));
+        if (isNaN(col)) {
+            return;
+        }
+        var state = table._chatbooSort || { col: -1, dir: "none", secondary: null };
+        if (state.col === col) {
+            state.dir =
+                state.dir === "asc"
+                    ? "desc"
+                    : state.dir === "desc"
+                      ? "none"
+                      : "asc";
+            if (state.dir === "none") {
+                state.secondary = null;
+                state.col = -1;
+            }
+        } else {
+            if (state.dir !== "none" && state.col >= 0) {
+                state.secondary = { col: state.col, dir: state.dir };
+            } else {
+                state.secondary = null;
+            }
+            state.col = col;
+            state.dir = "asc";
+        }
+        table._chatbooSort = state;
+        applyTableSort(table, state.col, state.dir, state.secondary);
+    }
+
+    var COL_DRAG_THRESHOLD = 6;
+
+    function tableSectionRows(table) {
+        var rows = [];
+        var collect = function (section) {
+            if (!section) {
+                return;
+            }
+            var r;
+            for (r = 0; r < section.rows.length; r++) {
+                var tr = section.rows[r];
+                if (tr.classList && tr.classList.contains("o_chatboo_ficha_title")) {
+                    continue;
+                }
+                rows.push(tr);
+            }
+        };
+        collect(table.tHead);
+        var b;
+        for (b = 0; b < (table.tBodies || []).length; b++) {
+            collect(table.tBodies[b]);
+        }
+        collect(table.tFoot);
+        return rows;
+    }
+
+    function moveTableColumn(table, fromIdx, toIdx) {
+        if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0) {
+            return;
+        }
+        var rows = tableSectionRows(table);
+        var r;
+        for (r = 0; r < rows.length; r++) {
+            var cells = rows[r].cells;
+            if (!cells || fromIdx >= cells.length || toIdx >= cells.length) {
+                continue;
+            }
+            var cell = cells[fromIdx];
+            if (!cell) {
+                continue;
+            }
+            if (fromIdx < toIdx) {
+                var ref = cells[toIdx];
+                if (ref && ref.nextSibling) {
+                    rows[r].insertBefore(cell, ref.nextSibling);
+                } else {
+                    rows[r].appendChild(cell);
+                }
+            } else {
+                rows[r].insertBefore(cell, cells[toIdx]);
+            }
+        }
+    }
+
+    function reindexSortCols(table) {
+        var ths = table.querySelectorAll("thead th.o_chatboo_th_sort");
+        var map = {};
+        var i;
+        for (i = 0; i < ths.length; i++) {
+            var old = Number(ths[i].getAttribute("data-chatboo-sort-col"));
+            if (!isNaN(old)) {
+                map[old] = i;
+            }
+            ths[i].setAttribute("data-chatboo-sort-col", String(i));
+        }
+        var state = table._chatbooSort;
+        if (!state) {
+            return;
+        }
+        if (state.col >= 0 && map[state.col] != null) {
+            state.col = map[state.col];
+        }
+        if (state.secondary && state.secondary.col >= 0 && map[state.secondary.col] != null) {
+            state.secondary.col = map[state.secondary.col];
+        }
+    }
+
+    function titleCaseKey(key) {
+        return String(key || "").replace(/_/g, " ").replace(/\S+/g, function (word) {
+            return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        });
+    }
+
+    function matchDatasetKey(label, keys, used) {
+        var want = String(label || "").replace(/\s+/g, " ").trim();
+        var k;
+        for (k = 0; k < keys.length; k++) {
+            if (used[keys[k]]) {
+                continue;
+            }
+            var titled = titleCaseKey(keys[k]).replace(/\s+/g, " ").trim();
+            if (keys[k] === want || titled === want) {
+                return keys[k];
+            }
+        }
+        return "";
+    }
+
+    function rewriteDatasetColumnOrder(table) {
+        var block = table.closest && table.closest(".o_chatboo_table_block");
+        if (!block) {
+            return;
+        }
+        var raw = block.getAttribute("data-chatboo-dataset");
+        if (!raw) {
+            return;
+        }
+        var rows;
+        try {
+            rows = JSON.parse(raw);
+        } catch (eParse) {
+            return;
+        }
+        if (!Array.isArray(rows) || !rows.length) {
+            return;
+        }
+        var keys = columnKeys(rows);
+        var ths = table.querySelectorAll("thead th.o_chatboo_th_sort");
+        var ordered = [];
+        var used = {};
+        var i;
+        var k;
+        for (i = 0; i < ths.length; i++) {
+            var hit = matchDatasetKey(headerCellLabel(ths[i]), keys, used);
+            if (hit) {
+                ordered.push(hit);
+                used[hit] = 1;
+            }
+        }
+        for (k = 0; k < keys.length; k++) {
+            if (!used[keys[k]]) {
+                ordered.push(keys[k]);
+            }
+        }
+        if (!ordered.length) {
+            return;
+        }
+        var next = rows.map(function (row) {
+            if (!row || typeof row !== "object") {
+                return row;
+            }
+            var out = {};
+            var j;
+            for (j = 0; j < ordered.length; j++) {
+                if (Object.prototype.hasOwnProperty.call(row, ordered[j])) {
+                    out[ordered[j]] = row[ordered[j]];
+                }
+            }
+            Object.keys(row).forEach(function (key) {
+                if (!Object.prototype.hasOwnProperty.call(out, key)) {
+                    out[key] = row[key];
+                }
+            });
+            return out;
+        });
+        block.setAttribute("data-chatboo-dataset", JSON.stringify(next));
+        var meta = block._chatbooChartMeta;
+        if (meta && meta.seriesKeys && meta.seriesKeys.length) {
+            var keep = {};
+            meta.seriesKeys.forEach(function (key) {
+                keep[key] = 1;
+            });
+            var series = [];
+            ordered.forEach(function (key) {
+                if (keep[key]) {
+                    series.push(key);
+                }
+            });
+            meta.seriesKeys.forEach(function (key) {
+                if (series.indexOf(key) < 0) {
+                    series.push(key);
+                }
+            });
+            meta.seriesKeys = series;
+        }
+    }
+
+    function colReorderHost(table) {
+        return (
+            (table.closest && table.closest(".table-responsive"))
+            || table.parentNode
+            || table
+        );
+    }
+
+    function hideColGuide(table) {
+        var host = colReorderHost(table);
+        if (!host) {
+            return;
+        }
+        var guide = host._chatbooColGuide;
+        if (guide && guide.parentNode) {
+            guide.parentNode.removeChild(guide);
+        }
+        host._chatbooColGuide = null;
+    }
+
+    function dropIndexFromClientX(table, clientX) {
+        var ths = table.querySelectorAll("thead th.o_chatboo_th_sort");
+        var i;
+        for (i = 0; i < ths.length; i++) {
+            var box = ths[i].getBoundingClientRect();
+            if (clientX < box.left + box.width / 2) {
+                return i;
+            }
+        }
+        return ths.length ? ths.length - 1 : 0;
+    }
+
+    function showColGuide(table, toIdx, fromIdx) {
+        var ths = table.querySelectorAll("thead th.o_chatboo_th_sort");
+        var th = ths[toIdx];
+        var host = colReorderHost(table);
+        if (!th || !host || !host.appendChild) {
+            return;
+        }
+        var guide = host._chatbooColGuide;
+        if (!guide) {
+            guide = global.document.createElement("div");
+            guide.className = "o_chatboo_col_reorder_guide";
+            guide.setAttribute("aria-hidden", "true");
+            host.appendChild(guide);
+            host._chatbooColGuide = guide;
+        }
+        var hostRect = host.getBoundingClientRect();
+        var thRect = th.getBoundingClientRect();
+        var tableRect = table.getBoundingClientRect();
+        var x = fromIdx < toIdx
+            ? thRect.right - hostRect.left + (host.scrollLeft || 0)
+            : thRect.left - hostRect.left + (host.scrollLeft || 0);
+        guide.style.left = x + "px";
+        guide.style.top = (tableRect.top - hostRect.top + (host.scrollTop || 0)) + "px";
+        guide.style.height = tableRect.height + "px";
+    }
+
+    function bindHeaderPointer(table, th) {
+        th.addEventListener("pointerdown", function (ev) {
+            if (ev.button != null && ev.button !== 0) {
+                return;
+            }
+            if (ev.target && ev.target.closest && ev.target.closest("a")) {
+                return;
+            }
+            var fromIdx = Number(th.getAttribute("data-chatboo-sort-col"));
+            var startX = ev.clientX;
+            var startY = ev.clientY;
+            var dragged = false;
+            var lastTo = fromIdx;
+            var colCount = table.querySelectorAll("thead th.o_chatboo_th_sort").length;
+            var onMove = function (e) {
+                if (
+                    !dragged
+                    && Math.abs(e.clientX - startX) < COL_DRAG_THRESHOLD
+                    && Math.abs(e.clientY - startY) < COL_DRAG_THRESHOLD
+                ) {
+                    return;
+                }
+                if (colCount < 2 || isNaN(fromIdx)) {
+                    return;
+                }
+                dragged = true;
+                table.classList.add("o_chatboo_col_reordering");
+                th.classList.add("is-dragging");
+                lastTo = dropIndexFromClientX(table, e.clientX);
+                showColGuide(table, lastTo, fromIdx);
+            };
+            var onUp = function () {
+                document.removeEventListener("pointermove", onMove);
+                document.removeEventListener("pointerup", onUp);
+                document.removeEventListener("pointercancel", onUp);
+                hideColGuide(table);
+                th.classList.remove("is-dragging");
+                table.classList.remove("o_chatboo_col_reordering");
+                if (dragged) {
+                    if (lastTo !== fromIdx && !isNaN(fromIdx)) {
+                        moveTableColumn(table, fromIdx, lastTo);
+                        reindexSortCols(table);
+                        rewriteDatasetColumnOrder(table);
+                        refreshOpenChart(table);
+                    }
+                } else {
+                    cycleSortOnHeader(table, th);
+                }
+            };
+            document.addEventListener("pointermove", onMove);
+            document.addEventListener("pointerup", onUp);
+            document.addEventListener("pointercancel", onUp);
+            ev.preventDefault();
+        });
+    }
+
+    function bindSortableTables(root) {
+        if (!root || !root.querySelectorAll) {
+            return;
+        }
+        var tables = root.querySelectorAll("table.o_chatboo_data_table");
+        var t;
+        for (t = 0; t < tables.length; t++) {
+            var table = tables[t];
+            if (table.getAttribute("data-chatboo-sort-bound") === "1") {
+                continue;
+            }
+            var ths = table.querySelectorAll("thead th.o_chatboo_th_sort");
+            if (!ths.length) {
+                var plain = table.querySelectorAll(
+                    "thead tr:last-child th"
+                );
+                var p;
+                for (p = 0; p < plain.length; p++) {
+                    if (plain[p].closest("tr.o_chatboo_ficha_title")) {
+                        continue;
+                    }
+                    plain[p].classList.add("o_chatboo_th_sort");
+                    plain[p].setAttribute("data-chatboo-sort-col", String(p));
+                    plain[p].setAttribute("aria-sort", "none");
+                }
+                ths = table.querySelectorAll("thead th.o_chatboo_th_sort");
+            }
+            if (!ths.length) {
+                continue;
+            }
+            table.setAttribute("data-chatboo-sort-bound", "1");
+            table._chatbooSort = { col: -1, dir: "none", secondary: null };
+            Array.prototype.forEach.call(ths, function (th) {
+                bindHeaderPointer(table, th);
+            });
+        }
+    }
+
     function hydrateRoot(root) {
         if (!root || !root.querySelectorAll) {
             return;
         }
+        bindSortableTables(root);
         var blocks = root.querySelectorAll(".o_chatboo_table_block[data-chatboo-dataset]");
         for (var i = 0; i < blocks.length; i++) {
             var block = blocks[i];
@@ -2300,6 +2906,10 @@
             if (!Array.isArray(rows) || !rows.length) {
                 continue;
             }
+            rows = rowsForChart(rows);
+            if (!rows.length) {
+                continue;
+            }
             var explicitChart = isChartTableMode(block);
             var analyzeOpts = explicitChart ? {} : { metricsOnly: true };
             var meta = analyzeDataset(rows, analyzeOpts);
@@ -2316,14 +2926,17 @@
                 if (explicitChart) {
                     mountChartTableShell(block);
                 }
+                maybeMountSeriesStats(block, rows, null);
                 block.setAttribute("data-chatboo-chart-ready", "1");
                 continue;
             }
             if (isKpiLabelValueMeta(meta)) {
+                maybeMountSeriesStats(block, rows, meta);
                 block.setAttribute("data-chatboo-chart-ready", "1");
                 continue;
             }
             if (!shouldAutoMountChartUi(block, meta, rows)) {
+                maybeMountSeriesStats(block, rows, meta);
                 block.setAttribute("data-chatboo-chart-ready", "1");
                 continue;
             }
@@ -2426,6 +3039,10 @@
         if (!Array.isArray(rows) || !rows.length) {
             return null;
         }
+        rows = rowsForChart(rows);
+        if (!rows.length) {
+            return null;
+        }
         var explicit = isChartTableMode(block);
         var opts = explicit ? {} : { metricsOnly: true };
         var meta = analyzeDataset(rows, opts);
@@ -2517,6 +3134,8 @@
         statsAoa: statsAoa,
         seriesStatsModel: seriesStatsModel,
         mountSeriesStats: mountSeriesStats,
+        setShowSeriesStats: setShowSeriesStats,
+        getShowSeriesStats: getShowSeriesStats,
     };
 
     // Copiar texto de celda (coords, etc.): data-copy-text en .o_chatboo_cell_copy

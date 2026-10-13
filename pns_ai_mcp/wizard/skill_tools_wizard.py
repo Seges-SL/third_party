@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Skills Tools: reload from disk, export ZIP, import."""
+
 from odoo import fields, models
 
 from ..utils.import_export_guard import ensure_ai_admin
 
 
 class AISkillToolsWizard(models.TransientModel):
-    _name = 'pns_ai_mcp.skill.tools.wizard'
+    _name = 'ai.skill.tools.wizard'
     _inherit = ['pns.operation.report.wizard']
     _description = 'Skills Tools'
 

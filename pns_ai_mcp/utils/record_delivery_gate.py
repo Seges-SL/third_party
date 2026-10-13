@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Candado estructural para entregar registros con enlace (sin léxico de verbos).
+"""Structural gate for delivering records with a link (no verb lexicon).
 
-1a — mismo turno: hubo filas tabulables y el cierre no las entregó.
-    Si el LLM ya escribió una respuesta sustancial (no thin), se respeta:
-    eligió entrega narrativa vía return_mode/inspect — no reinyectar el grid.
-1b — DESACTIVADO: nunca reinyectar prior_query_data a la burbuja (eco de tema
-    previo). La reutilización queda en sandbox vía previous_result/raw_data
-    solo cuando el código lo referencia; el anti-eco de salida cubre el HTML.
+1a — same turn: there were tabular rows and the close did not deliver them.
+    If the LLM already wrote a substantial (not thin) reply, keep it: it
+    chose narrative delivery via return_mode/inspect — do not re-inject the grid.
+1b — OFF: never re-inject prior_query_data into the bubble (topic echo).
+    Reuse stays in the sandbox via previous_result/raw_data only when the
+    code references it; the output anti-echo covers the HTML.
 """
 from __future__ import annotations
 
@@ -38,16 +38,28 @@ SHORT_USER_MSG_CHARS = 64
 THIN_FINAL_CHARS = 280
 
 
-def is_short_user_message(message, *, limit=SHORT_USER_MSG_CHARS):
-    if not isinstance(message, str):
-        return False
-    return len(message.strip()) <= int(limit)
-
 
 def is_thin_final_content(text, *, limit=THIN_FINAL_CHARS):
     if not isinstance(text, str):
         return True
     return len(text.strip()) <= int(limit)
+
+
+def bubble_with_delivered(delivered_html, html):
+    """What a closing ``replace`` must carry: the table already on screen.
+
+    A client reads ``replace`` as "this is the bubble now". The closing line
+    of a turn that already painted a grid is prose — sent on its own it wipes
+    the rows the user is about to tap.
+    """
+    if not delivered_html:
+        return html
+    if content_has_delivery(html):
+        return html
+    prose = (html or '').strip()
+    if not prose:
+        return delivered_html
+    return '%s\n\n%s' % (delivered_html, prose)
 
 
 def should_force_turn_payload(
@@ -70,35 +82,6 @@ def should_force_turn_payload(
     if not is_thin_final_content(final_content):
         return False
     return True
-
-
-def should_force_prior_render(
-    user_message,
-    final_content,
-    *,
-    prior_query_data,
-    relaxai_success_count,
-    table_already_delivered,
-    tools_invoked_count=0,
-    short_limit=SHORT_USER_MSG_CHARS,
-    thin_final_limit=THIN_FINAL_CHARS,
-):
-    """1b desactivado: nunca forzar el dataset de un turno anterior a la burbuja.
-
-    Conserva la firma por compatibilidad de tests/imports. El arrastre de tema
-    (facturas → Sesame) se corta con anti-eco + no auto-inyectar previous_result.
-    """
-    return False
-
-
-def tabular_payload_from_rows(rows, *, summary=''):
-    """Envuelve filas cacheadas para force-render."""
-    if not isinstance(rows, list) or not rows:
-        return None
-    payload = {'data': list(rows)}
-    if summary:
-        payload['summary'] = summary
-    return payload
 
 
 def first_tabular_rows(result):

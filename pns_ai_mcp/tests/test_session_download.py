@@ -5,6 +5,8 @@
 
 import unittest
 
+from odoo.tests import tagged
+
 from odoo.addons.pns_ai_mcp.utils.session_download import (
     build_binary_stored_meta,
     collect_download_chips,
@@ -15,6 +17,7 @@ from odoo.addons.pns_ai_mcp.utils.session_download import (
 )
 
 
+@tagged('post_install', '-at_install')
 class TestSessionDownload(unittest.TestCase):
     def test_binary_content_type_pdf(self):
         self.assertTrue(is_binary_content_type('application/pdf'))

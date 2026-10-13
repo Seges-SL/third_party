@@ -231,7 +231,7 @@
     <record id="action_server_export_selected_skills" model="ir.actions.server">
         <field name="name">Export selected skills to ZIP</field>
         <field name="model_id" ref="model_ai_skill"/>
-        <field name="binding_model_id" ref="model_ai_skill"/>
+        <field name="binding_model_id" eval="False"/>
         <field name="binding_view_types">list</field>
         <field name="state">code</field>
         <field name="code">action = records.action_export_selected()</field>
@@ -240,7 +240,7 @@
     <record id="action_server_import_skills" model="ir.actions.server">
         <field name="name">Import skills from ZIP</field>
         <field name="model_id" ref="model_ai_skill"/>
-        <field name="binding_model_id" ref="model_ai_skill"/>
+        <field name="binding_model_id" eval="False"/>
         <field name="binding_view_types">list</field>
         <field name="state">code</field>
         <field name="code">action = model.action_import_skills()</field>

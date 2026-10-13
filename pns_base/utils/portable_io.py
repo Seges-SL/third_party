@@ -34,6 +34,7 @@ _INTERNAL_FIELDS = frozenset({
 })
 _RELATIONAL_TYPES = frozenset({'one2many', 'many2many', 'many2one'})
 FILENAME_STYLES = frozenset({'geo', 'mcp'})
+EXPORT_MARK = 'pns_base:export'
 
 try:
     from odoo import fields as odoo_fields, _
@@ -80,13 +81,18 @@ def _is_export_computed_skip(field):
 # ── Record mapping ──────────────────────────────────────────────────────────
 
 
-def export_record_dict(record, skip_fields=None, extra=None, only_fields=None):
+def export_record_dict(
+    record, skip_fields=None, extra=None, only_fields=None, include_secrets=False,
+):
     """Export one record using live ``_fields`` (plus optional extras).
 
     *skip_fields* and *only_fields* are module filters, not a second policy.
-    Relational, binary, and unstored computed fields are omitted.
+    Relational, binary, and unstored computed fields are omitted, and so are
+    the model's declared secrets unless *include_secrets*.
     """
     skip = _INTERNAL_FIELDS | set(skip_fields or ())
+    if not include_secrets:
+        skip |= set(secret_fields(record))
     only = set(only_fields) if only_fields is not None else None
     model_fields = record._fields
     data = {}
@@ -123,6 +129,33 @@ def export_record_dict(record, skip_fields=None, extra=None, only_fields=None):
     return data
 
 
+def _selection_values(field, model_env):
+    """Keys of a selection, including one defined by a method.
+
+    ``None`` means the field has no list to check. An empty tuple means the
+    list was declared but could not be read, so the value is not accepted.
+    """
+    sel = getattr(field, 'selection', None)
+    if sel is None:
+        return None
+    if isinstance(sel, str):
+        method = getattr(model_env, sel, None)
+        if not callable(method):
+            return ()
+        try:
+            sel = method()
+        except Exception:
+            return ()
+    elif callable(sel):
+        try:
+            sel = sel(model_env)
+        except Exception:
+            return ()
+    if isinstance(sel, (list, tuple)):
+        return [pair[0] for pair in sel if pair]
+    return ()
+
+
 def import_vals_from_dict(model_env, data, skip_fields=None, key_aliases=None):
     """Build ORM write-vals from a JSON dict. Unknown keys become warnings."""
     skip = _INTERNAL_FIELDS | set(skip_fields or ())
@@ -154,8 +187,8 @@ def import_vals_from_dict(model_env, data, skip_fields=None, key_aliases=None):
             if _field_type(field) == 'boolean':
                 vals[orm_key] = bool(value)
             elif _field_type(field) == 'selection':
-                sel = getattr(field, 'selection', None)
-                if isinstance(sel, (list, tuple)) and value not in [s[0] for s in sel]:
+                allowed = _selection_values(field, model_env)
+                if allowed is not None and value not in allowed:
                     warnings.append(
                         _("Invalid value for '%s' skipped.") % json_key
                     )
@@ -172,14 +205,48 @@ def import_vals_from_dict(model_env, data, skip_fields=None, key_aliases=None):
     return vals, warnings
 
 
+# ── Secrets ─────────────────────────────────────────────────────────────────
+# A model names its credentials in ``_pns_secret_fields``. Without secrets the
+# keys leave the file; an import never blanks a credential already set.
+
+_EMPTY_SECRET = (False, None, '', '{}', '[]')
+
+
+def secret_fields(model):
+    """Field names *model* declares as secrets."""
+    return tuple(getattr(model, '_pns_secret_fields', ()) or ())
+
+
+def _is_empty_secret(value):
+    if isinstance(value, str):
+        value = value.strip()
+    return value in _EMPTY_SECRET
+
+
+def keep_existing_secrets(record, vals):
+    """Pop empty secrets from *vals* when *record* already holds one."""
+    record = record[:1]
+    if not record:
+        return vals
+    stored = record.sudo()
+    for name in secret_fields(record):
+        if name not in vals or not _is_empty_secret(vals[name]):
+            continue
+        if not _is_empty_secret(stored[name]):
+            vals.pop(name)
+    return vals
+
+
 # ── Filenames ───────────────────────────────────────────────────────────────
 
 
-def build_export_filename(env, artifact, ext, tag=None, style='mcp'):
+def build_export_filename(env, artifact, ext, tag=None, style='mcp', secrets=False):
     """Compose a filename. *style* is ``mcp`` or ``geo``; artifact stays the caller's.
 
-    - ``mcp``: ``YYYYmmddTHHMMSS_<db>[_tag]_<artifact>.<ext>``
-    - ``geo``: ``YYYYmmdd_HHMMSS[_tag]_<artifact>.<ext>``
+    - ``mcp``: ``YYYYmmddTHHMMSS_<db>[_tag]_<artifact>[_secrets].<ext>``
+    - ``geo``: ``YYYYmmdd_HHMMSS[_tag]_<artifact>[_secrets].<ext>``
+
+    *secrets*: the file carries keys in clear text; the name says so.
     """
     style = (style or 'mcp').strip().lower()
     if style not in FILENAME_STYLES:
@@ -201,6 +268,8 @@ def build_export_filename(env, artifact, ext, tag=None, style='mcp'):
     if tag_part:
         parts.append(tag_part)
     parts.append(artifact)
+    if secrets:
+        parts.append('secrets')
     return '%s.%s' % ('_'.join(parts), ext)
 
 
@@ -274,12 +343,17 @@ def write_export_attachment(
     env, filename, raw_bytes, mimetype='application/octet-stream',
     res_model=None, res_id=0,
 ):
-    """Store *raw_bytes* as ``ir.attachment`` and return the record."""
+    """Store *raw_bytes* as ``ir.attachment`` and return the record.
+
+    Marked with ``EXPORT_MARK``: the pns_base cron deletes it after
+    ``pns_base.export_retention_hours`` (exports may carry secrets).
+    """
     vals = {
         'name': filename,
         'type': 'binary',
         'datas': base64.b64encode(raw_bytes),
         'mimetype': mimetype,
+        'description': EXPORT_MARK,
     }
     if res_model:
         vals['res_model'] = res_model
@@ -310,14 +384,6 @@ def pack_zip_members(members):
                 payload = payload.encode('utf-8')
             zf.writestr(name, payload)
     return buf.getvalue()
-
-
-def write_zip_attachment(env, filename, members, res_model=None, res_id=0):
-    raw = pack_zip_members(members)
-    return write_export_attachment(
-        env, filename, raw, mimetype='application/zip',
-        res_model=res_model, res_id=res_id,
-    )
 
 
 # ── Download wizard ─────────────────────────────────────────────────────────
@@ -353,7 +419,7 @@ def open_export_wizard(
     html = build_json_export_report(
         count, attachment.name, success_text=summary_text,
     )
-    wizard = env[wizard_model].create({
+    wizard = env[wizard_model].sudo().create({
         'result_html': html,
         'attachment_id': attachment.id,
         'export_filename': attachment.name,
@@ -373,5 +439,5 @@ def open_export_empty_wizard(
         'fa-exclamation-triangle',
         rows=[],
     )
-    wizard = env[wizard_model].create({'result_html': html})
+    wizard = env[wizard_model].sudo().create({'result_html': html})
     return wizard._reopen_operation_wizard(title=dialog_title)

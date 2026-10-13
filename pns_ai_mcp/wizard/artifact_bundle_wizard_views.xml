@@ -2,7 +2,7 @@
 <odoo>
     <record id="view_artifact_bundle_export_wizard_form" model="ir.ui.view">
         <field name="name">pns.ai.mcp.artifact.bundle.export.wizard.form</field>
-        <field name="model">pns_ai_mcp.artifact_bundle.export.wizard</field>
+        <field name="model">ai.artifact.bundle.export.wizard</field>
         <field name="arch" type="xml">
             <form string="Export artifact bundle">
                 <group string="Content">
@@ -38,14 +38,14 @@
 
     <record id="action_artifact_bundle_export_wizard" model="ir.actions.act_window">
         <field name="name">Export artifact bundle</field>
-        <field name="res_model">pns_ai_mcp.artifact_bundle.export.wizard</field>
+        <field name="res_model">ai.artifact.bundle.export.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
     </record>
 
     <record id="view_artifact_bundle_import_wizard_form" model="ir.ui.view">
         <field name="name">pns.ai.mcp.artifact.bundle.import.wizard.form</field>
-        <field name="model">pns_ai_mcp.artifact_bundle.import.wizard</field>
+        <field name="model">ai.artifact.bundle.import.wizard</field>
         <field name="arch" type="xml">
             <form string="Import artifact bundle">
                 <group>
@@ -64,7 +64,7 @@
 
     <record id="action_artifact_bundle_import_wizard" model="ir.actions.act_window">
         <field name="name">Import artifact bundle</field>
-        <field name="res_model">pns_ai_mcp.artifact_bundle.import.wizard</field>
+        <field name="res_model">ai.artifact.bundle.import.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
     </record>

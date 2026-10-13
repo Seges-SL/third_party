@@ -7,6 +7,6 @@
         <function model="ai.skill" name="import_from_module"
                   eval="['pns_ai_chatboo']"/>
         <function model="ai.skill" name="unlink_named_factory_skills"
-                  eval="[['flota', 'payroll']]"/>
+                  eval="[['flota', 'payroll', 'analisis_financiero', 'analisis-financiero']]"/>
     </data>
 </odoo>

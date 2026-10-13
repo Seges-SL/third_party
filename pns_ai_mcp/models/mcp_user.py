@@ -6,11 +6,13 @@
 import secrets
 import string
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError
+from odoo.tools import html_escape
+from odoo.exceptions import AccessError, UserError
 
 from ..utils import mcp_ui
 from ..utils.import_export_guard import ensure_ai_admin
 from ..utils.api_key import hash_api_key, normalize_to_hash
+from ..utils.key_pin import compact_pin, format_pin, pin_length, pin_shaped
 from ..utils.portable_io import export_record_dict, import_vals_from_dict
 from ..utils.compat import (
     USER_GROUPS_FIELD,
@@ -42,9 +44,9 @@ class MCPUser(models.Model):
     **User** (internal user    Read via MCP API key / Chatboo. No CRUD, external
     + MCP API key, no extra    URL or external API until explicitly granted.
     AI groups)
-    **AI Writer**             CRUD via propose_safe_operations + AI content mgmt.
-    **AI External URL**       fetch_url via propose_safe_operations.
-    **AI External API**       api_call (MCP/OpenAPI) via propose_safe_operations.
+    **AI Writer**             CRUD via safe_plan_request + AI content mgmt.
+    **AI External URL**       fetch_url via safe_plan_request.
+    **AI External API**       api_call (MCP/OpenAPI) via safe_plan_request.
     **AI Administrator**      All of the above + infrastructure administration.
     ========================  ====================================================
 
@@ -71,6 +73,8 @@ class MCPUser(models.Model):
     _description = 'MCP User'
     _rec_name = 'user_id'
     _order = 'user_id'
+    # The hash moves the access: the same client key works on the target.
+    _pns_secret_fields = ('mcp_api_key_hash',)
 
     # Relación One2one con res.users (campo único)
     user_id = fields.Many2one(
@@ -105,9 +109,8 @@ class MCPUser(models.Model):
 
     # SHA-256 hash of the authentication token. We NEVER store the plaintext:
     # the raw key is shown once at generation time and then only its hash is
-    # kept. Indexed for O(1) lookup on the MCP endpoint. This hash is what gets
-    # exported/imported to make the key portable across instances (it is not a
-    # usable secret on its own).
+    # kept. Indexed for O(1) lookup on the MCP endpoint. An export carries it
+    # only when the admin says secrets go in the file.
     mcp_api_key_hash = fields.Char(
         string='AI API Key (hash)',
         copy=False,
@@ -132,6 +135,16 @@ class MCPUser(models.Model):
         string='Generated on',
         readonly=True,
         copy=False
+    )
+
+    # Shown on the user list. The plaintext key is not stored here: a browser
+    # tab holding the admin's list answers with it when an app sends this PIN.
+    key_pin = fields.Char(string='PIN', copy=False, index=True)
+    key_pin_used = fields.Boolean(string='PIN used', copy=False, default=False)
+    key_pin_killed = fields.Boolean(string='PIN invalidated', copy=False, default=False)
+    key_pin_html = fields.Text(
+        string='PIN',
+        compute='_compute_key_pin_html',
     )
 
     # AI permission flags — synced with res.groups (compute + inverse).
@@ -164,6 +177,14 @@ class MCPUser(models.Model):
         store=False,
         help='Call tools on configured external API servers (MCP or OpenAPI) '
              'via supervised safe plans (api_call).',
+    )
+    is_ai_conversational = fields.Boolean(
+        string='AI Conversational',
+        compute='_compute_is_ai_conversational',
+        inverse='_inverse_is_ai_conversational',
+        store=False,
+        help='Open-world AI dialogue (chat, walkie AI, MCP client). '
+             'Does not grant Writer or Administrator.',
     )
 
     last_mcp_client_label = fields.Char(
@@ -284,6 +305,19 @@ class MCPUser(models.Model):
         self._inverse_ai_group_flag('group_ai_external_api', 'is_ai_external_api')
         self._compute_is_ai_external_api()
 
+    @api.depends('user_id')
+    def _compute_is_ai_conversational(self):
+        group = self._ai_security_group('group_ai_conversational')
+        for record in self:
+            if record.user_id and group:
+                record.is_ai_conversational = user_has_group(record.user_id, group)
+            else:
+                record.is_ai_conversational = False
+
+    def _inverse_is_ai_conversational(self):
+        self._inverse_ai_group_flag('group_ai_conversational', 'is_ai_conversational')
+        self._compute_is_ai_conversational()
+
     @api.model
     def user_has_mcp_api_key(self, user=None):
         """True si el usuario tiene API key MCP activa (hash no vacío)."""
@@ -317,7 +351,10 @@ class MCPUser(models.Model):
                 _logger.debug("MCP: Campos ignorados al crear registro: %s", extra_fields)
             filtered_vals_list.append(filtered_vals)
         
-        return super(MCPUser, self).create(filtered_vals_list)
+        records = super(MCPUser, self).create(filtered_vals_list)
+        if any(vals.get('mcp_api_key_hash') for vals in filtered_vals_list):
+            records._forget_app_menu_cache()
+        return records
 
     def write(self, vals):
         """Sobreescribe write para filtrar campos ajenos al modelo."""
@@ -329,7 +366,17 @@ class MCPUser(models.Model):
             extra_fields = set(vals.keys()) - set(filtered_vals.keys())
             _logger.debug("MCP: Campos ignorados al escribir registro: %s", extra_fields)
         
-        return super(MCPUser, self).write(filtered_vals)
+        result = super(MCPUser, self).write(filtered_vals)
+        if 'mcp_api_key_hash' in filtered_vals:
+            self._forget_app_menu_cache()
+        return result
+
+    def _forget_app_menu_cache(self):
+        """Chatboo hides its icon until a key exists. The menu list is cached."""
+        try:
+            self.env['ir.ui.menu'].clear_caches()
+        except Exception:
+            _logger.debug('MCP: menu cache clear skipped', exc_info=True)
 
     @api.model
     def ensure_all_users_have_record(self):
@@ -429,7 +476,7 @@ class MCPUser(models.Model):
         return {
             'type': 'ir.actions.act_window',
             'name': 'Generate AI API Key',
-            'res_model': 'pns_ai_mcp.api_key_wizard',
+            'res_model': 'ai.api.key.wizard',
             'view_mode': 'form',
             'target': 'new',
             'context': {
@@ -454,7 +501,7 @@ class MCPUser(models.Model):
         return {
             'type': 'ir.actions.act_window',
             'name': 'Eliminar API Key MCP',
-            'res_model': 'pns_ai_mcp.api_key_wizard',
+            'res_model': 'ai.api.key.wizard',
             'view_mode': 'form',
             'target': 'new',
             'context': {
@@ -470,7 +517,7 @@ class MCPUser(models.Model):
         return {
             'type': 'ir.actions.act_window',
             'name': 'Importar API Key MCP',
-            'res_model': 'pns_ai_mcp.api_key_wizard',
+            'res_model': 'ai.api.key.wizard',
             'view_mode': 'form',
             'target': 'new',
             'context': {
@@ -586,7 +633,10 @@ class MCPUser(models.Model):
         # explicitly below so a legacy plaintext value never lands verbatim.
         vals, field_warnings = import_vals_from_dict(
             self, user_data,
-            skip_fields={'user_id', 'mcp_api_key', 'api_key', 'mcp_api_key_hash'},
+            skip_fields={
+                'user_id', 'mcp_api_key', 'api_key', 'mcp_api_key_hash',
+                'key_pin', 'key_pin_used', 'key_pin_killed', 'key_pin_html',
+            },
         )
         warnings.extend(field_warnings)
 
@@ -594,13 +644,20 @@ class MCPUser(models.Model):
             vals['mcp_api_key_hash'] = key_hash
             vals['mcp_api_key_state'] = 'generated'
             vals['mcp_api_key_generated_date'] = fields.Datetime.now()
+        else:
+            # A copy without secrets: the key state belongs to a key this file lacks.
+            vals.pop('mcp_api_key_state', None)
+            vals.pop('mcp_api_key_generated_date', None)
 
         return vals, bool(key_hash), warnings
 
-    def _export_user_dict(self):
+    def _export_user_dict(self, include_secrets=False):
         """Export a single user record to a portable dict using dynamic fields."""
         try:
-            data = export_record_dict(self, skip_fields={'user_id'})
+            data = export_record_dict(self, skip_fields={
+                'user_id', 'key_pin', 'key_pin_used', 'key_pin_killed',
+                'key_pin_html',
+            }, include_secrets=include_secrets)
         except Exception:
             data = {'login': self.login or '', 'name': self.name or ''}
         # Extra: group membership flags (not model fields but useful for portability)
@@ -612,39 +669,28 @@ class MCPUser(models.Model):
                     'pns_ai_mcp.group_ai_external_url')
                 data['is_ai_external_api'] = self.user_id.has_group(
                     'pns_ai_mcp.group_ai_external_api')
+                data['is_ai_conversational'] = self.user_id.has_group(
+                    'pns_ai_mcp.group_ai_conversational')
         except Exception:
             pass
         return data
 
     def action_export_users(self, *args, **kwargs):
-        """Export all MCP users to a JSON file (portable; not Odoo CSV export)."""
+        """Export all MCP users to a JSON file (asks for secrets first)."""
         ensure_ai_admin(self.env)
         del args, kwargs
-        users = self.env['ai.mcp.user'].search([])
-        if not users:
+        if not self.env['ai.mcp.user'].search_count([]):
             return mcp_ui.open_json_export_empty_wizard(
                 self.env,
                 dialog_title=_('Export'),
                 message=_('There are no users to export.'),
             )
-        
-        export_data = [user._export_user_dict() for user in users]
-        
-        filename = mcp_ui.build_export_filename(self.env, 'mcp_users', 'json')
-        attachment = mcp_ui.write_json_attachment(
-            self.env, filename, export_data,
-        )
-        
-        return mcp_ui.open_json_export_wizard(
-            self.env,
-            dialog_title=_('Export result'),
-            summary_text=_('%s user(s) exported.') % len(export_data),
-            count=len(export_data),
-            attachment=attachment,
+        return self.env['pns.export.secrets.wizard'].ask(
+            self.browse(), '_pns_export_all_users',
         )
 
     def action_export_selected(self, *args, **kwargs):
-        """Export selected MCP users to JSON (tree multi-select action)."""
+        """Export selected MCP users to JSON (asks for secrets first)."""
         ensure_ai_admin(self.env)
         del args, kwargs
         if not self:
@@ -653,9 +699,24 @@ class MCPUser(models.Model):
                 dialog_title=_('Export'),
                 message=_('No users selected for export.'),
             )
-        export_data = [user._export_user_dict() for user in self]
+        return self.env['pns.export.secrets.wizard'].ask(
+            self, '_pns_export_selected_users',
+        )
 
-        filename = mcp_ui.build_export_filename(self.env, 'mcp_users_selected', 'json')
+    def _pns_export_all_users(self, include_secrets=False):
+        ensure_ai_admin(self.env)
+        users = self.env['ai.mcp.user'].search([])
+        return users._export_users_file('mcp_users', include_secrets)
+
+    def _pns_export_selected_users(self, include_secrets=False):
+        ensure_ai_admin(self.env)
+        return self._export_users_file('mcp_users_selected', include_secrets)
+
+    def _export_users_file(self, artifact, include_secrets):
+        export_data = [user._export_user_dict(include_secrets) for user in self]
+        filename = mcp_ui.build_export_filename(
+            self.env, artifact, 'json', secrets=include_secrets,
+        )
         attachment = mcp_ui.write_json_attachment(
             self.env, filename, export_data,
         )
@@ -674,9 +735,167 @@ class MCPUser(models.Model):
         return {
             'type': 'ir.actions.act_window',
             'name': _('Import MCP Users'),
-            'res_model': 'pns_ai_mcp.import_users_wizard',
+            'res_model': 'ai.import.users.wizard',
             'view_mode': 'form',
             'views': [[False, 'form']],
             'target': 'new',
         }
+
+    def _ensure_pin_admin(self):
+        if self.env.su or self.env.user._is_superuser():
+            return
+        if self.env.user.has_group('pns_ai_mcp.group_ai_admin'):
+            return
+        raise AccessError(_(
+            'Only AI Administrators can manage temporary key PINs.'
+        ))
+
+    @api.depends('key_pin')
+    def _compute_key_pin_html(self):
+        desk = False
+        if 'ai.key.pin.desk' in self.env:
+            desk = self.env['ai.key.pin.desk'].sudo().any_open()
+        for rec in self:
+            shown = format_pin(rec.key_pin)
+            if not shown:
+                rec.key_pin_html = False
+                continue
+            # Live PIN only: spent ones are cleared, not painted grey/red.
+            color = '#1a73e8' if desk else '#1f1f1f'
+            rec.key_pin_html = (
+                '<span style="color:%s;font-weight:700;letter-spacing:0.08em">%s</span>'
+                '<button type="button" class="btn btn-link o_key_pin_copy" '
+                'data-pin="%s" title="%s" '
+                'style="padding:0 0 0 6px;vertical-align:baseline;">'
+                '<i class="fa fa-copy"></i></button>'
+                % (color, shown, shown, html_escape(_('Copy to clipboard')))
+            )
+
+    def _clear_key_pin(self):
+        """Wipe PIN digits and spent flags. Empty cell, like Delete API Key."""
+        self.write({
+            'key_pin': False,
+            'key_pin_used': False,
+            'key_pin_killed': False,
+        })
+
+    def action_key_pin_regenerate(self):
+        """New unused PIN. The previous one can no longer be handed out."""
+        self._ensure_pin_admin()
+        length = pin_length(self.env)
+        for rec in self:
+            rec._issue_key_pin(length)
+        if 'ai.key.pin.desk' in self.env:
+            self.env['ai.key.pin.desk'].sudo().notify_changed()
+        return False
+
+    def clear_key_pin(self):
+        """Delete the temporary PIN (same idea as Delete API Key)."""
+        self._ensure_pin_admin()
+        self._clear_key_pin()
+        if 'ai.key.pin.desk' in self.env:
+            self.env['ai.key.pin.desk'].sudo().notify_changed()
+        return False
+
+    def _issue_key_pin(self, length):
+        self.ensure_one()
+        pin = ''
+        for _try in range(30):
+            pin = ''.join(secrets.choice('0123456789') for _i in range(length))
+            clash = self.sudo().search([
+                ('id', '!=', self.id),
+                ('key_pin', '=', pin),
+            ], limit=1)
+            if not clash:
+                break
+        else:
+            raise UserError(_('Could not generate a free PIN. Try again.'))
+        self.write({
+            'key_pin': pin,
+            'key_pin_used': False,
+            'key_pin_killed': False,
+        })
+
+    @api.model
+    def redeem_key_pin(self, raw, ip=None):
+        """Hand the existing API key for a live PIN, via the open browser tab.
+
+        Does not mark the PIN used. A value that is not PIN-shaped is not
+        an attempt. A correct API key must be checked by the caller first.
+        """
+        length = pin_length(self.env)
+        raw = compact_pin(raw, length)
+        if not pin_shaped(raw, length):
+            return {'ok': False, 'error': 'invalid', 'counted': False}
+        Block = self.env['ai.key.pin.block'].sudo()
+        if Block.is_blocked(ip):
+            return {'ok': False, 'error': 'blocked', 'counted': False}
+        rec = self.sudo().search([
+            ('key_pin', '=', raw),
+            ('key_pin_used', '=', False),
+            ('key_pin_killed', '=', False),
+        ], limit=1)
+        if not rec:
+            paused = Block.note_failure(ip)
+            return {
+                'ok': False,
+                'error': 'blocked' if paused else 'invalid',
+                'counted': True,
+            }
+        if not rec.mcp_api_key_hash:
+            return {'ok': False, 'error': 'no_key', 'counted': False}
+        if not self.env['ai.key.pin.desk'].sudo().any_open():
+            return {'ok': False, 'error': 'no_desk', 'counted': False}
+        email = (rec.email or '').strip().lower()
+        login = (rec.login or '').strip().lower()
+        got = self.env['ai.key.pin.ask'].sudo().collect(rec, email, login)
+        if got is False:
+            return {'ok': False, 'error': 'mismatch', 'counted': False}
+        if not got:
+            return {'ok': False, 'error': 'no_desk', 'counted': False}
+        _logger.info(
+            'MCP: temporary PIN handed the API key to an app for user %s',
+            rec.user_id.id,
+        )
+        return {'ok': True, 'api_key': got}
+
+    @api.model
+    def consume_key_pin(self, raw, user):
+        """Wipe the PIN after the app has logged in with the key."""
+        raw = compact_pin(raw, pin_length(self.env))
+        if not raw or not user:
+            return False
+        rec = self.sudo().search([
+            ('key_pin', '=', raw),
+            ('key_pin_used', '=', False),
+            ('key_pin_killed', '=', False),
+            ('user_id', '=', user.id),
+        ], limit=1)
+        if not rec:
+            return False
+        rec._clear_key_pin()
+        if 'ai.key.pin.desk' in self.env:
+            self.env['ai.key.pin.desk'].sudo().notify_changed()
+        return True
+
+    @api.model
+    def _wipe_spent_key_pins(self):
+        """Leftover grey/red rows from older builds: clear them once."""
+        spent = self.sudo().search([
+            '|',
+            ('key_pin_used', '=', True),
+            ('key_pin_killed', '=', True),
+        ])
+        if spent:
+            spent._clear_key_pin()
+            _logger.info(
+                'MCP: wiped %s spent temporary key PIN(s)', len(spent),
+            )
+
+    def _register_hook(self):
+        super()._register_hook()
+        try:
+            self._wipe_spent_key_pins()
+        except Exception:
+            _logger.exception('MCP: wipe of spent key PINs skipped')
 

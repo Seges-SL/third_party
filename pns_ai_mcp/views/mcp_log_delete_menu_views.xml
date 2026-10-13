@@ -6,7 +6,7 @@
 <odoo>
     <record id="view_mcp_log_delete_menu_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.log_delete_menu.form</field>
-        <field name="model">pns_ai_mcp.log_delete_menu</field>
+        <field name="model">ai.log.delete.menu</field>
         <field name="arch" type="xml">
             <form string="Clear log history">
                 <div class="alert alert-info" role="alert">

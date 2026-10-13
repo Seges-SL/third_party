@@ -297,6 +297,59 @@
     box-sizing: border-box;
 }
 
+.o_chatboo_data_table th.o_chatboo_th_sort {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+.o_chatboo_data_table th.o_chatboo_th_sort:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+.o_chatboo_data_table th.o_chatboo_th_sort::after {
+    content: "↕";
+    display: inline-block;
+    margin-left: 0.4em;
+    font-size: 0.95em;
+    font-weight: 700;
+    line-height: 1;
+    color: #444;
+    opacity: 1;
+}
+.o_chatboo_data_table th.o_chatboo_th_sort[aria-sort="ascending"]::after {
+    content: "▲";
+    color: #111;
+}
+.o_chatboo_data_table th.o_chatboo_th_sort[aria-sort="descending"]::after {
+    content: "▼";
+    color: #111;
+}
+
+.o_chatboo_table_block .table-responsive,
+.o_chatboo_messages .table-responsive {
+    position: relative;
+}
+
+.o_chatboo_col_reorder_guide {
+    position: absolute;
+    top: 0;
+    width: 2px;
+    margin: 0;
+    padding: 0;
+    background: #007cba;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7);
+    pointer-events: none;
+    z-index: 30;
+}
+
+.o_chatboo_data_table.o_chatboo_col_reordering,
+.o_chatboo_data_table.o_chatboo_col_reordering th {
+    cursor: grabbing;
+}
+
+.o_chatboo_data_table th.o_chatboo_th_sort.is-dragging {
+    opacity: 0.55;
+}
+
 .o_chatboo_block_title {
     margin: 0 0 0.45em 0 !important;
 }
@@ -331,7 +384,7 @@
 }
 
 .o_chatboo_table_block .o_chatboo_chart_toolbar {
-    margin-top: 0;
+    margin-top: 0.65em;
 }
 
 .o_chatboo_chart_toolbar {
@@ -474,6 +527,30 @@
     background: #fff;
     line-height: 1.4;
 }
+.o_chatboo_usage_chip--turn {
+    background: #e3f2fd;
+    border-color: #bbdefb;
+    color: #1565c0;
+}
+.o_chatboo_usage_chip--buffer-ok {
+    background: #e8f5e9;
+    border-color: #c8e6c9;
+    color: #2e7d32;
+}
+.o_chatboo_usage_chip--buffer-warn {
+    background: #fff8e1;
+    border-color: #ffe082;
+    color: #f57f17;
+}
+.o_chatboo_usage_chip--buffer-danger {
+    background: #ffebee;
+    border-color: #ef9a9a;
+    color: #c62828;
+}
+.o_chatboo_usage_chip--spend {
+    background: #ffe082;
+    color: #1d1d1d;
+}
 
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -489,9 +566,16 @@
     transform: scale(1.1);
 }
 
+.o_chatboo_md_col {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
 .o_chatboo_ts_row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 0.5em;
     margin-top: 0.5rem;
 }
@@ -876,6 +960,78 @@
     /* JS mirrors CHATBOO_PROMPT_MAX_LINES; keep 10 as CSS fallback. */
     --o-chatboo-prompt-max-lines: 10;
     overflow: visible;
+}
+
+.o_chatboo_footer_prefs {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    min-height: 1.35em;
+    overflow: visible;
+}
+
+.o_chatboo_show_series_stats {
+    user-select: none;
+}
+
+.o_chatboo_footer_prefs .o_chatboo_directive_chip {
+    position: relative;
+    box-sizing: border-box;
+    border: 1px solid transparent;
+    line-height: 1.2;
+    padding: 0.2em 0.55em;
+}
+
+.o_chatboo_footer_prefs .o_chatboo_directive_chip[data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    inset-inline-start: 50%;
+    top: 0;
+    transform: translate(-50%, calc(-100% - 6px));
+    z-index: 50;
+    box-sizing: border-box;
+    max-width: 18rem;
+    width: max-content;
+    padding: 0.35em 0.6em;
+    border: 1px solid #e6d48a;
+    border-radius: 4px;
+    background: #fff9c4;
+    color: #000;
+    font-size: 0.8rem;
+    font-weight: 500;
+    line-height: 1.35;
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+    text-align: start;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    pointer-events: none;
+}
+
+.o_chatboo_footer_prefs .o_chatboo_directive_chip[data-tip]:hover::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: 50%;
+    top: 0;
+    transform: translate(-50%, calc(-100% - 1px));
+    z-index: 51;
+    border: 5px solid transparent;
+    border-top-color: #fff9c4;
+    pointer-events: none;
+}
+
+.o_chatboo_footer_prefs .o_chatboo_directive_chip--off {
+    color: var(--chatboo-text-muted, #6c757d) !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    border-color: var(--chatboo-border, #e0e0e0) !important;
+    opacity: 0.58;
+    box-shadow: none !important;
+}
+
+.o_chatboo_footer_prefs .o_chatboo_directive_chip--off i {
+    color: inherit !important;
 }
 
 .o_chatboo_prompt_wrap {

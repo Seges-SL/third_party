@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import logging
 import urllib.request
+from datetime import timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
@@ -18,6 +19,7 @@ _logger = logging.getLogger(__name__)
 ICP_KEY = 'pns_ai_mcp.fx_usd_cache'
 _TIMEOUT = 4
 _ERROR_MAX = 240
+_FAIL_CACHE_MINUTES = 15
 
 
 class AiFxSource(models.Model):
@@ -97,7 +99,7 @@ class AiFxSource(models.Model):
                 if (
                     data.get('as_of') == today_s
                     and isinstance(data.get('rates'), dict)
-                    and data['rates']
+                    and (data['rates'] or self._failure_still_fresh(data))
                 ):
                     return data
             except Exception:
@@ -133,13 +135,22 @@ class AiFxSource(models.Model):
             _logger.warning(
                 'FX unavailable: costs stay in USD (%s)', error,
             )
-            return {
+            retry_after = fields.Datetime.to_string(
+                fields.Datetime.now() + timedelta(minutes=_FAIL_CACHE_MINUTES),
+            )
+            payload = {
                 'base': 'USD',
                 'rates': {},
                 'as_of': today_s,
                 'source': '',
                 'error': error,
+                'retry_after': retry_after,
             }
+            try:
+                icp.set_param(ICP_KEY, json.dumps(payload))
+            except Exception:
+                _logger.warning('Could not cache FX failure')
+            return payload
         payload = {
             'base': 'USD',
             'rates': rates,
@@ -152,6 +163,18 @@ class AiFxSource(models.Model):
         except Exception:
             _logger.warning('Could not cache FX rates')
         return payload
+
+    @api.model
+    def _failure_still_fresh(self, data):
+        """A failed fetch is remembered for a few minutes, not until tomorrow."""
+        raw = (data or {}).get('retry_after') or ''
+        if not raw:
+            return False
+        try:
+            until = fields.Datetime.from_string(raw)
+        except Exception:
+            return False
+        return bool(until and until > fields.Datetime.now())
 
     @api.model
     def _rates_from_odoo_currency(self):

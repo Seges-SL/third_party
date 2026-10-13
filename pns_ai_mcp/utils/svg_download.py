@@ -110,7 +110,8 @@ def _axis_tokens():
         return set(AXIS_COMMANDS)
     except Exception:
         return {
-            'painter-local', 'painter-free', 'foot-verbose', 'foot-laconic',
+            'compose-agent', 'compose-model',
+            'foot-verbose', 'foot-laconic',
             'show-table', 'show-chart',
         }
 
@@ -411,11 +412,6 @@ def harvest_drawing_svgs(text, min_chars=MIN_SVG_CHARS, max_count=MAX_SVGS_PER_T
     return docs, _apply_removals(text, ranges)
 
 
-def extract_inline_svgs(html, min_chars=MIN_SVG_CHARS, max_count=MAX_SVGS_PER_TURN):
-    """Return sanitized SVG documents large enough to be a drawing, not an icon."""
-    return harvest_drawing_svgs(html, min_chars=min_chars, max_count=max_count)[0]
-
-
 def svg_filename(svg, index=1, prompt=None, skill_code=None):
     title = None
     match = _TITLE.search(svg or '')
@@ -445,10 +441,7 @@ def svg_inline_view_url(chip):
         match = re.search(r'/pns_ai_mcp/session_file/(\d+)', url)
     if not match:
         return url
-    token_m = re.search(r'access_token=([^&]+)', url)
-    token = token_m.group(1) if token_m else ''
-    path = '/pns_ai_mcp/session_file/%s' % match.group(1)
-    return '%s?access_token=%s' % (path, token) if token else path
+    return '/pns_ai_mcp/session_file/%s' % match.group(1)
 
 
 def persist_inline_svgs_from_html(env, session_id, html, prompt=None, skill_code=None):

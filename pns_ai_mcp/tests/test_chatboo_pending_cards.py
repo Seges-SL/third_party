@@ -35,7 +35,7 @@ class TestChatbooPendingCards(TransactionCase):
     def test_pending_payload_matches_sse_shape_and_skips_closed(self):
         mine = _make_pending(self.env, self.env.uid, title='my write')
         closed = _make_pending(self.env, self.env.uid, title='already done')
-        closed.write({'status': 'cancelled'})
+        closed.sudo().write({'status': 'cancelled'})
 
         other = new_test_user(
             self.env, login='pns_other_pending_card',
@@ -72,7 +72,7 @@ class TestChatbooPendingCards(TransactionCase):
     def test_expired_pending_is_not_restored(self):
         op = _make_pending(self.env, self.env.uid, title='stale')
         past = fields.Datetime.now() - timedelta(hours=1)
-        op.write({'create_date': past, 'expires_at': past})
+        op.sudo().write({'create_date': past, 'expires_at': past})
         items = self.env['ai.safe.operation'].chatboo_pending_card_payloads()
         self.assertNotIn(op.verification_id, [
             row['verification_id'] for row in items

@@ -1,3 +1,9 @@
+/**
+ * Compressed JSON field with expand and clipboard copy (Odoo 14).
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+ */
 odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
     "use strict";
 
@@ -150,7 +156,7 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
             // Bot├│n de copiar en el contenedor expandido
             var $copyButtonExpanded = $('<button>', {
                 class: 'btn btn-sm btn-link mcp_json_copy_btn_expanded',
-                html: '<i class="fa fa-copy"></i> Copiar',
+                html: '<i class="fa fa-copy"></i>',
                 css: {
                     'position': 'absolute',
                     'top': '5px',

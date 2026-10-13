@@ -23,5 +23,6 @@ ui_focus</field>
 Provides a chat interface for natural-language queries, tool execution,
 and skill-based procedures (slash commands).
 Baseline knowledge: @pns_ai_mcp + @pns_ai_chatboo.</field>
+        <field name="is_agent_conversational" eval="True"/>
     </record>
 </odoo>

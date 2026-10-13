@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Contexts Tools: stats, restore from module, export/import ZIP."""
+
 from odoo import fields, models, _
 
 from ..utils.import_export_guard import ensure_ai_admin
@@ -8,7 +10,7 @@ from .operation_result import context_zip_files_to_result
 
 
 class McpContextToolsWizard(models.TransientModel):
-    _name = 'pns_ai_mcp.context.tools.wizard'
+    _name = 'ai.context.tools.wizard'
     _inherit = ['pns.operation.report.wizard']
     _description = 'Contexts Tools'
 

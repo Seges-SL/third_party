@@ -28,8 +28,7 @@ SKILL_FRONT_MATTER_KEYS = frozenset((
     'agent_codes',
     'agent_code',
     'version',
-    'painter',
-    'formatting_mode',
+    'compose',
     'param_schema',
     'arg_hint',
     'args_policy',
@@ -42,8 +41,8 @@ SKILL_FRONT_MATTER_KEYS = frozenset((
 
 # Capabilities a skill may list in ``requires:`` (comma-separated).
 SKILL_ENGINE_CAPABILITIES = frozenset((
-    'painter-local',
-    'painter-free',
+    'compose-agent',
+    'compose-model',
     'report_outline',
     'closing_required',
     'recommendations_stub',

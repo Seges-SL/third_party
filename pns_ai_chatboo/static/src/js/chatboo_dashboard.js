@@ -1,7 +1,8 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com> */
 /**
  * Chatboo dashboard — draggable/closable cards for show_mode=dashboard.
  * Persists layout in localStorage (per dashboard id). Charts hydrate via ChatbooCharts.
- * SPDX-License-Identifier: Apache-2.0
  */
 (function (global) {
     "use strict";
@@ -427,17 +428,7 @@
         if (global.ChatbooCharts && typeof global.ChatbooCharts.hydrate === "function") {
             global.ChatbooCharts.hydrate(dashboard);
         }
-        // Diferir relayout: el grid ya no está maximizado y hay que recalcular alturas.
-        setTimeout(function () {
-            resizeChartsIn(dashboard);
-        }, 0);
-        setTimeout(function () {
-            if (global.ChatbooCharts && typeof global.ChatbooCharts.softResize === "function") {
-                global.ChatbooCharts.softResize(dashboard);
-            } else {
-                resizeChartsIn(dashboard);
-            }
-        }, 120);
+        resizeChartsIn(dashboard);
     }
 
     function visibleCards(grid, except) {
@@ -730,16 +721,22 @@
             return;
         }
         var scheduled = null;
+        var placed = false;
         var ro = new global.ResizeObserver(function () {
             // Nunca mutar layout dentro del callback del RO (provoca
             // "ResizeObserver loop completed with undelivered notifications").
             if (scheduled !== null) {
                 return;
             }
-            scheduled = global.setTimeout(function () {
+            scheduled = global.requestAnimationFrame(function () {
                 scheduled = null;
                 syncGridColumnMin(grid);
-                if (
+                // First size of the grid: card bodies now have their real
+                // height, so chart heights are computed again.
+                if (!placed) {
+                    placed = true;
+                    resizeChartsIn(dashboard);
+                } else if (
                     global.ChatbooCharts &&
                     typeof global.ChatbooCharts.softResize === "function"
                 ) {
@@ -747,7 +744,7 @@
                 } else {
                     softResizeFallback(dashboard);
                 }
-            }, 0);
+            });
         });
         ro.observe(grid);
         dashboard._chatbooDashboardRO = ro;
@@ -793,16 +790,6 @@
             global.ChatbooCharts.hydrate(dashboard);
         }
         resizeChartsIn(dashboard);
-        // Segundo pase tras layout del mensaje/grid (chart-table suele medir mal al 1º).
-        setTimeout(function () {
-            resizeChartsIn(dashboard);
-            if (
-                global.ChatbooCharts &&
-                typeof global.ChatbooCharts.softResize === "function"
-            ) {
-                global.ChatbooCharts.softResize(dashboard);
-            }
-        }, 200);
     }
 
     function hydrateRoot(root) {

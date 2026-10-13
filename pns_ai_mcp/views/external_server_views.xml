@@ -42,6 +42,10 @@
                             string="Auth from spec" class="btn-secondary"
                             icon="fa-key"
                             attrs="{'invisible': [('api_type', '!=', 'openapi')]}"/>
+                    <button name="action_open_openapi_generate_wizard" type="object"
+                            string="Generate OpenAPI from docs" class="btn-secondary"
+                            icon="fa-magic"
+                            attrs="{'invisible': ['|', ('api_type', '!=', 'openapi'), ('spec_manual', '=', False)]}"/>
                     <button name="action_suggest_detection" type="object"
                             string="Suggest triggers" class="btn-secondary"
                             icon="fa-lightbulb-o"/>
@@ -68,6 +72,8 @@
                             <field name="name" placeholder="Server name"/>
                         </h1>
                     </div>
+                    <div class="o_ai_last_operation_usage text-muted small"
+                         style="display:none;"/>
                     <notebook>
                         <!-- Tab 1: Form fields -->
                         <page string="Configuration" name="config">
@@ -92,6 +98,9 @@
                                     <field name="spec_manual"/>
                                     <field name="spec_url" placeholder="https://api.example.com/openapi.json"
                                            attrs="{'required': [('api_type', '=', 'openapi'), ('spec_manual', '=', False)], 'invisible': [('spec_manual', '=', True)]}"/>
+                                    <field name="docs_url"
+                                           placeholder="https://docs.example.com/api"
+                                           attrs="{'invisible': [('spec_manual', '=', False)]}"/>
                                     <field name="base_url" placeholder="https://api.example.com (optional, spec servers[] by default)"/>
                                 </group>
                                 <group string="Authentication"
@@ -149,6 +158,28 @@
                             <field name="config_json" widget="ace" options="{'mode': 'xml'}"
                                    nolabel="1" placeholder='{"code": {"type": "sse", "url": "..."}}'/>
                         </page>
+                        <page string="OpenAPI prompt" name="openapi_gen"
+                              attrs="{'invisible': ['|', ('api_type', '!=', 'openapi'), ('spec_manual', '=', False)]}">
+                            <div class="alert alert-info mb-2" role="alert">
+                                <strong>Edit the model prompt used to turn the docs URL into OpenAPI JSON.</strong>
+                                Not the Context usage guide. Set Documentation URL under
+                                Configuration, then <em>Generate OpenAPI from docs</em> in the header.
+                                Factory scope: this documentation page only. No links, not even on the same domain.
+                                Only this prompt and the fetched page go to the AI — no Odoo context.
+                            </div>
+                            <group string="AI system prompt (doc → OpenAPI)">
+                                <field name="openapi_gen_prompt" nolabel="1" colspan="2"
+                                       placeholder="Factory English prompt (filled by default)…"/>
+                                <div colspan="2">
+                                    <button name="action_restore_openapi_gen_prompt"
+                                            type="object"
+                                            string="Restore factory OpenAPI prompt"
+                                            class="btn-secondary"
+                                            icon="fa-undo"
+                                            confirm="Replace this prompt with the current factory English default? Your edits on this server will be lost."/>
+                                </div>
+                            </group>
+                        </page>
                         <!-- OpenAPI spec: textarea, not Ace. A converted spec is
                              often large; Odoo 14 Ace has no JSON/JS mode. -->
                         <page string="OpenAPI Spec" name="openapi_spec"
@@ -156,8 +187,10 @@
                             <div class="alert alert-info mb-2" role="alert"
                                  attrs="{'invisible': [('spec_manual', '=', False)]}">
                                 <strong>Manual spec.</strong>
-                                Paste the OpenAPI JSON below. Discover Tools rebuilds the catalogue
-                                from this document and will not download Spec URL.
+                                Paste the OpenAPI JSON below or use
+                                <em>Generate OpenAPI from docs</em> with a Documentation URL.
+                                Discover Tools rebuilds the catalogue from this document
+                                and will not download Spec URL.
                             </div>
                             <div class="alert alert-info mb-2" role="alert"
                                  attrs="{'invisible': [('spec_manual', '=', True)]}">
@@ -188,12 +221,23 @@
                         <!-- usage_guide: editable text injected with discovered tools -->
                         <page string="Context" name="server_context">
                             <div class="alert alert-info mb-2" role="alert">
-                                <strong>usage_guide</strong> — free text injected into the agent prompt
-                                alongside the discovered tool catalogue for this server.
+                                <strong>Optional runtime tips — not OpenAPI generation.</strong>
+                                After tools exist, this text is injected with the catalogue
+                                so the agent knows quirks (auth units, rate limits…).
+                                To build the spec from a web page, use
+                                <em>Generate from docs</em>.
                             </div>
                             <group string="Usage guide">
-                                <field name="usage_guide" nolabel="1"
+                                <field name="usage_guide" nolabel="1" colspan="2"
                                        placeholder="When to use this server, argument conventions, examples… Injected into the agent prompt with the discovered tools."/>
+                                <div colspan="2">
+                                    <button name="action_restore_usage_guide"
+                                            type="object"
+                                            string="Restore factory usage guide"
+                                            class="btn-secondary"
+                                            icon="fa-undo"
+                                            confirm="Replace the usage guide with the pack factory text for this server? Your edits will be lost."/>
+                                </div>
                             </group>
                             <group string="Discovered prompts (MCP prompts/list)" col="1"
                                    attrs="{'invisible': ['|', ('api_type', '!=', 'mcp'), ('prompts_count', '=', 0)]}">

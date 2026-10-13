@@ -10,7 +10,7 @@ The ZIP is produced by the JSON export action and contains:
 The wizard allows replacing existing contexts and/or overwriting
 the agent's composition (context_ids) from the manifest.
 
-Model: ``pns_ai_mcp.agent.import.wizard``
+Model: ``ai.agent.import.wizard``
 """
 import base64
 
@@ -25,7 +25,7 @@ class AIAgentImportWizard(models.TransientModel):
 
     Inherits ``pns.operation.report.wizard`` for the result view.
     """
-    _name = 'pns_ai_mcp.agent.import.wizard'
+    _name = 'ai.agent.import.wizard'
     _inherit = ['pns.operation.report.wizard']
     _description = 'Import context pack from ZIP'
 

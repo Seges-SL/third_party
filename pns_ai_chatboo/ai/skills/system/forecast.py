@@ -1,16 +1,13 @@
+# -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-# SKILL: forecast — Open-Meteo, any city, multi-day.
-#
-# AUTOCONTENIDO: toda la logica meteorologica vive AQUI, no en el motor. El
-# motor (ai engine) solo aporta el mecanismo generico multi-ronda: ejecuta los
-# `propose_steps` (fetch_url auto-confirmables) y, si el skill puso `continue`,
-# vuelve a ejecutar este code_body con los resultados en `previous_result`.
-#
-# Rondas (se distinguen mirando `previous_result`):
-#   1. previous_result vacio        -> geocodificar las ciudades (fetch geocoding-api).
-#   2. previous_result = geocodings -> armar 1 forecast por ciudad con &city=<nombre>.
-#   3. previous_result = forecasts  -> parsear y presentar (groups/data + footer).
+"""Open-Meteo forecast slash skill.
+
+Self-contained multi-round skill: geocode cities, fetch daily forecast, present
+tables. The engine only runs generic fetch_url steps when this script sets
+continue. Rounds are distinguished by previous_result (empty → geocode →
+forecast → present).
+"""
 import json
 import re
 from datetime import date, datetime, timedelta

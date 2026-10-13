@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Import AI agents from JSON."""
+
 import base64
 import json
 import logging
@@ -14,7 +16,7 @@ _logger = logging.getLogger(__name__)
 
 
 class ImportAgentsWizard(models.TransientModel):
-    _name = 'pns_ai_mcp.import_agents_wizard'
+    _name = 'ai.import.agents.wizard'
     _inherit = ['pns.operation.report.wizard']
     _description = 'Wizard to import AI Agents from JSON'
 

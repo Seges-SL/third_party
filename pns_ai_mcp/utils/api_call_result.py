@@ -11,10 +11,14 @@ API_CALL_DEFAULT_PAGE_SIZE = 50
 API_CALL_CACHE_TTL_SECONDS = 600
 
 
-def cache_key_for_api_call(server, tool, arguments):
-    """Stable cache key: server + tool + canonical JSON arguments."""
+def cache_key_for_api_call(server, tool, arguments, uid=None):
+    """Stable cache key: user + server + tool + canonical JSON arguments.
+
+    The same call can answer differently per user (per-user credential on the
+    server), so one user's body is never served to another.
+    """
     canonical = json.dumps(arguments or {}, sort_keys=True, ensure_ascii=False, default=str)
-    raw = '%s\0%s\0%s' % (server or '', tool or '', canonical)
+    raw = '%s\0%s\0%s\0%s' % (uid or '', server or '', tool or '', canonical)
     return hashlib.sha256(raw.encode('utf-8')).hexdigest()
 
 
@@ -87,7 +91,7 @@ def format_api_call_body_for_llm(body, arguments=None, max_chars=API_CALL_LLM_MA
         return body[:max_chars], True, {
             'hint': (
                 'Response is not JSON. Request smaller pages via tool arguments '
-                '(limit/page/offset) in propose_safe_operations api_call.'
+                '(limit/page/offset) in safe_plan_request api_call.'
             ),
             'original_size': len(body),
         }

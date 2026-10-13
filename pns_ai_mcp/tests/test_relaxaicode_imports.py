@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Contrato del sandbox RelaxAICode sobre imports de red.
+"""RelaxAICode sandbox contract for network imports.
 
-`urllib.parse` son funciones puras de texto (quote, urlencode, urlparse...) para
-COMPONER/TROCEAR URLs, sin red ni FS: se permite SOLO la forma
-`from urllib.parse import <nombre>`. Todo lo demás de red sigue prohibido, y
-`import urllib.parse` también (ligaría el paquete `urllib`, desde el que se
-alcanzaría urllib.request).
+``urllib.parse`` is pure text (quote, urlencode, urlparse…) to compose or
+split URLs, with no network or FS: only ``from urllib.parse import <name>``
+is allowed. Other network imports stay forbidden, including
+``import urllib.parse`` (that binds the ``urllib`` package, from which
+``urllib.request`` is reachable).
 """
 from odoo.tests import tagged, TransactionCase
 

@@ -19,6 +19,7 @@ from odoo.exceptions import UserError
 from odoo.http import request, Response
 
 from ..utils.chatboo_access import user_has_chatboo_access
+from ..utils.chatboo_product_icp import oversized_upload, upload_max_bytes
 from ..utils.compat import JSON_ROUTE_TYPE
 from ..utils.fx_rates import get_usd_fx
 
@@ -39,6 +40,10 @@ class ChatbooController(http.Controller):
             'connected': False,
         }
 
+    def _chatboo_failed(self):
+        """A fixed sentence. The exception stays in the log."""
+        return _('Chatboo could not complete that request.')
+
     def _chatboo_skill_ctx(self, session_id=None):
         if not session_id:
             return {}
@@ -56,9 +61,16 @@ class ChatbooController(http.Controller):
         except Exception:
             return 0.0
 
+    def _user_show_series_stats(self):
+        try:
+            return bool(request.env.user.chatboo_show_series_stats_value())
+        except Exception:
+            return False
+
     def _with_user_prefs(self, payload):
         data = dict(payload or {})
         data['card_width_ratio'] = self._user_card_width_ratio()
+        data['show_series_stats'] = self._user_show_series_stats()
         return data
 
     # ──────────────────────────── Salud / proveedor ────────────────────────────
@@ -70,6 +82,8 @@ class ChatbooController(http.Controller):
         Acceso Chatboo: fail-closed. Sin carnet MCP (hash) no hay systray ni
         uso del asistente; un error al comprobar acceso también deniega.
         """
+        if not self._user_may_use_chatboo():
+            return self._chatboo_access_denied()
         try:
             can_save_raw = request.env.user.has_group('pns_ai_mcp.group_ai_admin')
         except Exception:
@@ -121,24 +135,23 @@ class ChatbooController(http.Controller):
                         host = "localhost"
                 except Exception:
                     host = "Unknown Host"
-            alias = (getattr(provider, 'alias', None) or '').strip()
-            display = alias or f"{host} → {model}"
+            label, shown_model, shown_host = self._picker_label(provider, host, model)
             return self._with_user_prefs({
                 'status': 'ok',
-                'provider': display,
-                'model': model if not alias else display,
-                'host': '' if alias else host,
-                'alias': alias or None,
+                'provider': label,
+                'model': shown_model,
+                'host': shown_host,
+                'alias': (getattr(provider, 'alias', None) or '').strip() or None,
                 'connected': True, 'has_api_key': has_api_key, 'can_save_raw': can_save_raw,
                 'show_systray': show_systray,
                 'fx': fx,
                 'display_currency': display_currency,
                 **agent_diag,
             })
-        except Exception as e:
-            _logger.error("Chatboo Health Error: %s", e)
+        except Exception:
+            _logger.exception("Chatboo Health Error")
             return self._with_user_prefs({
-                'status': 'error', 'message': str(e), 'provider': 'System Error',
+                'status': 'error', 'message': self._chatboo_failed(), 'provider': 'System Error',
                 'connected': False, 'can_save_raw': can_save_raw,
                 'has_api_key': has_api_key,
                 'show_systray': show_systray,
@@ -148,17 +161,34 @@ class ChatbooController(http.Controller):
             })
 
     @http.route('/chatboo/prefs', type=JSON_ROUTE_TYPE, auth='user')
-    def save_prefs(self, card_width_ratio=None, **kwargs):
-        """Persist this user's Chatboo card width. Never writes another uid."""
+    def save_prefs(self, card_width_ratio=None, show_series_stats=None, **kwargs):
+        """Persist this user's Chatboo UI prefs. Never writes another uid.
+
+        A POST may send only one key (card width or STATS). Missing keys
+        are left untouched.
+        """
         if not self._user_may_use_chatboo():
             return self._chatboo_access_denied()
         if card_width_ratio is None:
             card_width_ratio = kwargs.get('card_width_ratio')
+        if show_series_stats is None:
+            show_series_stats = kwargs.get('show_series_stats')
+        Users = request.env['res.users']
+        out = {'status': 'ok'}
         try:
-            ratio = request.env['res.users'].chatboo_set_own_card_width_ratio(
-                card_width_ratio,
-            )
-            return {'status': 'ok', 'card_width_ratio': ratio}
+            if card_width_ratio is not None:
+                out['card_width_ratio'] = Users.chatboo_set_own_card_width_ratio(
+                    card_width_ratio,
+                )
+            else:
+                out['card_width_ratio'] = self._user_card_width_ratio()
+            if show_series_stats is not None:
+                out['show_series_stats'] = Users.chatboo_set_own_show_series_stats(
+                    show_series_stats,
+                )
+            else:
+                out['show_series_stats'] = self._user_show_series_stats()
+            return out
         except Exception as e:
             _logger.error("Chatboo prefs: %s", e)
             return {'status': 'error', 'message': str(e)}
@@ -299,7 +329,9 @@ class ChatbooController(http.Controller):
             return self._chatboo_access_denied()
         try:
             from odoo.addons.pns_ai_mcp.utils import artifact_export as ae
-            payload = ae.icon_xlsx_payload(sections, filename=filename)
+            payload = ae.icon_xlsx_payload(
+                sections, filename=filename, env=request.env,
+            )
         except Exception as e:
             _logger.error("Error building Excel: %s", e)
             return {'status': 'error', 'message': str(e)}
@@ -524,7 +556,7 @@ class ChatbooController(http.Controller):
             return self._chatboo_access_denied()
         try:
             agent_code = request.env['ai.agent'].resolve_inference_agent_code(
-                kwargs.get('agent_code'), consumer_key='chatboo',
+                None, consumer_key='chatboo',
             )
             Skill = request.env['ai.skill']
             skills = Skill.list_for_agent(agent_code)
@@ -544,7 +576,8 @@ class ChatbooController(http.Controller):
             return {'status': 'error', 'message': str(e), 'skills': []}
 
     @http.route('/chatboo/create-skill', type=JSON_ROUTE_TYPE, auth='user')
-    def create_skill(self, session_id, skill_code=None, turn_id=None):
+    def create_skill(self, session_id, skill_code=None, turn_id=None,
+                     param_prose=None):
         """Open the skill capture wizard from a Chatboo session (/create-skill)."""
         if not self._user_may_use_chatboo():
             return self._chatboo_access_denied()
@@ -559,6 +592,7 @@ class ChatbooController(http.Controller):
             action, warning = session.prepare_skill_capture_action(
                 skill_code_hint=(skill_code or '').strip() or None,
                 turn_id=(turn_id or '').strip() or None,
+                param_prose=(param_prose or '').strip() or None,
             )
             payload = {'status': 'ok', 'action': action}
             if warning:
@@ -604,14 +638,40 @@ class ChatbooController(http.Controller):
             _logger.exception("Chatboo rename_skill: %s", e)
             return {'status': 'error', 'message': str(e)}
 
+    @http.route('/chatboo/edit-skill', type=JSON_ROUTE_TYPE, auth='user')
+    def edit_skill(self, session_id, token=None, param_prose=None):
+        """Open the skill wizard on a skill the current Writer owns."""
+        if not self._user_may_use_chatboo():
+            return self._chatboo_access_denied()
+        try:
+            if not session_id:
+                return {'status': 'error', 'message': _('session_id is required.')}
+            session = request.env['chatboo.session'].browse(int(session_id))
+            if not session.exists():
+                return {'status': 'error', 'message': _('Session not found.')}
+            if session.user_id.id != request.env.uid:
+                return {'status': 'error', 'message': _('Access denied.')}
+            action, picks = session.prepare_skill_edit_action(
+                (token or '').strip() or None,
+                param_prose=(param_prose or '').strip() or None,
+            )
+            if picks is not None:
+                return {'status': 'ok', 'picks': picks}
+            return {'status': 'ok', 'action': action}
+        except UserError as e:
+            return {'status': 'error', 'message': str(e)}
+        except Exception as e:
+            _logger.exception("Chatboo edit_skill: %s", e)
+            return {'status': 'error', 'message': str(e)}
+
     # ──────────────────────────── Providers ─────────────────────────────────
 
     @http.route('/chatboo/providers', type=JSON_ROUTE_TYPE, auth='user')
     def list_providers(self):
-        """Return the providers in the Chatboo agent's failover chain.
+        """Providers the picker may offer: conversation, or no usage tick.
 
-        Also resolves the agent's current default provider so the UI
-        can pre-select it. (`ai.provider` has no `active` field.)
+        A vision-only or audio-only row stays out. Archived providers are
+        skipped. The first one left is the default.
         """
         if not self._user_may_use_chatboo():
             return self._chatboo_access_denied()
@@ -634,24 +694,27 @@ class ChatbooController(http.Controller):
                     providers = Provider.browse(provider_ids)
                     if providers:
                         default_provider_id = providers[0].id
-                if not providers:
-                    providers = Provider.sudo().search([])
-                    if len(providers) == 1:
-                        default_provider_id = providers[0].id
             except Exception:
-                providers = Provider.sudo().search([])
+                _logger.exception("Chatboo providers: failover chain failed")
+                providers = Provider.browse()
+            providers = self._for_the_picker(providers)
+            if not providers or default_provider_id not in providers.ids:
+                default_provider_id = providers[:1].id or None
             return {
                 'status': 'ok',
                 'default_provider_id': default_provider_id,
                 'providers': [self._serialize_provider(p) for p in providers],
             }
-        except Exception as e:
-            _logger.error("Chatboo providers error: %s", e)
-            return {'status': 'error', 'providers': [], 'message': str(e)}
+        except Exception:
+            _logger.exception("Chatboo providers error")
+            return {
+                'status': 'error', 'providers': [],
+                'message': self._chatboo_failed(),
+            }
 
     # ──────────────────────────── Inferencia (SSE) ────────────────────────────
 
-    @http.route('/chatboo/stream', type='http', auth='user', methods=['POST'], csrf=False, cors='*')
+    @http.route('/chatboo/stream', type='http', auth='user', methods=['POST'])
     def chat_stream(self, **kwargs):
         """Turno de chat con auto-promoción a segundo plano.
 
@@ -659,7 +722,8 @@ class ChatbooController(http.Controller):
         cursor propio, guarda el resultado en la sesión y avisa por bus. Este
         endpoint solo hace *tail* del job para el preview en vivo: si cierras o
         recargas, el hilo termina igual y la respuesta queda persistida en BD.
-        Body JSON: {session_id, message, history?, agent_code?, provider_id?, screen_context?}.
+        Body JSON: {session_id, message, history?, provider_id?,
+        screen_context?, refs?}.
         """
         if not self._user_may_use_chatboo():
             return self._json_response(
@@ -671,7 +735,6 @@ class ChatbooController(http.Controller):
             session_id = data.get('session_id')
             message = data.get('message')
             provider_id = data.get('provider_id')
-            agent_code = data.get('agent_code')
             history = data.get('history', [])
             screen_context = data.get('screen_context')
             images = data.get('images') or None
@@ -697,12 +760,35 @@ class ChatbooController(http.Controller):
             if not session:
                 session = Session.create({'user_id': request.env.uid})
             session_id = session.id
+            # Rows the user ticked in the answer. They travel with the
+            # sentence: the worker says them to the engine and narrows the
+            # dataset to them.
+            session.remember_marks(data.get('refs'))
 
             request.chatboo_options = {'chatboo_session_id': session_id}
 
+            too_big = oversized_upload(request.env, images, files, image_names)
+            if too_big is not None:
+                mb = upload_max_bytes(request.env) // (1024 * 1024)
+                if too_big:
+                    _too_big_msg = _('"%(name)s" is larger than the upload limit (%(mb)s MB).') % {
+                        'name': too_big, 'mb': mb,
+                    }
+                else:
+                    _too_big_msg = _('A file is larger than the upload limit (%s MB).') % mb
+
+                def _too_big_stream():
+                    yield self._sse_event('token', {'event': 'token', 'content': _too_big_msg})
+                    yield self._sse_event('done', {'event': 'done', 'session_id': session_id, 'usage': {}})
+
+                return Response(
+                    _too_big_stream(), mimetype='text/event-stream',
+                    direct_passthrough=True, headers=self._sse_headers(),
+                )
+
             # Comprobación rápida de proveedor → mensaje amable inmediato.
             resolved_code = request.env['ai.agent'].resolve_inference_agent_code(
-                agent_code, consumer_key='chatboo',
+                None, consumer_key='chatboo',
             )
             try:
                 _has_provider = bool(request.env['ai.execution.engine'].get_providers_for_agent(
@@ -729,14 +815,14 @@ class ChatbooController(http.Controller):
                 )
 
             # Encolar + lanzar worker en segundo plano (sobrevive a la desconexión).
-            job = request.env['chatboo.async.request'].enqueue(
+            job = request.env['chatboo.async.request']._enqueue(
                 session_id, message, history=history,
-                agent_code=agent_code, provider_id=provider_id,
+                agent_code=resolved_code, provider_id=provider_id,
                 screen_context=screen_context, images=images, files=files,
                 image_names=image_names,
             )
             request.env.cr.commit()  # hacer visible el job al cursor del worker
-            job.spawn()
+            job._spawn()
 
             rid = job.id
             # El generador SSE se itera fuera del 'with request:' (cursor liberado),
@@ -801,7 +887,7 @@ class ChatbooController(http.Controller):
                             done_evt.update({
                                 'event': 'done',
                                 'session_id': session_id,
-                                'authored': True,
+                                'authored': bool(done_evt.get('session_saved')),
                                 'is_error': state == 'error',
                             })
                             if state == 'error' and err:
@@ -830,9 +916,11 @@ class ChatbooController(http.Controller):
             )
         except json.JSONDecodeError:
             return self._json_response({'error': _('Request body is not valid JSON')}, status=400)
-        except Exception as e:
+        except Exception:
             _logger.exception("Error fatal en /chatboo/stream")
-            return self._json_response({'error': str(e)}, status=500)
+            return self._json_response(
+                {'error': self._chatboo_failed()}, status=500,
+            )
 
     def _sse_headers(self):
         return [
@@ -899,17 +987,30 @@ class ChatbooController(http.Controller):
             or "Unknown Model"
         )
         host = self._provider_host(provider)
-        alias = (getattr(provider, 'alias', None) or '').strip()
-        display = alias or f"{host} → {model}"
+        label, shown_model, shown_host = self._picker_label(provider, host, model)
         return {
             'id': provider.id,
             'name': provider.name,
             'protocol': provider.protocol,
-            'model': model,
-            'host': host,
-            'alias': alias or None,
-            'display': display,
+            'model': shown_model,
+            'host': shown_host,
+            'alias': (getattr(provider, 'alias', None) or '').strip() or None,
+            'display': label,
         }
+
+    def _for_the_picker(self, providers):
+        """Conversation, or no usage tick. Vision-, audio- and decision-only stay out."""
+        return providers.filtered(lambda provider: provider._fits('conversation'))
+
+    def _picker_label(self, provider, host, model):
+        """Alias in the picker. With none, the provider name."""
+        alias = (getattr(provider, 'alias', None) or '').strip()
+        if alias:
+            return alias, alias, ''
+        name = (getattr(provider, 'name', None) or '').strip()
+        if name:
+            return name, name, ''
+        return f"{host} → {model}", model, host
 
     def _global_display_currency(self):
         try:
@@ -943,11 +1044,13 @@ class ChatbooController(http.Controller):
             return request.env['ai.provider'].browse()
 
     def _json_response(self, data, status=200):
-        return request.make_response(
+        response = request.make_response(
             json.dumps(data, ensure_ascii=False),
             headers=[('Content-Type', 'application/json')],
             cookies=None,
         )
+        response.status_code = status
+        return response
 
     def _sse_event(self, event_name, data_dict):
         payload = json.dumps(data_dict, ensure_ascii=False)

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-# Renderizado HTML de resultados relaxaicode (Python puro, sin dependencias externas).
+"""HTML rendering of relaxaicode results (pure Python, no extra packages)."""
 
 import html
 import json
@@ -99,40 +99,121 @@ def _result_items(result):
 
 # Prefijos base64 de imagen → mime.
 _B64_IMG_PREFIXES = (('iVBORw', 'png'), ('/9j/', 'jpeg'), ('R0lGOD', 'gif'), ('UklGR', 'webp'))
-# Pistas de nombre de columna que indican una imagen (URL/ruta /web/image/...).
-# Incluye miniaturas de mapa (OSM/GM) generadas por ``map_thumbnail``.
-_IMG_KEY_HINTS = (
-    'image', 'imagen', 'logo', 'avatar', 'foto', 'photo',
-    'mapa', 'map_osm', 'map_gm', 'mapthumb', 'staticmap',
-)
+# Extensiones de fichero de imagen (tokens internacionales, como pdf/xlsx).
+_IMG_PATH_EXT_RE = re.compile(r'(?i)\.(?:jpe?g|png|gif|webp|bmp|avif)$')
 _IMG_STYLE = 'max-height:60px;border-radius:4px;object-fit:contain;'
 _MAP_THUMB_STYLE = (
     'max-height:100px;max-width:160px;border-radius:4px;'
     'object-fit:cover;display:block;'
 )
-# Columnas monetarias / importes (alineación numérica + 2 decimales).
-_MONEY_HINTS = (
-    'amount', 'total', 'importe', 'monto', 'saldo', 'balance', 'revenue',
-    'ingreso', 'precio', 'price', 'coste', 'cost', 'debe', 'haber',
-    'beneficio', 'margen', 'deuda', 'pend', 'subtotal', 'neto',
+# ISO 8601 date or datetime, as Odoo and APIs send it.
+_ISO_DATE_RE = re.compile(
+    r'^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$'
 )
+
+
+def _is_b64_image(text):
+    return len(text) > 64 and any(text.startswith(p) for p, _m in _B64_IMG_PREFIXES)
+
+
+# /web/image/<model>/<id>/<field>[/filename][?query]
+_WEB_IMAGE_PATH_RE = re.compile(
+    r'^(?P<head>/web/image/)'
+    r'(?P<model>[a-z][a-z0-9_.]*)/(?P<rid>\d+)/'
+    r'(?P<field>[A-Za-z_][A-Za-z0-9_]*)'
+    r'(?P<tail>(?:/[^?]*)?)(?P<query>\?.*)?$'
+)
+# image_128, avatar_512: the size is the trailing number, the rest is the stem.
+_SIZED_IMAGE_FIELD_RE = re.compile(r'^(?P<base>.+)_(?P<size>\d+)$')
+
+
+def _largest_image_url(url, env=None):
+    """Same picture, at the biggest size this model actually stores.
+
+    ``image_128`` becomes ``image_1920`` only when that field exists.
+    A picture stored only as ``image_128`` stays on ``image_128``. The
+    web route answers a missing field with the generic placeholder, and
+    the viewer then swaps the real picture for that icon.
+    """
+    if not isinstance(url, str) or not url.startswith('/web/image/') or env is None:
+        return url
+    found = _WEB_IMAGE_PATH_RE.match(url)
+    sized = _SIZED_IMAGE_FIELD_RE.match(found.group('field')) if found else None
+    if not sized:
+        return url
+    model = found.group('model')
+    try:
+        if model not in env:
+            return url
+        fields = env[model]._fields
+    except Exception:
+        return url
+    base = sized.group('base')
+    best_size = int(sized.group('size'))
+    best_name = found.group('field')
+    for name, field in fields.items():
+        other = _SIZED_IMAGE_FIELD_RE.match(name)
+        if not other or other.group('base') != base:
+            continue
+        if getattr(field, 'type', None) != 'binary':
+            continue
+        size = int(other.group('size'))
+        if size > best_size:
+            best_size = size
+            best_name = name
+    if best_name == found.group('field'):
+        return url
+    return '%s%s/%s/%s%s%s' % (
+        found.group('head'), model, found.group('rid'), best_name,
+        found.group('tail') or '', found.group('query') or '',
+    )
+
+
+def _is_image_ref(val):
+    """True when the cell value itself is a picture, whatever the column is called.
+
+    Odoo path ``/web/image/…``, a ``data:image`` URI, raw base64 of an image,
+    or an http(s) URL whose path ends in an image file extension.
+    """
+    if not isinstance(val, str):
+        return False
+    s = val.strip()
+    s = s[2:-1] if s.startswith(("b'", 'b"')) else s
+    low = s.lower()
+    if s.startswith(('/web/image/', '/web/image?')) or low.startswith('data:image/'):
+        return True
+    if low.startswith(('http://', 'https://')):
+        return bool(_IMG_PATH_EXT_RE.search(urlparse(s).path or ''))
+    return _is_b64_image(s)
+
+
+def _column_is_image(items, key):
+    """True when every filled cell of *key* (sampled) is a picture."""
+    seen = 0
+    for item in items[:25]:
+        if not isinstance(item, dict):
+            continue
+        val = item.get(key)
+        if val is None or val is False or val == '':
+            continue
+        if _is_map_thumb(val):
+            seen += 1
+            continue
+        if not _is_image_ref(_flatten_cell_value(val)):
+            return False
+        seen += 1
+    return seen > 0
 
 
 def _has_image_columns(items):
     """True si la lista tabular incluye columnas de imagen (fotos, logos, avatares)."""
     if not items or not isinstance(items[0], dict):
         return False
-    for key in items[0]:
-        if str(key).startswith('_'):
-            continue
-        key_l = str(key).lower()
-        if any(h in key_l for h in _IMG_KEY_HINTS):
-            return True
-        # Celdas ``__map_thumb__`` aunque el nombre de columna no tenga hint.
-        for it in items[:5]:
-            if isinstance(it, dict) and _is_map_thumb(it.get(key)):
-                return True
-    return False
+    return any(
+        _column_is_image(items, key)
+        for key in items[0]
+        if not str(key).startswith('_')
+    )
 
 
 def _is_homogeneous_table(items):
@@ -229,12 +310,16 @@ def format_amount(
     return u'%s%s' % (symbol, text)
 
 
+def _is_iso_date(val):
+    return bool(_ISO_DATE_RE.match(str(val).strip())) if val else False
+
+
 def _fmt_date(val, date_format):
     if not val:
         return ''
     try:
         import datetime
-        s = str(val)
+        s = str(val).strip().replace('T', ' ', 1)
         if len(s) >= 19:
             return datetime.datetime.strptime(s[:19], '%Y-%m-%d %H:%M:%S').strftime(date_format)
         if len(s) >= 10:
@@ -311,6 +396,7 @@ def render_context_from_env(env, result=None, user_message=None):
         'show_mode': show_mode,
         'chart_engine': chart_engine,
         'dual_axis': dual_axis,
+        'env': env,
     }
 
 
@@ -386,6 +472,16 @@ def _column_is_numeric(items, key):
     return seen > 0 and numeric >= max(1, int(seen * 0.8))
 
 
+def _column_has_decimals(items, key):
+    """True if a sampled cell is a decimal number (float or ``12,50``): 2 decimals for all."""
+    for item in items[:25]:
+        if isinstance(item, dict):
+            parsed = _parse_numeric(item.get(key))
+            if parsed is not None and parsed[1]:
+                return True
+    return False
+
+
 def _normalize_col_key(key):
     return str(key).lower().replace(' ', '_').replace('-', '_')
 
@@ -419,8 +515,7 @@ def _column_is_textual(items, key):
     """Columna con texto legible (no numérica, no bool, no imagen)."""
     if _column_is_numeric(items, key) or _column_is_boolean(items, key):
         return False
-    key_l = _normalize_col_key(key)
-    if any(h in key_l for h in _IMG_KEY_HINTS):
+    if _column_is_image(items, key):
         return False
     for item in items[:25]:
         if not isinstance(item, dict):
@@ -473,6 +568,16 @@ def _column_text_cardinality(items, key):
     return len(set(seen)) / float(len(seen))
 
 
+def _column_is_chip_styled(items, key):
+    """True when ``_style_<key>`` paints an inline chip (not a label to link)."""
+    for item in items[:25]:
+        if not isinstance(item, dict):
+            continue
+        if _style_is_inline_chip(item.get('_style_' + str(key))):
+            return True
+    return False
+
+
 def _select_name_link_keys(keys, items, numeric_keys):
     """Elige UNA columna cuyo valor enlaza al registro (sin hardcode de dominio).
 
@@ -483,15 +588,23 @@ def _select_name_link_keys(keys, items, numeric_keys):
        repetidos). Empate → orden de fila.
     3) Columna ``id`` (vale enlazar el id; mejor que un widget).
     4) Primera columna con algún valor mostrable.
+    A chip (``display:inline-block`` in ``_style_*``) is a badge, not the
+    record label — skip it so the description/name keeps the link.
     """
     by_norm = {_normalize_col_key(k): k for k in keys}
     for preferred in ('display_name', 'name'):
         key = by_norm.get(preferred)
-        if key is not None and _column_is_textual(items, key):
+        if (
+            key is not None
+            and _column_is_textual(items, key)
+            and not _column_is_chip_styled(items, key)
+        ):
             return {key}
     textual = []
     for key in keys:
         if key in numeric_keys or _is_technical_link_key(key):
+            continue
+        if _column_is_chip_styled(items, key):
             continue
         if _column_is_textual(items, key):
             textual.append(key)
@@ -506,6 +619,8 @@ def _select_name_link_keys(keys, items, numeric_keys):
     if id_key is not None:
         return {id_key}
     for key in keys:
+        if _column_is_chip_styled(items, key):
+            continue
         if _column_has_display_value(items, key):
             return {key}
     return set()
@@ -571,16 +686,20 @@ def _record_form_url(item):
     )
 
 
-def _name_cell_link_html(item, text):
+def _name_cell_link_html(item, text, inherit_color=False):
     """Enlace en el texto de nombre/descripción → formulario del registro."""
     url = _record_form_url(item)
     if not url or text is None or text == '':
         return ''
+    if inherit_color:
+        link_style = 'color:inherit;text-decoration:none;'
+    else:
+        link_style = 'color:#0d6efd;text-decoration:underline;'
     return (
         '<a href="%s" target="_blank" rel="noopener" '
         'class="o_chatboo_namelink" title="Abrir registro" '
-        'style="color:#0d6efd;text-decoration:underline;">%s</a>'
-    ) % (url, html.escape(str(text)))
+        'style="%s">%s</a>'
+    ) % (url, link_style, html.escape(str(text)))
 
 
 def _is_blank_cell(val):
@@ -611,7 +730,7 @@ def _map_thumb_title(val):
 
 def _render_map_thumb_cell(val):
     """Celda ``__map_thumb__``: miniatura PNG clicable (+ badge) o enlace texto."""
-    href = (val.get('href') or '').strip()
+    href = _safe_card_href(val.get('href'))
     alt = html.escape(str(val.get('alt') or 'mapa'), quote=True)
     png = (val.get('png_b64') or '').strip()
     prov = (val.get('provider') or 'osm').lower()
@@ -669,7 +788,7 @@ def _render_coords_cell(val):
     if not text:
         return '<span class="text-muted small">—</span>'
     copy = (val.get('copy') or text).strip()
-    href = (val.get('href') or '').strip()
+    href = _safe_card_href(val.get('href'))
     if not href and val.get('lat') is not None:
         try:
             lat_f = float(val['lat'])
@@ -827,7 +946,9 @@ def _table_display_keys(items, hide=None):
     hide = set(hide or ())
     keys = [
         k for k in items[0].keys()
-        if not str(k).startswith('_') and k not in hide
+        if not str(k).startswith('_')
+        and k not in hide
+        and str(k) not in ('id', '__model')
     ]
     kept = []
     for key in keys:
@@ -847,7 +968,6 @@ def _render_cell(key, val, ctx, numeric_column=False, item=None):
     if _is_coords_cell(val):
         return _render_coords_cell(val)
     val = _flatten_cell_value(val)
-    key_l = str(key).lower()
     d_sep = ctx.get('pk_decimal_sep', ',')
     t_sep = ctx.get('pk_thousands_sep', '.')
     name_links_on = True if not isinstance(ctx, dict) else ctx.get('name_links', True)
@@ -858,23 +978,28 @@ def _render_cell(key, val, ctx, numeric_column=False, item=None):
         and link_keys
         and key in link_keys
         and bool(_record_form_url(item))
+        and not _style_is_inline_chip(
+            item.get('_style_' + str(key)) if item else None,
+        )
     )
+
+    inherit_color = False
+    if item is not None:
+        _st = item.get('_style_' + str(key))
+        if _st and 'color:' in str(_st):
+            inherit_color = True
 
     def _as_record_link(text):
         if not want_record_link or text is None or text == '':
             return None
-        return _name_cell_link_html(item, text)
+        return _name_cell_link_html(item, text, inherit_color=inherit_color)
 
     # Enteros sin decimales (ids, contadores); floats con 2 (importes). bool va a texto.
     parsed = _parse_numeric(val)
-    money_col = any(h in key_l for h in _MONEY_HINTS)
-    if parsed is not None and (
-        numeric_column
-        or isinstance(val, (int, float))
-        or money_col
-    ):
+    decimal_col = key in (ctx.get('decimal_keys') or ())
+    if parsed is not None and (numeric_column or isinstance(val, (int, float))):
         number, is_float = parsed
-        if money_col or is_float or isinstance(val, float):
+        if decimal_col or is_float or isinstance(val, float):
             decimals = 2
         else:
             decimals = 0
@@ -883,7 +1008,7 @@ def _render_cell(key, val, ctx, numeric_column=False, item=None):
         if linked is not None:
             return linked
         return html.escape(formatted)
-    if 'date' in key_l or 'fecha' in key_l:
+    if _is_iso_date(val):
         formatted = _fmt_date(val, ctx.get('pk_date_format', '%d/%m/%Y'))
         linked = _as_record_link(formatted)
         if linked is not None:
@@ -894,31 +1019,40 @@ def _render_cell(key, val, ctx, numeric_column=False, item=None):
     if len(clean) > 64:
         for prefix, mime in _B64_IMG_PREFIXES:
             if clean.startswith(prefix):
-                return '<img src="data:image/%s;base64,%s" style="%s">' % (mime, clean, _IMG_STYLE)
-    if any(hint in key_l for hint in _IMG_KEY_HINTS):
-        if not val:
-            return '<span class="text-muted small">Sin imagen</span>'
-        if clean.startswith('/web/image/'):
-            if re.search(r'/image_\d+$', clean):
-                full_url = re.sub(r'image_\d+$', 'image_1920', clean)
-            else:
-                full_url = clean
-            return (
-                '<a href="%s" target="_blank" rel="noopener" title="Ver imagen completa">'
-                '<img src="%s" style="%s">'
-                '</a>'
-            ) % (html.escape(full_url, quote=True), html.escape(clean, quote=True), _IMG_STYLE)
-        if clean.startswith('http') or clean.startswith('/'):
-            return (
-                '<a href="%s" target="_blank" rel="noopener" title="Ver imagen completa">'
-                '<img src="%s" style="%s">'
-                '</a>'
-            ) % (html.escape(clean, quote=True), html.escape(clean, quote=True), _IMG_STYLE)
-        return '<span class="text-muted small">Formato desconocido</span>'
+                return '<img src="data:image/%s;base64,%s" style="%s">' % (
+                    mime, html.escape(clean, quote=True), _IMG_STYLE,
+                )
+    if _is_image_ref(clean):
+        env = ctx.get('env') if isinstance(ctx, dict) else None
+        full_url = _largest_image_url(clean, env)
+        return (
+            '<a href="%s" target="_blank" rel="noopener">'
+            '<img src="%s" style="%s">'
+            '</a>'
+        ) % (html.escape(full_url, quote=True), html.escape(clean, quote=True), _IMG_STYLE)
     linked = _as_record_link(clean)
     if linked is not None:
         return linked
     return html.escape(val_str)
+
+
+def _style_is_inline_chip(style):
+    """``display:inline-block`` in ``_style_*`` → chip inside the cell, not a painted td."""
+    return 'inline-block' in str(style or '')
+
+
+def _cell_sort_atom(val, numeric_column=False):
+    """Raw value for ``data-chatboo-sort`` (number string or plain text)."""
+    flat = _flatten_cell_value(val)
+    parsed = _parse_numeric(flat)
+    if parsed is not None and (
+        numeric_column
+        or isinstance(flat, (int, float)) and not isinstance(flat, bool)
+    ):
+        return str(parsed[0])
+    if flat in (None, ''):
+        return ''
+    return str(flat)
 
 
 def _render_table(items, ctx, caption=None, section_title=None, title_bg=None):
@@ -948,6 +1082,7 @@ def _render_table(items, ctx, caption=None, section_title=None, title_bg=None):
     if isinstance(ctx, dict):
         ctx = dict(ctx)
         ctx['name_link_keys'] = name_link_keys
+        ctx['decimal_keys'] = {k for k in numeric_keys if _column_has_decimals(items, k)}
     parts = [
         '<table class="table table-bordered table-sm o_chatboo_data_table'
         '%s" style="width:100%%;margin:0;">'
@@ -968,75 +1103,106 @@ def _render_table(items, ctx, caption=None, section_title=None, title_bg=None):
             % (n, html.escape(safe_bg, quote=True), section_title)
         )
     parts.append('<tr>')
-    for key in keys:
-        th_class = 'o_chatboo_num text-end' if key in numeric_keys else ''
-        cls_attr = (' class="%s"' % th_class) if th_class else ''
+    for idx, key in enumerate(keys):
+        classes = ['o_chatboo_th_sort']
+        if key in numeric_keys:
+            classes.extend(['o_chatboo_num', 'text-end'])
         parts.append(
-            '<th%s>%s</th>' % (
-                cls_attr,
+            '<th class="%s" data-chatboo-sort-col="%d" aria-sort="none">%s</th>'
+            % (
+                html.escape(' '.join(classes), quote=True),
+                idx,
                 html.escape(str(key).replace('_', ' ').title()),
             )
         )
-    parts.append('</tr></thead><tbody>')
-    for item in items:
-        tr_attrs = ''
-        row_class = item.get('_row_class')
-        row_color = item.get('_row_color')
-        if row_class:
-            tr_attrs += ' class="%s"' % html.escape(str(row_class), quote=True)
-        if row_color:
-            tr_attrs += ' style="background-color:%s;"' % html.escape(str(row_color), quote=True)
-        parts.append('<tr%s>' % tr_attrs)
-        for key in keys:
-            val = item.get(key, '')
-            is_num = key in numeric_keys
-            classes = []
-            if is_num:
-                classes.append('o_chatboo_num')
-                classes.append('text-end')
-            cell_class = item.get('_class_' + str(key))
-            if cell_class:
-                classes.append(str(cell_class))
-            td_attrs = ''
-            if classes:
-                td_attrs += ' class="%s"' % html.escape(' '.join(classes), quote=True)
-            style = ''
-            cell_color = item.get('_color_' + str(key))
-            if cell_color:
-                style += 'color:%s;' % cell_color
-            cell_style = item.get('_style_' + str(key))
-            if cell_style:
-                style += str(cell_style)
-            if style:
-                td_attrs += ' style="%s"' % html.escape(style, quote=True)
-            # Styled Chatboo tip via data-tip (native title is not themeable).
-            cell_title = item.get('_title_' + str(key))
-            if cell_title not in (None, False, ''):
-                tip = html.escape(str(cell_title), quote=True)
-                if ' class="' in td_attrs:
-                    td_attrs = td_attrs.replace(
-                        ' class="', ' class="o_chatboo_tiptarget ', 1,
-                    )
-                else:
-                    td_attrs += ' class="o_chatboo_tiptarget"'
-                td_attrs += ' data-tip="%s"' % tip
-            parts.append(
-                '<td%s>%s</td>' % (
-                    td_attrs,
-                    _render_cell(
-                        key, val, ctx, numeric_column=is_num, item=item,
-                    ),
+    parts.append('</tr></thead>')
+
+    def _emit_rows(row_items):
+        bits = []
+        for item in row_items:
+            tr_attrs = ''
+            row_class = item.get('_row_class')
+            row_color = item.get('_row_color')
+            if row_class:
+                tr_attrs += ' class="%s"' % html.escape(
+                    str(row_class), quote=True,
                 )
-            )
-        parts.append('</tr>')
-    parts.append('</tbody></table>')
+            if row_color:
+                tr_attrs += ' style="background-color:%s;"' % html.escape(
+                    str(row_color), quote=True,
+                )
+            bits.append('<tr%s>' % tr_attrs)
+            for key in keys:
+                val = item.get(key, '')
+                is_num = key in numeric_keys
+                classes = []
+                if is_num:
+                    classes.append('o_chatboo_num')
+                    classes.append('text-end')
+                cell_class = item.get('_class_' + str(key))
+                if cell_class:
+                    classes.append(str(cell_class))
+                td_attrs = ''
+                if classes:
+                    td_attrs += ' class="%s"' % html.escape(
+                        ' '.join(classes), quote=True,
+                    )
+                style = ''
+                cell_color = item.get('_color_' + str(key))
+                if cell_color:
+                    style += 'color:%s;' % cell_color
+                cell_style = item.get('_style_' + str(key))
+                inner_style = ''
+                if cell_style:
+                    if _style_is_inline_chip(cell_style):
+                        inner_style = str(cell_style)
+                    else:
+                        style += str(cell_style)
+                if style:
+                    td_attrs += ' style="%s"' % html.escape(style, quote=True)
+                sort_v = _cell_sort_atom(val, numeric_column=is_num)
+                if sort_v != '':
+                    td_attrs += ' data-chatboo-sort="%s"' % html.escape(
+                        sort_v, quote=True,
+                    )
+                cell_title = item.get('_title_' + str(key))
+                if cell_title not in (None, False, ''):
+                    tip = html.escape(str(cell_title), quote=True)
+                    if ' class="' in td_attrs:
+                        td_attrs = td_attrs.replace(
+                            ' class="', ' class="o_chatboo_tiptarget ', 1,
+                        )
+                    else:
+                        td_attrs += ' class="o_chatboo_tiptarget"'
+                    td_attrs += ' data-tip="%s"' % tip
+                cell_html = _render_cell(
+                    key, val, ctx, numeric_column=is_num, item=item,
+                )
+                if inner_style:
+                    cell_html = '<span style="%s">%s</span>' % (
+                        html.escape(inner_style, quote=True),
+                        cell_html,
+                    )
+                bits.append('<td%s>%s</td>' % (td_attrs, cell_html))
+            bits.append('</tr>')
+        return bits
+
+    body_items = []
+    foot_items = []
+    for item in items:
+        if isinstance(item, dict) and item.get('_tfoot'):
+            foot_items.append(item)
+        else:
+            body_items.append(item)
+    parts.append('<tbody>')
+    parts.extend(_emit_rows(body_items))
+    parts.append('</tbody>')
+    if foot_items:
+        parts.append('<tfoot>')
+        parts.extend(_emit_rows(foot_items))
+        parts.append('</tfoot>')
+    parts.append('</table>')
     return ''.join(parts)
-
-
-def _is_image_key(key):
-    """True si el nombre de columna sugiere imagen (no embeber en dataset de gráfico)."""
-    key_l = str(key).lower()
-    return any(h in key_l for h in _IMG_KEY_HINTS)
 
 
 def _json_safe_cell(val):
@@ -1082,7 +1248,7 @@ def _chart_dataset_rows(items):
         k for k in items[0].keys()
         if not str(k).startswith('_')
         and str(k) not in skip
-        and not _is_image_key(k)
+        and not _column_is_image(items, k)
     ]
     if not keys:
         return []
@@ -1095,6 +1261,8 @@ def _chart_dataset_rows(items):
             safe = _json_safe_cell(item.get(key))
             if safe is not None:
                 row[str(key)] = safe
+        if item.get('_tfoot'):
+            row['_tfoot'] = True
         if row:
             rows.append(row)
     return rows
@@ -1257,6 +1425,9 @@ def _map_banner_pin_count(result, cell=None):
 
 def _map_banner_card_html(href, label, pin_count=0, provider='osm'):
     """Tarjeta clicable con aspecto de mapa (CSS + SVG), no solo enlace texto."""
+    href = _safe_card_href(href)
+    if not href:
+        return ''
     safe_href = html.escape(href, quote=True)
     safe_label = html.escape(label)
     n = int(pin_count or 0)
@@ -1979,14 +2150,6 @@ SUBTLE_ZEBRA_COLORS = (
     '#eef1f5',  # soft grey-blue
 )
 
-# Columnas de etiqueta en fichas KPI (forma estructural, no dominio).
-_LABEL_COL_HINTS = (
-    'indicador', 'indicator', 'metric', 'concepto', 'concept', 'kpi',
-    'label', 'nombre', 'name', 'descripcion', 'description',
-    'serie', 'series',
-)
-
-
 def apply_subtle_zebra_coloring(items):
     """Two-tone grey zebra; overwrites existing `_row_color`."""
     if not items:
@@ -2054,14 +2217,12 @@ def _has_explicit_row_colors(items):
     return False
 
 
-def _is_label_column_key(key):
-    kl = str(key).lower()
-    return any(h in kl for h in _LABEL_COL_HINTS)
-
-
-def _is_money_column_key(key):
-    kl = str(key).lower()
-    return any(h in kl for h in _MONEY_HINTS)
+def _rows_are_records(items):
+    """Every row is an Odoo record (``__model`` + id): peers of one model."""
+    return bool(items) and all(
+        isinstance(it, dict) and it.get('__model') and _row_record_id(it)
+        for it in items
+    )
 
 
 def _numeric_column_keys(items):
@@ -2077,9 +2238,9 @@ def _numeric_column_keys(items):
 
 
 def _is_kpi_card_shape(items):
-    """True for 2-col label+value cards where the value is not a money ranking.
+    """True for 2-col label+value tables (a KPI card or a ranking: same shape).
 
-    Structural shape only (column roles), not domain-specific skill names.
+    Structural shape only (column roles), never the column names.
     """
     if not items or not isinstance(items[0], dict):
         return False
@@ -2097,14 +2258,9 @@ def _is_kpi_card_shape(items):
         )
         if n_num >= max(2, len(items) * 0.6):
             value_keys.append(key)
-        elif n_str >= max(2, len(items) * 0.5) or _is_label_column_key(key):
+        elif n_str >= max(2, len(items) * 0.5):
             label_keys.append(key)
-    if len(label_keys) != 1 or len(value_keys) != 1:
-        return False
-    # Money-named value column can still be a sorted ranking of peers.
-    if _is_money_column_key(value_keys[0]):
-        return False
-    return True
+    return len(label_keys) == 1 and len(value_keys) == 1
 
 
 def _tint_section_rows(items, result=None, render_context=None, group_opts=None):
@@ -2127,7 +2283,7 @@ def _tint_section_rows(items, result=None, render_context=None, group_opts=None)
             return
         if mode == 'quartile':
             if not _has_explicit_row_colors(items):
-                apply_quartile_coloring(items)
+                apply_quartile_coloring(items, asked=True)
                 if not _has_explicit_row_colors(items):
                     apply_subtle_zebra_coloring(items)
             return
@@ -2167,28 +2323,28 @@ def _quantile(sorted_vals, q):
     return sorted_vals[lo] * (1 - frac) + sorted_vals[hi] * frac
 
 
-def _detect_metric_key(items):
-    """Columna numérica de un ranking comparable, o None.
-
-    Prioriza hints monetarios. Sin hint: solo si hay una única columna
-    numérica, es monótona y la tabla no es ficha KPI etiqueta+valor.
-    """
+def _sorted_metric_key(items):
+    """The only non-technical numeric column, when it is sorted; else None."""
     if not items or not isinstance(items[0], dict) or len(items) < 5:
         return None
-    numeric = _numeric_column_keys(items)
-    if not numeric:
+    numeric = [k for k in _numeric_column_keys(items) if not _is_technical_link_key(k)]
+    if len(numeric) != 1:
         return None
-    money = [k for k in numeric if _is_money_column_key(k)]
-    for key in money:
-        seq = [it.get(key) for it in items if _is_number(it.get(key))]
-        if len(seq) >= 5 and _monotonic(seq):
-            return key
-    if len(numeric) == 1 and not _is_kpi_card_shape(items):
-        key = numeric[0]
-        seq = [it.get(key) for it in items if _is_number(it.get(key))]
-        if len(seq) >= 5 and _monotonic(seq):
-            return key
-    return None
+    key = numeric[0]
+    seq = [it.get(key) for it in items if _is_number(it.get(key))]
+    return key if len(seq) >= 5 and _monotonic(seq) else None
+
+
+def _detect_metric_key(items):
+    """Metric of a peer ranking, only when the shape leaves no doubt.
+
+    A 2-col label+value table can be a KPI card or a ranking; only record rows
+    (one model) settle it. Otherwise the author asks with ``__row_tint__``.
+    """
+    key = _sorted_metric_key(items)
+    if key and _is_kpi_card_shape(items) and not _rows_are_records(items):
+        return None
+    return key
 
 
 def _is_comparable_series(items):
@@ -2200,14 +2356,15 @@ def _is_comparable_series(items):
     return _detect_metric_key(items) is not None
 
 
-def apply_quartile_coloring(items):
+def apply_quartile_coloring(items, asked=False):
     """Inyecta _row_color por terciles sobre la columna métrica ordenada.
-    Respeta colores explícitos ya presentes (no pisa lo que pida el usuario)."""
+    Respeta colores explícitos ya presentes (no pisa lo que pida el usuario).
+    ``asked``: the author asked for tiers, so a label+value table qualifies."""
     if not items or len(items) < 5:
         return
     if _has_explicit_row_colors(items):
         return
-    key = _detect_metric_key(items)
+    key = _sorted_metric_key(items) if asked else _detect_metric_key(items)
     if not key:
         return
     vals = sorted(v for v in (it.get(key) for it in items) if _is_number(v))
@@ -2547,18 +2704,18 @@ def maybe_attach_formatted_text(result, summary='', render_context=None, force=F
     return True
 
 
-def _image_link_href(url):
+def _image_link_href(url, env=None):
     """URL para abrir imagen en pestaña nueva. None si no es abrible (p. ej. data:)."""
     if not url or url.startswith('data:'):
         return None
-    if url.startswith('/web/image/') and re.search(r'/image_\d+$', url):
-        return re.sub(r'image_\d+$', 'image_1920', url)
+    if url.startswith('/web/image/'):
+        return _largest_image_url(url, env)
     if url.startswith('http') or url.startswith('/'):
         return url
     return None
 
 
-def wrap_bare_images_clickable(html_content):
+def wrap_bare_images_clickable(html_content, env=None):
     """Envuelve <img> sueltas en enlaces target=_blank. Omite data: URI y imgs ya enlazadas."""
     if not html_content or '<img' not in html_content:
         return html_content
@@ -2570,7 +2727,7 @@ def wrap_bare_images_clickable(html_content):
         src_match = re.search(r'src=["\']([^"\']+)["\']', img_tag)
         if not src_match:
             return img_tag
-        href = _image_link_href(src_match.group(1))
+        href = _image_link_href(src_match.group(1), env)
         if not href:
             return img_tag
         return (

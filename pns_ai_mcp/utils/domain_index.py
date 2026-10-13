@@ -15,6 +15,7 @@ domain pack body, short ``api_call`` hint, or (phase 2) whitelist hint.
 """
 from __future__ import annotations
 
+import json
 import logging
 import re
 import time
@@ -210,13 +211,161 @@ def match_domains(
     }
 
 
-def format_inject_header(codes: Sequence[str], elapsed_ms: float) -> str:
+def parse_domain_codes(raw: Any) -> List[str]:
+    """Normalize a stored or inbound list of domain pack codes."""
+    if not raw:
+        return []
+    if isinstance(raw, dict):
+        return [str(c).strip() for c in raw if str(c).strip()]
+    if isinstance(raw, (list, tuple)):
+        return [str(c).strip() for c in raw if str(c).strip()]
+    text = str(raw).strip()
+    if not text:
+        return []
+    if text[0] in '[{':
+        try:
+            parsed = json.loads(text)
+        except (TypeError, ValueError):
+            parsed = None
+        if isinstance(parsed, dict):
+            return [str(c).strip() for c in parsed if str(c).strip()]
+        if isinstance(parsed, list):
+            return [str(c).strip() for c in parsed if str(c).strip()]
+    return [c.strip() for c in text.split(',') if c.strip()]
+
+
+def parse_domain_ages(raw: Any) -> Dict[str, int]:
+    """``{code: n}`` — turns a pack has been on the table. List → all ``1``."""
+    if not raw:
+        return {}
+    if isinstance(raw, dict):
+        out: Dict[str, int] = {}
+        for key, val in raw.items():
+            code = str(key).strip()
+            if not code:
+                continue
+            try:
+                n = int(val)
+            except (TypeError, ValueError):
+                n = 1
+            out[code] = n if n >= 1 else 1
+        return out
+    if isinstance(raw, str):
+        text = raw.strip()
+        if text.startswith('{'):
+            try:
+                parsed = json.loads(text)
+            except (TypeError, ValueError):
+                parsed = None
+            if isinstance(parsed, dict):
+                return parse_domain_ages(parsed)
+    return {code: 1 for code in parse_domain_codes(raw)}
+
+
+def age_domain_codes(
+    codes: Sequence[str],
+    matched: Sequence[str],
+    prior_ages: Optional[Any] = None,
+) -> Dict[str, int]:
+    """Rematch → ``1``. Only carried → previous ``n`` + 1. Does not drop."""
+    matched_set = set(parse_domain_codes(matched))
+    prior = parse_domain_ages(prior_ages)
+    ages: Dict[str, int] = {}
+    for code in parse_domain_codes(codes):
+        if code in matched_set:
+            ages[code] = 1
+        else:
+            ages[code] = int(prior.get(code) or 1) + 1
+    return ages
+
+
+def format_codes_with_age(
+    ages: Optional[Dict[str, int]],
+    codes: Optional[Sequence[str]] = None,
+) -> str:
+    """``invoice_concepts (1), custom_occ_crm_team (2)``."""
+    order = parse_domain_codes(codes if codes is not None else list(ages or []))
+    parts = []
+    age_map = parse_domain_ages(ages)
+    for code in order:
+        parts.append('%s (%s)' % (code, age_map.get(code, 1)))
+    return ', '.join(parts)
+
+
+def skill_domain_context_codes(
+    skill_codes: Optional[Sequence[str]],
+    indexed_targets: Optional[Any] = None,
+) -> List[str]:
+    """Skill context codes that discovery can inject. No handwritten list.
+
+    ``indexed_targets`` is the live domain-index set (entry codes +
+    soft_depends). Core / always-on contexts on the skill are dropped.
+    """
+    if isinstance(indexed_targets, set):
+        allowed = {str(c).strip() for c in indexed_targets if str(c).strip()}
+    else:
+        allowed = set(parse_domain_codes(indexed_targets))
+    out: List[str] = []
+    for code in parse_domain_codes(skill_codes):
+        if code in allowed and code not in out:
+            out.append(code)
+    return out
+
+
+def union_domain_codes(
+    matched: Sequence[str],
+    carried: Sequence[str],
+) -> Dict[str, Any]:
+    """Union this-turn hits with packs carried from the previous turn.
+
+    Matched codes stay first. Carried codes that are already matched are
+    not listed again under ``carried``. Never replaces a previous pack
+    just because this sentence hit another domain (follow-up ``ytd``).
+    """
+    matched_codes = parse_domain_codes(matched)
+    carried_only: List[str] = []
+    seen = set(matched_codes)
+    for code in parse_domain_codes(carried):
+        if code in seen:
+            continue
+        seen.add(code)
+        carried_only.append(code)
+    codes = list(matched_codes) + carried_only
+    if matched_codes and carried_only:
+        mode = 'union'
+    elif matched_codes:
+        mode = 'injected'
+    elif carried_only:
+        mode = 'sticky'
+    else:
+        mode = 'none'
+    return {
+        'codes': codes,
+        'matched': matched_codes,
+        'carried': carried_only,
+        'mode': mode,
+    }
+
+
+def format_inject_header(
+    codes: Sequence[str],
+    elapsed_ms: float,
+    carried: Optional[Sequence[str]] = None,
+) -> str:
     """Section header before turn-scoped domain bodies."""
     if not codes:
         return ''
+    carried_codes = [
+        str(c).strip()
+        for c in (carried or [])
+        if str(c).strip() and str(c).strip() in set(codes)
+    ]
+    extra = ''
+    if carried_codes:
+        extra = ' previous_turn=%s' % ','.join(carried_codes)
     return (
-        '\n\n---\n[DOMAIN_PACKS codes=%s elapsed_ms=%.2f]\n'
-        % (','.join(codes), float(elapsed_ms or 0.0))
+        '\n\n---\n[DOMAIN_PACKS codes=%s%s elapsed_ms=%.2f]\n'
+        % (','.join(codes), extra, float(elapsed_ms or 0.0))
     )
 
 
@@ -348,8 +497,10 @@ def build_detection_triggers_prompt(
         'Locale: %s.\n'
         'Rules: do NOT invent a different server code; do NOT copy secrets, '
         'tokens, URLs or header names; prefer spoken vocabulary for this '
-        'locale; keep items short; if nothing useful beyond the already-'
-        'extracted tokens, return {"triggers": []}. Reply with JSON only.'
+        'locale; keep items short; do NOT add payroll, salary, wage, invoice, '
+        'or map words — only tasks the usage guide describes; if the guide is '
+        'empty or nothing useful remains beyond the already-extracted tokens, '
+        'return {"triggers": []}. Reply with JSON only.'
         % (locale or 'neutral')
     )
     user = (
@@ -360,3 +511,117 @@ def build_detection_triggers_prompt(
         % (code or '', name or code or '', guide or '—', already_txt)
     )
     return system, user
+
+
+# Decision-model Choice (closed pack list). Not a chat completion.
+NONE_PACK_CHOICE = 'none'
+CHOICE_CARDINALITY = 255
+PACK_CHOICE_INSTRUCTIONS = (
+    'Which domain pack does this message ask for? '
+    'Pick none if it does not ask for any of these packs.'
+)
+NONE_PACK_TEXT = 'The message does not ask about any of these packs.'
+
+
+def sentence_has_unique_winner(matches: Sequence[Dict[str, Any]]) -> bool:
+    """True when the top word-list score belongs to exactly one row."""
+    ranked = list(matches or [])
+    if not ranked:
+        return False
+    top = ranked[0].get('score')
+    tied = [row for row in ranked if row.get('score') == top]
+    return len(tied) == 1
+
+
+def build_pack_choice_criteria(
+    entries: Sequence[Dict[str, Any]],
+    descriptions: Optional[Dict[str, str]] = None,
+) -> Optional[Dict[str, str]]:
+    """Option map for one Choice. ``None`` when the live index exceeds 254 packs.
+
+    Keys are discovery targets. Text is the target context description, or
+    the code when that description is empty. ``none`` is always last.
+    """
+    labels = descriptions or {}
+    criteria: Dict[str, str] = {}
+    for entry in entries or []:
+        code = str(entry.get('code') or '').strip()
+        if not code or code == NONE_PACK_CHOICE or code in criteria:
+            continue
+        text = str(labels.get(code) or '').strip() or code
+        if len(criteria) >= CHOICE_CARDINALITY - 1:
+            return None
+        criteria[code] = text
+    if not criteria:
+        return None
+    criteria[NONE_PACK_CHOICE] = NONE_PACK_TEXT
+    return criteria
+
+
+def accept_pack_choice(
+    answer: Optional[Dict[str, Any]],
+    criteria: Optional[Dict[str, str]],
+    min_confidence: Any,
+) -> Optional[str]:
+    """Pack code to inject, or ``None`` when the Choice must be ignored."""
+    if not answer or not criteria:
+        return None
+    choice = str(answer.get('choice') or '').strip()
+    if not choice or choice == NONE_PACK_CHOICE or choice not in criteria:
+        return None
+    try:
+        confidence = float(answer.get('confidence'))
+    except (TypeError, ValueError):
+        return None
+    try:
+        floor = float(min_confidence)
+    except (TypeError, ValueError):
+        floor = 0.7
+    if confidence < floor:
+        return None
+    return choice
+
+
+def codes_for_pack_choice(
+    entries: Sequence[Dict[str, Any]],
+    code: str,
+) -> List[str]:
+    """Chosen target plus its ``soft_depends``."""
+    want = (code or '').strip()
+    if not want:
+        return []
+    for entry in entries or []:
+        if str(entry.get('code') or '').strip() != want:
+            continue
+        out = [want]
+        for dep in entry.get('soft_depends') or []:
+            dep_c = str(dep).strip()
+            if dep_c and dep_c not in out:
+                out.append(dep_c)
+        return out
+    return []
+
+
+def discovery_step_summary(
+    route: str,
+    domain_part: str,
+    elapsed_ms: float,
+    *,
+    choice: Optional[str] = None,
+    confidence: Any = None,
+    declined: bool = False,
+) -> str:
+    """Visible Historial IA line for the discovery step."""
+    if route == 'decision' and not declined:
+        conf = ''
+        if confidence is not None:
+            try:
+                conf = ' confidence=%.2f' % float(confidence)
+            except (TypeError, ValueError):
+                conf = ''
+        head = 'decision · choice=%s%s' % (choice or '', conf)
+    elif route == 'decision' and declined:
+        head = 'decision · declined'
+    else:
+        head = 'words'
+    return '%s · %s · %.2f ms' % (head, domain_part, float(elapsed_ms or 0.0))

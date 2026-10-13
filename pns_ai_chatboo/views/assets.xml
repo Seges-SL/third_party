@@ -6,16 +6,19 @@
             <link rel="stylesheet" type="text/css" href="/pns_ai_chatboo/static/src/css/chatboo_floating.css"/>
             <link rel="stylesheet" type="text/css" href="/pns_ai_chatboo/static/src/css/chatboo_dashboard.css"/>
             <link rel="stylesheet" type="text/css" href="/pns_ai_chatboo/static/src/css/chatboo_systray.css"/>
+            <link rel="stylesheet" type="text/css" href="/pns_ai_chatboo/static/src/css/chatboo_row_marks.css"/>
+            <link rel="stylesheet" type="text/css" href="/pns_ai_chatboo/static/src/css/chatboo_pdf_viewer.css"/>
             <!-- Protocolo SSE compartido (common/) — replace/body/footer -->
             <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_sse.js"/>
             <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_screen_context.js"/>
             <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_choice_list.js"/>
-            <!-- Librerías vendor: Markdown (showdown), PDF (jsPDF), Excel (SheetJS). -->
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_row_marks.js"/>
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_pdf_viewer.js"/>
+            <!-- Librerías vendor: Markdown (showdown), PDF (jsPDF). -->
             <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/showdown.js"/>
             <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/jspdf.umd.min.js"/>
             <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/jspdf.plugin.autotable.min.js"/>
             <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/html2canvas.min.js"/>
-            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/xlsx.full.min.js"/>
             <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chart.umd.min.js"/>
             <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/echarts.min.js"/>
             <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_dashboard.js"/>

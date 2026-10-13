@@ -3,15 +3,15 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Deterministic Chatboo table/chart presentation layout (showmode).
 
-Session (ICP default + chatboo.session.presentation_show_mode) only
-oscillates between the layout pair:
+Context ``presentation_show_mode`` (the chat client sets it) and the
+ICP default oscillate between the layout pair:
 
 * ``show-table`` — table-first (data view; client auto-charts when eligible)
 * ``show-chart`` — chart-first (chart open; table always available)
 
 Updated from ``/show-table`` / ``/show-chart`` or user phrasing
 (“gráfico” / “tabla…”) via ``apply_sticky_show_mode``; unchanged until an
-explicit rupture. Suspended when painter is painter-free.
+explicit rupture. Suspended when compose is compose-model.
 
 Result-only modes (not written by session; not axis slashes):
 
@@ -328,29 +328,11 @@ def _user_lang_from_env(env):
 
 
 def _show_mode_from_session(env):
-    session_id = None
-    ctx = env.context or {}
-    if ctx.get('chatboo_session_id'):
-        session_id = int(ctx['chatboo_session_id'])
-    if not session_id:
-        try:
-            from odoo.http import request as http_request
-            if http_request and getattr(http_request, 'chatboo_options', None):
-                sid = http_request.chatboo_options.get('chatboo_session_id')
-                if sid:
-                    session_id = int(sid)
-        except Exception:
-            pass
-    if not session_id:
-        return None
-    try:
-        Session = env['chatboo.session'].sudo()
-        session = Session.browse(session_id)
-        raw = _session_show_mode(session) if session.exists() else None
-        if raw:
-            return normalize_show_mode(raw)
-    except Exception:
-        pass
+    """Layout the chat client put in context, if any."""
+    ctx = getattr(env, 'context', None) or {}
+    raw = ctx.get('presentation_show_mode') or ctx.get('presentation_showmode')
+    if raw:
+        return normalize_show_mode(raw)
     return None
 
 

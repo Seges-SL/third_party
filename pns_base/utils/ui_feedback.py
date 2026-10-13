@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-# Archivo: utils/ui_feedback.py
-# Descripción: Informes HTML y notificaciones cliente genéricas (import/restore/export).
+"""Generic HTML reports and client notifications (import / restore / export)."""
 
 import html as html_lib
 

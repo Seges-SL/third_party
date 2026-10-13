@@ -108,6 +108,7 @@ class IrTranslation(models.Model):
             seen[key] = len(kept)
             kept.append(row)
 
+        type(self)._pns_rows_dropped = dropped
         if dropped:
             cursor._rows = kept
             _logger.warning(

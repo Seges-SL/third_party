@@ -49,7 +49,7 @@
                     </group>
                     <group string="Selection hint (shown in prompts/list)">
                         <field name="description" nolabel="1"
-                               placeholder="Short, precise hint the model uses to decide whether to load this skill."/>
+                               placeholder="Leave empty for automatic generation."/>
                     </group>
                     <notebook>
                         <page string="Procedure" name="procedure">
@@ -65,10 +65,30 @@
                                 <field name="arg_hint" string="Argument hint"
                                        placeholder="Short usage example shown as the Chatboo input placeholder, e.g. Seville tomorrow or mes=2025-01. Purely informative."/>
                                 <field name="args_policy" string="Empty-args policy"/>
-                                <field name="painter"
-                                       string="Painter"/>
-                                <field name="param_schema" string="Param schema (JSON)"
-                                       placeholder='{"mes": {"type": "string", "desc": "..."}}'/>
+                                <field name="compose"/>
+                                <field name="param_schema" invisible="1"/>
+                            </group>
+                            <group string="Parameter list">
+                                <field name="param_line_ids" nolabel="1">
+                                    <tree editable="bottom">
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="label"/>
+                                        <field name="desc"/>
+                                        <field name="default"/>
+                                        <field name="required"/>
+                                        <field name="key" invisible="1"/>
+                                    </tree>
+                                </field>
+                            </group>
+                            <group string="Learned phrases">
+                                <field name="param_cache_ids" nolabel="1">
+                                    <tree editable="bottom">
+                                        <field name="unresolved"/>
+                                        <field name="key" readonly="1"/>
+                                        <field name="params_json"/>
+                                        <field name="active"/>
+                                    </tree>
+                                </field>
                             </group>
                         </page>
                         <page string="Referenced contexts" name="contexts">

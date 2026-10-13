@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2026 Patanegra Soft <https://patanegra.com>
+"""Defaults re-adds the seed and keeps links other modules added."""
+
 import uuid
 
 from odoo.tests import tagged, TransactionCase
@@ -76,6 +78,7 @@ class TestFactoryDefaultsKeepOthers(TransactionCase):
         blob = (mcp._module_factory_seed() or {}).get('default_context_codes') or ''
         self.assertIn('@pns_ai_mcp', blob)
         self.assertNotIn('@pns_geo', blob)
+        self.assertNotIn('@occ_custom', blob)
         self.assertNotIn('@occ_custom_ai', blob)
         self.assertNotIn('@pns_ocr', blob)
         self.assertNotIn('acl_security', blob)
@@ -88,6 +91,7 @@ class TestFactoryDefaultsKeepOthers(TransactionCase):
         ).get('default_context_codes') or ''
         if chat_blob:
             self.assertNotIn('@pns_geo', chat_blob)
+            self.assertNotIn('@occ_custom', chat_blob)
             self.assertNotIn('@occ_custom_ai', chat_blob)
             self.assertNotIn('acl_security', chat_blob)
             self.assertNotIn('@pns_acl_manager', chat_blob)

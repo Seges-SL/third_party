@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Each internal user only sees their own chat rows.
+    The worker that claims stuck jobs uses sudo() and does not pass these rules.
+-->
+<odoo>
+    <data noupdate="0">
+
+        <record id="chatboo_session_user_rule" model="ir.rule">
+            <field name="name">Chatboo session: own rows</field>
+            <field name="model_id" ref="model_chatboo_session"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="chatboo_async_request_user_rule" model="ir.rule">
+            <field name="name">Chatboo async request: own rows</field>
+            <field name="model_id" ref="model_chatboo_async_request"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+    </data>
+</odoo>

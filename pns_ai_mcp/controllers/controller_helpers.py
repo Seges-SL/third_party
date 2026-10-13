@@ -101,17 +101,17 @@ def check_safe_plan_permissions(steps, user=None):
 
     if needs_writer and not user.has_group(GROUP_AI_WRITER):
         return False, (
-            'Write permission denied: propose_safe_operations includes CRUD steps '
+            'Write permission denied: safe_plan_request includes CRUD steps '
             'but the user is not in the AI Writer group.'
         )
     if needs_url and not user.has_group(GROUP_AI_EXTERNAL_URL):
         return False, (
-            'External URL permission denied: propose_safe_operations includes '
+            'External URL permission denied: safe_plan_request includes '
             'fetch_url steps but the user is not in the AI External URL group.'
         )
     if needs_api and not user.has_group(GROUP_AI_EXTERNAL_API):
         return False, (
-            'External API permission denied: propose_safe_operations includes '
+            'External API permission denied: safe_plan_request includes '
             'api_call steps but the user is not in the AI External API group.'
         )
     return True, None
@@ -188,7 +188,7 @@ def get_readonly_env(controller):
     Las lecturas pueden provocar escrituras colaterales del ORM (mail, tracking,
     métodos de negocio). El cursor se revierte siempre al cerrar (rollback), así
     que nada persiste en BD. Las escrituras intencionales (.create/.write/.unlink)
-    las bloquea el AST y deben ir por la caja B (propose_safe_operations).
+    las bloquea el AST y deben ir por la caja B (safe_plan_request).
 
     Además se marca la transacción PostgreSQL como READ ONLY: si el AST falla
     (p. ej. confirm_by_user), el write aborta al instante en vez de tomar locks

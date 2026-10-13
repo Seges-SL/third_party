@@ -291,7 +291,8 @@ def format_data_as_xml(data, root_name, item_name, columns_config):
 
 
 def format_data_as_excel(data, columns_config, title="Reporte",
-                         include_row_index=True, caption=None, widths=None):
+                         include_row_index=True, caption=None, widths=None,
+                         cell_formulas=None, number_style=None):
     """One-sheet wrapper around ``format_excel_workbook``."""
     return format_excel_workbook([{
         'data': data,
@@ -300,6 +301,8 @@ def format_data_as_excel(data, columns_config, title="Reporte",
         'include_row_index': include_row_index,
         'caption': caption,
         'widths': widths,
+        'cell_formulas': cell_formulas or {},
+        'number_style': number_style,
     }])
 
 
@@ -343,6 +346,11 @@ def _fill_excel_sheet(ws, spec):
     include_row_index = bool(spec.get('include_row_index'))
     caption = (spec.get('caption') or '').strip()
     widths = spec.get('widths')
+    # {(excel_row, excel_col): '=…'}; positions count the row index column.
+    cell_formulas = spec.get('cell_formulas') or {}
+    style = spec.get('number_style') or {}
+    int_fmt = style.get('int_format') or '#,##0'
+    float_fmt = style.get('float_format') or '#,##0.00'
     ws.title = str(title)[:31] or 'Export'
 
     header_fill = PatternFill(start_color="667eea", end_color="764ba2", fill_type="solid")
@@ -386,14 +394,31 @@ def _fill_excel_sheet(ws, spec):
     for row_offset, row_data in enumerate(data, 1):
         row_idx = header_row + row_offset
         if include_row_index:
-            ws.cell(row=row_idx, column=1, value=row_offset).border = border
-            ws.cell(row=row_idx, column=1).alignment = center_align
+            idx_cell = ws.cell(row=row_idx, column=1, value=row_offset)
+            idx_cell.border = border
+            idx_cell.alignment = center_align
+            idx_cell.number_format = int_fmt
 
         for col_off, (key, label, formatter, align) in enumerate(columns_config):
             col_idx = data_col0 + col_off
             value = row_data.get(key, '') if isinstance(row_data, dict) else ''
             cell = ws.cell(row=row_idx, column=col_idx)
             cell.border = border
+            compiled = cell_formulas.get((row_idx, col_idx))
+            if compiled:
+                cell.value = compiled
+                if formatter == 'currency':
+                    cell.number_format = '#,##0.00 €'
+                    cell.alignment = right_align
+                elif formatter == 'percentage':
+                    cell.number_format = '0.00%'
+                    cell.alignment = center_align
+                else:
+                    cell.number_format = float_fmt
+                    cell.alignment = (
+                        center_align if formatter == 'number' else right_align
+                    )
+                continue
             if formatter == 'currency':
                 cell.value = float(value) if value is not None and value != '' else 0.0
                 cell.number_format = '#,##0.00 €'
@@ -407,6 +432,7 @@ def _fill_excel_sheet(ws, spec):
                 cell.alignment = center_align
             elif formatter == 'number':
                 cell.value = int(value) if value is not None and value != '' else 0
+                cell.number_format = int_fmt
                 cell.alignment = center_align
             else:
                 if isinstance(value, bool):
@@ -414,12 +440,14 @@ def _fill_excel_sheet(ws, spec):
                     cell.alignment = center_align
                 elif isinstance(value, int):
                     cell.value = value
+                    cell.number_format = int_fmt
                     cell.alignment = right_align
                 elif isinstance(value, float):
                     if value != value or value in (float('inf'), float('-inf')):
                         cell.value = ''
                     else:
                         cell.value = value
+                        cell.number_format = float_fmt
                     cell.alignment = right_align
                 else:
                     cell.value = str(value) if value is not None else ''
@@ -450,11 +478,6 @@ def _fill_excel_sheet(ws, spec):
 
 
 
-# Structural image-column hints (field shape, not a business glossary).
-_PDF_IMG_KEY_HINTS = (
-    'image', 'logo', 'avatar', 'photo',
-    'map_osm', 'map_gm', 'mapthumb', 'staticmap',
-)
 _PDF_B64_IMG_PREFIXES = (
     ('iVBORw', 'png'),
     ('/9j/', 'jpeg'),
@@ -480,11 +503,6 @@ def _pdf_regexes():
             r'^data:image/([^;]+);base64,(.+)$', re.I | re.DOTALL,
         )
     return _PDF_IMG_SRC_RE, _PDF_WEB_IMAGE_RE, _PDF_DATA_URI_RE
-
-
-def _pdf_looks_image_key(key):
-    key_l = str(key or '').lower()
-    return any(hint in key_l for hint in _PDF_IMG_KEY_HINTS)
 
 
 def _pdf_is_image_ref(value):
@@ -588,12 +606,6 @@ def _pdf_image_bytes(value, key=None, env=None):
             return _pdf_decode_b64(text)
     if web_re.search(text) or text.startswith('/web/image/'):
         return _pdf_image_from_env(text, env)
-    if _pdf_looks_image_key(key) and (
-        text.startswith('http') or text.startswith('/')
-    ):
-        if web_re.search(text) or text.startswith('/web/image/'):
-            return _pdf_image_from_env(text, env)
-        return None
     return None
 
 

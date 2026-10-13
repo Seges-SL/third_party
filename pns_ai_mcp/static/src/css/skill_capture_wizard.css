@@ -1,0 +1,69 @@
+/* Capture wizard: Chatboo-style typing dots (no Odoo blockUI spinner). */
+.o_skill_capture_progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1 0 100%;
+    width: 100%;
+    margin: 0 0 8px 0;
+    color: #5d6270;
+    font-size: 13px;
+    line-height: 1.3;
+}
+.o_skill_capture_typing {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    vertical-align: middle;
+}
+.o_skill_capture_typing > span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #00A09D;
+    opacity: 0.35;
+    animation: o_skill_capture_typing_bounce 1.2s infinite ease-in-out;
+}
+.o_skill_capture_typing > span:nth-child(2) { animation-delay: 0.18s; }
+.o_skill_capture_typing > span:nth-child(3) { animation-delay: 0.36s; }
+@keyframes o_skill_capture_typing_bounce {
+    0%, 80%, 100% { opacity: 0.3; transform: translateY(0) scale(0.85); }
+    40%           { opacity: 1;   transform: translateY(-4px) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .o_skill_capture_typing > span {
+        animation: o_skill_capture_typing_fade 1.2s infinite ease-in-out;
+    }
+    @keyframes o_skill_capture_typing_fade {
+        0%, 100% { opacity: 0.3; }
+        50% { opacity: 1; }
+    }
+}
+.o_ai_last_operation_usage {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.85rem;
+}
+
+.o_skill_capture_usage {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    border-radius: 999px;
+    border: 1px solid #e9ecef;
+    background: #fff;
+    line-height: 1.4;
+    color: #1d1d1d;
+}
+.o_skill_capture_stop {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    color: #5d6270;
+    line-height: 1.3;
+}
+.o_skill_capture_stop:hover,
+.o_skill_capture_stop:focus {
+    text-decoration: none;
+    color: #1d1d1d;
+}

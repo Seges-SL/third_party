@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com> */
 /**
  * Chatboo context-occupancy stats — shared between owl1 and owl2.
  *
@@ -28,6 +30,17 @@
             return "#ffc107";
         }
         return "#28a745";
+    }
+
+    function bufferLevelOf(percent) {
+        var p = Number(percent) || 0;
+        if (p > 80) {
+            return "danger";
+        }
+        if (p > 60) {
+            return "warn";
+        }
+        return "ok";
     }
 
     function stripQuestion(text) {
@@ -163,6 +176,52 @@
             + ';"></div></div>';
     }
 
+    /**
+     * Locale-aware k-token label for billed columns (e.g. 32,18k).
+     */
+    function formatTokensK(tokenCount) {
+        var n = Number(tokenCount) || 0;
+        if (n <= 0) {
+            return "0";
+        }
+        var k = n / 1024;
+        return new Intl.NumberFormat(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }).format(k) + "k";
+    }
+
+    /**
+     * Right-align numeric column headers with their data cells.
+     */
+    function numericThHtml(label, escFn) {
+        var esc = escFn || esc;
+        return '<div style="text-align:right;font-variant-numeric:tabular-nums;">'
+            + esc(label) + "</div>";
+    }
+
+    /**
+     * Right-align numbers on the decimal separator (32,18k, 0,0596 €).
+     * escFn must escape HTML in each text fragment.
+     */
+    function decimalAlignHtml(text, escFn) {
+        var esc = escFn || esc;
+        var s = String(text == null ? "" : text).trim();
+        if (!s || s === "-" || s === "—") {
+            return '<span style="font-variant-numeric:tabular-nums;">' + esc(s || "—") + "</span>";
+        }
+        var m = s.match(/^(\d+)([.,])(\S.*)$/);
+        if (!m) {
+            return '<span style="font-variant-numeric:tabular-nums;">' + esc(s) + "</span>";
+        }
+        return '<span style="display:inline-flex;justify-content:flex-end;align-items:baseline;'
+            + 'float:right;font-variant-numeric:tabular-nums;">'
+            + "<span>" + esc(m[1]) + "</span>"
+            + "<span>" + esc(m[2]) + "</span>"
+            + '<span style="text-align:left;min-width:3.5em">' + esc(m[3]) + "</span>"
+            + "</span>";
+    }
+
     function sparklineSvg(rows) {
         var occ = occupyingRows(rows);
         if (!occ.length) {
@@ -213,7 +272,7 @@
             var r = last ? 4.5 : 3;
             var fill = colorOf(occ[i].percent);
             var title = "#" + occ[i].n
-                + (occ[i].turnCode ? " · " + occ[i].turnCode : "")
+                + (occ[i].turn ? " · " + occ[i].turn : "")
                 + " · " + (occ[i].usedK || "?") + "k · "
                 + occ[i].percent.toFixed(1) + "%";
             svg += '<circle cx="' + pts[i].x.toFixed(1) + '" cy="'
@@ -228,14 +287,14 @@
         return String(code == null ? "" : code).replace(/[^A-Za-z0-9_-]/g, "");
     }
 
-    function findTurnBubble(root, turnCode, messageIndex) {
+    function findTurnBubble(root, turn, messageIndex) {
         if (!root) {
             return null;
         }
-        var token = safeTurnToken(turnCode);
+        var token = safeTurnToken(turn);
         var el = null;
         if (token) {
-            el = root.querySelector('[data-turn-code="' + token + '"]');
+            el = root.querySelector('[data-turn="' + token + '"]');
         }
         if (!el && messageIndex !== undefined && messageIndex !== null && messageIndex !== "") {
             el = root.querySelector('[data-msg-index="' + String(messageIndex) + '"]');
@@ -265,9 +324,13 @@
         occupyingRows: occupyingRows,
         lastOccupying: lastOccupying,
         colorOf: colorOf,
+        bufferLevelOf: bufferLevelOf,
         occupancyWidthPct: occupancyWidthPct,
         occupancyBarHtml: occupancyBarHtml,
         rowBarHtml: rowBarHtml,
+        formatTokensK: formatTokensK,
+        numericThHtml: numericThHtml,
+        decimalAlignHtml: decimalAlignHtml,
         sparklineSvg: sparklineSvg,
         esc: esc,
         stripQuestion: stripQuestion,

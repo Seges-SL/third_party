@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Import skills from a ZIP export."""
+
 import base64
 
 from odoo import fields, models, _
@@ -8,7 +10,7 @@ from odoo.exceptions import UserError
 
 
 class AISkillImportWizard(models.TransientModel):
-    _name = 'pns_ai_mcp.skill.import.wizard'
+    _name = 'ai.skill.import.wizard'
     _inherit = ['pns.operation.report.wizard']
     _description = 'Import skills from ZIP'
 

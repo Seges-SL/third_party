@@ -1,14 +1,18 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-from odoo.exceptions import UserError
+"""MCP bare-agent code resolution and delete guards."""
+
+from odoo.exceptions import AccessError, UserError
 from odoo.tests import tagged, TransactionCase
 
 from odoo.addons.pns_ai_mcp.models.ai_agent_consumer import MCP_BARE_AGENT_CODE
 from odoo.addons.pns_ai_mcp.tests._helpers import create_test_user, ensure_test_agents
 from odoo.addons.pns_ai_mcp.utils.ai_agent_registry import (
+    ADMIN_AGENT_CODE,
     CHATBOO_AGENT_CODE,
     FEATURE_AGENT_CODES,
+    SECRETARY_AGENT_CODE,
 )
 
 
@@ -58,11 +62,35 @@ class TestMcpAgent(TransactionCase):
         with self.assertRaises(UserError):
             agent.unlink()
 
+    def test_module_uninstall_removes_its_agent_and_links(self):
+        provider = self.env['ai.provider'].create({
+            'name': 'Uninstall test provider',
+            'protocol': 'openai',
+        })
+        agent = self.env['ai.agent'].create({
+            'name': 'Uninstall test agent',
+            'code': 'pns_uninstall_test_agent',
+            'origin': 'module',
+            'agent_type': 'inference',
+        })
+        link = self.env['ai.agent.provider'].create({
+            'agent_id': agent.id, 'provider_id': provider.id, 'priority': 1,
+        })
+        with self.assertRaises(UserError):
+            agent.unlink()
+        agent.with_context(_force_unlink=True).unlink()
+        self.assertFalse(agent.exists())
+        self.assertFalse(link.exists())
+
     def test_resolve_inference_via_feature_key(self):
         Agent = self.env['ai.agent']
         self.assertEqual(
             Agent.resolve_inference_agent_code(None, consumer_key='chatboo'),
             CHATBOO_AGENT_CODE,
+        )
+        self.assertEqual(
+            Agent.resolve_inference_agent_code(None, consumer_key='admin'),
+            ADMIN_AGENT_CODE,
         )
 
     def test_resolve_inference_missing_code_raises(self):
@@ -72,6 +100,24 @@ class TestMcpAgent(TransactionCase):
 
     def test_feature_agent_codes_chatboo(self):
         self.assertEqual(FEATURE_AGENT_CODES['chatboo'], CHATBOO_AGENT_CODE)
+
+    def test_feature_agent_codes_admin(self):
+        self.assertEqual(FEATURE_AGENT_CODES['admin'], ADMIN_AGENT_CODE)
+
+    def test_feature_agent_codes_secretary(self):
+        self.assertEqual(FEATURE_AGENT_CODES['secretary'], SECRETARY_AGENT_CODE)
+
+    def test_admin_agent_exists_inference(self):
+        agent = self.env['ai.agent'].search([
+            ('code', '=', ADMIN_AGENT_CODE),
+            ('active', '=', True),
+        ], limit=1)
+        self.assertTrue(
+            agent,
+            'AI agent pns_ai_admin missing — upgrade pns_ai_mcp (-u).',
+        )
+        self.assertEqual(agent.agent_type, 'inference')
+        self.assertEqual(agent.origin, 'module')
 
     def test_settings_open_module_endpoint_agents(self):
         settings = self.env['res.config.settings'].create({})
@@ -132,6 +178,14 @@ class TestMcpAgent(TransactionCase):
         self.assertTrue(providers, 'plain user should resolve providers')
         resolved = engine.resolve_provider(CHATBOO_AGENT_CODE)
         self.assertTrue(resolved)
+
+        # Entering the agent form reads the One2many; that is not admin-only.
+        agent_as_user = agent.with_user(plain_user)
+        links = agent_as_user.provider_ids
+        self.assertTrue(links)
+        links.read(['provider_id', 'priority', 'active'])
+        with self.assertRaises(AccessError):
+            links[0].write({'priority': 99})
 
     def test_api_key_for_inference_without_admin_acl(self):
         """Inference must read provider credentials without exposing them in UI."""

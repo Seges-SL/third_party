@@ -5,6 +5,8 @@
 
 import unittest
 
+from odoo.tests import tagged
+
 from odoo.addons.pns_ai_mcp.utils.presentation_mode import (
     SHOW_MODE_CHART_TABLE,
     SHOW_MODE_TABLE_CHART,
@@ -14,6 +16,7 @@ from odoo.addons.pns_ai_mcp.utils.presentation_mode import (
 from odoo.addons.pns_ai_mcp.utils.relaxaicode_render import _table_block_open
 
 
+@tagged('post_install', '-at_install')
 class TestPresentationMode(unittest.TestCase):
     def test_normalize_show_mode(self):
         self.assertEqual(normalize_show_mode('show-chart'), SHOW_MODE_CHART_TABLE)

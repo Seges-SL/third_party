@@ -1,6 +1,10 @@
+# -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-# SKILL: credit-facility — dispuesto fin de mes; chunk PDF; periodo + help + ask
+"""Credit-facility slash skill.
+
+Month-end drawn balances (credit − debit) on facility journals, chunked for PDF.
+"""
 from datetime import date
 from collections import defaultdict
 import re
@@ -232,7 +236,11 @@ else:
             '__no_footer__': True,
         }
     else:
-        journals = env['account.journal'].search([
+        try:
+            _company_id = env.company.id
+        except Exception:
+            _company_id = False
+        journal_domain = [
             '|', '|', '|', '|', '|',
             ('name', 'ilike', 'póliza'),
             ('name', 'ilike', 'poliza'),
@@ -240,7 +248,10 @@ else:
             ('name', 'ilike', 'line of credit'),
             ('code', '=like', 'P%'),
             ('default_account_id.name', 'ilike', 'póliza'),
-        ])
+        ]
+        if _company_id:
+            journal_domain.append(('company_id', '=', _company_id))
+        journals = env['account.journal'].search(journal_domain)
         series_meta = []
         seen = set()
         for j in journals:
@@ -288,20 +299,25 @@ else:
                     _MON[int(ym[5:7])], int(ym[:4]) % 100,
                 )
             opening = {s['aid']: 0.0 for s in series_meta}
-            for line in env['account.move.line'].search([
+            open_domain = [
                 ('account_id', 'in', aids),
                 ('move_id.state', '=', 'posted'),
                 ('date', '<', sd),
-            ]):
-                if line.account_id.id in opening:
-                    opening[line.account_id.id] += line.credit - line.debit
-            by_ym = defaultdict(float)
-            for line in env['account.move.line'].search([
+            ]
+            period_domain = [
                 ('account_id', 'in', aids),
                 ('move_id.state', '=', 'posted'),
                 ('date', '>=', sd),
                 ('date', '<=', ed),
-            ]):
+            ]
+            if _company_id:
+                open_domain.append(('company_id', '=', _company_id))
+                period_domain.append(('company_id', '=', _company_id))
+            for line in env['account.move.line'].search(open_domain):
+                if line.account_id.id in opening:
+                    opening[line.account_id.id] += line.credit - line.debit
+            by_ym = defaultdict(float)
+            for line in env['account.move.line'].search(period_domain):
                 by_ym[(str(line.date)[:7], line.account_id.id)] += (
                     line.credit - line.debit
                 )

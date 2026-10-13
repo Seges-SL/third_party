@@ -12,17 +12,17 @@ AppsMenu (``action.split`` on ``false``).
 from odoo import api, models
 
 _OPERATOR_MENU_XMLIDS = (
-    'pns_ai_mcp.menu_mcp_contexts_writer',
+    'pns_ai_mcp.menu_ai_context_writer',
     'pns_ai_mcp.menu_ai_skill_writer',
-    'pns_ai_mcp.menu_mcp_safe_operation',
-    'pns_ai_mcp.menu_mcp_logs',
+    'pns_ai_mcp.menu_ai_safe_operation',
+    'pns_ai_mcp.menu_ai_log',
 )
 
 # Security → Changes is AI admin only. XML already says so; this hides the
 # item when ir.ui.menu.groups_id was left empty (Odoo 19 dropped groups_id
 # on the window action, so a leftover empty menu group became visible).
 _ADMIN_ONLY_MENU_XMLIDS = (
-    'pns_ai_mcp.menu_mcp_change_journal',
+    'pns_ai_mcp.menu_ai_change_journal',
 )
 
 

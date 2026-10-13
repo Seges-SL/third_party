@@ -3,7 +3,7 @@ skill: billing
 name: Billing by period
 description: Posted customer invoice totals for a period (last N months, year, YTD or range); chart-ready table without business-area coupling.
 agent_codes: pns_ai_chatboo
-version: 1.2
+version: 1.3
 param_schema: {"periodo": {"type": "string", "desc": "Period hint: empty=last 12 months, 1-12=N months, YYYY=year, YYYY-YYYY=range, ytd=year to date. null if absent."}}
 arg_hint: ytd
 args_policy: default

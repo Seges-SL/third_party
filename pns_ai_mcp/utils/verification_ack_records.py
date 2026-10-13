@@ -27,6 +27,13 @@ def _resolve_document_target(model, rid, env=None, parent_of=None):
     return resolve_document_target(model, rid, env=env, parent_of=parent_of)
 
 
+def _fresh_target(model, rid, env=None, parent_of=None):
+    """``(model, id)`` for a record just created, unless it is a line."""
+    if not isinstance(model, str) or model.endswith('.line'):
+        return None
+    return (model, int(rid))
+
+
 def _push(out, seen, model, rid, name=None):
     if not model or not isinstance(model, str) or not rid:
         return
@@ -57,16 +64,24 @@ def collect_ack_records(results, steps=None, lookup=None, env=None, parent_of=No
         model = item.get('model')
         name = item.get('name')
         rids = []
+        fresh = False
         if op == 'create' and isinstance(item.get('id'), int):
             rids = [item['id']]
+            fresh = True
         elif op == 'copy' and isinstance(item.get('new_id'), int):
             rids = [item['new_id']]
+            fresh = True
         elif op == 'write' and isinstance(item.get('ids'), list):
             rids = [rid for rid in item['ids'] if isinstance(rid, int)]
         for rid in rids:
             target = _resolve_document_target(
                 model, rid, env=env, parent_of=parent_of,
             )
+            if not target and fresh:
+                # A record that did not exist a second ago is worth a card
+                # whatever its shape. Only a line lifts to its header; a
+                # header with no lines is still the thing the user made.
+                target = _fresh_target(model, rid, env=env, parent_of=parent_of)
             if not target:
                 continue
             label = name if model == target[0] else None

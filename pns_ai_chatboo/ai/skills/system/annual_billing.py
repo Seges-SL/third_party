@@ -1,6 +1,10 @@
+# -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-# SKILL: annual-billing — start_date/end_date/year/anio/arguments in sandbox
+"""Annual billing slash skill.
+
+Posted customer invoices (out_invoice) by ISO week for a year or date range.
+"""
 from datetime import date
 import re
 
@@ -39,6 +43,12 @@ domain = [
     ('invoice_date', '>=', start_date),
     ('invoice_date', '<=', end_date),
 ]
+try:
+    _company_id = env.company.id
+except Exception:
+    _company_id = False
+if _company_id:
+    domain.append(('company_id', '=', _company_id))
 invoices = env['account.move'].search(domain)
 
 by_week = {}

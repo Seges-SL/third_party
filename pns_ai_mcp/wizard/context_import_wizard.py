@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Import custom contexts from .txt, .md, .xml or .zip."""
+
 import base64
 import io
 import zipfile
@@ -14,7 +16,7 @@ _logger = logging.getLogger(__name__)
 
 
 class ContextImportWizard(models.TransientModel):
-    _name = 'pns_ai_mcp.context_import_wizard'
+    _name = 'ai.context.import.wizard'
     _inherit = ['pns.operation.report.wizard']
     _description = 'Wizard to import Custom Contexts from files'
 

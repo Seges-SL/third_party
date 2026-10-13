@@ -31,10 +31,48 @@ def resolve_remote_ip():
     return normalize_remote_ip(None)
 
 
-def resolve_client_label(env, user_id, origin, explicit=None):
+def request_log_stamp():
+    """Identity the host stamped on the live HTTP request, if any."""
+    try:
+        from odoo.http import request
+        if not request:
+            return {}
+        return {
+            'source_channel': getattr(request, 'mcp_source_channel', None),
+            'agent_code': getattr(request, 'mcp_agent_code', None),
+            'client_label': getattr(request, 'mcp_client_label', None),
+            'turn_prefix': getattr(request, 'mcp_turn_prefix', None),
+            'turn': getattr(request, 'mcp_turn', None),
+        }
+    except Exception:
+        return {}
+
+
+def resolve_log_agent(env, agent_code=None):
+    """``ai.agent`` row for this turn, or empty. Code comes from the caller."""
+    code = (agent_code or '').strip()
+    if not code and env is not None:
+        code = str((env.context or {}).get('mcp_agent_code') or '').strip()
+    if not code or env is None or 'ai.agent' not in env:
+        return env['ai.agent'] if env is not None and 'ai.agent' in env else None
+    return env['ai.agent'].sudo().search([('code', '=', code)], limit=1)
+
+
+def agent_log_label(agent):
+    """Agents-list name. Empty if the row is missing."""
+    if not agent:
+        return ''
+    return (agent.name or agent.code or '').strip()
+
+
+def resolve_client_label(env, user_id, origin, explicit=None, agent_code=None):
     """Human client name for ai.log.client_label (stored, English base strings)."""
     if explicit:
         return str(explicit)[:255]
+    agent = resolve_log_agent(env, agent_code)
+    name = agent_log_label(agent)
+    if name:
+        return name[:255]
     channel = origin or 'internal'
     if channel == 'chatboo':
         return CLIENT_CHATBOO

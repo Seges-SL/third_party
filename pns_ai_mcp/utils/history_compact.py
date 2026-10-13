@@ -6,7 +6,9 @@
 Invariant (no domain): the user-facing bubble may keep the full HTML/table.
 The prompt that goes to the model between turns must not replay rendered
 rows. Point at the on-screen artifact and the server-side dataset cache
-(``previous_result``). Same-turn ReAct tool results stay intact.
+(``previous_result``). Same-turn ReAct: compose-agent tabular tool results
+are stubbed in ``mcp_tool_payload.tool_result_json_for_llm``; errors stay
+intact. compose-model still sends the rows.
 
 See ``docs/decisions/historial_llm_stubs.md``.
 """
@@ -19,10 +21,10 @@ import re
 STUB_PREFIX = '[On-screen artifact'
 STUB_FOOTER = (
     'The full document is already visible to the user. Do not reprint the '
-    'rows. Cached dataset is previous_result if you need to reformat or '
-    'recompute. If the user asks about this artifact or its image, answer '
-    'from this stub (including any [image: …] refs). Use tools only for a '
-    'genuinely new query.'
+    'rows. previous_result is only the latest dataset in this session. If a '
+    'later turn replaced this answer, do not reformat this artifact. If the '
+    'user asks about this artifact or its image, answer from this stub '
+    '(including any [image: …] refs). Use tools only for a genuinely new query.'
 )
 
 USER_MAX_CHARS = 4000
@@ -384,6 +386,33 @@ def _message_text(msg):
     if not isinstance(msg, dict):
         return ''
     return _as_text(msg.get('content'))
+
+
+def turn_shown_text(messages, start=0):
+    """Join assistant texts produced this turn, after ``start``.
+
+    Skips tool-call placeholders and stubs already written for an older
+    artifact. The caller compacts the join. A trailing coda must not hide
+    the report the user actually saw.
+    """
+    parts = []
+    seq = messages or []
+    try:
+        start = int(start or 0)
+    except (TypeError, ValueError):
+        start = 0
+    if start < 0:
+        start = 0
+    for msg in seq[start:]:
+        if not isinstance(msg, dict):
+            continue
+        if msg.get('role') != 'assistant' or msg.get('tool_calls'):
+            continue
+        text = (_message_text(msg) or '').strip()
+        if not text or is_already_stub(text):
+            continue
+        parts.append(text)
+    return '\n\n'.join(parts)
 
 
 def _as_text(content):

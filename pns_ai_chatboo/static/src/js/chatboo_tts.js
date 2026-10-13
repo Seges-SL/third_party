@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com> */
 /*
  * Chatboo text-to-speech (Web Speech API).
  *
@@ -63,11 +65,19 @@
             return null;
         }
         var want = (lang || "es").slice(0, 2).toLowerCase();
+        var remote = null;
         for (var i = 0; i < voices.length; i++) {
             var v = voices[i];
             if (v.lang && v.lang.slice(0, 2).toLowerCase() === want) {
-                return v;
+                // A non-local voice sends the text to the vendor's server.
+                if (v.localService) {
+                    return v;
+                }
+                remote = remote || v;
             }
+        }
+        if (remote) {
+            return remote;
         }
         for (var j = 0; j < voices.length; j++) {
             if (voices[j].default) {

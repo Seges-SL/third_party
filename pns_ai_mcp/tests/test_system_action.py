@@ -3,12 +3,12 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Trusted system actions: view modifiers, propose group gate, reset."""
 from odoo import SUPERUSER_ID, api
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 from odoo.tests import tagged, TransactionCase
 from odoo.tests.common import new_test_user
 
 from odoo.addons.pns_ai_mcp.controllers.safe_plan import (
-    create_pending_safe_operation,
+    request_safe_plan,
     execute_safe_plan,
     validate_safe_plan,
 )
@@ -35,12 +35,12 @@ class TestSystemTrustedActions(TransactionCase):
     def test_required_inherit_and_reset(self):
         view = self._form()
         Action = self.env['ai.system.action']
-        preview = Action.preview_view_set_field_required(
+        preview = Action._preview_view_set_field_required(
             model='res.partner', field='comment', required=True,
             view_ids=[view.id],
         )
         self.assertIn('comment', preview)
-        result = Action.apply_view_set_field_required(
+        result = Action._apply_view_set_field_required(
             model='res.partner', field='comment', required=True,
             view_ids=[view.id],
         )
@@ -57,7 +57,7 @@ class TestSystemTrustedActions(TransactionCase):
         ])
         self.assertEqual(len(policy), 1)
 
-        Action.apply_view_reset_field_modifiers(
+        Action._apply_view_reset_field_modifiers(
             model='res.partner', field='comment',
         )
         self.assertFalse(inherit.exists())
@@ -69,7 +69,7 @@ class TestSystemTrustedActions(TransactionCase):
 
     def test_unknown_field_rejected(self):
         with self.assertRaises(UserError):
-            self.env['ai.system.action'].preview_view_set_field_required(
+            self.env['ai.system.action']._preview_view_set_field_required(
                 model='res.partner',
                 field='no_such_pns_field_xyz',
                 required=True,
@@ -78,7 +78,7 @@ class TestSystemTrustedActions(TransactionCase):
     def test_view_without_field_rejected(self):
         view = self._form('name')
         with self.assertRaises(UserError):
-            self.env['ai.system.action'].apply_view_set_field_required(
+            self.env['ai.system.action']._apply_view_set_field_required(
                 model='res.partner', field='comment', required=True,
                 view_ids=[view.id],
             )
@@ -134,12 +134,12 @@ class TestSystemTrustedActions(TransactionCase):
                 '</xpath>'
             ),
         })
-        preview = Action.preview_view_set_field_required(
+        preview = Action._preview_view_set_field_required(
             model='res.partner', field='x_pns_test_alias',
             required=True, view_id=inherit.id,
         )
         self.assertIn('x_pns_test_alias', preview)
-        preview_empty = Action.preview_view_set_field_required(
+        preview_empty = Action._preview_view_set_field_required(
             model='res.partner', field='x_pns_test_alias', required=True,
         )
         self.assertIn('x_pns_test_alias', preview_empty)
@@ -167,11 +167,11 @@ class TestSystemTrustedActions(TransactionCase):
             ),
         })
         Action = self.env['ai.system.action']
-        preview = Action.preview_view_set_field_required(
+        preview = Action._preview_view_set_field_required(
             model='res.partner', field='x_pns_test_req_only', required=True,
         )
         self.assertIn('1 view', preview)
-        result = Action.apply_view_set_field_required(
+        result = Action._apply_view_set_field_required(
             model='res.partner', field='x_pns_test_req_only', required=True,
         )
         inherit_ids = result.get('ids') or []
@@ -179,7 +179,7 @@ class TestSystemTrustedActions(TransactionCase):
         inherit = self.env['ir.ui.view'].browse(inherit_ids[0])
         self.assertEqual(inherit.inherit_id.id, form.id)
         self.assertNotEqual(inherit.inherit_id.id, tree.id)
-        tree_preview = Action.preview_view_set_field_required(
+        tree_preview = Action._preview_view_set_field_required(
             model='res.partner', field='x_pns_test_req_only', required=True,
             view_type='tree',
         )
@@ -198,7 +198,7 @@ class TestSystemTrustedActions(TransactionCase):
                 '</sheet></form>'
             ),
         })
-        result = self.env['ai.system.action'].apply_view_set_field_required(
+        result = self.env['ai.system.action']._apply_view_set_field_required(
             model='res.partner', field='comment', required=True,
             view_ids=[view.id],
         )
@@ -273,22 +273,22 @@ class TestSystemTrustedActions(TransactionCase):
         self.assertNotIn("oe_read_only", inherit.arch)
 
     def test_module_preview_no_apply(self):
-        text = self.env['ai.system.action'].preview_module_update(
+        text = self.env['ai.system.action']._preview_module_update(
             module='base', operation='upgrade',
         )
         self.assertIn('base', text.lower())
         with self.assertRaises(UserError):
-            self.env['ai.system.action'].preview_module_update(
+            self.env['ai.system.action']._preview_module_update(
                 module='base', operation='uninstall',
             )
         with self.assertRaises(UserError):
-            self.env['ai.system.action'].preview_module_update(
+            self.env['ai.system.action']._preview_module_update(
                 module='no_such_pns_module_xyz', operation='install',
             )
         base = self.env['ir.module.module'].search(
             [('name', '=', 'base')], limit=1,
         )
-        alias_text = self.env['ai.system.action'].preview_module_update(
+        alias_text = self.env['ai.system.action']._preview_module_update(
             module_ids=[base.id], button='button_immediate_upgrade',
         )
         self.assertIn('base', alias_text.lower())
@@ -298,18 +298,18 @@ class TestSystemTrustedActions(TransactionCase):
             self.env, login='pns_grp_target',
             groups='base.group_user',
         )
-        text = self.env['ai.system.action'].preview_user_add_group(
+        text = self.env['ai.system.action']._preview_user_add_group(
             user_id=target.id,
             group='pns_ai_mcp.group_ai_writer',
         )
         self.assertIn(target.name, text)
-        applied = self.env['ai.system.action'].apply_user_add_group(
+        applied = self.env['ai.system.action']._apply_user_add_group(
             user_id=target.id,
             group='pns_ai_mcp.group_ai_writer',
         )
         self.assertTrue(applied.get('ok'))
         self.assertTrue(target.has_group('pns_ai_mcp.group_ai_writer'))
-        self.env['ai.system.action'].apply_user_remove_group(
+        self.env['ai.system.action']._apply_user_remove_group(
             user_id=target.id,
             group='pns_ai_mcp.group_ai_writer',
         )
@@ -335,7 +335,7 @@ class TestSystemTrustedActions(TransactionCase):
             groups='base.group_user,pns_ai_mcp.group_ai_admin',
         )
         env_a = api.Environment(self.env.cr, admin.id, {})
-        pending = create_pending_safe_operation(env_a, [{
+        pending = request_safe_plan(env_a, [{
             'op': 'field_required',
             'model': 'res.partner',
             'field': 'comment',
@@ -387,7 +387,7 @@ class TestSystemTrustedActions(TransactionCase):
         )
         view = self._form()
         env_a = api.Environment(self.env.cr, admin.id, {})
-        pending = create_pending_safe_operation(env_a, [{
+        pending = request_safe_plan(env_a, [{
             'op': 'field_required',
             'model': 'res.partner',
             'field': 'comment',
@@ -398,7 +398,7 @@ class TestSystemTrustedActions(TransactionCase):
         self.assertIn(view.id, item_ids)
         result = accept_choice(
             env_a, pending['choice_id'], [view.id],
-            create_pending_safe_operation,
+            request_safe_plan,
         )
         self.assertTrue(result.get('success'), result)
         self.assertTrue(result.get('verification_id'))
@@ -418,13 +418,42 @@ class TestSystemTrustedActions(TransactionCase):
                 '</sheet></form>'
             ),
         })
-        result = self.env['ai.system.action'].apply_view_set_field_required(
+        result = self.env['ai.system.action']._apply_view_set_field_required(
             model='res.partner', field='comment', required=True,
             view_ids=[view.id], uniform=True,
         )
         inherit = self.env['ir.ui.view'].browse(result['ids'][0])
         self.assertNotIn('oe_read_only', inherit.arch)
         self.assertIn("expr=\"//field[@name='comment']\"", inherit.arch)
+
+    def test_internal_user_cannot_run_public_system_or_factory_maintenance(self):
+        user = new_test_user(
+            self.env, login='pns_plain_internal_rpc',
+            groups='base.group_user',
+        )
+        env_u = api.Environment(self.env.cr, user.id, {})
+        Action = env_u['ai.system.action']
+        self.assertFalse(hasattr(Action, 'apply_user_add_group'))
+        self.assertFalse(hasattr(Action, 'preview_user_add_group'))
+        self.assertTrue(hasattr(Action, '_apply_user_add_group'))
+        with self.assertRaises(AccessError):
+            env_u['ai.skill'].with_context(
+                skip_hardcoded_restrictions=True,
+            ).unlink_named_factory_skills(['not-a-real-skill'])
+
+    def test_internal_user_cannot_reach_system_action_through_trusted_action(self):
+        user = new_test_user(
+            self.env, login='pns_plain_internal_trusted',
+            groups='base.group_user',
+        )
+        env_u = api.Environment(self.env.cr, user.id, {})
+        trusted = env_u['ai.trusted.action']._get('user.add_group')
+        self.assertTrue(trusted)
+        self.assertFalse(hasattr(trusted, 'apply'))
+        self.assertFalse(hasattr(trusted, 'preview'))
+        with self.assertRaises(PermissionError):
+            trusted._apply(user_id=user.id, group='base.group_system')
+        self.assertFalse(user.has_group('base.group_system'))
 
     def _unlink_choice(self, choice_id):
         if not choice_id:

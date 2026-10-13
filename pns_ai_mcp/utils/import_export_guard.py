@@ -5,10 +5,15 @@
 
 
 def ensure_ai_admin(env):
-    """Raise AccessError unless the user is AI admin (or superuser / module bootstrap)."""
-    if env.context.get('skip_hardcoded_restrictions'):
+    """Raise AccessError unless the user is AI admin (or superuser / module bootstrap).
+
+    A context flag from RPC is not enough. ``sudo()`` plus the seed flag, or
+    the superuser, still passes: module install and ``-u`` use those.
+    """
+    from .knowledge_ownership import factory_lock_open
+    if factory_lock_open(env):
         return
-    if env.user._is_superuser() or env.user.has_group('pns_ai_mcp.group_ai_admin'):
+    if env.user.has_group('pns_ai_mcp.group_ai_admin'):
         return
     from odoo.exceptions import AccessError
     from odoo import _

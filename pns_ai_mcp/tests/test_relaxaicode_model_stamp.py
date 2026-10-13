@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2026 Patanegra Soft <https://patanegra.com>
-"""Stamp de __model: fórmula universal (display_name + solape), sin hardcode de dominio."""
+"""__model stamp: universal formula (display_name + overlap), no domain hardcode."""
 from odoo.tests import tagged, TransactionCase
 
 from odoo.addons.pns_ai_mcp.controllers.tools_relaxaicode import (
@@ -204,6 +204,43 @@ class TestRelaxAICodeModelStamp(TransactionCase):
         self.assertEqual(result['data'][0]['id'], partner.id)
         self.assertEqual(result['data'][0]['__model'], 'res.partner')
 
+    def test_stamp_from_what_the_turn_already_read(self):
+        """Filas rehechas desde un literal: el id conserva su modelo del turno.
+
+        El paso de presentación no toca el ORM (ni recordset ni ``env['x']``),
+        así que sin la memoria del turno la fila llegaría a pantalla sin
+        registro detrás y no se podría señalar.
+        """
+        partner = self.env['res.partner'].search([('name', '!=', False)], limit=1)
+        if not partner:
+            self.skipTest('no res.partner')
+        result = {'data': [{'id': partner.id, 'name': partner.name}]}
+        _stamp_models(
+            result,
+            id_model_map={},
+            single_model=None,
+            env=self.env,
+            candidate_models=set(),
+            turn_models={partner.id: 'res.partner'},
+        )
+        self.assertEqual(result['data'][0].get('__model'), 'res.partner')
+
+    def test_a_remembered_id_does_not_lend_its_link_to_another_row(self):
+        """Mismo número, otra cosa: sin el nombre del registro no hay enlace."""
+        partner = self.env['res.partner'].search([('name', '!=', False)], limit=1)
+        if not partner:
+            self.skipTest('no res.partner')
+        result = {'data': [{'id': partner.id, 'concepto': 'Horas', 'total': 12.0}]}
+        _stamp_models(
+            result,
+            id_model_map={},
+            single_model=None,
+            env=self.env,
+            candidate_models=set(),
+            turn_models={partner.id: 'res.partner'},
+        )
+        self.assertIsNone(result['data'][0].get('__model'))
+
     def test_stamp_from_xmlid_column(self):
         """Celda XML=module.name → __model inequívoco (evita empates de id)."""
         from odoo.addons.pns_ai_mcp.controllers.tools_relaxaicode import (
@@ -229,3 +266,42 @@ class TestRelaxAICodeModelStamp(TransactionCase):
         )
         self.assertEqual(result['data'][0]['__model'], 'res.groups')
         self.assertEqual(result['data'][0]['id'], group.id)
+
+    def test_a_car_name_in_the_model_column_does_not_steal_the_picture(self):
+        """La columna model con el nombre del coche no es fleet.vehicle.
+
+        Si el campo pedido no existe (logo), la miniatura sale de una imagen
+        que el registro sí tiene, no de una URL con ese texto.
+        """
+        from odoo.addons.pns_ai_mcp.controllers.tools_relaxaicode import (
+            _postprocess_images,
+        )
+
+        Partner = self.env['res.partner']
+        partner = Partner.search([('image_128', '!=', False)], limit=1)
+        if not partner:
+            partner = Partner.search([('name', '!=', False)], limit=1)
+        if not partner:
+            self.skipTest('no res.partner')
+        result = {'data': [{
+            'id': partner.id,
+            'model': 'KANGOO L1 1.5 BLUE 75 CV',
+            'name': partner.name,
+            'logo': True,
+        }]}
+        _stamp_models(
+            result,
+            id_model_map={partner.id: 'res.partner'},
+            single_model='res.partner',
+            env=self.env,
+            candidate_models={'res.partner'},
+        )
+        self.assertEqual(result['data'][0].get('__model'), 'res.partner')
+        _postprocess_images(result, model_hint='res.partner', env=self.env)
+        logo = result['data'][0].get('logo')
+        self.assertFalse(str(logo or '').startswith('/web/image/KANGOO'))
+        if partner.image_128:
+            self.assertEqual(
+                logo,
+                '/web/image/res.partner/%s/image_128' % partner.id,
+            )

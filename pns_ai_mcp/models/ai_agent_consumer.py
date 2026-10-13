@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""ai.agent inherit: delete guards and inference/MCP agent-code resolution."""
+
 import logging
 
 from odoo import api, models, _
+from odoo.addons.base.models.ir_model import MODULE_UNINSTALL_FLAG
 from odoo.exceptions import UserError
 
 from ..utils.ai_agent_registry import (
@@ -21,6 +24,9 @@ class AIAgent(models.Model):
     _inherit = 'ai.agent'
 
     def unlink(self):
+        # A module's uninstall removes its own agent; links go with it (cascade).
+        if self.env.context.get(MODULE_UNINSTALL_FLAG):
+            return super(AIAgent, self).unlink()
         for agent in self:
             if agent.provider_ids:
                 raise UserError(_(

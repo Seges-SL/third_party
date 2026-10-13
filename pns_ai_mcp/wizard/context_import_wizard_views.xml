@@ -2,7 +2,7 @@
 <odoo>
     <record id="view_context_import_wizard_form" model="ir.ui.view">
         <field name="name">pns.ai.mcp.context.import.wizard.form</field>
-        <field name="model">pns_ai_mcp.context_import_wizard</field>
+        <field name="model">ai.context.import.wizard</field>
         <field name="arch" type="xml">
             <form string="Import Contexts">
                 <field name="import_mode" invisible="1"/>
@@ -35,7 +35,7 @@
     <record id="action_context_import_wizard" model="ir.actions.act_window">
         <field name="name">Import Contexts</field>
         <field name="type">ir.actions.act_window</field>
-        <field name="res_model">pns_ai_mcp.context_import_wizard</field>
+        <field name="res_model">ai.context.import.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
     </record>

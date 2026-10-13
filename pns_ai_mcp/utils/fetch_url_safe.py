@@ -10,10 +10,38 @@ Validation errors are English (ai.log / LLM lingua franca).
 """
 from __future__ import annotations
 
+import ipaddress
+import socket
+from urllib.parse import urlsplit
+
 # Safe / idempotent HTTP methods for fetch_url (ad-hoc web read). Mutating
 # methods (POST/PUT/PATCH/DELETE) are out of core — use api_call on a
 # registered MCP/OpenAPI server.
 FETCH_URL_SAFE_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS', 'QUERY'})
+
+FETCH_URL_MAX_REDIRECTS = 5
+FETCH_URL_MAX_BYTES = 20 * 1024 * 1024
+
+
+def non_public_host_error(url):
+    """English reason when the URL's host is not on the public internet, else ''.
+
+    Every address the name resolves to must be global: one private answer is
+    enough to refuse (localhost, the database, cloud metadata, the LAN).
+    Internal APIs go through ``api_call`` on a server an admin registered.
+    """
+    host = urlsplit(url or '').hostname
+    if not host:
+        return 'URL without a host.'
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except (socket.gaierror, UnicodeError) as exc:
+        return 'Cannot resolve %s: %s' % (host, exc)
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0].split('%', 1)[0])
+        if not ip.is_global:
+            return 'fetch_url does not reach internal addresses (%s is %s).' % (host, ip)
+    return ''
 
 
 def normalize_fetch_url_method(method=None):

@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (C) 2026 Patanegra Soft <https://patanegra.com>
+# Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Chatboo capture: session note + re-apply fetch wrap the wizard onchange strips."""
 from odoo import api, fields, models
 
 
 class SkillCaptureWizard(models.TransientModel):
-    _inherit = 'pns_ai_mcp.skill.capture.wizard'
+    _inherit = 'ai.skill.capture.wizard'
 
     chatboo_session_id = fields.Integer(readonly=True)
 
@@ -17,7 +17,7 @@ class SkillCaptureWizard(models.TransientModel):
             return
         corr = ''
         if self.source_log_id:
-            corr = (self.source_log_id.correlation_id or '').strip()
+            corr = (self.source_log_id.turn or '').strip()
         wrapped, _note = self.env['chatboo.session'].compose_capture_code(
             self.code_body, corr,
         )
@@ -30,11 +30,30 @@ class SkillCaptureWizard(models.TransientModel):
         self._reapply_turn_fetch_wrap()
         return res
 
+    def action_author_params(self):
+        if self.from_chatboo:
+            self._reapply_turn_fetch_wrap()
+        return super().action_author_params()
+
+    def action_author_help(self):
+        if self.from_chatboo:
+            self._reapply_turn_fetch_wrap()
+        return super().action_author_help()
+
+    def action_adapt_code(self):
+        if self.from_chatboo:
+            self._reapply_turn_fetch_wrap()
+        return super().action_adapt_code()
+
     def action_create_draft(self):
         if not self.from_chatboo:
             return super().action_create_draft()
         self._reapply_turn_fetch_wrap()
-        ctx = {'chatboo_confirm_op': 'created'}
+        ctx = {
+            'chatboo_confirm_op': (
+                'updated' if self.existing_skill_id else 'created'
+            ),
+        }
         sid = self.chatboo_session_id or self.env.context.get('chatboo_session_id')
         if sid:
             ctx['chatboo_session_id'] = sid

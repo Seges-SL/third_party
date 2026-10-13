@@ -16,8 +16,8 @@ class MCPVerificationUI(http.Controller):
     def _get_owned_verification(self, verification_id):
         """Devuelve la verificación si la sesión puede resolverla, o (None, error).
 
-        Puede resolverla el usuario que la solicitó O un administrador de MCP
-        (group_ai_admin), que puede confirmar/cancelar las de otros usuarios.
+        Estas rutas son la tarjeta del chat: solo el usuario que la solicitó.
+        Un AI Administrator resuelve las de otros en Autorizaciones, no aquí.
         """
         if not verification_id:
             return None, 'missing_id'
@@ -26,9 +26,7 @@ class MCPVerificationUI(http.Controller):
         )
         if not verification:
             return None, 'not_found'
-        is_owner = verification.user_id.id == request.env.user.id
-        is_manager = request.env.user.has_group('pns_ai_mcp.group_ai_admin')
-        if not (is_owner or is_manager):
+        if verification.user_id.id != request.env.user.id:
             _logger.warning(
                 "MCP: usuario %s intentó confirmar/cancelar verificación %s de otro usuario %s",
                 request.env.user.id, verification_id, verification.user_id.id
@@ -103,6 +101,7 @@ class MCPVerificationUI(http.Controller):
                 ),
             },
             title, action='cancel', steps=steps,
+            env=request.env,
         )
 
     @http.route('/pns_ai_mcp/verification/pending', type=JSON_ROUTE_TYPE, auth='user')

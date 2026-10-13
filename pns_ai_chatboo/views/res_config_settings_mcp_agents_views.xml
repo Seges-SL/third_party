@@ -33,12 +33,35 @@
                                 <div class="o_setting_right_pane">
                                     <label for="chatboo_dataset_cache_max_mb"/>
                                     <field name="chatboo_dataset_cache_max_mb"/>
+                                    <div class="text-muted">Copy of the last table, kept aside so the next message can reorder it without a new query. Those rows stay out of the prompt: sending the whole table every turn used to fill it. A heavier list is skipped. 0 = no size cap.</div>
                                 </div>
                             </div>
                             <div class="col-12 col-lg-6 o_setting_box">
                                 <div class="o_setting_right_pane">
                                     <label for="chatboo_query_data_ttl_hours"/>
                                     <field name="chatboo_query_data_ttl_hours"/>
+                                    <div class="text-muted">After this the aside copy is dropped. Tables already on screen and files you uploaded stay in the session. A later "same list, but…" runs the query again. 0 = the copy lasts as long as the session.</div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-lg-6 o_setting_box">
+                                <div class="o_setting_right_pane">
+                                    <label for="chatboo_history_retention_days"/>
+                                    <field name="chatboo_history_retention_days"/>
+                                    <div class="text-muted">The chat you reopen: messages, tables on screen, and uploaded files. Deleted after this many days with no use. 0 = keep.</div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-lg-6 o_setting_box">
+                                <div class="o_setting_right_pane">
+                                    <label for="chatboo_download_max_mb"/>
+                                    <field name="chatboo_download_max_mb"/>
+                                    <div class="text-muted">Session file chips (named PDF/Excel/Word). Not the bubble Excel icon. 0 = no limit.</div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-lg-6 o_setting_box">
+                                <div class="o_setting_right_pane">
+                                    <label for="chatboo_upload_max_mb"/>
+                                    <field name="chatboo_upload_max_mb"/>
+                                    <div class="text-muted">Each picture or file sent to the chat. 0 = no limit.</div>
                                 </div>
                             </div>
                         </div>
@@ -56,6 +79,22 @@
                                     <label for="chatboo_default_show_mode"/>
                                     <field name="chatboo_default_show_mode"/>
                                     <div class="text-muted">Layout for new conversations (sticky per session after user phrasing).</div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-lg-6 o_setting_box">
+                                <div class="o_setting_right_pane">
+                                    <label for="chatboo_xlsx_float_decimals"/>
+                                    <field name="chatboo_xlsx_float_decimals"/>
+                                    <div class="text-muted">Decimals for floats and formula cells in Excel (integers stay whole).</div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-lg-6 o_setting_box">
+                                <div class="o_setting_left_pane">
+                                    <field name="chatboo_xlsx_thousands"/>
+                                </div>
+                                <div class="o_setting_right_pane">
+                                    <label for="chatboo_xlsx_thousands"/>
+                                    <div class="text-muted">Thousand separators on every numeric Excel cell. Locale of the spreadsheet.</div>
                                 </div>
                             </div>
                         </div>

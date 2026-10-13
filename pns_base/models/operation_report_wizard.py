@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-# Archivo: models/operation_report_wizard.py
-# Descripción: Mixin para wizards que muestran resultado de operación masiva.
+"""Mixin for wizards that show a bulk-operation result."""
 
-from odoo import fields, models, _
+from odoo import api, fields, models, _
+from odoo.tools import html_sanitize
 
 from odoo.addons.pns_base.utils import ui_feedback as pns_ui
 
@@ -34,6 +34,21 @@ class PnsOperationReportWizard(models.AbstractModel):
 
     # Legacy: informes dinámicos (cache rebuild, export JSON, estadísticas).
     result_html = fields.Html(string='Result', readonly=True, sanitize=False)
+
+    # The report HTML is built by platform code under sudo. Anything a user
+    # sends by RPC is sanitized: in Odoo 14 another user can open the record.
+    @api.model_create_multi
+    def create(self, vals_list):
+        if not self.env.su:
+            for vals in vals_list:
+                if vals.get('result_html'):
+                    vals['result_html'] = html_sanitize(vals['result_html'])
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if not self.env.su and vals.get('result_html'):
+            vals = dict(vals, result_html=html_sanitize(vals['result_html']))
+        return super().write(vals)
 
     def _apply_operation_result(
         self,
@@ -97,9 +112,3 @@ class PnsOperationReportWizard(models.AbstractModel):
             'views': [[False, 'form']],
             'target': 'new',
         }
-
-    def _show_operation_report(self, html, title=None):
-        """Legacy: informe HTML generado en Python. Preferir _apply_operation_result."""
-        self.ensure_one()
-        self.result_html = html
-        return self._reopen_operation_wizard(title=title or _('Operation result'))

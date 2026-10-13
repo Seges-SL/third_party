@@ -15,7 +15,7 @@ These tests call ``execute_plan_now()`` the same way every real call-site
 does: bound to an ``env`` on its OWN cursor obtained via
 ``registry.cursor()`` (never on the outer TransactionCase's savepoint
 cursor) — see ``_execute_plan_with_timeouts`` / auto-confirm /
-``_retry_confirmed_not_executed`` in ``mcp_safe_operation.py``. Because these
+``_retry_confirmed_not_executed`` in ``safe_operation.py``. Because these
 sub-cursors do real commits against the test database (outside the test's
 own rollback-on-teardown safety net), each test cleans up the rows it
 creates explicitly.
@@ -55,7 +55,7 @@ class TestSafePlanAtomicity(TransactionCase):
                 'plan': ['create 1 res.partner'], 'danger_level': 'low',
             },
         )
-        op.confirm_by_user(confirmed_uid=SUPERUSER_ID)
+        op.confirm_by_user()
         cr.commit()
         return op.id
 
@@ -161,7 +161,7 @@ class TestSafePlanAtomicity(TransactionCase):
                     'plan': ['module.update'], 'danger_level': 'high',
                 },
             )
-            op.confirm_by_user(confirmed_uid=SUPERUSER_ID)
+            op.confirm_by_user()
             cr.commit()
             op_id = op.id
             with self.assertRaises(UserError):

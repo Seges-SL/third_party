@@ -29,11 +29,13 @@ REPAIRABLE_AST_CODES = frozenset({
     'SORT_KEY',
 })
 # Rejects that must NOT be followed by "generate valid Python" — wrong tool,
-# not a syntax hole. The LLM must switch (get_context / api_call), not rewrite.
+# not a syntax hole. The LLM must switch (get_context / api_call / prose),
+# not rewrite.
 AST_SWITCH_TOOL_CODES = frozenset({
     'SORT_KEY',
     'CONTEXT_CATALOGUE',
     'API_CATALOGUE',
+    'SKILL_CATALOGUE',
 })
 
 
@@ -68,7 +70,7 @@ RELAXAICODE_NETWORK_IMPORT_MODULES = frozenset({
     'socket', 'ftplib', 'os', 'sys', 'pathlib', 'subprocess',
 })
 RELAXAICODE_NETWORK_IMPORT_HINT = (
-    "For external HTTP data use propose_safe_operations with op='fetch_url' "
+    "For external HTTP data use safe_plan_request with op='fetch_url' "
     "(GET only; whitelisted domains auto-confirm). "
     "Do NOT import requests/urllib/http/os — they are blocked in RelaxAICode."
 )
@@ -141,15 +143,18 @@ DANGEROUS_FORMAT_NAMES = frozenset({
 # Modelos de catálogo: RelaxAICode no los inspecciona por ORM.
 #   ai.api.server — teatro F1IZ; fuente = bloque inyectado + usage_guide; llamadas = api_call.
 #   ai.context    — packs ya inyectados / get_context; listar no es search+content XML.
+#   ai.skill      — slash en Chatboo; leer procedure/code_body reescribe el turno.
 RELAXAICODE_FORBIDDEN_API_SERVER_MODEL = 'ai.api.server'
 RELAXAICODE_FORBIDDEN_CONTEXT_MODEL = 'ai.context'
+RELAXAICODE_FORBIDDEN_SKILL_MODEL = 'ai.skill'
 RELAXAICODE_FORBIDDEN_CATALOGUE_MODELS = frozenset({
     RELAXAICODE_FORBIDDEN_API_SERVER_MODEL,
     RELAXAICODE_FORBIDDEN_CONTEXT_MODEL,
+    RELAXAICODE_FORBIDDEN_SKILL_MODEL,
 })
 
 # Atributos ORM de catálogo/secreto/drivers de ai.api.server. RelaxAICode
-# debe usar propose_safe_operations op=api_call — misma denylist en AST y runtime.
+# debe usar safe_plan_request op=api_call — misma denylist en AST y runtime.
 RELAXAICODE_FORBIDDEN_ORM_ATTRS = frozenset({
     '_get_driver',
     '_resolve_auth_token',
@@ -166,6 +171,41 @@ RELAXAICODE_FORBIDDEN_ORM_ATTRS = frozenset({
 RELAXAICODE_ORM_WRITE_ATTRS = frozenset({
     'create', 'write', 'unlink', 'copy',
 })
+
+# Business methods that write without calling .write(): most open their own
+# cursor and commit, so box A's rollback does not undo them. Blocked by name
+# both literally (AST) and through getattr/attrgetter/methodcaller (runtime).
+RELAXAICODE_SIDE_EFFECT_METHODS = frozenset({
+    'confirm_by_user',
+    'cancel_by_user',
+    'execute_plan_now',
+    'resolve_confirm_and_execute',
+    'resolve_confirm',
+    'resolve_execute',
+    'action_confirm_and_execute',
+    'action_execute_plan',
+    'action_cancel',
+    'cleanup_expired',
+    'cleanup_stuck_state',
+    'create_verification',
+    'button_immediate_install',
+    'button_immediate_upgrade',
+    'button_immediate_uninstall',
+})
+
+# RelaxAICode always runs as the asking user. These names hand out another
+# identity: ``sudo()``, ``with_user(1)`` (uid 1 is superuser), ``with_env``,
+# and ``record.env`` / ``env._env`` (the raw environment, outside the
+# catalogue gate). ``groups=`` and record rules only hold while none of them
+# is reachable.
+RELAXAICODE_PRIVILEGE_ATTRS = frozenset({
+    'sudo', 'with_user', 'with_env', 'env', '_env',
+})
+RELAXAICODE_PRIVILEGE_HINT = (
+    "RelaxAICode runs as the asking user: %r is not available. "
+    "Read with the user's own access (env['model'].search(...)); "
+    "what the user cannot read stays out of the answer."
+)
 
 RELAXAICODE_EXTERNAL_API_METHODS = frozenset({
     '_get_driver',
@@ -733,6 +773,163 @@ def _check_env_parameter_binding(tree):
     return True, None
 
 
+_SEARCH_DOMAIN_METHODS = frozenset({
+    'search', 'search_count', 'search_read', 'read_group', 'web_search_read',
+})
+_PRIOR_RESULT_NAMES = frozenset({'previous_result', 'raw_data'})
+_SEARCH_DOMAIN_KEYWORDS = frozenset({'domain', 'args'})
+
+
+def _ast_const_value(node):
+    if isinstance(node, ast.Constant):
+        return True, node.value
+    if isinstance(node, ast.NameConstant):
+        return True, node.value
+    return False, None
+
+
+def _is_empty_domain_filler(node):
+    """None / False / [] / () — not a real ORM domain, just the recipe fallback."""
+    ok, val = _ast_const_value(node)
+    if ok:
+        return val in (None, False, (), '', 0)
+    if isinstance(node, (ast.List, ast.Tuple, ast.Dict)):
+        return not (getattr(node, 'elts', None) or getattr(node, 'keys', None))
+    return False
+
+
+def _is_prior_result_alias(node, aliases):
+    """True when *node* is previous_result/raw_data or a name bound from them.
+
+    Structural: the whole expression is the prior dataset (or the recipe
+    ``previous_result.get('data') or raw_data or []``). A listcomp of ids
+    or a real domain list is not an alias.
+    """
+    if isinstance(node, ast.Name):
+        return node.id in _PRIOR_RESULT_NAMES or node.id in aliases
+    if isinstance(node, ast.Attribute):
+        return _is_prior_result_alias(node.value, aliases)
+    if isinstance(node, ast.Subscript):
+        return _is_prior_result_alias(node.value, aliases)
+    if isinstance(node, ast.Call):
+        if isinstance(node.func, ast.Attribute):
+            return _is_prior_result_alias(node.func.value, aliases)
+        if isinstance(node.func, ast.Name) and node.func.id in ('list', 'tuple'):
+            return any(_is_prior_result_alias(a, aliases) for a in node.args)
+        return False
+    if isinstance(node, ast.BoolOp):
+        has_prior = False
+        for val in node.values:
+            if _is_prior_result_alias(val, aliases):
+                has_prior = True
+            elif _is_empty_domain_filler(val):
+                continue
+            else:
+                return False
+        return has_prior
+    if isinstance(node, ast.IfExp):
+        body_ok = (
+            _is_prior_result_alias(node.body, aliases)
+            or _is_empty_domain_filler(node.body)
+        )
+        else_ok = (
+            _is_prior_result_alias(node.orelse, aliases)
+            or _is_empty_domain_filler(node.orelse)
+        )
+        has_prior = (
+            _is_prior_result_alias(node.body, aliases)
+            or _is_prior_result_alias(node.orelse, aliases)
+        )
+        return body_ok and else_ok and has_prior
+    return False
+
+
+def _bind_assign_aliases(targets, value, aliases):
+    is_alias = _is_prior_result_alias(value, aliases)
+    names = []
+    for target in targets:
+        if isinstance(target, ast.Name):
+            names.append(target.id)
+        elif isinstance(target, (ast.Tuple, ast.List)):
+            names.extend(
+                elt.id for elt in target.elts if isinstance(elt, ast.Name)
+            )
+    for name in names:
+        if is_alias:
+            aliases.add(name)
+        else:
+            aliases.discard(name)
+
+
+def _collect_prior_result_aliases(body, aliases):
+    for stmt in body or ():
+        if isinstance(stmt, ast.Assign):
+            _bind_assign_aliases(stmt.targets, stmt.value, aliases)
+        elif isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
+            if stmt.value is not None:
+                _bind_assign_aliases([stmt.target], stmt.value, aliases)
+        elif isinstance(stmt, ast.AugAssign) and isinstance(stmt.target, ast.Name):
+            if _is_prior_result_alias(stmt.value, aliases):
+                aliases.add(stmt.target.id)
+        elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            _collect_prior_result_aliases(stmt.body, aliases)
+        elif isinstance(stmt, ast.If):
+            _collect_prior_result_aliases(stmt.body, aliases)
+            _collect_prior_result_aliases(stmt.orelse, aliases)
+        elif isinstance(stmt, (ast.For, ast.AsyncFor, ast.While)):
+            _collect_prior_result_aliases(stmt.body, aliases)
+            _collect_prior_result_aliases(stmt.orelse, aliases)
+        elif isinstance(stmt, (ast.With, ast.AsyncWith)):
+            _collect_prior_result_aliases(stmt.body, aliases)
+        elif isinstance(stmt, ast.Try):
+            _collect_prior_result_aliases(stmt.body, aliases)
+            for handler in stmt.handlers:
+                _collect_prior_result_aliases(handler.body, aliases)
+            _collect_prior_result_aliases(stmt.orelse, aliases)
+            _collect_prior_result_aliases(stmt.finalbody, aliases)
+
+
+def _search_domain_arg(node):
+    """First positional domain, or domain=/args= keyword."""
+    if node.args:
+        return node.args[0]
+    for kw in node.keywords:
+        if kw.arg in _SEARCH_DOMAIN_KEYWORDS:
+            return kw.value
+    return None
+
+
+def _check_search_domain_not_prior_result(tree):
+    """Refuse Model.search(previous_result) and the SQHX3 recipe alias.
+
+    Invariant: the domain argument is an ORM domain (list of tuples and
+    '|','&','!'), never the prior-tool dataset. No model or field names.
+    """
+    aliases = set()
+    _collect_prior_result_aliases(getattr(tree, 'body', ()) or (), aliases)
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not isinstance(node.func, ast.Attribute):
+            continue
+        if node.func.attr not in _SEARCH_DOMAIN_METHODS:
+            continue
+        domain = _search_domain_arg(node)
+        if domain is None:
+            continue
+        if _is_prior_result_alias(domain, aliases):
+            return False, format_ast_error(
+                'SEARCH_DOMAIN',
+                "Model.search/search_count/read_group first argument must be "
+                "an ORM domain (list of tuples and '|', '&', '!'), not "
+                "previous_result, raw_data, or rows from a prior tool. "
+                "Wrong: Model.search(domain) after "
+                "domain = previous_result.get('data') or []. "
+                "Correct: Model.search([('field', '=', value)]).",
+            )
+    return True, None
+
+
 def _check_function_def_limits(tree):
     """Valida nº total y profundidad de anidamiento de def/async def.
 
@@ -783,11 +980,36 @@ def _check_function_def_limits(tree):
     return True, None
 
 
+def _privilege_error(name):
+    return format_ast_error('PRIVILEGE', RELAXAICODE_PRIVILEGE_HINT % (name,))
+
+
+def _privilege_attr_in_call(node):
+    """``getattr(x, 'sudo')`` / ``attrgetter('env')`` / ``methodcaller('sudo')``."""
+    if not isinstance(node, ast.Call) or not node.args:
+        return None
+    func = node.func
+    name = func.id if isinstance(func, ast.Name) else (
+        func.attr if isinstance(func, ast.Attribute) else None)
+    if name == 'getattr' and len(node.args) >= 2:
+        literal = _ast_static_str(node.args[1])
+    elif name in ('attrgetter', 'methodcaller'):
+        literal = _ast_static_str(node.args[0])
+    else:
+        return None
+    if not isinstance(literal, str):
+        return None
+    for part in literal.split('.'):
+        if part in RELAXAICODE_PRIVILEGE_ATTRS:
+            return part
+    return None
+
+
 def _external_api_bypass_error(method_name):
     return format_ast_error(
         'API_CATALOGUE',
         "RelaxAICode cannot access external API catalogue/secrets "
-        "via ORM (%r). Use the injected catalogue and propose_safe_operations "
+        "via ORM (%r). Use the injected catalogue and safe_plan_request "
         "with op='api_call' — never read ai.api.server drivers or specs from code."
         % method_name,
     )
@@ -798,7 +1020,7 @@ def _external_api_server_inspect_error():
         'API_CATALOGUE',
         "RelaxAICode cannot inspect ai.api.server "
         "(catalogue/config/spec). Do not retry with relaxaicode — "
-        "use the injected catalogue and propose_safe_operations with "
+        "use the injected catalogue and safe_plan_request with "
         "op='api_call' (fix arguments if propose failed).",
     )
 
@@ -811,8 +1033,22 @@ def _context_inspect_error():
         "list packs with get_context(context_name='contexts_index_core'); "
         "load one pack with get_context(context_name='<code>'). "
         "Always-on packs are already in the agent bundle; do not dump "
-        "pack XML. Creating discovery rows is propose_safe_operations, "
+        "pack XML. Creating discovery rows is safe_plan_request, "
         "not a sandbox search.",
+    )
+
+
+def _skill_inspect_error():
+    return format_ast_error(
+        'SKILL_CATALOGUE',
+        "RelaxAICode cannot inspect ai.skill "
+        "(slash catalogue). Do not retry with relaxaicode — "
+        "do not dump procedure or code_body. A skill runs when the user "
+        "types /command, or when the engine matches the sentence to that "
+        "skill's own trigger phrases; the model does not launch it. "
+        "On the MCP endpoint you do "
+        "not run slash skills: answer in prose that you serve tools and "
+        "knowledge packs. Creating or editing skills is not a sandbox search.",
     )
 
 
@@ -822,6 +1058,8 @@ def catalogue_inspect_error(model):
         return _external_api_server_inspect_error()
     if model == RELAXAICODE_FORBIDDEN_CONTEXT_MODEL:
         return _context_inspect_error()
+    if model == RELAXAICODE_FORBIDDEN_SKILL_MODEL:
+        return _skill_inspect_error()
     return None
 
 
@@ -924,24 +1162,8 @@ def _detect_requires_write_from_ast(tree):
     Cubre ofuscación estática: getattr(rec, 'wr'+'ite'), attrgetter('write').
     """
     orm_write_methods = frozenset({'create', 'write', 'unlink'})
-    # Escritura por API de negocio (no pasan el filtro .write/.create/.unlink).
-    side_effect_methods = frozenset({
-        'confirm_by_user',
-        'cancel_by_user',
-        'execute_plan_now',
-        'resolve_confirm_and_execute',
-        'resolve_confirm',
-        'resolve_execute',
-        'action_confirm_and_execute',
-        'action_execute_plan',
-        'action_cancel',
-        'cleanup_expired',
-        'cleanup_stuck_state',
-        'create_verification',
-        'button_immediate_install',
-        'button_immediate_upgrade',
-        'button_immediate_uninstall',
-    })
+    side_effect_methods = RELAXAICODE_SIDE_EFFECT_METHODS
+    by_name = RELAXAICODE_ORM_WRITE_ATTRS | side_effect_methods
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
@@ -956,23 +1178,22 @@ def _detect_requires_write_from_ast(tree):
             if (
                 isinstance(node.func.value, ast.Name)
                 and node.func.value.id == 'operator'
-                and node.func.attr in ('attrgetter', 'itemgetter')
+                and node.func.attr in ('attrgetter', 'methodcaller')
                 and node.args
             ):
                 attr = _ast_static_str(node.args[0])
-                if attr in RELAXAICODE_ORM_WRITE_ATTRS:
+                if attr in by_name:
                     return True
 
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
             # getattr(obj, 'write') / getattr(obj, 'wr'+'ite')
             if node.func.id == 'getattr' and len(node.args) >= 2:
                 attr = _ast_static_str(node.args[1])
-                if attr in RELAXAICODE_ORM_WRITE_ATTRS:
+                if attr in by_name:
                     return True
-            # attrgetter('write') / itemgetter — only attrgetter matters for methods
-            if node.func.id == 'attrgetter' and node.args:
+            if node.func.id in ('attrgetter', 'methodcaller') and node.args:
                 attr = _ast_static_str(node.args[0])
-                if attr in RELAXAICODE_ORM_WRITE_ATTRS:
+                if attr in by_name:
                     return True
 
         if isinstance(node, ast.AugAssign):
@@ -1594,6 +1815,54 @@ def repair_unsafe_sort_keys(code):
         return code, False
 
 
+_LEAKED_PARAM_TAG = re.compile(r'</?parameter\b', re.IGNORECASE)
+
+
+def strip_leaked_tool_markup(code):
+    """Drop a tool-call ``<parameter>`` tail the model glued onto the script.
+
+    Seed-style calls sometimes close ``code`` with ``</parameter name="summary"…>``
+    and that tag lands inside the Python. Only a trailing line, or a suffix
+    whose removal leaves a script that parses, is removed.
+    """
+    if not isinstance(code, str) or not code:
+        return code, False
+    low = code.lower()
+    if '<parameter' not in low and '</parameter' not in low:
+        return code, False
+    lines = code.split('\n')
+    changed = False
+    while lines:
+        raw = lines[-1]
+        stripped = raw.strip()
+        if not stripped:
+            lines.pop()
+            continue
+        if _LEAKED_PARAM_TAG.match(stripped):
+            lines.pop()
+            changed = True
+            continue
+        match = _LEAKED_PARAM_TAG.search(raw)
+        if match and match.start() > 0:
+            prefix = raw[:match.start()].rstrip()
+            candidate_lines = lines[:-1] + ([prefix] if prefix else [])
+            candidate = '\n'.join(candidate_lines)
+            try:
+                ast.parse(candidate)
+            except SyntaxError:
+                break
+            lines = candidate_lines
+            changed = True
+            continue
+        break
+    if not changed:
+        return code, False
+    repaired = '\n'.join(lines)
+    if repaired and not repaired.endswith('\n'):
+        repaired += '\n'
+    return repaired, True
+
+
 def validate_relaxaicode_source_ast(code):
     """
     Valida código Python usando AST completo.
@@ -1652,6 +1921,10 @@ def validate_relaxaicode_source_ast(code):
     env_ok, env_err = _check_env_parameter_binding(tree)
     if not env_ok:
         return False, env_err, False
+
+    domain_ok, domain_err = _check_search_domain_not_prior_result(tree)
+    if not domain_ok:
+        return False, domain_err, False
 
     dangerous_modules = RELAXAICODE_DANGEROUS_MODULES
     safe_modules = RELAXAICODE_SAFE_MODULES
@@ -1850,6 +2123,8 @@ def validate_relaxaicode_source_ast(code):
         if isinstance(node, ast.Attribute):
             if node.attr in RELAXAICODE_FORBIDDEN_ORM_ATTRS:
                 return False, _external_api_bypass_error(node.attr), False
+            if node.attr in RELAXAICODE_PRIVILEGE_ATTRS:
+                return False, _privilege_error(node.attr), False
             if node.attr in dangerous_attrs:
                 # type(x).__name__ → string label; no abre introspección de sandbox.
                 if not _is_safe_type_name_access(node):
@@ -1897,6 +2172,9 @@ def validate_relaxaicode_source_ast(code):
         # en context_builder, que evalúa el nombre real contra la MISMA denylist.
         # ============================================================
         if isinstance(node, ast.Call):
+            privileged = _privilege_attr_in_call(node)
+            if privileged:
+                return False, _privilege_error(privileged), False
             if isinstance(node.func, ast.Name) and node.func.id in ('getattr', 'setattr', 'delattr'):
                 if len(node.args) >= 2:
                     # Segundo argumento string literal (Py3.8+: Constant; <3.8: Str)

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Helpers para mapear stats de importación a campos del mixin operation report."""
+"""Map import stats onto the operation-report mixin fields."""
 
 
 def context_zip_files_to_result(files, warnings=None):

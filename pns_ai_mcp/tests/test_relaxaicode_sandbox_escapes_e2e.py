@@ -1,21 +1,20 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""E2E del sandbox RelaxAICode: pipeline REAL (AST → contexto → compile → exec).
+"""RelaxAICode sandbox E2E: real pipeline (AST → context → compile → exec).
 
-A diferencia del unit de host (unit_tests/test_relaxaicode_sandbox_escapes.py),
-aquí se ejecuta la herramienta completa `tool_relaxaicode` sobre un env
-Odoo real (cursor caja A READ ONLY incluido). Se comprueba que cada payload de
-fuga termina en un error CONTROLADO (nunca una excepción no capturada ni un
-resultado que haya alcanzado objetos peligrosos) y que el código legítimo sigue
-funcionando.
+Unlike the host unit file (unit_tests/test_relaxaicode_sandbox_escapes.py),
+this runs the full ``tool_relaxaicode`` tool on a real Odoo env (box-A
+read-only cursor included). Each escape payload must end in a controlled
+error (never an uncaught exception or a result that reached dangerous
+objects), and legitimate code must still work.
 
-El corpus se mantiene aquí en línea (una copia mínima del de unit_tests/), porque
-unit_tests/ no viaja dentro del addon en runtime de Odoo.
+The corpus is inlined here (a minimal copy of unit_tests/) because
+unit_tests/ is not shipped inside the addon at Odoo runtime.
 
-**Producción:** tag ``pns_intrusion`` + skip si la BD no es *prueba*/*test*
-(el cursor aislado de caja A puede escapar del rollback del TransactionCase).
-Suite host segura: ``./t.sh --intrusion-only``.
+Production: tag ``pns_intrusion`` + skip unless the DB is *prueba*/*test*
+(the isolated box-A cursor can escape the TransactionCase rollback).
+Safe host suite: ``./t.sh --intrusion-only``.
 """
 import json
 
@@ -53,6 +52,17 @@ ESCAPE_PAYLOADS = [
     "srv = env['ai.api.server'].browse(6)\nresult = srv.spec_json",
     "recs = env['ai.context'].search([('code', 'ilike', 'self')])\nresult = [{'id': r.id, 'code': r.code} for r in recs]",
     "result = env.sudo()['ai.context'].search([])",
+    "recs = env['ai.skill'].search([])\nresult = [{'code': r.code} for r in recs]",
+    "result = env.sudo()['ai.skill'].search([])",
+    # ── Un módulo seguro no es puerta a os/sys ni a open() ────────────────
+    "import platform\nresult = platform.os.getcwd()",
+    "result = uuid.os.getcwd()",
+    "result = datetime.sys.modules",
+    "result = io.open('/etc/hostname').read()",
+    # ── Siempre como el usuario que pregunta: sin sudo / with_user / env(su) ─
+    "result = env.sudo()['ai.provider'].search([]).mapped('api_key')",
+    "result = getattr(env.user, 'su' + 'do')().name",
+    "result = env(su=True)['res.users'].search_count([])",
 ]
 
 # Mutadores ORM ofuscados: deben marcar requires_write (caja B) o fallar

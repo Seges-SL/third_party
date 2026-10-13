@@ -1,9 +1,9 @@
-// -*- coding: utf-8 -*-
-// Archivo: static/src/js/mcp_context_tree.js
-// Creado: 2025-11-24 13:16:51
-// Modificado: 2026-01-26 (Force Update for Context Stats)
-// Descripciín: Botones unificados para gestiín de contextos (Importar Mídulo, Importar ZIP, Exportar Todo)
-
+/**
+ * Tools button for the Contexts list (Odoo 14).
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+ */
 odoo.define('pns_ai_mcp.mcp_context_tree', function (require) {
     "use strict";
 

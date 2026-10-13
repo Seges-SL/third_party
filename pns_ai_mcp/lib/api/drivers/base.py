@@ -17,6 +17,8 @@ inputSchema) regardless of the underlying protocol, so prompt injection,
 counts and HTML rendering work identically for every api_type.
 """
 
+import base64
+
 
 class APIDriverError(Exception):
     """Transport or protocol error raised by an API driver."""
@@ -26,15 +28,22 @@ def build_auth_headers(server, token=None):
     """HTTP auth headers from the server's auth config + a resolved token.
 
     ``token`` is the PER-CALL credential (user key or server default); the
-    header placement (bearer / api_key / custom_header) stays on the server.
+    header placement (bearer / basic / api_key / custom_header) stays on the
+    server. For ``basic``, ``token`` is the username and the password is
+    always empty (``username:``), matching common API-key-as-basic-user APIs.
     """
     headers = {}
     auth_type = server.auth_type
-    token = token if token is not None else (server.auth_token or '')
+    token = token if token is not None else (server.sudo().auth_token or '')
     if not token or auth_type == 'none':
         return headers
     if auth_type == 'bearer':
         headers['Authorization'] = 'Bearer %s' % token
+    elif auth_type == 'basic':
+        encoded = base64.b64encode(
+            ('%s:' % token).encode('utf-8'),
+        ).decode('ascii')
+        headers['Authorization'] = 'Basic %s' % encoded
     elif auth_type == 'api_key':
         headers[server.auth_header_name or 'Authorization'] = token
     elif auth_type == 'custom_header':
@@ -89,3 +98,10 @@ class APIDriver:
             APIDriverError: on transport/protocol failure or remote error.
         """
         raise NotImplementedError
+
+    def reads_only(self, server, tool_name):
+        """True when the protocol itself says *tool_name* changes nothing remote.
+
+        No network: answer from what discovery already stored. Unknown → False.
+        """
+        return False

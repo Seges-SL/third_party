@@ -34,9 +34,9 @@ TYPE_SELECTION = [(token, token) for token in ALL_TYPES]
 #: never prose, so it is deliberately absent here.
 INJECTABLE_TYPES = (CORE, DOMAIN, LOCALE)
 
-#: Roles advertised via MCP ``prompts``/``resources`` listings (the
-#: user-selectable knowledge). ``locale`` is internal glue; ``discovery`` is
-#: routing — both excluded.
+#: Roles advertised via MCP ``prompts`` listings (the user-selectable
+#: knowledge). ``locale`` is internal glue; ``discovery`` is routing —
+#: both excluded.
 MCP_LISTABLE_TYPES = (CORE, DOMAIN)
 
 #: Roles that are NEVER hand-composed onto an agent: ``core`` is the always-on

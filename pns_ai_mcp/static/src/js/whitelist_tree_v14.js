@@ -1,5 +1,9 @@
-// -*- coding: utf-8 -*-
-// Operations button for Whitelist list (Odoo 14).
+/**
+ * Tools button for the URL whitelist list (Odoo 14).
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+ */
 odoo.define('pns_ai_mcp.whitelist_tree', function (require) {
     "use strict";
 

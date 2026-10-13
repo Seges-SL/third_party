@@ -32,7 +32,7 @@ class TestChangeJournal(TransactionCase):
             ('op', '=', 'create'),
         ])
         self.assertEqual(len(created), 1)
-        self.assertEqual(created.step_seq, 1)
+        self.assertEqual(created.turn_step, 1)
         self.assertTrue(created.reversible)
         self.assertTrue(created.can_revert)
         self.assertIn('"schema_version": 1', created.after_json or '')
@@ -109,9 +109,9 @@ class TestChangeJournal(TransactionCase):
                     'plan': ['write field'], 'danger_level': 'medium',
                     'log_origin': 'internal',
                 },
-                correlation_id='FAILTEST',
+                turn='FAILTEST',
             )
-            op.confirm_by_user(confirmed_uid=SUPERUSER_ID)
+            op.confirm_by_user()
             cr.commit()
             op_id = op.id
             try:
@@ -119,7 +119,7 @@ class TestChangeJournal(TransactionCase):
             except Exception:
                 pass
         failed = self.env['ai.change.journal'].search([
-            ('correlation_id', '=', 'FAILTEST'),
+            ('turn', '=', 'FAILTEST'),
             ('state', '=', 'failed'),
         ])
         self.assertTrue(failed)

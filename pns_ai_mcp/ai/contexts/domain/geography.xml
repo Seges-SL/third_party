@@ -4,10 +4,10 @@
         <code>geography</code>
         <tipo>domain</tipo>
         <description>Geographic knowledge - country/province/city model, administrative levels (region is NOT a state), resolution funnel, and HONEST handling of missing geo data (report, never invent)</description>
-        <version>1.1</version>
+        <version>1.2</version>
         <created_at>2026-07-13</created_at>
         <created_by>Administrator</created_by>
-        <modified_at>2026-07-13</modified_at>
+        <modified_at>2026-09-20</modified_at>
         <modified_by>Administrator</modified_by>
     </metadata>
 
@@ -40,6 +40,7 @@
                 <rule>Match place names PRECISELY. Use an anchored/exact match — e.g. ('name', '=ilike', term) — NEVER a bare substring ('name', 'ilike', term) with limit=1, which grabs the first unrelated row that merely CONTAINS the text (real failures: 'linares' -&gt; "Embalse de Linares" in Segovia; 'ronda' -&gt; "Artatza Foronda" in Álava).</rule>
                 <rule>Filter by country when known (e.g. ('country_id.code', '=', 'ES')) to avoid homonyms in other countries.</rule>
                 <rule>If a term returns 0 matches, or MORE than one plausible match, do NOT pick one at random: report that item as "no encontrada" / "ambigua". A per-item "no encontrada" is a correct, expected outcome — never disguise it, and NEVER claim "all found" or "all have a province assigned" when some items did not resolve.</rule>
+                <rule>When the term is ambiguous, SHOW the candidates instead of only naming the problem: rows with `id`, the place name and what separates them (country, parent state), so the user can point at one. A homonym in two countries and a bilingual spelling are the usual cases. See the core rule on ambiguous records.</rule>
                 <rule>Preserve the user's spelling in the report. If a term looks like a typo (e.g. "úbda" for "Úbeda"), say so instead of silently matching something else.</rule>
             </name_matching>
             <resolution_funnel>

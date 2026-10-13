@@ -19,6 +19,7 @@ _BLOCK_KEYS = (
     'map_url', 'map_pins', 'pins_url', 'summary', 'title', 'name',
     'geo_coords', 'geo_thumbs', 'notices',
     '__model', '__subtle_zebra__', '__no_charts__', '__row_links__',
+    '__excel_formulas__',
 )
 
 
@@ -238,6 +239,7 @@ def render_basket_html(basket, *, fallback_html=None, env=None, render_context=N
         _logger.debug('turn_presentation_basket: merge produced no HTML')
         return fallback_html
     try:
-        return wrap_bare_images_clickable(html)
+        image_env = rcx.get('env') if isinstance(rcx, dict) else None
+        return wrap_bare_images_clickable(html, env=image_env or env)
     except Exception:
         return html

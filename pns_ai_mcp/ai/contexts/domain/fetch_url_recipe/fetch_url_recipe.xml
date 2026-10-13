@@ -4,7 +4,7 @@
         <code>fetch_url_recipe</code>
         <tipo>domain</tipo>
         <description>How to fetch external data: use the fetch_url safe operation, never import urllib/requests in relaxaicode</description>
-        <version>1.1</version>
+        <version>1.4</version>
     </metadata>
 
     <domain_knowledge>
@@ -21,9 +21,9 @@ for the web.
 
 ## The pattern (imitate this)
 
-1. If unsure whether the domain is allowed, read the `url_whitelist` resource
-   first with `fetch_native_mcp_resource`.
-2. Call `propose_safe_operations` with a `steps` list of `fetch_url` steps. Each
+1. If unsure whether the domain is allowed, use the trusted-domains list
+   already in the prompt.
+2. Call `safe_plan_request` with a `steps` list of `fetch_url` steps. Each
    step needs: `op = "fetch_url"`, a full `url`, and optionally `method`
    (`GET` default; also `HEAD`, `OPTIONS`, or `QUERY` with `body` +
    `content_type`). Safe methods only — no POST/PUT/PATCH/DELETE here.
@@ -42,7 +42,7 @@ WRONG — this is blocked, never do it:
     raw = urllib.request.urlopen("https://api.example.com/rate?base=USD").read()
     result = json.loads(raw)
 
-RIGHT — call `propose_safe_operations` with these arguments:
+RIGHT — call `safe_plan_request` with these arguments:
 
     {
       "steps": [
@@ -55,7 +55,7 @@ RIGHT — call `propose_safe_operations` with these arguments:
 Then read the returned JSON `body` and reply with the rate, citing the source.
 
 ## Good habits
-- BATCH: put several URLs as several steps in ONE `propose_safe_operations` call
+- BATCH: put several URLs as several steps in ONE `safe_plan_request` call
   (they confirm and run together) instead of one call per URL.
 - Prefer JSON APIs: `fetch_url` is a plain HTTP request with no JavaScript, so
   single-page-app pages return empty HTML shells.

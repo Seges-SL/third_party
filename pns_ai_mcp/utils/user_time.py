@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Huso del usuario de sesión (Odoo ``tz``), sin literales de negocio.
+"""Session user's timezone (Odoo ``tz``), no business literals.
 
-El reloj del proceso (contenedor) suele ser UTC. Las cards y el sandbox
-deben usar el IANA tz del usuario (``env.context['tz']`` / ``user.tz``).
+The process clock (container) is usually UTC. Cards and the sandbox must
+use the user's IANA tz (``env.context['tz']`` / ``user.tz``).
 """
 from __future__ import annotations
 

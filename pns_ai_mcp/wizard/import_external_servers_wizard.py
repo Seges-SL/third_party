@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Import external API servers (MCP / OpenAPI) from JSON."""
+
 import base64
 import logging
 
@@ -37,7 +39,7 @@ class ImportExternalServersWizard(models.TransientModel):
       - Match key: ``code``.
       - URL whitelist is a separate model — never mixed into this import.
     """
-    _name = 'pns_ai_mcp.import_external_servers_wizard'
+    _name = 'ai.import.external.servers.wizard'
     _inherit = ['pns.operation.report.wizard']
     _description = 'Wizard to import External API Servers from JSON'
 
@@ -97,7 +99,7 @@ class ImportExternalServersWizard(models.TransientModel):
                     vals['name'] = entry.get('name') or code
 
                 if existing:
-                    existing.write(vals)
+                    existing.write(existing._keep_secrets_on_import(vals))
                     updated += 1
                 else:
                     Server.create(vals)

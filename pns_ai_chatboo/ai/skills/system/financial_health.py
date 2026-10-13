@@ -1,7 +1,10 @@
+# -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-# SKILL: financial-health — EXACT base JYDY-14 (financial_situation_report)
-# + credit-facility / occ-polizas + neutral pajama (46Z6)
+"""Financial-health slash skill.
+
+Period KPIs, ledger liquidity, open AR/AP, and credit-facility drawn series.
+"""
 from datetime import date
 
 from collections import defaultdict
@@ -10,6 +13,34 @@ import re
 import calendar
 
 _CHUNK = 5
+
+# Month names this skill already accepts in period text (es + en).
+_MONTH_NUM = {
+    'january': 1, 'enero': 1,
+    'february': 2, 'febrero': 2,
+    'march': 3, 'marzo': 3,
+    'april': 4, 'abril': 4,
+    'may': 5, 'mayo': 5,
+    'june': 6, 'junio': 6,
+    'july': 7, 'julio': 7,
+    'august': 8, 'agosto': 8,
+    'september': 9, 'septiembre': 9,
+    'october': 10, 'octubre': 10,
+    'november': 11, 'noviembre': 11,
+    'december': 12, 'diciembre': 12,
+}
+
+
+def _month_and_year(blob_l):
+    """``septiembre de 2026`` / ``September 2026`` → (month, year), or None."""
+    for name, num in _MONTH_NUM.items():
+        matched = re.search(
+            r'\b%s\b(?:\s+de)?\s+(19\d{2}|20\d{2})\b' % name,
+            blob_l,
+        )
+        if matched:
+            return num, int(matched.group(1))
+    return None
 
 
 def _add_part(out, x):
@@ -113,6 +144,15 @@ def _parse_period(blob, today):
             end_d = today
         lab = yms[0] if len(yms) == 1 else 'months'
         return start_d, end_d, lab, yms
+    month_hit = _month_and_year(blob_l)
+    if month_hit:
+        num, yy = month_hit
+        start_d = date(yy, num, 1)
+        end_d = date(yy, num, calendar.monthrange(yy, num)[1])
+        if end_d > today:
+            end_d = today
+        if start_d <= end_d:
+            return start_d, end_d, '%04d-%02d' % (yy, num), None
     m_year = re.search(r'\b(19\d{2}|20\d{2})\b', blob)
     if m_year:
         yy = int(m_year.group(1))
@@ -179,10 +219,10 @@ def _is_facility_journal(j):
     return bool(re.match(r'^p\d', code))
 
 
-def _facilities_ytd(start_d, end_d, lab):
+def _facilities_ytd(start_d, end_d, lab, company_id=None):
     if 'account.journal' not in env or 'account.move.line' not in env:
         return None, None, 0.0, 0.0, lab['note']
-    journals = env['account.journal'].search([
+    journal_domain = [
         '|', '|', '|', '|', '|',
         ('name', 'ilike', 'póliza'),
         ('name', 'ilike', 'poliza'),
@@ -190,7 +230,10 @@ def _facilities_ytd(start_d, end_d, lab):
         ('name', 'ilike', 'line of credit'),
         ('code', '=like', 'P%'),
         ('default_account_id.name', 'ilike', 'póliza'),
-    ])
+    ]
+    if company_id:
+        journal_domain.append(('company_id', '=', company_id))
+    journals = env['account.journal'].search(journal_domain)
     series_meta = []
     seen = set()
     for j in journals:
@@ -217,19 +260,24 @@ def _facilities_ytd(start_d, end_d, lab):
             m = 1
             y += 1
     opening = {s['aid']: 0.0 for s in series_meta}
-    for line in env['account.move.line'].search([
+    open_domain = [
         ('account_id', 'in', aids),
         ('move_id.state', '=', 'posted'),
         ('date', '<', sd),
-    ]):
-        opening[line.account_id.id] += line.credit - line.debit
-    by_ym = defaultdict(float)
-    for line in env['account.move.line'].search([
+    ]
+    period_domain = [
         ('account_id', 'in', aids),
         ('move_id.state', '=', 'posted'),
         ('date', '>=', sd),
         ('date', '<=', ed),
-    ]):
+    ]
+    if company_id:
+        open_domain.append(('company_id', '=', company_id))
+        period_domain.append(('company_id', '=', company_id))
+    for line in env['account.move.line'].search(open_domain):
+        opening[line.account_id.id] += line.credit - line.debit
+    by_ym = defaultdict(float)
+    for line in env['account.move.line'].search(period_domain):
         by_ym[(str(line.date)[:7], line.account_id.id)] += line.credit - line.debit
     running = dict(opening)
     totals = []
@@ -268,9 +316,54 @@ def _pajama(rows):
     return rows
 
 
+_LEDGER_GROUPS = (
+    ('57',),
+    ('430', '431', '432'),
+    ('400', '401'),
+    ('410', '411'),
+    ('52',),
+    ('17',),
+    ('475', '476', '477', '465'),
+)
+
+
+def _ledger_group(code):
+    """Spanish chart prefix for one account code, or None."""
+    code = code or ''
+    for group in _LEDGER_GROUPS:
+        if any(code.startswith(pfx) for pfx in group):
+            return group
+    return None
+
+
+def _row_label(row):
+    """Label the closing paragraph reads. The table stores it as Metric."""
+    if not isinstance(row, dict):
+        return ''
+    return (
+        row.get('Indicator') or row.get('Indicador')
+        or row.get('Metric') or row.get('Métrica') or ''
+    )
+
+
+def _active_company():
+    try:
+        rec = company
+        if rec:
+            return rec
+    except NameError:
+        pass
+    try:
+        return env.company
+    except Exception:
+        return None
+
+
 def financial_situation_report(start_d, end_d, label):
     """Financial situation report for the given period."""
     ref = end_d
+    comp = _active_company()
+    cid = comp.id if comp else False
     y0, m0, d0 = ref.year, ref.month, ref.day
     start_ytd = start_d
     end_ytd = end_d
@@ -291,12 +384,15 @@ def financial_situation_report(start_d, end_d, label):
     pay_cut = date(y0 - 2, m0, 1)
 
     def inv_agg(date_from, date_to, types):
-        moves = env['account.move'].search([
+        domain = [
             ('state', '=', 'posted'),
             ('move_type', 'in', types),
             ('invoice_date', '>=', str(date_from)),
             ('invoice_date', '<=', str(date_to)),
-        ])
+        ]
+        if cid:
+            domain.append(('company_id', '=', cid))
+        moves = env['account.move'].search(domain)
         base = total = 0.0
         n_inv = n_ref = 0
         by_partner = {}
@@ -345,11 +441,14 @@ def financial_situation_report(start_d, end_d, label):
     if s_pytd['base']:
         var_ytd = round((s_ytd['base'] - s_pytd['base']) * 100.0 / s_pytd['base'], 2)
 
-    open_ar = env['account.move'].search([
+    open_ar_domain = [
         ('state', '=', 'posted'),
         ('move_type', 'in', ['out_invoice', 'out_refund']),
         ('payment_state', 'in', ['not_paid', 'partial', 'in_payment']),
-    ])
+    ]
+    if cid:
+        open_ar_domain.append(('company_id', '=', cid))
+    open_ar = env['account.move'].search(open_ar_domain)
     total_residual = 0.0
     overdue_residual = 0.0
     ar_by = {}
@@ -381,13 +480,16 @@ def financial_situation_report(start_d, end_d, label):
             ar_by[pid]['Open invoices'] += 1
             ar_by[pid]['pend_n'] += 1
 
-    paid_hist = env['account.move'].search([
+    paid_hist_domain = [
         ('state', '=', 'posted'),
         ('move_type', '=', 'out_invoice'),
         ('payment_state', '=', 'paid'),
         ('invoice_date', '>=', str(pay_cut)),
         ('partner_id', 'in', list(ar_by.keys()) or [0]),
-    ])
+    ]
+    if cid:
+        paid_hist_domain.append(('company_id', '=', cid))
+    paid_hist = env['account.move'].search(paid_hist_domain)
     for mv in paid_hist:
         pid = mv.partner_id.id
         if pid in ar_by:
@@ -414,23 +516,29 @@ def financial_situation_report(start_d, end_d, label):
         ar_rows.append(row)
     ar_rows = sorted(ar_rows, key=lambda x: x['Open amount'], reverse=True)[:15]
 
-    open_ap = env['account.move'].search([
+    open_ap_domain = [
         ('state', '=', 'posted'),
         ('move_type', 'in', ['in_invoice', 'in_refund']),
         ('payment_state', 'in', ['not_paid', 'partial', 'in_payment']),
-    ])
+    ]
+    if cid:
+        open_ap_domain.append(('company_id', '=', cid))
+    open_ap = env['account.move'].search(open_ap_domain)
     ap_total = 0.0
     for mv in open_ap:
         ap_total += abs(mv.amount_residual or 0.0)
 
     ytd_invoiced = 0.0
     ytd_res = 0.0
-    ytd_moves = env['account.move'].search([
+    ytd_domain = [
         ('state', '=', 'posted'),
         ('move_type', 'in', ['out_invoice', 'out_refund']),
         ('invoice_date', '>=', str(start_ytd)),
         ('invoice_date', '<=', str(end_ytd)),
-    ])
+    ]
+    if cid:
+        ytd_domain.append(('company_id', '=', cid))
+    ytd_moves = env['account.move'].search(ytd_domain)
     for mv in ytd_moves:
         sign = 1.0 if mv.move_type == 'out_invoice' else -1.0
         ytd_invoiced += (mv.amount_total or 0.0) * sign
@@ -458,39 +566,51 @@ def financial_situation_report(start_d, end_d, label):
     month_rows = [{'Month': k, 'Untaxed base': round(v, 2)} for k, v in months]
     pay_rows = [{'State': k, 'Invoice count': v} for k, v in sorted(s_ytd['by_pay'].items(), key=lambda x: -x[1])]
 
-    def bal_prefix(prefixes):
-        domain = [('move_id.state', '=', 'posted'), ('account_id', '!=', False)]
-        lines = env['account.move.line'].search(domain)
-        total = 0.0
-        detail = {}
-        for line in lines:
-            code = line.account_id.code or ''
-            ok = False
-            for pfx in prefixes:
-                if code.startswith(pfx):
-                    ok = True
-                    break
-            if not ok:
+    def ledger_as_of():
+        """One read of posted lines up to the period end, split by chart prefix."""
+        prefixes = [pfx for group in _LEDGER_GROUPS for pfx in group]
+        domain = [
+            ('move_id.state', '=', 'posted'),
+            ('account_id', '!=', False),
+            ('date', '<=', str(end_d)),
+        ]
+        if cid:
+            domain.append(('company_id', '=', cid))
+        code_domain = [('account_id.code', '=like', pfx + '%') for pfx in prefixes]
+        if len(code_domain) > 1:
+            domain.extend(['|'] * (len(code_domain) - 1))
+        domain.extend(code_domain)
+        buckets = {
+            group: {'total': 0.0, 'detail': {}} for group in _LEDGER_GROUPS
+        }
+        for line in env['account.move.line'].search(domain):
+            group = _ledger_group(line.account_id.code or '')
+            if group is None:
                 continue
-            s = (line.debit or 0.0) - (line.credit or 0.0)
-            total += s
+            signed = (line.debit or 0.0) - (line.credit or 0.0)
+            bucket = buckets[group]
+            bucket['total'] += signed
             aid = line.account_id.id
-            if aid not in detail:
-                detail[aid] = {
-                    'code': code,
+            if aid not in bucket['detail']:
+                bucket['detail'][aid] = {
+                    'code': line.account_id.code or '',
                     'account': line.account_id.name or '',
                     'saldo': 0.0,
                 }
-            detail[aid]['saldo'] += s
-        return total, detail
+            bucket['detail'][aid]['saldo'] += signed
+        return buckets
 
-    cash, cash_d = bal_prefix(['57'])
-    ar_acc, _ = bal_prefix(['430', '431', '432'])
-    ap_acc, ap_d = bal_prefix(['400', '401'])
-    acr_acc, acr_d = bal_prefix(['410', '411'])
-    fin_cp, fin_cp_d = bal_prefix(['52'])
-    fin_lp, fin_lp_d = bal_prefix(['17'])
-    fiscal, fiscal_d = bal_prefix(['475', '476', '477', '465'])
+    books = ledger_as_of()
+    cash, cash_d = books[('57',)]['total'], books[('57',)]['detail']
+    ar_acc = books[('430', '431', '432')]['total']
+    ap_acc, ap_d = books[('400', '401')]['total'], books[('400', '401')]['detail']
+    acr_acc, acr_d = books[('410', '411')]['total'], books[('410', '411')]['detail']
+    fin_cp, fin_cp_d = books[('52',)]['total'], books[('52',)]['detail']
+    fin_lp, fin_lp_d = books[('17',)]['total'], books[('17',)]['detail']
+    fiscal, fiscal_d = (
+        books[('475', '476', '477', '465')]['total'],
+        books[('475', '476', '477', '465')]['detail'],
+    )
 
     def as_liab(x):
         return round(-x if x < 0 else x, 2)
@@ -672,6 +792,7 @@ else:
         }
         _cf_wide, _cf_det, _cf_first, _cf_last, _cf_note = _facilities_ytd(
             _start, _end, _lab,
+            company_id=(_active_company().id if _active_company() else False),
         )
         _tables = list(result.get('tables') or [])
         if _tables and isinstance(_tables[0].get('data'), list):
@@ -762,7 +883,7 @@ else:
             for _row in (_t.get('data') or []):
                 if not isinstance(_row, dict):
                     continue
-                _ind = (_row.get('Indicator') or _row.get('Indicador') or '').lower()
+                _ind = _row_label(_row).lower()
                 _val = _row.get('Value') if 'Value' in _row else _row.get('Valor')
                 if 'overdue' in _ind or 'vencida' in _ind:
                     _overdue = _val

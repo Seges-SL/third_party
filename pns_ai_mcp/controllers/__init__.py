@@ -3,21 +3,31 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """MCP controllers package."""
 
+import logging
+
 from . import main
+from . import key_pin
 from . import verification_ui
 from . import choice_ui
 from . import session_file
+from . import remote_image
 
-# Importar tools para que se registren automáticamente con decoradores
-# Esto debe hacerse después de importar main para evitar imports circulares
-try:
-    from . import tools_system
-    from . import tools_relaxaicode
-    from . import safe_plan
-    from . import tools_context
-    from . import tools_context_analytics
-    from . import tools_i18n_audit
-except ImportError:
-    # Si hay error de importación, no fallar (puede ser durante instalación)
-    pass
+_logger = logging.getLogger(__name__)
 
+
+def _load_tool(name):
+    """Register one tool module. A miss is logged and does not hide the rest.
+
+    Install can hit this before the file is importable. A later boot that
+    still hits it leaves the same line, with the traceback.
+    """
+    try:
+        __import__(__name__ + '.' + name, fromlist=[name])
+    except ImportError:
+        _logger.exception('MCP tools: %s did not load', name)
+
+
+# After main, so these can import it.
+_load_tool('tools_relaxaicode')
+_load_tool('safe_plan')
+_load_tool('tools_context')

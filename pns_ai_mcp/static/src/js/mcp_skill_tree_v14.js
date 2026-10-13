@@ -1,8 +1,9 @@
-// -*- coding: utf-8 -*-
-// Archivo: static/src/js/mcp_skill_tree_v14.js
-// Descripción: Botón unificado "Herramientas" para la gestión de skills (Odoo 14).
-//              Equivalente a mcp_context_tree_v14.js pero para el modelo ai.skill.
-
+/**
+ * Tools button for the Skills list (Odoo 14).
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+ */
 odoo.define('pns_ai_mcp.mcp_skill_tree', function (require) {
     "use strict";
 

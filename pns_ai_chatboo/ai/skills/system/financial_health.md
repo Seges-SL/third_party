@@ -3,8 +3,9 @@ skill: financial-health
 name: Financial health
 description: Narrative financial situation report (JYDY-14): KPIs, liquidity, debts, collections, ratios, facilities; configurable period.
 agent_codes: pns_ai_chatboo
-version: 2.14
-painter: painter-free
+version: 2.17
+triggers: estado financiero, situación financiera, situacion financiera, informe financiero, financial health, financial situation, financial report
+compose: compose-model
 param_schema: {"periodo": {"type": "string", "desc": "Canonical period ONLY: null/empty, ytd, integer 1-60 (= last N months), YYYY, YYYY-YYYY, or YYYY-MM. Convert NL like 'últimos dos años'/'last 2 years' → '24'. Never return prose."}}
 arg_hint: ytd | 12 | 2025 | 2024-2025 | 2025-03 | ?
 args_policy: default
@@ -13,7 +14,7 @@ active: true
 context_codes:
 ---
 [FINANCIAL-HEALTH]
-Use with /financial-health (Spanish twin: /analisis-financiero).
+Use with /financial-health.
 
 FIGURES / TABLES = code_body (deterministic; engine paints HTML).
 NARRATIVE = you (LLM) with a FIXED skeleton — no Markdown tables.

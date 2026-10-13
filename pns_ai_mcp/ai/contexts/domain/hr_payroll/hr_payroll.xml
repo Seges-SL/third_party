@@ -27,6 +27,13 @@ live in the locale variant `hr_payroll_*`):
 Use **one** source per answer — never mix payslip totals with accounting totals in
 the same table.
 
+## Who earns more
+
+Questions about who earns more or less, wages, or a salary ranking use this
+pack: accounting first, then payslip. They are not an external attendance,
+check-in, or hours API. Do not call an external tool that needs one employee
+id in order to rank pay.
+
 ## Step 1: Accounting (locale variant)
 
 The active locale context (`hr_payroll_es_ES`, `hr_payroll_en_US`, …) defines:

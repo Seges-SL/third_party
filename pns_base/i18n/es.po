@@ -167,6 +167,8 @@ msgstr "Nombre de archivo"
 
 #. module: pns_base
 #: model_terms:ir.ui.view,arch_db:pns_base.view_export_file_wizard_form
+#: model_terms:ir.ui.view,arch_db:pns_base.view_export_secrets_wizard_form
+#: code:addons/pns_base/models/export_secrets_wizard.py:0
 msgid "Export"
 msgstr "Exportar"
 
@@ -244,3 +246,48 @@ msgstr "Pulsa «Descargar» para elegir dónde guardar el archivo."
 #: code:addons/pns_base/utils/portable_io.py:0
 msgid "Records exported"
 msgstr "Registros exportados"
+
+#. module: pns_base
+#: model:ir.model,name:pns_base.model_pns_export_secrets_wizard
+msgid "Ask whether an export carries secrets"
+msgstr "Preguntar si una exportación lleva secretos"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_export_secrets_wizard__include_secrets
+msgid "Include secrets"
+msgstr "Incluir secretos"
+
+#. module: pns_base
+#: model:ir.model.fields,help:pns_base.field_pns_export_secrets_wizard__include_secrets
+msgid "Adds API keys and tokens in clear text to the exported file."
+msgstr "Añade al archivo exportado las claves API y los tokens en claro."
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_export_secrets_wizard_form
+msgid "The file will carry API keys and tokens in clear text. Keep it safe."
+msgstr "El archivo llevará las claves API y los tokens en claro. Guárdalo en lugar seguro."
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_export_secrets_wizard_form
+msgid "Keys and tokens stay out of the file. Importing it never blanks the ones already set."
+msgstr "Las claves y los tokens se quedan fuera del archivo. Al importarlo, nunca se vacían los que ya hay."
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_export_secrets_wizard_form
+msgid "Cancel"
+msgstr "Cancelar"
+
+#. module: pns_base
+#: code:addons/pns_base/models/export_secrets_wizard.py:0
+msgid "This export cannot ask for secrets."
+msgstr "Esta exportación no puede preguntar por los secretos."
+
+#. module: pns_base
+#: code:addons/pns_base/models/base_language_install.py:0
+msgid "Translations"
+msgstr "Traducciones"
+
+#. module: pns_base
+#: code:addons/pns_base/models/base_language_install.py:0
+msgid "%s duplicate translation rows were skipped so the language could load."
+msgstr "%s filas de traducción duplicadas se han saltado para que el idioma pueda cargarse."

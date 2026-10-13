@@ -21,14 +21,11 @@ Entities covered (business keys used for matching on import):
     - settings               → ir.config_parameter (URL policy, domain index,
                                 skill code/command prefixes, slash-hidden skill codes)
 
-Secrets (provider api_key, server auth_token/env_vars) are included only when
-``include_secrets=True``. The file then contains third-party credentials in
-clear text — treat it as sensitive.
-
-The MCP user key is NOT a plaintext secret: only its SHA-256 hash is stored and
-exported. The hash is portable (the same client key keeps validating on the
-target instance) and is not usable on its own, so it is always included,
-regardless of ``include_secrets``.
+Secrets (provider api_key, server auth_token/env_vars, MCP user key hash) are
+included only when ``include_secrets=True``. The file then contains
+credentials — treat it as sensitive. The user key travels as its SHA-256 hash,
+but the hash moves the access (the same client key validates on the target),
+so it is a secret too.
 
 Design notes
 ------------
@@ -49,7 +46,11 @@ from odoo.addons.pns_base.utils import settings_io as sio
 
 from .api_key import normalize_to_hash
 from .display_currency import normalize_currency
-from .portable_io import export_record_dict, import_vals_from_dict
+from .portable_io import (
+    export_record_dict,
+    import_vals_from_dict,
+    keep_existing_secrets,
+)
 from .skill_code_prefix import (
     normalize_skill_code_prefix,
     normalize_skill_command_prefix,
@@ -89,12 +90,12 @@ def _section():
 # EXPORT
 # ─────────────────────────────────────────────────────────────────────────────
 
-def export_config(env, include_secrets=True):
+def export_config(env, include_secrets=False):
     """Return a portable dict with the whole AI configuration.
 
     Args:
         env: Odoo environment.
-        include_secrets: when True (default) include api keys / tokens.
+        include_secrets: when True include api keys / tokens (default off).
 
     Returns:
         dict ready for ``json.dumps`` (schema-versioned).
@@ -112,7 +113,7 @@ def export_config(env, include_secrets=True):
         'mcp_servers': _export_servers(env, include_secrets),
         'url_whitelists': _export_whitelist(env),
         'mcp_users': _export_users(env, include_secrets),
-        'settings': _export_settings(env),
+        'settings': _export_settings(env, include_secrets),
     }
     return data
 
@@ -121,12 +122,10 @@ def _export_providers(env, include_secrets):
     Provider = env['ai.provider'].sudo().with_context(active_test=False)
     out = []
     for p in Provider.search([]):
-        d = export_record_dict(p, skip_fields={'id', 'model_name'})
-        if not include_secrets:
-            d.pop('api_key', None)
-        d['models'] = [{'name': m.name} for m in p.available_model_ids]
+        d = export_record_dict(
+            p, skip_fields={'id', 'model_name'}, include_secrets=include_secrets,
+        )
         d['selected_model'] = p.model_id.name or None
-        d['usage_days'] = p.usage_day_ids.to_export_rows()
         out.append(d)
     return out
 
@@ -182,14 +181,7 @@ def _export_skills(env):
 def _export_servers(env, include_secrets):
     """Dynamic dump of every portable field on ai.api.server (incl. trusted)."""
     Srv = env['ai.api.server'].sudo().with_context(active_test=False)
-    out = []
-    for s in Srv.search([]):
-        row = export_record_dict(s)
-        if not include_secrets:
-            row['auth_token'] = ''
-            row['env_vars'] = '{}'
-        out.append(row)
-    return out
+    return [s._export_server_row(include_secrets) for s in Srv.search([])]
 
 
 def _export_whitelist(env):
@@ -198,37 +190,7 @@ def _export_whitelist(env):
 
 
 def _export_users(env, include_secrets):
-    # The user key is exported as its SHA-256 hash (not a usable secret), so it
-    # is always included — ``include_secrets`` does not gate it. Moving the hash
-    # keeps the very same client key valid on the target instance.
-    del include_secrets
-    U = env['ai.mcp.user'].sudo()
-    out = []
-    for u in U.search([]):
-        if not u.login or u.mcp_api_key_state != 'generated':
-            continue
-        row = {
-            'login': u.login,
-            'name': u.name or '',
-            'mcp_api_key_state': u.mcp_api_key_state,
-        }
-        try:
-            row['is_ai_admin'] = u.user_id.has_group('pns_ai_mcp.group_ai_admin')
-            row['is_ai_writer'] = u.user_id.has_group('pns_ai_mcp.group_ai_writer')
-            row['is_ai_external_url'] = u.user_id.has_group(
-                'pns_ai_mcp.group_ai_external_url')
-            row['is_ai_external_api'] = u.user_id.has_group(
-                'pns_ai_mcp.group_ai_external_api')
-        except Exception:
-            pass
-        if u.mcp_api_key_hash:
-            row['mcp_api_key_hash'] = u.mcp_api_key_hash
-            row['mcp_api_key_generated_date'] = (
-                fields.Datetime.to_string(u.mcp_api_key_generated_date)
-                if u.mcp_api_key_generated_date else None
-            )
-        out.append(row)
-    return out
+    return export_selected_users(env['ai.mcp.user'].sudo().search([]), include_secrets)
 
 
 def _clamp_mcp_settings(values, fields_map=None):
@@ -245,13 +207,13 @@ def _clamp_mcp_settings(values, fields_map=None):
         )
 
 
-def _export_settings(env):
+def _export_settings(env, include_secrets=True):
     Settings = env['res.config.settings']
     catalog = list(sio.iter_settings_fields(
         Settings, module=MODULE, icp_prefix=ICP_PREFIX,
     ))
     out = sio.collect_settings_payload(
-        Settings.get_values(), catalog, include_secrets=True,
+        Settings.get_values(), catalog, include_secrets=include_secrets,
         icp_prefix=ICP_PREFIX,
     )
     hidden = env['ir.config_parameter'].sudo().get_param(ICP_SKILLS_SLASH_HIDDEN)
@@ -264,7 +226,7 @@ def _export_settings(env):
 # IMPORT
 # ─────────────────────────────────────────────────────────────────────────────
 
-def import_config(env, data):
+def import_config(env, data, replace_existing=True):
     """Upsert the whole AI configuration from a portable dict.
 
     Resilient: per-row errors are collected, never abort the batch. Relations
@@ -284,7 +246,7 @@ def import_config(env, data):
         return report
 
     # ── Pass 1: scalar upsert ────────────────────────────────────────────────
-    replace = True
+    replace = bool(replace_existing)
     _import_providers(env, data.get('providers') or [], report, replace_existing=replace)
     _import_contexts(env, data.get('contexts') or [], report, replace_existing=replace)
     _import_skills(env, data.get('skills') or [], report, replace_existing=replace)
@@ -353,16 +315,14 @@ def import_partial(env, data, replace_existing=True):
     return report
 
 
-def export_selected_providers(providers, include_secrets=True):
+def export_selected_providers(providers, include_secrets=False):
     """Portable rows for a subset of ``ai.provider`` records."""
     out = []
     for p in providers:
-        d = export_record_dict(p, skip_fields={'id', 'model_name'})
-        if not include_secrets:
-            d.pop('api_key', None)
-        d['models'] = [{'name': m.name} for m in p.available_model_ids]
+        d = export_record_dict(
+            p, skip_fields={'id', 'model_name'}, include_secrets=include_secrets,
+        )
         d['selected_model'] = p.model_id.name or None
-        d['usage_days'] = p.usage_day_ids.to_export_rows()
         out.append(d)
     return out
 
@@ -393,16 +353,9 @@ def export_selected_agents(agents):
     return out
 
 
-def export_selected_servers(servers, include_secrets=True):
+def export_selected_servers(servers, include_secrets=False):
     """Portable rows for a subset of ``ai.api.server`` records."""
-    out = []
-    for s in servers:
-        row = export_record_dict(s)
-        if not include_secrets:
-            row['auth_token'] = ''
-            row['env_vars'] = '{}'
-        out.append(row)
-    return out
+    return [s._export_server_row(include_secrets) for s in servers]
 
 
 def export_selected_whitelist(entries):
@@ -410,9 +363,12 @@ def export_selected_whitelist(entries):
     return [export_record_dict(r) for r in entries]
 
 
-def export_selected_users(users, include_secrets=True):
-    """Portable rows for a subset of ``ai.mcp.user`` records."""
-    del include_secrets
+def export_selected_users(users, include_secrets=False):
+    """Portable rows for a subset of ``ai.mcp.user`` records.
+
+    The key hash moves the access (the same client key works on the target),
+    so it only goes in with *include_secrets*.
+    """
     out = []
     for u in users:
         if not u.login or u.mcp_api_key_state != 'generated':
@@ -429,9 +385,11 @@ def export_selected_users(users, include_secrets=True):
                 'pns_ai_mcp.group_ai_external_url')
             row['is_ai_external_api'] = u.user_id.has_group(
                 'pns_ai_mcp.group_ai_external_api')
+            row['is_ai_conversational'] = u.user_id.has_group(
+                'pns_ai_mcp.group_ai_conversational')
         except Exception:
             pass
-        if u.mcp_api_key_hash:
+        if include_secrets and u.mcp_api_key_hash:
             row['mcp_api_key_hash'] = u.mcp_api_key_hash
             row['mcp_api_key_generated_date'] = (
                 fields.Datetime.to_string(u.mcp_api_key_generated_date)
@@ -464,30 +422,25 @@ def _import_providers(env, rows, report, replace_existing=True):
                 sec['skipped'] += 1
                 continue
             if existing:
-                existing.write(vals)
+                existing.write(keep_existing_secrets(existing, vals))
                 provider = existing
                 sec['updated'] += 1
             else:
                 provider = Provider.create(vals)
                 sec['created'] += 1
-            # Models (upsert by name within provider) — the list feeds the
-            # model selector. context_window lives on the provider now, so a
-            # model record is just its name.
-            existing_models = {m.name: m for m in provider.available_model_ids}
-            for m in row.get('models') or []:
-                mname = (m.get('name') or '').strip()
-                if not mname or mname in existing_models:
-                    continue
-                Model.create({'name': mname, 'provider_id': provider.id})
-            # Selected model
-            sel = row.get('selected_model')
-            if sel:
-                target = provider.available_model_ids.filtered(lambda x: x.name == sel)
-                if target:
-                    provider.model_id = target[0].id
-            env['ai.provider.usage.day'].import_missing_days(
-                provider, row.get('usage_days') or [],
-            )
+            # The catalogue (prices, context, the other slugs) is fetched
+            # again from the provider. The file only names the chosen model.
+            sel = (row.get('selected_model') or '').strip()
+            if isinstance(sel, str) and sel:
+                target = provider.available_model_ids.filtered(
+                    lambda x: x.name == sel,
+                )
+                if not target:
+                    target = Model.create({
+                        'name': sel,
+                        'provider_id': provider.id,
+                    })
+                provider.model_id = target[0].id
         except Exception as e:
             report['errors'].append("provider %s: %s" % (name, e))
             _logger.exception("config_backup import provider %s", name)
@@ -569,7 +522,7 @@ def _import_servers(env, rows, report, replace_existing=True):
                 sec['skipped'] += 1
                 continue
             if existing:
-                existing.write(vals)
+                existing.write(existing._keep_secrets_on_import(vals))
                 sec['updated'] += 1
             else:
                 Srv.create(vals)
@@ -749,7 +702,9 @@ def _wire_agent_relations(env, rows, report, replace_existing=True):
             report['errors'].append("agent %s relations: %s" % (code, e))
 
 
-def _wire_skill_relations(env, rows, report):
+def _wire_skill_relations(env, rows, report, replace_existing=True):
+    if not replace_existing:
+        return
     Skill = env['ai.skill'].sudo().with_context(active_test=False)
     Agent = env['ai.agent'].sudo().with_context(active_test=False)
     Ctx = env['ai.context'].sudo().with_context(active_test=False)

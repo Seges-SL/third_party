@@ -1,3 +1,9 @@
+/**
+ * Context-window (tokens) dropdown: curated 1K–2M ladder, plus off-grid stored values.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+ */
 odoo.define('pns_ai_mcp.ContextWindowComboWidget', function (require) {
     "use strict";
     // Context window (tokens) as a plain dropdown <select>. Options are a

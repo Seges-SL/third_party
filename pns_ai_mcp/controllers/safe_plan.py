@@ -1,14 +1,12 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""PNS AI MCP - Safe Plan (Box B). PATANEGRA Soft (https://patanegra.com).
+"""Supervised operation declaration (Box B).
 
-Part of Patanegra Soft Suite (`pns_suite`), distributed via Patanegra Soft Hub.
-Supervised operation declaration of the Patanegra Application Agent Protocol
-(PAAP). The AI NEVER executes operations directly: it only DECLARES an intent as
+The AI never executes operations directly: it only declares an intent as
 data (a list of steps with closed verbs: create/write/copy/unlink/fetch_url/
 api_call). That data is stored as a pending operation, the human is notified by
-toast, and ONLY when the human clicks Confirm in Odoo does the server run the
+toast, and only when the human clicks Confirm in Odoo does the server run the
 plan with fixed, audited code. The AI never sees this code nor can run it.
 
 Danger levels (traffic light):
@@ -22,7 +20,6 @@ fetch_url policy (instance-level, orthogonal to group_ai_external_url):
   - open policy + not listed -> auto-add to whitelist + auto-execute.
   - whitelist_only + not listed + non-admin -> blocked at propose.
   - whitelist_only + not listed + admin -> confirm toast, then add + execute.
-Licensed under the Apache License 2.0 - see LICENSE.
 """
 
 import hashlib
@@ -35,14 +32,25 @@ from odoo import _, api, fields, SUPERUSER_ID
 from odoo.exceptions import UserError
 from odoo.addons.pns_base.utils.compat import normalize_model_write_values
 from odoo.addons.pns_ai_mcp.utils.fetch_url_safe import (
+    FETCH_URL_MAX_BYTES,
+    FETCH_URL_MAX_REDIRECTS,
     FETCH_URL_SAFE_METHODS,
+    non_public_host_error,
     normalize_fetch_url_method,
     validate_fetch_url_step,
 )
-from .controller_helpers import check_safe_plan_permissions
+from .controller_helpers import (
+    GROUP_AI_EXTERNAL_API,
+    GROUP_AI_EXTERNAL_URL,
+    GROUP_AI_WRITER,
+    check_safe_plan_permissions,
+)
 from .mcp_decorators import mcp_tool
 
 _logger = logging.getLogger(__name__)
+
+# A plan needs at least one of these (see check_safe_plan_permissions).
+_PLAN_GROUPS = (GROUP_AI_WRITER, GROUP_AI_EXTERNAL_URL, GROUP_AI_EXTERNAL_API)
 
 # Re-export histórico (docs / imports): fuente canónica = utils.fetch_url_safe.
 
@@ -125,6 +133,34 @@ def _meta_crud_block_error(model):
             + field_required_hint()
         )
     return None
+
+
+def _owed_to_the_model(env, model, values):
+    """What this model asks of the assistant and the plan does not carry.
+
+    Beyond the columns the ORM refuses to write empty: a record can be born
+    fine and still be of no use to anyone. The condition belongs to whoever
+    owns the model; here it only closes the door.
+    """
+    from ..utils.required_fields import missing_for_agent
+
+    owed = missing_for_agent(env, model, values)
+    if not owed:
+        return None
+    listed = ', '.join('%s (%s)' % (label, name) for name, label, _t in owed)
+    said = (
+        '%s needs these before it can be created, and the plan does not '
+        'carry them: %s. Ask the user for them in this turn instead of '
+        'proposing the write.' % (model, listed)
+    )
+    if any(ftype in ('date', 'datetime') for _n, _l, ftype in owed):
+        # Said out loud a day travels through the transcriber; a channel with
+        # a picker should use it rather than take dictation.
+        said += (
+            ' One of them is a date: ask for it the way your channel asks '
+            'for dates, if it has a way.'
+        )
+    return said
 
 
 def _plan_display_model(steps):
@@ -214,7 +250,7 @@ def validate_safe_plan(steps, env):
             # so we never create a Confirm toast that will bounce.
             if env is not None:
                 try:
-                    action.preview(**(step.get('args') or {}))
+                    action._preview(**(step.get('args') or {}))
                 except UserError as exc:
                     return False, 'Step %s: %s' % (
                         i + 1, exc.args[0] if exc.args else str(exc),
@@ -228,6 +264,26 @@ def validate_safe_plan(steps, env):
                 return False, 'Step %s: %s' % (i + 1, blocked)
         if op == 'create' and not isinstance(step.get('values'), dict):
             return False, f"Step {i + 1}: 'create' requires 'values' (field object)."
+        if op == 'create' and env is not None:
+            from ..utils.required_fields import missing_required_fields
+
+            missing = missing_required_fields(
+                env, step.get('model'), step.get('values'),
+            )
+            if missing:
+                listed = ', '.join(
+                    '%s (%s)' % (label, name) for name, label in missing
+                )
+                return False, (
+                    f"Step {i + 1}: {step['model']} cannot be created without "
+                    f"these fields and the plan leaves them empty: {listed}. "
+                    "Ask the user for what is missing — offer candidate rows "
+                    "when the field points at a record, so they can tap one "
+                    "instead of dictating it. Do not invent a value."
+                )
+            owed = _owed_to_the_model(env, step.get('model'), step.get('values'))
+            if owed:
+                return False, owed
         if op == 'write':
             if not isinstance(step.get('values'), dict):
                 return False, f"Step {i + 1}: 'write' requires 'values' (field object)."
@@ -347,27 +403,43 @@ def _all_steps_auto_confirmable(env, steps):
     intentionally NOT shared with the URL whitelist: an external server gets
     the call arguments and can invoke arbitrary operations, so it is far more
     delicate than a safe web fetch and must be trusted per-server.
+
+    Record or tool text already in this turn may carry injected orders. Then
+    only a read on a trusted server still runs alone (its driver says the
+    operation changes nothing there); fetch_url and remote writes wait.
     """
     from urllib.parse import urlparse
     if not steps:
         return False
-    Whitelist = env['ai.url.whitelist']
-    Server = env['ai.api.server'].sudo()
+    untrusted_turn = bool((env.context or {}).get('pns_ai_untrusted_turn'))
     for step in steps:
         op = _canonical_op(step.get('op'))
         if op == 'fetch_url':
+            if untrusted_turn:
+                return False
             hostname = (urlparse(step.get('url', '')).hostname or '').lower()
-            if not Whitelist.is_fetch_url_trusted(hostname):
+            if not env['ai.url.whitelist'].is_fetch_url_trusted(hostname):
                 return False
         elif op == 'api_call':
-            srv = Server.search(
+            srv = env['ai.api.server'].sudo().search(
                 [('code', '=', step.get('server', '')), ('active', '=', True)],
                 limit=1)
             if not (srv and srv.trusted):
                 return False
+            if untrusted_turn and not _api_call_reads_only(srv, step.get('tool', '')):
+                return False
         else:
             return False
     return True
+
+
+def _api_call_reads_only(srv, tool_name):
+    """True when the server's driver says *tool_name* changes nothing remote."""
+    try:
+        from ..lib.api.drivers import get_api_driver
+        return bool(get_api_driver(srv.api_type).reads_only(srv, tool_name))
+    except Exception:
+        return False
 
 
 # Comandos x2many de Odoo → etiqueta legible. Las operaciones destructivas
@@ -396,6 +468,24 @@ def _names_for(env, comodel, ids):
         return ', '.join(str(i) for i in ids)
 
 
+def _written_date(env, ftype, value):
+    """A date written the way this user writes dates.
+
+    The plan is read to decide in a couple of seconds, and the database
+    spelling leaves the reader working out which of the two numbers is the
+    month before they can say yes.
+    """
+    if not value:
+        return ''
+    try:
+        from odoo.tools.misc import format_date, format_datetime
+        if ftype == 'date':
+            return format_date(env, value)
+        return format_datetime(env, value)
+    except Exception:
+        return ''
+
+
 def _describe_value(env, field_def, value):
     """Traduce el valor de un campo a lenguaje legible. Las tuplas-comando x2many
     se explican y las destructivas se marcan con ⚠️."""
@@ -421,24 +511,97 @@ def _describe_value(env, field_def, value):
                 parts.append(str(cmd))
         return '; '.join(parts)
     if ftype == 'many2one' and isinstance(value, int):
-        return '«%s»' % (_names_for(env, comodel, [value]) or value)
+        from ..utils.record_label import placed_label
+        # Authorising a write means knowing which record is going in, and a
+        # bare name does not tell two companies of the same trade apart.
+        return '«%s»' % (
+            placed_label(env, comodel, value)
+            or _names_for(env, comodel, [value])
+            or value
+        )
+    if ftype in ('date', 'datetime'):
+        return _written_date(env, ftype, value) or str(value)
     return str(value)
 
 
-def _describe_values(env, model, values):
-    """Resumen legible de un dict de valores (traduce tuplas y resuelve nombres)."""
+_VALUE_CHARS_MAX = 160
+_VALUE_FIELDS_MAX = 12
+
+
+def _value_lines(env, model, values):
+    """One field per line, so a long one cannot push another off the card.
+
+    Strung together they were cut at a fixed length, and what fell off was
+    whatever came last —a date, an owner—, which is exactly the part the
+    reader is checking before authorising the write.
+    """
     if not isinstance(values, dict) or not values:
-        return '{}'
+        return []
     try:
         fields = env[model]._fields
     except Exception:
         fields = {}
-    bits = []
+    lines = []
     for fname, value in values.items():
         fdef = fields.get(fname)
         label = (getattr(fdef, 'string', None) or fname) if fdef else fname
-        bits.append('%s: %s' % (label, _describe_value(env, fdef, value)))
-    return '; '.join(bits)
+        shown = _describe_value(env, fdef, value)
+        if len(shown) > _VALUE_CHARS_MAX:
+            shown = shown[:_VALUE_CHARS_MAX] + '…'
+        lines.append('%s: %s' % (label, shown))
+    if len(lines) > _VALUE_FIELDS_MAX:
+        rest = len(lines) - _VALUE_FIELDS_MAX
+        lines = lines[:_VALUE_FIELDS_MAX]
+        lines.append(_('and %s more fields') % rest)
+    return lines
+
+
+_DETAIL_GROUP_MAX = 3
+_DETAIL_IDS_MAX = 5
+
+
+def _step_targets(env, model, step):
+    """Which records a step aims at, by name while they are few enough to read."""
+    ids = step.get('ids')
+    if isinstance(ids, list) and ids:
+        if len(ids) <= _DETAIL_IDS_MAX:
+            return _names_for(env, model, ids) or str(ids)
+        return _('%s records') % len(ids)
+    domain = step.get('domain')
+    return str(domain) if domain else ''
+
+
+def _crud_step_details(env, op, model, group):
+    """What each step carries, under the line that counts them.
+
+    "Create 1 record in Leads" is not something a person can authorise: what
+    decides it is the customer, the date and the text going in. Only small
+    groups are spelled out — past that the headline already gives the number,
+    and a wall of lines would bury the verb and the traffic light.
+    """
+    if len(group) > _DETAIL_GROUP_MAX:
+        return []
+    out = []
+    for step in group:
+        head = ''
+        values = None
+        if op in ('create', 'copy'):
+            if op == 'copy':
+                source = _names_for(env, model, [step.get('id')])
+                if source:
+                    head = _('from «%s»') % source
+            values = step.get('values') if op == 'create' else step.get('overrides')
+        else:
+            target = _step_targets(env, model, step)
+            if target:
+                head = _('on «%s»') % target
+            if op == 'write':
+                values = step.get('values')
+        if head:
+            out.append('   · ' + head)
+        for line in _value_lines(env, model, values):
+            out.append('   · ' + line)
+    return out
 
 
 def describe_safe_plan(env, steps):
@@ -452,7 +615,6 @@ def describe_safe_plan(env, steps):
       🔴 Conectarse a example.com (dominio no en lista blanca)
     """
     from urllib.parse import urlparse
-    from collections import Counter
 
     _danger_emoji = {'low': '🟢', 'medium': '🟡', 'high': '🔴'}
 
@@ -466,8 +628,9 @@ def describe_safe_plan(env, steps):
             pass
         return model_name
 
-    # Group CRUD steps by (op, model) to aggregate counts
-    crud_counts = Counter()  # (op, model) → count
+    # Group CRUD steps by (op, model): the headline counts them, and a small
+    # group also spells out what each step carries.
+    crud_steps = {}  # (op, model) → [step, …]
     lines = []
 
     for step in steps:
@@ -512,7 +675,7 @@ def describe_safe_plan(env, steps):
             # translated string elsewhere, e.g. the matching UI button).
             label = _(action.label) if action else step.get('action_code')
             try:
-                detail = action.preview(**(step.get('args') or {})) if action else ''
+                detail = action._preview(**(step.get('args') or {})) if action else ''
             except Exception as exc:
                 detail = f"(vista previa no disponible: {exc})"
             lines.append(f"{emoji} {label}: {detail}" if detail else f"{emoji} {label}")
@@ -526,7 +689,7 @@ def describe_safe_plan(env, steps):
             bits = []
             if not view_only:
                 try:
-                    bits.append(Action.preview_field_set_required(
+                    bits.append(Action._preview_field_set_required(
                         model=step.get('model'), field=step.get('field'),
                         required=required,
                     ))
@@ -534,7 +697,7 @@ def describe_safe_plan(env, steps):
                     bits.append(str(exc))
             if view_ids:
                 try:
-                    bits.append(Action.preview_view_set_field_required(
+                    bits.append(Action._preview_view_set_field_required(
                         model=step.get('model'), field=step.get('field'),
                         required=required, view_ids=view_ids,
                     ))
@@ -547,18 +710,20 @@ def describe_safe_plan(env, steps):
 
         # CRUD: aggregate by (op, model)
         model = step.get('model') or '?'
-        crud_counts[(op, model)] += 1
+        crud_steps.setdefault((op, model), []).append(step)
 
     # Emit aggregated CRUD lines
-    for (op, model), count in crud_counts.items():
+    for (op, model), group in crud_steps.items():
         danger = _OP_DANGER.get(op, 'medium')
         emoji = _danger_emoji.get(danger, '🟡')
         label = OP_LABEL.get(op, op)
         ml = _model_label(model)
+        count = len(group)
         if count == 1:
             lines.append(f"{emoji} {label} 1 registro en «{ml}»")
         else:
             lines.append(f"{emoji} {label} {count} registros en «{ml}»")
+        lines.extend(_crud_step_details(env, op, model, group))
 
     return lines
 
@@ -654,11 +819,11 @@ def execute_safe_plan(env, steps):
                 raise UserError(_('view_only requires at least one selected view.'))
             row = {'op': 'field_required', 'model': model, 'field': field}
             if not view_only:
-                row['orm'] = Action.apply_field_set_required(
+                row['orm'] = Action._apply_field_set_required(
                     model=model, field=field, required=required,
                 )
             if view_ids:
-                row['views'] = Action.apply_view_set_field_required(
+                row['views'] = Action._apply_view_set_field_required(
                     model=model, field=field, required=required,
                     view_ids=view_ids, uniform=True,
                 )
@@ -674,12 +839,8 @@ def execute_safe_plan(env, steps):
             if is_required_atom(action.code):
                 from ..utils.field_required_plan import field_required_hint
                 raise UserError(field_required_hint())
-            if not action.user_has_required_groups(env.user):
-                raise PermissionError(
-                    'Missing required group for trusted action %r' % action.code
-                )
             args = _resolve_refs(step.get('args') or {}, ref_map)
-            result = action.apply(**args)
+            result = action._apply(**args)
             row = {'op': 'action', 'action_code': action.code, 'result': result}
             results.append(row)
             journal_seq += 1
@@ -697,6 +858,10 @@ def execute_safe_plan(env, steps):
             if step.get('ref'):
                 ref_map[step['ref']] = rec.id
             row = {'op': 'create', 'model': model, 'id': rec.id, 'name': rec.display_name}
+            pending = _form_pending(env, model, rec)
+            if pending.get(rec.id):
+                row['pending'] = [label for _name, label in pending[rec.id]]
+            _post_pending_note(env, rec, pending)
             results.append(row)
             journal_seq += 1
             _record_change_journal(env, step, op, row, None, journal_seq)
@@ -705,8 +870,12 @@ def execute_safe_plan(env, steps):
                 model, _resolve_refs(step.get('values') or {}, ref_map), env)
             recs = _select_records(Model, step, ref_map)
             before = _journal_snapshot(env, recs, list(vals.keys()))
+            pending_before = _form_pending(env, model, recs)
             recs.write(vals)
             row = {'op': 'write', 'model': model, 'ids': recs.ids, 'count': len(recs)}
+            _post_pending_note(
+                env, recs, _form_pending(env, model, recs), pending_before,
+            )
             results.append(row)
             journal_seq += 1
             _record_change_journal(env, step, op, row, before, journal_seq)
@@ -718,6 +887,10 @@ def execute_safe_plan(env, steps):
                 ref_map[step['ref']] = new.id
             row = {'op': 'copy', 'model': model, 'source_id': rid,
                    'new_id': new.id, 'name': new.display_name}
+            pending = _form_pending(env, model, new)
+            if pending.get(new.id):
+                row['pending'] = [label for _name, label in pending[new.id]]
+            _post_pending_note(env, new, pending)
             results.append(row)
             journal_seq += 1
             _record_change_journal(env, step, op, row, None, journal_seq)
@@ -759,6 +932,43 @@ def _record_change_journal(env, step, op, result, before_records, step_seq):
     )
 
 
+def _form_pending(env, model, records):
+    """What the form still asks for on those records, read after the write."""
+    try:
+        from ..utils.required_fields import form_pending_by_record
+
+        return form_pending_by_record(env, model, records)
+    except Exception:  # pragma: no cover - a card is never worth a rollback
+        _logger.exception('Safe Plan: could not read pending fields on %s', model)
+        return {}
+
+
+def _post_pending_note(env, records, pending, before=None):
+    """Leave on the record itself what the assistant could not fill in.
+
+    A record born short says so. A write only says so when it changed the
+    situation: touching a phone number on a record that was already missing
+    its origin is not news. Nothing complete is ever posted about.
+    """
+    if not records or not hasattr(records, 'message_post'):
+        return
+    for record in records:
+        empty = pending.get(record.id) or []
+        if not empty:
+            continue
+        if before is not None and (before.get(record.id) or []) == empty:
+            continue
+        try:
+            record.message_post(body=_ack_tr(env, _(
+                'Written through the assistant. Still to fill in: %s'
+            )) % ', '.join(label for _name, label in empty))
+        except Exception:  # pragma: no cover - a note is never worth a rollback
+            _logger.exception(
+                'Safe Plan: could not note pending fields on %s#%s',
+                record._name, record.id,
+            )
+
+
 _CRUD_OPS = frozenset({'create', 'write', 'copy', 'unlink', 'field_required'})
 
 
@@ -787,77 +997,207 @@ def _needs_llm_followup(results=None, steps=None, action='confirm'):
     return False
 
 
+def _ack_lang(env):
+    """Lang of the door env (context), not the public request."""
+    if env is None:
+        return ''
+    ctx = getattr(env, 'context', None) or {}
+    lang = (ctx.get('lang') or getattr(env, 'lang', None) or '')
+    return lang.strip() if isinstance(lang, str) else ''
+
+
+def _ack_tr(env, source):
+    """Translate an ack msgid with the caller's env (PIN / user lang).
+
+    ``from odoo import _`` follows the HTTP request. Secretary is ``auth=none``,
+    so that request is public/English. Odoo 14 has no ``env._``; look up
+    ``ir.translation`` with the door lang, same as the PWA chrome.
+    """
+    if not source:
+        return source
+    if env is not None:
+        gettext = getattr(env, '_', None)
+        if callable(gettext):
+            try:
+                out = gettext(source)
+                if out and out != source:
+                    return out
+            except Exception:
+                pass
+        lang = _ack_lang(env)
+        if lang and 'ir.translation' in env:
+            try:
+                found = env['ir.translation'].sudo()._get_source(
+                    None, 'code', lang, source,
+                )
+                if found:
+                    return found
+            except Exception:
+                pass
+    return _(source)
+
+
+def _first_written_model(steps):
+    """The model of the write, to name the field the database complained about."""
+    for step in steps or []:
+        if isinstance(step, dict) and step.get('model'):
+            return step.get('model')
+    return None
+
+
+def _step_values(steps):
+    """Hand out the values of each create/copy step in the order they ran."""
+    queues = {}
+    for step in steps or []:
+        if not isinstance(step, dict):
+            continue
+        op = step.get('op')
+        if op not in ('create', 'copy'):
+            continue
+        vals = step.get('values') if op == 'create' else step.get('overrides')
+        queues.setdefault(op, []).append(vals if isinstance(vals, dict) else {})
+
+    def take(op):
+        queue = queues.get(op) or []
+        return queue.pop(0) if queue else {}
+    return take
+
+
+def _ack_card(env, model, rid, values=None, said=None):
+    """The record as a person reads it: its reference, its name, its fields."""
+    from ..utils.ack_record_card import record_card
+
+    try:
+        return record_card(
+            env, model, rid, values=values,
+            title_of=(lambda head: said % head) if said else None,
+        )
+    except Exception:
+        return None
+
+
 def build_user_ack_message(title, results=None, action='confirm', error=None,
-                           steps=None):
+                           steps=None, env=None):
     """Visible Chatboo note after Confirm/Cancel — CRUD writes only.
 
     Deterministic (no LLM). Returns None for pure fetch_url / api_call plans.
     """
-    from odoo import _
-
-    title = title or _('supervised operation')
+    title = title or _ack_tr(env, _('supervised operation'))
     if not _plan_has_crud(results=results, steps=steps):
         return None
 
     if action == 'cancel':
-        return _(
+        return _ack_tr(env, _(
             'Alright — I cancelled «%s». No changes were applied.'
-        ) % title
+        )) % title
 
     if error:
-        return _(
-            'The operation «%s» was confirmed but failed: %s'
-        ) % (title, error)
+        # The driver's own wording —constraint names, DETAIL lines, the column
+        # as the table spells it— tells the person who dictated a sentence
+        # nothing about what to do next.
+        from ..utils.db_error_text import failed_ack
+        return failed_ack(
+            env, title, error, model=_first_written_model(steps),
+            translate=(lambda source: _ack_tr(env, source)),
+        )
 
     # Only after execute (with result rows). Confirm-without-execute must not
     # claim success; callers may set user_ack_message explicitly for "applying…".
     if not results:
         return None
 
-    lines = [
-        _('Done. The write operation «%s» completed successfully.') % title,
-    ]
+    lines = []
+
+    def still_to_fill(item):
+        """What the form asks of the new record, under its own card."""
+        labels = [str(one) for one in (item.get('pending') or []) if one]
+        if not labels:
+            return []
+        return ['  - ' + _ack_tr(env, _('Still to fill in: %s')) % ', '.join(labels)]
+
+    pending = _step_values(steps)
     for item in results:
         if not isinstance(item, dict):
             continue
         op = item.get('op')
         if op == 'create':
+            card = _ack_card(
+                env, item.get('model'), item.get('id'),
+                values=pending('create'),
+                said=_ack_tr(env, _('Created: %s')),
+            )
+            if card:
+                lines.extend(card)
+                lines.extend(still_to_fill(item))
+                continue
             lines.append(
-                '- ' + _('Created: %s (%s #%s)') % (
+                '- ' + _ack_tr(env, _('Created: %s (%s #%s)')) % (
                     item.get('name') or '—',
                     item.get('model') or '?',
                     item.get('id') or '?',
                 )
             )
+            lines.extend(still_to_fill(item))
         elif op == 'write':
+            # One record is the usual case and the one worth reading: what
+            # it says now, not that a row somewhere changed.
+            ids = [rid for rid in (item.get('ids') or []) if rid]
+            changed = pending('write')
+            card = _ack_card(
+                env, item.get('model'), ids[0],
+                values=changed,
+                said=_ack_tr(env, _('Updated: %s')),
+            ) if len(ids) == 1 else None
+            if card:
+                lines.extend(card)
+                lines.extend(still_to_fill(item))
+                continue
             lines.append(
-                '- ' + _('Updated %s record(s) on %s') % (
-                    item.get('count') or len(item.get('ids') or []),
+                '- ' + _ack_tr(env, _('Updated %s record(s) on %s')) % (
+                    item.get('count') or len(ids),
                     item.get('model') or '?',
                 )
             )
         elif op == 'copy':
+            card = _ack_card(
+                env, item.get('model'), item.get('new_id'),
+                values=pending('copy'),
+                said=_ack_tr(env, _('Copied: %s')),
+            )
+            if card:
+                lines.extend(card)
+                lines.extend(still_to_fill(item))
+                continue
             lines.append(
-                '- ' + _('Copied: %s (%s #%s)') % (
+                '- ' + _ack_tr(env, _('Copied: %s (%s #%s)')) % (
                     item.get('name') or '—',
                     item.get('model') or '?',
                     item.get('new_id') or '?',
                 )
             )
+            lines.extend(still_to_fill(item))
         elif op == 'unlink':
             lines.append(
-                '- ' + _('Deleted %s record(s) on %s') % (
+                '- ' + _ack_tr(env, _('Deleted %s record(s) on %s')) % (
                     item.get('count') or len(item.get('ids') or []),
                     item.get('model') or '?',
                 )
             )
         elif op == 'field_required':
             lines.append(
-                '- ' + _('Field required on %s.%s') % (
+                '- ' + _ack_tr(env, _('Field required on %s.%s')) % (
                     item.get('model') or '?',
                     item.get('field') or '?',
                 )
             )
+    # The cards say what happened and name the records; the sentence above
+    # them said the same thing in the plan's own words, which is the words
+    # the user had just used. Kept only for a plan whose rows say nothing,
+    # where silence would read as nothing having run.
+    if not lines:
+        return _ack_tr(
+            env, _('Done. The write operation «%s» completed successfully.'),
+        ) % title
     return '\n'.join(lines)
 
 
@@ -892,6 +1232,7 @@ def attach_verification_chat_hints(payload, title, results=None, action='confirm
     if not out.get('user_ack_message'):
         ack = build_user_ack_message(
             title, results=results, action=action, error=error, steps=steps,
+            env=env,
         )
         if ack:
             out['user_ack_message'] = ack
@@ -919,7 +1260,7 @@ def build_verification_followup_message(title, results=None, action='confirm', e
     """
     guard = (
         ' IMPORTANTE: este es solo un aviso de resultado, NO una petición de escritura. '
-        'NO propongas ni vuelvas a llamar propose_safe_operations. '
+        'NO propongas ni vuelvas a llamar safe_plan_request. '
         'NO uses relaxaicode sobre ai.safe.operation: los datos ya están aquí.'
     )
     title = title or 'Operación supervisada'
@@ -991,7 +1332,7 @@ def build_verification_followup_message(title, results=None, action='confirm', e
             f'[Resultado del sistema] El usuario CONFIRMÓ api_call «{title}». '
             f'Los datos de la API externa están en el JSON siguiente (campo body). '
             f'Si truncated=true, usa pagination.suggested_arguments para la siguiente '
-            f'página con propose_safe_operations (op=api_call). '
+            f'página con safe_plan_request (op=api_call). '
             f'Analiza el JSON y responde con tabla o resumen legible; '
             f'NO inventes cifras. NO llames herramientas salvo paginar.\n'
             f'DATOS:\n{data_block}'
@@ -1185,6 +1526,64 @@ def _headers_summary_for_llm(resp_headers):
     return out
 
 
+def _fetch_url_request(env, method, url, headers, request_kwargs):
+    """Send the request; return ``(response, refusal)``.
+
+    Redirects are followed here, one hop at a time: each target must be
+    http(s), public and allowed by the URL policy, like the first URL.
+    The body is read in chunks and refused past ``FETCH_URL_MAX_BYTES``.
+    """
+    import requests as _requests
+    from urllib.parse import urljoin, urlparse
+    for _hop in range(FETCH_URL_MAX_REDIRECTS + 1):
+        refused = non_public_host_error(url)
+        if refused:
+            return None, refused
+        # (connect, read): un DNS/TLS colgado no debe bloquear propose/orquestación.
+        resp = _requests.request(
+            method,
+            url,
+            timeout=(3, 12),
+            allow_redirects=False,
+            stream=True,
+            headers=headers,
+            **request_kwargs,
+        )
+        location = resp.headers.get('Location') if resp.is_redirect else None
+        if not location:
+            break
+        resp.close()
+        url = urljoin(url, location)
+        if urlparse(url).scheme not in ('http', 'https'):
+            return None, 'fetch_url redirect to a non-http(s) URL: %s' % url
+        ok, policy_error = env['ai.url.whitelist'].check_fetch_url_steps(
+            [{'op': 'fetch_url', 'url': url}], user=env.user,
+        )
+        if not ok:
+            return None, 'fetch_url redirect refused: %s' % policy_error
+        if resp.status_code == 303 and method != 'HEAD':
+            method = 'GET'
+            request_kwargs = {}
+    else:
+        return None, 'fetch_url: more than %d redirects.' % FETCH_URL_MAX_REDIRECTS
+
+    declared = resp.headers.get('Content-Length') or ''
+    if declared.isdigit() and int(declared) > FETCH_URL_MAX_BYTES:
+        resp.close()
+        return None, 'fetch_url: the response is larger than %d MB.' % (
+            FETCH_URL_MAX_BYTES // (1024 * 1024))
+    body = bytearray()
+    for chunk in resp.iter_content(chunk_size=65536):
+        body.extend(chunk)
+        if len(body) > FETCH_URL_MAX_BYTES:
+            resp.close()
+            return None, 'fetch_url: the response is larger than %d MB.' % (
+                FETCH_URL_MAX_BYTES // (1024 * 1024))
+    resp._content = bytes(body)
+    resp._content_consumed = True
+    return resp, ''
+
+
 def _execute_fetch_url(env, step):
     """Execute a fetch_url step with a safe HTTP method to an allowed domain.
 
@@ -1233,15 +1632,11 @@ def _execute_fetch_url(env, step):
             # proponer); sin él la petición debe fallar en el servidor.
             headers['Content-Type'] = step.get('content_type') or 'application/json'
             request_kwargs['data'] = (body or '').encode('utf-8')
-        # (connect, read): un DNS/TLS colgado no debe bloquear propose/orquestación.
-        resp = _requests.request(
-            method,
-            url,
-            timeout=(3, 12),
-            allow_redirects=True,
-            headers=headers,
-            **request_kwargs,
+        resp, refused = _fetch_url_request(
+            env, method, url, headers, request_kwargs,
         )
+        if refused:
+            return {'op': 'fetch_url', 'url': url, 'success': False, 'error': refused}
 
         content_type = resp.headers.get('Content-Type', '')
         content_disposition = resp.headers.get('Content-Disposition', '')
@@ -1412,7 +1807,8 @@ def _execute_api_call(env, step):
             'error': schema_error,
         }
 
-    cache_key = cache_key_for_api_call(server_code, tool_name, arguments)
+    cache_key = cache_key_for_api_call(
+        server_code, tool_name, arguments, uid=env.uid)
     Cache = env['ai.api.result.cache']
 
     try:
@@ -1569,36 +1965,104 @@ def capture_safe_plan_log_context(env):
     turn_corr = None
     origin = 'internal'
     client_ip = ''
+    ctx = (env.context if env is not None else {}) or {}
+    try:
+        from odoo.addons.pns_ai_mcp.utils.mcp_logging import request_log_stamp
+        stamp = request_log_stamp()
+    except Exception:
+        stamp = {}
+    stamped = ctx.get('mcp_source_channel') or stamp.get('source_channel')
+    if stamped in ('chatboo', 'mcp_client', 'internal'):
+        origin = stamped
     try:
         from odoo.http import request as http_request
         if http_request:
-            if getattr(http_request, 'mcp_user_id', None):
-                origin = 'mcp_client'
-            if getattr(http_request, 'chatboo_options', None):
-                origin = 'chatboo'
+            # Leftover Chatboo attrs on the request must not steal a
+            # host that already stamped its door (Secretary, MCP, …).
+            if not stamped:
+                if getattr(http_request, 'mcp_user_id', None):
+                    origin = 'mcp_client'
+                elif getattr(http_request, 'chatboo_options', None):
+                    origin = 'chatboo'
             if hasattr(http_request, 'httprequest'):
                 client_ip = http_request.httprequest.remote_addr or ''
-            turn_corr = getattr(http_request, 'mcp_corr_id', None) or None
+            turn_corr = getattr(http_request, 'mcp_turn', None) or None
     except Exception:
         pass
     if not turn_corr:
-        turn_corr = (env.context or {}).get('mcp_correlation_id') or None
-    if origin == 'internal' and turn_corr and (env.context or {}).get(
-        'mcp_correlation_id'
-    ):
-        origin = 'chatboo'
+        turn_corr = ctx.get('mcp_turn') or stamp.get('turn') or None
     return turn_corr, origin, client_ip
 
 
-def create_pending_safe_operation(env, steps, title='Operación supervisada',
-                                  tool_name='propose_safe_operations',
-                                  views_locked=False):
+def _replace_pending_plan(env, verification_id, steps, title, tool_name,
+                          plan_desc, danger, log_origin):
+    """Write new steps onto a pending authorisation. Same id.
+
+    A missing or closed row is left alone: the caller creates another.
+    """
+    vid = str(verification_id or '').strip()
+    if not vid:
+        return None
+    op = env['ai.safe.operation'].sudo().search([
+        ('verification_id', '=', vid),
+        ('user_id', '=', env.uid),
+        ('status', '=', 'pending'),
+        ('executed', '=', False),
+    ], limit=1)
+    if not op:
+        return None
+    from ..constants import PIN_EXPIRY_MINUTES
+
+    old = op.get_operation_data() or {}
+    operation_data = {
+        'plan_steps': steps,
+        'title': title,
+        'plan': plan_desc,
+        'danger_level': danger,
+        'log_origin': log_origin or old.get('log_origin') or 'internal',
+    }
+    for key in ('mcp_agent_code', 'chatboo_session_id'):
+        if old.get(key):
+            operation_data[key] = old[key]
+    agent_code = (env.context or {}).get('mcp_agent_code')
+    if agent_code:
+        operation_data['mcp_agent_code'] = agent_code
+    now = fields.Datetime.now()
+    op.write({
+        'operation_type': _primary_operation_type(steps),
+        'model_name': _plan_display_model(steps),
+        'records_count': len(steps),
+        'changes_info': json.dumps(
+            {'plan': plan_desc, 'danger_level': danger}, default=str,
+        ),
+        'operation_data': json.dumps(operation_data, default=str),
+        'danger_level': danger,
+        'tool_name': tool_name or op.tool_name,
+        'expires_at': now + timedelta(minutes=PIN_EXPIRY_MINUTES),
+    })
+    op._notify_safe_plan_hosts()
+    return {
+        'success': True,
+        'verification_id': op.verification_id,
+        'plan': plan_desc,
+        'danger_level': danger,
+        'title': title,
+        'user_id': env.uid,
+        'replaced_pending': True,
+    }
+
+
+def request_safe_plan(env, steps, title='Operación supervisada',
+                      tool_name='safe_plan_request', views_locked=False,
+                      replace_verification_id=None):
     """Validate + persist a pending ``ai.safe.operation`` (no auto-confirm).
 
-    Used by ``propose_safe_operations`` and by skill fast-path CRUD propose_steps.
+    Used by ``safe_plan_request`` and by skill fast-path CRUD propose_steps.
     Returns a dict with ``success`` True/False; on success includes
     ``verification_id``, ``plan``, ``danger_level``, ``title``.
     ``views_locked`` is only set by the Chatboo choice accept path.
+    ``replace_verification_id`` rewrites that pending row when it is still
+    this user's and not executed. Same id, new steps.
     """
     ok, err = validate_safe_plan(steps, env)
     if not ok:
@@ -1618,7 +2082,7 @@ def create_pending_safe_operation(env, steps, title='Operación supervisada',
         return {
             'success': False,
             'error': perm_error or (
-                'Insufficient permissions for propose_safe_operations.'
+                'Insufficient permissions for safe_plan_request.'
             ),
         }
 
@@ -1627,6 +2091,17 @@ def create_pending_safe_operation(env, steps, title='Operación supervisada',
     )
     if not ok:
         return {'success': False, 'error': policy_error}
+
+    turn_corr, log_origin, client_ip = capture_safe_plan_log_context(env)
+    plan_desc = describe_safe_plan(env, steps)
+    danger = compute_danger_level(steps, env=env)
+    title = title or 'Operación supervisada'
+    replaced = _replace_pending_plan(
+        env, replace_verification_id, steps, title, tool_name,
+        plan_desc, danger, log_origin,
+    )
+    if replaced:
+        return replaced
 
     from ..utils.module_update_heal import steps_fingerprint
     fp = steps_fingerprint(steps)
@@ -1654,11 +2129,6 @@ def create_pending_safe_operation(env, steps, title='Operación supervisada',
         }
 
     user_id = env.uid
-    plan_desc = describe_safe_plan(env, steps)
-    danger = compute_danger_level(steps, env=env)
-    title = title or 'Operación supervisada'
-
-    turn_corr, log_origin, client_ip = capture_safe_plan_log_context(env)
 
     from ..utils.session_download import resolve_chatboo_session_id
 
@@ -1666,18 +2136,21 @@ def create_pending_safe_operation(env, steps, title='Operación supervisada',
     verification_id = None
     nctx = dict(env.context or {})
     if turn_corr:
-        nctx['mcp_correlation_id'] = turn_corr
+        nctx['mcp_turn'] = turn_corr
     session_id = resolve_chatboo_session_id(env)
     if session_id:
         nctx['chatboo_session_id'] = int(session_id)
     with env.registry.cursor() as ncr:
         nenv = api.Environment(ncr, SUPERUSER_ID, nctx)
         first_model = _plan_display_model(steps)
+        agent_code = (env.context or {}).get('mcp_agent_code')
         operation_data = {
             'plan_steps': steps, 'title': title,
             'plan': plan_desc, 'danger_level': danger,
             'log_origin': log_origin,
         }
+        if agent_code:
+            operation_data['mcp_agent_code'] = agent_code
         session_id = resolve_chatboo_session_id(env)
         if session_id:
             operation_data['chatboo_session_id'] = int(session_id)
@@ -1690,7 +2163,7 @@ def create_pending_safe_operation(env, steps, title='Operación supervisada',
             tool_name=tool_name,
             operation_data=operation_data,
             request_ip=client_ip,
-            correlation_id=turn_corr,
+            turn=turn_corr,
         )
         verification_id = verification.verification_id
         ncr.commit()
@@ -1706,7 +2179,7 @@ def create_pending_safe_operation(env, steps, title='Operación supervisada',
 
 
 @mcp_tool(
-    name='propose_safe_operations',
+    name='safe_plan_request',
     description=(
         'Declara un plan supervisado en Odoo: crear, modificar, duplicar, '
         'borrar, field_required (modelo + vistas que el humano elige), '
@@ -1721,8 +2194,9 @@ def create_pending_safe_operation(env, steps, title='Operación supervisada',
     is_write=False,
     validate_schema=False,
     input_schema=_PROPOSE_SCHEMA,
+    groups=_PLAN_GROUPS,
 )
-def tool_propose_safe_operations(controller, arguments):
+def tool_safe_plan_request(controller, arguments):
     """Crea una operación supervisada con el plan declarativo y avisa al humano por toast."""
     try:
         steps = arguments.get('steps')
@@ -1737,11 +2211,11 @@ def tool_propose_safe_operations(controller, arguments):
                 })
 
         env = controller._get_env_for_operation('read')
-        pending = create_pending_safe_operation(env, steps, title=title)
+        pending = request_safe_plan(env, steps, title=title)
         if not pending.get('success'):
             return _text_response({
                 'success': False,
-                'error': pending.get('error') or 'propose_safe_operations failed',
+                'error': pending.get('error') or 'safe_plan_request failed',
             })
         if pending.get('status') == 'pending_choice':
             return _text_response(pending)
@@ -1870,14 +2344,14 @@ def tool_propose_safe_operations(controller, arguments):
             ),
         })
     except Exception as e:
-        _logger.error("MCP: Error en propose_safe_operations: %s", e, exc_info=True)
+        _logger.error("MCP: Error en safe_plan_request: %s", e, exc_info=True)
         return _text_response({'success': False, 'error': str(e)})
 
 
 @mcp_tool(
-    name='get_safe_operation_status',
+    name='safe_plan_status',
     description=(
-        'Consulta el estado de una operación propuesta: pending/confirmed/cancelled/expired '
+        'Consulta el estado de una operación propuesta: pending/confirmed/executed/cancelled/expired '
         'y, si se ejecutó, el resultado. Úsalo cuando el usuario diga que YA ha confirmado en '
         'Odoo. Pasa el verification_id si lo tienes; si no lo recuerdas, llámalo SIN argumentos '
         'y te devuelve tu última operación. NUNCA vuelvas a proponer la operación: comprueba su '
@@ -1885,13 +2359,14 @@ def tool_propose_safe_operations(controller, arguments):
     ),
     is_write=False,
     validate_schema=False,
+    groups=_PLAN_GROUPS,
     input_schema={
         'type': 'object',
         'properties': {'verification_id': {'type': 'string'}},
         'required': [],
     },
 )
-def tool_get_safe_operation_status(controller, arguments):
+def tool_safe_plan_status(controller, arguments):
     """Devuelve el estado/resultado de una operación supervisada.
 
     Robusto frente a modelos que "olvidan" el verification_id entre turnos (causa
@@ -1905,17 +2380,18 @@ def tool_get_safe_operation_status(controller, arguments):
         verification_id = arguments.get('verification_id')
         env = controller._get_env_for_operation('read')
         Model = env['ai.safe.operation'].sudo()
+        # Ids are sequential: a named one is still only the caller's.
+        owned = [('user_id', '=', env.uid)]
 
         if verification_id:
             verif = Model.search(
-                [('verification_id', '=', verification_id)], limit=1)
+                [('verification_id', '=', verification_id)] + owned, limit=1)
         else:
             # Sin id: buscar la última operación del solicitante (mismo uid con el
             # que se creó), dentro de una ventana reciente. Preferir confirmada.
-            uid = env.uid
             cutoff = fields.Datetime.to_string(
                 fields.Datetime.now() - timedelta(hours=2))
-            base = [('user_id', '=', uid), ('create_date', '>=', cutoff)]
+            base = owned + [('create_date', '>=', cutoff)]
             verif = Model.search(
                 base + [('status', '=', 'confirmed')],
                 order='write_date desc', limit=1)
@@ -1936,18 +2412,17 @@ def tool_get_safe_operation_status(controller, arguments):
         if verif.status == 'confirmed' and not verif.executed:
             try:
                 verif._clear_stale_execute_claims(older_than_seconds=30)
-                # Invalidar cache tras clear SQL.
-                verif = Model.browse(verif.id)
-                applied = verif.execute_plan_now()
+                # The plan writes as the caller: in sudo it would skip ACL and rules.
+                applied = env['ai.safe.operation'].browse(verif.id).execute_plan_now()
                 verif = Model.browse(verif.id)
                 if applied is False:
                     _logger.info(
-                        'MCP: get_safe_operation_status %s execute busy',
+                        'MCP: safe_plan_status %s execute busy',
                         verif.verification_id,
                     )
             except Exception as apply_exc:
                 _logger.warning(
-                    'MCP: get_safe_operation_status apply %s failed: %s',
+                    'MCP: safe_plan_status apply %s failed: %s',
                     verif.verification_id, apply_exc,
                 )
         result = None

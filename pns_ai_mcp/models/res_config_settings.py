@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Settings fields for the AI engine (currency, domain-index inject, skill prefixes)."""
+
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools.safe_eval import safe_eval
@@ -25,6 +27,16 @@ from ..utils.skill_code_prefix import (
     prefix_stomps_slash,
 )
 from ..utils.domain_index import INJECT_ICP_KEY, icp_flag_enabled
+from ..utils.key_pin import (
+    DEFAULT_PIN_ATTEMPTS,
+    DEFAULT_PIN_BLOCK_HOURS,
+    DEFAULT_PIN_LENGTH,
+    ICP_PIN_ATTEMPTS,
+    ICP_PIN_BLOCK_HOURS,
+    ICP_PIN_LENGTH,
+    clamp_pin_length,
+    clamp_positive,
+)
 
 
 class ResConfigSettings(models.TransientModel):
@@ -36,9 +48,9 @@ class ResConfigSettings(models.TransientModel):
         default='USD',
         config_parameter=ICP_DISPLAY_CURRENCY,
         help=(
-            'Currency for Chatboo cost chips across all providers. '
-            'Vendors report USD; Chatboo converts at the rate loaded when '
-            'the chat opens. Stored usage stays in USD.'
+            'Currency for inference cost in the Activity log and Chatboo chips. '
+            'Vendors report USD; amounts convert at the loaded rate. '
+            'Stored usage stays in USD.'
         ),
     )
 
@@ -79,6 +91,22 @@ class ResConfigSettings(models.TransientModel):
             'Does not rewrite existing slashes by itself.'
         ),
     )
+    key_pin_length = fields.Integer(
+        string='PIN length',
+        default=DEFAULT_PIN_LENGTH,
+        help='Digits in a temporary key PIN. From 4 to 12. Empty or out of range stays 8.',
+    )
+    key_pin_attempts = fields.Integer(
+        string='PIN attempts per IP',
+        default=DEFAULT_PIN_ATTEMPTS,
+        help='Wrong PINs from the same address before that address is paused. A correct API key is not counted.',
+    )
+    key_pin_block_hours = fields.Integer(
+        string='PIN block (hours)',
+        default=DEFAULT_PIN_BLOCK_HOURS,
+        help='How long a paused address stays unable to redeem a PIN, right or wrong.',
+    )
+
     skill_command_prefix = fields.Char(
         string='Skill command prefix',
         default=DEFAULT_SKILL_COMMAND_PREFIX,
@@ -165,12 +193,22 @@ class ResConfigSettings(models.TransientModel):
         return self._prepare_act_window_action('pns_ai_mcp.action_ai_fx_source')
 
     def action_export_ai_config(self):
-        """Export the whole AI configuration to a downloadable JSON file."""
+        """Export the whole AI configuration (asks for secrets first)."""
         self.ensure_one()
         from ..utils.import_export_guard import ensure_ai_admin
         ensure_ai_admin(self.env)
-        data = config_backup.export_config(self.env, include_secrets=True)
-        filename = mcp_ui.build_export_filename(self.env, 'ai_config_backup', 'json')
+        return self.env['pns.export.secrets.wizard'].ask(
+            self.browse(), '_pns_export_ai_config',
+        )
+
+    def _pns_export_ai_config(self, include_secrets=False):
+        from ..utils.import_export_guard import ensure_ai_admin
+        ensure_ai_admin(self.env)
+        with_secrets = bool(include_secrets)
+        data = config_backup.export_config(self.env, include_secrets=with_secrets)
+        filename = mcp_ui.build_export_filename(
+            self.env, 'ai_config_backup', 'json', secrets=with_secrets,
+        )
         attachment = mcp_ui.write_json_attachment(self.env, filename, data)
         counts = [
             len(data.get('providers') or []),
@@ -184,11 +222,15 @@ class ResConfigSettings(models.TransientModel):
         return mcp_ui.open_json_export_wizard(
             self.env,
             dialog_title=_('AI configuration export'),
-            summary_text=_(
+            summary_text=(_(
                 'Configuration exported (secrets included). '
                 'Providers: %s, Agents: %s, Contexts: %s, Skills: %s, '
                 'Servers: %s, Whitelist: %s, User keys: %s.'
-            ) % tuple(counts),
+            ) if with_secrets else _(
+                'Configuration exported without secrets. '
+                'Providers: %s, Agents: %s, Contexts: %s, Skills: %s, '
+                'Servers: %s, Whitelist: %s, User keys: %s.'
+            )) % tuple(counts),
             count=sum(counts),
             attachment=attachment,
         )
@@ -201,7 +243,7 @@ class ResConfigSettings(models.TransientModel):
         return {
             'type': 'ir.actions.act_window',
             'name': _('Import AI configuration'),
-            'res_model': 'pns_ai_mcp.config_backup_wizard',
+            'res_model': 'ai.config.backup.wizard',
             'view_mode': 'form',
             'views': [[False, 'form']],
             'target': 'new',
@@ -243,6 +285,13 @@ class ResConfigSettings(models.TransientModel):
                 ICP_SKILL_COMMAND_PREFIX, DEFAULT_SKILL_COMMAND_PREFIX,
             ),
         )
+        res['key_pin_length'] = clamp_pin_length(ICP.get_param(ICP_PIN_LENGTH))
+        res['key_pin_attempts'] = clamp_positive(
+            ICP.get_param(ICP_PIN_ATTEMPTS), DEFAULT_PIN_ATTEMPTS,
+        )
+        res['key_pin_block_hours'] = clamp_positive(
+            ICP.get_param(ICP_PIN_BLOCK_HOURS), DEFAULT_PIN_BLOCK_HOURS,
+        )
         return res
 
     def set_values(self):
@@ -282,6 +331,28 @@ class ResConfigSettings(models.TransientModel):
             ))
         ICP.set_param(ICP_SKILL_CODE_PREFIX, code_pfx)
         ICP.set_param(ICP_SKILL_COMMAND_PREFIX, cmd_pfx)
+        ICP.set_param(ICP_PIN_LENGTH, str(clamp_pin_length(self.key_pin_length)))
+        ICP.set_param(
+            ICP_PIN_ATTEMPTS,
+            str(clamp_positive(self.key_pin_attempts, DEFAULT_PIN_ATTEMPTS)),
+        )
+        ICP.set_param(
+            ICP_PIN_BLOCK_HOURS,
+            str(clamp_positive(self.key_pin_block_hours, DEFAULT_PIN_BLOCK_HOURS)),
+        )
+
+    def action_key_pin_release(self):
+        """Drop every temporary-PIN pause. The PINs themselves stay as they are."""
+        self.ensure_one()
+        from ..utils.import_export_guard import ensure_ai_admin
+        ensure_ai_admin(self.env)
+        self.env['ai.key.pin.block'].sudo().release_all()
+        return mcp_ui.client_notification(
+            _('Temporary key PIN'),
+            _('PIN blocks released.'),
+            notification_type='success',
+            sticky=False,
+        )
 
     def _rebuild_inference_agent_caches_after_domain_index_toggle(self):
         """Always-on vs turn-scoped composition changes with the flag."""

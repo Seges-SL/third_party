@@ -1,13 +1,16 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Persist binary downloads linked to a Chatboo session (ir.attachment + chips)."""
+"""Persist binary downloads as ir.attachment + download chips.
+
+The engine creates the file. It does not hang it on another module's table.
+The chat client (if any) claims the attachment when it saves the turn.
+"""
 
 import base64
 import logging
 import re
-import uuid
-from urllib.parse import quote, unquote, urlencode, urlparse
+from urllib.parse import quote, unquote, urlparse
 
 _logger = logging.getLogger(__name__)
 
@@ -19,8 +22,6 @@ PERSIST_REASON_CHATBOO_UNAVAILABLE = 'chatboo_unavailable'
 PERSIST_REASON_SESSION_NOT_FOUND = 'session_not_found'
 PERSIST_REASON_CREATE_FAILED = 'create_failed'
 
-CHATBOO_SESSION_MODEL = 'chatboo.session'
-CHATBOO_ASYNC_REQUEST_MODEL = 'chatboo.async.request'
 ICP_DOWNLOAD_MAX_BYTES = 'pns_ai_chatboo.download_max_bytes'
 DEFAULT_DOWNLOAD_MAX_BYTES = 15 * 1024 * 1024
 
@@ -92,26 +93,17 @@ def safe_content_filename(filename):
     return (name or 'download')[:180]
 
 
-def content_download_url(attachment_id, access_token, filename, mimetype=None):
-    """Chip URL that keeps the proposed name and forces a file download.
+def content_download_url(attachment_id, filename, mimetype=None):
+    """Chip URL that keeps the proposed name; the route downloads it.
 
-    ``/web/content/<id>`` makes the browser save ``74007.pdf``. Putting the
-    chip name in the path and ``download=true`` sets Content-Disposition.
-    SVG stays on the inline viewer (open in a tab).
+    No token: the URL travels to the LLM and to the history, so only a
+    logged-in user who may see the file opens it. SVG opens in a tab.
     """
-    token = (access_token or '').strip()
     name = safe_content_filename(filename)
-    att_id = int(attachment_id)
+    path = '/pns_ai_mcp/session_file/%s' % int(attachment_id)
     if is_inline_preview_file(name, mimetype):
-        path = '/pns_ai_mcp/session_file/%s' % att_id
-        if token:
-            return '%s?access_token=%s' % (path, token)
         return path
-    path = '/web/content/%s/%s' % (att_id, quote(name, safe='._-'))
-    params = {'download': 'true'}
-    if token:
-        params['access_token'] = token
-    return '%s?%s' % (path, urlencode(params))
+    return '%s/%s' % (path, quote(name, safe='._-'))
 
 
 def mimetype_from_magic_bytes(raw):
@@ -360,29 +352,6 @@ def preferred_download_filename(raw_name, arguments=None, labels=None):
     return text[:255] if text else ''
 
 
-def _registry_model(env, model_name):
-    """Return env[model] when the model is installed, else None (O14-safe)."""
-    try:
-        registry = env.registry
-        if model_name not in registry:
-            return None
-        return env[model_name]
-    except Exception:
-        return None
-
-
-def _attachment_access_token(att):
-    """Return a portal access token for a freshly created attachment."""
-    gen = getattr(att, 'generate_access_token', None)
-    if callable(gen):
-        tokens = gen()
-        if tokens:
-            return tokens[0]
-    token = str(uuid.uuid4())
-    att.sudo().write({'access_token': token})
-    return token
-
-
 def coalesce_download_chips(*groups):
     """Merge chip lists, first URL (or name) wins. Skips empty groups."""
     seen = set()
@@ -404,9 +373,9 @@ def coalesce_download_chips(*groups):
 def _run_on_committed_cursor(env, fn):
     """Run ``fn(env2)`` on a short cursor and commit.
 
-    The Chatboo worker keeps the inference TX open until ``_finalize`` opens
-    a fresh cursor. Downloads created on the worker cursor are invisible
-    there. Without ``registry`` (host tests), ``fn`` runs on ``env``.
+    The inference worker may keep its TX open until finalize. Downloads
+    created on that cursor are invisible there. Without ``registry``
+    (host tests), ``fn`` runs on ``env``.
     """
     registry = getattr(env, 'registry', None)
     if registry is None:
@@ -431,50 +400,27 @@ def _run_on_committed_cursor(env, fn):
         return fn(env)
 
 
-def persist_chatboo_session_file_detail(env, session_id, raw_bytes, filename,
-                                        mimetype=None):
-    """Persist download bytes; return {ok, chip?, reason?, ...} for diagnostics."""
-    if not session_id:
-        _logger.info('Chatboo download skipped: missing session id')
-        return {'ok': False, 'reason': PERSIST_REASON_NO_SESSION}
+def persist_turn_file_detail(env, session_id, raw_bytes, filename,
+                             mimetype=None):
+    """Store bytes as an orphan ir.attachment; return {ok, chip?, reason?}."""
+    sid = int(session_id) if session_id else None
     if not raw_bytes:
-        _logger.info('Chatboo download skipped: empty payload (session %s)', session_id)
-        return {'ok': False, 'reason': PERSIST_REASON_NO_BYTES, 'session_id': int(session_id)}
+        _logger.info('Turn download skipped: empty payload')
+        return {'ok': False, 'reason': PERSIST_REASON_NO_BYTES, 'session_id': sid}
 
     max_bytes = get_download_max_bytes(env)
     size = len(raw_bytes)
     if max_bytes and size > max_bytes:
         _logger.info(
-            'Chatboo download skipped: %s bytes > limit %s (session %s)',
-            size, max_bytes, session_id,
+            'Turn download skipped: %s bytes > limit %s',
+            size, max_bytes,
         )
         return {
             'ok': False,
             'reason': PERSIST_REASON_SIZE_LIMIT,
             'size': size,
             'max_bytes': max_bytes,
-            'session_id': int(session_id),
-        }
-
-    Session = _registry_model(env, CHATBOO_SESSION_MODEL)
-    if Session is None:
-        _logger.warning(
-            'Chatboo download skipped: model %s not installed (session %s)',
-            CHATBOO_SESSION_MODEL, session_id,
-        )
-        return {
-            'ok': False,
-            'reason': PERSIST_REASON_CHATBOO_UNAVAILABLE,
-            'session_id': int(session_id),
-        }
-
-    session = Session.sudo().browse(int(session_id))
-    if not session.exists():
-        _logger.warning('Chatboo download skipped: session %s not found', session_id)
-        return {
-            'ok': False,
-            'reason': PERSIST_REASON_SESSION_NOT_FOUND,
-            'session_id': int(session_id),
+            'session_id': sid,
         }
 
     name = (filename or 'download')[:255]
@@ -499,26 +445,24 @@ def persist_chatboo_session_file_detail(env, session_id, raw_bytes, filename,
     except Exception:
         pass
     b64 = base64.b64encode(raw_bytes).decode('ascii')
-    sid = session.id
 
     def _create(env2):
         att = env2['ir.attachment'].sudo().create({
             'name': name,
             'datas': b64,
             'mimetype': mimetype,
-            'res_model': CHATBOO_SESSION_MODEL,
-            'res_id': sid,
         })
-        token = _attachment_access_token(att)
+        chip = {
+            'name': name,
+            'url': content_download_url(att.id, name, mimetype),
+            'mimetype': mimetype,
+            'size': size,
+            'source': 'download',
+            'attachment_id': att.id,
+        }
         return {
             'ok': True,
-            'chip': {
-                'name': name,
-                'url': content_download_url(att.id, token, name, mimetype),
-                'mimetype': mimetype,
-                'size': size,
-                'source': 'download',
-            },
+            'chip': chip,
             'session_id': sid,
         }
 
@@ -526,24 +470,39 @@ def persist_chatboo_session_file_detail(env, session_id, raw_bytes, filename,
         return _run_on_committed_cursor(env, _create)
     except Exception as exc:
         _logger.warning(
-            'Chatboo: could not persist session download %s (session %s)',
-            name, session_id, exc_info=True,
+            'Could not persist turn download %s',
+            name, exc_info=True,
         )
         return {
             'ok': False,
             'reason': PERSIST_REASON_CREATE_FAILED,
-            'session_id': int(session_id),
+            'session_id': sid,
             'detail': str(exc)[:200],
         }
 
 
-def persist_chatboo_session_file(env, session_id, raw_bytes, filename,
-                                   mimetype=None):
-    """Store bytes as ir.attachment on chatboo.session; return download chip."""
-    detail = persist_chatboo_session_file_detail(
+def persist_chatboo_session_file_detail(env, session_id, raw_bytes, filename,
+                                        mimetype=None):
+    """Compat name. Same as persist_turn_file_detail (orphan attachment)."""
+    return persist_turn_file_detail(
+        env, session_id, raw_bytes, filename, mimetype=mimetype,
+    )
+
+
+def persist_turn_file(env, session_id, raw_bytes, filename, mimetype=None):
+    """Store bytes as ir.attachment; return a download chip or None."""
+    detail = persist_turn_file_detail(
         env, session_id, raw_bytes, filename, mimetype=mimetype,
     )
     return detail.get('chip') if detail.get('ok') else None
+
+
+def persist_chatboo_session_file(env, session_id, raw_bytes, filename,
+                                   mimetype=None):
+    """Compat name. Same as persist_turn_file."""
+    return persist_turn_file(
+        env, session_id, raw_bytes, filename, mimetype=mimetype,
+    )
 
 
 def build_binary_stored_meta(persist_detail, filename, size):
@@ -570,22 +529,22 @@ def build_binary_stored_meta(persist_detail, filename, size):
 
     messages = {
         PERSIST_REASON_NO_SESSION: (
-            'File received but no Chatboo session is active, so it was not saved.'
+            'File received but could not be stored (no turn).'
         ),
         PERSIST_REASON_NO_BYTES: (
-            'File response was empty; nothing was saved in chat history.'
+            'File response was empty; nothing was saved.'
         ),
         PERSIST_REASON_SIZE_LIMIT: (
             'File exceeds the configured download limit (pns_ai_chatboo.download_max_bytes).'
         ),
         PERSIST_REASON_CHATBOO_UNAVAILABLE: (
-            'Chatboo is not available on this instance; file was not saved in chat history.'
+            'File received but could not be stored on this instance.'
         ),
         PERSIST_REASON_SESSION_NOT_FOUND: (
-            'Chatboo session no longer exists; file was not saved in chat history.'
+            'File received but the turn is gone; nothing was saved.'
         ),
         PERSIST_REASON_CREATE_FAILED: (
-            'File received but attachment creation failed; not saved in chat history.'
+            'File received but attachment creation failed.'
         ),
     }
     stored_meta['reason'] = reason or 'unknown'
@@ -622,7 +581,7 @@ def chatboo_session_id_from_env(env):
 
 
 def resolve_chatboo_session_id(env):
-    """Best-effort session id for download persistence during Safe Plan."""
+    """Turn id the client put in context or on the HTTP request, if any."""
     sid = chatboo_session_id_from_env(env)
     if sid:
         return sid
@@ -632,17 +591,6 @@ def resolve_chatboo_session_id(env):
             sid = http_request.chatboo_options.get('chatboo_session_id')
             if sid:
                 return int(sid)
-    except Exception:
-        pass
-    try:
-        Job = _registry_model(env, 'chatboo.async.request')
-        if Job:
-            job = Job.search([
-                ('user_id', '=', env.uid),
-                ('state', 'in', ('pending', 'running')),
-            ], order='id desc', limit=1)
-            if job.session_id:
-                return job.session_id.id
     except Exception:
         pass
     return None
@@ -822,97 +770,6 @@ def extract_binary_from_mcp_blocks(blocks, tool_name=None, arguments=None):
     }
 
 
-def notify_chatboo_session_files_updated(env, session_id):
-    """Ask Chatboo clients to reload session messages (download chips)."""
-    if not session_id:
-        return
-    try:
-        session = env['chatboo.session'].browse(int(session_id))
-        if not session.exists():
-            return
-        partner = session.user_id.partner_id
-        if not partner:
-            return
-        payload = {
-            'type': 'pns_chatboo_sync',
-            'action': 'message_received',
-            'session_id': int(session_id),
-        }
-        bus = env['bus.bus']
-        sendone = getattr(bus, '_sendone', None)
-        if sendone:
-            sendone(partner, 'pns_chatboo_sync', payload)
-            return
-        import json as _json
-        channel = (env.cr.dbname, 'res.partner', partner.id)
-        legacy = getattr(bus, 'sendone', None)
-        if legacy:
-            legacy(channel, _json.dumps(payload, ensure_ascii=False))
-    except Exception:
-        _logger.debug(
-            'Chatboo: could not notify session files update (session %s)',
-            session_id, exc_info=True,
-        )
-
-
-def chatboo_session_id_from_operation_data(data):
-    if not isinstance(data, dict):
-        return None
-    sid = data.get('chatboo_session_id')
-    if sid:
-        return int(sid)
-    return None
-
-
-def _session_turn_in_progress(env, session_id):
-    """True while a Chatboo async job is still saving the current turn."""
-    Async = _registry_model(env, CHATBOO_ASYNC_REQUEST_MODEL)
-    if not Async:
-        return False
-    return bool(Async.sudo().search([
-        ('session_id', '=', int(session_id)),
-        ('state', 'in', ('pending', 'running')),
-    ], limit=1))
-
-
 def merge_download_chips_into_session(env, session_id, chips):
-    """Append download chips to the last assistant message, or stage them."""
-    if not session_id or not chips:
-        return
-    session_id = int(session_id)
-    Session = _registry_model(env, CHATBOO_SESSION_MODEL)
-    if not Session:
-        return
-    session = Session.sudo().browse(session_id)
-    if not session.exists():
-        return
-    if _session_turn_in_progress(env, session_id):
-        def _stage(env2):
-            sess = env2[CHATBOO_SESSION_MODEL].sudo().browse(session_id)
-            if sess.exists() and hasattr(sess, 'stage_assistant_download_chips'):
-                sess.stage_assistant_download_chips(chips)
-                notify_chatboo_session_files_updated(env2, session_id)
-        try:
-            _run_on_committed_cursor(env, _stage)
-        except Exception:
-            _logger.debug(
-                'Chatboo: committed stage failed (session %s)',
-                session_id, exc_info=True,
-            )
-            if hasattr(session, 'stage_assistant_download_chips'):
-                session.stage_assistant_download_chips(chips)
-                notify_chatboo_session_files_updated(env, session_id)
-        return
-    if hasattr(session, 'apply_assistant_download_chips'):
-        session.apply_assistant_download_chips(chips)
-        notify_chatboo_session_files_updated(env, session_id)
-        return
-    messages = session.get_messages()
-    if messages and messages[-1].get('role') == 'assistant':
-        existing = list(messages[-1].get('files') or [])
-        messages[-1]['files'] = existing + list(chips)
-        session.set_messages(messages)
-        notify_chatboo_session_files_updated(env, session_id)
-    elif hasattr(session, 'stage_assistant_download_chips'):
-        session.stage_assistant_download_chips(chips)
-        notify_chatboo_session_files_updated(env, session_id)
+    """No-op. The chat client hangs chips when it saves the turn."""
+    return

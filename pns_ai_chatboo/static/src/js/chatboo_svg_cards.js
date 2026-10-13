@@ -1,8 +1,9 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com> */
 /**
  * Chatboo SVG cards — hydrate data-chatboo-card JSON (clock / fact / link).
  * Clock/fact: click opens/downloads the SVG (blob), like a PDF chip.
  * Link: real <a> banner (same gesture as the map card).
- * SPDX-License-Identifier: Apache-2.0
  */
 (function (global) {
     "use strict";

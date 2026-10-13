@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Transient wizard: download a file produced by a portable export."""
 from odoo import fields, models, _
 from odoo.exceptions import UserError
 
@@ -12,6 +13,12 @@ class PnsExportFileWizard(models.TransientModel):
 
     attachment_id = fields.Many2one('ir.attachment', string='Attachment', readonly=True)
     export_filename = fields.Char(string='File name', readonly=True)
+
+    def unlink(self):
+        files = self.sudo().mapped('attachment_id')
+        res = super().unlink()
+        files.unlink()
+        return res
 
     def action_download(self):
         self.ensure_one()

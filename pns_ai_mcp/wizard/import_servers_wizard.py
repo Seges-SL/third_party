@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Import AI providers from JSON (legacy servers wizard)."""
+
 import base64
 import json
 import logging
@@ -14,7 +16,7 @@ _logger = logging.getLogger(__name__)
 
 
 class ImportServersWizard(models.TransientModel):
-    _name = 'pns_ai_mcp.import_servers_wizard'
+    _name = 'ai.import.servers.wizard'
     _inherit = ['pns.operation.report.wizard']
     _description = 'Wizard to import AI Servers from JSON'
 
@@ -103,29 +105,20 @@ class ImportServersWizard(models.TransientModel):
                     target_server = server_model.create(vals)
                     imported_count += 1
 
-                available_models = server_data.get('available_models', [])
-                if available_models:
-                    target_server.available_model_ids.unlink()
-                    new_models = self.env['ai.provider.model']
-                    for model_name in available_models:
-                        new_models |= self.env['ai.provider.model'].create({
-                            'name': model_name,
-                            'provider_id': target_server.id
+                sel = server_data.get('selected_model')
+                if isinstance(sel, str):
+                    sel = sel.strip()
+                if sel:
+                    Model = self.env['ai.provider.model']
+                    match = target_server.available_model_ids.filtered(
+                        lambda m: m.name == sel,
+                    )
+                    if not match:
+                        match = Model.create({
+                            'name': sel,
+                            'provider_id': target_server.id,
                         })
-                    selected_model = server_data.get('selected_model')
-                    if selected_model:
-                        matching = new_models.filtered(lambda m: m.name == selected_model)
-                        if matching:
-                            target_server.model_id = matching[0].id
-
-                import_warnings += self._import_failovers(
-                    target_server,
-                    server_data.get('failovers', server_data.get('role_failovers', [])),
-                )
-                self.env['ai.provider.usage.day'].import_missing_days(
-                    target_server,
-                    server_data.get('usage_days') or [],
-                )
+                    target_server.model_id = match[0].id
 
             except Exception as e:
                 error_msg = "%s: %s" % (name or 'Sin nombre', str(e))
@@ -140,55 +133,3 @@ class ImportServersWizard(models.TransientModel):
             errors=errors,
             warnings=import_warnings,
         )
-
-    def _import_failovers(self, provider, failovers):
-        """Best-effort: vincula el proveedor a agentes (por code) con su prioridad.
-
-        Usa un savepoint por asignación para que un conflicto puntual (la
-        restricción global unique(agent_id, priority) cuando otro proveedor ya
-        ocupa ese hueco, o un agente inexistente en destino) se omita sin abortar
-        el resto de la importación. Devuelve avisos legibles para el informe.
-        """
-        warnings = []
-        if not failovers:
-            return warnings
-        Agent = self.env['ai.agent']
-        Assignment = self.env['ai.agent.provider']
-        for entry in failovers:
-            if not isinstance(entry, dict):
-                continue
-            code = (entry.get('agent_code') or '').strip()
-            if not code:
-                continue
-            agent = Agent.with_context(active_test=False).search(
-                [('code', '=', code)], limit=1
-            )
-            if not agent:
-                warnings.append(
-                    _("Provider '%s': agent '%s' does not exist here; failover entry skipped.")
-                    % (provider.name, code)
-                )
-                continue
-            avals = {
-                'agent_id': agent.id,
-                'provider_id': provider.id,
-                'priority': entry.get('priority', 0),
-                'active': entry.get('active', True),
-            }
-            existing = Assignment.with_context(active_test=False).search([
-                ('agent_id', '=', agent.id),
-                ('provider_id', '=', provider.id),
-            ], limit=1)
-            try:
-                with self.env.cr.savepoint():
-                    if existing:
-                        existing.write(avals)
-                    else:
-                        Assignment.create(avals)
-            except Exception as e:
-                warnings.append(
-                    _("Provider '%s': agent '%s' at priority %s could not be assigned "
-                      "(slot already taken).") % (provider.name, code, entry.get('priority', 0))
-                )
-                _logger.info("MCP: Assignment omitido %s/%s: %s", provider.name, code, e)
-        return warnings

@@ -61,8 +61,57 @@ CURRENCY_SELECTION = [
 ]
 
 
+# ISO code -> symbol. Missing entry → show code + amount (prefix).
+CURRENCY_SYMBOLS = {
+    'USD': '$',
+    'EUR': '€',
+    'GBP': '£',
+    'JPY': '¥',
+    'CNY': '¥',
+    'INR': '₹',
+    'RUB': '₽',
+    'TRY': '₺',
+    'KRW': '₩',
+    'ILS': '₪',
+    'BRL': 'R$',
+    'CAD': 'CA$',
+    'AUD': 'A$',
+    'NZD': 'NZ$',
+    'MXN': 'MX$',
+    'SGD': 'S$',
+    'HKD': 'HK$',
+    'ARS': 'AR$',
+    'CLP': 'CL$',
+    'COP': 'COL$',
+    'SEK': 'kr',
+    'NOK': 'kr',
+    'DKK': 'kr',
+    'PLN': 'zł',
+}
+
+
 def currency_codes():
     return [row[0] for row in CURRENCY_SELECTION]
+
+
+def format_amount_with_symbol(code, amount):
+    """Compact cost label: amount + space + symbol, or ISO code when no symbol."""
+    try:
+        n = float(amount)
+    except (TypeError, ValueError):
+        return '-'
+    if n < 0:
+        return '-'
+    iso = normalize_currency(code)
+    zero = n == 0
+    if zero or n >= 0.01:
+        fmt = '%.2f' % n
+    else:
+        fmt = '%.4f' % n
+    sym = CURRENCY_SYMBOLS.get(iso)
+    if not sym:
+        return '%s %s' % (iso, fmt)
+    return '%s %s' % (fmt, sym)
 
 
 def normalize_currency(code):

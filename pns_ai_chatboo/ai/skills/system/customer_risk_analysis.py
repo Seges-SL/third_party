@@ -1,5 +1,10 @@
+# -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Customer payment-risk slash skill.
+
+Scores partners from posted invoices (DSO, pay ratio, recency, open debt).
+"""
 from datetime import date
 
 # Parámetros refinables por `clave=valor` (deterministas; pueden faltar).
@@ -22,17 +27,42 @@ except NameError:
 if not isinstance(_top, int) or _top <= 0:
     _top = 30
 
+def payment_dates_of_line(line):
+    """Dates of the reconciled counterpart. Never this line's own date.
+
+    A customer receivable is the debit. The collection is the credit line of
+    the partial reconcile (and the other way around on a refund).
+    """
+    dates = []
+    for partial in getattr(line, 'matched_credit_ids', ()) or ():
+        other = partial.credit_move_id
+        if other and other.date and other.id != line.id:
+            dates.append(other.date)
+    for partial in getattr(line, 'matched_debit_ids', ()) or ():
+        other = partial.debit_move_id
+        if other and other.date and other.id != line.id:
+            dates.append(other.date)
+    return dates
+
+
 today = date.today()
 # Retroceder _meses desde el primer día del mes actual.
 _base = today.year * 12 + (today.month - 1) - _meses
 cutoff = date(_base // 12, _base % 12 + 1, 1)
 
-# 1. Obtener todas las facturas de clientes (posted)
-invoices = env['account.move'].search([
+# 1. Obtener todas las facturas de clientes (posted) de la compañía activa.
+_invoice_domain = [
     ('move_type', 'in', ['out_invoice', 'out_refund']),
     ('state', '=', 'posted'),
     ('invoice_date', '>=', str(cutoff)),
-])
+]
+try:
+    _company_id = env.company.id
+except Exception:
+    _company_id = False
+if _company_id:
+    _invoice_domain.append(('company_id', '=', _company_id))
+invoices = env['account.move'].search(_invoice_domain)
 
 # Detectar el campo de cuenta de cobro según la versión de Odoo:
 # Odoo 17+ usa account_id.account_type='asset_receivable';
@@ -43,6 +73,18 @@ try:
     recv_leaf = ('account_id.account_type', 'in', ['asset_receivable'])
 except Exception:
     recv_leaf = ('account_id.user_type_id.type', '=', 'receivable')
+
+# One read of the reconciled receivable lines. The payment date is the
+# counterpart, not the invoice line (whose date is the invoice date).
+_paid_ids = [inv.id for inv in invoices if inv.payment_state == 'paid']
+_recv_lines = env['account.move.line'].search([
+    ('move_id', 'in', _paid_ids or [0]),
+    recv_leaf,
+    ('reconciled', '=', True),
+]) if _paid_ids else []
+_lines_by_move = {}
+for _line in _recv_lines:
+    _lines_by_move.setdefault(_line.move_id.id, []).append(_line)
 
 # 2. Agrupar por cliente
 by_partner = {}
@@ -65,26 +107,18 @@ for inv in invoices:
     if inv.payment_state == 'paid':
         p['paid'] += 1
         p['amount_paid'] += inv.amount_total
-        # DSO: días entre invoice_date y fecha de pago
-        if inv.invoice_date and inv.invoice_date_due:
-            # Aproximamos fecha pago como invoice_date_due si está pagada
-            # (Odoo no siempre guarda fecha exacta de pago en account.move)
-            pay_lines = env['account.move.line'].search([
-                ('move_id', '=', inv.id),
-                recv_leaf,
-                ('reconciled', '=', True),
-            ], limit=1)
-            if pay_lines and pay_lines.date:
-                pay_date = pay_lines.date
+        if inv.invoice_date:
+            pay_dates = []
+            for _line in _lines_by_move.get(inv.id, ()):
+                pay_dates.extend(payment_dates_of_line(_line))
+            if pay_dates:
+                pay_date = max(pay_dates)
                 dso = (pay_date - inv.invoice_date).days
                 if dso >= 0:
                     p['dso_days'].append(dso)
-                # Recency
                 if p['last_payment'] is None or pay_date > p['last_payment']:
                     p['last_payment'] = pay_date
-                # Dispersión temporal
                 p['months_paid'].add((pay_date.year, pay_date.month))
-                # Cumplimiento vencimiento
                 if inv.invoice_date_due:
                     if pay_date <= inv.invoice_date_due:
                         p['on_time'] += 1
@@ -152,7 +186,7 @@ for pid, p in by_partner.items():
         'pending_fact': p['pending'],
         'amount_pending': p['amount_pending'],
         'amount_paid': p['amount_paid'],
-        'dso_medio': round(dso_medio if dso_medio < 999 else 0, 1),
+        'dso_medio': round(dso_medio, 1) if dso_medio < 999 else '',
         'dispersion': round(len(p['months_paid']) / _meses * 100, 1),
         'ratio_pago': round(ratio, 1),
         'score_ratio': score_ratio,
@@ -177,25 +211,25 @@ for r in result:
         r['score_cumplimiento']* 0.10
     )
     r['score'] = round(score, 1)
-    # Etiqueta
+    # Label
     if score >= 80:
         r['fiabilidad'] = '🟢 Premium'
         r['_row_color'] = '#e8f5e9'
         r['_color_score'] = '#2e7d32'
     elif score >= 60:
-        r['fiabilidad'] = '🟡 Fiable'
+        r['fiabilidad'] = '🟡 Reliable'
         r['_row_color'] = '#fffde7'
         r['_color_score'] = '#f9a825'
     elif score >= 40:
-        r['fiabilidad'] = '🟠 Con Riesgo'
+        r['fiabilidad'] = '🟠 At risk'
         r['_row_color'] = '#fff3e0'
         r['_color_score'] = '#e65100'
     elif score >= 20:
-        r['fiabilidad'] = '🔴 Problemático'
+        r['fiabilidad'] = '🔴 Problematic'
         r['_row_color'] = '#fde8e8'
         r['_color_score'] = 'red'
     else:
-        r['fiabilidad'] = '⛔ Bloqueado'
+        r['fiabilidad'] = '⛔ Blocked'
         r['_row_color'] = '#f3e5f5'
         r['_color_score'] = '#6a1b9a'
     # Limpiar campos internos
@@ -212,16 +246,16 @@ result = result[:_top]
 final = []
 for r in result:
     final.append({
-        'Cliente': r['name'],
-        'NIF': r['vat'],
-        'F.Pend.': r['pending_fact'],
-        'Deuda €': r['amount_pending'],
-        'F.Pagadas': r['paid_fact'],
+        'Customer': r['name'],
+        'VAT': r['vat'],
+        'Open invoices': r['pending_fact'],
+        'Debt': r['amount_pending'],
+        'Paid invoices': r['paid_fact'],
         'Ratio %': r['ratio_pago'],
-        'DSO días': r['dso_medio'],
-        'Dispersión %': r['dispersion'],
+        'DSO days': r['dso_medio'],
+        'Spread %': r['dispersion'],
         'Score': r['score'],
-        'Fiabilidad': r['fiabilidad'],
+        'Reliability': r['fiabilidad'],
         '_row_color': r.get('_row_color', ''),
         '_color_Score': r.get('_color_score', ''),
     })

@@ -1,21 +1,21 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-# Archivo: models/ir_ui_view_patch.py
-# Descripción: Compatibilidad de vistas single-branch para el ecosistema PNS.
-#
-#   La fuente XML de los módulos pns_* se escribe SIEMPRE en sintaxis antigua
-#   (attrs, <tree>), válida de forma nativa en Odoo 13-16. En Odoo 17+ este
-#   parche la convierte en runtime a invisible/readonly/required="expresión" y
-#   <list>. Vive en pns_base para no duplicarlo en cada módulo.
-#
-#   Detección de "vista PNS": señal fiable es el módulo del xml_id del <record>
-#   (pns_*). Para creación programática sin xml_id se usan pistas de nombre/modelo;
-#   la conversión solo actúa si hay sintaxis antigua, así que una pista de más
-#   nunca corrompe una vista ya escrita en sintaxis nueva.
-#
-#   Sin borrado silencioso: si un attrs no se puede convertir se registra ERROR
-#   y se deja tal cual, de modo que falle de forma visible en Odoo 17+.
+"""Single-branch view compatibility for pns_* XML.
+
+pns_* view XML is always written in the old syntax (attrs, <tree>), native
+on Odoo 13–16. On 17+ this patch converts attrs to
+invisible/readonly/required=\"expression\". On 18+ it also rewrites
+<tree> to <list> and view_mode tree→list. It lives in pns_base
+so each module does not copy it.
+
+A view is treated as PNS when its record xml_id module is pns_*. Programmatic
+create/write without xml_id uses name/model hints. Conversion only runs when
+old syntax is present, so an extra hint never rewrites a new-syntax view.
+
+If an attrs cannot be converted, an ERROR is logged and the attrs is left
+as-is so the failure is visible on Odoo 17+.
+"""
 
 import ast
 import html
@@ -77,7 +77,14 @@ def _action_vals_look_pns(vals):
 
 
 def _normalize_act_window_view_modes(vals):
-    """Replace tree→list in view_mode and nested act_window.view commands (O17+)."""
+    """Replace tree→list in view_mode and nested act_window.view commands (O18+).
+
+    Odoo 17 still uses view_mode 'tree'; 'list' exists from 18. No-op on 17.
+    """
+    from ..utils.version_gates import applies_tree_to_list
+    from ..utils.compat import ODOO_VERSION
+    if not applies_tree_to_list(ODOO_VERSION):
+        return
     if vals.get('view_mode'):
         vals['view_mode'] = vals['view_mode'].replace('tree', 'list')
     view_ids = vals.get('view_ids')
@@ -272,8 +279,8 @@ class IrUiView(models.Model):
     Parche de compatibilidad de vistas single-branch (Odoo 13 -> 19+).
 
     La fuente XML se escribe SIEMPRE en sintaxis antigua (attrs, <tree>), valida
-    de forma nativa en Odoo 13-16. Para Odoo 17+ este parche la convierte en
-    runtime a invisible/readonly/required="expresion" y <list>.
+    de forma nativa en Odoo 13-16. En 17+ convierte attrs a expresion; en 18+
+    tambien <tree> a <list>.
     """
     _inherit = 'ir.ui.view'
 
@@ -281,15 +288,17 @@ class IrUiView(models.Model):
     def _load_records(self, data_list, update=False):
         """Override: convert attrs→expression and tree→list for PNS views on load (O17+)."""
         from ..utils.compat import ODOO_VERSION
+        from ..utils.version_gates import applies_attrs_convert, applies_tree_to_list
         for data in data_list:
             vals = data.get('values', {})
             _alias_groups_vals(vals, self._fields)
-        if ODOO_VERSION >= 17:
+        if applies_attrs_convert(ODOO_VERSION):
             for data in data_list:
                 vals = data.get('values', {})
                 if _record_is_pns(data):
                     _convert_arch_fields(vals, self._auto_convert_attrs)
-                    if vals.get('type') == 'tree':
+                    # 'tree' is valid on O17; only drop it on 18+ after <list>.
+                    if applies_tree_to_list(ODOO_VERSION) and vals.get('type') == 'tree':
                         vals.pop('type', None)
         return super(IrUiView, self)._load_records(data_list, update)
 
@@ -297,11 +306,12 @@ class IrUiView(models.Model):
     def create(self, vals_list):
         """Override: convert attrs→expression for programmatically created PNS views (O17+)."""
         from ..utils.compat import ODOO_VERSION
+        from ..utils.version_gates import applies_attrs_convert, applies_tree_to_list
         for vals in vals_list:
             _alias_groups_vals(vals, self._fields)
-            if ODOO_VERSION >= 17 and _view_vals_look_pns(vals):
+            if applies_attrs_convert(ODOO_VERSION) and _view_vals_look_pns(vals):
                 _convert_arch_fields(vals, self._auto_convert_attrs)
-                if vals.get('type') == 'tree':
+                if applies_tree_to_list(ODOO_VERSION) and vals.get('type') == 'tree':
                     vals.pop('type', None)
         return super(IrUiView, self).create(vals_list)
 
@@ -321,10 +331,13 @@ class IrUiView(models.Model):
         """Core transformer: rewrite old-style XML arch for Odoo 17+ compatibility.
 
         Transformations applied (in order):
-          1. ``attrs="{...}"`` → individual ``invisible/readonly/required="expr"``
-          2. ``<tree>`` → ``<list>``
-          3. Static ``invisible="1"`` inside ``<list>`` → ``column_invisible="True"``
+          1. (O17+) ``attrs="{...}"`` → individual ``invisible/readonly/required="expr"``
+          2. (O18+) ``<tree>`` → ``<list>``
+          3. (O18+) Static ``invisible="1"`` inside ``<list>`` → ``column_invisible="True"``
           4. (O19+) res.config.settings xpath fix for new base form layout
+
+        ``<list>`` and view type/mode 'list' exist from Odoo 18; on Odoo 17
+        the list view is still ``<tree>``, so steps 2-3 must not run.
 
         Args:
             arch: XML arch string.
@@ -342,18 +355,21 @@ class IrUiView(models.Model):
         if 'name="attrs"' in arch or "name='attrs'" in arch:
             arch = _ATTRS_ATTRIBUTE_TAG_RE.sub(_convert_attribute_attrs_tag, arch)
 
-        # 2) <tree> -> <list>
-        arch = re.sub(r'<tree\b', '<list', arch)
-        arch = arch.replace('</tree>', '</list>')
+        from ..utils.compat import ODOO_VERSION
+        from ..utils.version_gates import applies_tree_to_list
 
-        # 3) invisible="1" estatico dentro de <list> -> column_invisible="True"
-        def replace_invisible_in_list(match):
-            """Replace static invisible='1' with column_invisible='True' inside <list> blocks."""
-            return match.group(0).replace('invisible="1"', 'column_invisible="True"')
-        arch = re.sub(r'<list\b.*?</list>', replace_invisible_in_list, arch, flags=re.DOTALL)
+        # 2) <tree> -> <list> (O18+; on O17 the list tag is still <tree>).
+        if applies_tree_to_list(ODOO_VERSION):
+            arch = re.sub(r'<tree\b', '<list', arch)
+            arch = arch.replace('</tree>', '</list>')
+
+            # 3) invisible="1" estatico dentro de <list> -> column_invisible="True"
+            def replace_invisible_in_list(match):
+                """Replace static invisible='1' with column_invisible='True' inside <list> blocks."""
+                return match.group(0).replace('invisible="1"', 'column_invisible="True"')
+            arch = re.sub(r'<list\b.*?</list>', replace_invisible_in_list, arch, flags=re.DOTALL)
 
         # 4) res.config.settings en Odoo 19+
-        from ..utils.compat import ODOO_VERSION
         if ODOO_VERSION >= 19:
             arch = arch.replace(
                 '''expr="//div[hasclass('settings')]"''',
@@ -368,35 +384,50 @@ class IrActionsActWindow(models.Model):
 
     @api.model
     def _load_records(self, data_list, update=False):
-        """Override: replace 'tree' with 'list' in view_mode for PNS actions (O17+)."""
-        from ..utils.compat import ODOO_VERSION
+        """Override: replace 'tree' with 'list' in view_mode for PNS actions (O18+)."""
         for data in data_list:
             vals = data.get('values', {})
             _alias_groups_vals(vals, self._fields)
-            if ODOO_VERSION >= 17 and _record_is_pns(data):
+            if _record_is_pns(data):
                 _normalize_act_window_view_modes(vals)
         return super(IrActionsActWindow, self)._load_records(data_list, update)
 
     @api.model_create_multi
     def create(self, vals_list):
-        """Override: replace 'tree' with 'list' in view_mode for new PNS actions (O17+)."""
-        from ..utils.compat import ODOO_VERSION
+        """Override: replace 'tree' with 'list' in view_mode for new PNS actions (O18+)."""
         for vals in vals_list:
             _alias_groups_vals(vals, self._fields)
-            if ODOO_VERSION >= 17 and _action_vals_look_pns(vals):
+            if _action_vals_look_pns(vals):
                 _normalize_act_window_view_modes(vals)
         return super(IrActionsActWindow, self).create(vals_list)
 
     def write(self, vals):
-        """Override: replace 'tree' with 'list' in view_mode when updating PNS actions (O17+)."""
+        """Override: replace 'tree' with 'list' in view_mode when updating PNS actions (O18+)."""
         from ..utils.compat import ODOO_VERSION
+        from ..utils.version_gates import applies_tree_to_list
         _alias_groups_vals(vals, self._fields)
-        if ODOO_VERSION >= 17 and 'view_mode' in vals:
+        if applies_tree_to_list(ODOO_VERSION) and 'view_mode' in vals:
             for record in self:
                 if _hint(record.res_model, _PNS_MODEL_HINTS):
                     vals['view_mode'] = vals['view_mode'].replace('tree', 'list')
                     break
         return super(IrActionsActWindow, self).write(vals)
+
+
+class IrActionsActWindowView(models.Model):
+    _inherit = 'ir.actions.act_window.view'
+
+    @api.model
+    def _load_records(self, data_list, update=False):
+        """The child row stores one mode. Odoo 19 rejects ``tree`` there."""
+        from ..utils.compat import ODOO_VERSION
+        from ..utils.version_gates import applies_tree_to_list
+        if applies_tree_to_list(ODOO_VERSION):
+            for data in data_list:
+                vals = data.get('values', {})
+                if _record_is_pns(data) and vals.get('view_mode') == 'tree':
+                    vals['view_mode'] = 'list'
+        return super(IrActionsActWindowView, self)._load_records(data_list, update)
 
 
 class IrUiMenu(models.Model):

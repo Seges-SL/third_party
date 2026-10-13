@@ -33,6 +33,8 @@ _logger = logging.getLogger(__name__)
 
 # HTTP methods that can appear as OpenAPI path operations.
 _HTTP_METHODS = ('get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace', 'query')
+# RFC 9110 safe methods (plus QUERY): they change nothing on the remote.
+_SAFE_METHODS = frozenset(('GET', 'HEAD', 'OPTIONS', 'QUERY'))
 # Methods whose semantics accept a request body.
 _BODY_METHODS = {'post', 'put', 'patch', 'delete', 'query'}
 
@@ -272,7 +274,15 @@ class OpenAPIDriver(APIDriver):
         servers = spec.get('servers') or []
         if servers and isinstance(servers[0], dict) and servers[0].get('url'):
             # Spec server URLs may be relative to the spec document location.
-            return urljoin(server.spec_url or '', servers[0]['url']).rstrip('/')
+            url = urljoin(server.spec_url or '', servers[0]['url']).rstrip('/')
+            # A downloaded spec must not pick where the credential goes.
+            spec_host = urlparse(server.spec_url or '').hostname
+            if self._spec_is_manual(server) or urlparse(url).hostname == spec_host:
+                return url
+            raise APIDriverError(
+                "The spec of OpenAPI server '%s' sends calls to %s, not to the "
+                'host it was downloaded from. Set base_url on the server to '
+                'allow that host.' % (server.code, urlparse(url).hostname))
         parsed = urlparse(server.spec_url or '')
         if parsed.scheme and parsed.netloc:
             return '%s://%s' % (parsed.scheme, parsed.netloc)
@@ -299,6 +309,14 @@ class OpenAPIDriver(APIDriver):
         raise APIDriverError(
             "Operation '%s' is not in the discovered spec. Re-run Discover "
             'Tools and use only catalogued operation names.' % tool_name)
+
+    def reads_only(self, server, tool_name):
+        try:
+            spec = self._resolve_spec(server, fetch=False)
+            method = self._find_operation(spec, tool_name)[0]
+        except Exception:
+            return False
+        return method in _SAFE_METHODS
 
     @staticmethod
     def _operation_expects_binary(op):

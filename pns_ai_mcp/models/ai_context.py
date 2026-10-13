@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-# ai.context — reusable knowledge directives (prompts) for AI agents.
+"""ai.context — reusable knowledge directives (prompts) for AI agents."""
 
 import json
 import os
@@ -17,6 +17,7 @@ from ..utils.import_export_guard import ensure_ai_admin
 from ..utils.knowledge_ownership import (
     apply_create_ownership,
     assert_writer_can_write_records,
+    factory_lock_open,
     filter_visible_records,
     ownership_read_domain,
 )
@@ -300,18 +301,19 @@ class AIContext(models.Model):
     )
     composition_origin = fields.Selection(
         selection=[
-            ('native', 'native'),
-            ('imported', 'imported'),
-            ('pinned', 'pinned'),
-            ('extra', 'extra'),
+            ('own', 'Own'),
+            ('imported', 'Imported'),
+            ('inserted', 'Inserted'),
+            ('extra', 'Extra'),
         ],
         string='Origin',
         compute='_compute_composition_link',
         search='_search_composition_origin',
-        help='Why this row is on the current agent. native: this agent file. '
-             'imported: other module in the XML seed. pinned: other module '
-             'pinched onto this agent. extra: not in the recipe (user / slash). '
-             'Empty source_module is extra.',
+        help="Why this row is on the current agent. Own: from this agent's module. "
+             "Imported: from another module; this agent asks for it. "
+             "Inserted: from another module; that module puts it in this agent. "
+             "Extra: no module manages it; a person added it. "
+             "Empty source_module is extra.",
     )
     link_visible = fields.Boolean(
         compute='_compute_composition_link',
@@ -332,15 +334,11 @@ class AIContext(models.Model):
     )
     @api.model
     def fields_get(self, allfields=None, attributes=None):
-        """Type and origin labels are tokens, never translated."""
+        """Type labels are tokens, never translated."""
         res = super().fields_get(allfields=allfields, attributes=attributes)
         info = res.get('context_type')
         if info and info.get('selection'):
             info['selection'] = list(context_roles.TYPE_SELECTION)
-        origin = res.get('composition_origin')
-        if origin and origin.get('selection'):
-            from .ai_agent import COMPOSITION_ORIGIN_SELECTION
-            origin['selection'] = list(COMPOSITION_ORIGIN_SELECTION)
         return res
 
     @api.model
@@ -445,15 +443,6 @@ class AIContext(models.Model):
                     stems.add(os.path.splitext(filename)[0])
         return stems
 
-    @api.model
-    def _default_import_agent(self):
-        """Fallback agent used to attach imported contexts when none is given."""
-        agent = self.env.ref('pns_ai_mcp.ai_agent_mcp', raise_if_not_found=False)
-        if not agent:
-            agent = self.env.ref('pns_ai_chatboo.ai_agent_chatboo', raise_if_not_found=False)
-        if agent:
-            return agent
-        return self.env['ai.agent'].search([], limit=1, order='sequence')
 
     # Size fields for token optimization visibility
     content_size_bytes = fields.Integer(
@@ -514,7 +503,8 @@ class AIContext(models.Model):
             user_locale (str): Locale code (e.g., 'es_ES', 'de_DE').
             
         Returns:
-            dict: {thousands_sep, decimal_sep, date_format, csv_sep} or empty dict if not found.
+            dict: {thousands_sep, decimal_sep, date_format, csv_sep, csv_quote}
+            or empty dict if not found.
         """
         if not user_locale:
             user_locale = self.env.context.get('lang', 'en_US')
@@ -549,6 +539,7 @@ class AIContext(models.Model):
             'thousands_sep': r'<thousands_separator[^>]*>(.*?)</thousands_separator>',
             'date_format': r'<date_format[^>]*>(.*?)</date_format>',
             'csv_sep': r'<csv_field_separator[^>]*>(.*?)</csv_field_separator>',
+            'csv_quote': r'<csv_quote_char[^>]*>(.*?)</csv_quote_char>',
         }
         
         for key, pattern in patterns.items():
@@ -597,7 +588,7 @@ class AIContext(models.Model):
         user_locale = self._normalize_user_locale(user_locale)
         
         # 1. Try locale-specific context via EXPLICIT base_code + locale fields.
-        locale_specific = self.search([
+        locale_specific = self.search(self.ownership_read_domain() + [
             ('base_code', '=', base_code),
             ('locale', '=', user_locale),
             ('active', '=', True),
@@ -636,7 +627,7 @@ class AIContext(models.Model):
             _logger.error("MCP: Error lazy loading on-demand %s: %s", base_code, e)
 
         # 2. Fallback to the language-neutral base context (explicit fields).
-        generic = self.search([
+        generic = self.search(self.ownership_read_domain() + [
             ('base_code', '=', base_code),
             ('locale', 'in', [False, '']),
             ('active', '=', True),
@@ -660,11 +651,11 @@ class AIContext(models.Model):
         load. Pure ``locale`` contexts (linguistic glue) are internal adaptation,
         not user-selectable, so they are excluded.
 
-        Shared by ``prompts/list`` and ``resources/list`` so both primitives
-        advertise exactly the same catalogue as the ``get_context`` tool index.
+        Shared by ``prompts/list`` so that primitive
+        advertises exactly the same catalogue as the ``get_context`` tool index.
         """
         from ..utils.agent_identity import is_identity_pack_code
-        contexts = self.search([
+        contexts = self.search(self.ownership_read_domain() + [
             ('active', '=', True),
             ('context_type', 'in', list(context_roles.MCP_LISTABLE_TYPES)),
         ], order='context_type, code')
@@ -896,7 +887,7 @@ class AIContext(models.Model):
             merge_trigger_lists,
         )
         user_locale = self._normalize_user_locale(user_locale)
-        rows = self.with_context(active_test=False).search([
+        rows = self.with_context(active_test=False).search(self.ownership_read_domain() + [
             ('context_type', '=', context_roles.DISCOVERY),
             ('active', '=', True),
         ])
@@ -959,13 +950,14 @@ class AIContext(models.Model):
         ``agent.context_ids``); otherwise consider the whole active catalog.
         """
         if agent:
-            contexts = agent.context_ids.filtered('active').sorted(
-                key=lambda c: (c.context_type or '', c.code)
-            )
+            contexts = self.filter_visible_for_user(
+                agent.context_ids.filtered('active')
+            ).sorted(key=lambda c: (c.context_type or '', c.code))
         else:
             contexts = self.search(
-                [('active', '=', True),
-                 ('context_type', '!=', context_roles.DISCOVERY)],
+                self.ownership_read_domain()
+                + [('active', '=', True),
+                   ('context_type', '!=', context_roles.DISCOVERY)],
                 order='context_type, code',
             )
         by_base = {}
@@ -1054,7 +1046,7 @@ class AIContext(models.Model):
     def _injectable_active_contexts(self):
         """Active contexts whose content can enter a prompt (never ``discovery``)."""
         return self.search(
-            [
+            self.ownership_read_domain() + [
                 ('active', '=', True),
                 ('context_type', 'in', list(context_roles.INJECTABLE_TYPES)),
             ],
@@ -1114,63 +1106,6 @@ class AIContext(models.Model):
         """UTF-8 byte size of ``build_bundle_payload``."""
         return len(self.build_bundle_payload(contexts, user_locale).encode('utf-8'))
 
-    @api.model
-    def get_monolithic_content(self, user_locale=None):
-        """Monolithic knowledge bundle (all injectable actives, locale-deduped).
-
-        Legacy max payload. With domain-index inject ON, agent caches are smaller
-        (always-on only); use ``split_contexts_by_domain_index`` +
-        ``build_bundle_payload`` for the min/max pair in statistics.
-        """
-        return self.build_bundle_payload(
-            self._injectable_active_contexts(),
-            user_locale=user_locale,
-        )
-
-    @api.model
-    def get_stats_by_ids(self, context_ids):
-        """
-        Composition stats for filtered contexts + always-on / monolithic sizes.
-        Used by the tree statistics button.
-        """
-        user_locale = self.env.context.get('lang', 'en_US')
-
-        if not context_ids:
-            contexts = self._injectable_active_contexts()
-        else:
-            contexts = self.browse(context_ids).filtered(
-                lambda c: c.active and context_roles.is_injectable(c.context_type),
-            )
-
-        always_on, turn_scoped, indexed, inject = self.split_contexts_by_domain_index(
-            contexts, user_locale=user_locale,
-        )
-        stats = self.get_composition_stats(always_on, user_locale=user_locale)
-        stats['cache_size'] = 0
-        stats['always_on_cache_size'] = 0
-        stats['monolithic_cache_size'] = 0
-        stats['inject_enabled'] = inject
-        stats['turn_scoped_codes'] = sorted(indexed)
-        stats['cache_error'] = False
-
-        try:
-            always_size = self.get_bundle_payload_size(always_on, user_locale)
-            mono_size = self.get_bundle_payload_size(
-                always_on | turn_scoped, user_locale,
-            )
-            stats['cache_size'] = always_size
-            stats['always_on_cache_size'] = always_size
-            stats['monolithic_cache_size'] = mono_size
-            if always_size == 0 and mono_size == 0:
-                stats['cache_error'] = (
-                    f"Cache vacío generado para locale {user_locale}"
-                )
-        except Exception as e:
-            _logger.warning(f"Error calculating cache size: {e}")
-            stats['cache_size'] = 0
-            stats['cache_error'] = str(e)
-
-        return stats
     
     @api.model
     def get_base_context_name(self, code):
@@ -1227,31 +1162,6 @@ class AIContext(models.Model):
         load_odoo14_assets_if_needed(self.env)
         return res
 
-    @api.model
-    def _build_module_restore_report_html(self, result, title=None):
-        errors = result.get('errors') or []
-        imported = result.get('imported', 0)
-        updated = result.get('updated', 0)
-        title = title or _('System contexts — restore from module')
-        status_class, status_icon, status_text, _ntype = pns_ui.derive_operation_status(
-            errors,
-            imported + updated,
-            failed_text=_('Contexts restore failed.'),
-            warnings_text=_('Contexts restore completed with warnings.'),
-            success_text=_('Contexts restore completed.'),
-        )
-        return pns_ui.build_operation_report_html(
-            title,
-            status_text,
-            status_class,
-            status_icon,
-            rows=[
-                (_('Contexts imported'), imported),
-                (_('Contexts updated'), updated),
-                (_('Contexts skipped (not overwritten)'), result.get('skipped', 0)),
-            ],
-            errors=errors,
-        )
 
     def action_restore_from_module(self, replace_existing=True):
         """
@@ -1298,106 +1208,9 @@ class AIContext(models.Model):
             notification_type=ntype if ntype != 'danger' else 'warning',
         )
 
-    def get_global_stats(self, domain=None):
-        """
-        Calcula estadísticas detalladas para el diálogo de estadísticas.
-        Args:
-            domain: Dominio de búsqueda actual (filtros activos en la vista)
-        """
-        # Si no se pasa dominio, usar uno por defecto (ej: activo por defecto)
-        search_domain = domain or []
-        
-        # 1. Obtener contextos que cumplen el filtro (o todos si no hay filtro activo)
-        # Nota: Asumimos que el usuario quiere ver estadísticas de lo que está filtrando
-        current_contexts = self.search(search_domain)
-        
-        # Asegurarnos de que solo contamos activos para las estadísticas REALES de uso
-        active_contexts = current_contexts.filtered(lambda r: r.active)
-        
-        stats = {
-            'total_count': len(active_contexts),
-            'total_size_raw': 0,
-            'total_size_optimized': 0,
-            'categories': {
-                'core': {'count': 0, 'size_raw': 0, 'size_optimized': 0},
-                'domain': {'count': 0, 'size_raw': 0, 'size_optimized': 0},
-                'locale': {'count': 0, 'size_raw': 0, 'size_optimized': 0},
-            }
-        }
-        
-        for ctx in active_contexts:
-            cat = ctx.context_type
-            if cat not in stats['categories']:
-                cat = 'domain' # Fallback
-            
-            # Sumar contadores
-            stats['categories'][cat]['count'] += 1
-            stats['categories'][cat]['size_raw'] += (ctx.content_size_bytes or 0)
-            stats['categories'][cat]['size_optimized'] += (ctx.content_size_without_metadata or 0)
-            
-            # Sumar totales globales
-            stats['total_size_raw'] += (ctx.content_size_bytes or 0)
-            stats['total_size_optimized'] += (ctx.content_size_without_metadata or 0)
-
-        return stats
-
-    def action_export_selected_zip(self):
-        """
-        Export selected contexts as ZIP file.
-        Can be called from tree view with selected records.
-        """
-        ensure_ai_admin(self.env)
-        if not self:
-            return pns_ui.warning_notification(
-                _('Export contexts'),
-                _('Please select at least one context to export.'),
-            )
-        
-        # Create ZIP in memory
-        zip_buffer = io.BytesIO()
-        
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            for record in self:
-                # Determine extension
-                extension = '.md'
-                if self._is_python_content(record.content):
-                    extension = '.py'
-                elif record.content and record.content.strip().startswith('<') and '>' in record.content:
-                    extension = '.xml'
-                
-                filename = f"{record.code}{extension}"
-                export_content = self._build_export_content(record, extension)
-                
-                # Determine folder based on context type (core = system)
-                folder = 'system' if record.context_type == 'core' else 'custom'
-                zip_path = f"{folder}/{filename}"
-                
-                zip_file.writestr(zip_path, export_content.encode('utf-8'))
-        
-        # Create temporary attachment
-        zip_buffer.seek(0)
-        zip_data = zip_buffer.read()
-        zip_buffer.close()
-        
-        count = len(self)
-        zip_filename = pns_ui.build_export_filename(
-            self.env, f"contexts_{count}selected", 'zip')
-        
-        attachment = pns_ui.write_export_attachment(
-            self.env, zip_filename, zip_data, 'application/zip',
-            res_model='ai.context', res_id=0,
-        )
-        
-        return pns_ui.open_json_export_wizard(
-            self.env,
-            dialog_title=_('Export selected contexts'),
-            summary_text=_('%s context(s) exported to ZIP.') % count,
-            count=count,
-            attachment=attachment,
-        )
 
     @api.model
-    def record_context_usage(self, context_code):
+    def _record_context_usage(self, context_code):
         """Increment usage_count on a short cursor (best-effort).
 
         Must not write on the Chatboo/ReAct REPEATABLE READ snapshot: other
@@ -1514,10 +1327,10 @@ class AIContext(models.Model):
         """
         Sobrescribe write para evitar modificar registros hardcodeados.
         Muestra una notificación amigable en lugar de bloquear la acción.
-        Permite saltarse la restricción si el contexto tiene skip_hardcoded_restrictions=True
-        (usado en procesos de importación/exportación).
+        The seed flag counts only inside sudo() or as the superuser. A
+        context key from RPC is not a grant.
         """
-        if not self.env.context.get('skip_hardcoded_restrictions'):
+        if not factory_lock_open(self.env):
             assert_writer_can_write_records(self, self.env)
             if not self.env.user.has_group('pns_ai_mcp.group_ai_admin'):
                 if vals.get('context_type') == 'core':
@@ -1629,10 +1442,10 @@ class AIContext(models.Model):
     def unlink(self):
         """Block core and live factory files; leftovers and user rows may go.
 
-        ``skip_hardcoded_restrictions`` stays open for import, ``-u`` and
-        uninstall hooks.
+        The seed flag stays open for import, ``-u`` and uninstall hooks
+        only when the environment is sudo or the superuser.
         """
-        if not self.env.context.get('skip_hardcoded_restrictions'):
+        if not factory_lock_open(self.env):
             assert_writer_can_write_records(self, self.env)
             locked = self.filtered(lambda rec: rec._is_shipped_factory_locked())
             if locked:
@@ -1643,38 +1456,32 @@ class AIContext(models.Model):
                 ))
         return super(AIContext, self).unlink()
 
+    # Maps discovery left the engine; pns_geo owns discovery_geo*.
+    _ENGINE_RETIRED_DISCOVERY_GEO_CODES = (
+        'discovery_geo',
+        'discovery_geo_es_ES',
+    )
+
     @api.model
-    def _purge_retired_self_source_files(self):
-        """Delete leftover ``ai/contexts/domain/self/`` on installed addons.
-
-        Git already dropped those files; a flatten/publish copy can leave
-        ``self.xml`` / ``self_es_ES.xml`` on the runtime module path, and the
-        next import would recreate the DB rows.
-        """
-        import os
-        import shutil
-
-        removed = []
-        for source_mod, ctx_dir in self._get_context_source_paths():
-            leftover = os.path.join(ctx_dir, 'domain', 'self')
-            if not os.path.isdir(leftover):
-                continue
-            if os.path.basename(os.path.normpath(leftover)) != 'self':
-                continue
-            try:
-                shutil.rmtree(leftover)
-            except OSError:
-                _logger.warning(
-                    'MCP: could not remove leftover identity folder %s (%s)',
-                    leftover, source_mod, exc_info=True,
-                )
-                continue
-            removed.append(leftover)
-            _logger.info(
-                'MCP: removed leftover identity folder %s (%s)',
-                leftover, source_mod,
-            )
-        return removed
+    def _unlink_retired_engine_discovery_geo(self):
+        """Drop engine-owned map discovery leftover (O14 -u, no 3.1.* migrate)."""
+        rows = self.sudo().with_context(
+            skip_hardcoded_restrictions=True,
+            tracking_disable=True,
+            active_test=False,
+        ).search([
+            ('code', 'in', list(self._ENGINE_RETIRED_DISCOVERY_GEO_CODES)),
+            ('source_module', '=', 'pns_ai_mcp'),
+            ('owner_id', '=', False),
+        ])
+        if not rows:
+            return self.browse()
+        n = len(rows)
+        rows.unlink()
+        _logger.info(
+            'MCP: unlinked leftover engine discovery_geo rows: %s', n,
+        )
+        return rows
 
     @api.model
     def _retire_generic_self_row(self):
@@ -1685,13 +1492,6 @@ class AIContext(models.Model):
         ``contexts/domain/self/``. Does not touch ``self_chatboo`` / ``self_mcp``.
         """
         from ..utils.agent_identity import is_retired_self_pack_code
-        try:
-            self._purge_retired_self_source_files()
-        except Exception:
-            _logger.warning(
-                'MCP: could not purge leftover domain/self folders',
-                exc_info=True,
-            )
         Context = self.with_context(
             skip_hardcoded_restrictions=True,
             active_test=False,
@@ -1801,11 +1601,6 @@ class AIContext(models.Model):
         content = content or ''
         return any(marker in content for marker in python_markers)
 
-    @staticmethod
-    def _format_datetime_value(value):
-        if not value:
-            return ''
-        return fields.Datetime.to_string(value)
 
     def _build_export_content(self, record, extension):
         content = record.content or ''
@@ -2023,14 +1818,6 @@ class AIContext(models.Model):
                 if ctx_dir:
                     sources = [(module_name, ctx_dir)]
 
-        try:
-            self._purge_retired_self_source_files()
-        except Exception:
-            _logger.warning(
-                'MCP: could not purge leftover domain/self folders',
-                exc_info=True,
-            )
-
         total_imported = 0
         total_updated = 0
         total_skipped = 0
@@ -2076,6 +1863,13 @@ class AIContext(models.Model):
         except Exception:
             _logger.warning(
                 'MCP: could not retire leftover generic self rows after import',
+                exc_info=True,
+            )
+        try:
+            self._unlink_retired_engine_discovery_geo()
+        except Exception:
+            _logger.warning(
+                'MCP: could not drop leftover engine discovery_geo rows',
                 exc_info=True,
             )
         try:
@@ -2205,6 +1999,8 @@ class AIContext(models.Model):
         """
         import os
 
+        from ..utils.agent_identity import is_retired_self_source_path
+
         codes = set()
         if not agent_code:
             return codes
@@ -2237,6 +2033,8 @@ class AIContext(models.Model):
                     if not os.path.isfile(filepath):
                         continue
                     rel = os.path.relpath(filepath, contexts_dir).replace('\\', '/')
+                    if is_retired_self_source_path(rel):
+                        continue
                     is_system = rel.startswith('system/') or rel.startswith('core/')
                     # Discovery rows are engine-consumed routing, never part of an
                     # agent's default composition.
@@ -2931,7 +2729,7 @@ class AIContext(models.Model):
         return {
             'type': 'ir.actions.act_window',
             'name': titles.get(import_mode, _('Import contexts')),
-            'res_model': 'pns_ai_mcp.context_import_wizard',
+            'res_model': 'ai.context.import.wizard',
             'view_mode': 'form',
             'target': 'new',
             'context': {'default_import_mode': import_mode},
@@ -3073,96 +2871,7 @@ class AIContext(models.Model):
             records, 'agent-%s' % agent.code, agent=agent, title='Export Agent Contexts',
         )
 
-    def action_export_selected_to_zip(self):
-        """Export the selected context records to a ZIP file.
 
-        Designed to be called from a server action bound to the tree view
-        (binding_view_types='list'), so ``self`` contains only the records
-        the user checked.
-        """
-        ensure_ai_admin(self.env)
-        if not self:
-            raise UserError(_('No contexts selected for export.'))
-        return self._export_records_to_zip(
-            self, 'selected', title=_('Export Selected Contexts'),
-        )
-
-    @api.model
-    def export_agent_to_zip(self, agent):
-        """Export agent manifest plus referenced contexts."""
-        ensure_ai_admin(self.env)
-        records = agent.context_ids
-        return self._export_records_to_zip(
-            records,
-            'agent-%s' % agent.code,
-            agent=agent,
-            title='Export Bundle',
-        )
-
-    @api.model
-    def import_custom_bootstrap(self):
-        """
-        Método interno para cargar archivos custom SOLO si no existen en BD.
-        Usado por el hook post-init para inicializar ejemplos sin sobrescribir cambios del usuario.
-        """
-        ensure_ai_admin(self.env)
-        import os
-        import re
-        
-        from ..utils.ai_paths import module_kind_dir
-        module_dir = self._get_module_path()
-        _ctx_dir = module_kind_dir(module_dir, 'contexts')
-        custom_dir = os.path.join(_ctx_dir, 'custom') if _ctx_dir else None
-        
-        imported_count = 0
-        errors = []
-        
-        if custom_dir and os.path.exists(custom_dir):
-            for root, dirs, files in os.walk(custom_dir):
-                for filename in files:
-                    if not filename.endswith(('.md', '.py')):
-                        continue
-                
-                try:
-                    code = os.path.splitext(filename)[0]
-                    
-                    # Verificar si YA existe (importante: bootstraps solo crean, no actualizan)
-                    existing = self.search([('code', '=', code)], limit=1)
-                    if existing:
-                        continue
-                        
-                    filepath = os.path.join(root, filename)
-                    # Relativo para guardar
-                    rel_path = os.path.relpath(filepath, custom_dir)
-                    with open(filepath, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                    
-                    if not content.strip():
-                        continue
-                    
-                    metadata = self._extract_metadata_from_content(content, filename)
-                    _ctype = context_roles.canonical_type(metadata.get('tipo') or '')
-                    vals = {
-                        'code': code,
-                        'description': metadata.get('description') or f"Contexto base: {filename}",
-                        'content': content,
-                        'context_type': _ctype,
-                        'active': metadata.get('active', True),
-                        'rel_path': rel_path,
-                        'locale': self._infer_explicit_locale(
-                            code, content, metadata,
-                        ) or False,
-                    }
-                    
-                    self.create(vals)
-                    imported_count += 1
-                    _logger.info("MCP: Bootstrap custom context: %s", code)
-                    
-                except Exception as e:
-                    _logger.error("MCP: Error bootstrap custom %s: %s", filename, str(e))
-                    errors.append(f"{filename}: {str(e)}")
-                    
-        return {'imported': imported_count, 'errors': errors}
     
     @api.model
     def _infer_explicit_locale(self, code, content, metadata=None):
@@ -3196,23 +2905,6 @@ class AIContext(models.Model):
                     return inner.group(1)
         return False
 
-    @api.model
-    def _backfill_explicit_locale(self):
-        """Fill empty ``locale`` on existing records (legacy imports without metadata)."""
-        updated = 0
-        for rec in self.with_context(active_test=False).search([
-            ('locale', 'in', [False, '']),
-        ]):
-            meta = self._extract_metadata_from_content(
-                rec.content or '', rec.rel_path or rec.code or '',
-            )
-            inferred = self._infer_explicit_locale(rec.code, rec.content or '', meta)
-            if inferred:
-                rec.with_context(skip_hardcoded_restrictions=True).write({
-                    'locale': inferred,
-                })
-                updated += 1
-        return updated
 
     @api.model
     def _extract_metadata_from_content(self, content, filename):
@@ -3467,16 +3159,4 @@ class AIContext(models.Model):
 
         return metadata
     
-    @api.model
-    def _extract_description_from_content(self, content, filename):
-        """
-        Extrae una descripción del contenido del archivo.
-        Usa _extract_metadata_from_content y retorna solo la descripción.
-        """
-        metadata = self._extract_metadata_from_content(content, filename)
-        if metadata['description']:
-            return metadata['description']
-        
-        # Fallback: usar nombre del archivo
-        return f"Contexto importado desde {filename}"
 

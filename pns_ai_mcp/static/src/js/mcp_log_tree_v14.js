@@ -1,3 +1,9 @@
+/**
+ * Clear History and Tools buttons on the ai.log list (Odoo 14).
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+ */
 odoo.define('pns_ai_mcp.mcp_log_tree', function (require) {
 "use strict";
 
@@ -30,7 +36,7 @@ odoo.define('pns_ai_mcp.mcp_log_tree', function (require) {
                     class: 'btn btn-primary o_mcp_log_delete_button',
                     type: 'button',
                     text: 'Clear History',
-                    title: 'Borra los logs m├ís antiguos, manteniendo los m├ís recientes. Permite borrar todo o mantener los N m├ís recientes.',
+                    title: 'Deletes the oldest logs, keeping the most recent ones. Can delete all or keep the N newest.',
                     click: function() {
                         self._onDeleteMenuClick();
                     }
@@ -47,24 +53,45 @@ odoo.define('pns_ai_mcp.mcp_log_tree', function (require) {
                 var $opsBtn = $('<button>', {
                     type: 'button',
                     class: 'btn btn-secondary o_mcp_btn_sm o_mcp_log_ops_button',
-                    html: "<i class='fa fa-cog'></i> " + core._t("Tools"),
-                    title: core._t("History Tools"),
+                    html: "<i class='fa fa-cog'></i> Tools",
+                    title: "History tools",
                     style: 'margin-left: 4px;',
                     click: function () {
                         self.do_action('pns_ai_mcp.action_log_tools_wizard');
                     },
                 });
                 this.$buttons.append($opsBtn);
-
-                self._insertMcpLogLegend();
             }
         },
 
-        _insertMcpLogLegend: function (attempt) {
-            if (this.modelName !== 'ai.log') {
-                return;
+        on_attach_callback: function () {
+            this._super.apply(this, arguments);
+            if (this.modelName === 'ai.log') {
+                this._mcpLogLegendReady();
             }
-            attempt = attempt || 0;
+        },
+
+        /**
+         * Promise of the legend bar in the control panel (resolves true once
+         * it is there). The usage chip lives inside that bar.
+         */
+        _mcpLogLegendReady: function () {
+            var self = this;
+            if (!this._mcpLogLegend) {
+                this._mcpLogLegend = this._insertMcpLogLegend().then(function (done) {
+                    if (!done) {
+                        self._mcpLogLegend = null;
+                    }
+                    return done;
+                });
+            }
+            return this._mcpLogLegend;
+        },
+
+        _insertMcpLogLegend: function () {
+            if (this.modelName !== 'ai.log') {
+                return Promise.resolve(false);
+            }
             // La leyenda se inserta en el CONTROL PANEL (zona fija, sin scroll) y no
             // antes de la tabla: insertarla dentro del área con scroll generaba un
             // segundo scrollbar vertical. Así queda un único scroll (el de la lista).
@@ -76,34 +103,33 @@ odoo.define('pns_ai_mcp.mcp_log_tree', function (require) {
                 $cp = this.$el.closest('.o_action_manager, .o_action').find('.o_control_panel').first();
             }
             if (!$cp.length) {
-                if (attempt < 10) {
-                    var self = this;
-                    setTimeout(function () {
-                        self._insertMcpLogLegend(attempt + 1);
-                    }, 60);
-                }
-                return;
+                return Promise.resolve(false);
             }
             // Idempotente: si ya existe la barra en este control panel, no duplicar.
             if ($cp.find('.o_mcp_log_legend_bar').length) {
-                return;
+                return Promise.resolve(true);
             }
             // FUENTE ÚNICA: el HTML lo genera el servidor (ai.log.render_flow_legend),
             // el mismo método que usa la ficha (form). Grid y form nunca divergen.
-            this._rpc({
+            return Promise.resolve(this._rpc({
                 model: 'ai.log',
                 method: 'render_flow_legend',
                 args: ['grid'],
-            }).then(function (html) {
-                if (!html || $cp.find('.o_mcp_log_legend_bar').length) {
-                    return;
+            })).then(function (html) {
+                if (!html) {
+                    return false;
                 }
-                $cp.append(html);
+                if (!$cp.find('.o_mcp_log_legend_bar').length) {
+                    $cp.append(html);
+                }
+                return true;
+            }, function () {
+                return false;
             });
         },
         
         _onDeleteMenuClick: function() {
-            this.do_action('pns_ai_mcp.action_mcp_logs_delete_menu_window');
+            this.do_action('pns_ai_mcp.action_ai_log_delete_menu_window');
         },
     });
 
@@ -120,55 +146,38 @@ odoo.define('pns_ai_mcp.mcp_log_tree', function (require) {
                     // Cerrar wizard activo y recargar vista de logs
                     if (result && typeof result.then === 'function') {
                         result.then(function() {
-                            setTimeout(function() {
-                                // Cerrar di├ílogos activos (wizards)
-                                if (self._dialogs && Array.isArray(self._dialogs)) {
-                                    var i = self._dialogs.length - 1;
-                                    while (i >= 0) {
-                                        var dialog = self._dialogs[i];
-                                        if (dialog && typeof dialog.close === 'function') {
-                                            try {
-                                                dialog.close();
-                                            } catch (e) {
-                                                console.warn('Error al cerrar di├ílogo:', e);
-                                            }
-                                            break;
+                            // Cerrar di├ílogos activos (wizards)
+                            if (self._dialogs && Array.isArray(self._dialogs)) {
+                                var i = self._dialogs.length - 1;
+                                while (i >= 0) {
+                                    var dialog = self._dialogs[i];
+                                    if (dialog && typeof dialog.close === 'function') {
+                                        try {
+                                            dialog.close();
+                                        } catch (e) {
+                                            console.warn('Error al cerrar di├ílogo:', e);
                                         }
-                                        i--;
+                                        break;
+                                    }
+                                    i--;
+                                }
+                            }
+
+                            // Buscar y recargar controladores de logs
+                            if (self._controllers && Array.isArray(self._controllers)) {
+                                for (var j = 0; j < self._controllers.length; j++) {
+                                    var controller = self._controllers[j];
+                                    if (controller && controller.modelName === 'ai.log' && typeof controller.reload === 'function') {
+                                        try {
+                                            controller.reload();
+                                        } catch (e) {
+                                            console.warn('Error al recargar controlador:', e);
+                                        }
                                     }
                                 }
-                                
-                                // Recargar vista de logs
-                                setTimeout(function() {
-                                    // Buscar y recargar controladores de logs
-                                    if (self._controllers && Array.isArray(self._controllers)) {
-                                        for (var j = 0; j < self._controllers.length; j++) {
-                                            var controller = self._controllers[j];
-                                            if (controller && controller.modelName === 'ai.log' && typeof controller.reload === 'function') {
-                                                try {
-                                                    controller.reload();
-                                                } catch (e) {
-                                                    console.warn('Error al recargar controlador:', e);
-                                                }
-                                            }
-                                        }
-                                    }
-                                    
-                                    // Tambi├®n recargar el controlador actual si es de logs
-                                    try {
-                                        var currentController = self.getCurrentController && self.getCurrentController();
-                                        if (currentController && currentController.modelName === 'ai.log' && typeof currentController.reload === 'function') {
-                                            currentController.reload();
-                                        }
-                                    } catch (e) {
-                                        console.warn('Error al obtener/recargar controlador actual:', e);
-                                    }
-                                }, 200);
-                            }, 100);
-                        });
-                    } else {
-                        // Si no hay promesa, recargar directamente
-                        setTimeout(function() {
+                            }
+
+                            // Tambi├®n recargar el controlador actual si es de logs
                             try {
                                 var currentController = self.getCurrentController && self.getCurrentController();
                                 if (currentController && currentController.modelName === 'ai.log' && typeof currentController.reload === 'function') {
@@ -177,7 +186,16 @@ odoo.define('pns_ai_mcp.mcp_log_tree', function (require) {
                             } catch (e) {
                                 console.warn('Error al obtener/recargar controlador actual:', e);
                             }
-                        }, 300);
+                        });
+                    } else {
+                        try {
+                            var currentController = self.getCurrentController && self.getCurrentController();
+                            if (currentController && currentController.modelName === 'ai.log' && typeof currentController.reload === 'function') {
+                                currentController.reload();
+                            }
+                        } catch (e) {
+                            console.warn('Error al obtener/recargar controlador actual:', e);
+                        }
                     }
                 }
             }

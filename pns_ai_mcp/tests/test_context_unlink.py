@@ -67,7 +67,7 @@ class TestContextUnlink(TransactionCase):
             'context_type': 'domain',
             'content': self._ctx_body(code),
             'source_module': 'pns_ai_mcp',
-            'rel_path': 'contexts/discovery/discovery_geo.json',
+            'rel_path': 'contexts/discovery/discovery_geography.json',
             'owner_id': False,
         })
         if not ctx._factory_source_file_exists():

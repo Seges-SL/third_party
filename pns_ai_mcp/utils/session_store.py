@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from queue import Empty, Queue
 
-from .mcp_correlation import new_correlation_id
+from .mcp_correlation import new_turn_id
 
 _logger = logging.getLogger(__name__)
 
@@ -21,9 +21,10 @@ class Session:
         self.session_id = session_id
         self.api_key = api_key
         self.mcp_user_id = mcp_user_id
-        self.correlation_id = new_correlation_id()
-        self.step_seq = 0
+        self.turn = new_turn_id()
+        self.turn_step = 0
         self.created_at = datetime.utcnow()
+        self.touched_at = self.created_at
         self.closed = False
         self.queue = Queue()
 
@@ -33,7 +34,7 @@ class MCPClientRegistry:
     Registro en memoria del cliente MCP (nombre + versión) por usuario.
 
     El protocolo MCP solo envía `clientInfo` en el `initialize`; las llamadas
-    posteriores (tools/call, resources/list...) no lo repiten. Aquí guardamos la
+    posteriores (tools/call, prompts/list…) no lo repiten. Aquí guardamos la
     etiqueta del cliente tras el initialize para poder rellenar la columna
     "Modelo/Agente" del histórico en TODAS las filas MCP de esa conexión.
 
@@ -123,6 +124,7 @@ class SessionStore:
         Returns:
             (session_id, message_url)
         """
+        self.cleanup_expired()
         session_id = str(uuid.uuid4())
         base = base_url.rstrip('/')
         if agent_code:
@@ -155,6 +157,7 @@ class SessionStore:
         session = self.get(session_id)
         if session is None:
             return False
+        session.touched_at = datetime.utcnow()
         try:
             session.queue.put_nowait(response)
             return True
@@ -176,6 +179,8 @@ class SessionStore:
         session = self.get(session_id)
         if session is None:
             return None
+        # The live stream waits here in a loop: that is what keeps it alive.
+        session.touched_at = datetime.utcnow()
         try:
             return session.queue.get(timeout=timeout)
         except Empty:
@@ -191,7 +196,7 @@ class SessionStore:
         _logger.debug("MCP SSE: Session closed: %s", session_id[:8] if session_id else "?")
 
     def cleanup_expired(self, max_age_seconds: int = 3600) -> int:
-        """Elimina sesiones inactivas. Retorna número eliminadas."""
+        """Elimina sesiones sin actividad. Retorna número eliminadas."""
         now = datetime.utcnow()
         to_remove = []
         with self._sessions_lock:
@@ -199,7 +204,7 @@ class SessionStore:
                 if session.closed:
                     to_remove.append(sid)
                     continue
-                delta = (now - session.created_at).total_seconds()
+                delta = (now - session.touched_at).total_seconds()
                 if delta > max_age_seconds:
                     to_remove.append(sid)
             for sid in to_remove:

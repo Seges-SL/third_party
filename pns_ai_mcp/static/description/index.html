@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta name="tdm-reservation" content="0"/>
 <title>AI Engine</title>
 </head>
 <body>
@@ -127,9 +128,8 @@
     </p>
     <p>
       Knowledge that is generic to the suite lives here (geo fabric, partners,
-      accounting, ACL&hellip;). Pilot-only skills, Sesame/CDMON connectors and
-      the Occidente failover chain belong in <code>occ_custom_ai</code>, not
-      in this repo.
+      accounting, ACL&hellip;). Customer-only skills and connectors belong in
+      an optional domain module, not in this repo.
     </p>
   </section>
 
@@ -153,7 +153,7 @@
     <h2>What it does not do</h2>
     <ul>
       <li><strong>No chat UI</strong> &mdash; that is <code>pns_ai_chatboo</code>. Install Chatboo if people will talk from the Odoo systray.</li>
-      <li><strong>No customer pack</strong> &mdash; Occidente skills, Sesame/CDMON tokens and the pilot failover chain are <code>occ_custom_ai</code>.</li>
+      <li><strong>No customer pack</strong> &mdash; tenant skills, connector tokens and a site-specific failover chain belong in an optional domain module.</li>
       <li><strong>No map HTTP</strong> &mdash; geocoding and routes go through <code>pns_geo</code> / <code>geo.service</code>. The engine must not call Google or OSM itself.</li>
       <li><strong>No secrets in the addon</strong> &mdash; provider keys, API tokens and <code>env</code> credentials stay in the database (or the instance env). The module only leaves the slot.</li>
     </ul>
@@ -162,11 +162,11 @@
   <section class="pns-apps-card">
     <h2>How to configure</h2>
     <ol class="pns-apps-steps">
-      <li>Before Apps: in the Odoo Python, install the extras stock Odoo does not ship (<code>httpx</code>, <code>pydantic</code>; on Odoo 14 also <code>openpyxl&gt;=3.1.2</code>). Then install <code>pns_base</code> and this module. Install <code>pns_geo</code> if maps or geocoding will be used.</li>
+      <li>Before Apps: in the Odoo Python, on Odoo 14 install <code>openpyxl&gt;=3.1.2</code> (Odoo 19 needs no extra). Then install <code>pns_base</code> and this module. Install <code>pns_geo</code> if maps or geocoding will be used.</li>
       <li>Open the <strong>AI Engine</strong> app. Create or open a provider, paste the API key, pick a model and save.</li>
       <li>On the Chatboo agent (or the agent your MCP user uses), set the provider and the failover chain. Order is on the agent, not in Chatboo.</li>
-      <li>If Cursor will call this instance: create an MCP user / API key and point the client at this database. Whitelist any extra hostnames the tools need.</li>
-      <li>Pilot databases: install <code>occ_custom_ai</code> after the engine so Occidente skills and connectors seed on top. Paste Sesame/CDMON tokens there, not here.</li>
+      <li>If Cursor will call this instance: in <strong>AI Engine &rarr; Security &rarr; Users</strong>, create an MCP user and copy its API key. Point the client at <code>https://&lt;this-instance&gt;/mcp?api_key=&lt;that-key&gt;</code>. Whitelist any extra hostnames the tools need.</li>
+      <li>If a customer pack exists, install it after the engine so its skills and connectors seed on top. Paste those tokens there, not here.</li>
     </ol>
   </section>
 
@@ -188,9 +188,9 @@
           <td>In-Odoo chat UI; depends on the engine</td>
         </tr>
         <tr>
-          <td><code>occ_custom_ai</code></td>
-          <td>O14 and O19</td>
-          <td>Occidente pack: pilot skills and connectors. Product never depends on it.</td>
+          <td>Optional domain module</td>
+          <td>Same majors as that pack</td>
+          <td>Customer skills and connectors. Product never depends on it.</td>
         </tr>
       </tbody>
     </table>
@@ -198,8 +198,11 @@
       UI source in English. Layout: <code>common/</code> plus OWL1 (O13&ndash;14) and OWL2 (O15&ndash;19+) stacks.
     </p>
     <p class="pns-apps-foot">
-      <a href="https://patanegra.com">PATANEGRA Soft</a>
-      &mdash; Apache License 2.0 (OSI approved). See <a href="LICENSE">LICENSE</a>.
+      <a href="https://patanegra.com">PATANEGRA Soft</a>&trade;
+      &mdash; Apache License 2.0 (OSI approved). See <a href="LICENSE">LICENSE</a>
+      and <a href="NOTICE">NOTICE</a>.
+      PATANEGRA Soft, PATANEGRA Soft Suite, Chatboo and PAAP are trademarks of
+      PATANEGRA Soft SL. The Apache license does not grant trademark rights.
     </p>
   </section>
 </div>

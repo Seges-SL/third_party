@@ -148,12 +148,3 @@ def try_resolve_date(text, today=None):
 
     return None
 
-
-def date_phrase_unresolved(text, today=None):
-    """True when ``text`` is non-empty free text that is not a known day phrase."""
-    raw = (text or '').strip()
-    if not raw:
-        return False
-    if is_help_like(raw):
-        return False
-    return try_resolve_date(raw, today=today) is None

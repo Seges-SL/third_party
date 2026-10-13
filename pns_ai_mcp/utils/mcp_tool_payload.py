@@ -18,28 +18,6 @@ _DEFAULT_WARM_FOOTER_EN = (
 )
 
 
-def mark_terminal_resource(facts):
-    """Marca un JSON plano de recurso como respuesta final (pinta y para).
-
-    Invariante de esquema ``system://``: el snapshot YA es la respuesta.
-    El motor no debe devolverlo al LLM (eso dispara Relaxaicode de adorno).
-    No añade hechos: solo flags de entrega y una vista ``data`` key/value
-    de los mismos campos.
-    """
-    if not isinstance(facts, dict):
-        facts = {}
-    payload = dict(facts)
-    payload['data'] = [
-        {'key': key, 'value': facts[key]}
-        for key in facts
-        if not str(key).startswith('_')
-    ]
-    payload['__return_direct__'] = True
-    payload['__stop_after_direct__'] = True
-    payload['__no_footer__'] = True
-    return payload
-
-
 def unwrap_tool_payload(tool_result):
     """Payload interno de un resultado de tool, o el dict original si ya lo es."""
     if not isinstance(tool_result, dict):
@@ -57,14 +35,14 @@ def unwrap_tool_payload(tool_result):
     return tool_result
 
 
-def summarize_propose_tool_result(result_str, max_len=480):
-    """One-line ai.log summary for ``propose_safe_operations`` tool results.
+def summarize_safe_plan_request(result_str, max_len=480):
+    """One-line ai.log summary for ``safe_plan_request`` tool results.
 
     Failures must surface the real ``error`` (schema, permissions, …). Never
     paint ``safe plan []`` when ``verification_id`` is missing on a reject —
-    that hides why propose failed and nudges the LLM into catalogue theatre.
+    that hides why the request failed and nudges the LLM into catalogue theatre.
     """
-    fallback = 'Proposed supervised write (safe plan)'
+    fallback = 'Proposed (supervised)'
     try:
         wrapper = json.loads(result_str or '{}')
     except Exception:
@@ -75,13 +53,13 @@ def summarize_propose_tool_result(result_str, max_len=480):
     err = payload.get('error')
     if payload.get('success') is False or err:
         return (
-            'Propose failed: %s' % (err or 'propose_safe_operations failed')
+            'Propose failed: %s' % (err or 'safe_plan_request failed')
         )[:max_len]
     title = payload.get('title') or 'safe plan'
     vid = payload.get('verification_id') or ''
     status = payload.get('status') or ''
     return (
-        'Proposed supervised write: %s [%s] %s' % (title, vid, status)
+        'Proposed: %s [%s] %s' % (title, vid, status)
     )[:max_len]
 
 
@@ -138,23 +116,23 @@ def append_local_warm_footer(html_content, footer_text=None):
 
 
 # ---------------------------------------------------------------------------
-# painter-free (provider, /painter-free, or skill painter: painter-free)
+# compose-model (provider, /compose-model, or skill compose: compose-model)
 #
-# painter-local (OFF): Chatboo paints HTML tables + charts; LLM writes a short
+# compose-agent (OFF): Chatboo paints HTML tables + charts; LLM writes a short
 # footer (or nothing if foot-laconic).
-# painter-free (ON): the LLM owns the ENTIRE response UI — Markdown, HTML,
+# compose-model (ON): the LLM owns the ENTIRE response UI — Markdown, HTML,
 # Chatboo table/chart blocks, mix. Nothing is forbidden. The server does not
 # auto-push a table into the bubble; it hands data + optional formatted_text
 # so the model can embed native charts if it wants. footmode and showmode
 # are suspended for that bubble.
 #
-# Isolation: painter-free branches MUST gate on the remote flag. When OFF,
+# Isolation: compose-model branches MUST gate on the remote flag. When OFF,
 # handoff/hints are never applied. Pure author_html without rows still
 # delivers locally.
 # ---------------------------------------------------------------------------
 
 REMOTE_FORMAT_SYSTEM_HINT = (
-    '[painter-free] You own the ENTIRE response UI for this turn. '
+    '[compose-model] You own the ENTIRE response UI for this turn. '
     'The server will NOT auto-push a Chatboo table or Gráfico toolbar. '
     'Markdown/HTML prose for narrative, greetings, captions and drawings — '
     'never a pipe table. footmode and showmode do not apply. '
@@ -177,64 +155,6 @@ _REMOTE_FORMAT_NOTE = (
     'short footer.'
 )
 
-
-def strip_chatboo_chart_affordances(html_content):
-    """Remove chart dataset/toolbar hooks so Chatboo cannot hydrate Gráfico UI.
-
-    Opt-out helper for explicit ``show_mode=table`` / ``__no_charts__``.
-    painter-free must NOT call this — the LLM may embed native charts.
-    """
-    if not html_content or not isinstance(html_content, str):
-        return html_content
-    out = html_content
-    out = re.sub(r'\s*data-chatboo-dataset="[^"]*"', '', out)
-    out = re.sub(r"\s*data-chatboo-dataset='[^']*'", '', out)
-    out = re.sub(
-        r'\s*data-chatboo-show-mode="[^"]*"',
-        ' data-chatboo-show-mode="table"',
-        out,
-    )
-    out = re.sub(
-        r"\s*data-chatboo-show-mode='[^']*'",
-        " data-chatboo-show-mode='table'",
-        out,
-    )
-    # Mark blocks so the client never hydrates a Gráfico toolbar.
-    out = re.sub(
-        r'(<div[^>]*\bo_chatboo_table_block\b)([^>]*)(>)',
-        lambda m: (
-            m.group(1)
-            + (
-                '' if 'data-chatboo-no-charts=' in m.group(2)
-                else ' data-chatboo-no-charts="1"'
-            )
-            + m.group(2)
-            + m.group(3)
-        ),
-        out,
-        flags=re.IGNORECASE,
-    )
-    # Drop any toolbar already embedded in the HTML string.
-    out = re.sub(
-        r'<div[^>]*\bo_chatboo_chart_toolbar\b[^>]*>[\s\S]*?</div>',
-        '',
-        out,
-        flags=re.IGNORECASE,
-    )
-    out = re.sub(
-        r'<div[^>]*\bo_chatboo_chart_host\b[^>]*>[\s\S]*?</div>',
-        '',
-        out,
-        flags=re.IGNORECASE,
-    )
-    return out
-
-
-def is_server_side_table_payload(payload):
-    """True when formatted_text came from the server table renderer."""
-    if not isinstance(payload, dict) or not payload.get('formatted_text'):
-        return False
-    return payload.get('__fmt_type__') == 'server_side_python'
 
 
 def payload_has_svg_cards(payload):
@@ -265,8 +185,163 @@ def payload_has_tabular_rows(payload):
     )
 
 
+# compose-agent same-turn stub (no cells). Errors stay intact.
+_LOCAL_STUB_MAX_COLUMNS = 12
+_LOCAL_STUB_TITLE_CHARS = 160
+LOCAL_TABULAR_STUB_NOTE = (
+    'Dataset is already shown to the user and cached as previous_result. '
+    'Do not reprint the rows. Write a short footer only if needed.'
+)
+COMPOSE_MODEL_OVERFLOW_HINT = (
+    'compose-model could not format that list in the model. '
+    'Ask again with /compose-agent for a server table. '
+    'The compose mode did not change.'
+)
+
+
+def _payload_is_tool_error(payload):
+    if not isinstance(payload, dict):
+        return False
+    return bool(
+        payload.get('__force_retry__')
+        or payload.get('error')
+        or payload.get('isError')
+    )
+
+
+def _first_tabular_row_list(payload):
+    """First list of row dicts. Column names / count only — no cell values."""
+    if not isinstance(payload, dict):
+        return []
+    for key in ('data', 'items'):
+        data = payload.get(key)
+        if isinstance(data, list) and data and isinstance(data[0], dict):
+            return data
+    for key in ('groups', 'sections', 'tables'):
+        block = payload.get(key)
+        if not isinstance(block, list):
+            continue
+        for item in block:
+            if isinstance(item, dict):
+                rows = item.get('data') or item.get('rows') or item.get('items')
+                if isinstance(rows, list) and rows and isinstance(rows[0], dict):
+                    return rows
+            elif isinstance(item, list) and item and isinstance(item[0], dict):
+                return item
+    return []
+
+
+def _tabular_row_count(payload):
+    rows = _first_tabular_row_list(payload)
+    if rows:
+        return len(rows)
+    total = 0
+    for key in ('groups', 'sections', 'tables'):
+        block = payload.get(key) if isinstance(payload, dict) else None
+        if not isinstance(block, list):
+            continue
+        for item in block:
+            if isinstance(item, dict):
+                inner = item.get('data') or item.get('rows') or item.get('items')
+                if isinstance(inner, list):
+                    total += len(inner)
+            elif isinstance(item, list):
+                total += len(item)
+    if total:
+        return total
+    for key in ('groups', 'sections', 'tables'):
+        block = payload.get(key) if isinstance(payload, dict) else None
+        if isinstance(block, list) and block:
+            return len(block)
+    return 0
+
+
+def _tabular_columns(payload):
+    rows = _first_tabular_row_list(payload)
+    if not rows:
+        return []
+    keys = []
+    for key in rows[0].keys():
+        if str(key).startswith('_'):
+            continue
+        keys.append(key)
+        if len(keys) >= _LOCAL_STUB_MAX_COLUMNS:
+            break
+    return keys
+
+
+def local_tabular_stub_payload(payload):
+    """Structural stub: rows × columns, no cell values."""
+    stub = {
+        'on_screen': True,
+        'previous_result': True,
+        'data_rendered': True,
+        'rows': _tabular_row_count(payload),
+        'columns': _tabular_columns(payload),
+        'note': LOCAL_TABULAR_STUB_NOTE,
+    }
+    if isinstance(payload, dict):
+        for key in ('summary', 'title'):
+            val = payload.get(key)
+            if isinstance(val, str) and val.strip():
+                stub[key] = val.strip()[:_LOCAL_STUB_TITLE_CHARS]
+    return stub
+
+
+def local_tool_result_for_llm(result):
+    """Replace tabular cells with a stub. Errors / ``__force_retry__`` stay intact."""
+    if not isinstance(result, dict):
+        return result
+    if _payload_is_tool_error(result):
+        return result
+    inner = unwrap_tool_payload(result)
+    if inner is None:
+        return result
+    if _payload_is_tool_error(inner):
+        return result
+    if not payload_has_tabular_rows(inner):
+        return result
+    stub = local_tabular_stub_payload(inner)
+    blocks = result.get('content')
+    if (
+        isinstance(blocks, list) and blocks
+        and isinstance(blocks[0], dict)
+        and blocks[0].get('type') == 'text'
+    ):
+        out = dict(result)
+        out['content'] = [{
+            'type': 'text',
+            'text': json.dumps(stub, ensure_ascii=False, default=str),
+        }]
+        return out
+    return stub
+
+
+def local_owns_tabular_paint(remote_flag, payload, *, force_retry=False):
+    """True when compose-agent must paint this table (and stub the LLM)."""
+    if remote_flag or force_retry:
+        return False
+    if _payload_is_tool_error(payload):
+        return False
+    return payload_has_tabular_rows(payload)
+
+
+def append_compose_model_overflow_hint(
+    err, *, compose, sent_tabular, translate=None,
+):
+    """Visible hint when compose-model died after sending rows. Does not paint."""
+    if compose != 'compose-model' or not sent_tabular:
+        return err
+    hint = COMPOSE_MODEL_OVERFLOW_HINT
+    if translate:
+        hint = translate(hint)
+    if not err:
+        return hint
+    return '%s\n%s' % (err, hint)
+
+
 def remote_owns_tabular_presentation(remote_flag, payload):
-    """True when painter-free owns presentation of this payload.
+    """True when compose-model owns presentation of this payload.
 
     Isolation: with ``remote_flag`` False always False (local path unchanged).
     With True, any tabular payload is owned by the LLM (it may embed the
@@ -284,23 +359,75 @@ def remote_owns_tabular_presentation(remote_flag, payload):
     return True
 
 
-def tool_result_json_for_llm(result, remote_flag):
-    """Serialize a tool result for the LLM; mark HTML as not-yet-shown if ON."""
+_PROBE_NOT_SHOWN_NOTE = (
+    'These rows were NOT shown to the user. They are a lookup, not the answer. '
+    'Do not paste them as a table.'
+)
+
+
+def probe_json_for_llm(result):
+    """Keep row values and drop chat HTML. The bubble did not get this probe."""
+    if not isinstance(result, dict):
+        return result
+    inner = unwrap_tool_payload(result)
+    if not isinstance(inner, dict):
+        return result
+    clean = dict(inner)
+    for key in (
+        'formatted_text',
+        '__return_direct__',
+        '__direct_return__',
+        '__return_direct_to_user__',
+        '__presentation_complete__',
+        '__satisfied__',
+        '__ready_for_presentation__',
+    ):
+        clean.pop(key, None)
+    clean['__shown_to_user__'] = False
+    clean['note'] = _PROBE_NOT_SHOWN_NOTE
+    blocks = result.get('content')
+    if (
+        isinstance(blocks, list) and blocks
+        and isinstance(blocks[0], dict)
+        and blocks[0].get('type') == 'text'
+    ):
+        out = dict(result)
+        out['content'] = [{
+            'type': 'text',
+            'text': json.dumps(clean, ensure_ascii=False, default=str),
+        }]
+        return out
+    return clean
+
+
+def tool_result_json_for_llm(result, remote_flag, shown_to_user=True):
+    """Serialize a tool result for the LLM.
+
+    compose-model: keep rows (strip delivery flags so the model formats).
+    compose-agent: stub tabular cells; the chat already has the table.
+    An unmarked multi-list probe (``shown_to_user=False``) keeps the row
+    values and says the bubble did not get them.
+    Errors / ``__force_retry__`` stay intact in both modes.
+    """
     import json as _json
     if remote_flag:
         result = strip_server_html_for_remote(result)
+    elif shown_to_user:
+        result = local_tool_result_for_llm(result)
+    else:
+        result = probe_json_for_llm(result)
     return _json.dumps(result, ensure_ascii=False, default=str)
 
 
 def strip_server_html_for_remote(result):
     """Mark tool HTML as not-yet-shown; keep ``formatted_text`` for the LLM.
 
-    painter-free: the model owns the bubble. It needs the rendered HTML
+    compose-model: the model owns the bubble. It needs the rendered HTML
     (chart datasets included) so it can embed native tables/charts.
     Delivery flags (``__return_direct__`` …) are dropped so the engine
     does not auto-push. Pure author_html without rows is left intact.
 
-    Callers MUST only invoke this when painter-free is active.
+    Callers MUST only invoke this when compose-model is active.
     """
     if not isinstance(result, dict):
         return result

@@ -23,17 +23,6 @@ from .utils import APIKeyLogFilter, MCPJSONRPCError, _logger
 from ..utils.context_utils import strip_xml_metadata, resolve_placeholders  # Importar utilidades de XML
 
 
-# Importar funciones de formateo
-from .formatters import (
-    format_currency,
-    format_percentage,
-    format_data_as_html_table,
-    format_data_as_csv,
-    format_data_as_xml,
-    format_data_as_excel,
-    format_data_as_pdf
-)
-
 # Import herramientas de contextos
 from .tools_context import (
     refuse_foreign_identity_pack,
@@ -64,48 +53,34 @@ from ..utils.mcp_protocol import (
     wrap_modern_result,
 )
 
-# Importar herramientas de mantenimiento del sistema
-from .tools_system import (
-    tool_clean_system
-)
-
-# Importar herramientas de memoria
-from .tools_memory import tool_search_memory
-from .tools_context_analytics import tool_get_context_usage_stats
-
 # Importar sistema de decoradores y registro automático
 from .mcp_decorators import (
-    get_registered_tools,
+    list_registered_tools_for_mcp,
     get_tool_function,
-    get_tool_metadata
+    get_tool_metadata,
+    tool_visible_to,
 )
 
 # Importar funciones de verificación de escritura
 from .safe_operation import (
-    requires_safe_operation,
-    check_massive_operation,
-    has_recent_operations,
-    record_direct_operation,
     cancel_pending_verifications_for_user
 )
 
 # Importar funciones auxiliares del controlador
 from .controller_helpers import (
-    get_mcp_user_record,
     mcp_user_has_group,
     check_mcp_permissions,
     get_env_for_operation,
     get_readonly_env,
-    load_module_manifest
 )
 
 # SessionStore para transporte SSE standalone (Antigravity)
 from ..utils.session_store import SessionStore
 from ..utils.mcp_correlation import (
-    ensure_turn_correlation,
-    next_step_seq,
-    bind_session_correlation,
-    next_step_for_session,
+    ensure_turn,
+    next_turn_step,
+    bind_session_turn,
+    next_turn_step_for_session,
 )
 
 
@@ -136,8 +111,14 @@ class MCPServerController(http.Controller):
         Registra una operación MCP en el log de Odoo usando el método del modelo robusto.
         """
         try:
-            # Obtener usuario
-            mcp_user_id = getattr(request, 'mcp_user_id', SUPERUSER_ID)
+            mcp_user_id = getattr(request, 'mcp_user_id', None)
+            if not mcp_user_id:
+                # No key, no user: nothing to attribute the row to.
+                _logger.info(
+                    "MCP: unauthenticated %s (%s) not stored in ai.log",
+                    tool_name, result_summary or '',
+                )
+                return
             env = request.env(user=mcp_user_id)
             
             # CRÍTICO: Extraer agent_llm automáticamente si no se proporciona
@@ -160,7 +141,7 @@ class MCPServerController(http.Controller):
                 if getattr(request, 'httprequest', None) else None)
             # Determinar tipos por defecto si no se especifican
             if not request_type:
-                if tool_name in ['tools/list', 'resources/list', 'prompts/list', 'system/initialize']:
+                if tool_name in ['tools/list', 'prompts/list', 'system/initialize']:
                     request_type = 'system'
                 else:
                     request_type = 'tool'
@@ -174,7 +155,7 @@ class MCPServerController(http.Controller):
             # payload_type/context_type are no longer forwarded: ai.log derives its
             # functional category from primitive + endpoint.
             if 'ai.log' in env:
-                corr_id, step_seq = self._resolve_mcp_log_correlation()
+                turn_id, turn_step = self._resolve_mcp_log_turn()
                 env['ai.log'].create_log_entry(
                     user_id=mcp_user_id,
                     operation_type=operation_type,
@@ -186,8 +167,8 @@ class MCPServerController(http.Controller):
                     code_to_execute=code_to_execute,
                     request_type=request_type,
                     agent_llm=agent_llm,
-                    correlation_id=corr_id,
-                    step_seq=step_seq,
+                    turn=turn_id,
+                    turn_step=turn_step,
                     source_channel='mcp_client',
                     remote_ip=remote_ip,
                 )
@@ -197,45 +178,17 @@ class MCPServerController(http.Controller):
         except Exception as e:
             _logger.error("MCP: Error registrando log (delegate): %s", str(e))
 
-    def _format_data_as_html_table(self, data, title, columns_config):
-        """Formatea datos tabulares como HTML - delega a formatters.py"""
-        return format_data_as_html_table(data, title, columns_config)
-
-    def _format_data_as_csv(self, data, columns_config):
-        """Formatea datos tabulares como CSV - delega a formatters.py"""
-        return format_data_as_csv(data, columns_config)
-
-    def _format_data_as_xml(self, data, root_name, item_name, columns_config):
-        """Formatea datos tabulares como XML - delega a formatters.py"""
-        return format_data_as_xml(data, root_name, item_name, columns_config)
-
-    def _format_data_as_excel(self, data, columns_config, title="Reporte"):
-        """Formatea datos tabulares como Excel - delega a formatters.py"""
-        return format_data_as_excel(data, columns_config, title)
-
-    def _format_data_as_pdf(self, data, columns_config, title="Reporte"):
-        """Formatea datos tabulares como PDF - delega a formatters.py"""
-        return format_data_as_pdf(data, columns_config, title)
 
     def _get_mcp_env(self):
         """
         Obtiene el entorno de Odoo usando el usuario MCP asociado a la API key.
-        Si no hay usuario MCP, usa SUPERUSER_ID.
+        Sin usuario MCP no hay entorno: nunca el superusuario.
         """
-        mcp_user_id = getattr(request, 'mcp_user_id', SUPERUSER_ID)
+        mcp_user_id = getattr(request, 'mcp_user_id', None)
+        if not mcp_user_id:
+            raise AccessError('MCP request without an authenticated user.')
         return request.env(user=mcp_user_id)
-    
-    def _normalize_locale(self, lang_code):
-        """Normaliza códigos de idioma a formato Odoo (xx_XX)"""
-        if not lang_code:
-            return None
-        # Convertir guiones a guiones bajos
-        code = lang_code.replace('-', '_')
-        # Formato xx_XX
-        parts = code.split('_')
-        if len(parts) == 2:
-            return f"{parts[0].lower()}_{parts[1].upper()}"
-        return code # Devolver tal cual si no es xx_XX (ej: "es")
+
 
     def _get_user_locale(self):
         """
@@ -386,29 +339,54 @@ class MCPServerController(http.Controller):
     def _get_mcp_agent_code(self):
         return getattr(request, 'mcp_agent_code', None) or ''
 
-    def _resolve_mcp_log_correlation(self, session=None):
-        """Return (correlation_id, step_seq) for the current MCP log line."""
+    def _mcp_conversational_denied(self, user):
+        """English error if the bound agent is conversational and the user is not.
+
+        Closed jobs (flag off) skip this door. Missing bind already 404s.
+        """
+        from ..utils.conversational import (
+            user_may_use_conversational_agent, REFUSED_MESSAGE,
+        )
+        env = request.env(user=SUPERUSER_ID)
+        if user_may_use_conversational_agent(
+            env, user, agent_code=self._get_mcp_agent_code(),
+        ):
+            return None
+        return REFUSED_MESSAGE
+
+    def _mcp_sse_jsonrpc_error(self, message, status):
+        response = Response(
+            'data: {"jsonrpc":"2.0","error":{"code":-32000,"message":%s},"id":null}\n\n'
+            % json.dumps(message),
+            mimetype='text/event-stream',
+            status=status,
+        )
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        return response
+
+    def _resolve_mcp_log_turn(self, session=None):
+        """Return (turn, turn_step) for the current MCP log line."""
         if session is not None:
-            corr = bind_session_correlation(request, session)
-            step = next_step_for_session(request, session)
-            return corr, step
+            turn = bind_session_turn(request, session)
+            step = next_turn_step_for_session(request, session)
+            return turn, step
         headers = request.httprequest.headers
         session_id = headers.get('Mcp-Session-Id') or request.params.get('session')
         if session_id:
             sess = SessionStore().get(session_id)
             if sess:
-                corr = bind_session_correlation(request, sess)
-                step = next_step_for_session(request, sess)
-                return corr, step
-        corr = ensure_turn_correlation(request)
-        return corr, next_step_seq(request, corr)
+                turn = bind_session_turn(request, sess)
+                step = next_turn_step_for_session(request, sess)
+                return turn, step
+        turn = ensure_turn(request)
+        return turn, next_turn_step(request, turn)
 
-    def _ensure_mcp_request_correlation(self):
-        """Bind turn correlation before tool handlers (Streamable HTTP POST /mcp).
+    def _ensure_mcp_request_turn(self):
+        """Bind turn id before tool handlers (Streamable HTTP POST /mcp).
 
-        Without this, ``mcp_corr_id`` was only set when logging *after*
-        ``tools/call``, so ``propose_safe_operations`` created
-        ``ai.safe.operation`` rows without ``correlation_id``.
+        Without this, ``mcp_turn`` was only set when logging *after*
+        ``tools/call``, so ``safe_plan_request`` created
+        ``ai.safe.operation`` rows without ``turn``.
         """
         try:
             headers = request.httprequest.headers
@@ -416,8 +394,8 @@ class MCPServerController(http.Controller):
             if session_id:
                 sess = SessionStore().get(session_id)
                 if sess:
-                    return bind_session_correlation(request, sess)
-            return ensure_turn_correlation(request)
+                    return bind_session_turn(request, sess)
+            return ensure_turn(request)
         except Exception:
             return None
 
@@ -471,6 +449,9 @@ class MCPServerController(http.Controller):
                     'data: {"jsonrpc":"2.0","error":{"code":-32000,"message":"Invalid API key"},"id":null}\n\n',
                     mimetype='text/event-stream', status=401
                 )
+            denied = self._mcp_conversational_denied(mcp_user_record.user_id)
+            if denied:
+                return None, self._mcp_sse_jsonrpc_error(denied, 403)
             return (api_key, mcp_user_record), None
         except Exception as e:
             return None, Response(
@@ -490,6 +471,8 @@ class MCPServerController(http.Controller):
             while True:
                 msg = store.get_pending(session_id, KEEPALIVE_INTERVAL)
                 if msg is None:
+                    if store.get(session_id) is None:
+                        break
                     yield b': keep-alive\n\n'
                     continue
                 if isinstance(msg, dict) and msg.get('_sse_close'):
@@ -524,6 +507,9 @@ class MCPServerController(http.Controller):
             return err_resp
         api_key, mcp_user_record = valid
         user = mcp_user_record.user_id
+        denied = self._mcp_conversational_denied(user)
+        if denied:
+            return self._mcp_sse_jsonrpc_error(denied, 403)
         request.mcp_user = user
         request.mcp_user_id = user.id
         base_url = self._get_mcp_base_url()
@@ -569,6 +555,9 @@ class MCPServerController(http.Controller):
                 return err_resp
             api_key, mcp_user_record = valid
             user = mcp_user_record.user_id
+            denied = self._mcp_conversational_denied(user)
+            if denied:
+                return self._mcp_sse_jsonrpc_error(denied, 403)
             request.mcp_user = user
             request.mcp_user_id = user.id
             try:
@@ -659,21 +648,26 @@ class MCPServerController(http.Controller):
             r.headers['Access-Control-Allow-Origin'] = '*'
             return r
 
-        request.mcp_user_id = session.mcp_user_id or SUPERUSER_ID
-        request.mcp_user = request.env['res.users'].browse(request.mcp_user_id)
-        bind_session_correlation(request, session)
+        # The stream may live for hours: a revoked key or a user switched off
+        # stops here, on the next message, not when the stream ends.
+        mcp_rec = request.env(user=SUPERUSER_ID)['ai.mcp.user'].search([
+            ('mcp_api_key_hash', '=', hash_api_key(api_key))
+        ], limit=1)
+        user = mcp_rec.user_id
+        if (not user or not user.active or user.id != session.mcp_user_id
+                or self._mcp_conversational_denied(user)):
+            store.close(session_id)
+            r = Response(
+                json.dumps({'error': {'code': -32000, 'message': 'Invalid API key'}}),
+                status=401, mimetype='application/json'
+            )
+            r.headers['Access-Control-Allow-Origin'] = '*'
+            return r
+        request.mcp_user_id = user.id
+        request.mcp_user = user
+        bind_session_turn(request, session)
         headers = request.httprequest.headers
         request.mcp_agent_llm = headers.get('X-MCP-LLM') or headers.get('X-MCP-Agent')
-        try:
-            mcp_rec = request.env(user=SUPERUSER_ID)['ai.mcp.user'].search([
-                ('mcp_api_key_hash', '=', hash_api_key(session.api_key))
-            ], limit=1)
-            if mcp_rec:
-                if mcp_rec.user_id:
-                    request.mcp_user_id = mcp_rec.user_id.id
-                    request.mcp_user = mcp_rec.user_id
-        except Exception:
-            pass
 
         method = payload.get('method')
         params = payload.get('params', {})
@@ -769,6 +763,9 @@ class MCPServerController(http.Controller):
                     return response
                 
                 user = mcp_user_record.user_id
+                denied = self._mcp_conversational_denied(user)
+                if denied:
+                    return self._mcp_sse_jsonrpc_error(denied, 403)
                 request.mcp_user = user
                 request.mcp_user_id = user.id
             except Exception as e:
@@ -783,7 +780,7 @@ class MCPServerController(http.Controller):
             
             # Devolver handshake SSE
             response = Response(
-                'data: {"jsonrpc":"2.0","result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{"listChanged":false},"prompts":{"listChanged":false},"resources":{"listChanged":false}},"serverInfo":{"name":"pns_ai_mcp","version":"1.0.0"},"instructions":"Use prompts/get(name=\\"system_prompt\\") to load the system knowledge context and start dialogue."},"id":null}\n\n',
+                'data: {"jsonrpc":"2.0","result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{"listChanged":false},"prompts":{"listChanged":false}},"serverInfo":{"name":"pns_ai_mcp","version":"1.0.0"},"instructions":"Use prompts/get(name=\\"system_prompt\\") to load the system knowledge context and start dialogue."},"id":null}\n\n',
                 mimetype='text/event-stream'
             )
             response.headers['Access-Control-Allow-Origin'] = '*'
@@ -906,6 +903,11 @@ class MCPServerController(http.Controller):
                 
                 # API key válida, asignar usuario
                 user = mcp_user_record.user_id
+                denied = self._mcp_conversational_denied(user)
+                if denied:
+                    raise MCPJSONRPCError(
+                        -32000, denied, payload.get('id') if payload else None,
+                    )
                 mcp_user = user
                 mcp_user_id = user.id
 
@@ -945,7 +947,7 @@ class MCPServerController(http.Controller):
             # Detectar si es una notificación (no tiene id)
             is_notification = request_id is None
 
-            self._ensure_mcp_request_correlation()
+            self._ensure_mcp_request_turn()
 
             era = detect_mcp_era(method, params, headers)
             request.mcp_protocol_era = era
@@ -1078,7 +1080,9 @@ class MCPServerController(http.Controller):
             if not getattr(request, 'mcp_agent_llm', None):
                 request.mcp_agent_llm = client_label
             from ..utils.session_store import MCPClientRegistry
-            mcp_uid = getattr(request, 'mcp_user_id', SUPERUSER_ID)
+            mcp_uid = getattr(request, 'mcp_user_id', None)
+            if not mcp_uid:
+                return
             remote_ip = None
             try:
                 from ..utils.mcp_logging import normalize_remote_ip
@@ -1134,10 +1138,6 @@ class MCPServerController(http.Controller):
             return self._mcp_prompts_list(params)
         elif method == 'prompts/get':
             return self._mcp_prompts_get(params)
-        elif method == 'resources/list':
-            return self._mcp_resources_list(params)
-        elif method == 'resources/read':
-            return self._mcp_resources_read(params)
         else:
             return {
                 'error': {
@@ -1179,7 +1179,6 @@ class MCPServerController(http.Controller):
             'capabilities': {
                 'tools': {'listChanged': False},
                 'prompts': {'listChanged': False},
-                'resources': {'listChanged': False}
             },
             'serverInfo': {
                 'name': 'pns_ai_mcp',
@@ -1240,44 +1239,19 @@ class MCPServerController(http.Controller):
                 return desc + perm_info_write
             return desc + perm_info_read
         
-        # Obtener tools del registro automático (decoradores)
-        registered_tools = get_registered_tools()
-        
-        # Construir lista de tools: primero las registradas automáticamente, luego las manuales
+        # Registro automático; expose_mcp=False (p. ej. get_context) no sale aquí.
+        # Chatboo lee el saco entero vía AgentEngine.get_tools_schema.
+        registered_tools = list_registered_tools_for_mcp()
+        mcp_user = self._get_mcp_env().user
         tools = []
-        
-        # Añadir tools registradas automáticamente (todas las tools están ahora con decoradores)
         for tool_name, tool_data in registered_tools.items():
+            if not tool_visible_to(tool_data, mcp_user):
+                continue
             tools.append({
                 'name': tool_data['name'],
                 'description': add_perm_info(tool_data['description'], tool_data['is_write']),
                 'inputSchema': tool_data['inputSchema']
             })
-        
-        # Advertise the available context IDs to the model in a SPEC-LEGAL place:
-        # appended to get_context's own `description` (a standard field every MCP
-        # client shows the model), instead of a non-standard `availablePrompts`
-        # sibling field. This keeps the signal universal without polluting the
-        # tool object. Contexts are also published via prompts/list + resources/list
-        # for clients that consume those primitives.
-        try:
-            env = request.env(user=SUPERUSER_ID)
-            if 'ai.context' in env:
-                context_ids = [
-                    (ctx.base_code or ctx.code)
-                    for ctx in env['ai.context'].get_listable_for_mcp()
-                ]
-                if context_ids:
-                    hint = (
-                        "\n\nAvailable context IDs: " + ", ".join(context_ids)
-                        + ". Call get_context(context_name='contexts_index_core') "
-                        "for the full registry with descriptions."
-                    )
-                    for tool in tools:
-                        if tool['name'] == 'get_context':
-                            tool['description'] = tool['description'] + hint
-        except Exception as e:
-            _logger.warning("MCP: Error building context hint for tools/list: %s", str(e), exc_info=True)
 
         result = {
             'tools': tools
@@ -1439,6 +1413,11 @@ class MCPServerController(http.Controller):
             error_message = str(e)
             import traceback
             error_traceback = traceback.format_exc()
+            # The request ends in a commit: half a failed tool must not land.
+            # What the tool already committed itself (a confirmed plan) stays.
+            request.env.cr.rollback()
+            if not hasattr(request.env, 'invalidate_all'):
+                request.env['base'].invalidate_cache()
             
             # Crear respuesta de error
             result = {
@@ -1460,9 +1439,10 @@ class MCPServerController(http.Controller):
         Método prompts/list según especificación MCP.
 
         Devuelve, como prompts de primera clase: system_prompt (contexto
-        compilado dinámicamente), las skills del agente activo y cada contexto
-        core/domain (uno por base_code). El cuerpo de cada prompt se sirve bajo
-        demanda vía prompts/get; get_context permanece como fallback universal.
+        compilado dinámicamente) y cada contexto core/domain (uno por
+        base_code). Skills are /slash in the Odoo chat host — not listed
+        here (an MCP client cannot invoke them). El cuerpo se sirve bajo
+        demanda vía prompts/get; get_context permanece como fallback.
         """
         prompts = [{
             'name': 'system_prompt',
@@ -1485,30 +1465,12 @@ class MCPServerController(http.Controller):
             ],
         }]
 
-        # Skills (selectable procedures) for the active MCP agent — progressive
-        # disclosure: only name + description here, body served by prompts/get.
-        try:
-            env = self._get_mcp_env()
-            skill_agent = self._get_mcp_agent_code()
-            if not skill_agent:
-                skill_agent = env['ai.agent'].resolve_mcp_agent_code(None)
-                request.mcp_agent_code = skill_agent
-            if 'ai.skill' in env:
-                for skill in env['ai.skill'].get_for_agent(skill_agent):
-                    prompts.append({
-                        'name': skill.mcp_prompt_name(),
-                        'title': skill.name,
-                        'description': skill.description or skill.name,
-                        'arguments': [],
-                    })
-        except Exception as e:
-            _logger.warning("MCP: Error listing skills for prompts/list: %s", str(e))
-
         # Contexts as first-class MCP prompts (spec-correct). Body served on
         # demand by prompts/get; get_context stays as a universal fallback for
         # clients with weak prompts support.
         try:
-            env = request.env(user=SUPERUSER_ID)
+            # sudo keeps the caller's uid: private contexts stay their owner's.
+            env = self._get_mcp_env().sudo()
             if 'ai.context' in env:
                 for ctx in env['ai.context'].get_listable_for_mcp():
                     prompts.append({
@@ -1631,39 +1593,9 @@ class MCPServerController(http.Controller):
                 }
                 return error_response
 
-
-        # Skill (selectable procedure) lookup before generic context lookup.
-        if prompt_name.startswith('skill.'):
-            try:
-                env = self._get_mcp_env()
-                user_lang = self._get_user_locale()
-                skill = env['ai.skill'].get_by_prompt_name(prompt_name)
-                if skill:
-                    payload = skill.build_prompt_payload(user_locale=user_lang)
-                    result = {
-                        'description': payload['description'],
-                        'messages': [{
-                            'role': 'user',
-                            'content': {'type': 'text', 'text': payload['text']},
-                        }],
-                    }
-                    self._log_mcp_operation(
-                        operation_type='read',
-                        tool_name=prompt_name,
-                        prompt_data=params,
-                        result_data=result,
-                        result_summary=f"Skill served: {skill.code} ({user_lang})",
-                        request_type='tool',
-                        payload_type='context',
-                        context_type='protocol'
-                    )
-                    return result
-            except Exception as e:
-                _logger.exception("MCP: Error obteniendo skill: %s", str(e))
-
     # Buscar en base de datos usando virtualización
         try:
-            env = request.env(user=SUPERUSER_ID)
+            env = self._get_mcp_env().sudo()
             blocked = refuse_foreign_identity_pack(self, env, prompt_name)
             if blocked:
                 return blocked
@@ -1681,7 +1613,7 @@ class MCPServerController(http.Controller):
                     _logger.info("MCP: Prompt virtualizado: %s -> %s", prompt_name, context.code)
                     # Registrar uso del contexto (Fase 6: Monitoreo)
                     try:
-                        env['ai.context'].record_context_usage(context.code)
+                        env['ai.context']._record_context_usage(context.code)
                     except Exception as e:
                         _logger.warning("MCP: Error registrando uso de contexto: %s", str(e))
                     
@@ -1710,7 +1642,7 @@ class MCPServerController(http.Controller):
                         tool_name=prompt_name,
                         prompt_data=params,
                         result_data=result,
-                        result_summary=f"Contexto obtenido: {prompt_name} (actual={context.code}, tipo={context.context_type})",
+                        result_summary=f"Context fetched: {prompt_name} (current={context.code}, type={context.context_type})",
                         request_type='tool',
                         payload_type='context',
                         context_type=context.context_type
@@ -1735,402 +1667,11 @@ class MCPServerController(http.Controller):
             tool_name=prompt_name,
             prompt_data=params,
             result_data=error_response,
-            result_summary=f"Prompt no encontrado: {prompt_name}",
+            result_summary=f"Prompt not found: {prompt_name}",
             request_type='prompt'
         )
         return error_response
 
-    def _mcp_resources_list(self, params):
-        """
-        Método resources/list según especificación MCP.
-
-        Expone (a) recursos de sistema (info/version/locale) y (b) cada contexto
-        core/domain como recurso legible por URI ``mcp://contexts/<base_code>``.
-        Los clientes que respetan `resources` obtienen así el catálogo de forma
-        estándar; los que no, siguen teniendo la tool get_context como fallback.
-        """
-        resources = [
-            {
-                "uri": "system://info",
-                "name": "System Information",
-                "description": "USE ONLY IF the user explicitly asks for technical diagnostics, system information, or metadata (like Odoo version, database name, Python version, or MCP Version). DO NOT use this to check the current date or time.",
-                "mimeType": "application/json"
-            },
-            {
-                "uri": "system://version",
-                "name": "Odoo Version",
-                "description": "Odoo version and series information. Use exclusively for queries explicitly requesting the current Odoo version.",
-                "mimeType": "application/json"
-            },
-            {
-                "uri": "system://locale",
-                "name": "User Locale",
-                "description": "Active user language and locale code settings. Use for queries regarding the current interface language or regional configurations.",
-                "mimeType": "application/json"
-            },
-            {
-                "uri": "url_whitelist",
-                "name": "URL whitelist",
-                "description": (
-                    "Active egress domains allowed for fetch_url / external "
-                    "API. Inspect before proposing fetch_url. Not a user-facing "
-                    "results table."
-                ),
-                "mimeType": "application/json"
-            }
-        ]
-
-        # Contexts as first-class MCP resources (spec-correct).
-        try:
-            env = request.env(user=SUPERUSER_ID)
-            if 'ai.context' in env:
-                for ctx in env['ai.context'].get_listable_for_mcp():
-                    base = ctx.base_code or ctx.code
-                    resources.append({
-                        "uri": "mcp://contexts/%s" % base,
-                        "name": base,
-                        "description": ctx.description or base,
-                        "mimeType": "text/markdown",
-                    })
-        except Exception as e:
-            _logger.warning("MCP: Error listing contexts for resources/list: %s", str(e))
-
-        result = {
-            'resources': resources
-        }
-        
-        # Log resources/list (RESTORED)
-        agent_llm = getattr(request, 'mcp_agent_llm', None)
-        self._log_mcp_operation(
-            operation_type='read',
-            tool_name='resources/list',
-            prompt_data=params,
-            result_data=result, 
-            result_summary=f"Listed {len(resources)} resources",
-            request_type='system',
-            agent_llm=agent_llm
-        )
-        
-        return result
-
-    def _mcp_resources_read(self, params):
-        """
-        Método resources/read según especificación MCP.
-        Lee un recurso específico, incluyendo contextos dinámicos.
-        """
-        uri = params.get('uri')
-        
-        if not uri:
-            error_response = {
-                'error': {
-                    'code': -32602,
-                    'message': 'Missing required parameter: uri'
-                }
-            }
-            # Registrar log de error
-            self._log_mcp_operation(
-                operation_type='read',
-                tool_name='resources/read',
-                prompt_data=params,
-                result_data=error_response,
-                result_summary="Error: Falta parámetro 'uri'",
-                additional_info="La petición no incluye el URI del recurso",
-                request_type='resource'
-            )
-            return error_response
-        
-        
-        # Manejar recurso de sistema system://version
-        if uri == 'system://version':
-            try:
-                import odoo.release
-                # Clean version strategy: use serie (usually "14.0", "16.0")
-                clean_ver = odoo.release.serie
-                
-                info = {
-                    'version': clean_ver,
-                    'full_version': odoo.release.version,
-                    'serie': odoo.release.serie
-                }
-                
-                result = {
-                    'contents': [
-                        {
-                            'uri': uri,
-                            'mimeType': 'application/json',
-                            'text': json.dumps(info, indent=2)
-                        }
-                    ],
-                    '__payload_size__': len(json.dumps(info, indent=2)),
-                    '__fmt_type__': 'local_json'
-                }
-                
-                self._log_mcp_operation(
-                    operation_type='read',
-                    tool_name=uri,
-                    prompt_data=params,
-                    result_data=result,
-                    result_summary=f"Version: {clean_ver}",
-                    request_type='resource'
-                )
-                return result
-            except Exception as e:
-                error_response = {'error': {'code': -32603, 'message': f'Error reading version: {str(e)}'}}
-                return error_response
-
-        # Manejar recurso de sistema system://locale
-        if uri == 'system://locale':
-            try:
-                user_lang = self._get_user_locale()
-                lang_name = user_lang
-                try:
-                    env = request.env(user=SUPERUSER_ID)
-                    lang_rec = env['res.lang'].search([('code', '=', user_lang)], limit=1)
-                    if lang_rec:
-                        lang_name = lang_rec.name
-                except:
-                    pass
-
-                info = {
-                    'code': user_lang,
-                    'locale': user_lang,  # Alias para clientes que esperan 'locale'
-                    'name': lang_name
-                }
-                
-                result = {
-                    'contents': [
-                        {
-                            'uri': uri,
-                            'mimeType': 'application/json',
-                            'text': json.dumps(info, indent=2)
-                        }
-                    ],
-                    '__payload_size__': len(json.dumps(info, indent=2)),
-                    '__fmt_type__': 'local_json'
-                }
-                
-                self._log_mcp_operation(
-                    operation_type='read',
-                    tool_name=uri,
-                    prompt_data=params,
-                    result_data=result,
-                    result_summary=f"Language: {user_lang}",
-                    request_type='resource'
-                )
-                return result
-            except Exception as e:
-                error_response = {'error': {'code': -32603, 'message': f'Error reading language: {str(e)}'}}
-                return error_response
-
-        # Manejar recurso de sistema system://info
-        if uri == 'system://info':
-            try:
-                from ..utils.system_info import resource_system_info
-
-                env = request.env(user=SUPERUSER_ID)
-                info = resource_system_info(env)
-                
-                result = {
-                    'contents': [
-                        {
-                            'uri': uri,
-                            'mimeType': 'application/json',
-                            'text': json.dumps(info, indent=2)
-                        }
-                    ],
-                    '__payload_size__': len(json.dumps(info, indent=2)),
-                    '__fmt_type__': 'local_json'
-                }
-                
-                # Registrar log
-                self._log_mcp_operation(
-                    operation_type='read',
-                    tool_name=uri,
-                    prompt_data=params,
-                    result_data=result,
-                    result_summary="Recurso de sistema leído",
-                    request_type='resource'
-                )
-                return result
-            except Exception as e:
-                # Si falla, dejaremos que caiga al error generico o devolvemos error aqui
-                _logger.exception("MCP: Error reading system resource: %s", str(e))
-                # Fallback to standard error handling below if we re-raise or creating specific error here
-                error_response = {
-                    'error': {
-                        'code': -32603,
-                        'message': f'Error reading system resource: {str(e)}'
-                    }
-                }
-                return error_response
-
-        from ..utils.mcp_resources import (
-            is_whitelist_uri,
-            whitelist_facts,
-        )
-        if is_whitelist_uri(uri):
-            try:
-                env = request.env(user=SUPERUSER_ID)
-                info = whitelist_facts(env)
-                text = json.dumps(info, indent=2, default=str)
-                result = {
-                    'contents': [
-                        {
-                            'uri': uri,
-                            'mimeType': 'application/json',
-                            'text': text,
-                        }
-                    ],
-                    '__payload_size__': len(text),
-                    '__fmt_type__': 'local_json',
-                }
-                self._log_mcp_operation(
-                    operation_type='read',
-                    tool_name=uri,
-                    prompt_data=params,
-                    result_data=result,
-                    result_summary='URL whitelist (%s)' % info.get('count', 0),
-                    request_type='resource',
-                )
-                return result
-            except Exception as e:
-                return {
-                    'error': {
-                        'code': -32603,
-                        'message': 'Error reading URL whitelist: %s' % e,
-                    }
-                }
-
-        # Manejar recursos de contextos dinámicos
-        if uri.startswith('mcp://contexts/'):
-            context_name = uri.replace('mcp://contexts/', '')
-            
-            try:
-                env = request.env(user=SUPERUSER_ID)
-                blocked = refuse_foreign_identity_pack(self, env, context_name)
-                if blocked:
-                    return blocked
-                if 'ai.context' in env:
-                    # Resolver por base_code + locale del usuario (igual que prompts/get),
-                    # para que mcp://contexts/<base_code> funcione aunque solo existan
-                    # variantes locale. Fallback a búsqueda por code exacto.
-                    base_name = env['ai.context'].get_base_context_name(context_name)
-                    user_lang = self._get_user_locale()
-                    context = env['ai.context'].get_context_for_country(base_name, user_locale=user_lang)
-                    if not context:
-                        context = env['ai.context'].search([
-                            ('code', '=', context_name),
-                            ('active', '=', True)
-                        ], limit=1)
-
-                    if context:
-                        # Registrar uso del contexto (Fase 6: Monitoreo)
-                        try:
-                            env['ai.context'].record_context_usage(context.code)
-                        except Exception as e:
-                            _logger.warning("MCP: Error registrando uso de contexto: %s", str(e))
-                        
-                        # Resolve {locale} placeholders in context content
-                        resolved_content = self._resolve_locale_placeholders(context.content)
-                        
-                        # Clean metadata (headers) to save tokens (peel the onion)
-                        resolved_content = strip_xml_metadata(resolved_content)
-                        
-                        result = {
-                            'contents': [
-                                {
-                                    'uri': uri,
-                                    'mimeType': 'text/markdown',
-                                    'text': resolved_content
-                                }
-                            ]
-                        }
-                        
-                        # Registrar log de operación exitosa
-                        self._log_mcp_operation(
-                            operation_type='read',
-                            tool_name=uri,
-                            prompt_data=params,
-                            result_data=result,
-                            result_summary=f"Recurso leído: {uri}",
-                            request_type='resource'
-                        )
-                        
-                        return result
-            except Exception as e:
-                _logger.exception("MCP: Error obteniendo contexto desde recurso: %s", str(e))
-                error_response = {
-                    'error': {
-                        'code': -32603,
-                        'message': f'Error reading resource: {str(e)}'
-                    }
-                }
-                # Registrar log de error
-                self._log_mcp_operation(
-                    operation_type='read',
-                    tool_name=uri,
-                    prompt_data=params,
-                    result_data=error_response,
-                    result_summary=f"Error leyendo recurso: {str(e)[:200]}",
-                    additional_info=f"Traceback: {str(e)}",
-                    request_type='resource'
-                )
-                return error_response
-            
-            # Contexto no encontrado
-            error_response = {
-                'error': {
-                    'code': -32602,
-                    'message': f'Resource not found: {uri}'
-                }
-            }
-            # Registrar log de error
-            self._log_mcp_operation(
-                operation_type='read',
-                tool_name=uri,
-                prompt_data=params,
-                result_data=error_response,
-                result_summary=f"Recurso no encontrado: {uri}",
-                request_type='resource'
-            )
-            return error_response
-        
-        error_response = {
-            'error': {
-                'code': -32602,
-                'message': f'Resource not found: {uri}. Use mcp://contexts/{{context_name}} for dynamic contexts.'
-            }
-        }
-        # Registrar log de error
-        self._log_mcp_operation(
-            operation_type='read',
-            tool_name=uri,
-            prompt_data=params,
-            result_data=error_response,
-            result_summary=f"Recurso no implementado: {uri}",
-            request_type='resource'
-        )
-        return error_response
-
-    def _get_customers_info_resource(self, resource_type='data'):
-        """Resource: clientes = res.partner con ≥1 factura de venta posted."""
-        return get_customers_info_resource(self, resource_type)
-
-    def _get_suppliers_info_resource(self, resource_type='data'):
-        """Resource: Obtiene información completa de los proveedores (res.partner con supplier_rank > 0)"""
-        return get_suppliers_info_resource(self, resource_type)
-
-    def _get_employees_info_resource(self, resource_type='data'):
-        """Resource: Obtiene información completa de los empleados (hr.employee)"""
-        return get_employees_info_resource(self, resource_type)
-
-    def _get_mcp_info_resource(self, resource_type='data'):
-        """Resource: Obtiene información detallada del servidor MCP y su módulo en Odoo"""
-        return get_mcp_info_resource(self, resource_type)
-
-    def _get_mcp_user_record(self):
-        """Obtiene el registro ai.mcp.user asociado al usuario actual de la petición"""
-        return get_mcp_user_record()
 
     def _check_mcp_permissions(self, operation_type='read'):
         """Verifica los permisos MCP del usuario según el tipo de operación"""
@@ -2144,25 +1685,6 @@ class MCPServerController(http.Controller):
         """Entorno sobre cursor READ ONLY (caja A) para ejecutar relaxaicode de lectura"""
         return get_readonly_env(self)
 
-    def _load_module_manifest(self, module_name):
-        """Lee el manifest de un módulo de forma compatible con versiones anteriores de Odoo"""
-        return load_module_manifest(self, module_name)
-
-    def _requires_safe_operation(self, operation_type, model_name, records_count, search_domain=None):
-        """Determina si una operación de escritura requiere verificación"""
-        return requires_safe_operation(operation_type, model_name, records_count, search_domain)
-
-    def _check_massive_operation(self, operation_type, model_name, tool_name, user_id, records_count=1, time_window_seconds=60):
-        """Detecta si una operación es parte de una operación masiva"""
-        return check_massive_operation(self, operation_type, model_name, tool_name, user_id, records_count, time_window_seconds)
-
-    def _has_recent_operations(self, operation_type, model_name, tool_name, user_id, time_window_seconds=30):
-        """Verifica si hay operaciones recientes para detectar patrones masivos"""
-        return has_recent_operations(operation_type, model_name, tool_name, user_id, time_window_seconds)
-
-    def _record_direct_operation(self, operation_type, model_name, tool_name, user_id, records_count):
-        """Registra una operación que se ejecutó directamente para detectar patrones masivos"""
-        return record_direct_operation(operation_type, model_name, tool_name, user_id, records_count)
 
     def _cancel_pending_verifications_for_user(self, user_id, reason="falta de permisos"):
         """Cancela automáticamente todas las verificaciones pendientes de un usuario"""

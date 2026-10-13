@@ -1,3 +1,9 @@
+/**
+ * Datetime field rendered as fixed ISO 8601 (no locale, no relative dates).
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+ */
 odoo.define('pns_ai_mcp.mcp_iso_datetime_widget', function (require) {
     "use strict";
 

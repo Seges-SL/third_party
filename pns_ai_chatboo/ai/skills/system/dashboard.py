@@ -1,6 +1,10 @@
+# -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-# SKILL: dashboard — 9 chart cards (3 periods × team / top / trend)
+"""Billing dashboard slash skill.
+
+Nine chart cards: month, quarter, and YTD × team/journal, top customers, trend.
+"""
 from datetime import date
 import calendar
 
@@ -42,13 +46,22 @@ def _chart_rows(bucket, label_key, limit=None, sort='revenue'):
     ]
 
 
+try:
+    _company_id = env.company.id
+except Exception:
+    _company_id = False
+
+
 def _period_groups(start, end, title, grain, has_team):
-    moves = env['account.move'].search([
+    domain = [
         ('move_type', '=', 'out_invoice'),
         ('state', '=', 'posted'),
         ('invoice_date', '>=', str(start)),
         ('invoice_date', '<=', str(end)),
-    ])
+    ]
+    if _company_id:
+        domain.append(('company_id', '=', _company_id))
+    moves = env['account.move'].search(domain)
     by_team = {}
     by_partner = {}
     by_period = {}
