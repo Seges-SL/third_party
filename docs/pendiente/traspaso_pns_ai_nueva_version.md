@@ -185,3 +185,40 @@ Desde ~/GitHub/lab_pns_ai. Te AUTORIZO a escribir SOLO en la BD lab_pns_ai_14 (a
 1. Abre una conversación nueva en el proyecto **claude-odoo-kit** de claude.ai. Este traspaso está en el proyecto como `claude/traspaso_pns_ai_nueva_version.md`.
 2. Primer mensaje, por ejemplo: *«Lee `claude/traspaso_pns_ai_nueva_version.md`. He terminado la fase 0: la versión nueva es pns_ai_mcp <x>, pns_ai_chatboo <y>, pns_base <z>, y estos son los resultados de los pasos 2 y 5: …»*
 3. Después, fase a fase, pega lo que te muestre cada agente al terminar.
+
+---
+
+## 10. Estado al cierre del 13/10/2026
+
+- Fase 0 hecha: rama `14.0-pns-ai-3` con pns_base 1.2.32, pns_ai_mcp 3.1.782 y pns_ai_chatboo 2.1.453 (commit propio del fabricante) y el traspaso en `docs/pendiente/`.
+- Fase 1 hecha: `docs/specs/cambios_pns_ai_3-1-782.md`. Bloqueo: la versión no se importa en Odoo 14 (Python 3.7).
+- Fase 2 hecha: `docs/pendiente/seguimiento_informe_pns_ai.md`. 80 PNS: 32 corregidos, 32 parciales, 13 sin cambios, 2 ya no aplican y 1 dudoso. Nuevos: PNS-81 a PNS-89. Sección «Compatibilidad con Odoo 14»: 1 fallo al importar y 2 en ejecución.
+- Decisión de Sergio: parchear en la propia rama `14.0-pns-ai-3` (destino: staging), en un commit propio y documentado en `docs/pendiente/parches_pns_ai.md`. Parche aplicado y probado (`paridad`: 0 no se importan; pruebas de imagen y de receta correctas), con commit y push hechos.
+- **Siguiente:** fase 3a (sección 11): copia de `lab_pns_ai_14`, actualización y análisis del log. Pendiente de decidir: si hay un proveedor de LLM con clave para las pruebas funcionales en el laboratorio, o si se dejan para staging. Después, la fase 3b (pruebas de permisos), la 4 (revisión) y la 5 (cierre e informe de seguimiento).
+- El laboratorio está parado (`odoo-dev 14 parar`) y su contexto sigue siendo el activo de la 14.
+
+## 11. Fase 3a — prompt listo (copia, actualización y análisis)
+
+La actualización **no se puede deshacer** (borra tablas obsoletas y XML ID `mcp_*`, y activa la purga de logs), por eso empieza con una copia de la BD del laboratorio. En VS Code, abre `~/GitHub/third_party` (rama `14.0-pns-ai-3`), haz `/clear` y pega:
+
+```
+Fase 3a: actualizar los módulos pns_* en el LABORATORIO. Te AUTORIZO a escribir SOLO en la BD lab_pns_ai_14 (actualizar módulos). Ninguna otra BD. Sin reglas de permisos permanentes, sin pip y sin commit.
+
+1. Desde ~/GitHub/lab_pns_ai: `odoo-dev 14 estado`. Debe mostrar BD=lab_pns_ai_14, third_party como copia de trabajo en la rama 14.0-pns-ai-3 y ningún aviso de contexto. Si no, PARA y avísame.
+2. Copia de seguridad (solo lectura sobre la BD):
+   mkdir -p ~/odoo-dev/14.0/copias && docker exec odoo-dev-14-db-1 pg_dump -U odoo -Fc lab_pns_ai_14 > ~/odoo-dev/14.0/copias/lab_pns_ai_14_antes_3-1-782.dump && ls -lh ~/odoo-dev/14.0/copias/
+   Si el archivo pesa 0 bytes o hay error, PARA.
+3. Estado previo (solo lectura, SELECT): versiones instaladas de pns_*, número de crons activos, número de XML ID de pns_ai_mcp que empiezan por mcp_, número de registros de ai_log y su fecha más antigua.
+4. `odoo-dev 14 actualizar pns_base,pns_ai_mcp,pns_ai_chatboo`. Si necesita el stack en marcha, ejecuta antes `odoo-dev 14 arrancar` desde ~/GitHub/lab_pns_ai.
+5. Resume el resultado del analizador (BLOQUEANTES y AVISOS) y busca en el log de esa operación (~/odoo-dev/14.0/logs/): "Running migration" (esperado 0), "DROP leftover" o borrado de tablas, errores al borrar XML ID mcp_*, "Failed to load", tracebacks y cualquier AttributeError.
+6. Estado posterior (mismas consultas del paso 3, solo SELECT), más: crons de pns_* (nombre, activo, numbercall, próxima ejecución), si existen los XML ID ai_* equivalentes a los mcp_* que había, y si quedan los 3 servidores externos de fábrica y la skill analisis_financiero.
+7. `odoo-dev 14 estado` y `odoo-dev 14 log 100`: el servidor debe arrancar sin tracebacks.
+
+Anota todo en una sección nueva "Versión 3.1.782 — actualización en el laboratorio (fase 3a)" de docs/pendiente/verificacion_seguridad_pns_ai.md (es el único archivo que puedes modificar). Compara el estado previo y el posterior, y relaciona lo observado con PNS-81, PNS-87, PNS-88 y la sección de migraciones de docs/specs/cambios_pns_ai_3-1-782.md (confirma o corrige sus inferencias).
+Al terminar, muéstrame: el resultado del analizador, la tabla antes/después y cualquier error o sorpresa.
+```
+
+- Permisos: acepta el `pg_dump`, el `actualizar` y las consultas (escribir en `lab_pns_ai_14` está autorizado). La BD del laboratorio no está neutralizada: no saldrá el mensaje de crons desactivados.
+- Si algo sale mal, la copia permite volver atrás. Ojo: `bd-cargar --reemplazar` neutraliza la BD al cargarla.
+
+**Decisión pendiente para la fase 3b:** las pruebas de permisos (RPC con usuarios de prueba) no necesitan IA. Las funcionales (consulta por fechas, imágenes en Chatboo, PNS-16, 59 y 60) necesitan un proveedor de LLM configurado en el laboratorio: clave de API, algo de coste y salida de datos de demostración hacia el proveedor. Alternativa: dejarlas para staging.
