@@ -504,7 +504,9 @@ def ensure_date_param_coercion(code: str) -> Tuple[str, bool]:
         first_real = body[0] if body else None
     if first_real is None:
         return src, False
-    already = ast.get_source_segment(src, func) or src
+    # Seges: parche de compatibilidad con Odoo 14 (Python 3.7 / Pillow 5.4). Ver docs/pendiente/parches_pns_ai.md
+    get_segment = getattr(ast, 'get_source_segment', None)
+    already = (get_segment and get_segment(src, func)) or src
     pending = [
         n for n in names
         if ('fromisoformat(%s[:10])' % n) not in already
