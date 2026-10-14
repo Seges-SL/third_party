@@ -8,7 +8,116 @@
 pns_base](../specs/analisis_pns_base.md), los bloques 1-8 del análisis de `pns_ai_mcp` y los
 bloques C1-C3 de `pns_ai_chatboo`.
 
+## Revisión tras la versión 3.1.782
+
+**Fecha:** 14/10/2026 · **Rama:** `14.0-pns-ai-3` · **Versiones:** `pns_base` 1.2.32, `pns_ai_mcp`
+3.1.782 y `pns_ai_chatboo` 2.1.453, con los parches de compatibilidad 1 a 4.
+**Aprobación:** Sergio, 14/10/2026: la tabla completa y N1 a N5 con las opciones indicadas en cada una.
+**Fuentes:** [seguimiento del informe](seguimiento_informe_pns_ai.md) (estado de PNS-01 a PNS-92),
+[verificación de seguridad](verificacion_seguridad_pns_ai.md) (secciones «Versión 3.1.782»: fases 3a,
+3b-1, 3b-2, 3c y parche 4), [parches de compatibilidad](parches_pns_ai.md) e
+[inventario de cambios](../specs/cambios_pns_ai_3-1-782.md).
+
+**Cómo se ha aplicado:** el texto original de cada decisión se conserva. Debajo de cada una hay un
+bloque «Tras 3.1.782 (14/10/2026)» con su estado, lo que la motivaba ahora (por PNS) y, si cambia, el
+nuevo alcance. Las CERRADA no necesitan decisión. Las decisiones nuevas N1 a N5 están en la
+[sección 8](#8-decisiones-nuevas-tras-la-versión-31782-n1-n5).
+
+**Correspondencia riesgo → PNS.** El informe al fabricante no numera los riesgos (su tabla 1.1 no
+tiene esa columna). La correspondencia se ha hecho comparando los títulos del §4 de los consolidados
+con la tabla 1.1 del informe:
+- riesgos n.º 1-27 → PNS-01 a PNS-27;
+- n.º 30-34 → PNS-28 a PNS-32; n.º 37-44 → PNS-33 a PNS-40; n.º 46-52 → PNS-45 a PNS-51;
+- n.º 28, 29, 36 y 45 → §7.1, §7.2, §7.3 y §7.4 del informe (compatibilidad, sin número PNS); n.º 35
+  (rendimiento) no está en el informe;
+- n.º 54-78 (Chatboo) → PNS-53 a PNS-77 (número de riesgo menos uno);
+- PNS-41 a PNS-44 y PNS-52 vienen de los riesgos de `pns_base`; PNS-78 a PNS-80, de la fase 2 y la
+  revisión del informe; PNS-81 a PNS-92, del seguimiento.
+
+### Tabla resumen
+
+| Decisión | Propuesta | Motivo |
+|---|---|---|
+| D1 | CAMBIA | Bloquea ahora por PNS-82, 83, 85, 90 y 91 y los restos de PNS-01/02 y PNS-07; A-D cerradas. |
+| D33 | CAMBIA | Conversaciones aisladas; el bloqueo de Chatboo queda limitado a PNS-82. |
+| D18 | SIGUE ABIERTA | Funcional; con Chatboo depende de D33, D29 y D46. |
+| D17 | CAMBIA | Se añaden las personalizaciones sobre los 38 XML ID `mcp_*` que se pierden (PNS-88). |
+| D38 | SIGUE ABIERTA | Misma sobrescritura de contextos y skills de fábrica (PNS-32, 66). |
+| D19 | SIGUE ABIERTA | PNS-46 no concluyente; la duda afecta igual a todos los idiomas. |
+| D20 | CAMBIA | Sesiones revocadas corregidas; clave en cabecera (PNS-33) y parche 4 para `prompts/*`. |
+| D23 | CERRADA | `clean_system` ya no existe; el resto va en D17. |
+| D26 | CAMBIA | Ambos caminos comprueban el dueño; pasa a ser usabilidad; el resto depende de D29. |
+| D29 | CAMBIA | Riesgo residual del saneador; deja de bloquear si la prueba 8 de staging sale bien. |
+| D31 | CERRADA | PNS-34 corregido y los tests siempre van en BD nueva. |
+| D4 | CAMBIA | Writer baja a medio; AI Administrator equivale a administrador de Odoo. |
+| D46 | CAMBIA | Se decide clave y grupo conversacional; quedan D36 y la entrega por PIN (N4). |
+| D5 | CERRADA | PNS-48 corregido: menú solo para `base.group_system`. |
+| D22 | CAMBIA | Queda el nombre de la BD en el sandbox (y `sys-info`, en D36). |
+| D24 | CAMBIA | SSRF corregido; `whitelist_only` no limita mientras siga PNS-91; `open` abre `remote_image`. |
+| D25 | CAMBIA | Sin auto-confirmación de escrituras en turnos no confiables ni doble ejecución. |
+| D27 | CAMBIA | Opción 3 aplicada por el fabricante; queda pedir la opción 2. |
+| D36 | SIGUE ABIERTA | PNS-66 sin cambios. |
+| D10 | CAMBIA | «No external failover» permite garantizar la opción 2; sin filtro por campo. |
+| D11 | CAMBIA | Claude viable; quedan `temperature` 0, `max_completion_tokens` y endpoint en el error. |
+| D12 | CAMBIA | El usuario ya no elige proveedor; el tope se pone en la cuenta del proveedor. |
+| D13 | CAMBIA | Hay retención (30 días) que purga al actualizar: se decide valor y momento (N1). |
+| D35 | CAMBIA | Cron global corregido; queda fijar el plazo antes de su primera pasada (N1). |
+| D41 | CAMBIA | Prefiere voz local; solo afecta a navegadores sin ella. |
+| D42 | SIGUE ABIERTA | Los documentos se siguen subiendo solos (PNS-65). |
+| D6 | CERRADA | PNS-08 corregido; lo que queda (PNS-90) va en D1. |
+| D7 | CAMBIA | `stdio` solo para el administrador de Ajustes; quedan los 5 servidores heredados (PNS-88). |
+| D8 + PB-6 | CAMBIA | Sin secretos por defecto y purga a 24 h; no exportar con secretos mientras siga PNS-82. |
+| D3 + PB-3 | CAMBIA | Solo `openpyxl`; Python 3.7 únicamente con los parches 1-4 (N2). |
+| D14 | CAMBIA | Sin Internet, como mucho una espera cada 15 minutos (PNS-47). |
+| D15 | SIGUE ABIERTA | Infraestructura; sin cambios. |
+| D16 | CERRADA | Ya no hay borrado de carpetas en disco. |
+| D21 | CERRADA | Sin filas sin clave; los restos de PNS-28 y PNS-30 van al informe (D2). |
+| D30 | SIGUE ABIERTA | Técnica; sin cambios (recomendado 8 MB). |
+| D39 | CAMBIA | Defensa en profundidad: las imágenes ya pasan por el servidor. |
+| D40 | SIGUE ABIERTA | Información del cliente. |
+| D2 + PB-9 | CAMBIA | Envío del seguimiento con prioridad para el patrón de PNS-01; PB-9 pasa a N2. |
+| D28 | CAMBIA | `zoneinfo` corregido; solo queda `platform`. |
+| D32 | CERRADA | SheetJS fuera y jsPDF 4.2.1. |
+| D34 | CAMBIA | Proveedor corregido; solo queda el historial enviado por el navegador. |
+| D37 | CAMBIA | F18 confirmado: basta revisar el agente en la copia de producción. |
+| D44 | CAMBIA | Solo queda showdown, detrás del saneador. |
+| D45 | CAMBIA | Sin impacto de seguridad: se documenta como inocuo. |
+| D9 | CAMBIA | Mismos parches globales y más `include` de JS (de 11 a 19). |
+| D43 | SIGUE ABIERTA | Quedan 6 librerías y el choque de Chart.js. |
+| PB-1 | CERRADA | PNS-41 corregido. |
+| PB-2 | CAMBIA | Sigue el cambio global; se comprueba `_notifyInvalidFields` en los `web_*`. |
+| PB-5 | CERRADA | `pns_base` ya no recorre los módulos. |
+| PB-7 | SIGUE ABIERTA | El descarte sigue; ahora con aviso en el asistente. |
+| PB-8 | CERRADA | El asistente sanea el HTML que llega por RPC. |
+
+**Recuento:** 51 decisiones revisadas: 10 CERRADA · 31 CAMBIA · 10 SIGUE ABIERTA. Además, 5 NUEVAS
+(N1 a N5), ya decididas.
+
+| Nueva | Tema | Opción elegida |
+|---|---|---|
+| N1 | Valores de retención antes de actualizar producción | a), con la secuencia segura |
+| N2 | Mantener los parches 1-4 hasta que el fabricante corrija PNS-81 | c) |
+| N3 | ¿Es apta la 3.1.782 para algún cliente? | b) ahora; a) para producción |
+| N4 | ¿Se usa la mesa de entrega de claves por PIN? | a) no se usa |
+| N5 | Proveedor y datos para las 9 pruebas pendientes de staging | a); c) como puente |
+
+### Bloqueantes vigentes
+
+- **Siempre:** D1, D3, D4, D9, D10 y PB-2.
+- **Si se instala Chatboo:** además D33 y D46.
+- **Condicionada:** D29 deja de ser bloqueante si la prueba 8 de staging (PNS-60, respuesta y
+  exportación) sale CORREGIDO; si no, es bloqueante con Chatboo.
+- PB-1 deja de ser bloqueante (CERRADA).
+
+> La tabla «Tema · Decisiones · Bloqueantes» de «Cómo leer este documento» es la original del
+> 2026-10-08; la vigente es la de esta sección.
+
+---
+
+
 ## Resumen
+
+> Resumen del 2026-10-08, sobre la versión 3.1.486; el estado vigente está en «Revisión tras la versión 3.1.782».
 
 1. `pns_ai_mcp` ("AI Engine", PATANEGRA Soft) es el motor de IA de la familia PNS: conecta Odoo con proveedores de IA, publica Odoo como servidor MCP y deja que la IA consulte datos y proponga cambios que un humano confirma. Necesita `pns_base`, que además cambia el comportamiento de módulos que no son PNS.
 2. `pns_ai_chatboo` 2.1.322 ("Chatboo") es el chat de IA dentro del backend: cada mensaje lo resuelve `pns_ai_mcp`, y lo ve quien tenga clave MCP generada (no tiene grupo propio).
@@ -72,6 +181,10 @@ críticos propios, sin reproducir (n.º 54 y 55); su bloqueo específico se deci
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-01 a PNS-07, PNS-53 y PNS-54 (riesgos n.º 1-7, 54 y 55). Las vías de las pruebas A-D están cerradas: PNS-01 y PNS-02 CORREGIDO en la vía RPC (3b-1), PNS-03 CORREGIDO (3b-1), PNS-04 corregido en código, PNS-05 corregido en código (prueba 6 pendiente de staging), PNS-06 CORREGIDO (3b-1) y PNS-53 CORREGIDO (3b-1). Quedan restos: PNS-01/02 (un AI Administrator sin Ajustes se da `base.group_system` con un plan que él mismo confirma), PNS-07 (el sandbox no bloquea los métodos privados) y PNS-54 (un script en la página confirma sin pasar por la tarjeta).
+- **Nuevo alcance:** el bloqueo se mantiene por los hallazgos nuevos con el mismo patrón que PNS-01 (métodos públicos en `sudo` sin control de grupo, invocables por cualquier usuario autenticado): PNS-82 (adjuntos ajenos, internos), PNS-83 (claves MCP por PIN, también portal), PNS-85 (caché de parámetros de skills, VULNERABLE en 3b-1), PNS-90 (caché de `fetch_url`, VULNERABLE con portal en 3c) y PNS-91 (lista blanca, VULNERABLE con portal en 3c); más los restos de PNS-01/02 y PNS-07. Criterio de desbloqueo: una versión que los corrija y la repetición de las pruebas de 3b-1 y 3c y de las 9 pendientes de staging. PNS-92 (protegido solo por rebote) no lleva decisión: va al informe al fabricante (D2). Sigue siendo **BLOQUEANTE**; qué se permite mientras tanto, en N3.
+
 ### D33 — ¿Se bloquea Chatboo hasta que el fabricante aísle las conversaciones de cada usuario? — **BLOQUEANTE si se instala Chatboo**
 
 **Contexto:** Chatboo no tiene reglas de registro: cualquier usuario interno, tenga o no clave
@@ -101,6 +214,10 @@ como el código plantado (F30-F32).
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-53 a PNS-57 (riesgos n.º 54-58). PNS-53, PNS-56 y PNS-57 CORREGIDO (3b-1); PNS-55 PARCIAL, con el aislamiento de sesiones y trabajos CORREGIDO (3b-1); PNS-54 PARCIAL (ver D26 y D29). Además, PNS-80 (`read_progress`) YA NO APLICA (3c).
+- **Nuevo alcance:** las conversaciones ya están aisladas. El bloqueo de Chatboo queda limitado a PNS-82: cualquier interno puede engancharse a su propia sesión adjuntos sin `res_model` o sin `res_id` (descargas del chat de otros usuarios y copias de configuración, que pueden llevar secretos) y descargarlos. Resto menor de PNS-55: el ACL de los trabajos sigue con `create` y `write`. Sigue siendo **BLOQUEANTE si se instala Chatboo**.
+
 ### D18 — ¿Qué otros módulos `pns_*` con conocimiento de IA se instalarán?
 
 **Contexto:** `pns_ai_mcp` es infraestructura: el chat lo aporta `pns_ai_chatboo`, y hay otros
@@ -128,6 +245,10 @@ conversaciones (F29), lo que mantiene la opción 2 sujeta a D33.
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): SIGUE ABIERTA.**
+- **Lo que la motivaba:** PNS-11, 15, 21, 27, 32, 53 a 60, 65 y 72. CORREGIDO: PNS-11, 15, 21, 27, 53, 56, 57 y 58; PARCIAL: PNS-32, 54, 55, 59, 60, 65 y 72.
+- **Alcance:** es una decisión funcional. La opción 2 sigue sujeta a D33 (ahora PNS-82), D29 y D46.
+
 ### D17 — ¿Se han editado a mano contextos de fábrica en la base de datos del cliente?
 
 **Contexto:** en cada cambio de versión el módulo sobrescribe y reactiva los contextos de fábrica
@@ -142,6 +263,10 @@ lo mismo con sus 3 contextos y 11 skills de fábrica (ver D38).
 **Riesgos relacionados:** n.º 34.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-32 PARCIAL: la sincronización sigue sobrescribiendo los contextos de fábrica editados (3a: 53 contextos actualizados). Nuevo PNS-88 (CONFIRMADO en 3a): los 38 XML ID `mcp_*` (reglas, accesos, menús, acciones y vistas de `ai.safe.operation`, `ai.log`, `ai.context` y `ai.change.journal`) se borran y se recrean como `ai_*` con ids nuevos.
+- **Nuevo alcance:** el cliente debe informar también de las personalizaciones hechas sobre esos registros (dominios de regla, menús, vistas, traducciones) y de los favoritos o filtros guardados sobre esas acciones: se pierden al actualizar. En `third_party` y `vertical-instaladores` no hay vistas heredadas de ellos.
 
 ### D38 — ¿Deben conservarse los cambios de un administrador en los contextos y skills de fábrica de Chatboo?
 
@@ -159,6 +284,10 @@ parámetros, desactivar una skill) se pierde. Enlaza con D17 y con D36.
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): SIGUE ABIERTA.**
+- **Lo que la motivaba:** PNS-32 PARCIAL y PNS-66 SIN CAMBIOS. En 3a se reimportaron los contextos y 10 skills de fábrica.
+- **Alcance:** el mismo comportamiento que antes.
+
 ### D19 — ¿Qué idiomas tienen los usuarios?
 
 **Contexto:** el prompt se guarda en una caché por agente e idioma que se recompila a menudo, y
@@ -171,6 +300,10 @@ probablemente el glosario en español no llega a la parte fija del prompt.
 **Riesgos relacionados:** n.º 47.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): SIGUE ABIERTA.**
+- **Lo que la motivaba:** PNS-46 DUDOSO. 3b-1 NO CONCLUYENTE: la parte fija del agente de Chatboo es idéntica en `es_ES` y `en_US` y no contiene ningún glosario, aunque existen y están activos.
+- **Alcance:** la duda del glosario afecta igual a los dos idiomas; sigue siendo información que aporta el cliente.
 
 ### D20 — ¿Qué cliente MCP externo se usará?
 
@@ -190,6 +323,10 @@ la base de datos (D22); las sesiones antiguas siguen activas con una clave revoc
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-13 CORREGIDO (3b-1: con la clave revocada, la sesión se cierra); PNS-33 SIN CAMBIOS (clave aceptada en la URL, prefijo en el log, hash sin sal); PNS-36 PARCIAL (desaparecen `resources/*` y `system://info`; queda el nombre de la BD en el sandbox); PNS-39 PARCIAL. Nuevo: PNS-81, `prompts/*` solo devuelve contextos con el parche 4.
+- **Nuevo alcance:** desaparece el impacto de las sesiones antiguas con clave revocada. Queda configurar el cliente para que envíe la clave en la cabecera `X-MCP-API-Key` y no en la URL (PNS-33), y que el servidor lleve el parche 4 (N2).
+
 ### D23 — ¿Hay módulos del cliente con acciones de ventana sobre asistentes `pns_ai_mcp.*`?
 
 **Contexto:** la herramienta `clean_system` borra acciones de ventana de esos asistentes y hoy se
@@ -202,6 +339,10 @@ puede ejecutar sin ser AI Writer.
 **Riesgos relacionados:** n.º 22.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): CERRADA.**
+- **Lo que la motivaba:** PNS-22: `clean_system` desaparece con `controllers/tools_system.py`. Los asistentes `pns_ai_mcp.*` pasan a `ai.*` (3a).
+- **Lo que queda:** las posibles acciones del cliente sobre los modelos renombrados se revisan en D17.
 
 ### D26 — ¿Cómo se confirmarán las operaciones supervisadas: con el aviso del chat o con el botón de Autorizaciones?
 
@@ -221,6 +362,10 @@ puede confirmar y ejecutar la operación sin que el usuario pulse nada (n.º 55)
 **Riesgos relacionados:** n.º 3, 4, 5, 55.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-03 CORREGIDO (3b-1); PNS-04 corregido en código; PNS-05 corregido en código (prueba 6 pendiente de staging); PNS-54 PARCIAL: el AI Administrator ya no confirma operaciones ajenas desde la tarjeta.
+- **Nuevo alcance:** los dos caminos comprueban el dueño; pasa a ser una elección de usabilidad. El riesgo que queda (un script en la página confirma y ejecuta sin la tarjeta y sin espera en servidor para `high`, resto de PNS-54) depende de D29.
 
 ### D29 — ¿Se acepta el riesgo de XSS hasta que lo corrija el fabricante? — **BLOQUEANTE si se instala Chatboo**
 
@@ -244,6 +389,10 @@ use el chat; por eso pasa a ser bloqueante.
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-15 CORREGIDO; PNS-53 CORREGIDO (3b-1); PNS-16 PARCIAL; PNS-54 PARCIAL; PNS-59 PARCIAL (parte del servidor probada en 3b-2); PNS-60 PARCIAL: saneador por lista negra, `escapeHtml` sin comillas en atributos y showdown 2.1.0; la respuesta y la exportación están pendientes de staging.
+- **Nuevo alcance:** ya no se trata de aceptar un XSS conocido, sino el riesgo residual del saneador. Deja de ser bloqueante si la prueba 8 de staging (PNS-60, respuesta y exportación) sale CORREGIDO; si no, sigue siendo **BLOQUEANTE si se instala Chatboo**.
+
 ### D31 — ¿Se ejecutarán alguna vez los tests del módulo sobre una copia de producción?
 
 **Contexto:** uno de los tests guarda de forma permanente una clave MCP predecible para el
@@ -257,6 +406,10 @@ administrador.
 **Riesgos relacionados:** n.º 38.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): CERRADA.**
+- **Lo que la motivaba:** PNS-34 CORREGIDO: el test ya no deja guardada una clave predecible. Además, `odoo-dev tests` crea siempre una BD nueva.
+- **Lo que queda:** observación menor: si la ejecución se corta entre el montaje y el desmontaje, el administrador se queda con la clave del test. No afecta a las BD desechables.
 
 ---
 
@@ -282,6 +435,10 @@ chat no depende de estos grupos sino de la clave MCP (D46).
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-06 CORREGIDO (3b-1: se rechaza al guardar una escritura con `sudo`); PNS-09 CORREGIDO (servidores `stdio` solo para el administrador de Ajustes); PNS-10 CORREGIDO (3b-1); PNS-23 SIN CAMBIOS. Además: resto de PNS-01/02 (un AI Administrator sin Ajustes se da `base.group_system` con un plan propio), PNS-84 (el AI Administrator lee PIN y claves en claro) y PNS-86 (generador OpenAPI con SSRF y lectura, solo AI Administrator).
+- **Nuevo alcance:** AI Writer baja a riesgo medio: ya no escala al guardar ni escribe en el prompt de todos; sigue activando skills sin revisión (D27). AI Administrator equivale a administrador de Odoo: solo para personal técnico que ya lo sea. Sigue siendo **BLOQUEANTE**.
+
 ### D46 — ¿A qué usuarios se generará la clave MCP para usar Chatboo? — **BLOQUEANTE si se instala Chatboo**
 
 **Contexto:** Chatboo no tiene grupo propio: la clave MCP ("carnet") que se genera por usuario
@@ -300,6 +457,10 @@ generarla puede hacer falta recargar el navegador para ver el menú. Enlaza con 
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba** (riesgos n.º 13, 40, 55, 58, 67 y 77): PNS-13 CORREGIDO (3b-1); PNS-36 PARCIAL; PNS-54 PARCIAL; PNS-57 CORREGIDO (3b-1); PNS-66 SIN CAMBIOS; PNS-76 PARCIAL (el menú ya aparece sin recargar; la receta, en D37). Novedades de 3.1.782: el grupo `group_ai_conversational` (no lo implica AI Administrator), que se asigna desde `ai.mcp.user.is_ai_conversational`, y la entrega de claves por PIN (PNS-83 y PNS-84). Qué exige exactamente el acceso al chat se comprobará en staging (las pruebas usan clave MCP y grupo conversacional).
+- **Nuevo alcance:** decidir a quién se da la clave MCP y el grupo conversacional. La clave ya no da acceso a conversaciones ajenas; la exposición que queda son las skills de fábrica (D36) y la entrega por PIN, que no se usará (N4). Sigue siendo **BLOQUEANTE si se instala Chatboo**.
+
 ### D5 — ¿Quién debe poder abrir AI Engine → Settings?
 
 **Contexto:** hoy hace falta tener a la vez Ajustes (administrador de Odoo) y AI Administrator; el
@@ -315,6 +476,9 @@ menú se muestra a un AI Administrator aunque luego no pueda entrar.
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CERRADA.**
+- **Lo que la motivaba:** PNS-48 CORREGIDO: el menú Settings pasa a `base.group_system` y ya no se muestra a quien no puede entrar. El fabricante aplicó la opción 1.
+
 ### D22 — ¿Se expone a todos los usuarios con clave MCP el esquema de modelos y la información del sistema?
 
 **Contexto:** por MCP, cualquier usuario con clave puede ver la estructura de cualquier modelo
@@ -328,6 +492,10 @@ Decisión: ____ / Fecha: ____
 **Riesgos relacionados:** n.º 40.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-36 PARCIAL: desaparecen `resources/*` y `system://info`; queda el nombre de la BD precargado en el sandbox de `relaxaicode` (prueba 7 pendiente de staging). La skill `sys-info` (PNS-66, SIN CAMBIOS) sigue dando BD, URL y versiones.
+- **Nuevo alcance:** aceptar o no que cualquier usuario con chat o MCP vea el nombre de la BD y, si la prueba 7 lo confirma, el esquema de modelos sin permiso de lectura. `sys-info` se decide en D36.
 
 ### D24 — ¿Qué política de acceso a URL tendrá el cliente?
 
@@ -347,6 +515,10 @@ pintar una respuesta de Chatboo con imágenes externas (n.º 60, ver D39).
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-16 PARCIAL; PNS-17 PARCIAL (en `fetch_url` está corregido el SSRF: rechaza direcciones no públicas, valida cada redirección y corta a 20 MB); PNS-59 PARCIAL. Nuevo PNS-91, VULNERABLE (3c): cualquier usuario autenticado, también de portal, añade o reactiva hosts en la lista blanca.
+- **Nuevo alcance:** las direcciones internas ya están protegidas en `fetch_url`. `whitelist_only` sigue siendo la opción recomendada, pero no limita los hosts mientras siga PNS-91. `open` abre además `remote_image` (salida de datos sin clic desde el servidor, resto de PNS-59) y sigue añadiendo el dominio a la lista al confirmar.
+
 ### D25 — ¿Habrá servidores externos marcados como "de confianza" (`trusted`)?
 
 **Contexto:** las llamadas de la IA a un servidor de confianza se ejecutan sin confirmación humana,
@@ -360,6 +532,10 @@ incluidas las que modifican datos en ese servicio.
 **Riesgos relacionados:** n.º 16, 25.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-16 PARCIAL: en un turno no confiable (con datos de pantalla o tras cualquier herramienta) ya no se auto-confirma un `api_call` que no sea de solo lectura. PNS-25 CORREGIDO: no hay doble ejecución tras el failover.
+- **Nuevo alcance:** es una decisión funcional (qué servidores serán `trusted`). El riesgo de llamadas de escritura inducidas por un texto malicioso baja mucho; se confirmará con la prueba 3 de staging.
 
 ### D27 — Skills con código: ¿quién puede crearlas y activarlas, y con qué revisión?
 
@@ -379,6 +555,10 @@ activas sin revisión.
 **Riesgos relacionados:** n.º 6, 23.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-06 CORREGIDO (con el resto común del sandbox, PNS-07); PNS-23 SIN CAMBIOS.
+- **Nuevo alcance:** el fabricante ya aplicó la opción 3. Queda la opción 2: pedir que la captura desde Chatboo y la importación ZIP dejen la skill inactiva (va en el informe, D2).
 
 ### D36 — ¿Se limita quién puede ejecutar las skills de usuarios y sistema de Chatboo? ¿Se mantiene la previsión meteorológica?
 
@@ -400,6 +580,10 @@ Las skills se reactivan en cada actualización (D38). Enlaza con D14.
 **Riesgos relacionados:** n.º 11, 67.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): SIGUE ABIERTA.**
+- **Lo que la motivaba:** PNS-66 SIN CAMBIOS (`users-all`, `users-logged`, `sys-info` y `forecast` sin control de grupo). PNS-11 CORREGIDO (ya no se pueden borrar skills de fábrica por RPC), sin efecto sobre las opciones.
+- **Alcance:** el mismo que antes.
 
 ---
 
@@ -429,6 +613,10 @@ vista y URL) y el texto completo de los ficheros adjuntos (todas las hojas de un
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-16 PARCIAL; PNS-18 PARCIAL (nuevo campo `no_external_failover`, comprobado en 3b-2); PNS-19 PARCIAL (métodos privados desde el sandbox); PNS-62 PARCIAL (tope de 15 MB por archivo; documentos leídos a trozos).
+- **Nuevo alcance:** la opción 2 (solo proveedor local) ya se puede garantizar marcando el proveedor local con «No external failover» (N3). Sigue sin haber filtro por modelo, campo o empresa. Sigue siendo **BLOQUEANTE**.
+
 ### D11 — ¿Qué proveedor, modelo y clave se configurarán?
 
 **Contexto:** el módulo envía siempre parámetros que algunos modelos recientes rechazan; cuando
@@ -446,6 +634,10 @@ eso ocurre, pasa al proveedor de respaldo y el usuario ve un error con la direcc
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-40 PARCIAL.
+- **Nuevo alcance:** los modelos Claude ya son viables (`temperature` omitible, reintento sin ella e imágenes en el formato de Anthropic). Quedan: `temperature = 0` pasa a 0,7; el driver de OpenAI no usa `max_completion_tokens` (modelos de razonamiento); el error al usuario incluye el endpoint.
+
 ### D12 — ¿Hace falta un tope de gasto o restringir la elección de proveedor?
 
 **Contexto:** no hay tope de gasto, de tokens ni de turnos; algunas llamadas no se contabilizan, y
@@ -461,6 +653,10 @@ tamaño para imágenes ni para el texto extraído de los adjuntos.
 **Riesgos relacionados:** n.º 31, 62, 63.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-29 PARCIAL (sin topes; no se cuentan los `cache_creation_input_tokens` de Anthropic); PNS-61 PARCIAL (el `provider_id` del navegador ya no se acepta, 3b-2); PNS-62 PARCIAL (15 MB por archivo; sin tope de número de archivos ni del total).
+- **Nuevo alcance:** el usuario ya no elige el proveedor. El tope de gasto se controla en la cuenta del proveedor: el módulo no lo trae.
 
 ### D13 — ¿Qué retención se quiere para el registro de actividad, las cachés y las exportaciones del chat?
 
@@ -481,6 +677,10 @@ borran nunca (detalle en D35).
 **Riesgos relacionados:** n.º 21, 32, 64.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-21 CORREGIDO (descargas sin token, solo para el creador o quien pueda leer el registro; 3c); PNS-30 PARCIAL: cron diario de retención, 30 días por defecto; el AI Administrator ya no modifica filas (sí las borra); `create_log_entry` sigue siendo público. Nuevo PNS-87 (CONFIRMADO en 3a): la purga se ejecuta en la primera pasada del programador tras actualizar, y cada `-u` borra la tabla `ai_provider_usage_day`.
+- **Nuevo alcance:** ya no se decide si hay retención, sino el valor y el momento de fijarlo: ver N1. La sub-decisión queda resuelta: el AI Administrator ya no puede modificar filas.
 
 ### D35 — Retención de Chatboo: ¿hace falta un cron que purgue conversaciones, adjuntos y trabajos?
 
@@ -503,6 +703,10 @@ corrija D33. Amplía D13.
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-63 CORREGIDO: el cron de mantenimiento (cada 5 minutos) purga las sesiones de todos los usuarios con más días que `pns_ai_chatboo.history_retention_days` (30 por defecto); PNS-55 PARCIAL; PNS-21 CORREGIDO.
+- **Nuevo alcance:** ya no hace falta pedir el cron. Queda fijar el plazo antes de su primera pasada: ver N1.
+
 ### D41 — ¿Se acepta que el texto de las respuestas pueda salir hacia servicios de voz de Google o Microsoft?
 
 **Contexto:** la lectura en voz alta de Chatboo usa las voces del navegador y no da preferencia a
@@ -522,6 +726,10 @@ navegadores del cliente (F51, D40).
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-64 PARCIAL: prefiere una voz local del idioma; si no la hay, usa una remota; no hay ajuste para desactivar la función.
+- **Nuevo alcance:** solo afecta a navegadores sin voz local del idioma (D40). La opción 2 se reduce a pedir un ajuste para desactivarla.
+
 ### D42 — ¿Es aceptable que Chatboo suba documentos a Odoo sin acción del usuario?
 
 **Contexto:** algunos documentos de una respuesta (PDF, Word, HTML) se generan en el navegador y
@@ -537,6 +745,10 @@ exportaciones pueden incluir columnas de datos que no se veían en pantalla.
 **Riesgos relacionados:** n.º 21, 66.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): SIGUE ABIERTA.**
+- **Lo que la motivaba:** PNS-65 PARCIAL: los documentos pendientes se siguen subiendo solos; el Word se sanea y se sirve con `nosniff`. PNS-21 CORREGIDO.
+- **Alcance:** el mismo; los adjuntos ya están aislados por sesión, salvo por PNS-82 (D33).
 
 ---
 
@@ -563,6 +775,10 @@ otro sigue verificado solo en el código: no se probó porque no hay servidores 
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CERRADA.**
+- **Lo que la motivaba:** PNS-08 CORREGIDO (3b-1: un interno ya no lee `auth_token`, `env_vars` ni `config_json`); PNS-14 PARCIAL, con la caché de `api_call` por usuario y las reglas de `ai.api.result.cache` y `ai.safe.choice` CORREGIDAS (3b-1).
+- **Lo que queda:** el resto de PNS-14 es la caché de `fetch_url` (PNS-90), que no afecta a los servidores externos: se trata en D1.
+
 ### D7 — ¿Se usarán servidores `stdio` u OpenAPI con `base_url` vacío?
 
 **Contexto:** un servidor `stdio` ejecuta un comando libre en el servidor con todo el entorno de
@@ -579,6 +795,10 @@ credencial.
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-09 CORREGIDO: solo un administrador de Ajustes crea o cambia un servidor `stdio`; entorno mínimo, timeout y cierre del proceso. PNS-17 PARCIAL: OpenAPI ya no deja que la especificación elija el host, pero el driver sigue las redirecciones con las cabeceras de autenticación. PNS-88: siguen en las BD actualizadas 5 servidores de fábrica inactivos (3 `stdio` con `npx`, `sesame` y `cdmon`).
+- **Nuevo alcance:** AI Administrator ya no equivale a acceso al sistema operativo. Queda decidir qué se hace con esos 5 servidores heredados (dejarlos inactivos y documentar `stdio` como prohibido, o borrarlos) y no usar OpenAPI contra hosts que redirijan.
+
 ### D8 (+ PB-6) — ¿Se usarán las copias de configuración? ¿Quién las genera y custodia?
 
 **Contexto:** la copia completa lleva siempre las claves; la opción "sin secretos" no las quita
@@ -593,6 +813,10 @@ sobrescribe la configuración y puede abrir la política de URL.
 **Riesgos relacionados:** n.º 20; pns_base 6.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-20 PARCIAL: exportación sin secretos por defecto (se pregunta desde Ajustes) y purga de los adjuntos a las 24 h; la importación sigue sobrescribiendo, sin resumen previo. Nuevo PNS-82: durante esas 24 h, cualquier interno puede apropiarse de una copia (se guardan sin `res_model`).
+- **Nuevo alcance:** la custodia es más sencilla, pero mientras siga PNS-82 no se exportan copias con secretos (N3).
 
 ---
 
@@ -616,6 +840,10 @@ del módulo (zonas horarias, recetas de código) no están disponibles.
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** §7.1 del informe, corregido: `external_dependencies` declara solo `openpyxl`, `reportlab` y `requests` (ya no `httpx` ni `pydantic`). §7.3 y nuevo PNS-81: con Python 3.7 o 3.8 el módulo no se importa sin el parche 1, y tres funciones fallan sin los parches 2 a 4.
+- **Nuevo alcance:** al Dockerfile del cliente solo hay que añadir `openpyxl`. Python 3.7 vale solo con los parches 1 a 4 (N2). Sigue siendo **BLOQUEANTE**.
+
 ### D14 — ¿Hay salida a Internet desde el servidor?
 
 **Contexto:** sin Internet, cada comprobación de estado espera hasta 8 segundos por las fuentes de
@@ -632,6 +860,10 @@ salir a Open-Meteo (D36).
 **Riesgos relacionados:** n.º 48, 67, 73.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-47 CORREGIDO (un fallo de las fuentes de tipos de cambio se recuerda 15 minutos, y antes se prueba `res.currency`); PNS-72 PARCIAL (`check_health` en cada carga; los tipos se consultan una vez al día); PNS-66 SIN CAMBIOS (`forecast`).
+- **Nuevo alcance:** sin Internet, como mucho una espera cada 15 minutos. La decisión sigue por los proveedores externos (D10) y `forecast` (D36).
 
 ### D15 — Configuración de Odoo en el VPS (workers, límites, proxy, HTTPS)
 
@@ -654,6 +886,10 @@ el código que genera la IA tendrá límites de CPU/memoria propios o los del wo
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): SIGUE ABIERTA.**
+- **Lo que la motivaba:** riesgo n.º 35 (rendimiento; no tiene PNS en el informe), sin cambios; PNS-39 PARCIAL. F26 y F44 siguen sin probar. Dato nuevo: cada canje de PIN ocupa un worker hasta 20 s (PNS-83; no aplica si no se usa la mesa, N4).
+- **Alcance:** el mismo; es una decisión de infraestructura.
+
 ### D16 — ¿La carpeta de módulos está montada en solo lectura?
 
 **Contexto:** la sincronización del conocimiento de fábrica puede borrar carpetas
@@ -666,6 +902,9 @@ Decisión: ____ / Fecha: ____
 **Riesgos relacionados:** n.º 34.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): CERRADA.**
+- **Lo que la motivaba:** PNS-32: ya no hay `shutil.rmtree` ni otro borrado de archivos; la retirada de los contextos `self` solo toca la BD.
 
 ### D21 — ¿Se acepta que cualquier web cree filas en el registro de actividad?
 
@@ -681,6 +920,10 @@ autenticadas; una web abierta en el navegador de un usuario puede llenar `ai.log
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CERRADA.**
+- **Lo que la motivaba:** PNS-28 PARCIAL: las peticiones sin clave ya no crean filas en `ai.log` (3b-1).
+- **Lo que queda:** CORS `*` sin validación de `Origin` (resto de PNS-28) y `create_log_entry` público, que deja a cualquier usuario autenticado crear filas a nombre de otro (resto de PNS-30). No requieren decisión: van al informe al fabricante (D2).
+
 ### D30 — ¿Qué tope tendrá la caché de datos de cada turno (`pns_ai_mcp.dataset_cache_max_bytes`)?
 
 **Contexto:** por defecto 8 MB por turno; con 0 no hay límite, con consumo de memoria y CPU del
@@ -693,6 +936,10 @@ worker.
 **Riesgos relacionados:** n.º 35.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): SIGUE ABIERTA.**
+- **Lo que la motivaba:** riesgo n.º 35 (sin PNS en el informe), sin cambios.
+- **Alcance:** el mismo. Recomendación técnica: mantener 8 MB.
 
 ### D39 — ¿Se configura una política de seguridad de contenidos (CSP) en el proxy para frenar la salida de datos por imágenes?
 
@@ -711,6 +958,10 @@ Chatboo ponen una CSP en `/web`, y la lista blanca de URL solo controla al servi
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-17 PARCIAL; PNS-59 PARCIAL: el saneador del cliente reescribe las imágenes de otro origen a `/pns_ai_mcp/remote_image`, así que el navegador ya no contacta con terceros (pendiente de staging, prueba 9); el servidor solo las descarga de hosts de la lista blanca, o de cualquiera con la política `open`.
+- **Nuevo alcance:** la CSP pasa a ser defensa en profundidad, por si falla el saneador. El canal que queda está en el servidor (D24, PNS-91), y la CSP no lo corta.
+
 ### D40 — ¿Qué navegadores (y versiones) usan los usuarios del cliente?
 
 **Contexto:** Chatboo añade al JavaScript común del backend sintaxis reciente sin adaptar, y
@@ -725,6 +976,10 @@ de las voces de cada navegador (D41). Es información que debe aportar el client
 **Riesgos relacionados:** n.º 65, 74.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): SIGUE ABIERTA.**
+- **Lo que la motivaba:** PNS-64 PARCIAL; PNS-73 SIN CAMBIOS.
+- **Alcance:** el mismo; es información que aporta el cliente.
 
 ---
 
@@ -753,6 +1008,10 @@ prueba. Totales: 9 críticos, 26 altos, 25 medios y 20 bajos (80 hallazgos).
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** el informe (PNS-01 a PNS-80) tuvo respuesta en 3.1.782: 31 CORREGIDO, 33 PARCIAL, 13 SIN CAMBIOS, 2 YA NO APLICA y 1 DUDOSO, más 12 hallazgos nuevos (PNS-81 a PNS-92), todo en [seguimiento_informe_pns_ai.md](seguimiento_informe_pns_ai.md).
+- **Nuevo alcance:** decidir el envío del seguimiento. Prioridad: PNS-83, 90, 82, 85 y 91 (el patrón de PNS-01), los restos de PNS-01/02 y PNS-07/19, PNS-81 (compatibilidad) y PNS-87/88 (pérdida de datos al actualizar). Incluye también PNS-92 (sin decisión propia), los restos de PNS-28 y PNS-30 (D21) y lo que piden D27, D28, D34 y D44. **PB-9** (parche local en lugar de informar): ver N2.
+
 ### D28 — ¿Se pide corregir `platform` en el sandbox y el anuncio de `zoneinfo` en el prompt?
 
 **Contexto:** el código de la IA puede leer datos del sistema operativo del contenedor; el prompt
@@ -766,6 +1025,10 @@ anuncia una función de zonas horarias que no existe en Python 3.7.
 **Riesgos relacionados:** n.º 36, 52.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** §7.3: `zoneinfo` corregido (`context_builder.py` con alternativa `dateutil`); PNS-51 SIN CAMBIOS.
+- **Nuevo alcance:** solo queda pedir que se quite `platform` del sandbox.
 
 ### D32 — ¿Se pide actualizar jsPDF y SheetJS?
 
@@ -783,6 +1046,10 @@ aplican), pero no usa SheetJS. Showdown se trata en D44.
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CERRADA.**
+- **Lo que la motivaba:** PNS-27 CORREGIDO: sale SheetJS y las copias de `pns_ai_mcp`; queda una sola jsPDF, la 4.2.1, cargada solo por Chatboo. PNS-72: sin duplicados.
+- **Lo que queda:** menor: `jspdf.plugin.autotable` sin revisar (va con D44).
+
 ### D34 — ¿Se pide al fabricante que el chat solo use el proveedor y el agente configurados?
 
 **Contexto:** Chatboo acepta del navegador el proveedor (cualquiera dado de alta, no solo la
@@ -797,6 +1064,10 @@ conversación enviado por el navegador, que el usuario puede inventar. Enlaza co
 **Riesgos relacionados:** n.º 31, 62.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-29 PARCIAL; PNS-61 PARCIAL: el `provider_id` ajeno se rechaza (3b-2); el `history` del navegador entra en el prompt (prueba 4 pendiente de staging).
+- **Nuevo alcance:** solo queda pedir que el historial lo tome el servidor.
 
 ### D37 — ¿Es intencionado que las bases de datos actualizadas y las nuevas tengan una receta distinta del agente Chatboo? (pregunta al fabricante)
 
@@ -814,6 +1085,10 @@ otra se actualizó.
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-76 PARCIAL. F18 CONFIRMADO en 3a: al actualizar de 3.1.486 a 3.1.782 no se ejecutó ninguna migración (0 «Running migration»).
+- **Nuevo alcance:** no hace falta preguntar al fabricante: una BD que solo ha estado en Odoo 14 no ha ejecutado esas migraciones. Basta revisar en la copia de producción `default_context_codes` del agente `pns_ai_chatboo` e igualarlo si trae `acl_security`.
+
 ### D44 — ¿Se pide al fabricante un plan para showdown y jsPDF?
 
 **Contexto:** Chatboo convierte las respuestas con showdown 2.1.0, que no sanea por diseño, tiene
@@ -830,6 +1105,10 @@ servicio con imágenes, corregidas en 3.0.2. Amplía D32.
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-27 CORREGIDO (jsPDF 4.2.1); PNS-60 PARCIAL: showdown 2.1.0 sigue, pero su salida pasa por el saneador.
+- **Nuevo alcance:** solo pedir que se sustituya showdown (y revisar autotable). Menos urgente.
+
 ### D45 — Código muerto o heredado del cliente web de Chatboo: ¿se comunica o se documenta como inocuo?
 
 **Contexto:** el JavaScript de Chatboo incluye funciones sin uso, llamadas a servicios que no
@@ -843,6 +1122,10 @@ seguridad conocido, salvo un enlace que abre ventanas sin `noopener`.
 **Riesgos relacionados:** n.º 75.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-74 PARCIAL: `noopener` y «#undefined» corregidos; el resto es código sin uso.
+- **Nuevo alcance:** sin impacto de seguridad: se documenta como inocuo (ya figura en el seguimiento).
 
 ---
 
@@ -870,6 +1153,10 @@ siguen igual.
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-31 SIN CAMBIOS: sigue global el backport de `_process_ondelete`, `set_values` reescribe la política de URL en cada guardado de Ajustes y `http_patch` ya estaba acotado a `/mcp`. Los `include` de JS de `pns_ai_mcp` pasan de 11 a 19, con uno nuevo sobre `WebClient` que arranca el sondeo del bus para todo usuario del backend. PNS-69 CORREGIDO.
+- **Nuevo alcance:** la misma pregunta, con más alcance. Sigue siendo **BLOQUEANTE**.
+
 ### D43 — ¿Se acepta que Chatboo cargue sus 7 librerías JavaScript en todo el backend?
 
 **Contexto:** todos los usuarios internos, usen o no el chat, descargan en cada carga del backend
@@ -887,6 +1174,10 @@ rompen). Cada carga del backend, además, llama a la comprobación de estado (D1
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): SIGUE ABIERTA.**
+- **Lo que la motivaba:** PNS-72 PARCIAL: quedan 6 librerías (showdown, jsPDF, autotable, html2canvas, Chart.js y ECharts) sin duplicados, y `check_health` en cada carga; PNS-70 SIN CAMBIOS (choque de Chart.js); PNS-31 SIN CAMBIOS.
+- **Alcance:** el mismo; mejora poco.
+
 ### PB-1 — ¿Se acepta que `pns_base` reescriba la web y la descripción de todos los módulos? — **BLOQUEANTE**
 
 **Contexto:** en cada arranque cambia el enlace "Learn More" de todos los módulos con
@@ -903,6 +1194,10 @@ sesión del administrador que abre la ficha.
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CERRADA.**
+- **Lo que la motivaba:** PNS-41 CORREGIDO: ya no se reescribe `website`, y el `iframe` del índice lleva `sandbox` sin `allow-scripts`.
+- **Lo que queda:** comprobar en el VPS la ficha de un módulo OCA: el `website` vuelve al del manifiesto al actualizar la lista de aplicaciones.
+
 ### PB-2 — ¿Se acepta el cambio global de validación de formularios y listas? — **BLOQUEANTE**
 
 **Contexto:** `pns_base` cambia el aviso de campos obligatorios vacíos en todos los formularios y
@@ -918,6 +1213,10 @@ del cliente.
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CAMBIA.**
+- **Lo que la motivaba:** PNS-42 SIN CAMBIOS en lo esencial: desaparece el `ListController.include`, pero el `BasicController.include` sigue sustituyendo `_notifyInvalidFields` en todos los formularios y listas, y el CSS de obligatorios sigue siendo global, sin opción para desactivarlo.
+- **Nuevo alcance:** la comprobación de los módulos `web_*` del cliente se hace sobre `_notifyInvalidFields` de `BasicController` (el parche de `ListController` ya no existe). Sigue siendo **BLOQUEANTE**.
+
 ### PB-5 — ¿Hay módulos registrados en la base de datos sin código en el servidor?
 
 **Contexto:** `pns_base` recorre todos los módulos en cada arranque y genera un aviso por cada uno
@@ -931,6 +1230,9 @@ sin código. Información que debe aportar el cliente (se puede comprobar con `p
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CERRADA.**
+- **Lo que la motivaba:** `pns_base/models/ir_module_module.py` ya solo tiene un campo calculado: no recorre los módulos ni escribe durante la carga (PNS-44, YA NO APLICA). Comprobado leyendo el código, sin prueba.
+
 ### PB-7 — ¿Se cargarán idiomas con "Sobrescribir" en producción?
 
 **Contexto:** `pns_base` descarta en silencio las traducciones duplicadas de cualquier módulo al
@@ -943,6 +1245,10 @@ cargar un idioma con sobrescritura (solo deja un aviso en el log).
 **Riesgos relacionados:** pns_base 2.
 
 Decisión: ____ / Fecha: ____
+
+**Tras 3.1.782 (14/10/2026): SIGUE ABIERTA.**
+- **Lo que la motivaba:** PNS-43 PARCIAL: el asistente de cargar idioma avisa de cuántas filas descartó; el descarte sigue para cualquier módulo, y por otras vías solo queda el WARNING del log.
+- **Alcance:** el mismo, con menor impacto porque ahora se ve.
 
 ### PB-8 — ¿Se acepta que cualquier interno cree resultados de exportación con HTML sin sanear?
 
@@ -958,7 +1264,164 @@ directamente.
 
 Decisión: ____ / Fecha: ____
 
+**Tras 3.1.782 (14/10/2026): CERRADA.**
+- **Lo que la motivaba:** `pns_base/models/operation_report_wizard.py:39-50` sanea `result_html` al crear y al escribir, salvo como superusuario. Comprobado en el código; no está en el seguimiento ni se ha probado en el laboratorio.
+
 ---
+
+## 8. Decisiones nuevas tras la versión 3.1.782 (N1-N5)
+
+### N1 — Valores de retención antes de actualizar producción
+
+**Contexto:** al actualizar a 3.1.782 se pierden datos sin aviso (PNS-87, PNS-63):
+- el cron nuevo de `ai.log` purga en la primera pasada del programador, unos minutos después de
+  arrancar, todo lo que tenga más de `pns_ai_mcp.log_retention_days` días (30 si el parámetro no
+  existe), incluido el historial de consumo y coste;
+- cada `-u` borra la tabla `ai_provider_usage_day` (histórico diario de tokens y coste por proveedor);
+- el cron de Chatboo (cada 5 minutos) borra las sesiones de más de
+  `pns_ai_chatboo.history_retention_days` días (30), también las de quien no vuelve al chat. Ese
+  parámetro se crea al actualizar con un XML ID (`icp_chatboo_history_retention_days`,
+  `noupdate="1"`). Si se crea a mano antes, sin XML ID, la carga chocaría con `key_uniq` de
+  `ir.config_parameter` (según el código; no probado). Con la secuencia segura no hace falta
+  probarlo: ese parámetro nunca se crea antes de actualizar.
+
+**Opciones:**
+1. **a) Fijar los valores con una secuencia segura** y exportar el histórico. — *Impacto:* pasos
+   manuales en cada BD que se actualice.
+2. **b) Aceptar los 30 días por defecto.** — *Impacto:* pérdida de la auditoría y del histórico de
+   costes de más de 30 días y de las conversaciones antiguas.
+
+**Secuencia segura (opción a).** No necesita opciones especiales del servidor.
+
+Antes de actualizar, con el servicio todavía en marcha:
+1. Exportar `ai_provider_usage_day` si interesa conservar el histórico.
+2. Crear en Parámetros del sistema `pns_ai_mcp.log_retention_days` con los días elegidos (`0` = no
+   purgar). Este parámetro no tiene registro de datos, así que crearlo antes no choca con nada, y su
+   cron aún no existe.
+
+Actualización:
+3. Parar el servicio de Odoo.
+4. Actualizar con `-u pns_base,pns_ai_mcp,pns_ai_chatboo --stop-after-init`: el proceso termina al
+   acabar y no ejecuta crons.
+5. Fijar `pns_ai_chatboo.history_retention_days` (que ya existe con su XML ID) con `odoo shell`, que
+   tampoco ejecuta crons: `env['ir.config_parameter'].set_param(...)` seguido de `env.cr.commit()`.
+6. Arrancar el servicio. Si la BD está neutralizada, los crons siguen desactivados; en producción se
+   activan.
+
+En local, con el kit: `odoo-dev 14 parar` → `odoo-dev 14 actualizar pns_base,pns_ai_mcp,pns_ai_chatboo`
+→ `odoo-dev 14 shell` → `odoo-dev 14 arrancar`. Hay que parar antes porque, según el MANUAL,
+`actualizar` reinicia el servidor al terminar. Esta secuencia no se ha probado. En la fase 3a,
+`actualizar` funcionó con el contenedor de la BD en marcha; si `parar` detiene también la BD, puede
+que `actualizar` y `shell` no la encuentren. En ese caso, en local basta con parar solo el servidor
+web.
+
+**Riesgos relacionados:** PNS-30, PNS-63, PNS-87.
+
+Decisión: **a)**, con la secuencia segura (Sergio) / Fecha: 14/10/2026
+
+### N2 — Mantener los parches 1-4 hasta que el fabricante corrija PNS-81
+
+**Contexto:** sin el parche 1, `pns_ai_mcp` y `pns_ai_chatboo` no se importan en Odoo 14 con Python
+3.7 o 3.8, y la BD que los tenga instalados no carga. Sin los parches 2, 3 y 4 fallan sin aviso
+`remote_image` y el reescalado de imágenes (Pillow 5.4.1), las consultas con parámetros de fecha y
+`prompts/*` por MCP. Detalle en [parches_pns_ai.md](parches_pns_ai.md). Sustituye a **PB-9** (parche
+local en lugar de informar): el parche existe y se informa a la vez.
+
+**Opciones:**
+1. **a) Mantenerlos en la rama** y volver a comprobarlos en cada versión del fabricante, con el
+   procedimiento de `parches_pns_ai.md`. — *Impacto:* excepción documentada a la regla de no tocar
+   código de terceros; trabajo en cada versión.
+2. **b) No desplegar** hasta tener una versión del fabricante compatible. — *Impacto:* sin módulos
+   hasta entonces.
+3. **c) Pedir al fabricante una fecha de corrección y mantener a) mientras tanto.** — *Impacto:* el de
+   a), con fecha de salida.
+
+**Riesgos relacionados:** PNS-81; §7.3 del informe.
+
+Decisión: **c)** (Sergio) / Fecha: 14/10/2026
+
+### N3 — ¿Es apta la versión 3.1.782 para algún cliente?
+
+**Contexto:** los críticos del informe están corregidos o reducidos (D1), pero hay hallazgos nuevos
+explotables sin permisos de IA: PNS-83, PNS-90 y PNS-91 también por portal (PNS-90 y PNS-91
+comprobados con portal en 3c); PNS-85, por cualquier usuario autenticado (probado con un interno en
+3b-1); PNS-82, por cualquier interno. Además, nueve pruebas siguen pendientes de staging (N5).
+
+**Opciones:**
+1. **a) No apta para BD con usuarios reales** hasta que el fabricante corrija PNS-82, 83, 85, 90 y 91.
+2. **b) Apta solo para el VPS de pruebas**, sin usuarios de portal, con usuarios técnicos de
+   confianza y con las mitigaciones de la opción c).
+3. **c) Apta con mitigaciones operativas** (ver abajo). — *Impacto:* quedan los PNS no mitigables.
+
+**Mitigaciones operativas posibles (opción c):**
+
+| Mitigación | PNS que cubre | Hasta dónde |
+|---|---|---|
+| BD sin usuarios de portal | PNS-83, 85, 90 y 91 en su vía de portal | Solo quita a los atacantes de portal: los internos siguen pudiendo explotarlos. |
+| `group_ai_external_url` solo para quien lo necesite | PNS-90 (quién recibe el contenido envenenado de la caché); PNS-91 (uso por `fetch_url` de los hosts añadidos); PNS-16 | No impide escribir en la caché ni ampliar la lista blanca. No consta que `remote_image` (PNS-59) dependa de este grupo. |
+| Mesa de entrega por PIN nunca abierta y sin generar PIN (N4) | PNS-83 (sin mesa abierta, el canje no devuelve claves), PNS-84 (no hay PIN ni claves en claro), PNS-89 | Sigue siendo posible bloquear IP por `note_failure`, sin efecto si no se usa la mesa. |
+| No exportar copias de configuración con secretos mientras siga PNS-82 (D8) | PNS-82 en lo que afecta a secretos; PNS-20 | Las descargas del chat de otros usuarios siguen expuestas a cualquier interno con Chatboo. |
+| Si el proveedor es local, toda la cadena de proveedores con «No external failover» (D10) | PNS-18 | Sigue sin haber filtro por modelo, campo o empresa. |
+| Complementaria (D4): AI Administrator solo para administradores de Odoo | Resto de PNS-01/02, PNS-84, PNS-86 | Se cubre por completo mientras se respete. |
+
+**No se pueden mitigar con configuración** (solo los corrige el fabricante o no instalar):
+- **PNS-90:** cualquier interno, sin grupos de IA, lee y sobrescribe la caché de `fetch_url`
+  (comprobado en 3c). Sin portal sigue siendo explotable por cualquier interno; el grupo de URL solo
+  limita quién recibe el contenido.
+- **PNS-91:** cualquier interno añade o reactiva hosts en la lista blanca, lo que anula
+  `whitelist_only`.
+- **PNS-85:** cualquier usuario autenticado fija los parámetros con que se ejecutarán las skills de
+  todos; no depende de ningún grupo.
+- **PNS-82:** cualquier interno (el ACL de `chatboo.session` es `base.group_user`) se apropia de las
+  descargas del chat ajenas; solo se evita sin Chatboo.
+- **Restos de PNS-07 y PNS-19:** desde el sandbox, cualquier usuario del chat o de MCP puede invocar
+  métodos privados (entre ellos, el que devuelve la clave del proveedor); solo se evita sin dar acceso
+  al chat ni a MCP.
+- **Restos de PNS-54 y PNS-60:** XSS residual y confirmación sin la tarjeta; dependen del código (D29).
+- **Resto de PNS-30:** filas de auditoría a nombre de otro con `create_log_entry`.
+- **PNS-92:** hoy protegido solo por un efecto lateral; ninguna configuración lo refuerza.
+
+**Riesgos relacionados:** PNS-01, 07, 16, 18, 19, 20, 54, 60, 82 a 86, 89 a 92.
+
+Decisión: **b)** ahora y **a)** para producción (Sergio) / Fecha: 14/10/2026
+
+### N4 — ¿Se usa la mesa de entrega de claves por PIN?
+
+**Contexto:** función nueva de 3.1.782. Con una mesa abierta por un AI Administrator, cualquier
+usuario autenticado, también de portal, puede probar PIN por RPC sin límite efectivo y obtener la
+clave MCP de otro usuario (PNS-83). El PIN y la clave quedan en claro en la BD y en el
+`sessionStorage` del navegador (PNS-84), y cerrar la mesa no exige CSRF (PNS-89).
+
+**Opciones:**
+1. **a) No usarla:** generar la clave con el asistente y entregarla por un canal propio. —
+   *Impacto:* entrega manual; no depende del fabricante.
+2. **b) Usarla tras la corrección del fabricante.** — *Impacto:* depende de una versión nueva.
+
+**Riesgos relacionados:** PNS-83, PNS-84, PNS-89.
+
+Decisión: **a)** (Sergio) / Fecha: 14/10/2026
+
+### N5 — ¿Con qué proveedor y qué datos se repiten las pruebas pendientes de staging?
+
+**Contexto:** nueve pruebas de la fase 3b-2 quedaron pendientes porque el proveedor estaba saturado
+(lista en la [verificación](verificacion_seguridad_pns_ai.md), «Pruebas pendientes para staging»).
+Necesitan una clave de proveedor y Chatboo instalado. Hacerlas con datos reales sería enviar datos al
+proveedor antes de resolver D10.
+
+**Opciones:**
+1. **a) VPS de pruebas con datos de demostración y un proveedor externo.** — *Impacto:* no salen datos
+   reales; hay que preparar el VPS.
+2. **b) VPS con copia real y un proveedor local con «No external failover».** — *Impacto:* hace falta
+   el hardware y el modelo local.
+3. **c) Repetirlas en el laboratorio cuando el proveedor responda.** — *Impacto:* ninguno; no prueba el
+   entorno del VPS.
+
+**Riesgos relacionados:** PNS-05, 16, 22, 29, 36, 59, 60, 61 y 81 (las pruebas pendientes).
+
+Decisión: **a)**, con **c)** como puente si el VPS no está listo (Sergio) / Fecha: 14/10/2026
+
+---
+
 
 ## Anexo — Preguntas que se resolverán ejecutando en el laboratorio (F1-F51)
 
