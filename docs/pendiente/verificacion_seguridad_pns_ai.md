@@ -632,8 +632,14 @@ Después de esa ejecución, todos tienen `nextcall` en el futuro y siguen con `n
 1. Copia de la BD.
 2. Contar `ai_log` (filas de más de 30 días), `ai_provider_usage_day` y `chatboo_session` (sesiones con
    `last_used_date` de más de 30 días).
-3. Decidir los valores de `pns_ai_mcp.log_retention_days` y `pns_ai_chatboo.history_retention_days`, y
-   crearlos **antes** de actualizar. Exportar `ai_provider_usage_day` si se quiere conservar.
+3. Retención (son dos parámetros con tratamiento distinto). Exportar antes `ai_provider_usage_day` si se
+   quiere conservar.
+   - `pns_ai_mcp.log_retention_days`: el módulo no lo crea, así que se puede crear **antes** de actualizar
+     con el valor decidido (`0` para no purgar).
+   - `pns_ai_chatboo.history_retention_days`: lo crea el módulo con XML ID
+     (`icp_chatboo_history_retention_days`, `noupdate="1"`). **No crearlo antes**: un parámetro creado a
+     mano sin XML ID chocaría con `key_uniq` al cargar ese registro. Actualizar con los crons parados
+     (`--stop-after-init`), ajustar el valor y después arrancar el servidor (ver PNS-63 del seguimiento).
 4. Buscar personalizaciones sobre los 38 registros `mcp_*` (dominios de reglas, menús, vistas) y filtros
    o favoritos guardados sobre sus acciones.
 5. Actualizar `pns_base,pns_ai_mcp,pns_ai_chatboo` con los parches de PNS-81 aplicados, si el servidor
@@ -698,6 +704,10 @@ propiedad de C, un contexto privado de A, y la clave MCP de A.
   posicional, pero con él también da `AccessError`). Coincide.
 - **PNS-12 — CORREGIDO.** B RPC `ai.context.get_listable_for_mcp()` devuelve un recordset que **no**
   incluye el contexto privado de A (`CTX_A_PRIV`) ni el de C. Coincide.
+  > **Nota (fase 3c):** esta prueba no es concluyente. La llamada por RPC sin `sudo` solo comprueba la
+  > regla de registro «módulo o propias», que ya existía en 3.1.486. Ver la repetición en la fase 3c
+  > (prueba 4): el filtro funciona bajo `sudo` en el modelo, y por `/mcp` no se puede probar por el
+  > fallo de `Environment.sudo()` (PNS-81).
 - **PNS-13 — CORREGIDO (ampliación, 2026-10-14).** En la primera pasada no se pudo montar la prueba con
   un interno sin IA: tanto `GET /mcp/sse` como `POST /mcp` responden `Conversational AI is not allowed for
   this user.` (403 en SSE, error `-32000` en `/mcp`), porque la puerta conversacional exige el grupo
@@ -723,8 +733,14 @@ propiedad de C, un contexto privado de A, y la clave MCP de A.
   hay usuario y revalidar por mensaje) sí se observa y queda cubierto de hecho por las pruebas de PNS-13.
 - **PNS-14 — CORREGIDO.** B: `ai.fetch.cache`→`AccessError`; `ai.api.result.cache.search_read`→solo su
   fila (`create_uid=B`); `ai.safe.choice.search_read`→solo su fila (`user_id=B`). Coincide.
+  > **Nota (fase 3c):** la comprobación de `ai.fetch.cache` solo probaba el ACL estándar. Los métodos
+  > públicos `get_cached` y `store` trabajan en `sudo` y no pasan por ese ACL: en la fase 3c (prueba 1)
+  > resultaron vulnerables (PNS-90). PNS-14 queda PARCIAL.
 - **PNS-21 — CORREGIDO.** `GET /pns_ai_mcp/session_file/<att de A>`: sin sesión → **404**; como B → **404**
   (B no puede leer la sesión de A). Coincide (matiz: sin sesión devuelve 404, no una redirección a login).
+  > **Nota (fase 3c):** el 404 «sin sesión» no probaba `auth='user'`: sin cookie no había BD
+  > seleccionada. Repetida en la fase 3c (prueba 5) con la BD fijada: redirige a `/web/login`. La parte
+  > «como B → 404» sí era válida.
 - **PNS-28 — CORREGIDO (parte probada).** `POST /mcp` **sin clave** (con la BD fijada por cookie) →
   `API key required`; tras la petición, `ai_log` **no** gana ninguna fila (solo quedaba la de PNS-30).
   Coincide con la parte corregida del seguimiento (PARCIAL; el resto es el CORS `*`, no probado aquí).
@@ -748,6 +764,9 @@ propiedad de C, un contexto privado de A, y la clave MCP de A.
 - **PNS-80 — YA NO APLICA / CORREGIDO.** B y P RPC `chatboo.async.request.read_progress`→`AttributeError`
   (no existe). `/chatboo/async/poll` con B y el `session_id` de A → denegado por falta de clave MCP (no
   entrega datos de A). Coincide.
+  > **Nota (fase 3c):** la parte del sondeo no era concluyente: B no tenía clave MCP y lo frenó
+  > `_user_may_use_chatboo` antes del filtro por `user_id`. Repetida en la fase 3c (prueba 6) con un B
+  > con clave MCP y `group_ai_conversational`: listas vacías y control positivo correcto.
 - **PNS-82 — SIN CAMBIOS (vulnerable hoy).** B RPC `chatboo.session.claim_turn_file_chips([CS_B],
   [{'attachment_id': <att de A>}])` → `ok`; después el adjunto de A pasa a `res_model=chatboo.session`,
   `res_id=CS_B`, y `GET /pns_ai_mcp/session_file/<att>` como B devuelve **200** con el contenido de A.
@@ -762,13 +781,14 @@ propiedad de C, un contexto privado de A, y la clave MCP de A.
   fábrica>, <frase de prueba>, <un parámetro estable ficticio>)` → crea la fila (id 1, `create_uid=SUPERUSER`), sin
   `AccessError`. (Una primera llamada con `norm` de texto plano se saltó por payload no válido, no por
   permisos.) Coincide con el hallazgo: método público sin control de grupo que escribe como superusuario.
-- **PNS-46 (DUDOSO) — SIN CAMBIOS (en lo observable).** Reconstrucción del contenido fijo del agente
+- **PNS-46 (DUDOSO) — NO CONCLUYENTE.** Reconstrucción del contenido fijo del agente
   `pns_ai_chatboo` **sin commit** (`_build_shared_content('es_ES')`, que ensambla sin persistir, y
   rollback): el resultado (78097 caracteres) **no** contiene `1.234,56`, ni `In Spain`, ni el código
   `corporate_terms_es_ES`; y es **idéntico en longitud** para `es_ES` y `en_US`. Los contextos
   `corporate_terms` y `corporate_terms_es_ES` existen y están activos (tipo `locale`), pero **ninguno**
-  (ni el genérico) llega a la parte fija del prompt. Coincide con la sospecha del hallazgo (el glosario
-  `es_ES` no llega a la parte fija). No se comprobaron las vías por usuario ni de descubrimiento, que
+  (ni el genérico) llega a la parte fija del prompt. El resultado no confirma la sospecha del informe
+  (que llega el genérico y no la variante `es_ES`), sino que la contradice: el glosario no está en la
+  parte fija para ningún idioma. No se comprobaron las vías por usuario ni de descubrimiento, que
   requieren un turno con IA.
 
 ### Bloque Writer (usuario C) — un AI Writer no puede hacer de administrador
@@ -826,10 +846,10 @@ de fábrica intactos.
 | F8 / PNS-08 | CORREGIDO | CORREGIDO | Sí |
 | F2 (portal) | CORREGIDO | CORREGIDO | Sí |
 | PNS-09 | CORREGIDO | CORREGIDO | Sí |
-| PNS-12 | CORREGIDO | CORREGIDO | Sí |
+| PNS-12 | CORREGIDO | NO CONCLUYENTE (ver 3c: CORREGIDO en el modelo) | No (solo la regla de registro) |
 | PNS-13 | CORREGIDO | CORREGIDO (clave revocada y usuario archivado → 401 + sesión cerrada) | Sí |
 | PNS-79 | CORREGIDO | NO CONCLUYENTE (no alcanzable en caja negra) | Parcial |
-| PNS-14 | CORREGIDO | CORREGIDO | Sí |
+| PNS-14 | CORREGIDO | PARCIAL: resto vulnerable (3c, PNS-90) | No |
 | PNS-21 | CORREGIDO | CORREGIDO | Sí |
 | PNS-28 | PARCIAL | CORREGIDO (parte de `ai.log`) | Sí (parte probada) |
 | PNS-30 | PARCIAL | SIN CAMBIOS (resto reproducido) | Sí |
@@ -842,7 +862,7 @@ de fábrica intactos.
 | PNS-82 | NUEVO (sin corregir) | SIN CAMBIOS (vulnerable) | Sí |
 | PNS-83 | NUEVO (sin corregir) | SIN CAMBIOS (vulnerable) | Sí |
 | PNS-85 | NUEVO (sin corregir) | SIN CAMBIOS (vulnerable) | Sí |
-| PNS-46 | DUDOSO | SIN CAMBIOS (ausente de la parte fija) | Señal concreta |
+| PNS-46 | DUDOSO | NO CONCLUYENTE (ningún glosario en la parte fija, para ningún idioma) | No confirma la sospecha; la contradice |
 | PNS-06 | CORREGIDO | CORREGIDO | Sí |
 | PNS-10 | CORREGIDO | CORREGIDO | Sí |
 | PNS-24 | PARCIAL | NO APLICA (contexto: Writer bloqueado) | — (se mantiene PARCIAL) |
@@ -861,9 +881,10 @@ de fábrica intactos.
    archivo) es el esperado.
 3. **PNS-83:** la respuesta trae `counted:true`, pero sin `ip` **no** se crea fila en `ai.key.pin.block`
    (no hay límite efectivo), como dice el hallazgo.
-4. **PNS-46:** el laboratorio aporta una señal concreta que la fase 2 dejó como DUDOSO: ni el glosario
-   `es_ES` ni el genérico `corporate_terms` llegan a la parte fija del prompt, y esa parte es idéntica para
-   `es_ES` y `en_US`.
+4. **PNS-46 (NO CONCLUYENTE; sigue DUDOSO):** ni el glosario `es_ES` ni el genérico `corporate_terms`
+   llegan a la parte fija del prompt, y esa parte es idéntica para `es_ES` y `en_US`. Eso no confirma la
+   sospecha del informe (llega el genérico y no la variante), sino que la contradice: el glosario no está
+   en la parte fija para ningún idioma. Queda revisar la vía de descubrimiento y un turno real con IA.
 5. **PNS-24, 48, 84, 86 (bloque Writer):** las pruebas solo confirman que un AI Writer queda bloqueado por
    el ACL estándar (Ajustes o `group_ai_admin`), pero el hallazgo de cada uno es sobre otro rol u otra
    operación (la ejecución de `module.update` por el plan; la visibilidad del menú del AI Administrator; lo
@@ -1034,9 +1055,10 @@ CONCLUYENTE (proveedor)**; lo que el servidor hace antes de llamar al modelo sí
 - **Prueba 4 — Imagen en Chatboo (visión + EXIF, parche 2), U1: PENDIENTE PARA STAGING (proveedor saturado: 503 y tiempos agotados).** Imagen
   sintética de cuatro cuadrantes con EXIF 6; pregunta por el color de un cuadrante. 1.er intento: el paso
   previo de lectura de la imagen (OCR, llamada aparte) **respondió** (`ai_log` 13: 1159 de entrada, 7 de
-  salida, 1234 en total; «sin texto»), lo que confirma que la imagen se procesó y se envió sin errores
-  de Pillow; la ronda principal dio 503. Reintento: tiempo agotado (sin paso de OCR, ya hecho). La
-  orientación con la que llega al modelo no se pudo comprobar.
+  salida, 1234 en total; «sin texto»), pero eso no demuestra el parche 2: sin él, el fallo de Pillow
+  es silencioso (las funciones de imagen devuelven `None` y la imagen se envía sin reescalar). La prueba
+  válida del parche 2 es la de `remote_image` (prueba 2). La ronda principal dio 503. Reintento: tiempo
+  agotado (sin paso de OCR, ya hecho). La orientación con la que llega al modelo no se pudo comprobar.
 - **Prueba 5 — PNS-16 (contenido no confiable que pide una URL), U3, política `open` temporal: NO
   CONCLUYENTE (proveedor).** Contexto de pantalla del contacto 73 y petición de resumir su ficha. El
   contexto de pantalla solo lleva nombre y campos de resumen (no la nota): la nota llegaría al modelo
@@ -1103,8 +1125,10 @@ respuesta en el paso de OCR, el resto 503 o tiempo agotado) + 4 GET de catálogo
   Sin reintento. Timeout restaurado a 45 antes de la limpieza. Sigue **PENDIENTE PARA STAGING (proveedor
   saturado: 503 y tiempos agotados)**.
 - **Observación lateral:** al abrir Chatboo en el navegador (U1, 11:52 UTC) se creó el parámetro
-  `pns_ai_mcp.fx_usd_cache` (caché de tipos de cambio): el cliente consulta tipos de cambio a una fuente
-  externa al abrirse. Se borró en la limpieza (se regenera). Al primer inicio de sesión de U1, `mail_bot`
+  `pns_ai_mcp.fx_usd_cache` (caché de tipos de cambio): al abrir Chatboo, el servidor consulta tipos de
+  cambio a una fuente externa (una vez al día, en caché), dentro de `/chatboo/check_health`
+  (`pns_ai_chatboo/controllers/chatboo.py:101` → `pns_ai_mcp/models/ai_fx_source.py:72-78`). Se borró en
+  la limpieza (se regenera). Al primer inicio de sesión de U1, `mail_bot`
   creó su canal de bienvenida (canal, alias, mensaje e imagen): también borrado.
 
 **Contador final de peticiones a Google: 23 de inferencia** (5 peticiones mínimas directas: 4 con 503 y 1
@@ -1169,7 +1193,7 @@ Todas con un usuario que solo tenga `group_ai_conversational` + clave MCP (U3: a
 | PNS-59 — host no permitido (prueba 3) | PARCIAL | CORREGIDO en el servidor (404 sin salida); navegador y `open` pendientes | Sí (parte probada) |
 | PNS-62 — tope de subida (prueba 12) | PARCIAL | CORREGIDO (archivo único); suma de varios sin probar | Sí (parte probada) |
 | Parche 3 / PNS-81 — consulta por fechas (prueba 1) | NUEVO (parcheado) | PENDIENTE PARA STAGING (proveedor saturado) | — |
-| Imagen en Chatboo / parche 2 (prueba 4) | NUEVO (parcheado) | PENDIENTE PARA STAGING; el paso de OCR procesó la imagen sin errores | — |
+| Imagen en Chatboo / parche 2 (prueba 4) | NUEVO (parcheado) | PENDIENTE PARA STAGING; el paso de OCR respondió, pero no demuestra el parche 2 (lo demuestra la prueba 2) | — |
 | PNS-16 (prueba 5) | PARCIAL | PENDIENTE PARA STAGING; el filtrado de herramientas por grupo sí se observa | — |
 | PNS-61 (prueba 7) | PARCIAL | `provider_id` ajeno: CORREGIDO; historial: entra en el prompt (SIN CAMBIOS en lo observable), respuesta PENDIENTE | Sí (parte probada) |
 | PNS-22 (prueba 8) | PARCIAL | PENDIENTE PARA STAGING | — |
@@ -1182,3 +1206,182 @@ Todas con un usuario que solo tenga `group_ai_conversational` + clave MCP (U3: a
 | PNS-60 — respuesta y exportación | PARCIAL | PENDIENTE PARA STAGING | — |
 | PNS-29 — tokens | PARCIAL | `ai_log` guarda entrada/salida/total; razonamiento solo dentro del total; `cost_usd` 0; `done` sin el paso de OCR | Sí (PARCIAL) |
 | Candidato menor (sin numerar) | — | Duplicar un proveedor copia su clave API | Nuevo candidato |
+
+## Versión 3.1.782 — pruebas complementarias tras la revisión (fase 3c)
+
+**Fecha:** 2026-10-14 (horas del log en UTC, 15:10 a 15:20). **Entorno:** el mismo de la fase 3b
+(`odoo-dev 14` desde `~/GitHub/lab_pns_ai`, BD **`lab_pns_ai_14`**, no neutralizada, servidor en
+`http://localhost:8169`, `third_party` en `14.0-pns-ai-3`). **Origen:** observaciones 1, 2, 5, 6, 7 y 19
+de la revisión independiente de `odoo-reviewer` (2026-10-14). **Autorización:** escribir solo en
+`lab_pns_ai_14` (usuarios y registros de prueba por `shell` con commit, JSON-RPC/HTTP a `localhost:8169`).
+Sin IA ni proveedores, sin `pip`, sin `git commit`, sin reglas de permisos permanentes. URL y dominios
+ficticios (`.invalid`), textos inocuos. Contraseñas y claves aleatorias, no anotadas; el hash de la clave
+MCP se comparó por huella `md5` sin mostrarse.
+
+**Línea base (`SELECT`):** 0 usuarios `lab_*`; `ai_mcp_user` solo 3 (`demo`) y 4 (`admin`);
+`ai_fetch_cache` 0; lista blanca con las 2 entradas de fábrica; 0 contextos con propietario; 0 sesiones y
+jobs de Chatboo; `ai_log` 0.
+
+**Usuarios y registros de prueba** (shell, sudo; borrados al final):
+
+| etiqueta | login (id) | grupos | registros de apoyo |
+|---|---|---|---|
+| A | `lab_3c_a` (41) | `base.group_user` (interno sin IA) | `ai.mcp.user` 26 sin clave; contexto privado `lab3c_priv_a` (69, tipo domain); sesión de Chatboo 28 con el adjunto 426 (creado por A); job 25 `done`, `seen=false` |
+| B | `lab_3c_b` (42) | `base.group_user` + `pns_ai_mcp.group_ai_conversational` | `ai.mcp.user` 27 con clave MCP; contexto privado `lab3c_priv_b` (70); sesión 29; job 26 `done`, `seen=false` |
+| P | `lab_3c_portal` (43) | `base.group_portal` | — |
+
+### Prueba 1 — PNS-90: `ai.fetch.cache.get_cached` / `store` públicos en `sudo`
+
+URL ficticia `https://example.invalid/lab`, resultado `{success, 200, text/plain, texto inocuo}`, TTL 600 s.
+
+| Paso | Llamada (RPC) | Respuesta | `SELECT ai_fetch_cache` |
+|---|---|---|---|
+| 1a | A `store(URL, «texto A», 600)` | OK | fila 1, `body`=texto A, `create_uid`=A |
+| 1b | P `get_cached(URL)` | devuelve el cuerpo de A (`_from_cache: true`) | — |
+| 1c | P `store(URL, «texto P», 600)` | OK | fila 1 sobrescrita: `body`=texto P, `write_uid`=P |
+| 1d | A `get_cached(URL)` | devuelve el cuerpo **de P** | — |
+| 1e | P `store(URL+'2', …)` | OK | fila 2 nueva, `create_uid`=P, caducidad 10 min |
+
+**Resultado: VULNERABLE (confirmado).** Un interno sin IA y un usuario de portal leen la caché de
+cualquier URL y la crean o sobrescriben con el contenido y el TTL que elijan. La caché es global por URL,
+sin usuario, y es la que consulta `fetch_url` antes de salir a la red, así que el contenido envenenado
+llegaría a la herramienta de otros usuarios. El ACL de `ai.fetch.cache` (solo AI Administrator) no
+interviene. **PNS-14 no está CORREGIDO**: pasa a PARCIAL y el resto se propone como hallazgo nuevo.
+
+### Prueba 2 — PNS-91: `ai.url.whitelist.ensure_domain_whitelisted` público en `sudo`
+
+| Paso | Llamada (RPC) | Respuesta | `SELECT ai_url_whitelist` |
+|---|---|---|---|
+| 2a | A `ensure_domain_whitelisted('lab.invalid', 'lab 3c', 'web')` | `True` | fila 4 `lab.invalid`, activa, `added_by`=`create_uid`=A |
+| 2b | P `ensure_domain_whitelisted('lab-p.invalid', 'lab 3c', 'web')` | `True` | fila 5 `lab-p.invalid`, activa, `create_uid`=P |
+| 2c | (control) A `search_read` | ve las dos filas (ACL de lectura de internos) | — |
+| 2d | (control) A `create` directo | `AccessError` (solo AI Administrator) | sin fila |
+| 2e | fila 4 archivada por shell; P `ensure_domain_whitelisted('lab.invalid', …)` | `True` | fila 4 **reactivada**, `write_uid`=P, nota añadida |
+
+**Resultado: VULNERABLE (confirmado).** Cualquier usuario autenticado, también de portal, añade o
+reactiva hosts en la lista blanca, aunque el ACL le impide crear directamente (2d). La restricción «solo
+hacia hosts permitidos» de PNS-16, PNS-59 y PNS-86 no se sostiene mientras exista este punto de entrada.
+Solo se probó el tipo `web`.
+
+### Prueba 3 — PNS-92: `ai.mcp.user.set_mcp_api_key` / `action_generate_mcp_api_key`
+
+Antes de empezar: MU_B (27) con hash, MU_A (26) sin hash, `ai_log` 0. Después de cada intento se comparó
+por `SELECT` la huella de `mcp_api_key_hash` + `mcp_api_key_state` + `mcp_api_key_generated_date`.
+
+| Intento | Llamada (RPC) | Respuesta | Línea del `AccessError` | ¿Cambió el hash? | `ai_log` |
+|---|---|---|---|---|---|
+| 3a | A `set_mcp_api_key([MU_B], <valor de laboratorio>)` | `AccessError` (ai.mcp.user) | `mcp_user.py:465` | no | 0 |
+| 3b | A `action_generate_mcp_api_key([MU_B])` | `AccessError` | `mcp_user.py:437` (vía `:448`) | no | 0 |
+| 3c | P `set_mcp_api_key([MU_B], …)` | `AccessError` | `mcp_user.py:465` | no | 0 |
+| 3d | P `action_generate_mcp_api_key([MU_B])` | `AccessError` | `mcp_user.py:437` | no | 0 |
+| 3e | A `set_mcp_api_key([MU_A], …)` (sobre sí mismo) | `AccessError` | `mcp_user.py:465` | no | 0 |
+| 3f | A `action_generate_mcp_api_key([MU_A])` | `AccessError` | `mcp_user.py:437` | no | 0 |
+
+**Resultado: protegido hoy, por una barrera de rebote (no CRÍTICO).** Mecanismo: los dos métodos son
+públicos y no comprueban grupo. La escritura de la clave se hace con `sudo()` (`mcp_user.py:460-464` en
+`set_mcp_api_key`; `_store_api_key_hash`, `:410-414`, en la generación) y **se ejecuta**. La línea
+siguiente, el `_logger.info` (`:465` y `:437`), lee `self.user_id` en el entorno del usuario que llama.
+Un usuario sin ACL de lectura sobre `ai.mcp.user` (el ACL es solo de AI Administrator, `csv:39`) provoca
+ahí el `AccessError`, y el error deshace toda la transacción de la petición, incluida la escritura ya
+hecha. Por eso el hash no cambia y no queda fila en `ai_log`. Los argumentos del log se evalúan siempre,
+con cualquier nivel de log. No hay ningún control explícito antes de la escritura: la única protección es
+que la lectura posterior falle y aborte la transacción. Sobre sí mismo (3e y 3f) el resultado es el
+mismo, porque un interno tampoco puede leer su propio `ai.mcp.user`. El asistente que llama a estos
+métodos (`ai.api.key.wizard`, `mcp_api_key_wizard.py:104, 113`) solo tiene ACL de AI Administrator
+(`csv:40`). La barrera dejaría de proteger con cualquier cambio que dé lectura sobre `ai.mcp.user` a
+usuarios no administradores o que mueva o quite esa línea de log. **Propuesta:** observación para el
+fabricante (Media, defensa en profundidad): comprobar el grupo antes de escribir, o hacer privados los
+métodos.
+
+### Prueba 4 — PNS-12 por `/mcp` (`prompts/list`, `prompts/get`), repetida
+
+B con su clave MCP en `X-Mcp-Token` y la BD fijada por una cookie anónima (`/web/login?db=…`). Sin
+`tools/call`.
+
+| Paso | Llamada | Respuesta |
+|---|---|---|
+| 4a | `initialize` | 200, `result` |
+| 4b | `prompts/list` | 200, **1 prompt** (`system_prompt`): ni `lab3c_priv_a` (de A) ni `lab3c_priv_b` (**el propio de B, control**) |
+| 4c | `prompts/get(name='lab3c_priv_a')` | `-32602 Prompt not found` |
+| 4d | `prompts/get(name='lab3c_priv_b')` (control) | `-32602 Prompt not found` |
+
+El control falla, así que el resultado HTTP **no prueba el filtro**. Causa, en el log del servidor:
+`MCP: Error listing contexts for prompts/list: 'Environment' object has no attribute 'sudo'` y
+`MCP: Error obteniendo contexto BD: 'Environment' object has no attribute 'sudo'`. En 3.1.782,
+`_mcp_prompts_list` y `_mcp_prompts_get` hacen `self._get_mcp_env().sudo()` (`controllers/main.py:1473`
+y `:1598`), y en Odoo 14 `Environment` no tiene `sudo()` (solo `__call__(…, su=…)`,
+`odoo/api.py:508`). La excepción se captura: `prompts/list` devuelve solo `system_prompt` y `prompts/get`
+de cualquier contexto responde «no encontrado». La versión analizada (3.1.486) no tenía ese `.sudo()`
+(`main.py:1491, 1638` de `14.0-analisis-pns-ai`). **Hallazgo nuevo de compatibilidad con Odoo 14**:
+en Odoo 14 los clientes MCP no reciben ningún contexto por `prompts/*`.
+
+**Prueba del filtro en el shell** (sin commit, con rollback), con el entorno que el código pretende
+construir (`env(user=B, su=True)`):
+
+| Paso | Llamada | Resultado |
+|---|---|---|
+| 4e | `ai.context.get_listable_for_mcp()` | 20 contextos; incluye `lab3c_priv_b`, **no** `lab3c_priv_a` |
+| 4f | `get_context_for_country('lab3c_priv_a')` / `('lab3c_priv_b')` | vacío / `lab3c_priv_b` |
+| 4g | (control) `search` en `sudo` sin filtro de `lab3c_priv_a` | existe |
+
+**Resultado:** el filtro por propietario funciona bajo `sudo` (CORREGIDO a nivel de modelo). Por
+`/mcp` el contexto de A tampoco se expone, pero por el error de compatibilidad y no por el filtro. La
+fila de PNS-12 de la fase 3b-1 era NO CONCLUYENTE, como señaló la revisión; ahora queda CORREGIDO
+(modelo, probado en el shell) con la vía HTTP no operativa en Odoo 14. Las vías del motor (inyección en
+turnos de B) siguen pendientes para staging. El seguimiento (PNS-12) cita ese `.sudo()` como si
+funcionara: hay que corregirlo.
+
+### Prueba 5 — PNS-21: `GET /pns_ai_mcp/session_file/<adjunto de A>`, repetida
+
+| Paso | Petición | Respuesta |
+|---|---|---|
+| 5a | sin cookie, `?db=lab_pns_ai_14` | **404**: en Odoo 14 el parámetro `db` no selecciona la BD en esta ruta (varias BD, sin `dbfilter`) |
+| 5b | cookie anónima con la BD ya fijada | **302 → `/web/login?redirect=…/session_file/426`** (`auth='user'`) |
+| 5c | como B | **404** |
+| 5d | (control) como A | **200**, `text/plain`, contenido inocuo de A |
+
+**Resultado: CORREGIDO (concluyente).** El 404 «sin sesión» de la fase 3b-1 se debía a que no había BD
+seleccionada. Con la BD seleccionada y sin usuario, la ruta redirige a login.
+
+### Prueba 6 — PNS-80: `/chatboo/async/poll`, repetida con B con acceso a Chatboo
+
+B tiene `group_ai_conversational` y clave MCP, así que pasa `_user_may_use_chatboo`.
+
+| Paso | Llamada (JSON) | Respuesta | `SELECT chatboo_async_request` |
+|---|---|---|---|
+| antes | — | — | job 25 (A, sesión 28) `seen=f`; job 26 (B, sesión 29) `seen=f` |
+| 6a | B `poll(session_id=28)` (sesión de A) | `{'status': 'ok', 'pending': [], 'running': []}` | job 25 sigue `seen=f` |
+| 6b | (control) B `poll()` | `pending: [{request_id: 26, session_id: 29}]` | job 26 pasa a `seen=t`; job 25 sigue `seen=f` |
+
+**Resultado: CORREGIDO (concluyente).** El filtro `user_id = uid` impide a B ver o marcar como visto el
+job de A, y el control demuestra que la ruta sí entrega los jobs propios.
+
+### Limpieza (fase 3c)
+
+Hecha por ORM (`shell`, con commit) y verificada con `SELECT`:
+
+| Elemento | Verificación |
+|---|---|
+| Usuarios 41, 42, 43 y sus partners | 0 |
+| `ai.mcp.user` 26 y 27 | quedan solo 3 (`demo`) y 4 (`admin`) |
+| `ai_fetch_cache` (filas 1 y 2) | 0 |
+| Lista blanca (filas 4 y 5) | quedan las 2 de fábrica (`api.open-meteo.com`, `geocoding-api.open-meteo.com`) |
+| Contextos 69 y 70 | 0 contextos `lab3c%` y 0 con propietario |
+| Sesiones 28 y 29, jobs 25 y 26 | 0 y 0 |
+| Adjunto 426 | 0 |
+| `ai_log` (4 filas de la prueba 4) | 0 |
+| Barrido de todas las tablas con `create_uid`/`write_uid` 41 a 43 | sin restos |
+| «Gemini lab» (id 5) | `api_key` vaciada por ORM, sin leerla y con `pns_skip_speech_gate` para no lanzar la sonda de voz hacia el proveedor (`ai_provider.py:577, 594`). Sigue archivado. **Conviene revocar igualmente la clave en AI Studio.** |
+
+Los secretos de laboratorio (contraseñas y clave MCP) se borraron del directorio temporal al terminar.
+
+### Tabla final (fase 3c)
+
+| Prueba | Estado en el seguimiento | Resultado laboratorio | ¿Qué cambia? |
+|---|---|---|---|
+| 1 — `ai.fetch.cache` (PNS-14 / PNS-90) | PNS-14 CORREGIDO | VULNERABLE: lectura y envenenamiento entre usuarios, también desde portal | PNS-14 → PARCIAL; PNS-90 nuevo |
+| 2 — `ensure_domain_whitelisted` (PNS-91) | no recogido (resto 3: «solo hosts permitidos») | VULNERABLE: interno y portal añaden y reactivan hosts | PNS-91 nuevo; matizar PNS-16, 59 y 86 y el resto 3 |
+| 3 — `set_mcp_api_key` / `action_generate_mcp_api_key` (PNS-92) | no recogido | protegido por rebote: el `AccessError` del log deshace la escritura; sin control explícito | PNS-92 nuevo (Media, defensa en profundidad) |
+| 4 — PNS-12 por `/mcp` | CORREGIDO | modelo CORREGIDO (shell); HTTP no operativo por `Environment.sudo()` | citar el error de compatibilidad; corregir la evidencia de PNS-12 |
+| 5 — PNS-21 | CORREGIDO | CORREGIDO (302 a login; B 404; A 200) | ninguno (la prueba de la fase 3b-1 queda sustituida) |
+| 6 — PNS-80 | CORREGIDO / YA NO APLICA | CORREGIDO (B no ve el job de A; control positivo) | ninguno (la prueba de la fase 3b-1 queda sustituida) |

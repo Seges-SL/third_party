@@ -83,7 +83,7 @@ HECHO: ningún archivo de los tres módulos importa ya `httpx` ni `pydantic` (Gr
 - **Eliminados (32**, de ellos 9 scripts de migración):
   - Controladores (herramientas MCP retiradas): `tools_context_analytics.py`, `tools_i18n_audit.py`, `tools_memory.py`, `tools_system.py`, `write_verification.py`.
   - Modelo `models/ai_provider_usage_day.py` (modelo `ai.provider.usage.day`).
-  - Datos: `data/ai_provider_data.xml` y `data/external_server_openapi_data.xml` (no estaban en el manifiesto anterior), `data/external_server_data.xml` (sí estaba; `noupdate="1"`, 3 registros).
+  - Datos: `data/ai_provider_data.xml` y `data/external_server_openapi_data.xml` (no estaban en el manifiesto anterior), `data/external_server_data.xml` (sí estaba). Entre los dos archivos de servidores había 5 registros `noupdate="1"`: 3 en `external_server_data.xml` y 2 en `external_server_openapi_data.xml` (ver «Migraciones», correcciones tras el laboratorio, punto 3).
   - Contextos de descubrimiento: `ai/contexts/discovery/discovery_{api_cdmon,api_sesame,geo}{,_es_ES}.json`.
   - Utilidades: `api_key_migration.py`, `mcp_resources.py`, `system_info.py`.
   - JS: `showdown.js`, `showdown.min.js`, `jspdf.umd.min.js`, `xlsx.full.min.js`. `i18n/ar_001.po`.
@@ -198,7 +198,7 @@ El detalle por hallazgo corresponde a la fase 2.
 - **`/pns_ai_mcp/remote_image`** (`utils/remote_image.py:24-68`): el servidor descarga la imagen; cada salto (máx. 3 redirecciones) exige http(s), host permitido por `ai.url.whitelist.may_show_remote_image` (entrada `web` o **política abierta**, `models/url_whitelist.py:168-176`) y host público (`non_public_host_error`); 8 MB máx.; se re-codifica como JPEG/PNG de 1024 px máx. con cabeceras `nosniff` y `CSP default-src 'none'`. Lo puede pedir cualquier interno.
 - **Generador OpenAPI** (`services/openapi_spec_generator.py:579-610`, asistente solo admin): exige que el host de la documentación esté en la lista blanca `web`, pero `requests.get` sigue redirecciones por defecto y no aplica `non_public_host_error`. HECHO en código; impacto a valorar en fase 2.
 - Drivers LLM nuevos: `openrouter_driver.py` y `systemone_driver.py` (protocolo «elección cerrada», `urllib.request.urlopen`, `:96`). `promote_decision_provider` convierte proveedores `protocol='decision'` en `systemone` (`utils/schema_fossils.py:150-194`).
-- Datos de fábrica retirados: proveedores y servidores externos preconfigurados (cdmon, Sesame, OVH Kepler, OpenRouter, Brave). En BD existentes, los 3 registros de `external_server_data.xml` eran `noupdate="1"`: **Odoo no los borra** al desaparecer el archivo (INFERENCIA por `_process_end`, que solo borra XML ID sin `noupdate`).
+- Datos de fábrica retirados: proveedores y servidores externos preconfigurados (cdmon, Sesame, OVH Kepler, OpenRouter, Brave). En BD existentes, los 5 servidores de fábrica (`mcp_test`, `brave_search` y `sequential_thinking` de `external_server_data.xml`; `sesame` y `cdmon` de `external_server_openapi_data.xml`) eran `noupdate="1"`: **Odoo no los borra** al desaparecer los archivos (`_process_end` solo borra XML ID sin `noupdate`; confirmado en la fase 3a, ver «Migraciones»).
 - Herramientas MCP retiradas: `tools_system` (información del sistema), `tools_memory`, `tools_i18n_audit`, `tools_context_analytics`.
 
 ### Almacenamiento de claves y exportaciones
@@ -239,7 +239,7 @@ El fabricante lo reconoce explícitamente (`pns_ai_mcp/utils/schema_fossils.py:6
 
 | Tarea de migración | ¿Replicada en 14? | Dónde |
 |---|---|---|
-| Borrar tablas de asistentes renombrados y recetas (517-518, 547-548, 553-555) | Sí | `models/ai_schema_fossil.py:25-31` (`DROP TABLE IF EXISTS … CASCADE` de 12 tablas fijas; protege `ai_safe_choice` y `ai_change_journal`) |
+| Borrar tablas de asistentes renombrados y recetas (517-518, 547-548, 553-555) | Sí, en parte (ver «Correcciones tras el laboratorio», 1 y 2) | `models/ai_schema_fossil.py:25-31` (`DROP TABLE IF EXISTS … CASCADE` de 12 tablas fijas; protege `ai_safe_choice` y `ai_change_journal`). Entre ellas está `ai_provider_usage_day`, que son datos. |
 | `painter` → `compose` | Sí | `utils/schema_fossils.py:65-89` |
 | `correlation_id`/`step_seq` → `turn`/`turn_step` (636) | Sí | `utils/schema_fossils.py:135-141` |
 | Columnas obsoletas (642, 643) | Sí | `utils/schema_fossils.py:44-53,197-200` |
@@ -253,6 +253,36 @@ El fabricante lo reconoce explícitamente (`pns_ai_mcp/utils/schema_fossils.py:6
 Consecuencia esperada de los XML ID sin renombrar (INFERENCIA, verificar en la fase 3): al actualizar se crean registros nuevos `ai_*` (reglas, accesos, menús, acciones, vistas) y, al final, `_process_end` borra los `mcp_*` que ya no están en los datos (están en bloques `noupdate="0"`). El resultado debería ser equivalente, salvo que el borrado falle (por ejemplo, una vista heredada de otro módulo que apunte a una vista `mcp_*`) o haya personalizaciones sobre esos registros, que se perderían. La skill retirada `analisis_financiero` de Chatboo probablemente queda en BD actualizadas.
 
 En la fase 3, buscar en el log de `actualizar`: `Running migration` (esperado: 0), `pns_ai_mcp: DROP leftover` y errores de `_process_end` / `unlink` de XML ID `mcp_*`.
+
+### Correcciones tras el laboratorio (fase 3a, 2026-10-14)
+
+Resultado completo en `docs/pendiente/verificacion_seguridad_pns_ai.md`, sección «Versión 3.1.782 —
+actualización en el laboratorio (fase 3a)». Se confirma lo anterior: no se ejecuta ningún script de
+migración, el renombrado de XML ID no se replica (se crean 38 `ai_*` nuevos y se borran los 38 `mcp_*`
+sin errores), el cron de caché recupera `numbercall` y la skill `analisis-financiero` se borra (no
+queda, como se infería arriba). Hay que corregir cuatro puntos:
+
+1. **`ai_provider_usage_day` son datos, no un asistente.** Entre las 12 tablas que borra
+   `ai.schema.fossil` está el histórico diario de tokens, coste y peticiones por proveedor (modelo
+   `ai.provider.usage.day` de 3.1.486; `utils/schema_fossils.py:27`). Ninguna migración ni `init()` lo
+   traslada, así que **se pierde en la primera actualización**. Si interesa conservarlo, hay que
+   exportarlo antes. Recogido en PNS-87 del seguimiento.
+2. **Los asistentes renombrados se borran solo en parte.** De los 31 modelos que Odoo da de baja, el
+   fósil borra la tabla de 2 (`pns_ai_mcp_skill_capture_wizard` y `ai_provider_usage_day`), además de 7
+   tablas de relación y 3 restos de `relaxaicode` sin modelo. Quedan **30 tablas huérfanas**
+   `pns_ai_mcp_*` (29 de asistentes y una de relación), sin impacto funcional.
+3. **Servidores de fábrica: son 5 en dos archivos**, no «los 3 de `external_server_data.xml`»:
+   `external_server_mcp_test`, `external_server_brave_search` y `external_server_sequential_thinking`
+   (de `data/external_server_data.xml`), y `external_server_sesame` y `external_server_cdmon` (de
+   `data/external_server_openapi_data.xml`). Ambos archivos desaparecen en la versión nueva; los 5
+   registros son `noupdate="1"`, siguen inactivos y Odoo no los borra (PNS-88).
+4. **No estaba inventariada la retención de Chatboo.** `pns_ai_chatboo` crea el parámetro
+   `pns_ai_chatboo.history_retention_days` (30 días; registro `icp_chatboo_history_retention_days` de
+   `data/chatboo_icp_data.xml`, `noupdate="1"`, nuevo en esta versión). El cron de mantenimiento, cada 5
+   minutos, llama a `chatboo.session._cleanup_old_sessions`
+   (`pns_ai_chatboo/models/chatboo_session.py:1360-1382`), que borra en `sudo` las sesiones de **todos**
+   los usuarios con más días que la retención. Antes solo se purgaban las del usuario que volvía al chat.
+   Es la corrección de PNS-63; ver allí la nota operativa para la actualización.
 
 ## Paridad
 
