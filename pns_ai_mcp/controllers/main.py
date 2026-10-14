@@ -1470,7 +1470,8 @@ class MCPServerController(http.Controller):
         # clients with weak prompts support.
         try:
             # sudo keeps the caller's uid: private contexts stay their owner's.
-            env = self._get_mcp_env().sudo()
+            # Seges: parche de compatibilidad con Odoo 14 (API de Odoo 14: Environment sin sudo). Ver docs/pendiente/parches_pns_ai.md
+            env = self._get_mcp_env()(su=True)
             if 'ai.context' in env:
                 for ctx in env['ai.context'].get_listable_for_mcp():
                     prompts.append({
@@ -1595,7 +1596,8 @@ class MCPServerController(http.Controller):
 
     # Buscar en base de datos usando virtualización
         try:
-            env = self._get_mcp_env().sudo()
+            # Seges: parche de compatibilidad con Odoo 14 (API de Odoo 14: Environment sin sudo). Ver docs/pendiente/parches_pns_ai.md
+            env = self._get_mcp_env()(su=True)
             blocked = refuse_foreign_identity_pack(self, env, prompt_name)
             if blocked:
                 return blocked

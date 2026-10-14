@@ -260,7 +260,7 @@ Resultado completo en `docs/pendiente/verificacion_seguridad_pns_ai.md`, secció
 actualización en el laboratorio (fase 3a)». Se confirma lo anterior: no se ejecuta ningún script de
 migración, el renombrado de XML ID no se replica (se crean 38 `ai_*` nuevos y se borran los 38 `mcp_*`
 sin errores), el cron de caché recupera `numbercall` y la skill `analisis-financiero` se borra (no
-queda, como se infería arriba). Hay que corregir cuatro puntos:
+queda, contra lo que se infería arriba). Hay que corregir cuatro puntos:
 
 1. **`ai_provider_usage_day` son datos, no un asistente.** Entre las 12 tablas que borra
    `ai.schema.fossil` está el histórico diario de tokens, coste y peticiones por proveedor (modelo

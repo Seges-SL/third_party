@@ -6,6 +6,9 @@
 **Alcance:** solo lectura del repo salvo este informe. Sin claves de IA. Sin llamadas a
 servicios externos. Solo datos de demostración.
 
+> **Nota:** Fecha, Rama y Alcance de esta cabecera describen las fases 1 y 2. Cada sección
+> «Versión 3.1.782» indica su propio entorno, rama y alcance.
+
 ## Nota sobre la imagen de laboratorio
 
 La instalación **no** se pudo hacer con la imagen común `odoo-dev:14`: a `pns_ai_mcp` le
@@ -702,12 +705,13 @@ propiedad de C, un contexto privado de A, y la clave MCP de A.
   `reapply_source_module_prefixes('no_existe_modulo')` y `sync_slash_hidden_from_field()` → todos
   `AccessError: Only the system can run this maintenance action.` (`reapply` exige además un argumento
   posicional, pero con él también da `AccessError`). Coincide.
-- **PNS-12 — CORREGIDO.** B RPC `ai.context.get_listable_for_mcp()` devuelve un recordset que **no**
+- **PNS-12 — NO CONCLUYENTE (ver nota).** B RPC `ai.context.get_listable_for_mcp()` devuelve un recordset que **no**
   incluye el contexto privado de A (`CTX_A_PRIV`) ni el de C. Coincide.
   > **Nota (fase 3c):** esta prueba no es concluyente. La llamada por RPC sin `sudo` solo comprueba la
   > regla de registro «módulo o propias», que ya existía en 3.1.486. Ver la repetición en la fase 3c
   > (prueba 4): el filtro funciona bajo `sudo` en el modelo, y por `/mcp` no se puede probar por el
-  > fallo de `Environment.sudo()` (PNS-81).
+  > fallo de `Environment.sudo()` (PNS-81); probado después con el parche 4: CORREGIDO también por
+  > `/mcp`.
 - **PNS-13 — CORREGIDO (ampliación, 2026-10-14).** En la primera pasada no se pudo montar la prueba con
   un interno sin IA: tanto `GET /mcp/sse` como `POST /mcp` responden `Conversational AI is not allowed for
   this user.` (403 en SSE, error `-32000` en `/mcp`), porque la puerta conversacional exige el grupo
@@ -731,7 +735,7 @@ propiedad de C, un contexto privado de A, y la clave MCP de A.
   una sesión sin usuario por el flujo normal; el propio informe lo da como «inferido del código, no
   explotable demostrado». No se pudo ejercer en el laboratorio; el código de la corrección (rechazar si no
   hay usuario y revalidar por mensaje) sí se observa y queda cubierto de hecho por las pruebas de PNS-13.
-- **PNS-14 — CORREGIDO.** B: `ai.fetch.cache`→`AccessError`; `ai.api.result.cache.search_read`→solo su
+- **PNS-14 — PARCIAL (ver nota).** B: `ai.fetch.cache`→`AccessError`; `ai.api.result.cache.search_read`→solo su
   fila (`create_uid=B`); `ai.safe.choice.search_read`→solo su fila (`user_id=B`). Coincide.
   > **Nota (fase 3c):** la comprobación de `ai.fetch.cache` solo probaba el ACL estándar. Los métodos
   > públicos `get_cached` y `store` trabajan en `sudo` y no pasan por ese ACL: en la fase 3c (prueba 1)
@@ -878,7 +882,7 @@ de fábrica intactos.
    queda **NO CONCLUYENTE**: no es alcanzable en caja negra porque las rutas que crean sesión guardan siempre
    un usuario validado.
 2. **PNS-21:** sin sesión devuelve **404** en lugar de redirigir al login; el efecto (no se entrega el
-   archivo) es el esperado.
+   archivo) es el esperado. Sustituida por la fase 3c (prueba 5).
 3. **PNS-83:** la respuesta trae `counted:true`, pero sin `ip` **no** se crea fila en `ai.key.pin.block`
    (no hay límite efectivo), como dice el hallazgo.
 4. **PNS-46 (NO CONCLUYENTE; sigue DUDOSO):** ni el glosario `es_ES` ni el genérico `corporate_terms`
@@ -898,7 +902,8 @@ de fábrica intactos.
 **`lab_pns_ai_14`** (no neutralizada), `third_party` en `14.0-pns-ai-3`, web en marcha y sin aviso de
 contexto (`estado`). **Proveedor:** Google Gemini, nivel gratuito, protocolo OpenAI-compatible
 (endpoint `…/v1beta/openai/chat/completions`), registro `ai.provider` id 5 «Gemini lab», modelo
-`models/gemini-3.8-flash` (fila 33 de `ai.provider.model`, creada por el catálogo). La clave la
+inicial `models/gemini-3.8-flash` (fila 33 de `ai.provider.model`, creada por el catálogo), que respondía
+503; las pruebas se hicieron con `models/gemini-3.7-flash` (fila 32). La clave la
 introdujo Sergio en la interfaz; no se ha leído ni mostrado (los `SELECT` excluyen la columna). La
 revoca Sergio en AI Studio. **Autorización:** escribir solo en `lab_pns_ai_14` (usuarios y registros de
 prueba, sesiones de chat); como mucho unas 30 peticiones al modelo; solo datos de demostración y textos
@@ -929,7 +934,7 @@ inocuos; nada de `resolve_*`, `execute_*` ni `apply_module_update`. No se usó `
 - `ai_log`: 6 filas (ids 2 a 7), del 2026-10-14 entre las 10:16 y las 10:19, `origin=mcp_client`,
   `initialize`/`tools/list`, cliente «lab 1», `user_id` vacío (usuario borrado). Son **restos de la
   ampliación de PNS-13 de la fase 3b-1** (usuario D): la limpieza de la 3b-1 no borró esas filas de
-  protocolo. Se conservan; no se borran en esta fase salvo que se decida.
+  protocolo. Se conservaron durante las pruebas y se borraron en la limpieza de esta fase.
 - `ai.mcp.user` ids 3 (`demo`) y 4 (`admin`), creados el 2026-10-09 a las 07:58:59 (mismo instante, en
   la instalación de la fase 2), **sin** hash de clave. No son de pruebas; se conservan.
 - `res_users` máx. id 7; 0 sesiones de Chatboo.
@@ -1045,8 +1050,8 @@ escribe la línea `OpenAIDriver request to`).
 principales de Chatboo** (prompt completo del agente con herramientas) fallaron: unas con **503
 UNAVAILABLE** («high demand») y otras con **lectura agotada a los 45 s** (`llm_idle_timeout` del enlace
 agente-proveedor) sin recibir ningún dato. Solo respondió una llamada auxiliar pequeña (lectura de la
-imagen). Por la regla acordada, las pruebas que dependen de la respuesta del modelo quedan **NO
-CONCLUYENTE (proveedor)**; lo que el servidor hace antes de llamar al modelo sí se pudo observar.
+imagen). Por la regla acordada, las pruebas que dependen de la respuesta del modelo quedan **PENDIENTE
+PARA STAGING (proveedor saturado)**; lo que el servidor hace antes de llamar al modelo sí se pudo observar.
 
 - **Prueba 1 — Parche 3 / PNS-81 (consulta por fechas), U1: PENDIENTE PARA STAGING (proveedor saturado: 503 y tiempos agotados).** Pregunta por el
   número de contactos creados en un rango de fechas, pidiendo una función con `date_from`/`date_to`.
@@ -1059,8 +1064,8 @@ CONCLUYENTE (proveedor)**; lo que el servidor hace antes de llamar al modelo sí
   es silencioso (las funciones de imagen devuelven `None` y la imagen se envía sin reescalar). La prueba
   válida del parche 2 es la de `remote_image` (prueba 2). La ronda principal dio 503. Reintento: tiempo
   agotado (sin paso de OCR, ya hecho). La orientación con la que llega al modelo no se pudo comprobar.
-- **Prueba 5 — PNS-16 (contenido no confiable que pide una URL), U3, política `open` temporal: NO
-  CONCLUYENTE (proveedor).** Contexto de pantalla del contacto 73 y petición de resumir su ficha. El
+- **Prueba 5 — PNS-16 (contenido no confiable que pide una URL), U3, política `open` temporal:
+  PENDIENTE PARA STAGING (proveedor saturado).** Contexto de pantalla del contacto 73 y petición de resumir su ficha. El
   contexto de pantalla solo lleva nombre y campos de resumen (no la nota): la nota llegaría al modelo
   por el resultado de una herramienta, que también se marca como no confiable. Dos tiempos agotados; no
   se creó ninguna operación supervisada ni hubo salida a `api.open-meteo.com`, pero el modelo no llegó a
@@ -1157,7 +1162,8 @@ Hecha por ORM (`shell`, con commit) y verificada con `SELECT`:
 | «Gemini lab» (id 5) | **archivado** con `model_id` 32 (`models/gemini-3.7-flash`); su catálogo (63 filas) se conserva | `active = f`, `model_id = 32` |
 | Grupos de `admin` | quitados AI Administrator y, además, los que había dejado su asignación: Writer, External URL y External API (implicados por AI Administrator) y AI Conversational. Al empezar no tenía ninguno | `admin`, `demo`, `portal`: 0 grupos de IA |
 
-La clave del proveedor sigue guardada en el registro archivado; **la revoca Sergio en AI Studio**.
+La clave del proveedor sigue guardada en el registro archivado; **la revoca Sergio en AI Studio**. (Se
+vació después, en la limpieza de la fase 3c.)
 
 ### Pruebas pendientes para staging (lista aprobada, para repetirlas con un proveedor disponible)
 
@@ -1385,3 +1391,106 @@ Los secretos de laboratorio (contraseñas y clave MCP) se borraron del directori
 | 4 — PNS-12 por `/mcp` | CORREGIDO | modelo CORREGIDO (shell); HTTP no operativo por `Environment.sudo()` | citar el error de compatibilidad; corregir la evidencia de PNS-12 |
 | 5 — PNS-21 | CORREGIDO | CORREGIDO (302 a login; B 404; A 200) | ninguno (la prueba de la fase 3b-1 queda sustituida) |
 | 6 — PNS-80 | CORREGIDO / YA NO APLICA | CORREGIDO (B no ve el job de A; control positivo) | ninguno (la prueba de la fase 3b-1 queda sustituida) |
+
+## Versión 3.1.782 — parche 4 (prompts/* en Odoo 14)
+
+**Fecha:** 2026-10-14 (horas del log en UTC; prueba a las 16:12). **Entorno:** el de la fase 3c
+(`odoo-dev 14` desde `~/GitHub/lab_pns_ai`, BD **`lab_pns_ai_14`**, no neutralizada,
+`http://localhost:8169`, `third_party` en `14.0-pns-ai-3` con el parche 4 sin confirmar en git).
+**Origen:** prueba 4 de la fase 3c (fallo de `Environment.sudo()`, PNS-81) y decisión de Sergio de
+aplicar el parche 4 en la rama. **Autorización:** escribir solo en `lab_pns_ai_14` (usuarios, clave MCP y
+contextos de prueba por `shell` con commit; HTTP a `localhost:8169`). Sin IA ni proveedores, sin `pip`,
+sin `git commit`, sin reglas de permisos permanentes. Textos inocuos; contraseñas y clave aleatorias, no
+anotadas y borradas del directorio temporal al terminar.
+
+**Parche:** `pns_ai_mcp/controllers/main.py:1474` (`_mcp_prompts_list`) y `:1600` (`_mcp_prompts_get`)
+(fabricante: `:1473` y `:1598`): `self._get_mcp_env().sudo()` → `self._get_mcp_env()(su=True)`, con el
+comentario `# Seges: parche de compatibilidad…` encima de cada línea (añadido después de la prueba;
+solo es un comentario). Detalle en
+`docs/pendiente/parches_pns_ai.md`, «Parche 4». Compila con Python 3.7.3 en la imagen
+`odoo-dev:14-lab_pns_ai`.
+
+**Arranque:** `odoo-dev 14 arrancar` con el stack en marcha no recrea el contenedor (seguía «Up 8 hours»)
+ni recarga el código Python (Odoo sin `--dev=reload`). Se reinició con `odoo-dev 14 parar` y
+`odoo-dev 14 arrancar`. `odoo-dev 14 estado`: los dos contenedores en marcha; `odoo-dev 14 log 100`: 0
+tracebacks y 0 `ERROR` (solo un `DeprecationWarning` de `jinja2`, ajeno).
+
+**Línea base (`SELECT`):** 0 usuarios `lab_*`; `ai_mcp_user` solo 3 (`demo`) y 4 (`admin`); 0 contextos con
+propietario y 0 `lab%`; `ai_log` 0.
+
+**Usuarios y registros de prueba** (shell como superusuario; borrados al final):
+
+| etiqueta | login (id) | grupos | registros de apoyo |
+|---|---|---|---|
+| A | `lab_p4_a` (44) | `base.group_user` (interno sin IA) | contexto privado `lab_p4_priv_a` (71, tipo `domain`, `owner_id`=A) |
+| B | `lab_p4_b` (45) | `base.group_user` + `pns_ai_mcp.group_ai_conversational` | `ai.mcp.user` 28 con clave MCP (`set_mcp_api_key`); contexto privado `lab_p4_priv_b` (72, `owner_id`=B) |
+
+### Prueba — PNS-12 por `/mcp` (`prompts/list`, `prompts/get`), con el parche 4
+
+B con su clave en `X-Mcp-Token` y la BD fijada por una cookie anónima (`/web/login?db=lab_pns_ai_14`).
+`Mcp-Session-Id` del `initialize` reenviado en las llamadas siguientes. Sin `tools/call`.
+
+| Paso | Llamada | Respuesta | Esperado | ¿Coincide? |
+|---|---|---|---|---|
+| a | `initialize` | 200, `result` (`protocolVersion`, `capabilities`, `serverInfo`, `instructions`) | 200 | sí |
+| b | `prompts/list` | 200, **21 prompts**: `system_prompt` (fijo), los 19 contextos compartidos y `lab_p4_priv_b`; **no** `lab_p4_priv_a` | compartidos + privado de B, sin el de A | sí |
+| c | `prompts/get(name='lab_p4_priv_b')` (control positivo) | 200, `messages` con el texto de B | contenido de B | sí |
+| d | `prompts/get(name='lab_p4_priv_a')` | `-32602 Prompt not found: lab_p4_priv_a` | «Prompt not found» | sí |
+
+**Log del servidor (16:12:22):** cuatro `TRACE_MCP` (uno por llamada, usuario 45) y
+`Prompt virtualizado: lab_p4_priv_b -> lab_p4_priv_b`. **0 `AttributeError`** y 0 tracebacks (en la
+fase 3c: `'Environment' object has no attribute 'sudo'`). Cuatro filas en `ai_log` (51 a 54).
+
+**Resultado: CORREGIDO por HTTP con el parche 4.** `prompts/*` vuelve a servir contextos en Odoo 14, y
+el filtro por propietario de PNS-12 se cumple también por `/mcp`: B ve y obtiene el suyo y no el de A.
+La comparación con la fase 3c confirma que la diferencia es el parche: allí, con los mismos pasos, el
+control positivo fallaba.
+
+**Observaciones (no se tocan; para el informe al fabricante):**
+- `system_prompt` aparece **dos veces** en `prompts/list`: la entrada fija del controlador
+  (`main.py:1448`) y el contexto core id 1, cuyo `code` es también `system_prompt`. Antes no se veía
+  porque la lista de contextos fallaba. Nombres duplicados en `prompts/list` pueden confundir a los
+  clientes MCP. Gravedad baja.
+- El servidor escribe en el log los 10 primeros caracteres de la clave MCP en cada petición
+  (`MCP Auth: Using X-Mcp-Token: …`, `main.py:863`). Ya existía; no se añade como hallazgo aquí, solo se
+  anota.
+
+### Búsqueda de otros `.sudo()` sobre un `Environment` (solo informar)
+
+Grep en `pns_base`, `pns_ai_mcp` y `pns_ai_chatboo` (`env().sudo()`, `_env().sudo()`,
+`request.env.sudo()`, cualquier variable con `env` en el nombre seguida de `.sudo(`, y entornos
+construidos con `api.Environment(…)` o `env(user=…)`):
+
+| Archivo:línea | ¿Es un `Environment`? | ¿Se ejecuta? | Efecto en Odoo 14 |
+|---|---|---|---|
+| `pns_ai_mcp/controllers/main.py:1474, 1600` (fabricante: `:1473, 1598`) | sí | sí | corregido por el parche 4 |
+| `pns_ai_mcp/controllers/controller_helpers.py:179` (`tool_env(controller, sudo=True)`) | sí | sí (`tools_context.py:204, 227, 274`) | ninguno: `try: env.sudo()` / `except AttributeError: return env(su=True)`. Lanza y captura la excepción en cada llamada, pero el resultado es el correcto |
+| `pns_ai_mcp/tests/test_relaxaicode_sandbox_escapes_e2e.py:54, 56, 63` | dentro de cadenas | no como código de Odoo: son entradas de ataque que el validador de `relaxaicode` debe rechazar | ninguno |
+| `pns_ai_mcp/controllers/validators.py:1067, 1079` | en docstrings | no | ninguno (el validador analiza `env.sudo()` en el AST; no lo ejecuta) |
+
+Con esos patrones no aparecen más: `pns_base` y `pns_ai_chatboo` no tienen ninguno, ni hay
+`request.env.sudo()` o `self.env.sudo()`. Las demás coincidencias de `.sudo()` con `env` son sobre
+`env['modelo']` (recordsets, que sí tienen `sudo()` en Odoo 14). Un `Environment` guardado
+en una variable sin `env` en el nombre no lo detectaría este Grep.
+
+### Limpieza (parche 4)
+
+Hecha por ORM (`shell`, con commit) y verificada con `SELECT`:
+
+| Elemento | Verificación |
+|---|---|
+| Usuarios 44 y 45 y sus partners | 0 |
+| `ai.mcp.user` 28 | quedan solo 3 (`demo`) y 4 (`admin`) |
+| Contextos 71 y 72 | 0 contextos `lab_p4%` y 0 con propietario |
+| `ai_log` 51 a 54 | 0 |
+| Barrido de todas las tablas con `create_uid`/`write_uid` 44 o 45 | sin restos |
+
+La BD queda como en la línea base. La clave, las cookies, las respuestas y las copias del log (que
+incluían el prefijo de la clave) se borraron del directorio temporal.
+
+### Tabla final (parche 4)
+
+| Prueba | Estado en el seguimiento (antes) | Resultado laboratorio | ¿Qué cambia? |
+|---|---|---|---|
+| PNS-12 por `/mcp` | CORREGIDO en el modelo; HTTP NO CONCLUYENTE | CORREGIDO: B ve su contexto y no el de A; control positivo correcto | PNS-12: «por HTTP CORREGIDO con el parche 4» |
+| PNS-81, fallo de `Environment.sudo()` | sin parche | parche 4 eficaz, sin `AttributeError` | PNS-81 y fila de compatibilidad: «parche 4 en la rama» |

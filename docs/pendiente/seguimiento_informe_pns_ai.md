@@ -9,10 +9,10 @@
   `docs/specs/cambios_pns_ai_3-1-782.md` (inventario de la fase 1), el código actual y
   `docs/pendiente/verificacion_seguridad_pns_ai.md` (laboratorio, fases 3a, 3b-1, 3b-2 y 3c).
 - **Método:** lectura de código (fase 2) y pruebas en el laboratorio (fase 3). Las líneas citadas son
-  las de la rama `14.0-pns-ai-3`, que incluye los parches de compatibilidad 1 a 3
-  (`docs/pendiente/parches_pns_ai.md`, commit `ce6790b`). Solo cambian respecto al código del
-  fabricante las de `mcp_decorators.py`, `relaxaicode_recipe.py` y `pdf_io.py` (ver PNS-81 y
-  «Compatibilidad con Odoo 14»).
+  las de la rama `14.0-pns-ai-3`, que incluye los parches de compatibilidad 1 a 4
+  (`docs/pendiente/parches_pns_ai.md`; 1 a 3 en el commit `ce6790b`). Solo cambian respecto al código
+  del fabricante las de `mcp_decorators.py`, `relaxaicode_recipe.py`, `pdf_io.py` y `main.py` (de la
+  1473 en adelante, +1; de la 1598 en adelante, +2) (ver PNS-81 y «Compatibilidad con Odoo 14»).
 - **Alcance:** primer bloque, hallazgos de gravedad crítica y alta (35); segundo bloque, de gravedad
   media y baja (45, con PNS-22, que pasó a Media en la revisión del informe, y PNS-79). Total: los
   80 hallazgos del informe. Tercer bloque: hallazgos nuevos (PNS-81 a PNS-92) y compatibilidad con
@@ -23,7 +23,8 @@
 > - **3b-1:** permisos sin IA;
 > - **3b-2:** pruebas funcionales con proveedor, **parcial**: el proveedor estaba saturado y varias
 >   pruebas quedan pendientes para staging;
-> - **3c:** pruebas complementarias tras la revisión independiente (PNS-12, 21, 80, 90, 91 y 92).
+> - **3c:** pruebas complementarias tras la revisión independiente (PNS-12, 21, 80, 90, 91 y 92);
+> - **parche 4:** `prompts/*` por `/mcp`, PNS-12 por HTTP CORREGIDO.
 >
 > El resultado de cada PNS probado está en la columna «Laboratorio» de la tabla resumen y en su
 > detalle. «—» significa que no se probó en el laboratorio.
@@ -56,7 +57,7 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-09 | Alta | CORREGIDO | CORREGIDO (parte probada: `action_test_connection` de un interno, 3b-1) |
 | PNS-10 | Alta | CORREGIDO | CORREGIDO (3b-1) |
 | PNS-11 | Alta | CORREGIDO | CORREGIDO (3b-1) |
-| PNS-12 | Alta | CORREGIDO | CORREGIDO en el modelo (3c); por `/mcp`, NO CONCLUYENTE (ver PNS-81) |
+| PNS-12 | Alta | CORREGIDO | CORREGIDO en el modelo (3c); por HTTP CORREGIDO con el parche 4 (ver PNS-81) |
 | PNS-13 | Alta | CORREGIDO | CORREGIDO (3b-1) |
 | PNS-14 | Alta | PARCIAL | VULNERABLE en `ai.fetch.cache` (3c, PNS-90); el resto, CORREGIDO (3b-1) |
 | PNS-15 | Alta | CORREGIDO | — |
@@ -123,7 +124,7 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-77 | Baja | SIN CAMBIOS | — |
 | PNS-78 | Baja | CORREGIDO | — |
 | PNS-79 | Baja | CORREGIDO | NO CONCLUYENTE (3b-1) |
-| PNS-81 | Alta | NUEVO | importación resuelta con el parche 1 (3a); parche 2 eficaz (3b-2); parche 3, PENDIENTE STAGING; `prompts/*` falla (3c) |
+| PNS-81 | Alta | NUEVO | importación resuelta con el parche 1 (3a); parche 2 eficaz (3b-2); parche 3, PENDIENTE STAGING; `prompts/*`: parche 4 en la rama, eficaz (prueba del parche 4) |
 | PNS-82 | Alta | NUEVO | VULNERABLE (3b-1) |
 | PNS-83 | Alta | NUEVO | VULNERABLE (3b-1) |
 | PNS-84 | Media | NUEVO | — |
@@ -402,7 +403,7 @@ Restos que se repiten en varios parciales:
 
 ### PNS-12 — Contextos privados de otros usuarios expuestos
 
-- **Estado:** CORREGIDO (en el modelo).
+- **Estado:** CORREGIDO (en el modelo; por HTTP CORREGIDO con el parche 4).
 - **Evidencia:**
   - `get_listable_for_mcp`, `get_context_for_country`, `get_discovery_entries` y
     `get_discovery_indexed_codes` filtran con `ownership_read_domain()` (`ai_context.py:345-346,
@@ -415,13 +416,18 @@ Restos que se repiten en varios parciales:
     `get_context_for_country` devuelve vacío para el de A y el registro para el de B. Como control,
     una búsqueda sin filtro encuentra el de A. La prueba de la fase 3b-1 (RPC sin `sudo`) solo
     comprobaba la regla de registro, que ya existía en 3.1.486.
-  - **Por HTTP no es concluyente:** `prompts/list` y `prompts/get` llaman a `.sudo()` sobre el
-    `Environment` (`controllers/main.py:1473, 1598`), que no existe en Odoo 14. El error se captura y no
-    se lista ni se sirve ningún contexto, tampoco el propio (es el tercer fallo en ejecución de PNS-81).
-    El contexto de A no se expone, pero por ese error y no por el filtro.
+  - **Por HTTP, CORREGIDO con el parche 4:** en 3.1.782 `prompts/list` y `prompts/get` llaman a
+    `.sudo()` sobre el `Environment` (`controllers/main.py:1474, 1600`; fabricante: `:1473, 1598`), que no existe en Odoo 14; en
+    la fase 3c el error se capturaba y no se listaba ni servía ningún contexto, tampoco el propio
+    (cuarto fallo de PNS-81), así que la prueba HTTP no era concluyente. Con el parche 4
+    (`self._get_mcp_env()(su=True)`) se repitió por `/mcp` (2026-10-14, 16:12 UTC; detalle en
+    `verificacion_seguridad_pns_ai.md`, «Versión 3.1.782 — parche 4»): B, con su clave,
+    recibe en `prompts/list` los contextos compartidos y su contexto privado, y no el de A;
+    `prompts/get` del suyo devuelve su contenido (control positivo) y el de A, «Prompt not found». En
+    el log, ningún `AttributeError`.
 - **Pendiente para staging:** que el contenido del contexto de A no se inyecte en los turnos de B que
-  activen ese dominio (necesita IA). Cuando se corrija PNS-81, repetir `prompts/list` y `prompts/get`
-  por `/mcp`.
+  activen ese dominio (necesita IA). Si el fabricante corrige PNS-81 sin el parche 4, repetir
+  `prompts/list` y `prompts/get` por `/mcp` con su versión.
 
 ### PNS-13 — `/mcp/message` no revalida clave ni usuario; sesiones sin caducidad
 
@@ -1481,9 +1487,8 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
 
 ### PNS-81 — Incompatibilidades con Odoo 14: el módulo no se importa y tres funciones fallan en ejecución
 
-- **Gravedad:** Alta · **Estado:** NUEVO. En la rama `14.0-pns-ai-3`, los tres primeros fallos tienen
-  parche local (parches 1 a 3, `docs/pendiente/parches_pns_ai.md`); el cuarto no tiene parche
-  (pendiente de decisión).
+- **Gravedad:** Alta · **Estado:** NUEVO. En la rama `14.0-pns-ai-3`, los cuatro fallos tienen
+  parche local (parches 1 a 4, `docs/pendiente/parches_pns_ai.md`).
 - **Descripción:** detalle completo en «Compatibilidad con Odoo 14». Líneas de la rama (con los
   parches); entre paréntesis, la línea del código del fabricante cuando cambia.
   - **Al importar** (parche 1): `pns_ai_mcp/controllers/mcp_decorators.py:171` (fabricante: `:169`).
@@ -1508,15 +1513,15 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
       `controllers/remote_image.py`);
     - Chatboo reenvía al proveedor las imágenes previas sin reescalar
       (`pns_ai_chatboo/models/chatboo_async_request.py:1079-1094`).
-  - **Al ejecutar, Odoo 14** (sin parche): `_mcp_prompts_list` y `_mcp_prompts_get` llaman a `.sudo()`
-    sobre el `Environment` (`pns_ai_mcp/controllers/main.py:1473, 1598`). En Odoo 14 `Environment` no
+  - **Al ejecutar, Odoo 14** (parche 4): `_mcp_prompts_list` y `_mcp_prompts_get` llaman a `.sudo()`
+    sobre el `Environment` (`pns_ai_mcp/controllers/main.py:1474, 1600`; fabricante: `:1473, 1598`). En Odoo 14 `Environment` no
     tiene ese método (solo `__call__(…, su=…)`, `odoo/api.py:508` de la referencia). El
     `AttributeError` se captura en silencio: `prompts/list` devuelve solo `system_prompt` y
     `prompts/get` de cualquier contexto responde «Prompt not found». Los clientes MCP externos no
     reciben ningún contexto por `prompts/*`. En 3.1.486 no pasaba: esas rutas usaban
-    `self._get_mcp_env()` sin `.sudo()` (`main.py:1491, 1638` de `14.0-analisis-pns-ai`). Corrección
-    mínima: `self._get_mcp_env()(su=True)`, que en Odoo 14 conserva el uid del usuario de la clave y
-    mantiene el filtro de PNS-12.
+    `self._get_mcp_env()` sin `.sudo()` (`main.py:1491, 1638` de `14.0-analisis-pns-ai`). El parche 4
+    lo cambia por `self._get_mcp_env()(su=True)`, que en Odoo 14 conserva el uid del usuario de la
+    clave y mantiene el filtro de PNS-12.
 - **Impacto:** en un servidor Odoo 14 con Python 3.7 (la imagen oficial, Debian Buster) o 3.8,
   sustituir el código deja la base de datos sin cargar, porque `pns_ai_mcp` está instalado y no se
   importa. Corregida la importación, los demás fallos dejan funciones rotas sin aviso. Con Python 3.8
@@ -1526,7 +1531,11 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
   - fase 3b-2: con el parche 2, `remote_image` devuelve 200 con la imagen re-codificada;
   - el parche 3 (consulta con un parámetro de fecha) queda pendiente para staging por el proveedor;
   - fase 3c: `prompts/list` y `prompts/get` por `/mcp` con un usuario con clave no devuelven ningún
-    contexto, tampoco el propio, y el log registra el `AttributeError`.
+    contexto, tampoco el propio, y el log registra el `AttributeError`;
+  - parche 4 (2026-10-14, 16:12 UTC): la misma prueba por `/mcp` lista los contextos compartidos y el
+    privado del usuario (no el de otro), `prompts/get` sirve el propio y rechaza el ajeno («Prompt not
+    found»), y el log no registra ningún `AttributeError` (`verificacion_seguridad_pns_ai.md`,
+    «Versión 3.1.782 — parche 4»).
 
 ### PNS-82 — `chatboo.session.claim_turn_file_chips` se apropia de adjuntos ajenos sin `res_model` o sin `res_id`
 
@@ -1868,8 +1877,9 @@ Objetivo: Odoo 14 con Python 3.7 y las librerías de la imagen oficial (la del l
   `datetime.UTC`, `missing_ok=`, `ET.indent`, `include_extras`, `math.comb`, `itertools.pairwise`…).
 - Comprobación con `python3 -c` en la imagen (`docker run --rm --entrypoint python3`, sin Odoo ni BD)
   de la forma del AST de 3.7 y de los atributos de las librerías usadas.
-- Las líneas son las de la rama `14.0-pns-ai-3`, con los parches 1 a 3 (`ce6790b`). Respecto al
-  código del fabricante solo cambian `mcp_decorators.py` (de la línea 169 en adelante, +2),
+- Las líneas son las de la rama `14.0-pns-ai-3`, con los parches 1 a 4 (1 a 3 en `ce6790b`). Respecto
+  al código del fabricante solo cambian `main.py` (de la 1473 en adelante, +1; de la 1598 en adelante,
+  +2), `mcp_decorators.py` (de la línea 169 en adelante, +2),
   `relaxaicode_recipe.py` (la 507 pasa a 508-509 y, de la 508 en adelante, +2) y `pdf_io.py` (la 94
   pasa a 95 y, de la 98 en adelante, +17). La clasificación describe el código del fabricante; las
   filas parcheadas lo indican.
@@ -1880,8 +1890,8 @@ Versiones en la imagen: **Python 3.7.3**, PyPDF2 1.26.0, openpyxl 3.1.2, request
 1.24.1), reportlab 3.5.13, Pillow 5.4.1, lxml 4.3.2, pdfminer 20181108. No están `pypdf`, `fitz`
 (PyMuPDF) ni `pdftoppm`.
 
-**Resumen:** FALLA AL IMPORTAR 1 · FALLA AL EJECUTAR 3 · SEGURO 22. Los cuatro fallos son PNS-81; los
-tres primeros tienen parche en la rama y el de `Environment.sudo()` no.
+**Resumen:** FALLA AL IMPORTAR 1 · FALLA AL EJECUTAR 3 · SEGURO 22. Los cuatro fallos son PNS-81 y
+los cuatro tienen parche en la rama (parches 1 a 4; el de `Environment.sudo()` es el parche 4).
 
 ### a) Python
 
@@ -1889,7 +1899,7 @@ tres primeros tienen parche en la rama y el de `Environment.sudo()` no.
 |---|---|---|---|---|
 | `pns_ai_mcp/controllers/mcp_decorators.py:171` (fabricante: `:169`) | `-> tuple[bool, Optional[str]]` (3.9) | **FALLA AL IMPORTAR** (parche 1 en la rama) | Anotación de retorno evaluada al definir la función; sin `from __future__ import annotations`. No se importan `pns_ai_mcp` ni `pns_ai_chatboo`. | `Tuple[bool, Optional[str]]` (ya importa `typing`) o añadir `from __future__ import annotations`. |
 | `pns_ai_mcp/utils/relaxaicode_recipe.py:508` (fabricante: `:507`) | `ast.get_source_segment` (3.8) | **FALLA AL EJECUTAR** (parche 3 en la rama) | Desde `tools_relaxaicode.py:1867`, sin protección: la herramienta devuelve error si el código define una función de nivel superior con un parámetro de fecha. Desde `:1252` está dentro de `try` (ver fila SEGURO). | `getattr(ast, 'get_source_segment', None)` y, si no existe, usar `src`, como ya hace con `or src`. |
-| `pns_ai_mcp/controllers/main.py:1473, 1598` | `self._get_mcp_env().sudo()` (API de Odoo, no de Python) | **FALLA AL EJECUTAR** (sin parche) | `Environment` no tiene `sudo()` en Odoo 14 (`odoo/api.py:508` de la referencia: solo `__call__(…, su=…)`). El `AttributeError` se captura: `prompts/list` solo devuelve `system_prompt` y `prompts/get` de cualquier contexto da «Prompt not found» (comprobado en la fase 3c). En 3.1.486 no había `.sudo()`. | `self._get_mcp_env()(su=True)`. |
+| `pns_ai_mcp/controllers/main.py:1474, 1600` (fabricante: `:1473, 1598`) | `self._get_mcp_env().sudo()` (API de Odoo, no de Python) | **FALLA AL EJECUTAR** (parche 4 en la rama; eficaz: `prompts/list` y `prompts/get` sirven los contextos visibles y no los ajenos, sin `AttributeError`) | `Environment` no tiene `sudo()` en Odoo 14 (`odoo/api.py:508` de la referencia: solo `__call__(…, su=…)`). El `AttributeError` se captura: `prompts/list` solo devuelve `system_prompt` y `prompts/get` de cualquier contexto da «Prompt not found» (comprobado en la fase 3c). En 3.1.486 no había `.sudo()`. | `self._get_mcp_env()(su=True)`. |
 | `pns_ai_mcp/controllers/tools_relaxaicode.py:1252` | misma llamada | SEGURO | `try/except Exception` (`:1238-1257`): solo se pierde la coerción de fechas. | — |
 | `pns_ai_mcp/controllers/mcp_decorators.py:13` | `typing.get_origin`, `get_args` (3.8) | SEGURO | `try/except ImportError` con alternativa propia. | — |
 | `pns_ai_mcp/controllers/mcp_decorators.py:103` | `get_type_hints(..., include_extras=True)` (3.9) | SEGURO | Dentro de `try/except Exception` (`:90-160`): esquema vacío. Ninguna herramienta entra en esa rama (sin cambios desde §7.3). | — |

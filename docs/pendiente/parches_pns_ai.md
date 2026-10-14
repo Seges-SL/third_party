@@ -16,9 +16,10 @@
 > Antes de probarla en Odoo 14, ejecuta la comprobación de cada entrada. Si alguna sigue dando
 > resultado, vuelve a aplicar ese parche (mismo cambio, mismo comentario `# Seges: …`).
 
-Cada cambio lleva junto a él el comentario
-`# Seges: parche de compatibilidad con Odoo 14 (Python 3.7 / Pillow 5.4). Ver docs/pendiente/parches_pns_ai.md`.
-Para listarlos: `grep -rn "Seges: parche de compatibilidad" pns_base pns_ai_mcp pns_ai_chatboo`.
+Cada cambio lleva junto a él un comentario con el prefijo común
+`# Seges: parche de compatibilidad con Odoo 14`, seguido de un paréntesis con el motivo y de
+`Ver docs/pendiente/parches_pns_ai.md`. El paréntesis es `(Python 3.7 / Pillow 5.4)` en los parches 1
+a 3 y `(API de Odoo 14: Environment sin sudo)` en el 4. Para listarlos: `grep -rn "Seges: parche de compatibilidad" pns_base pns_ai_mcp pns_ai_chatboo`.
 
 ## Parche 1: `pns_ai_mcp/controllers/mcp_decorators.py:171` (antes `:169`)
 
@@ -136,6 +137,58 @@ Para listarlos: `grep -rn "Seges: parche de compatibilidad" pns_base pns_ai_mcp 
   Está corregido si no sale nada, o si toda aparición está protegida (`getattr`/`hasattr` o
   `try/except`) con alternativa.
 
+## Parche 4: `pns_ai_mcp/controllers/main.py:1474` y `:1600` (antes `:1473` y `:1598`)
+
+- **Fecha:** 2026-10-14.
+- **PNS:** PNS-81 (fallo en ejecución, API de Odoo 14); afecta a la prueba HTTP de PNS-12.
+- **Qué falla sin él:** `_mcp_prompts_list` y `_mcp_prompts_get` llaman a `.sudo()` sobre el
+  `Environment` que devuelve `_get_mcp_env()` (`request.env(user=<usuario de la clave>)`). En Odoo 14
+  `Environment` no tiene `sudo()` (solo `__call__(cr, user, context, su)`, `odoo/api.py:508` de la
+  referencia). El `AttributeError` se captura y solo deja un aviso en el log:
+  - `prompts/list` devuelve solo `system_prompt`, sin ningún contexto;
+  - `prompts/get` de cualquier contexto responde `-32602 Prompt not found`.
+  Los clientes MCP externos no reciben ningún contexto por `prompts/*` (comprobado en la fase 3c). En
+  3.1.486 no pasaba: esas rutas no tenían `.sudo()`.
+- **Cambio:**
+  ```diff
+  @@ _mcp_prompts_list (línea 1473 del fabricante)
+  -            env = self._get_mcp_env().sudo()
+  +            # Seges: parche de compatibilidad con Odoo 14 (API de Odoo 14: Environment sin sudo). Ver docs/pendiente/parches_pns_ai.md
+  +            env = self._get_mcp_env()(su=True)
+  @@ _mcp_prompts_get (línea 1598 del fabricante)
+  -            env = self._get_mcp_env().sudo()
+  +            # Seges: parche de compatibilidad con Odoo 14 (API de Odoo 14: Environment sin sudo). Ver docs/pendiente/parches_pns_ai.md
+  +            env = self._get_mcp_env()(su=True)
+  ```
+  `env(su=True)` es lo que hace `sudo()` en un recordset de Odoo 14: el mismo uid (el usuario de la
+  clave) con el modo superusuario. Así el `env.user` sigue siendo el real y el filtro por propietario
+  de PNS-12 (`ownership_read_domain()`) se aplica igual. El comentario desplaza la numeración de
+  `main.py`: +1 de la línea 1473 en adelante y +2 de la 1598 en adelante.
+- **Qué se degrada:** nada. Con versiones de Odoo cuyo `Environment` tenga `sudo()` el efecto es el
+  mismo.
+- **Cómo comprobar si el fabricante ya lo ha corregido:** en `_mcp_prompts_list` y
+  `_mcp_prompts_get` de `controllers/main.py` no debe quedar `.sudo()` aplicado al resultado de
+  `_get_mcp_env()`.
+- **Comprobaciones realizadas (2026-10-14):**
+  1. Compilación del archivo con Python 3.7.3 dentro de la imagen `odoo-dev:14-lab_pns_ai`, sin Odoo
+     (`compile()` del código fuente): correcta.
+  2. Servidor del laboratorio reiniciado con `odoo-dev 14 parar` y `odoo-dev 14 arrancar` (desde
+     `~/GitHub/lab_pns_ai`; `arrancar` solo no recrea el contenedor si ya está en marcha). Arranque
+     sin tracebacks.
+  3. Prueba por `/mcp` (2026-10-14, 16:12 UTC; detalle en `verificacion_seguridad_pns_ai.md`,
+     «Versión 3.1.782 — parche 4»), con A (interno sin IA, contexto privado) y B
+     (`group_ai_conversational`, clave MCP, contexto privado propio):
+
+     | Paso | Llamada (B) | Resultado |
+     |---|---|---|
+     | 1 | `initialize` | 200, `result` |
+     | 2 | `prompts/list` | 200, 21 prompts: los contextos compartidos y el privado de B; no el de A |
+     | 3 | `prompts/get` del contexto de B | 200, devuelve su contenido |
+     | 4 | `prompts/get` del contexto de A | `-32602 Prompt not found` |
+
+     En el log, ningún `AttributeError` ni traceback.
+  - **Resultado:** eficaz. Los datos de prueba se borraron y se comprobó con `SELECT`.
+
 ## Comprobaciones realizadas (2026-10-13)
 
 1. `python3 -m py_compile` de los tres archivos: correcto con el Python del equipo y con Python
@@ -182,7 +235,12 @@ Para listarlos: `grep -rn "Seges: parche de compatibilidad" pns_base pns_ai_mcp 
 
 Tras `odoo-dev 14 actualizar pns_base,pns_ai_mcp,pns_ai_chatboo`:
 
+- una respuesta con una imagen externa permitida, que debe mostrarse (no 404): **hecha** en la fase
+  3b-2 (`remote_image` devuelve 200 con la imagen re-codificada);
 - una consulta del chat que defina una función con un parámetro `date_from`, que debe responder
-  sin error de la herramienta;
-- una respuesta con una imagen externa permitida, que debe mostrarse (no 404);
-- una foto de móvil vertical adjunta en Chatboo, que debe llegar derecha al proveedor.
+  sin error de la herramienta: **pendiente para staging** (proveedor saturado en el laboratorio);
+- una foto de móvil vertical adjunta en Chatboo, que debe llegar derecha al proveedor: **pendiente
+  para staging** (proveedor saturado en el laboratorio).
+
+Las dos pendientes están en la lista de `verificacion_seguridad_pns_ai.md`, «Pruebas pendientes para
+staging» de la fase 3b-2.
