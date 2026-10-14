@@ -429,3 +429,440 @@ tengan, así que la ausencia de `"Running migration"` en el log no prueba nada s
 - Módulos: `pns_ai_mcp`, `pns_ai_chatboo` y `hr` quedan **instalados** (como pide la
   tarea).
 - La base de datos `lab_pns_ai_14` **NO se borró**.
+
+## Versión 3.1.782 — actualización en el laboratorio (fase 3a)
+
+**Fecha:** 2026-10-14 (horas del log en UTC). **Entorno:** `odoo-dev 14` lanzado desde `~/GitHub/lab_pns_ai`,
+imagen `odoo-dev:14-lab_pns_ai` (Python 3.7.3, Pillow 5.4.1), BD **`lab_pns_ai_14`**. `third_party`
+es una copia de trabajo en la rama `14.0-pns-ai-3`, con los tres parches de compatibilidad de
+`docs/pendiente/parches_pns_ai.md` (commit `ce6790b`). Sin avisos de contexto. La BD **no está
+neutralizada**: el kit no toca sus crons.
+**Autorización:** escribir solo en `lab_pns_ai_14` (actualizar módulos). El resto de las consultas son
+`SELECT`. Sin `pip`, sin reglas de permisos permanentes y sin commit.
+
+### Pasos
+
+1. `odoo-dev 14 estado`: contexto correcto (ver arriba). Solo estaba en marcha el contenedor de la BD.
+2. Copia previa: `~/odoo-dev/14.0/copias/lab_pns_ai_14_antes_3-1-782.dump` (`pg_dump -Fc`, **3,5 MB**).
+3. Estado previo (`SELECT`).
+4. `odoo-dev 14 actualizar pns_base,pns_ai_mcp,pns_ai_chatboo`. No hizo falta arrancar antes: usa un
+   contenedor propio. Log: `~/odoo-dev/14.0/logs/actualizar-20261014-103123.log` (2 914 líneas,
+   08:31:25 → 08:32:20).
+5. Revisión del log (abajo).
+6. Estado posterior (`SELECT`).
+7. `odoo-dev 14 arrancar` (el servidor web no estaba levantado), una petición `GET /web/login` para que
+   cargue el registro, `odoo-dev 14 log` y `estado`.
+
+### Resultado del analizador
+
+`0 bloqueante(s) · 0 tipo(s) de aviso` → **RESULTADO: OK**.
+
+El analizador no muestra los WARNING de Odoo que se ven en el log. Ninguno bloquea:
+
+- 31 × `The model … could not be dropped because it did not exist in the registry`: 29 asistentes
+  `pns_ai_mcp.*` renombrados a `ai.*`, `pns_ai_mcp.agent.compose.line` y `ai.provider.usage.day`. Odoo
+  borra su `ir.model`, campos y accesos, pero **no la tabla** (ver «Tablas»).
+- 3 etiquetas duplicadas: `ai.trusted.action` (`model_name`/`model_id`), `ai.mcp.user`
+  (`key_pin_html`/`key_pin`) y `ai.log` (`agent_display`/`agent_id`). Son cosméticas.
+- 3 `<i class="fa …">` sin `title` (accesibilidad), el `DeprecationWarning` de Jinja2 del sistema y 2 ×
+  `MCP: skip retired unlink for pns_ai_mcp (no skill files on disk)`.
+
+### Búsquedas en el log de `actualizar`
+
+| Patrón | Coincidencias | Lectura |
+|---|---|---|
+| `Running migration` | **0** | Esperado. Esta vez sí es concluyente (de 3.1.486 a 3.1.782, con carpetas `3.1.496`…`3.1.643` pendientes): confirma F18 y la sección «¿Se ejecutarán en Odoo 14?» del inventario. |
+| `DROP leftover` | **12** | Lo hace `ai.schema.fossil` (`init()`). Detalle en «Tablas». |
+| Borrado de XML ID `*mcp*` | **38 de 38**, uno por cada renombrado de 3.1.518/519 | `_process_end`: `Deleting <id>@<modelo> (pns_ai_mcp.<antiguo>)` y `User #1 deleted …`. Ningún error. |
+| `Failed to load` | 0 | |
+| `Traceback` | 0 | |
+| `AttributeError` | 0 | Los parches 2 y 3 (PNS-81) no se ejecutan durante la actualización, así que esto no los prueba. |
+| ` ERROR ` / `CRITICAL` (nivel de log) | 0 | Las 43 líneas con «error» son nombres de campo (`result_errors`) y contadores `'errors': []`. |
+
+Otras líneas relevantes:
+- Contextos de fábrica: `0 imported, 53 updated`; skills: `updated: 10`.
+- `MCP: unlinked leftover engine discovery_geo rows: 2`.
+- Se borran 31 `ir.model`, 522 `ir.model.fields`, 66 `ir.model.fields.selection`, 13 vistas, 9 accesos,
+  8 acciones, 7 menús, 4 reglas y 1 restricción.
+- Entre los 9 accesos borrados hay 3 que no son de los renombrados: `access_ai_provider_usage_day_admin`,
+  `access_ai_provider_usage_day_user` y **`access_ai_fetch_cache_user`**. Este último confirma en la BD
+  que se quita la lectura de `ai.fetch.cache` a todos los internos (inventario, «Resumen»; F8).
+
+### Estado antes y después
+
+| Dato | Antes | Después |
+|---|---|---|
+| `pns_base` | 14.0.1.2.10 | **14.0.1.2.32** |
+| `pns_ai_mcp` | 14.0.3.1.486 | **14.0.3.1.782** |
+| `pns_ai_chatboo` | 14.0.2.1.322 | **14.0.2.1.453** |
+| Crons activos (todos) | 13 | **15** (+`ir_cron_ai_log_retention`, +`ir_cron_pns_export_purge`) |
+| XML ID de `pns_ai_mcp` que empiezan por `mcp_` | 4 (las 4 reglas) | **0** |
+| XML ID de `pns_ai_mcp` con `mcp` en el nombre | 638 | 77 |
+| De los 38 renombrados de 3.1.518/519: antiguos / nuevos `ai_*` | 38 / 0 | **0 / 38** |
+| `ai_log`: filas / más antigua | 0 / — | 0 / — |
+| `ai.api.server` de fábrica (`external_server_*`, `noupdate`) | 5, inactivos | **5, inactivos** (sin cambios) |
+| Skill `analisis_financiero` (id 1, `pns_ai_chatboo`) | existe, activa | **borrada** (quedan 10 skills) |
+| Tablas `ai_*`/`pns_*`/`chatboo*` | 65 | 103 |
+| Menús de módulos `pns_*` | 21 | 21 (sin nombres duplicados ni menús huérfanos) |
+| Parámetros `pns*` | 7 | 12 |
+
+Parámetros nuevos en la BD: `pns_ai_chatboo.history_retention_days=30`, `pns_ai_chatboo.xlsx_float_decimals=2`,
+`pns_ai_chatboo.xlsx_thousands=True` y los sellos `pns_ai_mcp.admin_auto_link_fossil_cleared=1` y
+`pns_ai_mcp.fossil_acl_security_agent=1`; además `pns_ai.factory_knowledge_stamp` pasa a la versión nueva.
+**No** se crean `pns_ai_mcp.log_retention_days` ni `pns_base.export_retention_hours`: se aplican los
+valores por defecto del código (30 días y 24 h).
+
+**Crons de `pns_*` después de actualizar y arrancar:**
+
+| Cron | `noupdate` | `active` | `numbercall` | Intervalo | `nextcall` al acabar `actualizar` | Primera ejecución tras arrancar |
+|---|---|---|---|---|---|---|
+| `pns_base.ir_cron_pns_export_purge` (nuevo) | t | t | -1 | 1 h | 2026-10-14 08:31:48 | 08:35:12, OK |
+| `pns_ai_mcp.ir_cron_ai_log_retention` (nuevo) | t | t | -1 | 1 día | 2026-10-14 08:32:04 | 08:35:12, OK |
+| `pns_ai_mcp.ir_cron_ai_api_result_cache_gc` | t | t | **0 → -1** | 1 h | 2026-10-08 15:42:58 | 08:35:12, OK |
+| `pns_ai_mcp.ir_cron_ai_fetch_cache_gc` | t | t | -1 | 1 h | 2026-10-09 08:42:58 | 08:35:12, OK |
+| `pns_ai_mcp.ir_cron_ai_safe_operation_expire` | t | t | -1 | 5 min | 2026-10-09 08:02:58 | 08:35:12, OK |
+| `pns_ai_chatboo.ir_cron_chatboo_async_maintenance` | t | t | -1 | 5 min | 2026-10-09 08:02:53 | 08:35:12, OK |
+
+Después de esa ejecución, todos tienen `nextcall` en el futuro y siguen con `numbercall=-1`.
+
+**Tablas:**
+- `ai.schema.fossil` borró 12: las 7 tablas `*_pns_ai_mcp_artifact_bundle_export_wizard_rel`,
+  `ai_relaxaicode_recipe`, `pns_ai_mcp_relaxaicode_library`, `pns_ai_mcp_relaxaicode_raw_result`,
+  `pns_ai_mcp_skill_capture_wizard` y **`ai_provider_usage_day`**.
+- **Quedan 30 tablas `pns_ai_mcp_*`** de los asistentes antiguos, ya sin modelo, porque Odoo no las borra
+  (aviso «could not be dropped»). Una es `pns_ai_mcp_skill_capture_wizard_agent_rel`, la tabla de
+  relación de un asistente cuya tabla principal sí se borró. Son asistentes (transitorios): no tienen
+  datos de negocio, solo ocupan sitio.
+- Se crean 68 tablas `ai_*`: los asistentes con nombre nuevo, `ai_key_pin_*`, `ai_skill_param_cache`,
+  `ai_openapi_spec_generate_wizard`, `pns_export_secrets_wizard`, etc.
+
+### Arranque del servidor (paso 7)
+
+- `odoo-dev 14 estado`: `odoo-dev-14-web-1` en marcha con la imagen `odoo-dev:14-lab_pns_ai`, mismo
+  contexto y sin avisos.
+- `odoo-dev 14 log`: `loading 27 modules` → `Modules loaded` en 0,78 s. Se registran las herramientas MCP
+  `get_context`, `relaxaicode`, `safe_plan_request` y `safe_plan_status`, y `GET /web/login` responde 200.
+- Primera pasada del programador de crons (08:35:12): se ejecutan los 6 crons de `pns_*` y los del
+  estándar, todos `done`.
+- **0** `Traceback`, `ERROR` o `CRITICAL` en las últimas 1 000 líneas. El único WARNING es el
+  `DeprecationWarning` de Jinja2.
+- Con el parche 1, `pns_ai_mcp` y `pns_ai_chatboo` se importan y la BD carga en Python 3.7.3.
+
+### Relación con los hallazgos y con el inventario
+
+**PNS-81 (compatibilidad con Odoo 14).**
+- **Confirmado:** con el parche 1, el fallo al importar queda resuelto en el laboratorio: actualización
+  completa y servidor arrancado.
+- **Sin probar:** los fallos en ejecución (parches 2 y 3: imagen remota y consulta con parámetro de fecha)
+  necesitan una petición funcional. Quedan para la fase 3b.
+
+**PNS-87 (purga de `ai.log` a 30 días).**
+- **Confirmado en parte:**
+  - el cron se crea activo, diario y con `numbercall=-1`;
+  - el parámetro `pns_ai_mcp.log_retention_days` no existe, así que se aplican 30 días;
+  - **se ejecuta en la primera pasada del programador tras arrancar** (unos 3 min después de actualizar,
+    porque su `nextcall` es la hora de creación).
+- **No se ha podido medir el borrado:** `ai_log` tenía 0 filas (el laboratorio no tiene proveedor de IA).
+- **Precisión para producción:** la purga no espera un día, sino que se ejecuta al primer arranque tras
+  la actualización. Si se quiere conservar el log, hay que crear el parámetro (`0`, o los días que se
+  quieran) **antes** de actualizar.
+- **Relacionado, sin numerar** (candidato a ampliar PNS-87):
+  - Chatboo crea ahora `pns_ai_chatboo.history_retention_days=30`.
+  - `chatboo.session._cleanup_old_sessions` (`pns_ai_chatboo/models/chatboo_session.py:1360-1382`) lo
+    llama el cron de mantenimiento cada 5 minutos (`models/chatboo_async_request.py:2167`). Borra con
+    `sudo()` las sesiones de **todos** los usuarios cuyo último uso tenga más de 30 días.
+  - En la versión anterior, el borrado solo afectaba a las sesiones del usuario actual.
+  - Aquí `chatboo_session` tenía 0 filas: sin efecto medible.
+
+**PNS-88 (datos que la actualización no limpia).**
+- **XML ID: confirmado.**
+  - Los 38 `mcp_*` de las migraciones 3.1.518/519 se borran en `_process_end` sin errores, y se crean 38
+    `ai_*` con `res_id` **nuevos** (por ejemplo, la regla `ai_safe_operation_user_rule` es la 60; la
+    antigua era la 42).
+  - Por tanto, se pierden las personalizaciones y las referencias por id a los registros antiguos
+    (favoritos y filtros sobre esas acciones, traducciones), como preveía PNS-88.
+  - No quedan menús duplicados.
+  - Precisión: la consulta «empiezan por `mcp_`» solo cuenta las 4 reglas. Los otros 34 nombres llevan
+    `mcp` en medio (`menu_mcp_logs`, `view_mcp_log_form`…).
+  - Antes de actualizar, la única vista ajena que heredaba de una vista `*mcp*` de `pns_ai_mcp` era
+    `pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp`. Hereda de
+    `res_config_settings_view_form_mcp`, que no se renombra, así que no bloqueó nada.
+- **Servidores de fábrica: hay que corregir el número.**
+  - Quedan **5**, no 3: `mcp_test`, `brave_search` y `seq_thinking` (de `external_server_data.xml`), y
+    también **`sesame`** y **`cdmon`**, de `data/external_server_openapi_data.xml`, otro archivo eliminado.
+  - Los 5 tienen XML ID `noupdate=True` e inactivos. Odoo no los borra.
+- **Skill `analisis_financiero`: confirmado** que se borra en 14 (lo que ya decía la corrección de PNS-67).
+
+**Inventario `docs/specs/cambios_pns_ai_3-1-782.md`, sección «Migraciones».**
+- **Confirmado:**
+  - ningún script de migración se ejecuta;
+  - el renombrado de XML ID no se replica, y su consecuencia es la descrita (registros `ai_*` nuevos y
+    `mcp_*` borrados, sin fallos);
+  - el cron de caché sin `numbercall` queda arreglado por `init()` (`numbercall` pasa de 0 a -1 y vuelve
+    a ejecutarse; cierra F20 y §7.4 en las BD que se actualicen);
+  - la skill de Chatboo se borra.
+- **Corregir:**
+  1. «Borrar tablas de asistentes renombrados y recetas» no es exacto. Entre las 12 tablas que borra
+     `ai.schema.fossil` está **`ai_provider_usage_day`**: el histórico diario de tokens y coste por
+     proveedor (modelo `ai.provider.usage.day` de la versión anterior), es decir, datos, no un asistente.
+     No hay ninguna migración ni `init()` que los traslade. Aquí estaba vacía, verificado con
+     `pg_restore -a -t ai_provider_usage_day` sobre la copia. **En producción se perderá ese histórico**.
+     Si interesa conservarlo, hay que exportarlo antes de actualizar. Es un candidato a hallazgo (o a
+     ampliar PNS-87, porque también es pérdida de datos de consumo sin aviso).
+  2. Los asistentes renombrados se borran solo **en parte**. De los 31 modelos que Odoo da de baja, el
+     fósil borra la tabla de 2 (`pns_ai_mcp_skill_capture_wizard` y `ai_provider_usage_day`). Además borra
+     7 tablas de relación y 3 restos de `relaxaicode` que ya no tenían modelo. Quedan huérfanas **30**
+     tablas `pns_ai_mcp_*` (29 asistentes y una tabla de relación). No tiene impacto funcional.
+  3. «Los 3 registros de `external_server_data.xml`»: son 5 en dos archivos (ver PNS-88).
+  4. No cubierto en el inventario: `pns_ai_chatboo.history_retention_days` y la purga global de sesiones
+     de Chatboo (ver PNS-87).
+
+### Estado en que queda la BD
+
+- `lab_pns_ai_14` con las tres versiones nuevas instaladas. Servidor web en marcha
+  (`http://localhost:8169`).
+- Escrituras hechas, todas por Odoo: la propia actualización y la primera pasada de los crons tras
+  arrancar.
+- No se han creado usuarios, registros de prueba ni parámetros a mano.
+- Para volver al estado previo: `~/odoo-dev/14.0/copias/lab_pns_ai_14_antes_3-1-782.dump`. Restaurarla
+  lo decide el usuario. Ojo: `bd-cargar --reemplazar` neutraliza la BD al cargarla.
+
+### Plan para el VPS de pruebas (antes de producción)
+
+1. Copia de la BD.
+2. Contar `ai_log` (filas de más de 30 días), `ai_provider_usage_day` y `chatboo_session` (sesiones con
+   `last_used_date` de más de 30 días).
+3. Decidir los valores de `pns_ai_mcp.log_retention_days` y `pns_ai_chatboo.history_retention_days`, y
+   crearlos **antes** de actualizar. Exportar `ai_provider_usage_day` si se quiere conservar.
+4. Buscar personalizaciones sobre los 38 registros `mcp_*` (dominios de reglas, menús, vistas) y filtros
+   o favoritos guardados sobre sus acciones.
+5. Actualizar `pns_base,pns_ai_mcp,pns_ai_chatboo` con los parches de PNS-81 aplicados, si el servidor
+   tiene Python < 3.9 o Pillow < 6.
+6. En la interfaz: menús de Safe operations, Logs, Contexts y Change journal (uno de cada, y que abran);
+   Ajustes de IA y de Chatboo.
+
+## Versión 3.1.782 — pruebas de permisos (fase 3b-1)
+
+**Fecha:** 2026-10-14 (horas del log en UTC). **Entorno:** `odoo-dev 14` desde `~/GitHub/lab_pns_ai`,
+imagen `odoo-dev:14-lab_pns_ai` (Python 3.7.3), BD **`lab_pns_ai_14`**, servidor web en marcha
+(`http://localhost:8169`). `third_party` copia de trabajo en `14.0-pns-ai-3`. Contexto correcto y sin
+avisos (`estado`). La BD **no está neutralizada**.
+**Alcance:** pruebas de permisos **sin IA** (no se configuraron proveedores ni se hicieron llamadas
+externas). **Autorización:** escribir solo en `lab_pns_ai_14` (crear/borrar usuarios y registros de
+prueba por `shell` con commit, y JSON-RPC/HTTP a `localhost:8169`). Sin reglas de permisos permanentes,
+sin `pip`, sin `git commit`. Contraseñas omitidas. Nunca se invocó `apply_module_update`, `resolve_*`
+ni `execute_*`; los `unlink` se hicieron con nombres inexistentes; no hubo ninguna escalada que revertir
+(todas fallaron). No se usó `/opt/odoo-src/14.0/third_party`.
+
+**Usuarios de prueba** (shell, sin grupos de IA salvo C; borrados al final):
+
+| etiqueta | login | grupos |
+|---|---|---|
+| A | `lab_perm_a` | `base.group_user` (interno sin IA; propietario de los registros de apoyo; con clave MCP) |
+| B | `lab_perm_b` | `base.group_user` (interno sin IA) |
+| P | `lab_perm_portal` | `base.group_portal` |
+| C | `lab_perm_writer` | `base.group_user` + `pns_ai_mcp.group_ai_writer` (AI Writer, **sin** AI Administrator ni Ajustes) |
+
+Registros de apoyo creados a nombre de A/B (shell, sudo): `ai.safe.operation` (de A, `pending`),
+`chatboo.session` (una de A, una de B), `chatboo.async.request` (de A), `ai.api.server` inactivo con
+secretos ficticios, `ai.safe.choice` (A y B), `ai.api.result.cache` (A y B), `ir.attachment` sin
+`res_model` (descarga ficticia de A) y otro colgado de la sesión de A, `ai.skill` y `ai.context`
+propiedad de C, un contexto privado de A, y la clave MCP de A.
+
+### Grupo a — re-verificación de lo CONFIRMADO en las fases 1 y 2
+
+| Ref | Llamada | Respuesta | Comprobación posterior | Conclusión |
+|---|---|---|---|---|
+| **F-A** (PNS-01) | A y P RPC `ai.system.action.apply_user_add_group(uid,'base.group_system')` y `_apply_user_add_group(...)` | `apply…`→`AttributeError` (no existe); `_apply…`→`AccessError: Private methods … cannot be called remotely` (A y P) | `res_groups_users_rel`: ni A, ni B, ni P tienen `group_system` | **CORREGIDO** |
+| **F-B** (PNS-02) | A RPC `ai.system.action.preview_module_update('pns_base','upgrade')` | `AttributeError` (método privado, no expuesto) | — | **CORREGIDO** |
+| **F-C** (PNS-11) | A RPC `ai.skill.unlink_named_factory_skills(['no_existe_lab'])` | `AccessError: Only the system can run this maintenance action.` | — (nombre inexistente) | **CORREGIDO** |
+| **F-D** (PNS-03) | A (dueño) RPC `ai.safe.operation.write([SO1],{'status':'confirmed'})`, `{'user_id':2}`, `{'operation_data':…}` | las tres → `AccessError: Only the system can change the state of a supervised operation.` | SO1 sigue `status=pending`, `user_id=A` | **CORREGIDO** |
+| **F29** (PNS-53/55) | B RPC `chatboo.session.search_read/write/unlink` de la sesión de A | `search_read`→`[]`; `write`/`unlink`→`AccessError` (chatboo.session) | sesión de A intacta | **CORREGIDO** |
+| **F8** (PNS-08/14) | B RPC `ai.api.server.read([SRV1],['auth_token','env_vars','config_json'])`; `ai.fetch.cache.search_read` | `read`→`AccessError` (campos de AI Administrator); `ai.fetch.cache`→`AccessError` (solo AI Administrator) | — | **CORREGIDO** |
+| **F2** (PNS-02/11, portal) | P RPC `preview_module_update`, `preview_user_add_group`, `unlink_named_factory_skills(['no_existe_lab'])` | los `preview_*`→`AttributeError`; el `unlink`→`AccessError: Only the system…` | — | **CORREGIDO** |
+
+### Grupo b — PNS del seguimiento (permisos, sin IA)
+
+- **PNS-01 / PNS-02 — CORREGIDO (vía RPC).** Los `apply_*`/`preview_*` ya no existen como métodos
+  públicos (`AttributeError`) y los `_apply_*` se rechazan por privados, tanto para A como para P.
+  Coincide con el seguimiento (PARCIAL): el vector RPC del informe está cerrado; el resto (un AI
+  Administrator que confirma un plan) queda fuera de esta ronda sin IA.
+- **PNS-03 — CORREGIDO.** (Ver F-D.) Coincide con el seguimiento.
+- **PNS-08 — CORREGIDO.** B no lee `auth_token`/`env_vars`/`config_json` (`AccessError`). Coincide.
+- **PNS-09 — CORREGIDO.** A RPC `ai.api.server.action_test_connection([SRV1])` → `AccessError: Only AI
+  Administrators can import or export AI configuration artifacts.` Coincide.
+- **PNS-11 — CORREGIDO.** A y P RPC `unlink_named_factory_skills(['no_existe_lab'])`,
+  `unlink_retired_from_module('pns_ai_mcp')`, `hide_unprefixed_slash_twins()`,
+  `reapply_source_module_prefixes('no_existe_modulo')` y `sync_slash_hidden_from_field()` → todos
+  `AccessError: Only the system can run this maintenance action.` (`reapply` exige además un argumento
+  posicional, pero con él también da `AccessError`). Coincide.
+- **PNS-12 — CORREGIDO.** B RPC `ai.context.get_listable_for_mcp()` devuelve un recordset que **no**
+  incluye el contexto privado de A (`CTX_A_PRIV`) ni el de C. Coincide.
+- **PNS-13 — CORREGIDO (ampliación, 2026-10-14).** En la primera pasada no se pudo montar la prueba con
+  un interno sin IA: tanto `GET /mcp/sse` como `POST /mcp` responden `Conversational AI is not allowed for
+  this user.` (403 en SSE, error `-32000` en `/mcp`), porque la puerta conversacional exige el grupo
+  `pns_ai_mcp.group_ai_conversational` (`utils/conversational.py`). Con autorización, se creó un usuario
+  **D** con ese grupo mínimo (sin AI Administrator, AI Writer ni Ajustes) y clave MCP; según el informe
+  (`informe_fabricante_pns_ai.md`, PNS-13) el hallazgo cubre **clave revocada** y **usuario archivado**, así
+  que se probaron los dos, cada uno en una sesión SSE nueva, **manteniendo el stream abierto** (al cerrarlo,
+  la sesión se cierra sola a los pocos segundos, lo que falseaba la prueba). Sin `tools/call`.
+  - **Caso A — clave revocada:** sesión SSE abierta con K1; `initialize` y `tools/list` → **202** (válidos).
+    Se regenera la clave con el método del módulo `ai.mcp.user.action_generate_mcp_api_key()` (rota la clave;
+    K1 queda invalidada). Siguiente mensaje con K1 → **401 `Invalid API key`**; mensaje posterior en la misma
+    sesión → **400 `Invalid or expired session`** (sesión cerrada) y el **stream SSE termina solo**.
+  - **Caso B — usuario archivado:** nueva sesión SSE con K2 (fijada con `set_mcp_api_key`); `initialize` →
+    **202**. Se archiva D (`active=False`). Siguiente mensaje con K2 → **401 `Invalid API key`**; mensaje
+    posterior → **400 `Invalid or expired session`** (sesión cerrada) y el stream termina.
+  Coincide con el seguimiento (CORREGIDO): `/mcp/message` revalida clave y usuario en cada mensaje y cierra
+  la sesión. (Las rutas `/mcp*` son `auth='none'`; se fijó la BD con una cookie de sesión para alcanzarlas.)
+- **PNS-79 — NO CONCLUYENTE (no alcanzable en caja negra).** El hallazgo es el valor por defecto
+  `SUPERUSER_ID` cuando la sesión MCP no tiene usuario (`controllers/main.py:662`). Las rutas que crean
+  sesión (`/mcp/sse`, `initialize`) guardan siempre un usuario ya validado, así que no hay forma de llegar a
+  una sesión sin usuario por el flujo normal; el propio informe lo da como «inferido del código, no
+  explotable demostrado». No se pudo ejercer en el laboratorio; el código de la corrección (rechazar si no
+  hay usuario y revalidar por mensaje) sí se observa y queda cubierto de hecho por las pruebas de PNS-13.
+- **PNS-14 — CORREGIDO.** B: `ai.fetch.cache`→`AccessError`; `ai.api.result.cache.search_read`→solo su
+  fila (`create_uid=B`); `ai.safe.choice.search_read`→solo su fila (`user_id=B`). Coincide.
+- **PNS-21 — CORREGIDO.** `GET /pns_ai_mcp/session_file/<att de A>`: sin sesión → **404**; como B → **404**
+  (B no puede leer la sesión de A). Coincide (matiz: sin sesión devuelve 404, no una redirección a login).
+- **PNS-28 — CORREGIDO (parte probada).** `POST /mcp` **sin clave** (con la BD fijada por cookie) →
+  `API key required`; tras la petición, `ai_log` **no** gana ninguna fila (solo quedaba la de PNS-30).
+  Coincide con la parte corregida del seguimiento (PARCIAL; el resto es el CORS `*`, no probado aquí).
+- **PNS-30 — SIN CAMBIOS.** A RPC `ai.log.create_log_entry(user_id=B,'write','lab_tool_pns30',…)` → crea
+  una fila en `ai_log` con `user_id=B` (31) y `origin=internal`, hecha por A, sin `AccessError`.
+  (La primera llamada con `operation_type='action'` falló por un valor inválido de `access_mode`, ajeno
+  al hallazgo; con `'write'` creó la fila.) Coincide con el resto del seguimiento: el método público
+  `create_log_entry` sigue explotable por un interno.
+- **PNS-53 — CORREGIDO.** (Ver F29.) Coincide.
+- **PNS-55 — CORREGIDO (aislamiento de sesiones/jobs).** B: `chatboo.async.request.search_read` de A
+  →`[]`; `write`→`AccessError`. El resto (ACL de jobs y `claim_turn_file_chips`) se evalúa en PNS-82.
+- **PNS-56 — CORREGIDO.** B RPC `chatboo.session.write([CS_A],{'last_query_code':…})` → `AccessError`.
+  Coincide.
+- **PNS-57 — CORREGIDO.** B RPC `chatboo.async.request.create` sobre la sesión de A → `AccessError: A
+  Chatboo turn can only run in your own session.`; sobre la suya → crea (permitido); `spawn`→`AttributeError`;
+  `_spawn`→`AccessError` (privado). Coincide.
+- **PNS-58 — CORREGIDO.** `POST /chatboo/stream` con cookie de A y cuerpo de texto inocuo, **sin**
+  `csrf_token` → **400** `Session expired (invalid CSRF token)`. Coincide.
+- **PNS-71 — CORREGIDO.** `/chatboo/check_health` con A autenticado **sin clave MCP** → `status:error`,
+  `Chatboo access denied. An MCP API key is required.` Coincide.
+- **PNS-80 — YA NO APLICA / CORREGIDO.** B y P RPC `chatboo.async.request.read_progress`→`AttributeError`
+  (no existe). `/chatboo/async/poll` con B y el `session_id` de A → denegado por falta de clave MCP (no
+  entrega datos de A). Coincide.
+- **PNS-82 — SIN CAMBIOS (vulnerable hoy).** B RPC `chatboo.session.claim_turn_file_chips([CS_B],
+  [{'attachment_id': <att de A>}])` → `ok`; después el adjunto de A pasa a `res_model=chatboo.session`,
+  `res_id=CS_B`, y `GET /pns_ai_mcp/session_file/<att>` como B devuelve **200** con el contenido de A.
+  Coincide con el hallazgo (se esperaba que funcionara).
+- **PNS-83 — SIN CAMBIOS (vulnerable hoy).** A y P RPC `ai.mcp.user.redeem_key_pin(<valor con forma de PIN inexistente>)` →
+  `{'ok': false, 'error': 'invalid', 'counted': true}` (responde, sin `AccessError`); `ai.key.pin.block.
+  release_all()` → `0` (ejecuta, sin error). Ambos métodos públicos son invocables por un interno y por
+  un usuario de portal. Con PIN erróneo y **sin `ip`**, `ai_key_pin_block` **no** gana ninguna fila
+  (coincide con el hallazgo: sin `ip` no se cuenta ni se bloquea). Discrepancia menor: el `counted:true`
+  de la respuesta no se traduce en una fila de bloqueo cuando falta `ip`.
+- **PNS-85 — SIN CAMBIOS (vulnerable hoy).** A RPC `ai.skill.param.cache.remember_for_skill(<skill de
+  fábrica>, <frase de prueba>, <un parámetro estable ficticio>)` → crea la fila (id 1, `create_uid=SUPERUSER`), sin
+  `AccessError`. (Una primera llamada con `norm` de texto plano se saltó por payload no válido, no por
+  permisos.) Coincide con el hallazgo: método público sin control de grupo que escribe como superusuario.
+- **PNS-46 (DUDOSO) — SIN CAMBIOS (en lo observable).** Reconstrucción del contenido fijo del agente
+  `pns_ai_chatboo` **sin commit** (`_build_shared_content('es_ES')`, que ensambla sin persistir, y
+  rollback): el resultado (78097 caracteres) **no** contiene `1.234,56`, ni `In Spain`, ni el código
+  `corporate_terms_es_ES`; y es **idéntico en longitud** para `es_ES` y `en_US`. Los contextos
+  `corporate_terms` y `corporate_terms_es_ES` existen y están activos (tipo `locale`), pero **ninguno**
+  (ni el genérico) llega a la parte fija del prompt. Coincide con la sospecha del hallazgo (el glosario
+  `es_ES` no llega a la parte fija). No se comprobaron las vías por usuario ni de descubrimiento, que
+  requieren un turno con IA.
+
+### Bloque Writer (usuario C) — un AI Writer no puede hacer de administrador
+
+Todas las llamadas con C (AI Writer sin AI Administrator ni Ajustes):
+
+- **PNS-06 — CORREGIDO.** C crea con `ai.skill.create` una skill cuyo código (`code_body`) usa `sudo()`
+  para escribir en un registro → `ValidationError` (el validador rechaza la escritura con `sudo` al
+  guardar). Una skill de solo lectura (que devuelve un resultado válido) sí se guarda. Coincide.
+- **PNS-10 — CORREGIDO.** C `ai.context.write([CTX_C],{'owner_id':False})` y `ai.skill.write([SKILL_C],
+  {'owner_id':False})` con contexto RPC `skip_hardcoded_restrictions=True` → `UserError: Only
+  administrators can change context/skill ownership.` (la bandera del contexto se ignora). Coincide.
+- **PNS-24 — NO APLICA (comprobación de contexto: el Writer está bloqueado).** La prueba (C
+  `ir.module.module.write` → `AccessError`) solo comprueba el ACL estándar de Odoo (Administración/Ajustes);
+  el hallazgo es sobre la operación `module.update` ejecutada por el flujo del plan (y su atomicidad), no
+  sobre un AI Writer. Se mantiene el estado de la fase 2 (PARCIAL).
+- **PNS-48 — NO APLICA (comprobación de contexto: el Writer está bloqueado).** La prueba (C
+  `res.config.settings.create` → `AccessError`) solo reconfirma el ACL estándar `base.group_system`; el
+  hallazgo es la visibilidad del menú Settings para un AI Administrator y las acciones duplicadas. Se
+  mantiene el estado de la fase 2 (CORREGIDO).
+- **PNS-84 — NO APLICA (comprobación de contexto: el Writer está bloqueado).** La prueba (C no lee
+  `ai.key.pin.ask` ni `ai.mcp.user`) solo comprueba el ACL `group_ai_admin`; el hallazgo es lo que un AI
+  Administrator ve en claro (PIN y clave MCP). Se mantiene el estado de la fase 2 (NUEVO).
+- **PNS-86 — NO APLICA (comprobación de contexto: el Writer está bloqueado).** La prueba (C no crea
+  `ai.openapi.spec.generate.wizard`) solo comprueba el ACL `group_ai_admin`; el hallazgo es el SSRF que
+  ejecuta un AI Administrator. Se mantiene el estado de la fase 2 (NUEVO).
+
+### Limpieza (paso 4)
+
+Borrados con `SELECT` de verificación a 0: usuarios `lab_perm_*` (A incluido), sus `ai.mcp.user` (3),
+`chatboo.session` (2), `chatboo.async.request` (2), `ai.safe.operation` (1), `ai.safe.choice` (2),
+`ai.api.result.cache` (2), `ai.skill.param.cache` (1, de PNS-85), `ai.api.server` lab (1), `ir.attachment`
+lab (2), `ai.skill` lab (2), `ai.context` lab (2), `ai.log` lab (1, de PNS-30). `ai.key.pin.block`: 0 (no
+se creó ninguno). **Los 5 `ai.api.server` de fábrica siguen intactos e inactivos**: `mcp_test`,
+`brave_search`, `seq_thinking`, `sesame`, `cdmon`. La BD `lab_pns_ai_14` no se borró.
+
+**Ampliación PNS-13 (2026-10-14):** el usuario de prueba **D** (`lab_perm_d`, grupo
+`pns_ai_mcp.group_ai_conversational`) y su `ai.mcp.user`/clave MCP se borraron al terminar; no se creó E.
+`SELECT` de verificación: 0 usuarios `lab_perm_d`/`lab_perm_e`, 0 `ai.mcp.user` huérfanos, 5 `ai.api.server`
+de fábrica intactos.
+
+### Tabla final (PNS/F · estado fase 2 · resultado laboratorio · ¿coinciden?)
+
+| PNS/F | Estado fase 2 | Resultado laboratorio | ¿Coinciden? |
+|---|---|---|---|
+| F-A / PNS-01 | PARCIAL | CORREGIDO (vector RPC) | Sí (vector RPC) |
+| F-B / PNS-02 | PARCIAL | CORREGIDO (vector RPC) | Sí (vector RPC) |
+| F-C / PNS-11 | CORREGIDO | CORREGIDO | Sí |
+| F-D / PNS-03 | CORREGIDO | CORREGIDO | Sí |
+| F29 / PNS-53 | CORREGIDO | CORREGIDO | Sí |
+| F8 / PNS-08 | CORREGIDO | CORREGIDO | Sí |
+| F2 (portal) | CORREGIDO | CORREGIDO | Sí |
+| PNS-09 | CORREGIDO | CORREGIDO | Sí |
+| PNS-12 | CORREGIDO | CORREGIDO | Sí |
+| PNS-13 | CORREGIDO | CORREGIDO (clave revocada y usuario archivado → 401 + sesión cerrada) | Sí |
+| PNS-79 | CORREGIDO | NO CONCLUYENTE (no alcanzable en caja negra) | Parcial |
+| PNS-14 | CORREGIDO | CORREGIDO | Sí |
+| PNS-21 | CORREGIDO | CORREGIDO | Sí |
+| PNS-28 | PARCIAL | CORREGIDO (parte de `ai.log`) | Sí (parte probada) |
+| PNS-30 | PARCIAL | SIN CAMBIOS (resto reproducido) | Sí |
+| PNS-55 | PARCIAL | CORREGIDO (aislamiento) / ver PNS-82 | Sí |
+| PNS-56 | CORREGIDO | CORREGIDO | Sí |
+| PNS-57 | CORREGIDO | CORREGIDO | Sí |
+| PNS-58 | CORREGIDO | CORREGIDO | Sí |
+| PNS-71 | CORREGIDO | CORREGIDO | Sí |
+| PNS-80 | YA NO APLICA | YA NO APLICA | Sí |
+| PNS-82 | NUEVO (sin corregir) | SIN CAMBIOS (vulnerable) | Sí |
+| PNS-83 | NUEVO (sin corregir) | SIN CAMBIOS (vulnerable) | Sí |
+| PNS-85 | NUEVO (sin corregir) | SIN CAMBIOS (vulnerable) | Sí |
+| PNS-46 | DUDOSO | SIN CAMBIOS (ausente de la parte fija) | Señal concreta |
+| PNS-06 | CORREGIDO | CORREGIDO | Sí |
+| PNS-10 | CORREGIDO | CORREGIDO | Sí |
+| PNS-24 | PARCIAL | NO APLICA (contexto: Writer bloqueado) | — (se mantiene PARCIAL) |
+| PNS-48 | CORREGIDO | NO APLICA (contexto: Writer bloqueado) | — (se mantiene CORREGIDO) |
+| PNS-84 | NUEVO | NO APLICA (contexto: Writer bloqueado) | — (se mantiene NUEVO) |
+| PNS-86 | NUEVO | NO APLICA (contexto: Writer bloqueado) | — (se mantiene NUEVO) |
+
+**Discrepancias / matices:**
+1. **PNS-13:** verificado con un usuario D del grupo mínimo `group_ai_conversational` (ampliación del
+   2026-10-14): la revalidación por mensaje funciona para clave revocada y para usuario archivado (401 +
+   sesión cerrada + fin del stream). Matiz: hay que mantener el stream SSE abierto durante la prueba, porque
+   al cerrarlo la sesión se cierra sola a los pocos segundos. **PNS-79** (sesión sin usuario → `SUPERUSER_ID`)
+   queda **NO CONCLUYENTE**: no es alcanzable en caja negra porque las rutas que crean sesión guardan siempre
+   un usuario validado.
+2. **PNS-21:** sin sesión devuelve **404** en lugar de redirigir al login; el efecto (no se entrega el
+   archivo) es el esperado.
+3. **PNS-83:** la respuesta trae `counted:true`, pero sin `ip` **no** se crea fila en `ai.key.pin.block`
+   (no hay límite efectivo), como dice el hallazgo.
+4. **PNS-46:** el laboratorio aporta una señal concreta que la fase 2 dejó como DUDOSO: ni el glosario
+   `es_ES` ni el genérico `corporate_terms` llegan a la parte fija del prompt, y esa parte es idéntica para
+   `es_ES` y `en_US`.
+5. **PNS-24, 48, 84, 86 (bloque Writer):** las pruebas solo confirman que un AI Writer queda bloqueado por
+   el ACL estándar (Ajustes o `group_ai_admin`), pero el hallazgo de cada uno es sobre otro rol u otra
+   operación (la ejecución de `module.update` por el plan; la visibilidad del menú del AI Administrator; lo
+   que ve en claro un AI Administrator; el SSRF del AI Administrator). Por eso pasan a **NO APLICA
+   (comprobación de contexto)** y se conserva el estado de la fase 2; no aportan evidencia sobre el
+   hallazgo en sí.
