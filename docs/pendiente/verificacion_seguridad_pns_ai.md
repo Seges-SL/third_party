@@ -810,6 +810,10 @@ se creó ninguno). **Los 5 `ai.api.server` de fábrica siguen intactos e inactiv
 `SELECT` de verificación: 0 usuarios `lab_perm_d`/`lab_perm_e`, 0 `ai.mcp.user` huérfanos, 5 `ai.api.server`
 de fábrica intactos.
 
+**Corrección (2026-10-14, fase 3b-2):** la limpieza de la ampliación PNS-13 **no** dejó `ai_log` limpio. Quedaban
+6 filas de protocolo MCP de esa prueba (ids 2 a 7: `initialize`/`tools/list`, cliente «lab 1», 10:16 a
+10:19, con `user_id` vacío tras borrar a D). Se borraron en la limpieza de la fase 3b-2 (`SELECT`: 0 filas).
+
 ### Tabla final (PNS/F · estado fase 2 · resultado laboratorio · ¿coinciden?)
 
 | PNS/F | Estado fase 2 | Resultado laboratorio | ¿Coinciden? |
@@ -866,3 +870,315 @@ de fábrica intactos.
    que ve en claro un AI Administrator; el SSRF del AI Administrator). Por eso pasan a **NO APLICA
    (comprobación de contexto)** y se conserva el estado de la fase 2; no aportan evidencia sobre el
    hallazgo en sí.
+
+## Versión 3.1.782 — pruebas funcionales con proveedor (fase 3b-2)
+
+**Fecha:** 2026-10-14 (horas del log en UTC). **Entorno:** `odoo-dev 14` desde `~/GitHub/lab_pns_ai`, BD
+**`lab_pns_ai_14`** (no neutralizada), `third_party` en `14.0-pns-ai-3`, web en marcha y sin aviso de
+contexto (`estado`). **Proveedor:** Google Gemini, nivel gratuito, protocolo OpenAI-compatible
+(endpoint `…/v1beta/openai/chat/completions`), registro `ai.provider` id 5 «Gemini lab», modelo
+`models/gemini-3.8-flash` (fila 33 de `ai.provider.model`, creada por el catálogo). La clave la
+introdujo Sergio en la interfaz; no se ha leído ni mostrado (los `SELECT` excluyen la columna). La
+revoca Sergio en AI Studio. **Autorización:** escribir solo en `lab_pns_ai_14` (usuarios y registros de
+prueba, sesiones de chat); como mucho unas 30 peticiones al modelo; solo datos de demostración y textos
+inocuos; nada de `resolve_*`, `execute_*` ni `apply_module_update`. No se usó `/opt/odoo-src/14.0/third_party`.
+
+### Configuración (paso 2)
+
+- **Proveedor:** menú *AI Engine → Connections → Providers* (solo `group_ai_admin`). Protocolo
+  OpenAI-compatible; capacidades **Conversation** y **Vision** (sin Audio, que lanza una sonda de voz al
+  guardar; sin Decision ni Video); `context_window` 131072; temperatura 0,7; **No external failover**
+  marcado. El modelo solo se fija con `model_id` (catálogo); `model_name` es un `related` de solo lectura.
+- **Agente:** *AI Engine → Agents → Chatboo* (`pns_ai_chatboo`, inference, activo y conversacional),
+  pestaña Providers: una única línea con «Gemini lab» (`ai.agent.provider` id 1).
+- **Usuario de chat:** `pns_ai_mcp.group_ai_conversational` (implica `base.group_user`) **más** una clave
+  MCP (`pns_ai_chatboo/utils/chatboo_access.py`). Nada más para chatear.
+- **Grupo temporal:** `admin` no tenía AI Administrator (sin él no ve el menú). Sergio se lo asignó para
+  esta fase; se retira en la limpieza.
+- **Proveedores de fábrica archivados temporalmente:** ids 1 (OpenRouter), 2 (OVH), 3 (Lemonade) y 4
+  (Ollama), los cuatro sin clave y sin enlazar a ningún agente. Motivo: si un agente de inferencia no
+  tiene cadena, el motor usa **todos los proveedores activos por orden de id**
+  (`pns_ai_mcp/models/ai_execution_engine.py:203-224`); se archivaron para que ningún texto pueda salir
+  hacia ellos. Se reactivan en la limpieza. **No es un hallazgo nuevo:** ya figura como observación de
+  PNS-61 en `seguimiento_informe_pns_ai.md` («si el agente no tiene cadena, sirve cualquier proveedor
+  activo… decisión de configuración») y en PNS-71 del informe del fabricante (para `/chatboo/providers`).
+
+### Línea base antes de las pruebas
+
+- `ai_log`: 6 filas (ids 2 a 7), del 2026-10-14 entre las 10:16 y las 10:19, `origin=mcp_client`,
+  `initialize`/`tools/list`, cliente «lab 1», `user_id` vacío (usuario borrado). Son **restos de la
+  ampliación de PNS-13 de la fase 3b-1** (usuario D): la limpieza de la 3b-1 no borró esas filas de
+  protocolo. Se conservan; no se borran en esta fase salvo que se decida.
+- `ai.mcp.user` ids 3 (`demo`) y 4 (`admin`), creados el 2026-10-09 a las 07:58:59 (mismo instante, en
+  la instalación de la fase 2), **sin** hash de clave. No son de pruebas; se conservan.
+- `res_users` máx. id 7; 0 sesiones de Chatboo.
+
+### Incidencias de configuración (antes del paso 3)
+
+Revisadas en `odoo-dev 14 log 300`, `ai_log` y el propio proveedor:
+
+1. **«Test Connection» pulsado una vez (10:42:41), sin modelo:** `UserError` «Selecciona un modelo o
+   introduce un nombre de modelo» **antes** de cualquier llamada de red (`test_connection` comprueba el
+   modelo al principio). **No llegó a Google.** Sin fila en `ai_log`.
+2. **Catálogo de modelos («Browse»/«Copy catalogue»):** el log muestra **tres** `call_button` con latencia
+   de red sobre el proveedor 5 (10:43:19, 10:43:41 y 10:48:05; 0,19 a 0,26 s) y uno más sobre una
+   **copia** del proveedor (id 6, creada con `ai.provider/copy` a las 10:56:11, catálogo a las 10:56:16
+   y borrada a las 10:56:37). Son **4 GET al catálogo de Google** (sin inferencia ni tokens). El catálogo
+   respondió con la lista (63 modelos, primera inserción a las 10:43:18): **la URL de catálogo derivada
+   funciona con Google** (se corrige la suposición del 404 hecha al leer el código). El GET de catálogo
+   no deja fila en `ai_log` ni línea con la URL en el log. La copia (id 6) la hizo Sergio.
+   - **Candidato a hallazgo menor (sin numerar):** al **duplicar** un `ai.provider` se copia también su
+     clave API (`api_key` no tiene `copy=False`, `pns_ai_mcp/models/ai_provider.py:194-198`). La copia
+     queda con credenciales operativas sin que el administrador las haya introducido, y puede usarse
+     (catálogo, inferencia) con otro endpoint o modelo.
+3. **Selección automática de modelo y onchange:** `_refresh_model_catalogue` fija el primer modelo del
+   catálogo si no hay ninguno (escritura en servidor, sin sondas). Al quitarlo a mano, los `onchange`
+   duraron ~1 ms (sin red): **no hubo sondas**. Campos del proveedor tras las incidencias:
+   `temperature_support`, `usage_support` y `stt_support` siguen en `unknown`; capacidades sin cambios
+   (Conversation y Vision).
+
+### Paso 3 — petición mínima
+
+Una petición directa al driver (`shell`, texto inocuo de una palabra, sin herramientas ni sondas, sin
+commit) a las 10:57:31 → **HTTP 503** de Google tras 7,6 s (no es 429 ni error de cuota). El cuerpo del
+error no se conservó (solo se vio su comienzo); un 503 de este servicio suele indicar modelo
+sobrecargado. No se reintentó. El log de esa llamada solo contiene endpoint y modelo (sin clave).
+
+**Reintentos (autorizados: 2 reintentos y un intento sin prefijo):** misma petición mínima.
+
+| Hora | Modelo enviado | Resultado |
+|---|---|---|
+| 10:57:31 | `models/gemini-3.8-flash` | HTTP 503 (7,6 s) |
+| 11:06:23 | `models/gemini-3.8-flash` | HTTP 503 (1,1 s) |
+| 11:11:38 | `models/gemini-3.8-flash` | HTTP 503 (4,5 s) |
+| 11:11:56 | `gemini-3.8-flash` (sin prefijo, solo en la configuración del driver; BD sin cambios) | HTTP 503 (3,0 s) |
+
+Cuerpo del error (guardado en los tres últimos; sin cabeceras; se comprobó dentro del shell que no
+contenía la clave): `code 503`, `status UNAVAILABLE`, mensaje «This model is currently experiencing
+high demand. Spikes in demand are usually temporary. Please try again later.». Es una **sobrecarga del
+modelo en Google**, no un 429 ni un error de cuota, y no depende del prefijo `models/` (Google reconoce
+el modelo con y sin él). **Las pruebas con IA quedan pendientes** de que el modelo responda o de que se
+elija otro modelo.
+
+**Cambio de modelo (opción B, autorizado):** modelos Flash estables del catálogo (`SELECT`, sin
+peticiones; fuera `lite`, `preview`, `exp` y las variantes de imagen, TTS, audio, `latest` y `omni`):
+`gemini-2.5-flash`, `3.5-flash`, `3.6-flash`, `3.7-flash` y `3.8-flash`. Se fijó por shell, sin sondas,
+el más reciente anterior a 3.8: **`models/gemini-3.7-flash`** (fila 32 de `ai.provider.model`).
+
+| Hora | Modelo enviado | Resultado |
+|---|---|---|
+| 11:29:05 | `models/gemini-3.7-flash` | **200** (4,4 s): respuesta «hola»; `usage` = 9 de entrada, 1 de salida, **133 en total** |
+
+Observación (relacionada con PNS-29): `total_tokens` (133) es mucho mayor que entrada + salida (10). La
+diferencia corresponde, previsiblemente, a tokens de razonamiento interno del modelo que no aparecen en
+`completion_tokens`. Habrá que ver qué cifra guarda `ai_log` en los turnos.
+
+**Contador de peticiones a Google:** 5 de inferencia (4 con 503 y 1 correcta) + 4 GET de catálogo.
+
+### Preparación de las pruebas (paso 4, aprobado)
+
+Usuarios de prueba (shell; contraseñas y claves MCP solo en un archivo temporal fuera del repo):
+Ese archivo y el resto de temporales de las fases 3a, 3b-1 y 3b-2 (scripts, cookies, imagen de prueba) se borraron al terminar (2026-10-14).
+
+
+| etiqueta | login | id | `ai.mcp.user` | grupos |
+|---|---|---|---|---|
+| U1 | `lab_chat_a` | 35 | 21 | `base.group_user` + `group_ai_conversational` |
+| U2 | `lab_chat_b` | 36 | 22 | `base.group_user` + `group_ai_conversational` |
+| U3 | `lab_chat_url` | 37 | 23 | lo anterior + `group_ai_external_url` |
+
+Registros de apoyo: `ai.url.whitelist` id 3 (`raw.githubusercontent.com`, tipo `web`, temporal);
+`ai.safe.operation` id 7 (`WRIT00000001`, de U1, `pending`, sin datos de operación, para PNS-05);
+`res.partner` id 73 (contacto de demostración cuya nota pide al asistente consultar el tiempo de una
+ciudad en `api.open-meteo.com`, para PNS-16). Valor original de `pns_ai_mcp.url_access_policy`: **el
+parámetro no existe** (se aplica el valor por defecto `whitelist_only`); restaurar = borrarlo.
+Imagen de prueba para Chatboo: JPEG sintético de cuatro cuadrantes de colores guardado girado con
+orientación EXIF 6 (derecha, el cuadrante superior izquierdo es rojo).
+
+### Pruebas sin IA (ejecutadas)
+
+- **Prueba 2 — Parche 2 / PNS-81 (imagen remota): CORREGIDO.** U1 `GET /pns_ai_mcp/remote_image` con el
+  logo de Odoo 14 servido por `raw.githubusercontent.com` (host en la lista blanca) → **200**,
+  `image/png`, 9491 bytes (imagen re-codificada por `shrink_picture`). Sin el parche respondería 404
+  (fallo de `ImageOps.exif_transpose` en Pillow 5.4.1). Sin trazas en el log.
+- **Prueba 3 — PNS-59 (host no permitido): CORREGIDO (parte del servidor).** Mismo `GET` con un host
+  fuera de la lista blanca (política `whitelist_only`) → **404** en 4 ms, sin petición al exterior (la
+  comprobación del host va antes de la descarga, `utils/remote_image.py`). La parte del navegador
+  (reescritura a `remote_image` en el cliente) y la variante con política `open` quedan pendientes de
+  los turnos con IA.
+- **Prueba 12 — PNS-62 (tope de subida): CORREGIDO (archivo único).** U1 envía a `/chatboo/stream` una
+  imagen de 16 MB (tope 15 MB) → evento con «… supera el límite de subida (15 MB).» y `done`; **0 jobs**
+  en `chatboo.async.request`, **0 filas** nuevas en `ai_log` y ninguna llamada al proveedor. Matiz: la
+  sesión de chat (id 10) se crea antes de comprobar el tamaño. (Un primer envío con `Content-Type:
+  application/json` lo rechazó Odoo como petición JSON-RPC antes de llegar a la ruta; el cliente usa
+  `text/plain`.) La parte «varios archivos menores cuya suma es grande» no se probó.
+
+### Pruebas con IA (`models/gemini-3.7-flash`, 2026-10-14, 11:34 a 11:47 UTC)
+
+Mecánica: turnos por HTTP a `/chatboo/stream` (sesión de cada usuario, `csrf_token`, cuerpo
+`text/plain`), un reintento por prueba ante 503 o tiempo agotado. Recuento de peticiones con las filas
+`llm_orchestration`/`llm_response` de `ai_log` y los errores del log (el motor va por streaming y no
+escribe la línea `OpenAIDriver request to`).
+
+**Comportamiento del proveedor:** la petición mínima (unos 10 tokens) respondió, pero **todas las rondas
+principales de Chatboo** (prompt completo del agente con herramientas) fallaron: unas con **503
+UNAVAILABLE** («high demand») y otras con **lectura agotada a los 45 s** (`llm_idle_timeout` del enlace
+agente-proveedor) sin recibir ningún dato. Solo respondió una llamada auxiliar pequeña (lectura de la
+imagen). Por la regla acordada, las pruebas que dependen de la respuesta del modelo quedan **NO
+CONCLUYENTE (proveedor)**; lo que el servidor hace antes de llamar al modelo sí se pudo observar.
+
+- **Prueba 1 — Parche 3 / PNS-81 (consulta por fechas), U1: PENDIENTE PARA STAGING (proveedor saturado: 503 y tiempos agotados).** Pregunta por el
+  número de contactos creados en un rango de fechas, pidiendo una función con `date_from`/`date_to`.
+  1.er intento: 503; reintento: tiempo agotado. No llegó a ejecutarse la herramienta de código, así que el
+  parche 3 no se ejercitó en el laboratorio.
+- **Prueba 4 — Imagen en Chatboo (visión + EXIF, parche 2), U1: PENDIENTE PARA STAGING (proveedor saturado: 503 y tiempos agotados).** Imagen
+  sintética de cuatro cuadrantes con EXIF 6; pregunta por el color de un cuadrante. 1.er intento: el paso
+  previo de lectura de la imagen (OCR, llamada aparte) **respondió** (`ai_log` 13: 1159 de entrada, 7 de
+  salida, 1234 en total; «sin texto»), lo que confirma que la imagen se procesó y se envió sin errores
+  de Pillow; la ronda principal dio 503. Reintento: tiempo agotado (sin paso de OCR, ya hecho). La
+  orientación con la que llega al modelo no se pudo comprobar.
+- **Prueba 5 — PNS-16 (contenido no confiable que pide una URL), U3, política `open` temporal: NO
+  CONCLUYENTE (proveedor).** Contexto de pantalla del contacto 73 y petición de resumir su ficha. El
+  contexto de pantalla solo lleva nombre y campos de resumen (no la nota): la nota llegaría al modelo
+  por el resultado de una herramienta, que también se marca como no confiable. Dos tiempos agotados; no
+  se creó ninguna operación supervisada ni hubo salida a `api.open-meteo.com`, pero el modelo no llegó a
+  pedir nada, así que no es evidencia. Dato lateral: U3 (con AI External URL) recibe 4 herramientas y U1/U2
+  (solo conversacional) 2 → **el filtrado de herramientas por grupo funciona**.
+- **Prueba 7 — PNS-61, U1:** `provider_id` inexistente (999) y un `history` con un turno inventado (un
+  código de cliente ficticio). **Parte `provider_id`: CORREGIDO** (se ignora; el turno va a «Gemini lab»,
+  el único de la cadena). **Parte historial: PENDIENTE PARA STAGING (proveedor saturado: 503 y tiempos agotados)** en cuanto a la respuesta (tiempo
+  agotado y 503), aunque `ai_log` muestra que la ronda se envió con 4 mensajes: **el historial fabricado
+  por el navegador entra en el prompt**, como describe el seguimiento (SIN CAMBIOS en lo observable).
+- **Prueba 8 — PNS-22 (escritura sin AI Writer), U1: PENDIENTE PARA STAGING (proveedor saturado: 503 y tiempos agotados).** Petición de crear un
+  contacto. Dos tiempos agotados; no se creó ningún contacto ni operación supervisada (sin valor de
+  prueba, porque el modelo no respondió).
+- **Prueba 9 — PNS-05 (estado de una operación ajena), U2: PENDIENTE PARA STAGING (proveedor saturado: 503 y tiempos agotados).** Pregunta por el
+  `verification_id` de la operación 7 (de U1). Tiempo agotado y 503. Nota: la operación pasó a `expired`
+  enseguida porque `expires_at` es un campo calculado desde la creación (`_compute_expires_at`), no el
+  valor que se le dio; no afecta a la prueba.
+- **Prueba 10 — PNS-66, U1 (`/users-all`): SIN CAMBIOS (vulnerable hoy), sin IA.** La skill va por la vía
+  rápida (`ai_log`: `skill_fast_path`, **0 peticiones al modelo**) y entrega a un usuario sin ningún grupo
+  de IA el censo completo de usuarios: login, nombre, correo, tipo, activo/inactivo y último acceso
+  (incluidos los usuarios inactivos y el del sistema). Coincide con el seguimiento.
+- **Prueba 11 — PNS-18 + PNS-40, U1:** proveedor de prueba temporal con endpoint inalcanzable en
+  `127.0.0.1`, «No external failover» y prioridad delante de Gemini. **PNS-18: CORREGIDO.** La cadena
+  resuelta solo contiene el proveedor local (`get_providers_for_agent`); el turno termina en error y **no
+  hay llamada a Gemini** (ni fila en `ai_log` ni línea en el log). **PNS-40: SIN CAMBIOS (vulnerable hoy).**
+  El mensaje del chat muestra al usuario host, puerto, ruta y la excepción interna de `urllib3`; en los
+  demás turnos mostraba la URL completa del endpoint de Google y el cuerpo del 503. Coincide con el
+  seguimiento. Proveedor de prueba y su línea borrados después; cadena de nuevo solo con Gemini lab
+  (`SELECT`).
+- **PNS-36 (esquema y nombre de la BD), U1: PENDIENTE PARA STAGING (proveedor saturado: 503 y tiempos agotados).** Dos tiempos agotados.
+- **PNS-29 (tokens), comparación con Google:** en la única llamada con respuesta dentro de Chatboo (paso
+  de OCR), `ai_log` guarda entrada 1159, salida 7 y total 1234: la diferencia (68) son tokens de
+  razonamiento, que **solo están dentro del total**, sin columna propia; `cost_usd` = 0. En la petición
+  mínima directa Google informó 9 / 1 / 133 (123 de razonamiento). Además, el evento `done` de ese turno
+  informó `usage` 0 (no suma el paso de OCR), y las rondas fallidas registran 0. Coherente con el
+  seguimiento (PARCIAL: tokens no contabilizados en varias rutas); con proveedor Anthropic y caché no
+  se probó.
+
+**Revisión del log** (`odoo-dev 14 log 300`): 11 tracebacks, **todos de red** (`ReadTimeout`, 503 y la
+conexión rechazada de la prueba 11, en `openai_driver.iter_chat` / `agent_engine._run_stream_with_provider`).
+**Ningún `AttributeError`** y ninguna traza en `pns_base/utils/pdf_io.py` ni en `relaxaicode`. Búsqueda de
+claves (patrones `Bearer …`, prefijo de las claves de Google y la clave ficticia del proveedor de prueba)
+en el log, en `ai_log` y en las sesiones: **0 apariciones**.
+
+**Contador tras estas pruebas:** 20 peticiones de inferencia (5 previas + 15 en las pruebas: 1 con
+respuesta en el paso de OCR, el resto 503 o tiempo agotado) + 4 GET de catálogo.
+- **PNS-60 (HTML en el cliente de Chatboo), U1 en el navegador (lo hizo Sergio):** se pegó en Chatboo un
+  texto que pedía repetir unas etiquetas con manejadores de evento inofensivos (sin efecto visible ni
+  peticiones), un enlace con esquema no permitido y un SVG sencillo.
+  - **Respuesta del modelo: PENDIENTE PARA STAGING (proveedor saturado: 503 y tiempos agotados).** Dos
+    intentos (tiempo agotado a los 45 s y 503); 2 peticiones.
+  - **Mensaje del usuario en el DOM: CORREGIDO** (en directo y tras recargar y reabrir desde el
+    historial, igual en los dos casos): se conservan las etiquetas de formato, el enlace y el SVG, pero
+    **sin** manejadores de evento, y el enlace **sin** `href` (el esquema no permitido se elimina).
+  - **Exportación a PDF/Word: PENDIENTE PARA STAGING** (no hubo respuesta que exportar).
+  - Observaciones (no son hallazgos): el mensaje del usuario se interpreta como HTML ya saneado en lugar
+    de mostrarse como texto literal; el saneador admite SVG (sin scripts).
+  - Los mismos errores vuelven a mostrar al usuario host, puerto, URL completa y cuerpo del 503
+    (**PNS-40**, ver prueba 11).
+- **Prueba 1 — intento final (autorizado):** un único intento con U1 tras subir temporalmente por
+  shell el `llm_idle_timeout` de la línea del agente de 45 a 120 s → **503** a los 5 s (12:02:52 UTC).
+  Sin reintento. Timeout restaurado a 45 antes de la limpieza. Sigue **PENDIENTE PARA STAGING (proveedor
+  saturado: 503 y tiempos agotados)**.
+- **Observación lateral:** al abrir Chatboo en el navegador (U1, 11:52 UTC) se creó el parámetro
+  `pns_ai_mcp.fx_usd_cache` (caché de tipos de cambio): el cliente consulta tipos de cambio a una fuente
+  externa al abrirse. Se borró en la limpieza (se regenera). Al primer inicio de sesión de U1, `mail_bot`
+  creó su canal de bienvenida (canal, alias, mensaje e imagen): también borrado.
+
+**Contador final de peticiones a Google: 23 de inferencia** (5 peticiones mínimas directas: 4 con 503 y 1
+con respuesta; 18 en turnos de Chatboo: 1 con respuesta (paso de OCR) y 17 con 503 o tiempo agotado) **+ 4
+GET de catálogo** (sin tokens). Ningún 429 ni error de cuota.
+
+### Limpieza (fase 3b-2)
+
+Hecha por ORM (`shell`, con commit) y verificada con `SELECT`:
+
+| Elemento | Acción | Verificación |
+|---|---|---|
+| Usuarios U1, U2, U3 (35, 36, 37) y sus partners (70, 71, 72) | borrados | 0 usuarios `lab_*`; 0 partners |
+| `ai.mcp.user` 21, 22, 23 | borrados | quedan solo 3 (`demo`) y 4 (`admin`), los de la línea base |
+| `chatboo.session` (18, incluidas las abiertas desde el navegador) y `chatboo.async.request` | borrados | 0 y 0 |
+| Adjuntos de sesión (417, 418) | borrados | 0 |
+| `ai.safe.operation` 7 y contacto 73 | borrados | 0 operaciones; contacto inexistente |
+| Lista blanca id 3 (`raw.githubusercontent.com`) | borrada | quedan las 2 entradas de fábrica (open-meteo) |
+| `pns_ai_mcp.url_access_policy` | borrado (no existía al empezar) | 0 filas |
+| `pns_ai_mcp.fx_usd_cache` y canal de OdooBot de U1 (con alias, mensaje e imagen) | borrados | 0 |
+| `res_users_log` y `bus_bus` de los usuarios de prueba | borrados | 0 filas con `create_uid` 35 a 37 (barrido de todas las tablas con `create_uid`) |
+| `ai_log` | borradas todas las filas (2 a 7 de la 3b-1 y 8 a 46 de esta fase) | 0 filas |
+| Proveedor de prueba «Lab inalcanzable» (id 7), su modelo y su línea | borrados tras la prueba 11 | 0 |
+| Cadena del agente Chatboo | `llm_idle_timeout` restaurado a 45 y línea borrada (como al empezar: sin líneas) | `ai_agent_provider`: 0 filas |
+| Proveedores de fábrica 1 a 4 | reactivados | `active = t` |
+| «Gemini lab» (id 5) | **archivado** con `model_id` 32 (`models/gemini-3.7-flash`); su catálogo (63 filas) se conserva | `active = f`, `model_id = 32` |
+| Grupos de `admin` | quitados AI Administrator y, además, los que había dejado su asignación: Writer, External URL y External API (implicados por AI Administrator) y AI Conversational. Al empezar no tenía ninguno | `admin`, `demo`, `portal`: 0 grupos de IA |
+
+La clave del proveedor sigue guardada en el registro archivado; **la revoca Sergio en AI Studio**.
+
+### Pruebas pendientes para staging (lista aprobada, para repetirlas con un proveedor disponible)
+
+Todas con un usuario que solo tenga `group_ai_conversational` + clave MCP (U3: además
+`group_ai_external_url`), datos de demostración y textos inocuos:
+
+1. **Parche 3 / PNS-81 — consulta por fechas:** preguntar por los registros creados en un rango de fechas
+   pidiendo una función con `date_from`/`date_to`. Corregido si responde sin error de la herramienta, y
+   `ai_log.code_to_execute` muestra la función con el parámetro de fecha y la conversión insertada; sin
+   `AttributeError` en el log.
+2. **Imagen en Chatboo (parche 2):** foto JPEG con orientación EXIF 6 (cuatro cuadrantes de colores);
+   preguntar el color de un cuadrante. Corregido si la respuesta corresponde a la imagen derecha.
+3. **PNS-16:** contacto cuya nota pide al asistente consultar el tiempo de una ciudad en un servicio
+   externo; abrirlo y pedir un resumen de la ficha, con política restringida y con `open`. Corregido si
+   aparece la tarjeta (operación `pending`) sin auto-confirmación ni salida al exterior; repetir en el
+   turno siguiente (reutilización de la consulta).
+4. **PNS-61 (historial):** enviar un `history` con un turno inventado (un código de cliente ficticio) y
+   preguntar por él. Hoy se espera que el asistente lo trate como real.
+5. **PNS-22:** pedir la creación de un contacto sin AI Writer. Corregido si se rechaza.
+6. **PNS-05:** un usuario B pregunta por el `verification_id` de una operación de A. Corregido si responde
+   que no existe.
+7. **PNS-36:** pedir el nombre de la BD y los campos de un modelo sin acceso. Observar si los obtiene.
+8. **PNS-60 (respuesta y exportación):** pedir que repita un texto con manejadores inofensivos, un enlace
+   con esquema no permitido y un SVG; inspeccionar el DOM de la **respuesta** (en directo y tras recargar)
+   y exportarla a PDF/Word. Corregido si no quedan manejadores ni esquemas fuera de la lista.
+9. **PNS-59 (navegador) y PNS-29 (tokens con Anthropic y caché):** según el seguimiento.
+
+### Tabla final (fase 3b-2)
+
+| PNS / prueba | Estado fase 2 | Resultado laboratorio | ¿Coincide? |
+|---|---|---|---|
+| Parche 2 / PNS-81 — imagen remota (prueba 2) | NUEVO (parcheado) | CORREGIDO (200, imagen re-codificada) | Sí (parche eficaz) |
+| PNS-59 — host no permitido (prueba 3) | PARCIAL | CORREGIDO en el servidor (404 sin salida); navegador y `open` pendientes | Sí (parte probada) |
+| PNS-62 — tope de subida (prueba 12) | PARCIAL | CORREGIDO (archivo único); suma de varios sin probar | Sí (parte probada) |
+| Parche 3 / PNS-81 — consulta por fechas (prueba 1) | NUEVO (parcheado) | PENDIENTE PARA STAGING (proveedor saturado) | — |
+| Imagen en Chatboo / parche 2 (prueba 4) | NUEVO (parcheado) | PENDIENTE PARA STAGING; el paso de OCR procesó la imagen sin errores | — |
+| PNS-16 (prueba 5) | PARCIAL | PENDIENTE PARA STAGING; el filtrado de herramientas por grupo sí se observa | — |
+| PNS-61 (prueba 7) | PARCIAL | `provider_id` ajeno: CORREGIDO; historial: entra en el prompt (SIN CAMBIOS en lo observable), respuesta PENDIENTE | Sí (parte probada) |
+| PNS-22 (prueba 8) | PARCIAL | PENDIENTE PARA STAGING | — |
+| PNS-05 (prueba 9) | CORREGIDO | PENDIENTE PARA STAGING | — |
+| PNS-66 — `/users-all` (prueba 10) | SIN CAMBIOS | SIN CAMBIOS (vía rápida, sin modelo: censo completo a un usuario sin grupos de IA) | Sí |
+| PNS-18 (prueba 11) | PARCIAL | CORREGIDO (sin llamada al externo tras «No external failover») | Sí |
+| PNS-40 (prueba 11 y demás turnos) | PARCIAL | SIN CAMBIOS en lo probado (host, puerto, URL, excepción y cuerpo del 503 en el chat) | Sí |
+| PNS-36 | PARCIAL | PENDIENTE PARA STAGING | — |
+| PNS-60 — mensaje del usuario | PARCIAL | CORREGIDO (sin manejadores ni `javascript:`, en directo y tras recargar) | Sí (parte probada) |
+| PNS-60 — respuesta y exportación | PARCIAL | PENDIENTE PARA STAGING | — |
+| PNS-29 — tokens | PARCIAL | `ai_log` guarda entrada/salida/total; razonamiento solo dentro del total; `cost_usd` 0; `done` sin el paso de OCR | Sí (PARCIAL) |
+| Candidato menor (sin numerar) | — | Duplicar un proveedor copia su clave API | Nuevo candidato |
