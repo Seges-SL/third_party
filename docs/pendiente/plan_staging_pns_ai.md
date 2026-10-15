@@ -544,8 +544,11 @@ Propuesta de este plan a partir de las decisiones; la decisión final es del res
 
 - **Concretado (§2, §2.3):** el servicio propio de `pns_demo` es `odoo14_pns`, del proyecto de Docker
   Compose `pns_staging` (`/opt/odoo/pns_staging`), en `127.0.0.1:8169` y `127.0.0.1:8172` detrás de
-  `https://pns.liyben.com`. Las órdenes dentro del servicio se ejecutan con `docker compose exec` desde
-  esa carpeta. Cómo se para y se elimina al terminar: §9.
+  `https://pns.liyben.com`. Las órdenes de Odoo que usan la base de datos (`odoo shell`, `-i`, `-u`) se
+  ejecutan desde `/opt/odoo/pns_staging` con `docker compose run --rm web odoo <orden> -d pns_demo`,
+  porque `run` pasa por el entrypoint de la imagen, que añade la conexión a PostgreSQL (`HOST`, `USER`,
+  `PASSWORD`), y `exec` no. Para un script de `odoo shell`, `docker compose run --rm -T web odoo shell
+  -d pns_demo` con un heredoc. Cómo se para y se elimina al terminar: §9.
 - **Concretado (§2, §2.4):** comparte imagen (`odoo-web`) con `odoo14_server`, pero no PostgreSQL:
   tiene el suyo, `odoo14_pns_db`.
 - **Concretado (§2):** no hace falta tocar el `dbfilter` de `odoo14_server`: con PostgreSQL propio no

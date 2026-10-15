@@ -850,6 +850,8 @@ Decisión: ____ / Fecha: ____
 - **Lo que la motivaba:** §7.1 del informe, corregido: `external_dependencies` declara solo `openpyxl`, `reportlab` y `requests` (ya no `httpx` ni `pydantic`). §7.3 y nuevo PNS-81: con Python 3.7 o 3.8 el módulo no se importa sin el parche 1, y tres funciones fallan sin los parches 2 a 4.
 - **Nuevo alcance:** al Dockerfile del cliente solo hay que añadir `openpyxl`. Python 3.7 vale solo con los parches 1 a 4 (N2). Sigue siendo **BLOQUEANTE**.
 
+**Observación (15/10/2026):** el VPS de staging (imagen `odoo-web`) tiene Python 3.7.3, con `openpyxl` 3.1.3, `reportlab` 3.5.13 y `requests` 2.31.0; por tanto, los parches 1 a 4 son necesarios (N2). Ver el plan de staging, §2.1.
+
 ### D14 — ¿Hay salida a Internet desde el servidor?
 
 **Contexto:** sin Internet, cada comprobación de estado espera hasta 8 segundos por las fuentes de
