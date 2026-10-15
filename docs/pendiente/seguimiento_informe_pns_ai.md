@@ -915,6 +915,12 @@ repiten»: cuando un resto toca el sandbox o la Caja B, se indica en el propio h
     (`static/src/js/key_pin_desk_v14.js:349-364`). Siguen el oyente global de clics y el
     `MutationObserver` de todo el documento (`ai_agent_origin_filter_v14.js:330, 375-379`), y se
     añaden dos oyentes globales más (`key_pin_desk_v14.js:285, 301`).
+  - Observación (fase 5c, revisión de código): el parche de `http_patch.py` está acotado a las rutas
+    `/mcp`, pero no a la base de datos. Sustituye `odoo.http.Root.get_request` al importar el módulo
+    (`http_patch.py:22-35`, importado desde `__init__.py:15`), con la única condición de la versión
+    de Odoo (`NEEDS_ROOT_GET_REQUEST_PATCH`, `pns_base/utils/compat.py:20`). Por tanto afecta a todas
+    las bases de datos que sirve el mismo proceso, tengan o no instalado `pns_ai_mcp`. Impacto
+    práctico bajo: solo cambia el tratamiento de las peticiones `POST` JSON a `/mcp` y `/mcp/*`.
 - **Prueba en el laboratorio:** no (revisión de código).
 
 ### PNS-32 — Sincronización de fábrica: sobrescribe ediciones y borra carpetas en disco

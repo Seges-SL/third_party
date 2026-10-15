@@ -1157,6 +1157,8 @@ Decisión: ____ / Fecha: ____
 - **Lo que la motivaba:** PNS-31 SIN CAMBIOS: sigue global el backport de `_process_ondelete`, `set_values` reescribe la política de URL en cada guardado de Ajustes y `http_patch` ya estaba acotado a `/mcp`. Los `include` de JS de `pns_ai_mcp` pasan de 11 a 19, con uno nuevo sobre `WebClient` que arranca el sondeo del bus para todo usuario del backend. PNS-69 CORREGIDO.
 - **Nuevo alcance:** la misma pregunta, con más alcance. Sigue siendo **BLOQUEANTE**.
 
+**Observación (15/10/2026, fase 5c):** el parche de `http_patch.py` afecta a todas las BD que sirve el mismo proceso, tengan o no los módulos; impacto práctico bajo. En servidores con varias BD, la BD con los `pns_*` se sirve desde un servicio de Odoo propio (ver PNS-31 en el seguimiento y el plan de staging §2.3).
+
 ### D43 — ¿Se acepta que Chatboo cargue sus 7 librerías JavaScript en todo el backend?
 
 **Contexto:** todos los usuarios internos, usen o no el chat, descargan en cada carga del backend

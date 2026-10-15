@@ -169,6 +169,15 @@ Solo lo corrige el fabricante o no instalar (N3):
 | Proxy: servidor MCP | Con varios workers, solo `POST /mcp`; no el modo SSE (`/mcp/sse`) | SSE no funciona con varios procesos (D20). |
 | Proxy: CSP | Opcional, como defensa en profundidad (§12) | D39. |
 
+> **Nota sobre `dbfilter` y varias bases de datos:** `dbfilter` decide qué base de datos atiende cada
+> petición, pero no aísla el código. En cuanto una base de datos del servidor tiene instalados los
+> `pns_*`, su código se carga para todo el proceso de Odoo. Uno de sus parches, el de `http_patch.py`
+> (D9, PNS-31), se aplica a todo el proceso al cargarse el módulo y alcanza también a las demás bases
+> de datos que sirve ese proceso, aunque no tengan los módulos instalados. (El backport de
+> `_process_ondelete`, también en PNS-31, se hace con `_inherit` y solo actúa en las bases de datos
+> donde está instalado.) Si esas otras bases de datos no deben verse afectadas, se sirven desde un
+> servicio de Odoo distinto.
+
 ### 4.4 Cuenta del proveedor de IA
 
 - Una **clave de API** del proveedor elegido.
