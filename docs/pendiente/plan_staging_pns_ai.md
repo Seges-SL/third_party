@@ -29,7 +29,8 @@
   cliente**, en una base de datos nueva con datos de demostración, `<bd_demo>`, y hacer las
   comprobaciones posteriores que aplican a una instalación nueva (§3).
 - Ejecutar las **9 pruebas pendientes** de la fase 3b-2, que no se pudieron hacer en el laboratorio
-  porque el proveedor estaba saturado (N5; guía §13, punto 9).
+  porque el proveedor estaba saturado (N5; guía §13, punto 9), y dos más pendientes del seguimiento
+  (pruebas 10 y 11: PNS-12 y PNS-46).
 - Con sus resultados, revisar N3, D29 y D46 (§6).
 
 **Una sola base de datos, con un servicio de Odoo propio.** Ningún cliente tiene hoy los `pns_*`
@@ -228,8 +229,8 @@ Usuarios técnicos, internos, sin portal. Los grupos de IA se asignan a mano (ni
 | Etiqueta | Grupos | Clave MCP | Se usa en |
 |---|---|---|---|
 | ADM | Administrador de Odoo (Ajustes) + AI Administrator (D4) | No | Instalación (§3); configuración; revisión de Activity y Applied changes; cambios de política de URL |
-| U1 | Interno + AI Conversational | Sí | §4.4, punto 5; pruebas 1, 2, 4, 5, 7, 8 y 9 |
-| U2 | Interno + AI Conversational | Sí | Prueba 6 (usuario B) |
+| U1 | Interno + AI Conversational | Sí | §4.4, punto 5; pruebas 1, 2, 4, 5, 7, 8, 9, 10 y 11 |
+| U2 | Interno + AI Conversational | Sí | Prueba 6 (usuario B); dueño del contexto privado de la prueba 10 |
 | U3 | Interno + AI Conversational + External URL | Sí | Prueba 3 |
 | UW | Interno + AI Conversational + AI Writer | Sí | Prueba 6 (usuario A) |
 
@@ -275,7 +276,12 @@ Creados por ADM desde la interfaz, sobre datos de demostración:
   del VPS.
 - **Para la prueba 3:** un contacto de demostración cuya nota pide al asistente consultar el tiempo de una
   ciudad en `api.open-meteo.com`.
-- **Para el §4.4, punto 5:** un contexto privado de U1 y otro de U2, con textos inocuos.
+- **Para el §4.4, punto 5, y la prueba 10:** un contexto privado de U1 y otro de U2, con textos
+  inocuos. El de U2 trata de un tema concreto e incluye un **término inocuo y distintivo** (inventado,
+  que no aparezca en los datos de demostración ni en otros contextos), para poder buscarlo en la
+  respuesta y en Activity.
+- **Para la prueba 11:** U1 con el idioma **español (`es_ES`)** en sus preferencias (ADM instala el
+  idioma si no lo está). Al terminar, se puede dejar así: ninguna otra prueba depende del idioma.
 - Textos de prueba inocuos; no se copian en este plan ni en el registro.
 
 ---
@@ -284,7 +290,8 @@ Creados por ADM desde la interfaz, sobre datos de demostración:
 
 Las 9 de la 3b-2 ([verificación](verificacion_seguridad_pns_ai.md), «Pruebas pendientes para staging»),
 en `<bd_demo>`, con datos de demostración y textos inocuos. La prueba 9 se divide en 9a (PNS-59) y 9b
-(PNS-29). Durante cada prueba, revisar el log del servidor en busca de `Traceback` o `ERROR`.
+(PNS-29). Las pruebas 10 (PNS-12) y 11 (PNS-46) son las del [seguimiento](seguimiento_informe_pns_ai.md)
+que también necesitan turnos reales. Durante cada prueba, revisar el log del servidor en busca de `Traceback` o `ERROR`.
 
 Resumen:
 
@@ -300,6 +307,8 @@ Resumen:
 | 8 | U1 | Saneado de la respuesta y de su exportación | PNS-60, D29 |
 | 9a | U1 (+ ADM) | Imágenes externas en el navegador | PNS-59 |
 | 9b | U1 (+ ADM) | Tokens con Anthropic y caché | PNS-29 |
+| 10 | U1, U2 (+ ADM) | Contexto privado de un usuario en los turnos de otro | PNS-12 |
+| 11 | U1 (+ ADM) | Glosario `es_ES` en lo que recibe el modelo (observación) | PNS-46 |
 
 ### Prueba 1 — Consulta por rango de fechas
 
@@ -391,6 +400,24 @@ Resumen:
 | **Resultado esperado si está CORREGIDO** | Los tokens coinciden, incluidos los de escritura de caché. **Resultado previsto hoy:** los de lectura de caché sí se cuentan y los de escritura no (resto de PNS-29). |
 | **Revisa** | PNS-29 |
 
+### Prueba 10 — Contexto privado de un usuario en los turnos de otro
+
+| | |
+|---|---|
+| **Usuario** | U1; U2 (dueño del contexto); ADM para Activity |
+| **Qué se hace** | U2 tiene el contexto privado de §4.5 con el término distintivo. U1 pregunta en Chatboo por el tema de ese contexto. ADM abre la línea del turno de U1 en AI Engine → Security → Activity. |
+| **Resultado esperado si está CORREGIDO** | La respuesta a U1 no contiene el término distintivo y la línea de Activity del turno de U1 no muestra el contexto privado de U2. |
+| **Revisa** | PNS-12 (complementa el §4.4, punto 5, que lo comprueba por `/mcp`) |
+
+### Prueba 11 — Glosario `es_ES` en lo que recibe el modelo (observación)
+
+| | |
+|---|---|
+| **Usuario** | U1 con idioma `es_ES` (§4.5); ADM para Activity |
+| **Qué se hace** | U1 hace en Chatboo una pregunta que lleve a una respuesta con importes. ADM abre la línea del turno en Activity y revisa lo que recibe el modelo. |
+| **Resultado esperado si está CORREGIDO** | Es una prueba de **observación**: se anota si lo que recibe el modelo incluye el glosario `corporate_terms_es_ES` (o solo el genérico `corporate_terms`, o ninguno) y si pide el formato `1.234,56`. En el laboratorio, la parte fija del prompt no lo incluía para ningún idioma (NO CONCLUYENTE). |
+| **Revisa** | PNS-46 |
+
 ---
 
 ## 6. Registro de resultados y criterios de revisión
@@ -419,6 +446,8 @@ observaciones van en una nota debajo de la tabla, sin textos de prueba ni datos 
 | 8 Saneado de respuesta y exportación | PNS-60 | | | |
 | 9a Imágenes externas | PNS-59 | | | |
 | 9b Tokens con Anthropic | PNS-29 | | | |
+| 10 Contexto privado en turnos de otro | PNS-12 | | | |
+| 11 Glosario `es_ES` (observación) | PNS-46 | | | |
 | Borrado de `<bd_demo>`, eliminación de `<servicio_odoo>` y revocación de la clave | — | | | |
 
 Al terminar, trasladar los resultados a la [verificación](verificacion_seguridad_pns_ai.md) y al
@@ -435,9 +464,9 @@ Propuesta de este plan a partir de las decisiones; la decisión final es del res
   D46 se decide con esa información (a quién se da la clave y el grupo). Si el chat exige algo más o
   funciona con menos, revisar la guía §7 antes de decidir.
 - **N3:**
-  - Si todas las pruebas dan el resultado esperado (CORREGIDO, o el resto conocido en 4a, 7, 9a-2 y 9b),
-    N3 no cambia: b) para el VPS de pruebas y a) para producción mientras no se corrijan PNS-82, 83, 85,
-    90 y 91. Se vuelve a revisar con una versión corregida (guía §15).
+  - Si todas las pruebas dan el resultado esperado (CORREGIDO, o el resto conocido en 4a, 7, 9a-2 y 9b,
+    y lo observado en 11), N3 no cambia: b) para el VPS de pruebas y a) para producción mientras no se
+    corrijan PNS-82, 83, 85, 90 y 91. Se vuelve a revisar con una versión corregida (guía §15).
   - Si falla alguna prueba con resultado esperado CORREGIDO (sobre todo 3, 5, 6 u 8), el estado de ese
     PNS empeora en el seguimiento y hay que revisar también la opción b): si la versión sigue siendo
     apta incluso para staging.

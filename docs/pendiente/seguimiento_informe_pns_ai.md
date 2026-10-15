@@ -173,10 +173,11 @@ Restos que se repiten en varios parciales:
     que ahora comprueba los grupos del registro sobre el usuario real; `ai.trusted.action` también
     pasa sus métodos `apply`/`preview` a privados. Test: `test_system_action.py:444-456`.
   - **Resto:** el grupo exigido para `user.add_group` / `user.remove_group` es solo
-    `group_ai_admin` (`pns_ai_mcp/data/trusted_actions_system.xml:84`), y `_apply_user_add_group`
-    resuelve usuario y grupo en `sudo` (`ai_system_action.py:674-697`) y escribe con
-    `pns_base/utils/compat.py:113-116`. Un AI Administrator que no sea administrador de Odoo puede,
-    con un plan que él mismo confirma, darse `base.group_system`. El informe pedía exigir los dos
+    `group_ai_admin` (`pns_ai_mcp/data/trusted_actions_system.xml:84, 94`), y `_apply_user_add_group`
+    y `_apply_user_remove_group` resuelven usuario y grupo en `sudo` (`ai_system_action.py:674-697`)
+    y escriben con `pns_base/utils/compat.py:113-116` y `119-122`. Un AI Administrator que no sea
+    administrador de Odoo puede, con un plan que él mismo confirma, darse `base.group_system`. El
+    informe pedía exigir los dos
     grupos. El fabricante sí lo aplica ya en otro sitio (servidores `stdio`, ver PNS-09), lo que
     indica que no considera equivalentes a ambos administradores.
 - **Prueba en el laboratorio:** sí.
@@ -455,15 +456,15 @@ Restos que se repiten en varios parciales:
       `security/ir.model.access.csv:50`).
   - **Resto (punto de entrada no cubierto por el ACL, ya existía):** `ai.fetch.cache.get_cached` y
     `ai.fetch.cache.store` son métodos públicos `@api.model` que trabajan en `sudo`
-    (`models/fetch_cache.py:62-88, 91-123`). La caché es global por URL, sin usuario, y es la que
+    (`models/fetch_cache.py:63-89, 91-123`). La caché es global por URL, sin usuario, y es la que
     consulta `fetch_url` antes de salir a la red (`controllers/safe_plan.py:1493-1503`). Cualquier
     usuario autenticado, también de portal, la lee y la sobrescribe por RPC. Tiene número propio: PNS-90.
   - **Laboratorio:** la parte corregida se comprobó en la fase 3b-1 (B no ve las filas de A de
     `ai.api.result.cache` ni de `ai.safe.choice`). La comprobación de `ai.fetch.cache` de esa fase
     (`search_read` → `AccessError`) solo probaba el ACL estándar; el resto se reprodujo en la fase 3c
     (PNS-90).
-- **Pendiente para staging:** la misma `api_call` hecha por A y luego por B en menos de 10 minutos no
-  debe servir a B la respuesta de A.
+- **Staging:** verificado en código (la clave de caché incluye el uid); sin prueba en staging, que no
+  tiene servidores externos (plan §4.4).
 
 ### PNS-15 — HTML sin sanear (XSS)
 
@@ -1139,7 +1140,7 @@ repiten»: cuando un resto toca el sandbox o la Caja B, se indica en el propio h
     del cron tras actualizar (cada 5 minutos) borra todas las sesiones de más de 30 días, también las
     de los usuarios que no vuelven al chat. El parámetro `pns_ai_chatboo.history_retention_days` se
     crea con el registro de datos `icp_chatboo_history_retention_days` (`data/chatboo_icp_data.xml:8-11`,
-    `noupdate="1"`), que en 3.1.486 no existía. Conviene fijar la retención deseada antes de que se
+    `noupdate="1"`), que en `pns_ai_chatboo` 2.1.322 no existía. Conviene fijar la retención deseada antes de que se
     ejecute el cron. Según el código (no probado): si el parámetro se crea a mano antes de actualizar,
     sin XML ID, la carga de ese registro chocaría con la restricción `key_uniq` de
     `ir.config_parameter`. Hay que crearlo con su XML ID o ajustarlo justo después de actualizar con
@@ -1730,7 +1731,7 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
   para no purgar, o los días que se quieran) y exportar `ai_provider_usage_day` si interesa conservar
   el histórico.
 
-### PNS-88 — Datos que la actualización en Odoo 14 no limpia: XML ID `mcp_*` y servidores de fábrica
+### PNS-88 — Renombrados de XML ID `mcp_*` que no se ejecutan en Odoo 14 y servidores de fábrica heredados
 
 - **Gravedad:** Baja · **Estado:** NUEVO.
 - **Ubicación:** `pns_ai_mcp/migrations/3.1.518/pre-migrate.py` y `3.1.519/pre-migrate.py` (38 XML ID);
@@ -1752,7 +1753,9 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
     - de `external_server_openapi_data.xml`, dos OpenAPI: `external_server_sesame` y
       `external_server_cdmon`.
 - **Descartado:** la skill `analisis-financiero` sí se borra en 14 (ver la corrección en PNS-67).
-- **Impacto:** bajo; limpieza y posible pérdida de personalizaciones al actualizar.
+- **Impacto:** bajo. En 14 los renombrados de `migrations/` no se ejecutan: al actualizar, los 38
+  registros se borran y se recrean con ids nuevos, y se pierden las personalizaciones y las referencias
+  a los antiguos. Los servidores de fábrica retirados quedan en la BD.
 - **Laboratorio (fase 3a): CONFIRMADO.** Los 38 XML ID `mcp_*` se borran en `_process_end` sin
   errores, y se crean 38 `ai_*` con ids nuevos, así que se pierden las personalizaciones y las
   referencias por id a los registros antiguos. No quedan menús duplicados. Siguen los 5 servidores de
@@ -1764,11 +1767,12 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
 - **Ubicación:** `pns_ai_mcp/controllers/key_pin.py:35-54` (`type='http'`, `POST`, `csrf=False`).
 - **Comportamiento:**
   - Una página de otro origen puede hacer que el navegador de un AI Administrator envíe el POST.
-  - El único efecto es cerrar la mesa cuyo token se envíe y avisar por el bus. El token es aleatorio y
-    vive en el `sessionStorage` de la pestaña (`key_pin_desk_v14.js:20-30`), así que sin conocerlo no
-    hay efecto.
+  - El único efecto es cerrar la mesa cuyo token se envíe y avisar por el bus. El token se genera en el
+    navegador con `Date.now()` y `Math.random()` (`key_pin_desk_v14.js:28`), no con un generador
+    criptográfico, y vive en el `sessionStorage` de la pestaña (`key_pin_desk_v14.js:20-30`); sin
+    conocerlo no hay efecto.
   - Probablemente se usa con `sendBeacon` al cerrar la pestaña, que puede llevar el `csrf_token` en el
-    cuerpo.
+    cuerpo. Propuesta: quitar `csrf=False` y generar el token con `crypto.getRandomValues`.
 - **Impacto:** mínimo hoy; es una excepción de CSRF innecesaria en una función sensible.
 - **Prueba en el laboratorio:** no (revisión de código).
 
@@ -1776,7 +1780,7 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
 
 - **Gravedad:** Alta · **Estado:** NUEVO (ya existía en 3.1.486; resto de PNS-14; relacionado con
   PNS-16 y PNS-17).
-- **Ubicación:** `pns_ai_mcp/models/fetch_cache.py:62-88` (`get_cached`) y `:91-123` (`store`);
+- **Ubicación:** `pns_ai_mcp/models/fetch_cache.py:63-89` (`get_cached`) y `:91-123` (`store`);
   `controllers/safe_plan.py:1493-1503` (clave de caché), `:1619` (lectura) y `:1667, 1723`
   (escritura).
 - **Comportamiento:**
@@ -1803,7 +1807,7 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
 
 - **Gravedad:** Media · **Estado:** NUEVO (ya existía en 3.1.486; relacionado con PNS-16, PNS-59 y
   PNS-86).
-- **Ubicación:** `pns_ai_mcp/models/url_whitelist.py:235-264`; tipos admitidos en `:54-56`.
+- **Ubicación:** `pns_ai_mcp/models/url_whitelist.py:235-266`; tipos admitidos en `:54-56`.
 - **Comportamiento:**
   - `ensure_domain_whitelisted(hostname, notes, kind)` es `@api.model` público. Crea la fila con
     `sudo().create` o reactiva una archivada con `sudo().write`, sin comprobar grupo.
