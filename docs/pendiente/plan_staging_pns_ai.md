@@ -1,50 +1,62 @@
 # Plan de staging: pns_base 1.2.32, pns_ai_mcp 3.1.782 y pns_ai_chatboo 2.1.453 (Odoo 14)
 
-- **Rama:** `14.0-pns-ai-3` · **Fecha del plan:** 2026-10-15 (decisiones de Sergio del mismo día)
+- **Rama:** `14.0-pns-ai-3` · **Fecha del plan:** 2026-10-15 (decisiones de Sergio del mismo día) ·
+  **Preparación del VPS:** hecha el 15/10/2026 (§2).
 - **Referencia de configuración:** [guía de configuración](../specs/guia_configuracion_pns_ai.md). Este
   plan remite a sus secciones (§) y no las copia.
-- **Otras fuentes:** [decisiones](pns_ai_decisiones.md) (N1-N5, D3, D7, D15, D17, D29, D37, D46, PB-1),
-  [verificación](verificacion_seguridad_pns_ai.md) (interna), [seguimiento](seguimiento_informe_pns_ai.md)
-  y [parches](parches_pns_ai.md).
-- **Marcadores:** `<servicio_odoo>`, `<bd_demo>`, `<archivo_conf>` y similares dependen del despliegue y
-  están marcados **«A concretar con el VPS»**. Lo que no tiene respaldo en las fuentes está marcado
-  **«Pendiente de confirmar»**. Lista completa en el §7.
+- **Otras fuentes:** [decisiones](pns_ai_decisiones.md) (N1-N10, D3, D7, D9, D15, D17, D29, D37, D46,
+  PB-1), [verificación](verificacion_seguridad_pns_ai.md) (interna),
+  [seguimiento](seguimiento_informe_pns_ai.md) y [parches](parches_pns_ai.md).
+- **Nombres del despliegue:** servicio de Odoo `odoo14_pns`, base de datos `pns_demo`, proyecto de Docker
+  Compose `pns_staging` en `/opt/odoo/pns_staging`, dominio `https://pns.liyben.com` (§2). Lo que no
+  tiene respaldo en las fuentes está marcado **«Pendiente de confirmar»** (§7.2).
+- **Sin secretos en este plan:** ni contraseñas, ni claves, ni el contenido de `.env`.
 
 ## Índice
 
 1. Objetivo y condiciones
-2. Preparación del VPS
+2. Preparación del VPS (hecha el 15/10/2026)
 3. Instalación nueva y comprobaciones posteriores
 4. Configuración
 5. Pruebas
 6. Registro de resultados y criterios de revisión
-7. A concretar con el VPS y pendiente de confirmar
+7. Concretado con el VPS y pendiente de confirmar
+8. Después del staging: instalación en LIYBEN
+9. Limpieza al terminar
 
 ---
 
 ## 1. Objetivo y condiciones
 
+**Entorno.** El staging **no** está en el VPS de un cliente: es el VPS de **`odoo14_server`**, un Odoo 14
+propio de Seges cuya base de datos **LIYBEN** (`https://liyben.com`) tiene los datos antiguos de la
+empresa. En el mismo VPS hay instancias heredadas de otros dos clientes (Odoo 11 y Odoo 8), cada una con
+su PostgreSQL; no se tocan. El staging tiene **servicio de Odoo, PostgreSQL y despliegue de código
+propios** (§2; decisión N10).
+
 **Objetivo:**
-- Instalar desde cero 3.1.782 (con los parches 1 a 4 de la rama) en el **VPS de pruebas de un
-  cliente**, en una base de datos nueva con datos de demostración, `<bd_demo>`, y hacer las
-  comprobaciones posteriores que aplican a una instalación nueva (§3).
+- Instalar desde cero 3.1.782 (con los parches 1 a 4 de la rama) en una base de datos nueva con datos de
+  demostración, `pns_demo`, servida por su propio servicio `odoo14_pns`, y hacer las comprobaciones
+  posteriores que aplican a una instalación nueva (§3).
 - Ejecutar las **9 pruebas pendientes** de la fase 3b-2, que no se pudieron hacer en el laboratorio
   porque el proveedor estaba saturado (N5; guía §13, punto 9), y dos más pendientes del seguimiento
-  (pruebas 10 y 11: PNS-12 y PNS-46).
+  (pruebas 10 y 11: PNS-12 y PNS-46). La **9b no aplica** en este staging: el proveedor es Gemini
+  (§4.2, N8).
 - Con sus resultados, revisar N3, D29 y D46 (§6).
+- Después, como fase aparte, instalar en **LIYBEN**, que es el objetivo final (camino A, N6; §8).
 
-**Una sola base de datos, con un servicio de Odoo propio.** Ningún cliente tiene hoy los `pns_*`
-instalados, así que no hay copia en 3.1.486 que actualizar. Todo el plan (instalación, configuración y
-pruebas) se hace en `<bd_demo>`, y en las demás bases de datos del VPS **no se instala ningún `pns_*`**
-(§2.4).
+**Una sola base de datos, con un servicio de Odoo propio.** Ningún entorno tiene hoy los `pns_*`
+instalados (LIYBEN los tuvo en 3.1.486 y se desinstalaron el 15/10/2026, §2.4), así que no hay copia en
+3.1.486 que actualizar. Todo el plan (instalación, configuración y pruebas) se hace en `pns_demo`, y en
+las demás bases de datos del VPS **no se instala ningún `pns_*`** durante el staging (§2.4).
 
 `pns_ai_mcp` modifica, al cargarse, una clase del servidor HTTP de Odoo para todo el proceso, sin
-comprobar en qué base de datos está instalado (D9; guía §3). Por eso `<bd_demo>` no puede compartir
-proceso con la BD de pruebas del cliente: tiene su **propio servicio de Odoo** en el VPS
-(`<servicio_odoo>`, otro contenedor, con su `<archivo_conf>` y un `dbfilter` que solo encuentre
-`<bd_demo>`), y el servicio de la BD de pruebas del cliente **no sirve** `<bd_demo>` (§2.3 y §2.4).
+comprobar en qué base de datos está instalado (D9; guía §3). Por eso `pns_demo` no comparte proceso con
+LIYBEN: tiene su **propio servicio de Odoo** (`odoo14_pns`, otro contenedor, con su `odoo.conf` y un
+`dbfilter` que solo encuentra `pns_demo`) y, además, su propio PostgreSQL, así que `odoo14_server` ni
+siquiera la ve (§2.3 y §2.4).
 
-**Lo que este plan no valida** (no aplica a ningún cliente actual):
+**Lo que este plan no valida** (no aplica a ningún entorno actual):
 - La **secuencia de actualización de N1** (guía §5.1 y §5.2) de principio a fin. La guía §5 sigue como
   referencia, sin probar (guía §16.1).
 - **D17** (personalizaciones de los 38 registros `mcp_*`, PNS-88): una instalación nueva no los tiene.
@@ -52,6 +64,7 @@ proceso con la BD de pruebas del cliente: tiene su **propio servicio de Odoo** e
   hay datos antiguos. En staging solo se comprueba que los dos crons de purga se ejecutan sin error (§3.3).
 - **D37** solo se cubre en parte: se anota el `default_context_codes` de una instalación nueva como
   referencia (§3.3), sin una base de datos actualizada con la que compararlo.
+- **PNS-29 (prueba 9b):** sin Anthropic en el staging; queda para LIYBEN si se elige Anthropic (§8).
 
 Si hiciera falta validar N1 antes de actualizar a un cliente, se puede hacer aparte, en local
 (`odoo-dev 14`), con la copia del laboratorio previa a la actualización a 3.1.782 (§7.2).
@@ -60,110 +73,150 @@ El resto de PNS-01/02 (un AI Administrator sin Ajustes intenta darse la administ
 se prueba aquí: queda para la reverificación ante una versión corregida (guía §15). En staging se
 cubre con D4 (AI Administrator solo para administradores de Odoo).
 
-**Condiciones (obligatorias durante todo el plan, en `<bd_demo>`):**
+**Condiciones (obligatorias durante todo el plan, en `pns_demo`):**
 
 | Condición | Origen | Detalle |
 |---|---|---|
-| Sin usuarios de portal | N3 b) | Guía §2.1. PNS-83, 90 y 91 son explotables también por portal. |
-| Solo usuarios técnicos de confianza | N3 b) | De Seges o del cliente. Usuarios de prueba en §4.3. |
+| Sin usuarios de portal | N3 b) | Guía §2.1. PNS-83, 90 y 91 son explotables también por portal. Los usuarios demo y portal de los datos de demostración están archivados (§3.1). |
+| Solo usuarios técnicos de confianza | N3 b) | De Seges. Usuarios de prueba en §4.3. |
 | Datos de demostración en las pruebas con IA | N3 b), N5 a) | Ningún dato real sale hacia el proveedor (D10 sigue abierta). |
-| Proveedor externo | N5 a) | Anthropic (§4.2), con límite de gasto en su consola (guía §4.4). Si el VPS no está listo, las pruebas se adelantan en el laboratorio como puente (N5 c) y se repiten después aquí. |
+| Proveedor externo | N5 a), N8 | **Gemini** (§4.2), con una clave nueva solo para el staging (§7.2) y límite de gasto o cuota en su consola (guía §4.4). Sustituye a Anthropic, previsto en el traspaso: no hay clave de API de Anthropic. |
 | Sin mesa de entrega de claves por PIN | N4 a) | No abrirla ni generar PIN. Las claves MCP se generan con el asistente (guía §7.1). |
 | Mitigaciones de la tabla 2.2 de la guía | N3 | Guía §2.2. |
 | Política de URL `whitelist_only` | Guía §9.1 y §9.3 | Única excepción: el paso temporal a `open` de las pruebas 3 y 9a (§4.4, punto 2). |
 
-**Al terminar:** borrar `<bd_demo>` (guía §11.2), parar y eliminar `<servicio_odoo>` (el servicio
-propio de `<bd_demo>`), revocar en la consola del proveedor la clave de API usada y anotar en el §6 la
-fecha de borrado.
+**Al terminar:** la limpieza del §9: borrar `pns_demo` sin guardar copia (guía §11.2; N9), parar y
+eliminar el proyecto `pns_staging`, retirar el sitio del proxy y su certificado, revocar la clave de
+Gemini del staging y anotar en el §6 la fecha.
 
 ---
 
-## 2. Preparación del VPS
+## 2. Preparación del VPS (hecha el 15/10/2026)
+
+**Montaje (N10).** Proyecto de Docker Compose independiente, **`pns_staging`**, en
+`/opt/odoo/pns_staging`:
+- servicio **`odoo14_pns`**: imagen `odoo-web` (la misma de `odoo14_server`); puertos `127.0.0.1:8169` y
+  `127.0.0.1:8172` (solo accesibles desde el host, detrás del proxy); `mem_limit` 2g;
+- PostgreSQL propio **`odoo14_pns_db`** (`postgres:15-alpine`; `mem_limit` 512m);
+- volúmenes con nombre para la base de datos y el filestore; la configuración y el núcleo de Odoo
+  (`/opt/odoo/odoo-core`) se montan en solo lectura.
+
+Con PostgreSQL propio, `odoo14_server` no puede ver `pns_demo` ni `odoo14_pns` ve LIYBEN: no hace falta
+tocar el `dbfilter` de `odoo14_server`. Los límites de memoria se deben a que el VPS no tiene swap.
 
 ### 2.1 Imagen (D3)
 
-1. Python **3.7 o superior** en la imagen (guía §4.1, punto 1). Anotar la versión exacta: D3 la pide y
-   la guía no la ha validado (§16.2).
-2. **`openpyxl`** añadido en la **imagen** del cliente (su Dockerfile), nunca a mano en un contenedor
-   (guía §4.1, puntos 3 y 5). `httpx` y `pydantic` ya no hacen falta.
-3. Comprobación, con el contenedor en marcha: ejecutar dentro de `<servicio_odoo>` (el servicio propio
-   de `<bd_demo>`, §2.3) la versión de Python
-   y la importación de `openpyxl` (por ejemplo,
-   `docker compose exec <servicio_odoo> python3 -c "import sys, openpyxl; print(sys.version)"`).
-   **A concretar con el VPS** (orden y nombre del servicio).
+**Hecho:** no se ha construido imagen nueva. `odoo-web` ya tiene lo necesario; comprobado dentro de
+`odoo14_pns`:
 
-### 2.2 Código: rama `14.0-pns-ai-3` con los parches 1 a 4 (N2)
+| Requisito (guía §4.1) | En `odoo-web` |
+|---|---|
+| Python 3.7 o superior (punto 1) | **Python 3.7.3** (dato para D3; la guía no lo ha validado, §16.2) |
+| `openpyxl` en la imagen, nunca a mano en un contenedor (puntos 3 y 5) | 3.1.3 |
+| `reportlab` | 3.5.13 |
+| `requests` | 2.31.0 |
 
-1. Desplegar `third_party` desde la rama **`14.0-pns-ai-3`** (guía §4.1, punto 2). Respecto a `14.0`,
-   la rama solo cambia `pns_base`, `pns_ai_mcp`, `pns_ai_chatboo` y `docs/`, así que el resto de
-   módulos de `third_party` que use la BD de pruebas del cliente no cambia, siempre que el VPS esté hoy
-   en `14.0`. Cómo se despliega en el VPS (clon, copia, volumen) y en qué commit está ahora:
-   **A concretar con el VPS**.
-2. Comprobar que el código desplegado es el de la rama:
-   - versiones del manifiesto: `pns_base` 14.0.1.2.32, `pns_ai_mcp` 14.0.3.1.782 y `pns_ai_chatboo`
-     14.0.2.1.453 ([parches](parches_pns_ai.md), cabecera);
+`httpx` y `pydantic` ya no hacen falta.
+
+### 2.2 Código: `pns_base`, `pns_ai_mcp` y `pns_ai_chatboo` del commit `95d6b1a` (N2)
+
+1. **Hecho:** no se despliega `third_party` completo, sino solo **`pns_base`, `pns_ai_mcp` y
+   `pns_ai_chatboo`** del commit **`95d6b1a`** de la rama `14.0-pns-ai-3` (guía §4.1, punto 2), con
+   `git archive` desde el equipo de Sergio. Huella SHA-256 del archivo:
+   `e6141b0edcae4e16d3bdb186736a18500316d78d3cd3c7b8ff15fac8332e2d0e`, idéntica en el VPS. Están en
+   `/opt/odoo/pns_staging/addons`, montada en **solo lectura**. Sus dependencias (`web`, `mail`, `bus`)
+   son del núcleo.
+2. Comprobaciones hechas sobre el código desplegado (**conformes**):
+   - versiones del manifiesto: `pns_base` 1.2.32, `pns_ai_mcp` 3.1.782 y `pns_ai_chatboo` 2.1.453 (Odoo
+     añade el prefijo `14.0.`; [parches](parches_pns_ai.md), cabecera);
    - los comentarios de los parches, con la orden de la cabecera de
      [parches_pns_ai.md](parches_pns_ai.md):
      `grep -rn "Seges: parche de compatibilidad" pns_base pns_ai_mcp pns_ai_chatboo`.
-     En la rama salen **6 líneas en 4 archivos** (el parche 2 lleva dos comentarios y el 4 otros dos):
+     Salen **6 líneas en 4 archivos** (el parche 2 lleva dos comentarios y el 4 otros dos):
      `pns_base/utils/pdf_io.py`, `pns_ai_mcp/utils/relaxaicode_recipe.py`,
      `pns_ai_mcp/controllers/mcp_decorators.py` y `pns_ai_mcp/controllers/main.py`.
 3. Para cada parche, el apartado «Cómo comprobar si el fabricante ya lo ha corregido» de
-   [parches_pns_ai.md](parches_pns_ai.md) (parches 1 a 4): en el código desplegado, cada comprobación
-   debe dar el resultado «protegido» (parches 2 y 3), ninguna anotación genérica sin protección
-   (parche 1) y ningún `.sudo()` sobre `_get_mcp_env()` (parche 4). Si alguna falla, **no instalar**:
-   el código desplegado no es el de la rama.
+   [parches_pns_ai.md](parches_pns_ai.md) (parches 1 a 4): «protegido» en los parches 2 y 3, ninguna
+   anotación genérica sin protección (parche 1) y ningún `.sudo()` sobre `_get_mcp_env()` (parche 4).
+   **Resultado: conformes; apto para instalar.** Si se volviera a desplegar código, repetir los
+   puntos 2 y 3 y, si alguno falla, **no instalar**.
 
 ### 2.3 Configuración de Odoo y del proxy (guía §4.2 y §4.3, D15)
 
 D15 sigue abierta (decisión de infraestructura); para staging se usan los valores de la guía §4.3.
 
-**Servicio propio para `<bd_demo>` (D9; guía §3).** El parche de `pns_ai_mcp` sobre el servidor HTTP
+**Servicio propio para `pns_demo` (D9; guía §3).** El parche de `pns_ai_mcp` sobre el servidor HTTP
 de Odoo se aplica a todo el proceso en cuanto se carga el módulo, sin comprobar si está instalado en la
-base de datos de cada petición: si un mismo servicio sirviera `<bd_demo>` y la BD de pruebas del
-cliente, esta también recibiría el comportamiento modificado. Por eso:
-- `<bd_demo>` se sirve con un servicio de Odoo propio, `<servicio_odoo>`: otro contenedor, con su propio
-  `<archivo_conf>` y un `dbfilter` que solo encuentre `<bd_demo>`. Los ajustes de esta tabla son los de
-  ese servicio.
-- El servicio de la BD de pruebas del cliente no sirve `<bd_demo>`: su `dbfilter` no la encuentra.
-- Al terminar el plan, `<servicio_odoo>` se para y se elimina junto con `<bd_demo>` (§1).
+base de datos de cada petición: si un mismo servicio sirviera `pns_demo` y LIYBEN, esta también
+recibiría el comportamiento modificado. Por eso `pns_demo` se sirve solo desde `odoo14_pns`, con su
+propio PostgreSQL (`odoo14_pns_db`), y `odoo14_server` no la ve. Al terminar el plan, el proyecto
+`pns_staging` se elimina entero (§9).
 
-| Ajuste | Qué comprobar | Dónde |
+**`odoo.conf` de `odoo14_pns` (hecho):**
+
+| Ajuste | Valor | Guía §4.3 |
 |---|---|---|
-| Servicio propio | `<servicio_odoo>` solo sirve `<bd_demo>`, y el servicio de la BD de pruebas del cliente no la sirve (no aparece en su selector ni responde con su nombre). | Contenedores y `<archivo_conf>` de cada servicio — **A concretar con el VPS** |
-| `dbfilter` | Obligatorio: solo encuentra `<bd_demo>` (sin él, `/mcp` responde 404 si el servidor PostgreSQL tiene más BD). | `<archivo_conf>` — **A concretar con el VPS** |
-| `workers` | Mayor que 0 | `<archivo_conf>` |
-| `limit_time_real` | 600 s o más | `<archivo_conf>` |
-| `limit_time_cpu`, `limit_memory_hard`, `limit_request` | Revisar con el técnico | `<archivo_conf>` |
-| Proxy, ruta `/chatboo/stream` | Sin buffering y lectura de 10 min o más | Configuración del proxy — **A concretar con el VPS** |
-| Proxy, MCP | Solo `POST /mcp`, sin `/mcp/sse` | Configuración del proxy |
-| HTTPS | Activo (el botón de copiar la clave MCP lo necesita) | Guía §4.2 |
-| Salida a Internet | Hacia el proveedor y, para las pruebas 3 y 9a, hacia los servicios que usen | Guía §4.2 |
+| `dbfilter` | `^pns_demo$` | Obligatorio (sin él, `/mcp` responde 404 si el servidor PostgreSQL tiene más BD) |
+| `list_db` | `False` (gestor de bases de datos desactivado) | — |
+| `proxy_mode` | `True` | Detrás del proxy |
+| `workers` | 2 | Mayor que 0 |
+| `max_cron_threads` | 1 | — |
+| `limit_time_real` | 900 s | 600 s o más |
+| `limit_time_cpu` | 600 s | Revisar con el técnico |
+| `limit_memory_soft` / `limit_memory_hard` | 1 GiB / 1,25 GiB (dentro del `mem_limit` de 2g) | Revisar con el técnico |
+| `limit_request` | 8192 | Revisar con el técnico |
+| `data_dir` | `/var/lib/odoo` (volumen con nombre) | — |
+| `admin_passwd` | Aleatoria (no se anota aquí) | — |
+
+La contraseña de PostgreSQL va en `.env` (permisos 600), no en `odoo.conf`.
+
+**Proxy (hecho).** Nginx del host, sitio `/etc/nginx/conf.d/pns_liyben_com.conf`, dominio
+**`https://pns.liyben.com`**, certificado de Let's Encrypt con `certbot` (renovación automática):
+
+| Ajuste | Configurado |
+|---|---|
+| Ruta `/chatboo/stream` | Sin buffering y `proxy_read_timeout` de 900 s (guía: lectura de 10 min o más) |
+| MCP | `location = /mcp` solo con `POST` (`GET` da 403); `/mcp/sse` devuelve 404 |
+| HTTPS | Activo (el botón de copiar la clave MCP lo necesita; guía §4.2) |
+| Resto de cabeceras y límites | Copiados del sitio existente de `liyben.com` |
+| Salida a Internet | Hacia el proveedor y, para las pruebas 3 y 9a, hacia los servicios que usen (guía §4.2) |
 
 ### 2.4 Otras bases de datos del VPS
 
-1. Anotar qué bases de datos hay en el VPS además de `<bd_demo>`. **A concretar con el VPS**.
-2. En ellas **no se instala ni se actualiza ningún `pns_*`**: instalarlos en la BD de pruebas del
-   cliente, con datos reales, queda fuera de este plan (§7.2).
-3. **No basta con no instalar:** el parche de `pns_ai_mcp` sobre el servidor HTTP de Odoo afecta a todas
-   las bases de datos que sirve el mismo proceso, tengan o no el módulo (D9; guía §3). Por eso esas
-   bases de datos no comparten servicio con `<bd_demo>`: la sirve solo `<servicio_odoo>`, y el
-   servicio de la BD de pruebas del cliente no la encuentra (§2.3). Antes de instalar, comprobar las dos
-   cosas.
-4. `<archivo_conf>` (§2.3) es el de `<servicio_odoo>`: sus cambios no afectan al servicio de la BD de
-   pruebas del cliente. Si los dos servicios comparten imagen o PostgreSQL, revisar con el técnico el
-   cambio de la imagen (§2.1) y la carga añadida antes de reiniciar nada.
+1. **En el VPS hay, además de `pns_demo`:** LIYBEN, en `odoo14_server` (Odoo 14, Seges), y las
+   instancias heredadas de dos clientes (Odoo 11 y Odoo 8), cada una con su PostgreSQL. Ninguna se ha
+   tocado salvo la desinstalación de LIYBEN (punto 4).
+2. En ellas **no se instala ni se actualiza ningún `pns_*` durante el staging**. La instalación en
+   LIYBEN es una fase aparte, después del staging (§8).
+3. **Aislamiento (D9; guía §3):** `pns_demo` tiene servicio y PostgreSQL propios, así que ningún otro
+   proceso de Odoo la sirve ni la ve. **Comprobado el 15/10/2026 (fase 9):** los otros servicios no se
+   han reiniciado y siguen respondiendo; cada PostgreSQL ve solo sus bases; el gestor de bases de
+   `odoo14_pns` está desactivado; los recursos tienen margen (el VPS no tiene swap: de ahí los
+   `mem_limit` del §2).
+4. **LIYBEN, `pns_*` desinstalados.** LIYBEN tenía instalados desde el 02/09/2026 `pns_base` 1.2.10,
+   `pns_ai_mcp` 3.1.486 y `pns_ai_chatboo` 2.1.322 (pruebas internas de Seges; 67 registros en
+   `ai_log`, el último del 13/10/2026), publicados en `https://liyben.com`. El 15/10/2026:
+   - copia previa en `/opt/odoo/backups`: `LIYBEN_antes_desinstalar_pns_20261015.dump` y
+     `LIYBEN_filestore_20261015.tar.gz`;
+   - desinstalación desde Aplicaciones: los tres en `uninstalled`, 0 tablas `ai_*`;
+   - reinicio de `odoo14_server`, porque el parche de `http_patch.py` seguía en memoria;
+   - comprobación: `POST /mcp` en `liyben.com` devuelve 404.
+
+   **Pendiente:** revocar en sus consolas las claves de los proveedores que tenía configurados LIYBEN
+   (§7.2). Con la desinstalación, N1 (actualización desde 3.1.486) vuelve a no aplicar a ningún entorno.
 
 ---
 
 ## 3. Instalación nueva y comprobaciones posteriores
 
-Sobre `<bd_demo>`. Lo hace el usuario **ADM** (§4.3).
+Sobre `pns_demo`. Lo hace el usuario **ADM** (§4.3).
 
 ### 3.1 Instalación (guía §6)
 
-1. Crear `<bd_demo>` **con datos de demostración**. Cómo (gestor de bases de datos u orden de Odoo):
-   **A concretar con el VPS**.
+1. **Hecho (15/10/2026):** `pns_demo` creada en `odoo14_pns` con `base`, **datos de demostración** e
+   idioma `es_ES`. Usuarios demo y portal de los datos de demostración archivados; contraseña de
+   `admin` cambiada (no se anota aquí). **Todavía no hay ningún `pns_*` instalado:** la instalación
+   empieza en el punto 2.
 2. Instalar "AI Engine" (guía §6, paso 1) y después "Chatboo" (paso 7). Los demás pasos de la guía §6
    son la configuración del §4.
 3. Guardar el log del servidor de la instalación para el paso 13 (§3.3).
@@ -185,7 +238,7 @@ Sobre `<bd_demo>`. Lo hace el usuario **ADM** (§4.3).
 | 15. `prompts/*` por `/mcp` | Necesita U1 con clave MCP: se hace en el §4.4, punto 5. |
 | 16. Menús | Abrir uno de cada (operaciones supervisadas, registro de actividad, contextos y diario de cambios) y los Ajustes de IA y de Chatboo. |
 | 17. Personalizaciones y agente | Personalizaciones (D17): no aplica. **D37:** anotar el `default_context_codes` del agente `pns_ai_chatboo` y si incluye `acl_security`, como referencia para las futuras actualizaciones de clientes. |
-| 18. Ficha de un módulo OCA (PB-1) | Solo si `<bd_demo>` tiene algún módulo OCA instalado: abrir su ficha en Aplicaciones, actualizar la lista de aplicaciones y comprobar que su enlace es el `website` de su manifiesto. En una instalación nueva solo comprueba que 3.1.782 no reescribe `website`; que el valor reescrito por una versión anterior vuelve al del manifiesto sigue sin probar. |
+| 18. Ficha de un módulo OCA (PB-1) | Solo si `pns_demo` tiene algún módulo OCA instalado: abrir su ficha en Aplicaciones, actualizar la lista de aplicaciones y comprobar que su enlace es el `website` de su manifiesto. En una instalación nueva solo comprueba que 3.1.782 no reescribe `website`; que el valor reescrito por una versión anterior vuelve al del manifiesto sigue sin probar. |
 | 19. Restos inocuos | No aplica: las tablas de asistentes antiguos y los 5 servidores heredados solo existen en bases de datos actualizadas (PNS-88). |
 
 **Además:**
@@ -202,25 +255,28 @@ Sobre `<bd_demo>`. Lo hace el usuario **ADM** (§4.3).
 
 ## 4. Configuración
 
-Sobre `<bd_demo>`. Lo hace el usuario **ADM** (administrador de Odoo y AI Administrator).
+Sobre `pns_demo`. Lo hace el usuario **ADM** (administrador de Odoo y AI Administrator).
 
 ### 4.1 Base de datos
 
-`<bd_demo>` creada, con "AI Engine" y "Chatboo" instalados y las comprobaciones del §3 hechas. Antes de
-seguir, comprobar que se trabaja en `<bd_demo>` y no en otra base de datos del VPS (§2.4).
+`pns_demo` creada, con "AI Engine" y "Chatboo" instalados y las comprobaciones del §3 hechas. Antes de
+seguir, comprobar que se trabaja en `pns_demo` y no en otra base de datos del VPS (§2.4).
 
 ### 4.2 Proveedor y cadena del agente (guía §8)
 
-1. **Proveedor: Anthropic.** La prueba 9b solo se puede hacer con él (guía §4.4: los modelos de Claude
-   ya son viables), y el módulo activa la caché de prompt siempre que la petición lleva prompt de
-   sistema (prueba 9b), así que la 9b aplica.
+1. **Proveedor: Gemini** (N8), con una **clave nueva** creada solo para el staging (no la del
+   laboratorio, que debe estar revocada; §7.2). Sustituye a Anthropic, previsto en el
+   [traspaso](traspaso_pns_ai_staging.md): no hay clave de API de Anthropic. Referencia: en el
+   laboratorio se usó Gemini con el protocolo compatible con OpenAI y `models/gemini-3.7-flash`
+   ([verificación](verificacion_seguridad_pns_ai.md), fase 3b-2). Consecuencia: la **prueba 9b no
+   aplica** (§5); queda para LIYBEN si allí se elige Anthropic (§8).
 2. **Crear el proveedor desde cero**: una instalación nueva de 3.1.782 no crea ninguno (guía §8.5).
    No duplicar ninguno (la copia se lleva la clave, guía §8.6).
 3. Pegar la clave, cargar el catálogo y **elegir el modelo**; después, «Test Connection» (guía §8.2).
    Sin capacidad de audio. Para la prueba 2, el modelo debe admitir imágenes.
 4. **Cadena del agente Chatboo definida** con ese proveedor (AI Engine → Agents → Chatboo → "Providers",
    guía §8.1). Sin cadena, el motor usaría todos los proveedores activos.
-5. Límite de gasto configurado en la consola del proveedor (guía §4.4).
+5. Límite de gasto o cuota configurados en la consola del proveedor (guía §4.4).
 
 ### 4.3 Usuarios y grupos (guía §7)
 
@@ -244,7 +300,7 @@ Ninguno más recibe AI Administrator, AI Writer ni External URL. External API: s
    canal propio. **Sin mesa de PIN** (N4).
 2. **Política de URL `whitelist_only`** (guía §9.1). **Excepción a la guía §9.3** («no usar nunca
    `open`»): las pruebas 3 y 9a la cambian a `open` **solo durante la prueba** y la restauran (guía §9.6:
-   comprobarla después de cada guardado). Se admite porque `<bd_demo>` solo tiene datos de
+   comprobarla después de cada guardado). Se admite porque `pns_demo` solo tiene datos de
    demostración, no hay usuarios de portal y el cambio es temporal; con `open`, los dominios que se
    añadan solos a la lista se borran al restaurar (guía §9.4 y §9.5).
 3. **Lista blanca mínima** (guía §9.4). Los dos dominios de fábrica de Open-Meteo
@@ -259,7 +315,7 @@ Ninguno más recibe AI Administrator, AI Writer ni External URL. External API: s
 5. **Comprobación pendiente del §3.3 (paso 15 de la guía §5.3), PNS-12 y parche 4:** con la clave de U1,
    el mismo método que en la verificación del parche 4: peticiones HTTP directas a `POST /mcp` (sin
    cliente MCP de escritorio), con la clave en la cabecera `X-Mcp-Token` (nunca en la URL), la base de
-   datos fijada por `dbfilter` o por una cookie de sesión anónima obtenida con `/web/login?db=<bd_demo>`,
+   datos fijada por `dbfilter` o por una cookie de sesión anónima obtenida con `/web/login?db=pns_demo`,
    y el `Mcp-Session-Id` que devuelve `initialize` reenviado en las llamadas siguientes. Secuencia:
    `initialize`, `prompts/list`, `prompts/get` de un contexto propio de U1 (control positivo) y
    `prompts/get` de un contexto privado de otro usuario (por ejemplo, de U2). Sin `tools/call`.
@@ -280,8 +336,8 @@ Creados por ADM desde la interfaz, sobre datos de demostración:
   inocuos. El de U2 trata de un tema concreto e incluye un **término inocuo y distintivo** (inventado,
   que no aparezca en los datos de demostración ni en otros contextos), para poder buscarlo en la
   respuesta y en Activity.
-- **Para la prueba 11:** U1 con el idioma **español (`es_ES`)** en sus preferencias (ADM instala el
-  idioma si no lo está). Al terminar, se puede dejar así: ninguna otra prueba depende del idioma.
+- **Para la prueba 11:** U1 con el idioma **español (`es_ES`)** en sus preferencias (`pns_demo` ya
+  tiene `es_ES` instalado, §3.1). Al terminar, se puede dejar así: ninguna otra prueba depende del idioma.
 - Textos de prueba inocuos; no se copian en este plan ni en el registro.
 
 ---
@@ -289,8 +345,8 @@ Creados por ADM desde la interfaz, sobre datos de demostración:
 ## 5. Pruebas
 
 Las 9 de la 3b-2 ([verificación](verificacion_seguridad_pns_ai.md), «Pruebas pendientes para staging»),
-en `<bd_demo>`, con datos de demostración y textos inocuos. La prueba 9 se divide en 9a (PNS-59) y 9b
-(PNS-29). Las pruebas 10 (PNS-12) y 11 (PNS-46) son las del [seguimiento](seguimiento_informe_pns_ai.md)
+en `pns_demo`, con datos de demostración y textos inocuos. La prueba 9 se divide en 9a (PNS-59) y 9b
+(PNS-29); la **9b no aplica en este staging** (proveedor Gemini, N8). Las pruebas 10 (PNS-12) y 11 (PNS-46) son las del [seguimiento](seguimiento_informe_pns_ai.md)
 que también necesitan turnos reales. Durante cada prueba, revisar el log del servidor en busca de `Traceback` o `ERROR`.
 
 Resumen:
@@ -306,7 +362,7 @@ Resumen:
 | 7 | U1 | Nombre de la base de datos y campos de un modelo sin acceso | PNS-36, D46 |
 | 8 | U1 | Saneado de la respuesta y de su exportación | PNS-60, D29 |
 | 9a | U1 (+ ADM) | Imágenes externas en el navegador | PNS-59 |
-| 9b | U1 (+ ADM) | Tokens con Anthropic y caché | PNS-29 |
+| 9b | — | Tokens con Anthropic y caché: **no aplica en este staging** (proveedor Gemini) | PNS-29 |
 | 10 | U1, U2 (+ ADM) | Contexto privado de un usuario en los turnos de otro | PNS-12 |
 | 11 | U1 (+ ADM) | Glosario `es_ES` en lo que recibe el modelo (observación) | PNS-46 |
 
@@ -393,6 +449,12 @@ Resumen:
 
 ### Prueba 9b — Tokens con Anthropic y caché
 
+> **No aplica en este staging (proveedor Gemini).** La prueba necesita Anthropic: lo que revisa PNS-29 son
+> los tokens de escritura de la caché de prompt de Anthropic (`cache_creation_input_tokens`), que el
+> módulo no cuenta. No hay clave de API de Anthropic, así que el staging usa Gemini (N8).
+> **Pendiente para LIYBEN** si en la demostración se elige Anthropic (§8). La descripción se conserva
+> para entonces.
+
 | | |
 |---|---|
 | **Usuario** | U1; ADM para Activity |
@@ -445,10 +507,10 @@ observaciones van en una nota debajo de la tabla, sin textos de prueba ni datos 
 | 7 Nombre de la BD y campos | PNS-36 | | | |
 | 8 Saneado de respuesta y exportación | PNS-60 | | | |
 | 9a Imágenes externas | PNS-59 | | | |
-| 9b Tokens con Anthropic | PNS-29 | | | |
+| 9b Tokens con Anthropic | PNS-29 | NO REALIZADA: no aplica en este staging (Gemini, N8); pendiente para LIYBEN si se elige Anthropic (§8) | | |
 | 10 Contexto privado en turnos de otro | PNS-12 | | | |
 | 11 Glosario `es_ES` (observación) | PNS-46 | | | |
-| Borrado de `<bd_demo>`, eliminación de `<servicio_odoo>` y revocación de la clave | — | | | |
+| Limpieza del §9 (borrado de `pns_demo` sin copia, proyecto `pns_staging`, proxy, certificado, DNS y clave de Gemini) | — | | | |
 
 Al terminar, trasladar los resultados a la [verificación](verificacion_seguridad_pns_ai.md) y al
 [seguimiento](seguimiento_informe_pns_ai.md) (estado de cada PNS), para el informe al fabricante.
@@ -464,49 +526,122 @@ Propuesta de este plan a partir de las decisiones; la decisión final es del res
   D46 se decide con esa información (a quién se da la clave y el grupo). Si el chat exige algo más o
   funciona con menos, revisar la guía §7 antes de decidir.
 - **N3:**
-  - Si todas las pruebas dan el resultado esperado (CORREGIDO, o el resto conocido en 4a, 7, 9a-2 y 9b,
-    y lo observado en 11), N3 no cambia: b) para el VPS de pruebas y a) para producción mientras no se
-    corrijan PNS-82, 83, 85, 90 y 91. Se vuelve a revisar con una versión corregida (guía §15).
+  - Si todas las pruebas dan el resultado esperado (CORREGIDO, o el resto conocido en 4a, 7 y 9a-2, y
+    lo observado en 11; la 9b no se hace aquí), N3 no cambia: b) para el staging y para LIYBEN, interna
+    de Seges (N7, §8), y a) para las BD de clientes con usuarios reales mientras no se corrijan PNS-82,
+    83, 85, 90 y 91. Se vuelve a revisar con una versión corregida (guía §15).
   - Si falla alguna prueba con resultado esperado CORREGIDO (sobre todo 3, 5, 6 u 8), el estado de ese
     PNS empeora en el seguimiento y hay que revisar también la opción b): si la versión sigue siendo
-    apta incluso para staging.
+    apta incluso para staging y, por tanto, para LIYBEN (N7).
 - **N1:** este plan no la valida (§1). Si los crons de purga fallan al lanzarlos a mano (§3.3), revisar
-  N1 antes de actualizar ninguna base de datos de cliente.
+  N1 antes de actualizar ninguna base de datos de cliente. Hoy N1 no aplica a ningún entorno (§2.4).
 
 ---
 
-## 7. A concretar con el VPS y pendiente de confirmar
+## 7. Concretado con el VPS y pendiente de confirmar
 
-### 7.1 A concretar con el VPS
+### 7.1 Concretado con el VPS (15/10/2026)
 
-- `<servicio_odoo>`: el servicio de Odoo propio de `<bd_demo>` (otro contenedor), su nombre, la forma
-  de ejecutar órdenes dentro (§2.1), su puerto o dominio detrás del proxy y cómo se para y se elimina
-  al terminar (§1, §2.3).
-- Si `<servicio_odoo>` comparte imagen y servidor PostgreSQL con el servicio de la BD de pruebas del
-  cliente (§2.4).
-- El `dbfilter` del servicio de la BD de pruebas del cliente, para que no encuentre `<bd_demo>` (§2.3).
-- Cómo se despliega `third_party` desde `14.0-pns-ai-3` en `<servicio_odoo>` y en qué commit está hoy el
-  VPS (§2.2).
-- `<archivo_conf>`: ruta del archivo de configuración de `<servicio_odoo>` y valores de `dbfilter`
-  (solo `<bd_demo>`), `workers` y límites (§2.3).
-- Configuración del proxy para `/chatboo/stream` y `/mcp` (§2.3).
-- Qué otras bases de datos hay en el VPS (§2.4).
-- `<bd_demo>`: cómo se crea con datos de demostración (§3.1).
+- **Concretado (§2, §2.3):** el servicio propio de `pns_demo` es `odoo14_pns`, del proyecto de Docker
+  Compose `pns_staging` (`/opt/odoo/pns_staging`), en `127.0.0.1:8169` y `127.0.0.1:8172` detrás de
+  `https://pns.liyben.com`. Las órdenes dentro del servicio se ejecutan con `docker compose exec` desde
+  esa carpeta. Cómo se para y se elimina al terminar: §9.
+- **Concretado (§2, §2.4):** comparte imagen (`odoo-web`) con `odoo14_server`, pero no PostgreSQL:
+  tiene el suyo, `odoo14_pns_db`.
+- **Concretado (§2):** no hace falta tocar el `dbfilter` de `odoo14_server`: con PostgreSQL propio no
+  ve `pns_demo`.
+- **Concretado (§2.2):** se despliegan solo `pns_base`, `pns_ai_mcp` y `pns_ai_chatboo` del commit
+  `95d6b1a`, con huella comprobada, en `/opt/odoo/pns_staging/addons` (solo lectura).
+- **Concretado (§2.3):** `odoo.conf` de `odoo14_pns`: `dbfilter` `^pns_demo$`, `workers` 2 y límites.
+- **Concretado (§2.3):** proxy Nginx para `/chatboo/stream` y `/mcp`.
+- **Concretado (§2.4):** otras bases de datos del VPS: LIYBEN (`odoo14_server`) y las instancias
+  heredadas de Odoo 11 y Odoo 8.
+- **Concretado (§3.1):** `pns_demo` creada con datos de demostración y `es_ES`.
+- **Concretado (§2.1):** Python 3.7.3 y `openpyxl` 3.1.3 en la imagen, sin imagen nueva.
 
 ### 7.2 Pendiente de confirmar
 
-- Que el modelo de Anthropic elegido admite imágenes (§4.2, prueba 2).
+- **Revocar en sus consolas las claves de los proveedores que tenía configurados LIYBEN** (§2.4).
+- **Comprobar que la clave de Gemini del laboratorio está revocada** en Google AI Studio
+  ([verificación](verificacion_seguridad_pns_ai.md): «Conviene revocar igualmente la clave en AI
+  Studio»).
+- **Crear una clave nueva de Gemini para el staging** (§4.2), con límite de gasto o cuota (guía §4.4).
+- **Antes de usar Gemini con datos de LIYBEN** (§8), comprobar las condiciones de uso de datos del
+  nivel gratuito (si Google puede usar las peticiones para mejorar sus productos). En el staging solo
+  se envían datos de demostración.
+- Que el modelo de Gemini elegido admite imágenes (§4.2, prueba 2).
 - Si grupo AI Conversational + clave MCP bastan para el chat (D46; guía §16.1).
 - La recomendación para External API y el borrado de los 5 servidores heredados (D7, sigue pendiente
-  de decisión; en `<bd_demo>` no existen, guía §10) (guía §16.1).
+  de decisión; en `pns_demo` no existen, guía §10) (guía §16.1).
 
 **No se valida en este plan** (§1):
 - La **secuencia de N1** de principio a fin (guía §5; §16.1): sigue como referencia, sin probar. Se
   podría validar aparte en local (`odoo-dev 14`) con la copia del laboratorio previa a la actualización
-  a 3.1.782.
+  a 3.1.782. Hoy N1 no aplica a ningún entorno (§2.4).
 - **D17** (personalizaciones `mcp_*`, PNS-88) y la comparación de **D37** con una base de datos
   actualizada.
-- La **medida real de las purgas** (guía §16.2): sin datos antiguos en `<bd_demo>`.
+- La **medida real de las purgas** (guía §16.2): sin datos antiguos en `pns_demo`.
+- **PNS-29 (prueba 9b):** sin Anthropic en el staging (§8 si se elige Anthropic para LIYBEN).
 
-**Fuera de este plan:** instalar los módulos en la BD de pruebas del cliente, con datos reales, es una
-decisión aparte (N3, N5).
+---
+
+## 8. Después del staging: instalación en LIYBEN
+
+**Camino A (N6).** Terminado este plan, se instala en LIYBEN como **fase aparte**, con su propio plan.
+LIYBEN es el objetivo final.
+
+**Objetivo:** instalación **nueva** (no actualización) de `pns_base` 1.2.32, `pns_ai_mcp` 3.1.782 y
+`pns_ai_chatboo` 2.1.453, con los parches 1 a 4, en LIYBEN (`odoo14_server`, `https://liyben.com`). Los
+`pns_*` de 3.1.486 ya están desinstalados (§2.4), así que N1 no aplica.
+
+**Condiciones:**
+- **Versión (N7):** 3.1.782 con los parches 1 a 4 (N2) y las mitigaciones de N3 (guía §2.2), aunque el
+  fabricante no haya corregido aún PNS-82, 83, 85, 90 y 91. Se admite porque LIYBEN es interna de
+  Seges, con datos antiguos de la empresa: se aplican las condiciones de N3 b) (sin usuarios de
+  portal, solo usuarios de confianza de Seges, mitigaciones de la guía §2.2). Si el staging empeora
+  algún PNS (§6.2), revisar N7 antes de instalar.
+- **Proveedor (N8):** lo decide el jefe en la demostración: Anthropic o Gemini.
+  - Si se elige **Anthropic**, hacer allí la **prueba 9b** (§5), con su descripción y criterios.
+  - Si se elige **Gemini**, antes comprobar las condiciones de uso de datos del nivel gratuito (§7.2).
+- **Datos personales hacia el proveedor (punto a valorar, D10):** LIYBEN tiene datos reales, aunque
+  antiguos, de la empresa (contactos, por ejemplo). A diferencia del staging, los turnos enviarán esos
+  datos al proveedor externo. Valorarlo antes de dar acceso al chat.
+- **Copia previa** de la base de datos y del filestore de LIYBEN, como la del 15/10/2026 (§2.4).
+- **Configuración** según la [guía](../specs/guia_configuracion_pns_ai.md) (§4 a §11), como en el
+  §3 y el §4 de este plan, sin las excepciones propias del staging (el paso temporal a `open` de las
+  pruebas 3 y 9a).
+- **D9 no afecta a otras bases:** `odoo14_server` solo sirve LIYBEN, así que el parche de
+  `http_patch.py` no alcanza a otras bases de datos. Comprobarlo de nuevo antes de instalar (su
+  `dbfilter` y las bases de datos de su PostgreSQL).
+
+**A planificar:**
+- **Cómo se despliega el código** en el `third_party` del VPS que usa `odoo14_server`: qué rama o commit
+  tiene hoy, si se lleva la rama `14.0-pns-ai-3` o solo los tres módulos (como en el §2.2), y que el
+  resto de módulos de `third_party` que usa LIYBEN no cambie. Después, las comprobaciones del §2.2,
+  puntos 2 y 3.
+- La imagen es la misma (`odoo-web`, §2.1): no hace falta construir otra.
+- La configuración de `odoo14_server` y de su proxy frente a la guía §4.3 (`workers`, límites,
+  `/chatboo/stream` y `/mcp`), como en el §2.3.
+
+---
+
+## 9. Limpieza al terminar
+
+Al terminar el staging (después del §6), en este orden. Son operaciones destructivas: se describen,
+no se dan listas para pegar. Las hace quien administra el VPS. **No se guarda ninguna copia de
+`pns_demo`** (N9).
+
+1. **Servicio y datos:** en `/opt/odoo/pns_staging`, bajar el proyecto de Docker Compose con la opción
+   que elimina también sus volúmenes con nombre (`docker compose down` con `-v`). Borra `odoo14_pns`,
+   `odoo14_pns_db`, la base de datos `pns_demo` y su filestore. Antes, comprobar que se está en esa
+   carpeta: los volúmenes de `odoo14_server` no deben verse afectados.
+2. **Proxy:** borrar el sitio `/etc/nginx/conf.d/pns_liyben_com.conf`, comprobar la configuración de
+   Nginx (`nginx -t`) y, solo si es correcta, recargar Nginx (recargar, no reiniciar).
+3. **Certificado:** eliminar con `certbot` el certificado `pns.liyben.com` (subcomando `delete` con
+   `--cert-name pns.liyben.com`), para que deje de renovarse.
+4. **Archivos:** borrar la carpeta `/opt/odoo/pns_staging` (incluidos `.env` y `addons`) y los archivos
+   `/tmp/pns_addons_*.tar.gz` del despliegue.
+5. **DNS:** quitar el registro de `pns.liyben.com`.
+6. **Clave:** revocar en la consola de Google la clave de Gemini del staging.
+7. **Comprobar:** `odoo14_server` (LIYBEN) y las instancias de Odoo 11 y Odoo 8 siguen respondiendo, y
+   anotar la fecha en el §6.1.

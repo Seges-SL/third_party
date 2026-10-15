@@ -21,7 +21,8 @@ bloques C1-C3 de `pns_ai_chatboo`.
 **Cómo se ha aplicado:** el texto original de cada decisión se conserva. Debajo de cada una hay un
 bloque «Tras 3.1.782 (14/10/2026)» con su estado, lo que la motivaba ahora (por PNS) y, si cambia, el
 nuevo alcance. Las CERRADA no necesitan decisión. Las decisiones nuevas N1 a N5 están en la
-[sección 8](#8-decisiones-nuevas-tras-la-versión-31782-n1-n5).
+[sección 8](#8-decisiones-nuevas-tras-la-versión-31782-n1-n5), y las del staging y LIYBEN (N6 a N10,
+15/10/2026), en la [sección 9](#9-staging-y-liyben-n6-n10).
 
 **Correspondencia riesgo → PNS.** El informe al fabricante no numera los riesgos (su tabla 1.1 no
 tiene esa columna). La correspondencia se ha hecho comparando los títulos del §4 de los consolidados
@@ -100,6 +101,11 @@ con la tabla 1.1 del informe:
 | N3 | ¿Es apta la 3.1.782 para algún cliente? | b) ahora; a) para producción |
 | N4 | ¿Se usa la mesa de entrega de claves por PIN? | a) no se usa |
 | N5 | Proveedor y datos para las 9 pruebas pendientes de staging | a); c) como puente |
+| N6 | Orden de instalación: staging y después LIYBEN | Camino A (15/10/2026) |
+| N7 | Versión que se instala en LIYBEN | 3.1.782 con parches 1-4 y mitigaciones de N3 (15/10/2026) |
+| N8 | Proveedor externo del staging | Gemini; LIYBEN, en la demostración (15/10/2026) |
+| N9 | Copias de `pns_demo` | No se guardan (15/10/2026) |
+| N10 | Montaje del staging | Servicio, PostgreSQL y despliegue propios (15/10/2026) |
 
 ### Bloqueantes vigentes
 
@@ -1321,6 +1327,11 @@ web.
 
 Decisión: **a)**, con la secuencia segura (Sergio) / Fecha: 14/10/2026
 
+**Observación (15/10/2026, preparación del VPS):** LIYBEN, la única BD que tenía los `pns_*` (3.1.486,
+pruebas internas de Seges), los ha desinstalado el 15/10/2026, con copia previa (plan de staging §2.4).
+N1 (actualización desde 3.1.486) **vuelve a no aplicar a ningún entorno**: en LIYBEN la 3.1.782 será
+una instalación nueva (N6, N7).
+
 ### N2 — Mantener los parches 1-4 hasta que el fabricante corrija PNS-81
 
 **Contexto:** sin el parche 1, `pns_ai_mcp` y `pns_ai_chatboo` no se importan en Odoo 14 con Python
@@ -1421,6 +1432,106 @@ proveedor antes de resolver D10.
 **Riesgos relacionados:** PNS-05, 16, 22, 29, 36, 59, 60, 61 y 81 (las pruebas pendientes).
 
 Decisión: **a)**, con **c)** como puente si el VPS no está listo (Sergio) / Fecha: 14/10/2026
+
+**Observación (15/10/2026, preparación del VPS):** el proveedor externo de la opción a) es **Gemini**,
+no Anthropic como preveía el traspaso del staging: no hay clave de API de Anthropic (N8). Por eso la
+prueba 9b (PNS-29) no se hace en el staging y queda para LIYBEN si allí se elige Anthropic. El VPS de
+pruebas es el de `odoo14_server` (propio de Seges), no el de un cliente (N10).
+
+---
+
+
+## 9. Staging y LIYBEN (N6-N10)
+
+Decisiones de Sergio del 15/10/2026, durante la preparación del VPS. Detalle del entorno en el
+[plan de staging](plan_staging_pns_ai.md) (§1, §2, §8 y §9).
+
+### N6 — ¿En qué orden se instala: staging y después LIYBEN?
+
+**Contexto:** el VPS del staging es el de `odoo14_server`, un Odoo 14 propio de Seges cuya BD LIYBEN
+(`https://liyben.com`) tiene los datos antiguos de la empresa. LIYBEN tenía instalada la 3.1.486 desde
+el 02/09/2026 (pruebas internas) y se ha desinstalado el 15/10/2026 (N1, observación). LIYBEN es el
+objetivo final de la instalación.
+
+**Opciones:**
+1. **a) Camino A:** ejecutar primero el plan de staging en `pns_demo` (datos de demostración, servicio
+   propio) y, después, como fase aparte, instalar en LIYBEN. — *Impacto:* las pruebas pendientes (N5) se
+   hacen sin enviar datos reales al proveedor; LIYBEN espera al staging.
+2. **b) Instalar directamente en LIYBEN**, sin staging previo. — *Impacto:* las pruebas se harían con
+   datos reales de la empresa y con el parche global de `http_patch.py` en el proceso de LIYBEN (D9).
+
+**Riesgos relacionados:** los de N3 y N5; D9, D10.
+
+Decisión: **a) Camino A** (Sergio) / Fecha: 15/10/2026
+
+### N7 — ¿Qué versión se instala en LIYBEN mientras el fabricante no corrija PNS-82, 83, 85, 90 y 91?
+
+**Contexto:** N3 declara la 3.1.782 apta solo para el VPS de pruebas (opción b) y no apta para BD con
+usuarios reales (opción a) hasta que el fabricante corrija PNS-82, 83, 85, 90 y 91. LIYBEN no es de un
+cliente: es interna de Seges, con datos antiguos de la empresa.
+
+**Opciones:**
+1. **a) 3.1.782 con los parches 1 a 4 (N2) y las mitigaciones de N3** (guía §2.2: sin portal, usuarios
+   de confianza de Seges), sin esperar al fabricante. — *Impacto:* LIYBEN queda expuesta a los PNS no
+   mitigables de N3, acotados por ser una BD interna.
+2. **b) Esperar a una versión corregida.** — *Impacto:* sin módulos en LIYBEN hasta entonces.
+
+**Riesgos relacionados:** PNS-82, 83, 85, 90 y 91; N2, N3.
+
+Decisión: **a)** (Sergio) / Fecha: 15/10/2026. Si el staging empeora algún PNS, el plan de staging
+(§6.2 y §8) propone revisar esta decisión antes de instalar.
+
+### N8 — ¿Qué proveedor externo se usa en el staging (y en LIYBEN)?
+
+**Contexto:** el traspaso del staging preveía Anthropic, necesario para la prueba 9b (PNS-29: tokens de
+escritura de la caché de prompt de Anthropic). No hay clave de API de Anthropic. En el laboratorio se
+usó Gemini (fase 3b-2).
+
+**Opciones:**
+1. **a) Gemini en el staging**, con una clave nueva solo para él; la prueba 9b no aplica. —
+   *Impacto:* PNS-29 queda sin probar en el staging.
+2. **b) Esperar a tener clave de Anthropic.** — *Impacto:* retrasa el staging.
+
+**Riesgos relacionados:** PNS-29; D10, D11.
+
+Decisión: **a) Gemini en el staging**; sustituye a la previsión del traspaso (Anthropic). En LIYBEN, el
+proveedor (Anthropic o Gemini) lo decide el jefe en la demostración; si es Anthropic, allí se hace la
+prueba 9b; si es Gemini, antes se comprueban las condiciones de uso de datos del nivel gratuito
+(Sergio) / Fecha: 15/10/2026
+
+### N9 — ¿Se guardan copias de `pns_demo`?
+
+**Contexto:** `pns_demo` solo tiene datos de demostración y existe para el staging. Ya estaba decidido
+borrarla al terminar (plan de staging §1; guía §11.2).
+
+**Opciones:**
+1. **a) No guardar copias:** al terminar se borra con el resto del proyecto `pns_staging`. — *Impacto:*
+   no se puede volver a ella; los resultados quedan en el registro del plan (§6.1).
+2. **b) Guardar una copia** antes de borrarla. — *Impacto:* una copia más que custodiar y borrar.
+
+**Riesgos relacionados:** ninguno.
+
+Decisión: **a)** (Sergio) / Fecha: 15/10/2026
+
+### N10 — ¿Cómo se monta el staging en el VPS de `odoo14_server`?
+
+**Contexto:** el parche de `http_patch.py` afecta a todas las BD que sirve el mismo proceso (D9,
+observación de la fase 5c). En el VPS conviven `odoo14_server` (LIYBEN) e instancias heredadas de dos
+clientes (Odoo 11 y Odoo 8), cada una con su PostgreSQL. El VPS no tiene swap.
+
+**Opciones:**
+1. **a) Servicio, PostgreSQL y despliegue propios:** proyecto de Docker Compose `pns_staging` con
+   `odoo14_pns` (imagen `odoo-web`, la de `odoo14_server`) y `odoo14_pns_db` (PostgreSQL 15), límites
+   de memoria, y solo `pns_base`, `pns_ai_mcp` y `pns_ai_chatboo` del commit `95d6b1a` en solo lectura.
+   — *Impacto:* aislamiento completo; `odoo14_server` no ve `pns_demo` y no hay que tocar su
+   `dbfilter`; un PostgreSQL más en el VPS.
+2. **b) Servicio propio compartiendo el PostgreSQL de `odoo14_server`**, con `dbfilter` en los dos. —
+   *Impacto:* menos recursos, pero `pns_demo` queda en el mismo servidor de BD que LIYBEN y hay que
+   cambiar el `dbfilter` de `odoo14_server`.
+
+**Riesgos relacionados:** D9, D15, D16 (código en solo lectura).
+
+Decisión: **a)** (Sergio) / Fecha: 15/10/2026. Hecho y comprobado el 15/10/2026 (plan de staging §2).
 
 ---
 
