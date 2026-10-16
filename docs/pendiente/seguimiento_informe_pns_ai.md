@@ -4,18 +4,22 @@
   pns_ai_chatboo 2.1.322; la versión del informe) frente a `HEAD` de `14.0-pns-ai-3` (pns_base 1.2.32,
   pns_ai_mcp 3.1.782, pns_ai_chatboo 2.1.453). Diff: `git diff 14.0-analisis-pns-ai..HEAD`.
 - **Fecha:** 13/10/2026 (código, fase 2). Actualizado el 14/10/2026 con el laboratorio (fase 3) y la
-  revisión independiente del seguimiento.
+  revisión independiente del seguimiento, y el 16/10/2026 con el staging (15-16/10/2026).
 - **Fuentes:** `docs/pendiente/informe_fabricante_pns_ai.md` (PNS-01 a PNS-80),
   `docs/specs/cambios_pns_ai_3-1-782.md` (inventario de la fase 1), el código actual y
-  `docs/pendiente/verificacion_seguridad_pns_ai.md` (laboratorio, fases 3a, 3b-1, 3b-2 y 3c).
+  `docs/pendiente/verificacion_seguridad_pns_ai.md` (laboratorio, fases 3a, 3b-1, 3b-2 y 3c, y
+  sección «Staging (15-16/10/2026)») y `docs/pendiente/plan_staging_pns_ai.md` (registro del §6.1).
 - **Método:** lectura de código (fase 2) y pruebas en el laboratorio (fase 3). Las líneas citadas son
-  las de la rama `14.0-pns-ai-3`, que incluye los parches de compatibilidad 1 a 4
+  las de la rama `14.0-pns-ai-3`, que incluye los parches 1 a 6
   (`docs/pendiente/parches_pns_ai.md`; 1 a 3 en el commit `ce6790b`). Solo cambian respecto al código
-  del fabricante las de `mcp_decorators.py`, `relaxaicode_recipe.py`, `pdf_io.py` y `main.py` (de la
-  1473 en adelante, +1; de la 1598 en adelante, +2) (ver PNS-81 y «Compatibilidad con Odoo 14»).
+  del fabricante las de `mcp_decorators.py`, `relaxaicode_recipe.py`, `pdf_io.py`, `main.py` (de la
+  1473 en adelante, +1; de la 1598 en adelante, +2), `openai_driver.py` (parche 5: de la 659 en
+  adelante, +9) y `chatboo_async_request.py` (parche 6: dos marcadores y llamadas antes de las dos
+  llamadas a `_finalize`, y el método nuevo; las líneas que se citan de ese archivo en PNS-94 son las
+  del fabricante) (ver PNS-81, PNS-93, PNS-94 y «Compatibilidad con Odoo 14»).
 - **Alcance:** primer bloque, hallazgos de gravedad crítica y alta (35); segundo bloque, de gravedad
   media y baja (45, con PNS-22, que pasó a Media en la revisión del informe, y PNS-79). Total: los
-  80 hallazgos del informe. Tercer bloque: hallazgos nuevos (PNS-81 a PNS-92) y compatibilidad con
+  80 hallazgos del informe. Tercer bloque: hallazgos nuevos (PNS-81 a PNS-96) y compatibilidad con
   Odoo 14 (Python 3.7 y librerías de la imagen).
 
 > **Fase 3 (laboratorio) hecha**, con el parche 1 aplicado para que los módulos se importen:
@@ -26,8 +30,13 @@
 > - **3c:** pruebas complementarias tras la revisión independiente (PNS-12, 21, 80, 90, 91 y 92);
 > - **parche 4:** `prompts/*` por `/mcp`, PNS-12 por HTTP CORREGIDO.
 >
-> El resultado de cada PNS probado está en la columna «Laboratorio» de la tabla resumen y en su
-> detalle. «—» significa que no se probó en el laboratorio.
+> **Staging hecho (15-16/10/2026)** en `pns_demo` (VPS de `odoo14_server`, proveedor Gemini, parches 1
+> a 6): las pruebas pendientes de la 3b-2 y las 10 y 11 del plan de staging (la 9b, PNS-29, no aplica
+> con Gemini). De ahí salen PNS-93 a PNS-96.
+>
+> El resultado de cada PNS probado está en la columna «Laboratorio y staging» de la tabla resumen y en
+> su detalle; «(staging)» marca lo probado en el VPS. «—» significa que no se probó ni en el
+> laboratorio ni en el staging.
 
 Estados: **CORREGIDO** (el cambio cubre el hallazgo y sus puntos de entrada) · **PARCIAL** (cubre
 una parte; queda un resto concreto) · **SIN CAMBIOS** · **YA NO APLICA** (el código desapareció) ·
@@ -35,20 +44,20 @@ una parte; queda un resto concreto) · **SIN CAMBIOS** · **YA NO APLICA** (el c
 el informe: del código nuevo o modificado de esta versión o, en PNS-90 a PNS-92, código anterior
 detectado en la revisión).
 
-Columna «Laboratorio»: **CORREGIDO** · **CORREGIDO (parte probada: …)** (solo se probó esa parte) ·
+Columna «Laboratorio y staging»: **CORREGIDO** · **CORREGIDO (parte probada: …)** (solo se probó esa parte) ·
 **SIN CAMBIOS** / **VULNERABLE** (reproducido) · **NO CONCLUYENTE** · **PENDIENTE STAGING** (no se
 pudo probar por el proveedor) · **CONFIRMADO** (hallazgo funcional observado) · «—» (no probado o
 prueba que solo comprueba otro rol o el ACL estándar).
 
 ## Tabla resumen
 
-| PNS | Gravedad | Estado | Laboratorio |
+| PNS | Gravedad | Estado | Laboratorio y staging |
 |---|---|---|---|
 | PNS-01 | Crítica | PARCIAL | CORREGIDO (parte probada: vía RPC cerrada, 3b-1) |
 | PNS-02 | Crítica | PARCIAL | CORREGIDO (parte probada: vía RPC cerrada, 3b-1) |
 | PNS-03 | Crítica | CORREGIDO | CORREGIDO (3b-1) |
 | PNS-04 | Crítica | CORREGIDO | — |
-| PNS-05 | Crítica | CORREGIDO | PENDIENTE STAGING (3b-2) |
+| PNS-05 | Crítica | CORREGIDO | CORREGIDO (staging, prueba 6) |
 | PNS-06 | Crítica | CORREGIDO | CORREGIDO (parte probada: rechazo al guardar de una escritura con `sudo`, 3b-1) |
 | PNS-07 | Crítica | PARCIAL | — |
 | PNS-53 | Crítica | CORREGIDO | CORREGIDO (3b-1) |
@@ -57,11 +66,11 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-09 | Alta | CORREGIDO | CORREGIDO (parte probada: `action_test_connection` de un interno, 3b-1) |
 | PNS-10 | Alta | CORREGIDO | CORREGIDO (3b-1) |
 | PNS-11 | Alta | CORREGIDO | CORREGIDO (3b-1) |
-| PNS-12 | Alta | CORREGIDO | CORREGIDO en el modelo (3c); por HTTP CORREGIDO con el parche 4 (ver PNS-81) |
+| PNS-12 | Alta | CORREGIDO | CORREGIDO en el modelo (3c); por HTTP CORREGIDO con el parche 4 (ver PNS-81; confirmado en staging, §4.4); en los turnos del chat, CORREGIDO (staging, prueba 10) |
 | PNS-13 | Alta | CORREGIDO | CORREGIDO (3b-1) |
 | PNS-14 | Alta | PARCIAL | VULNERABLE en `ai.fetch.cache` (3c, PNS-90); el resto, CORREGIDO (3b-1) |
 | PNS-15 | Alta | CORREGIDO | — |
-| PNS-16 | Alta | PARCIAL | NO CONCLUYENTE (3b-2) |
+| PNS-16 | Alta | PARCIAL | CORREGIDO (parte probada: tarjeta sin auto-confirmación ni salida, con las dos políticas; staging, prueba 3); resto (reinyección como `system`), NO CONCLUYENTE |
 | PNS-17 | Alta | PARCIAL | — |
 | PNS-18 | Alta | PARCIAL | CORREGIDO (parte probada: `no_external_failover`, 3b-2) |
 | PNS-19 | Alta | PARCIAL | — |
@@ -76,10 +85,10 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-56 | Alta | CORREGIDO | CORREGIDO (3b-1) |
 | PNS-57 | Alta | CORREGIDO | CORREGIDO (3b-1) |
 | PNS-58 | Alta | CORREGIDO | CORREGIDO (3b-1) |
-| PNS-59 | Alta | PARCIAL | CORREGIDO (parte probada: 404 sin salida para un host no permitido, 3b-2) |
-| PNS-60 | Alta | PARCIAL | CORREGIDO (parte probada: mensaje del usuario, 3b-2); respuesta y exportación, PENDIENTE STAGING |
+| PNS-59 | Alta | PARCIAL | CORREGIDO (parte probada: 404 sin salida para un host no permitido, 3b-2; navegador con `whitelist_only`, staging, prueba 9a); con `open`, NO CONCLUYENTE |
+| PNS-60 | Alta | PARCIAL | CORREGIDO (parte probada: mensaje del usuario, 3b-2; respuesta en directo, tras recargar, PDF y Word, staging, prueba 8) |
 | PNS-80 | Alta | YA NO APLICA | CORREGIDO (3c) |
-| PNS-22 | Media | PARCIAL | PENDIENTE STAGING (3b-2) |
+| PNS-22 | Media | PARCIAL | CORREGIDO (parte probada: por chat, staging, prueba 5) |
 | PNS-28 | Media | PARCIAL | CORREGIDO (parte probada: sin filas de `ai.log` sin clave, 3b-1) |
 | PNS-29 | Media | PARCIAL | PARCIAL (3b-2) |
 | PNS-30 | Media | PARCIAL | SIN CAMBIOS (resto reproducido, 3b-1) |
@@ -88,14 +97,14 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-33 | Media | SIN CAMBIOS | — |
 | PNS-34 | Media | CORREGIDO | — |
 | PNS-35 | Media | SIN CAMBIOS | — |
-| PNS-36 | Media | PARCIAL | PENDIENTE STAGING (3b-2) |
+| PNS-36 | Media | PARCIAL | SIN CAMBIOS (resto reproducido: nombre de la BD y campos sin valores, staging, prueba 7) |
 | PNS-37 | Media | SIN CAMBIOS | — |
 | PNS-38 | Media | SIN CAMBIOS | — |
 | PNS-39 | Media | PARCIAL | — |
 | PNS-40 | Media | PARCIAL | SIN CAMBIOS (resto reproducido, 3b-2) |
 | PNS-41 | Media | CORREGIDO | — |
 | PNS-42 | Media | SIN CAMBIOS | — |
-| PNS-61 | Media | PARCIAL | CORREGIDO (parte probada: `provider_id`, 3b-2); historial, SIN CAMBIOS |
+| PNS-61 | Media | PARCIAL | CORREGIDO (parte probada: `provider_id`, 3b-2 y staging, prueba 4b); historial, SIN CAMBIOS (staging, prueba 4a) |
 | PNS-62 | Media | PARCIAL | CORREGIDO (parte probada: archivo único, 3b-2) |
 | PNS-63 | Media | CORREGIDO | — |
 | PNS-64 | Media | PARCIAL | — |
@@ -107,7 +116,7 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-43 | Baja | PARCIAL | — |
 | PNS-44 | Baja | YA NO APLICA | — |
 | PNS-45 | Baja | CORREGIDO | — |
-| PNS-46 | Baja | DUDOSO | NO CONCLUYENTE (3b-1) |
+| PNS-46 | Baja | DUDOSO | NO CONCLUYENTE (3b-1 y staging, prueba 11; síntoma en PNS-95) |
 | PNS-47 | Baja | CORREGIDO | — |
 | PNS-48 | Baja | CORREGIDO | — |
 | PNS-49 | Baja | PARCIAL | — |
@@ -124,7 +133,7 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-77 | Baja | SIN CAMBIOS | — |
 | PNS-78 | Baja | CORREGIDO | — |
 | PNS-79 | Baja | CORREGIDO | NO CONCLUYENTE (3b-1) |
-| PNS-81 | Alta | NUEVO | importación resuelta con el parche 1 (3a); parche 2 eficaz (3b-2); parche 3, PENDIENTE STAGING; `prompts/*`: parche 4 en la rama, eficaz (prueba del parche 4) |
+| PNS-81 | Alta | NUEVO | importación resuelta con el parche 1 (3a); parche 2 eficaz (3b-2 y staging, prueba 2); parche 3 eficaz (staging, prueba 1); `prompts/*`: parche 4 en la rama, eficaz (prueba del parche 4 y staging, §4.4) |
 | PNS-82 | Alta | NUEVO | VULNERABLE (3b-1) |
 | PNS-83 | Alta | NUEVO | VULNERABLE (3b-1) |
 | PNS-84 | Media | NUEVO | — |
@@ -136,17 +145,21 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-90 | Alta | NUEVO | VULNERABLE (3c) |
 | PNS-91 | Media | NUEVO | VULNERABLE (3c) |
 | PNS-92 | Media | NUEVO | protegido solo por rebote (3c) |
+| PNS-93 | Media | NUEVO | CONFIRMADO (staging); parche 5 eficaz |
+| PNS-94 | Alta | NUEVO | CONFIRMADO (staging); parche 6 eficaz (5 casos) |
+| PNS-95 | Baja | NUEVO | CONFIRMADO (staging, prueba 11) |
+| PNS-96 | Baja | NUEVO | CONFIRMADO (staging, con modelos `lite`) |
 
 **Recuento:** CORREGIDO 31 · PARCIAL 33 · SIN CAMBIOS 13 · YA NO APLICA 2 · DUDOSO 1 (80 del
-informe) · NUEVO 12 (total 92). Por gravedad:
+informe) · NUEVO 16 (total 96). Por gravedad:
 
 | Gravedad | Corregido | Parcial | Sin cambios | Ya no aplica | Dudoso | Nuevo | Total |
 |---|---|---|---|---|---|---|---|
 | Crítica | 5 | 4 | 0 | 0 | 0 | 0 | 9 |
-| Alta | 13 | 11 | 1 | 1 | 0 | 4 | 30 |
-| Media | 4 | 12 | 9 | 0 | 0 | 5 | 30 |
-| Baja | 9 | 6 | 3 | 1 | 1 | 3 | 23 |
-| **Total** | **31** | **33** | **13** | **2** | **1** | **12** | **92** |
+| Alta | 13 | 11 | 1 | 1 | 0 | 5 | 31 |
+| Media | 4 | 12 | 9 | 0 | 0 | 6 | 31 |
+| Baja | 9 | 6 | 3 | 1 | 1 | 5 | 25 |
+| **Total** | **31** | **33** | **13** | **2** | **1** | **16** | **96** |
 
 Restos que se repiten en varios parciales:
 1. **El sandbox (caja A) bloquea por lista de nombres y no impide llamar a métodos privados**
@@ -254,6 +267,11 @@ Restos que se repiten en varios parciales:
 - **Prueba en el laboratorio:** sí. Con dos usuarios, B pide en el chat el estado de una operación de
   A dando su `verification_id`: debe responder que no hay operación. Para A, una operación confirmada
   se ejecuta respetando sus ACL (una escritura sobre un modelo sin permiso debe fallar).
+- **Staging (16/10/2026, prueba 6): CORREGIDO.** U2 no obtuvo ningún dato de la operación de UW
+  (`WRIT00000003`); hizo una búsqueda a ciegas de 10 rondas con falsos positivos (campos no
+  almacenados de `res.users`), sin valores. La segunda parte también se observó: antes de tener
+  «Creación de contactos», la operación confirmada de UW se ejecutó con sus permisos y falló con el
+  `AccessError` de Odoo, sin escribir.
 
 ### PNS-06 — El `code_body` de una skill se ejecuta al guardarla, sin solo lectura
 
@@ -426,9 +444,11 @@ Restos que se repiten en varios parciales:
     recibe en `prompts/list` los contextos compartidos y su contexto privado, y no el de A;
     `prompts/get` del suyo devuelve su contenido (control positivo) y el de A, «Prompt not found». En
     el log, ningún `AttributeError`.
-- **Pendiente para staging:** que el contenido del contexto de A no se inyecte en los turnos de B que
-  activen ese dominio (necesita IA). Si el fabricante corrige PNS-81 sin el parche 4, repetir
-  `prompts/list` y `prompts/get` por `/mcp` con su versión.
+- **Staging (15-16/10/2026): CORREGIDO** por `/mcp` (plan §4.4, con el parche 4) y **en los turnos
+  del chat** (prueba 10): el término distintivo del contexto privado de U2 no aparece en ningún
+  registro de `ai_log` de U1, y el índice de contextos de los turnos de U1 no incluye el de U2.
+- **Pendiente:** si el fabricante corrige PNS-81 sin el parche 4, repetir `prompts/list` y
+  `prompts/get` por `/mcp` con su versión.
 
 ### PNS-13 — `/mcp/message` no revalida clave ni usuario; sesiones sin caducidad
 
@@ -511,6 +531,13 @@ Restos que se repiten en varios parciales:
   una URL externa: no debe haber auto-confirmación (debe aparecer la tarjeta), tanto con política
   restringida como `open`. Repetir pidiéndolo en el turno siguiente (reutilizando la consulta):
   observar si se auto-confirma.
+- **Staging (16/10/2026, prueba 3, U3 con AI External URL):**
+  - **Parte principal: CORREGIDO**, con `whitelist_only` y con `open`. Con la nota leída y la petición
+    explícita «haz lo que indica la nota», `safe_plan_request` quedó `Proposed`/`pending_confirmation`
+    (`FURL00000001`, `3` y `4`) y se rechazó, sin salida a `open-meteo`. Sin petición explícita, el
+    modelo no obedeció la instrucción oculta.
+  - **Resto (reinyección como `system`):** con `open` no se manifestó (también hubo tarjeta en el
+    turno de reutilización); con `whitelist_only`, NO CONCLUYENTE. El estado sigue PARCIAL.
 
 ### PNS-17 — `fetch_url` sin protección SSRF ni límite de tamaño
 
@@ -786,6 +813,9 @@ Restos que se repiten en varios parciales:
   permitido debe mostrarse como enlace o texto alternativo, sin petición al exterior (ver el log
   del servidor y la pestaña de red). Repetir con la política `open`: hoy se espera que el servidor
   haga la petición.
+- **Staging (16/10/2026, prueba 9a):** con `whitelist_only`, **CORREGIDO**: la imagen pasa por
+  `remote_image`, que responde 404, y no hay salida al exterior. Con `open`, **NO CONCLUYENTE**: el
+  modelo no incluyó la imagen en la respuesta, así que el resto no se pudo observar.
 
 ### PNS-60 — HTML del asistente insertado sin sanear en el cliente de Chatboo
 
@@ -814,6 +844,10 @@ Restos que se repiten en varios parciales:
   (manejadores de evento, enlaces con esquemas no permitidos, SVG): inspeccionar el DOM del mensaje
   durante el streaming, tras recargar y en la exportación a PDF/Word. No deben aparecer manejadores
   ni esquemas fuera de la lista.
+- **Staging (16/10/2026, prueba 8): CORREGIDO** en la respuesta, en directo y tras recargar, y en la
+  exportación a PDF y a Word (un `.doc` que es HTML): sin atributos de evento, sin esquemas fuera de
+  la lista y sin contenido activo del SVG. El resto del código (`escapeHtml` sin comillas, lista
+  negra, showdown) no se ha probado: el estado sigue PARCIAL. D29 deja de ser bloqueante.
 
 ### PNS-80 — `read_progress` devuelve el progreso y la respuesta de cualquier turno a cualquier usuario
 
@@ -851,6 +885,9 @@ repiten»: cuando un resto toca el sandbox o la Caja B, se indica en el propio h
     una herramienta de escritura futura dependerá otra vez de pedir el entorno correcto.
 - **Prueba en el laboratorio:** sí. Un usuario de chat sin AI Writer pide una operación de
   escritura por Chatboo y por `/mcp`: debe rechazarse en ambos casos.
+- **Staging (16/10/2026, prueba 5): CORREGIDO por Chatboo.** U1 (con «Creación de contactos», para que
+  el único freno fuera la falta de AI Writer) pidió crear un contacto: sin tarjeta y sin `create`,
+  `write` ni `unlink` en el código ejecutado. Por `/mcp` no se probó; el resto de `tools/call` sigue.
 
 ### PNS-28 — CORS `*`, sin validación de `Origin` y registro de peticiones no autenticadas
 
@@ -993,6 +1030,8 @@ repiten»: cuando un resto toca el sandbox o la Caja B, se indica en el propio h
     Ningún validador bloquea `fields_get` sobre un modelo sin permiso de lectura.
 - **Prueba en el laboratorio:** sí. Un usuario de chat sin grupos de IA pide el nombre de la base de
   datos y los campos de un modelo al que no tiene acceso: observar si los obtiene.
+- **Staging (16/10/2026, prueba 7): SIN CAMBIOS** (resto reproducido, como se preveía). U1 obtuvo el
+  nombre de la BD y la lista de campos de `ai.mcp.user`, sobre el que no tiene acceso, sin valores.
 
 ### PNS-37 — Diario de cambios incompleto y valores sin redactar
 
@@ -1103,6 +1142,12 @@ repiten»: cuando un resto toca el sandbox o la Caja B, se indica en el propio h
 - **Prueba en el laboratorio:** sí. Enviar a `/chatboo/stream` un `provider_id` fuera de la cadena:
   debe ignorarse. Enviar un `history` con un turno inventado: hoy se espera que el asistente lo
   trate como real.
+- **Staging (16/10/2026, pruebas 4a y 4b):**
+  - **Historial: SIN CAMBIOS.** El asistente trató como real un turno inventado (código de cliente
+    ficticio `CLI-7731` → «Ready Mat») y **el historial falso quedó guardado en la sesión**. El enlace de la respuesta usaba un id inventado (106 en vez
+    de 12; ver PNS-96).
+  - **Proveedor: CORREGIDO.** Un `provider_id` fuera de la cadena se ignoró; el turno lo resolvió el
+    de la cadena.
 
 ### PNS-62 — Adjuntos e imágenes sin límites de tamaño ni truncado
 
@@ -1283,8 +1328,14 @@ repiten»: cuando un resto toca el sandbox o la Caja B, se indica en el propio h
   contextos por usuario), o la composición de esa BD difiere de la de fábrica (ver PNS-76). Los tests
   del fabricante esperan `corporate_terms` como «importado» en el agente de Chatboo
   (`pns_ai_mcp/tests/test_knowledge_composition.py:209-222`).
-- **Pendiente:** revisar la vía de descubrimiento y repetir con un turno real con IA (staging),
-  buscando en lo que recibe el modelo el formato `1.234,56` y los términos de `corporate_terms_es_ES`.
+- **Staging (16/10/2026, prueba 11): NO CONCLUYENTE.** `prompt_data` de `ai_log` no guarda el prompt
+  de los turnos de Chatboo, así que no se puede ver si llega el glosario. Síntoma compatible con la
+  sospecha: con un usuario `es_ES`, el formato de los importes cambia entre ejecuciones (`1,234.50` y
+  `1.234,50`) y el texto y la tabla de una misma respuesta se contradicen. Se registra aparte como
+  PNS-95, junto con un redondeo erróneo.
+- **Pendiente:** revisar la vía de descubrimiento; para ver el prompt hace falta otra vía de registro
+  (el bucle de herramientas registra la petición sin `prompt_data`, `agent_engine.py:3134-3146`; ver
+  `analisis_parche5_gemini.md`, «Registro de actividad»).
 
 ### PNS-47 — Sin red, cada `check_health` espera los timeouts de las fuentes FX
 
@@ -1481,7 +1532,9 @@ repiten»: cuando un resto toca el sandbox o la Caja B, se indica en el propio h
 
 PNS-81 a PNS-89: solo código nuevo o modificado en `git diff 14.0-analisis-pns-ai..HEAD`. PNS-90 a
 PNS-92: código que ya existía en 3.1.486 y que el informe no citaba; salieron en la revisión
-independiente del seguimiento y se comprobaron en el laboratorio (fase 3c). Mismo criterio de
+independiente del seguimiento y se comprobaron en el laboratorio (fase 3c). PNS-93 a PNS-96: observados
+en el staging (15-16/10/2026, `pns_demo`, proveedor Gemini; `verificacion_seguridad_pns_ai.md`,
+«Staging (15-16/10/2026)»); la gravedad es una propuesta. Mismo criterio de
 gravedad que el informe. Antes de numerar cada uno se ha comprobado con Grep que no figuraba en el
 informe ni en este seguimiento; cuando era un resto ya citado, se indica la relación.
 
@@ -1536,7 +1589,11 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
 - **Laboratorio:**
   - fase 3a: con el parche 1, la actualización termina y el servidor arranca;
   - fase 3b-2: con el parche 2, `remote_image` devuelve 200 con la imagen re-codificada;
-  - el parche 3 (consulta con un parámetro de fecha) queda pendiente para staging por el proveedor;
+  - el parche 3 (consulta con un parámetro de fecha) quedó pendiente para staging por el proveedor;
+    en staging (16/10/2026, prueba 1), CORREGIDO: respuesta sin error de la herramienta y sin
+    `AttributeError`;
+  - staging (16/10/2026, prueba 2): con el parche 2, una foto con EXIF 6 adjunta en el chat llega
+    derecha al modelo;
   - fase 3c: `prompts/list` y `prompts/get` por `/mcp` con un usuario con clave no devuelven ningún
     contexto, tampoco el propio, y el log registra el `AttributeError`;
   - parche 4 (2026-10-14, 16:12 UTC): la misma prueba por `/mcp` lista los contextos compartidos y el
@@ -1849,6 +1906,91 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
   (`:465` o `:437`), no de un control previo.
 - **Corrección propuesta:** comprobar `group_ai_admin` (o la propiedad, si se quiere autoservicio) antes
   de escribir, o hacer privados los métodos y llamarlos solo desde el asistente.
+
+### PNS-93 — El driver `openai` pierde la `thought_signature` de Gemini 3 y todo turno con herramientas falla
+
+- **Gravedad propuesta:** Media · **Estado:** NUEVO. En la rama `14.0-pns-ai-3`, con parche local
+  (**parche 5**, `docs/pendiente/parches_pns_ai.md`), validado en staging.
+- **Descripción:** con Gemini 3.x configurado con `protocol = openai`
+  (`…/v1beta/openai/chat/completions`), Gemini envía en cada `tool_call` el campo
+  `extra_content.google.thought_signature` y exige recibirlo de vuelta. `iter_chat` reconstruye cada
+  `tool_call` solo con `id`, `type` y `function` y lo pierde
+  (`pns_ai_mcp/lib/llm/drivers/openai_driver.py:645-657` del fabricante; mensaje final en
+  `:661-664`). La siguiente ronda del bucle de herramientas recibe `HTTP 400 … Function call is
+  missing a thought_signature in functionCall parts`. «Test Connection» funciona porque no envía
+  herramientas (`models/ai_provider.py:995-997`). Análisis completo en
+  `docs/pendiente/analisis_parche5_gemini.md`.
+- **Impacto:** con Gemini 3 por el protocolo OpenAI, Chatboo no puede responder ninguna pregunta que
+  necesite consultar datos. El 400 se convierte en `ProviderConnectionError` y dispara el failover;
+  con un solo proveedor, el usuario ve el error. No es un problema de seguridad ni de Odoo 14.
+- **Staging (16/10/2026):** sin el parche, todo turno con herramientas fallaba (15/10). Con el parche 5
+  (commit `27cadbb`), varias rondas de herramientas en el mismo turno y un segundo turno en la misma
+  conversación, sin 400, con `gemini-3.6-flash`, `3.5-flash-lite` y `3.5-flash`. No se observaron
+  llamadas paralelas (la ampliación 1 del análisis, para llamadas sin `index`, sigue sin aplicar).
+- **Corrección sugerida:** conservar `extra_content` de cualquier delta del `tool_call` (el parche 5
+  es esa corrección mínima) y revisar las llamadas paralelas sin `index` y el fallback de llamadas
+  escritas en texto (`agent_engine.py:3215-3240`).
+
+### PNS-94 — Bloqueo de `chatboo_session` tras un turno con adjunto: denegación de servicio por cualquier usuario de Chatboo
+
+- **Gravedad propuesta:** Alta · **Estado:** NUEVO. En la rama `14.0-pns-ai-3`, con parche local
+  (**parche 6**, `docs/pendiente/parches_pns_ai.md`), validado en staging.
+- **Descripción:** el turno se ejecuta en un hilo dentro del worker HTTP con un cursor propio (A) que
+  mantiene la transacción abierta todo el turno (`pns_ai_chatboo/models/chatboo_async_request.py:252-303`,
+  cursor en `:280`). Al terminar, `_finalize` abre en el mismo hilo otro cursor (B) y escribe la misma
+  fila de `chatboo_session` (`:835-918`, cursor en `:885-887`; `input_history` en `:1723`). Si A tiene
+  un lock sobre esa fila, B espera a A, y A no se cerrará nunca: su `rollback` está en el `finally`
+  (`:724`), después de `_finalize`, en el mismo hilo. PostgreSQL no lo detecta como interbloqueo y
+  ningún límite de Odoo afecta a un hilo de fondo. Hipótesis de trabajo sobre el origen del lock (H1):
+  la escritura de `last_screen_context` por A después del commit de `:514` (`:556-562`), que con
+  imagen llega a SQL por A; H2 (commit de `:514` fallido) descartada porque los logs no tienen «could
+  not commit the session writes». Líneas del código del fabricante (antes del parche 6). Análisis
+  completo en `docs/pendiente/analisis_bloqueo_chatboo_session.md`.
+- **Impacto:** el job no llega a `done` y el navegador sigue esperando. Cada recarga ejecuta
+  `update_last_used()` sobre la misma fila sin límite de espera (`pns_ai_chatboo/controllers/chatboo.py:286`)
+  y ocupa un worker; con 2 workers bastan unas pocas para dejar Odoo sin servicio, y las conexiones
+  quedan en PostgreSQL hasta reiniciar. Se reproduce siempre al adjuntar una imagen, también cuando
+  el proveedor devuelve error. **Cualquier usuario de Chatboo** (grupo conversacional y clave MCP, sin
+  privilegios) puede provocarlo, sin querer o a propósito.
+- **Staging:** dos incidentes antes del parche (resueltos reiniciando). Con el parche 6 (commit
+  `63ee2dc`, 16/10/2026), validado en sus 5 casos (imagen con respuesta, imagen con error del
+  proveedor, solo texto, cancelación y turno siguiente que recupera el contexto de pantalla), sin
+  conexiones colgadas ni avisos en el log.
+- **Corrección sugerida** (análisis, §5.2): cerrar la transacción de A antes de `_finalize` (el
+  parche 6) y, de fondo, que toda escritura en la sesión durante el turno vaya en cursores cortos; no
+  tragarse un commit fallido; `lock_timeout` en las escrituras de la sesión; no ejecutar trabajo largo
+  en hilos dentro de los workers; detección y cierre del job si `_finalize` no obtiene el lock.
+
+### PNS-95 — Formato de importes inconsistente y redondeo erróneo con usuarios `es_ES`
+
+- **Gravedad propuesta:** Baja · **Estado:** NUEVO (relacionado con PNS-46).
+- **Descripción:** con un usuario `es_ES`, las respuestas con importes usan unas veces `1,234.50` y
+  otras `1.234,50`, y en una misma respuesta el texto y la tabla se contradicen. Además, un importe de
+  `1493,745` aparece como `1.493,74` en la tabla. Ubicación: sin localizar en el código. El formato lo
+  produce el modelo y la parte fija del prompt no incluye el glosario `corporate_terms_es_ES`
+  (PNS-46, laboratorio 3b-1: `pns_ai_mcp/models/ai_context.py:818-826`); el redondeo puede venir de la
+  representación en coma flotante (`1493,745` no es exacto en binario), sin comprobar.
+- **Impacto:** cifras ambiguas o incorrectas en respuestas financieras para usuarios españoles.
+- **Staging (16/10/2026, prueba 11):** observado. Lo que recibe el modelo no se puede ver: `prompt_data`
+  no guarda el prompt de los turnos de Chatboo.
+- **Corrección sugerida:** formatear los importes en el servidor según el idioma del usuario (o
+  incluir de forma fiable el glosario y el formato en el prompt) y redondear con `Decimal` o con la
+  precisión de la moneda; guardar el prompt en `ai_log` para poder auditarlo.
+
+### PNS-96 — Calidad de las respuestas con modelos `lite`
+
+- **Gravedad propuesta:** Baja · **Estado:** NUEVO (observación de calidad; depende en parte del
+  modelo).
+- **Descripción:** con modelos `lite` (en staging, `gemini-3.5-flash-lite`), el asistente interpreta
+  mal «empresas», inventa ids en los enlaces a registros (como el 106 en vez de 12 de la prueba 4a),
+  muestra al usuario los errores de acceso tal cual (relacionado con PNS-40) y añade «>» de más
+  al formato. Ubicación: sin localizar en el código.
+- **Impacto:** enlaces que llevan a otro registro o a ninguno, y mensajes de error técnicos en el
+  chat. Sin efecto de seguridad observado: los accesos se siguen comprobando en Odoo.
+- **Staging (16/10/2026):** observado en varias pruebas con modelos `lite`.
+- **Corrección sugerida:** construir los enlaces a partir de los ids devueltos por la herramienta (no
+  del texto del modelo), traducir los errores de acceso a un mensaje para el usuario y documentar los
+  modelos mínimos recomendados.
 
 ### Candidatos evaluados y descartados
 

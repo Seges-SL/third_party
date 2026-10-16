@@ -48,7 +48,7 @@ con la tabla 1.1 del informe:
 | D20 | CAMBIA | Sesiones revocadas corregidas; clave en cabecera (PNS-33) y parche 4 para `prompts/*`. |
 | D23 | CERRADA | `clean_system` ya no existe; el resto va en D17. |
 | D26 | CAMBIA | Ambos caminos comprueban el dueño; pasa a ser usabilidad; el resto depende de D29. |
-| D29 | CAMBIA | Riesgo residual del saneador; deja de bloquear si la prueba 8 de staging sale bien. |
+| D29 | CAMBIA | Riesgo residual del saneador; deja de bloquear: la prueba 8 de staging salió CORREGIDO (16/10/2026). |
 | D31 | CERRADA | PNS-34 corregido y los tests siempre van en BD nueva. |
 | D4 | CAMBIA | Writer baja a medio; AI Administrator equivale a administrador de Odoo. |
 | D46 | CAMBIA | Se decide clave y grupo conversacional; quedan D36 y la entrega por PIN (N4). |
@@ -102,7 +102,7 @@ con la tabla 1.1 del informe:
 | N4 | ¿Se usa la mesa de entrega de claves por PIN? | a) no se usa |
 | N5 | Proveedor y datos para las 9 pruebas pendientes de staging | a); c) como puente |
 | N6 | Orden de instalación: staging y después LIYBEN | Camino A (15/10/2026) |
-| N7 | Versión que se instala en LIYBEN | 3.1.782 con parches 1-4 y mitigaciones de N3 (15/10/2026) |
+| N7 | Versión que se instala en LIYBEN | 3.1.782 con parches 1-4 y mitigaciones de N3 (15/10/2026); parches 1-6 tras el staging (nota 16/10/2026) |
 | N8 | Proveedor externo del staging | Gemini; LIYBEN, en la demostración (15/10/2026) |
 | N9 | Copias de `pns_demo` | No se guardan (15/10/2026) |
 | N10 | Montaje del staging | Servicio, PostgreSQL y despliegue propios (15/10/2026) |
@@ -111,8 +111,8 @@ con la tabla 1.1 del informe:
 
 - **Siempre:** D1, D3, D4, D9, D10 y PB-2.
 - **Si se instala Chatboo:** además D33 y D46.
-- **Condicionada:** D29 deja de ser bloqueante si la prueba 8 de staging (PNS-60, respuesta y
-  exportación) sale CORREGIDO; si no, es bloqueante con Chatboo.
+- **Ya no bloqueante:** D29, desde el 16/10/2026: la prueba 8 de staging (PNS-60, respuesta y
+  exportación) salió CORREGIDO en los cuatro casos (ver D29, «Tras el staging»).
 - PB-1 deja de ser bloqueante (CERRADA).
 
 > La tabla «Tema · Decisiones · Bloqueantes» de «Cómo leer este documento» es la original del
@@ -399,6 +399,16 @@ Decisión: ____ / Fecha: ____
 - **Lo que la motivaba:** PNS-15 CORREGIDO; PNS-53 CORREGIDO (3b-1); PNS-16 PARCIAL; PNS-54 PARCIAL; PNS-59 PARCIAL (parte del servidor probada en 3b-2); PNS-60 PARCIAL: saneador por lista negra, `escapeHtml` sin comillas en atributos y showdown 2.1.0; la respuesta y la exportación están pendientes de staging.
 - **Nuevo alcance:** ya no se trata de aceptar un XSS conocido, sino el riesgo residual del saneador. Deja de ser bloqueante si la prueba 8 de staging (PNS-60, respuesta y exportación) sale CORREGIDO; si no, sigue siendo **BLOQUEANTE si se instala Chatboo**.
 
+**Tras el staging (16/10/2026): DEJA DE SER BLOQUEANTE.**
+- **Resultado:** la prueba 8 (plan de staging §5 y §6.1) salió **CORREGIDO** en los cuatro casos: en
+  directo, tras recargar, en PDF y en Word (un `.doc` que es HTML). Sin atributos de evento, sin
+  esquemas fuera de `http`, `https`, `mailto`, `tel` y `blob` propio y sin contenido activo del SVG.
+  También salió CORREGIDO la parte del navegador de PNS-59 con `whitelist_only` (prueba 9a).
+- **Lo que queda:** el riesgo residual del saneador (PNS-60 sigue PARCIAL: `escapeHtml` sin comillas
+  en atributos, lista negra de etiquetas y showdown 2.1.0), que no se ha probado, y PNS-59 con la
+  política `open` (NO CONCLUYENTE). Se decide como riesgo aceptado o no, sin bloquear la instalación
+  (criterio del plan de staging, §6.2).
+
 ### D31 — ¿Se ejecutarán alguna vez los tests del módulo sobre una copia de producción?
 
 **Contexto:** uno de los tests guarda de forma permanente una clave MCP predecible para el
@@ -466,6 +476,25 @@ Decisión: ____ / Fecha: ____
 **Tras 3.1.782 (14/10/2026): CAMBIA.**
 - **Lo que la motivaba** (riesgos n.º 13, 40, 55, 58, 67 y 77): PNS-13 CORREGIDO (3b-1); PNS-36 PARCIAL; PNS-54 PARCIAL; PNS-57 CORREGIDO (3b-1); PNS-66 SIN CAMBIOS; PNS-76 PARCIAL (el menú ya aparece sin recargar; la receta, en D37). Novedades de 3.1.782: el grupo `group_ai_conversational` (no lo implica AI Administrator), que se asigna desde `ai.mcp.user.is_ai_conversational`, y la entrega de claves por PIN (PNS-83 y PNS-84). Qué exige exactamente el acceso al chat se comprobará en staging (las pruebas usan clave MCP y grupo conversacional).
 - **Nuevo alcance:** decidir a quién se da la clave MCP y el grupo conversacional. La clave ya no da acceso a conversaciones ajenas; la exposición que queda son las skills de fábrica (D36) y la entrega por PIN, que no se usará (N4). Sigue siendo **BLOQUEANTE si se instala Chatboo**.
+
+**Tras el staging (16/10/2026): información para decidir.** Sigue siendo **BLOQUEANTE si se instala
+Chatboo**; con esto se puede decidir (plan de staging, §6.2).
+- **Qué exige el acceso:** grupo AI Conversational + clave MCP, ni más ni menos (guía §13, punto 3,
+  conforme en staging). No hace falta revisar la guía §7.
+- **Qué obtiene quien tiene acceso** (pruebas del plan de staging, §5):
+  - prueba 7 (PNS-36): el nombre de la BD y la lista de campos de un modelo sin permiso de lectura
+    (`ai.mcp.user`), **sin valores**;
+  - prueba 3 (PNS-16, usuario con AI External URL): una instrucción oculta en un registro solo llevó a
+    una consulta externa cuando el usuario lo pidió expresamente, y aun así quedó pendiente de
+    confirmación (tarjeta), sin salida; sin petición expresa, el modelo no la obedeció;
+  - pruebas 5, 6 y 10: no escribe sin AI Writer, no obtiene datos de operaciones ajenas y no recibe
+    contextos privados ajenos; las escrituras confirmadas se ejecutan con los permisos de Odoo del
+    usuario (un `AccessError` las detiene);
+  - prueba 4a (PNS-61): puede fabricar un historial falso, que el asistente trata como real y que
+    queda guardado en su sesión (solo le afecta a él);
+  - hallazgo nuevo PNS-94: cualquier usuario de Chatboo podía dejar Odoo sin servicio adjuntando una
+    imagen. Corregido con el parche 6 (N2), validado en staging: toda instalación con Chatboo debe
+    llevarlo.
 
 ### D5 — ¿Quién debe poder abrir AI Engine → Settings?
 
@@ -1097,6 +1126,12 @@ Decisión: ____ / Fecha: ____
 - **Lo que la motivaba:** PNS-76 PARCIAL. F18 CONFIRMADO en 3a: al actualizar de 3.1.486 a 3.1.782 no se ejecutó ninguna migración (0 «Running migration»).
 - **Nuevo alcance:** no hace falta preguntar al fabricante: una BD que solo ha estado en Odoo 14 no ha ejecutado esas migraciones. Basta revisar en la copia de producción `default_context_codes` del agente `pns_ai_chatboo` e igualarlo si trae `acl_security`.
 
+**Tras el staging (15/10/2026): CONFORME (referencia).**
+- **Resultado:** en la instalación nueva de `pns_demo`, el `default_context_codes` del agente
+  `pns_ai_chatboo` es «@pns_ai_mcp» y «@pns_ai_chatboo». No existe ningún contexto `acl_security`
+  (ni XML ID ni `code`). Plan de staging, §6.1.
+- **Uso:** es la referencia con la que comparar el agente de una BD actualizada antes de igualarlo.
+
 ### D44 — ¿Se pide al fabricante un plan para showdown y jsPDF?
 
 **Contexto:** Chatboo convierte las respuestas con showdown 2.1.0, que no sanea por diseño, tiene
@@ -1369,9 +1404,9 @@ la corrección 1a del análisis del bloqueo de `chatboo_session` tras un turno c
 Sergio: sin ella, un turno con imagen deja el hilo del worker esperándose a sí mismo, el navegador no
 recibe el fin del turno y las recargas acaban dejando Odoo sin servicio. No es un problema de Odoo 14
 ni de PNS-81, pero se gestiona igual que los parches 1-5: se mantiene en la rama, se comprueba en cada
-versión del fabricante y se le comunica. Pendiente de validar en staging. Ver
-[analisis_bloqueo_chatboo_session.md](analisis_bloqueo_chatboo_session.md) y
-[parches_pns_ai.md](parches_pns_ai.md), «Parche 6».
+versión del fabricante y se le comunica. Validado en staging el 16/10/2026 (5 casos; ver
+[parches_pns_ai.md](parches_pns_ai.md), «Parche 6»). Análisis en
+[analisis_bloqueo_chatboo_session.md](analisis_bloqueo_chatboo_session.md).
 
 ### N3 — ¿Es apta la versión 3.1.782 para algún cliente?
 
@@ -1501,6 +1536,10 @@ cliente: es interna de Seges, con datos antiguos de la empresa.
 Decisión: **a)** (Sergio) / Fecha: 15/10/2026. Si el staging empeora algún PNS, el plan de staging
 (§6.2 y §8) propone revisar esta decisión antes de instalar.
 
+**Nota (16/10/2026, tras el staging):** LIYBEN lleva los **parches 1 a 6** (N2 revisada). El 6 es
+obligatorio si se instala Chatboo (PNS-94); el 5 es inocuo para otros proveedores y necesario con
+Gemini. El proveedor se estudia con OVH (N8).
+
 ### N8 — ¿Qué proveedor externo se usa en el staging (y en LIYBEN)?
 
 **Contexto:** el traspaso del staging preveía Anthropic, necesario para la prueba 9b (PNS-29: tokens de
@@ -1518,6 +1557,13 @@ Decisión: **a) Gemini en el staging**; sustituye a la previsión del traspaso (
 proveedor (Anthropic o Gemini) lo decide el jefe en la demostración; si es Anthropic, allí se hace la
 prueba 9b; si es Gemini, antes se comprueban las condiciones de uso de datos del nivel gratuito
 (Sergio) / Fecha: 15/10/2026
+
+**Nota (16/10/2026, tras el staging):** en el staging se usó **Gemini** con el protocolo `openai`
+(modelos `gemini-3.6-flash`, `3.5-flash-lite` y `3.5-flash`). Hizo falta el parche 5 (PNS-93, N2);
+`3.7-flash` y `3.8-flash` dieron 503 con frecuencia, `2.5-flash` y `2.5-flash-lite` dan 404 a usuarios
+nuevos y el nivel gratuito admite 20 peticiones al día por modelo. Para **LIYBEN se estudia OVH**; si
+al final fuera Gemini, valorar el nivel de pago, además de las condiciones de uso de datos (plan de
+staging, §7.2).
 
 ### N9 — ¿Se guardan copias de `pns_demo`?
 

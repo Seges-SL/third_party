@@ -4,7 +4,8 @@
 - **Fecha:** 2026-10-15
 - **Versión del fabricante analizada:** `pns_ai_mcp` 14.0.3.1.782 · `pns_ai_chatboo` 14.0.2.1.453
 - **Estado:** **Aplicado (parche mínimo)** el 2026-10-16 (sección 3; ampliaciones opcionales no
-  aplicadas). Ver `parches_pns_ai.md`, «Parche 5», y la revisión de N2 en `pns_ai_decisiones.md`.
+  aplicadas) y **validado en staging (16/10/2026)** (ver «Plan de prueba»). Ver `parches_pns_ai.md`,
+  «Parche 5», la revisión de N2 en `pns_ai_decisiones.md` y PNS-93 en `seguimiento_informe_pns_ai.md`.
 - **Relacionado:** `docs/pendiente/parches_pns_ai.md` (parches 1-4), `plan_staging_pns_ai.md`.
 
 ## Problema
@@ -243,6 +244,15 @@ lo que se vea en staging con llamadas paralelas.
    - Segundo turno en la misma conversación (el historial no debe reenviar tool_calls).
 3. **No regresión:** el mismo turno con un proveedor OpenAI/Ollama ya configurado.
 4. **ai_log:** las filas de petición/respuesta del turno muestran los mismos datos que antes.
+
+**Resultado (16/10/2026):**
+- **Local:** casos (a), (b) y (c) correctos con el driver en la imagen `odoo-dev:14` (ver
+  `parches_pns_ai.md`, «Parche 5», comprobación 2).
+- **Staging: validado.** Desplegado con el commit `27cadbb`. Con `gemini-3.6-flash`,
+  `gemini-3.5-flash-lite` y `gemini-3.5-flash` (`3.7-flash` y `3.8-flash` daban 503 con frecuencia):
+  turnos con varias rondas de herramientas y segundo turno en la misma conversación, sin 400.
+- **Llamadas paralelas: no observadas.** La ampliación 1 sigue sin aplicar; se decidirá si aparecen.
+- **No regresión con otro proveedor OpenAI-compatible:** no probada (en staging solo había Gemini).
 
 ## Fuentes
 

@@ -195,8 +195,9 @@ protocolo OpenAI: thought_signature)`. El parche 6 tampoco es de Odoo 14, y su c
 ## Parche 5: `pns_ai_mcp/lib/llm/drivers/openai_driver.py:659-667` (`iter_chat`)
 
 - **Fecha:** 2026-10-16.
-- **PNS:** ninguno todavía (incompatibilidad con Gemini 3 detectada en staging). Análisis completo en
-  [analisis_parche5_gemini.md](analisis_parche5_gemini.md).
+- **Estado:** **validado en staging (16/10/2026)** (comprobación 3).
+- **PNS:** PNS-93 del [seguimiento](seguimiento_informe_pns_ai.md) (incompatibilidad con Gemini 3
+  detectada en staging). Análisis completo en [analisis_parche5_gemini.md](analisis_parche5_gemini.md).
 - **Qué falla sin él:** con Gemini 3.x configurado con `protocol = openai`
   (`…/v1beta/openai/chat/completions`), todo turno de Chatboo en el que el modelo llama a una
   herramienta falla en la petición siguiente del bucle de herramientas con
@@ -244,13 +245,25 @@ protocolo OpenAI: thought_signature)`. El parche 6 tampoco es de Odoo 14, y su c
      | (a) `tool_call` completo en un delta, con `extra_content` y sin `index` | OK: el mensaje final conserva `extra_content` (sin parche se perdía) |
      | (b) stream clásico troceado, sin `extra_content` | OK: mensaje idéntico al del driver sin parche |
      | (c) `extra_content` en un delta posterior al del `id` | OK: se conserva; `id`, nombre y argumentos intactos |
-  - **Pendiente:** prueba en staging con Gemini 3.5, 3.6 y 3.7-flash (plan de prueba del análisis).
+  3. **Staging (16/10/2026): validado.** Desplegado con el commit `27cadbb` (huella comprobada;
+     `diff -rq` con solo `openai_driver.py`). Gemini por el protocolo `openai`, con
+     `gemini-3.6-flash`, `gemini-3.5-flash-lite` y `gemini-3.5-flash` (`3.7-flash` daba 503 con
+     frecuencia):
+
+     | Caso | Resultado |
+     |---|---|
+     | Turno con varias rondas de herramientas (`relaxaicode`) | OK: sin 400 (antes, 400 en la segunda ronda) |
+     | Segundo turno en la misma conversación | OK: sin 400 |
+     | Llamadas paralelas en la misma ronda | no observadas: la ampliación 1 del análisis sigue sin aplicar |
+     | No regresión con otro proveedor OpenAI-compatible | no probada: en staging solo había Gemini |
 
 ## Parche 6: `pns_ai_chatboo/models/chatboo_async_request.py` (`_process`, `:697-698` y `:714-715`; método nuevo `_release_worker_cursor`, `:839-866`)
 
 - **Fecha:** 2026-10-16.
-- **PNS:** ninguno todavía (bloqueo detectado en staging). Análisis completo en
-  [analisis_bloqueo_chatboo_session.md](analisis_bloqueo_chatboo_session.md) (corrección 1a de §5.2).
+- **Estado:** **validado en staging (16/10/2026)** (comprobación 3).
+- **PNS:** PNS-94 del [seguimiento](seguimiento_informe_pns_ai.md) (bloqueo detectado en staging).
+  Análisis completo en [analisis_bloqueo_chatboo_session.md](analisis_bloqueo_chatboo_session.md)
+  (corrección 1a de §5.2).
 - **Qué falla sin él:** al terminar un turno de Chatboo con una imagen adjunta (también cuando el
   proveedor devuelve 429), el hilo del turno se queda esperándose a sí mismo:
   - el cursor del hilo (A) conserva un lock sobre la fila de `chatboo_session` (hipótesis H1: el
@@ -334,7 +347,20 @@ protocolo OpenAI: thought_signature)`. El parche 6 tampoco es de Odoo 14, y su c
      de la imagen `odoo-dev:14` (sin red y con el repo montado en solo lectura).
   2. `grep -rn "Seges: parche de compatibilidad" pns_base pns_ai_mcp pns_ai_chatboo`: las 7 líneas
      de los parches 1-5 y las 3 del parche 6.
-  - **Pendiente:** validación en staging (análisis, §5.1, «Validación del parche 6»).
+  3. **Staging (16/10/2026): validado** con los 5 casos del análisis (§5.1, «Validación del parche
+     6»). Desplegado con el commit `63ee2dc` (huella comprobada; `diff -rq` con solo
+     `chatboo_async_request.py`).
+
+     | # | Caso | Resultado |
+     |---|---|---|
+     | 1 | Turno con imagen y proveedor que responde | OK |
+     | 2 | Turno con imagen y error del proveedor | OK |
+     | 3 | Turno de solo texto | OK |
+     | 4 | Cancelación de un turno en curso | OK |
+     | 5 | Turno siguiente al de la imagen | OK: recupera el contexto de pantalla |
+
+     En todos: sin conexiones colgadas (ni `idle in transaction` ni esperas de lock) y sin avisos en
+     el log. El riesgo residual (lock en otro cursor del hilo) no se dio.
 
 ## Comprobaciones realizadas (2026-10-13)
 
@@ -385,9 +411,8 @@ Tras `odoo-dev 14 actualizar pns_base,pns_ai_mcp,pns_ai_chatboo`:
 - una respuesta con una imagen externa permitida, que debe mostrarse (no 404): **hecha** en la fase
   3b-2 (`remote_image` devuelve 200 con la imagen re-codificada);
 - una consulta del chat que defina una función con un parámetro `date_from`, que debe responder
-  sin error de la herramienta: **pendiente para staging** (proveedor saturado en el laboratorio);
-- una foto de móvil vertical adjunta en Chatboo, que debe llegar derecha al proveedor: **pendiente
-  para staging** (proveedor saturado en el laboratorio).
+  sin error de la herramienta: **hecha en staging** (16/10/2026, prueba 1: CORREGIDO);
+- una foto de móvil vertical adjunta en Chatboo, que debe llegar derecha al proveedor: **hecha en
+  staging** (16/10/2026, prueba 2: CORREGIDO).
 
-Las dos pendientes están en la lista de `verificacion_seguridad_pns_ai.md`, «Pruebas pendientes para
-staging» de la fase 3b-2.
+Detalle en `verificacion_seguridad_pns_ai.md`, «Staging (15-16/10/2026)».

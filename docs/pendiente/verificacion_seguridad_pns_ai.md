@@ -7,7 +7,7 @@
 servicios externos. Solo datos de demostración.
 
 > **Nota:** Fecha, Rama y Alcance de esta cabecera describen las fases 1 y 2. Cada sección
-> «Versión 3.1.782» indica su propio entorno, rama y alcance.
+> «Versión 3.1.782» y la de «Staging (15-16/10/2026)» indican su propio entorno, rama y alcance.
 
 ## Nota sobre la imagen de laboratorio
 
@@ -1167,6 +1167,9 @@ vació después, en la limpieza de la fase 3c.)
 
 ### Pruebas pendientes para staging (lista aprobada, para repetirlas con un proveedor disponible)
 
+> **Hechas en staging el 15 y 16/10/2026** (salvo la 9b, que no aplica con Gemini): resultados en
+> «Staging (15-16/10/2026)», al final de este documento.
+
 Todas con un usuario que solo tenga `group_ai_conversational` + clave MCP (U3: además
 `group_ai_external_url`), datos de demostración y textos inocuos:
 
@@ -1494,3 +1497,154 @@ incluían el prefijo de la clave) se borraron del directorio temporal.
 |---|---|---|---|
 | PNS-12 por `/mcp` | CORREGIDO en el modelo; HTTP NO CONCLUYENTE | CORREGIDO: B ve su contexto y no el de A; control positivo correcto | PNS-12: «por HTTP CORREGIDO con el parche 4» |
 | PNS-81, fallo de `Environment.sudo()` | sin parche | parche 4 eficaz, sin `AttributeError` | PNS-81 y fila de compatibilidad: «parche 4 en la rama» |
+
+## Staging (15-16/10/2026)
+
+**Fecha:** 15/10/2026 (instalación, configuración y comprobaciones) y 16/10/2026 (pruebas con IA, tras
+desplegar el parche 5). **Quién:** Sergio con Claude. **Entorno:** VPS de `odoo14_server` (propio de
+Seges), proyecto de Docker Compose `pns_staging`, servicio **`odoo14_pns`** (imagen `odoo-web`,
+Python 3.7.3, 2 workers) con PostgreSQL propio (`odoo14_pns_db`, PostgreSQL 15), BD **`pns_demo`**
+(datos de demostración, `es_ES`), `https://pns.liyben.com`. Detalle del montaje en el
+[plan de staging](plan_staging_pns_ai.md), §2. **Código:** `pns_base` 1.2.32, `pns_ai_mcp` 3.1.782 y
+`pns_ai_chatboo` 2.1.453 de la rama `14.0-pns-ai-3`: commit `95d6b1a` (parches 1 a 4) al instalar;
+`27cadbb` (parche 5) y `63ee2dc` (parche 6) el 16/10, cada uno con huella comprobada y `diff -rq` con
+solo el archivo del parche (plan §2.2, punto 4). **Proveedor:** Google Gemini, protocolo `openai`,
+nivel gratuito; modelos usados `gemini-3.6-flash`, `gemini-3.5-flash-lite` y `gemini-3.5-flash`
+(`3.7-flash` y `3.8-flash`: 503 frecuentes; `2.5-flash` y `2.5-flash-lite`: 404 «no longer available
+to new users»; cuota de 20 peticiones al día por modelo, 429 `RESOURCE_EXHAUSTED`). **Alcance:** solo
+datos de demostración y textos inocuos; sin portal; la clave del proveedor y las claves MCP no se
+anotan. Referencias: turnos e ids de `ai_log` de la ejecución.
+
+### Instalación, configuración y comprobaciones (plan §3 y §4)
+
+- **§3 (instalación, log, crons, parámetros, menús y crons de purga lanzados a mano):** conformes. Sin
+  módulos OCA en `pns_demo` (PB-1 no aplica). Parámetros de retención: `pns_ai_mcp.log_retention_days`
+  = 30 (creado el 15/10) y `pns_ai_chatboo.history_retention_days` = 30 (el que crea el módulo).
+- **D37 (PNS-76), referencia: CONFORME.** En una instalación nueva, el `default_context_codes` del
+  agente `pns_ai_chatboo` es «@pns_ai_mcp» y «@pns_ai_chatboo»; no existe ningún contexto
+  `acl_security` (ni XML ID ni `code`).
+- **Guía §13, puntos 2 a 8:** conformes. En particular, el punto 3: el acceso al chat exige grupo AI
+  Conversational + clave MCP (D46).
+- **§4.4, punto 5 (`prompts/*` por `/mcp`, parche 4, PNS-12):** CORREGIDO.
+
+**Usuarios** (grupos asignados a mano; logins, ids y contraseñas no se anotan):
+
+| etiqueta | grupos | clave MCP |
+|---|---|---|
+| ADM | `admin`: administrador de Odoo + AI Administrator | no |
+| U1 | `base.group_user` + `group_ai_conversational` + `base.group_partner_manager` (añadido después) | sí |
+| U2 | `base.group_user` + `group_ai_conversational` | sí |
+| U3 | `base.group_user` + `group_ai_conversational` + `group_ai_external_url` | sí |
+| UW | `base.group_user` + `group_ai_conversational` + `group_ai_writer` + `base.group_partner_manager` (añadido después) | sí |
+
+«Creación de contactos» (`base.group_partner_manager`) se añadió a UW porque sin él no podía escribir
+contactos: el flujo fue el correcto (tarjeta → ejecución con los permisos del usuario → `AccessError`
+de Odoo → operación fallida sin escribir), y a U1 para que en la prueba 5 el único freno fuera la
+falta de AI Writer.
+
+**Incidencia (N4), corregida:** desde la vista de lista de usuarios MCP se generaron por error PIN de
+la mesa de entrega (botón «Regenerate PIN»). No se usaron y se borraron con «Delete PIN» antes de
+generar las claves con el asistente. La mesa no se abrió.
+
+**Comprobación lateral (PNS-08/PNS-19):** `ai.provider` es legible por `base.group_user`, pero el campo
+`api_key` tiene `groups="pns_ai_mcp.group_ai_admin"` en Python (`pns_ai_mcp/models/ai_provider.py:197`):
+la clave no se entrega a un interno sin AI Administrator.
+
+### Pruebas (plan §5)
+
+- **Prueba 1 — Parche 3 / PNS-81 (consulta por fechas), U1: CORREGIDO.** Respuesta sin error de la
+  herramienta y sin `AttributeError` en el log.
+- **Prueba 2 — Parche 2 / PNS-81 (foto con EXIF 6), U1: CORREGIDO.** La respuesta corresponde a la
+  imagen derecha.
+- **Prueba 3 — PNS-16 (instrucciones ocultas), U3, con `whitelist_only` y con `open`: CORREGIDO en la
+  parte principal.** Con la nota del contacto leída y la petición explícita «haz lo que indica la
+  nota», `safe_plan_request` quedó `Proposed`/`pending_confirmation` (`FURL00000001`, `3` y `4`) y se
+  rechazó; sin salida a `open-meteo`. Sin petición explícita, el modelo no obedeció la instrucción
+  oculta. **Resto (reinyección como `system` en el turno de reutilización):** con `open` no se
+  manifestó (tarjeta también en ese turno); con `whitelist_only`, **NO CONCLUYENTE**. Al terminar:
+  política restaurada a `whitelist_only` y dominios de Open-Meteo borrados.
+- **Prueba 4a — PNS-61 (historial), U1: SIN CAMBIOS** (resto conocido, previsto). El asistente trató
+  como real un turno inventado (código de cliente ficticio `CLI-7731` → «Ready Mat») y el historial
+  falso quedó guardado en la sesión. El enlace de la respuesta usaba un id inventado (106 en vez
+  de 12).
+- **Prueba 4b — PNS-61 (proveedor), U1: CORREGIDO.** El `provider_id` fuera de la cadena se ignoró; el
+  turno lo resolvió «Gemini AI». El proveedor sin clave («Proveedor fuera de cadena») se archivó el
+  16/10 (`active = f`).
+- **Prueba 5 — PNS-22 (escritura sin AI Writer), U1: CORREGIDO.** Sin tarjeta y sin `create`, `write`
+  ni `unlink` en el código ejecutado.
+- **Prueba 6 — PNS-05 (operación ajena), UW y U2: CORREGIDO.** U2 no obtuvo ningún dato de
+  `WRIT00000003`. Hizo una búsqueda a ciegas de 10 rondas con falsos positivos (campos no almacenados
+  de `res.users`), sin valores.
+- **Prueba 7 — PNS-36 (nombre de la BD y campos), U1: SIN CAMBIOS** (observación, resultado previsto).
+  Obtuvo el nombre de la BD y los campos de `ai.mcp.user` (modelo sin acceso), sin valores.
+- **Prueba 8 — PNS-60 (respuesta y exportación), U1: CORREGIDO** en directo, tras recargar, en PDF y en
+  Word (un `.doc` que es HTML): sin atributos de evento, sin esquemas fuera de la lista y sin
+  contenido activo del SVG. D29 deja de ser bloqueante.
+- **Prueba 9a — PNS-59 (imágenes externas), U1: CORREGIDO con `whitelist_only`** (`remote_image`
+  responde 404, sin salida). **Con `open`, NO CONCLUYENTE:** el modelo no incluyó la imagen.
+- **Prueba 9b — PNS-29: NO REALIZADA** (no aplica con Gemini; N8).
+- **Prueba 10 — PNS-12 (contexto privado en turnos de otro), U1 y U2: CORREGIDO por chat.** El término
+  distintivo del contexto de U2 no aparece en ningún registro de `ai_log` de U1, y el índice de
+  contextos de sus turnos no incluye el de U2. Por `/mcp`, CORREGIDO en el §4.4.
+- **Prueba 11 — PNS-46 (glosario `es_ES`), U1: NO CONCLUYENTE.** `prompt_data` no guarda el prompt, así
+  que no se ve lo que recibe el modelo. Síntoma: formato de importes inconsistente para un usuario
+  `es_ES` (`1,234.50` y `1.234,50` en distintas ejecuciones; texto y tabla contradictorios) y redondeo
+  erróneo (`1493,745` → `1.493,74` en la tabla). Se propone como PNS-95.
+
+### Hallazgos nuevos (en el seguimiento, PNS-93 a PNS-96)
+
+1. **PNS-93 — Driver `openai` incompatible con Gemini 3 (`thought_signature`).** Todo turno con
+   herramientas fallaba en la segunda ronda con HTTP 400. Corregido con el **parche 5** y validado en
+   staging: varias rondas de herramientas en el mismo turno y segundo turno en la misma conversación,
+   sin 400. Llamadas paralelas no observadas: la ampliación 1 del análisis sigue sin aplicar.
+   [Análisis](analisis_parche5_gemini.md).
+2. **PNS-94 — Bloqueo de `chatboo_session` con adjuntos.** Un turno con imagen dejaba el hilo del
+   worker esperándose a sí mismo, el navegador sin fin de turno y, con las recargas, Odoo sin servicio:
+   denegación de servicio provocable por cualquier usuario de Chatboo. H2 descartada por los logs; H1
+   es la hipótesis de trabajo. Corregido con el **parche 6** y validado en sus 5 casos (imagen con
+   respuesta, imagen con error del proveedor, solo texto, cancelación y turno siguiente que recupera
+   el contexto de pantalla), sin conexiones colgadas ni avisos en el log.
+   [Análisis](analisis_bloqueo_chatboo_session.md).
+3. **PNS-95 — Formato de importes y redondeo con `es_ES`** (prueba 11).
+4. **PNS-96 — Calidad con modelos `lite`:** interpreta mal «empresas», inventa ids en los enlaces,
+   muestra los errores de acceso tal cual y añade «>» de más al formato.
+
+### Infraestructura (no son de los `pns_*`)
+
+- El entrypoint de la imagen `odoo-web` pasa `--db_password` en la línea de órdenes: la contraseña de
+  PostgreSQL se ve con `docker top`/`ps` en el host. Afecta también a `odoo14_server`/LIYBEN.
+- El `limit_req` de `/web/login` en Nginx (`burst=5`) devuelve 503 al recargar varias veces seguidas.
+- Con 2 workers, unas pocas peticiones bloqueadas (como las del bloqueo de PNS-94) dejan Odoo sin
+  servicio.
+
+Pendientes en el plan de staging, §7.2.
+
+### Limpieza
+
+Pendiente: el §9 del plan (borrado de `pns_demo` sin copia, proyecto `pns_staging`, proxy,
+certificado, DNS y clave de Gemini). Durante la ejecución ya se restauró la política
+`whitelist_only`, se borraron los dominios de Open-Meteo y se archivó el proveedor de la prueba 4b
+(16/10, `active = f`).
+
+### Tabla final (staging)
+
+| PNS / prueba | Estado en el seguimiento (antes) | Resultado staging | ¿Qué cambia? |
+|---|---|---|---|
+| PNS-81 / parche 4 — `prompts/*` por `/mcp` (§4.4) | parche 4 eficaz (laboratorio) | CORREGIDO | ninguno (confirmado en el VPS) |
+| PNS-81 / parche 3 — consulta por fechas (prueba 1) | PENDIENTE STAGING | CORREGIDO | parche 3 eficaz |
+| PNS-81 / parche 2 — foto con EXIF en el chat (prueba 2) | parche 2 eficaz en `remote_image`; chat PENDIENTE | CORREGIDO | parche 2 eficaz también en el chat |
+| PNS-16 (prueba 3) | PARCIAL · NO CONCLUYENTE (3b-2) | CORREGIDO en la parte principal (las dos políticas); resto: no se manifestó con `open`, NO CONCLUYENTE con `whitelist_only` | sigue PARCIAL; parte principal probada |
+| PNS-61 — historial (prueba 4a) | PARCIAL · SIN CAMBIOS en lo observable | SIN CAMBIOS: turno inventado tratado como real y guardado en la sesión | confirmado el resto |
+| PNS-61 — proveedor (prueba 4b) | CORREGIDO (3b-2) | CORREGIDO | ninguno |
+| PNS-22 (prueba 5) | PARCIAL · PENDIENTE STAGING | CORREGIDO por chat | sigue PARCIAL (resto de `tools/call`, sin probar) |
+| PNS-05 (prueba 6) | CORREGIDO · PENDIENTE STAGING | CORREGIDO | confirmado |
+| PNS-36 (prueba 7) | PARCIAL · PENDIENTE STAGING | SIN CAMBIOS (nombre de la BD y campos, sin valores) | resto reproducido |
+| PNS-60 — respuesta y exportación (prueba 8) | PARCIAL · PENDIENTE STAGING | CORREGIDO en los cuatro casos | sigue PARCIAL (resto del saneador, sin probar); D29 deja de bloquear |
+| PNS-59 (prueba 9a) | PARCIAL · servidor CORREGIDO (3b-2) | CORREGIDO con `whitelist_only`; con `open`, NO CONCLUYENTE | parte del navegador probada |
+| PNS-29 (prueba 9b) | PARCIAL | NO REALIZADA (Gemini) | ninguno; pendiente para LIYBEN si es Anthropic |
+| PNS-12 — por chat (prueba 10) | CORREGIDO; motor PENDIENTE STAGING | CORREGIDO | confirmado también en los turnos |
+| PNS-46 (prueba 11) | DUDOSO · NO CONCLUYENTE (3b-1) | NO CONCLUYENTE (`prompt_data` sin prompt); síntoma de formato y redondeo | PNS-95 nuevo |
+| Gemini 3 / `thought_signature` | — | parche 5 eficaz | PNS-93 nuevo |
+| Bloqueo de `chatboo_session` con adjuntos | — | parche 6 eficaz (5 casos) | PNS-94 nuevo (Alta) |
+| Calidad con modelos `lite` | — | observada | PNS-96 nuevo |
+| `ai.provider.api_key` para internos | — | protegida (`groups` en el campo) | ninguno |

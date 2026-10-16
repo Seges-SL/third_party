@@ -1,8 +1,9 @@
 # Análisis: bloqueo de `chatboo_session` tras un turno con imagen (pns_ai_chatboo 2.1.453 / pns_ai_mcp 3.1.782, Odoo 14)
 
 - Fecha: 16/10/2026. Análisis estático, SOLO LECTURA (no se ha escrito en ninguna BD).
-- **Estado: Aplicado (corrección 1a, parche 6), pendiente de validar en staging.** Ver
-  [parches_pns_ai.md](parches_pns_ai.md), «Parche 6», y la validación en §5.1.
+- **Estado: Aplicado (corrección 1a, parche 6) y validado en staging (16/10/2026)** en sus 5
+  casos (§5.1, «Validación del parche 6»). Ver [parches_pns_ai.md](parches_pns_ai.md), «Parche 6», y
+  PNS-94 en [seguimiento_informe_pns_ai.md](seguimiento_informe_pns_ai.md).
 - Observado en staging (2 workers, `limit_time_real` 900 s, PostgreSQL 15), sesión id 9.
 - Síntoma: el turno termina (`ai_log` «Turn completed»), pero el navegador sigue esperando el fin.
   En `pg_stat_activity`:
@@ -342,6 +343,12 @@ Comprobaciones en cada caso:
    que puede ser el del turno anterior al de la imagen (degradación conocida del parche 6). En ese
    caso, anotar qué pantalla usa.
 
+**Resultado (16/10/2026): validado.** Desplegado con el commit `63ee2dc`. Los 5 casos, correctos:
+imagen con respuesta, imagen con error del proveedor, solo texto, cancelación y turno siguiente que
+recupera el contexto de pantalla. Sin conexiones colgadas ni avisos en el log. La validación real se
+hizo **sin cambiar la configuración de PostgreSQL** (sin la preparación temporal descrita arriba), con
+`pg_stat_activity`, el log de Odoo y el navegador, y fue suficiente.
+
 Si algún caso con imagen sigue dejando una conexión esperando lock, se ha dado el riesgo residual
 del parche 6: el lock lo tiene otro cursor del hilo, no A. Hay que identificar el PID con
 `pg_blocking_pids`, ejecutar `py-spy dump` (paso 4 de la reproducción) y liberar con el paso 6.
@@ -386,10 +393,10 @@ Las demás no se han aplicado.
   session writes» → **H2 descartada; H1 es la hipótesis de trabajo** (16/10/2026). La
   reproducción de §5.1 sigue siendo útil para confirmar qué `UPDATE chatboo_session` sale por A.
 - Pendiente: pasar el informe al fabricante.
-- **Corrección 1a (§5.2): aplicada como parche 6** (aprobada por Sergio, 16/10/2026), pendiente de
-  validar en staging (§5.1, «Validación del parche 6»). El informe al fabricante debe seguir
-  pidiendo la corrección de fondo (1b y 2-6).
-- Mientras tanto, en producción y en staging con usuarios reales: **no adjuntar imágenes en
-  Chatboo**. Si hace falta una contención técnica sin tocar el código del fabricante, hay que
-  valorar `idle_in_transaction_session_timeout` en el servidor PostgreSQL. Lo decide el usuario y
-  afecta a todas las BD del rol.
+- **Corrección 1a (§5.2): aplicada como parche 6** (aprobada por Sergio, 16/10/2026) y **validada
+  en staging** el mismo día (§5.1, «Validación del parche 6»). El informe al fabricante debe seguir
+  pidiendo la corrección de fondo (1b y 2-6). Propuesto como PNS-94 (gravedad alta).
+- Con el parche 6 se pueden adjuntar imágenes. En una instalación **sin** el parche 6: **no adjuntar
+  imágenes en Chatboo**.
+- `idle_in_transaction_session_timeout` en el servidor PostgreSQL como defensa adicional (no corrige
+  el fallo): a decidir (plan de staging, §7.2). Lo decide el usuario y afecta a todas las BD del rol.
