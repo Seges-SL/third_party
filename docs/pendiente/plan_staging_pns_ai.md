@@ -716,6 +716,8 @@ Propuesta de este plan a partir de las decisiones; la decisión final es del res
 
 ## 8. Después del staging: instalación en LIYBEN
 
+**Ejecutado el 16/10/2026:** ver [instalacion_liyben_pns_ai.md](instalacion_liyben_pns_ai.md).
+
 **Camino A (N6).** Terminado este plan, se instala en LIYBEN como **fase aparte**, con su propio plan.
 LIYBEN es el objetivo final.
 
