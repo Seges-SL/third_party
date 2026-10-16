@@ -21,7 +21,8 @@ Cada cambio lleva junto a él un comentario con el prefijo común
 `Ver docs/pendiente/parches_pns_ai.md`. El paréntesis es `(Python 3.7 / Pillow 5.4)` en los parches 1
 a 3 y `(API de Odoo 14: Environment sin sudo)` en el 4. El parche 5 no es de Odoo 14 sino de
 compatibilidad con Gemini, y su comentario es `# Seges: parche de compatibilidad (Gemini 3 por el
-protocolo OpenAI: thought_signature)`; el `grep` lo lista igual. Para listarlos: `grep -rn "Seges: parche de compatibilidad" pns_base pns_ai_mcp pns_ai_chatboo`.
+protocolo OpenAI: thought_signature)`. El parche 6 tampoco es de Odoo 14, y su comentario es
+`# Seges: parche de compatibilidad (bloqueo de chatboo_session)`. El `grep` lista los dos igual. Para listarlos: `grep -rn "Seges: parche de compatibilidad" pns_base pns_ai_mcp pns_ai_chatboo`.
 
 ## Parche 1: `pns_ai_mcp/controllers/mcp_decorators.py:171` (antes `:169`)
 
@@ -244,6 +245,96 @@ protocolo OpenAI: thought_signature)`; el `grep` lo lista igual. Para listarlos:
      | (b) stream clásico troceado, sin `extra_content` | OK: mensaje idéntico al del driver sin parche |
      | (c) `extra_content` en un delta posterior al del `id` | OK: se conserva; `id`, nombre y argumentos intactos |
   - **Pendiente:** prueba en staging con Gemini 3.5, 3.6 y 3.7-flash (plan de prueba del análisis).
+
+## Parche 6: `pns_ai_chatboo/models/chatboo_async_request.py` (`_process`, `:697-698` y `:714-715`; método nuevo `_release_worker_cursor`, `:839-866`)
+
+- **Fecha:** 2026-10-16.
+- **PNS:** ninguno todavía (bloqueo detectado en staging). Análisis completo en
+  [analisis_bloqueo_chatboo_session.md](analisis_bloqueo_chatboo_session.md) (corrección 1a de §5.2).
+- **Qué falla sin él:** al terminar un turno de Chatboo con una imagen adjunta (también cuando el
+  proveedor devuelve 429), el hilo del turno se queda esperándose a sí mismo:
+  - el cursor del hilo (A) conserva un lock sobre la fila de `chatboo_session` (hipótesis H1: el
+    `UPDATE … last_screen_context` de `:556-562`, enviado por A en un flush durante el motor);
+  - `_finalize` abre en el mismo hilo otro cursor (B) y se queda esperando ese lock en
+    `UPDATE chatboo_session SET input_history=…`;
+  - el `rollback` que cerraría A está en el `finally`, después de `_finalize`, en el mismo hilo.
+
+  PostgreSQL no lo detecta como interbloqueo y ningún límite de Odoo afecta al hilo. El job no
+  llega a `done`, el navegador sigue esperando y cada recarga (`update_last_used`) ocupa un worker
+  hasta dejar Odoo sin servicio.
+- **Cambio:** justo antes de cada una de las dos llamadas a `_finalize` (éxito y excepción) se
+  llama a `_release_worker_cursor()`. Este método hace `rollback` de A, lo que libera cualquier lock
+  que A tenga, venga de la sentencia que venga, y conserva las escrituras ORM pendientes. En Odoo 14,
+  `towrite` y `tocompute` son comunes a todos los cursores del hilo (`odoo/api.py:472-475`), y
+  `cr.rollback()` los vacía (`api.py:628-635`). Se copian antes y se restauran después, con el
+  mismo patrón que `Environment.clear_upon_failure` (`api.py:638-662`), para que las siga guardando
+  B, como hoy. En modo test no hace nada (el TestCursor es la transacción del test).
+  ```diff
+               domain_codes_out = last_domain_codes
+               if domain_codes_out is _DOMAIN_CODES_LEAVE and releases_domain_codes:
+                   domain_codes_out = []
+  +            # Seges: parche de compatibilidad (bloqueo de chatboo_session). Ver docs/pendiente/parches_pns_ai.md
+  +            self._release_worker_cursor()
+               self._finalize(
+  ...
+               self._stop_heartbeat(beat)
+               beat = None
+  +            # Seges: parche de compatibilidad (bloqueo de chatboo_session). Ver docs/pendiente/parches_pns_ai.md
+  +            self._release_worker_cursor()
+               self._finalize(acc, struct, done_meta, error=str(exc) or exc.__class__.__name__)
+  ...
+  +    def _release_worker_cursor(self):
+  +        """Cierra la transacción del cursor del hilo antes de ``_finalize``. (…)"""
+  +        # Seges: parche de compatibilidad (bloqueo de chatboo_session). Ver docs/pendiente/parches_pns_ai.md
+  +        if _is_test_mode(self.env):
+  +            return
+  +        envs = self.env.all
+  +        tocompute = {field: set(ids) for field, ids in envs.tocompute.items()}
+  +        towrite = {
+  +            model: {rid: dict(vals) for rid, vals in id_vals.items()}
+  +            for model, id_vals in envs.towrite.items()
+  +        }
+  +        try:
+  +            self.env.cr.rollback()
+  +        except Exception:
+  +            _logger.warning(
+  +                "Chatboo async job %s: could not roll back the worker cursor",
+  +                self.id, exc_info=True,
+  +            )
+  +        envs.tocompute.update(tocompute)
+  +        for model, id_vals in towrite.items():
+  +            for rid, vals in id_vals.items():
+  +                envs.towrite[model][rid].update(vals)
+  ```
+- **Qué se degrada:**
+  - **`last_screen_context` en los turnos con imagen.** Si A ya había enviado ese `UPDATE` a la
+    BD, el valor del turno se pierde con el `rollback`, como pasaría hoy con el `rollback` del
+    `finally`. Si el turno siguiente llega sin `screen_context`, el motor usa el valor anterior
+    guardado en la sesión (`:585-589`). `input_history`, los mensajes, los adjuntos y el resto de lo
+    que guarda `_finalize` no cambian. Conservarlo exigiría escribirlo en un cursor corto
+    (corrección 1b del análisis, no aplicada).
+  - **Turnos de solo texto, 429, cancelación y cron:** el resultado en la BD es el mismo que antes.
+    Se descarta lo mismo que descartaba el `rollback` del `finally` y se conserva lo mismo que
+    guardaba `_finalize`. El `rollback` del `finally` queda sobre una transacción vacía o de solo
+    lectura.
+  - **Riesgo residual:** si el lock lo tuviera otro cursor del mismo hilo distinto de A (uno que
+    no se cerrara), el parche no lo resolvería. La validación en staging lo mostraría:
+    `pg_stat_activity` seguiría con una conexión esperando lock.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "_finalize(\|cr.rollback()\|cr.commit()" pns_ai_chatboo/models/chatboo_async_request.py
+  ```
+  Está corregido si, sin el parche, en `_process` se cierra la transacción del cursor del hilo
+  (`rollback` o `commit`) antes de las llamadas a `_finalize`, o si toda la escritura en la sesión
+  durante el turno (incluida la de `last_screen_context`) se hace en cursores cortos que confirman
+  en el acto (corrección 1b). En ese caso, este parche sobra. En caso de duda, repite la prueba con
+  imagen de la validación.
+- **Comprobaciones realizadas (2026-10-16):**
+  1. `py_compile` del archivo: correcto con el Python del equipo (3.12.3) y con Python 3.7.3 dentro
+     de la imagen `odoo-dev:14` (sin red y con el repo montado en solo lectura).
+  2. `grep -rn "Seges: parche de compatibilidad" pns_base pns_ai_mcp pns_ai_chatboo`: las 7 líneas
+     de los parches 1-5 y las 3 del parche 6.
+  - **Pendiente:** validación en staging (análisis, §5.1, «Validación del parche 6»).
 
 ## Comprobaciones realizadas (2026-10-13)
 

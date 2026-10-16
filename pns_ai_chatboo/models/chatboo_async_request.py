@@ -694,6 +694,8 @@ class ChatbooAsyncRequest(models.Model):
             domain_codes_out = last_domain_codes
             if domain_codes_out is _DOMAIN_CODES_LEAVE and releases_domain_codes:
                 domain_codes_out = []
+            # Seges: parche de compatibilidad (bloqueo de chatboo_session). Ver docs/pendiente/parches_pns_ai.md
+            self._release_worker_cursor()
             self._finalize(
                 acc, struct, done_meta, error=None,
                 query_code=last_query_code, query_data=last_query_data,
@@ -709,6 +711,8 @@ class ChatbooAsyncRequest(models.Model):
             )
             self._stop_heartbeat(beat)
             beat = None
+            # Seges: parche de compatibilidad (bloqueo de chatboo_session). Ver docs/pendiente/parches_pns_ai.md
+            self._release_worker_cursor()
             self._finalize(acc, struct, done_meta, error=str(exc) or exc.__class__.__name__)
         finally:
             # Parar el latido pase lo que pase (éxito o error).
@@ -831,6 +835,35 @@ class ChatbooAsyncRequest(models.Model):
             if fold(invoke) == folded or fold(rec.code) == folded:
                 return True
         return False
+
+    def _release_worker_cursor(self):
+        """Cierra la transacción del cursor del hilo antes de ``_finalize``.
+
+        ``_finalize`` escribe la sesión con otro cursor en este mismo hilo: si
+        este cursor tiene un lock sobre esa fila, el hilo se espera a sí mismo.
+        Las escrituras ORM pendientes (compartidas entre los cursores del hilo
+        en Odoo 14) se conservan para que las guarde ``_finalize``.
+        """
+        # Seges: parche de compatibilidad (bloqueo de chatboo_session). Ver docs/pendiente/parches_pns_ai.md
+        if _is_test_mode(self.env):
+            return
+        envs = self.env.all
+        tocompute = {field: set(ids) for field, ids in envs.tocompute.items()}
+        towrite = {
+            model: {rid: dict(vals) for rid, vals in id_vals.items()}
+            for model, id_vals in envs.towrite.items()
+        }
+        try:
+            self.env.cr.rollback()
+        except Exception:
+            _logger.warning(
+                "Chatboo async job %s: could not roll back the worker cursor",
+                self.id, exc_info=True,
+            )
+        envs.tocompute.update(tocompute)
+        for model, id_vals in towrite.items():
+            for rid, vals in id_vals.items():
+                envs.towrite[model][rid].update(vals)
 
     def _finalize(self, acc, struct, done_meta, error, query_code=None, query_data=None, active_skill=_SKILL_STATE_LEAVE, domain_codes=_DOMAIN_CODES_LEAVE, drop_query_cache=False):
         """Escribe estado final, persiste el turno en la sesión y avisa por bus."""

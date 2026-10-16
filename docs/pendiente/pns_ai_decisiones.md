@@ -97,7 +97,7 @@ con la tabla 1.1 del informe:
 | Nueva | Tema | Opción elegida |
 |---|---|---|
 | N1 | Valores de retención antes de actualizar producción | a), con la secuencia segura |
-| N2 | Mantener los parches 1-4 hasta que el fabricante corrija PNS-81, y el 5 hasta que corrija la compatibilidad con Gemini 3 (ver «N2 revisada (15/10/2026)») | c) |
+| N2 | Mantener los parches 1-4 hasta que el fabricante corrija PNS-81, el 5 hasta que corrija la compatibilidad con Gemini 3 y el 6 hasta que corrija el bloqueo de `chatboo_session` (ver «N2 revisada (15/10/2026)» y «N2 revisada (16/10/2026)») | c) |
 | N3 | ¿Es apta la 3.1.782 para algún cliente? | b) ahora; a) para producción |
 | N4 | ¿Se usa la mesa de entrega de claves por PIN? | a) no se usa |
 | N5 | Proveedor y datos para las 9 pruebas pendientes de staging | a); c) como puente |
@@ -1362,6 +1362,16 @@ thought_signature» en la segunda ronda de herramientas). No es un problema de O
 pero se gestiona igual que los parches 1-4: se mantiene en la rama, se comprueba en cada versión del
 fabricante y se le comunica. Ver [analisis_parche5_gemini.md](analisis_parche5_gemini.md) y
 [parches_pns_ai.md](parches_pns_ai.md), «Parche 5».
+
+**N2 revisada (16/10/2026):** se añade el **parche 6** (`chatboo_async_request.py`: cerrar la
+transacción del cursor del hilo antes de `_finalize`, conservando las escrituras ORM pendientes). Es
+la corrección 1a del análisis del bloqueo de `chatboo_session` tras un turno con imagen, aprobada por
+Sergio: sin ella, un turno con imagen deja el hilo del worker esperándose a sí mismo, el navegador no
+recibe el fin del turno y las recargas acaban dejando Odoo sin servicio. No es un problema de Odoo 14
+ni de PNS-81, pero se gestiona igual que los parches 1-5: se mantiene en la rama, se comprueba en cada
+versión del fabricante y se le comunica. Pendiente de validar en staging. Ver
+[analisis_bloqueo_chatboo_session.md](analisis_bloqueo_chatboo_session.md) y
+[parches_pns_ai.md](parches_pns_ai.md), «Parche 6».
 
 ### N3 — ¿Es apta la versión 3.1.782 para algún cliente?
 
