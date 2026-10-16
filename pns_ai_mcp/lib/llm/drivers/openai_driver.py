@@ -656,6 +656,15 @@ class OpenAIDriver(LLMDriver):
                         row['function']['name'] += fn['name']
                     if fn.get('arguments'):
                         row['function']['arguments'] += fn['arguments']
+                    # Seges: parche de compatibilidad (Gemini 3 por el protocolo OpenAI:
+                    # thought_signature). Ver docs/pendiente/parches_pns_ai.md
+                    # Gemini exige devolver extra_content.google.thought_signature en el
+                    # tool_call; otros proveedores no lo envían y la fila no cambia.
+                    extra = tc.get('extra_content')
+                    if isinstance(extra, dict) and extra:
+                        merged = dict(row.get('extra_content') or {})
+                        merged.update(extra)
+                        row['extra_content'] = merged
         finally:
             response.close()
         message = {'role': 'assistant', 'content': text}

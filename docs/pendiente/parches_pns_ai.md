@@ -19,7 +19,9 @@
 Cada cambio lleva junto a él un comentario con el prefijo común
 `# Seges: parche de compatibilidad con Odoo 14`, seguido de un paréntesis con el motivo y de
 `Ver docs/pendiente/parches_pns_ai.md`. El paréntesis es `(Python 3.7 / Pillow 5.4)` en los parches 1
-a 3 y `(API de Odoo 14: Environment sin sudo)` en el 4. Para listarlos: `grep -rn "Seges: parche de compatibilidad" pns_base pns_ai_mcp pns_ai_chatboo`.
+a 3 y `(API de Odoo 14: Environment sin sudo)` en el 4. El parche 5 no es de Odoo 14 sino de
+compatibilidad con Gemini, y su comentario es `# Seges: parche de compatibilidad (Gemini 3 por el
+protocolo OpenAI: thought_signature)`; el `grep` lo lista igual. Para listarlos: `grep -rn "Seges: parche de compatibilidad" pns_base pns_ai_mcp pns_ai_chatboo`.
 
 ## Parche 1: `pns_ai_mcp/controllers/mcp_decorators.py:171` (antes `:169`)
 
@@ -188,6 +190,60 @@ a 3 y `(API de Odoo 14: Environment sin sudo)` en el 4. Para listarlos: `grep -r
 
      En el log, ningún `AttributeError` ni traceback.
   - **Resultado:** eficaz. Los datos de prueba se borraron y se comprobó con `SELECT`.
+
+## Parche 5: `pns_ai_mcp/lib/llm/drivers/openai_driver.py:659-667` (`iter_chat`)
+
+- **Fecha:** 2026-10-16.
+- **PNS:** ninguno todavía (incompatibilidad con Gemini 3 detectada en staging). Análisis completo en
+  [analisis_parche5_gemini.md](analisis_parche5_gemini.md).
+- **Qué falla sin él:** con Gemini 3.x configurado con `protocol = openai`
+  (`…/v1beta/openai/chat/completions`), todo turno de Chatboo en el que el modelo llama a una
+  herramienta falla en la petición siguiente del bucle de herramientas con
+  `HTTP 400 … Function call is missing a thought_signature in functionCall parts`. Gemini envía la
+  firma en `tool_calls[].extra_content.google.thought_signature` y exige recibirla de vuelta en el
+  mismo `tool_call`; `iter_chat` reconstruye cada `tool_call` solo con `id`, `type` y `function` y la
+  pierde. «Test Connection» funciona porque no envía herramientas.
+- **Cambio:** dentro del bucle `for tc in delta.get('tool_calls') or []:`, tras acumular los
+  argumentos, se copia `extra_content` a la fila del `tool_call` si el delta lo trae (de cualquier
+  delta, no solo del primero). El motor (`agent_engine.py`) ya reenvía ese mismo dict en la
+  siguiente petición, así que no hay que tocar nada más.
+  ```diff
+                       if fn.get('arguments'):
+                           row['function']['arguments'] += fn['arguments']
+  +                    # Seges: parche de compatibilidad (Gemini 3 por el protocolo OpenAI:
+  +                    # thought_signature). Ver docs/pendiente/parches_pns_ai.md
+  +                    # Gemini exige devolver extra_content.google.thought_signature en el
+  +                    # tool_call; otros proveedores no lo envían y la fila no cambia.
+  +                    extra = tc.get('extra_content')
+  +                    if isinstance(extra, dict) and extra:
+  +                        merged = dict(row.get('extra_content') or {})
+  +                        merged.update(extra)
+  +                        row['extra_content'] = merged
+           finally:
+  ```
+- **Qué se degrada:** nada. Los proveedores que no envían `extra_content` (OpenAI, Azure, Ollama,
+  vLLM…) reciben exactamente el mismo mensaje que antes. No se cubren (ampliaciones opcionales del
+  análisis, no aplicadas): llamadas paralelas de Gemini sin `index` y el fallback de llamadas
+  escritas en texto (`agent_engine.py:3215-3240`).
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "extra_content" pns_ai_mcp/lib/llm/drivers/openai_driver.py
+  ```
+  Si, sin el parche, sale alguna línea en `iter_chat` que copie `extra_content` (o
+  `thought_signature`) al `tool_call`, está corregido y este parche sobra.
+- **Comprobaciones realizadas (2026-10-16):**
+  1. `py_compile` del archivo: correcto con el Python del equipo (3.12.3) y con Python 3.7.3 dentro
+     de la imagen `odoo-dev:14`.
+  2. Prueba del driver sin Odoo ni BD, en la imagen `odoo-dev:14` (Python 3.7.3, `requests` 2.21.0),
+     con `requests.post` sustituido por un stream SSE simulado. Se ejecutó con el driver parcheado y
+     con el de `HEAD` (sin parche) para comparar:
+
+     | Caso | Resultado |
+     |---|---|
+     | (a) `tool_call` completo en un delta, con `extra_content` y sin `index` | OK: el mensaje final conserva `extra_content` (sin parche se perdía) |
+     | (b) stream clásico troceado, sin `extra_content` | OK: mensaje idéntico al del driver sin parche |
+     | (c) `extra_content` en un delta posterior al del `id` | OK: se conserva; `id`, nombre y argumentos intactos |
+  - **Pendiente:** prueba en staging con Gemini 3.5, 3.6 y 3.7-flash (plan de prueba del análisis).
 
 ## Comprobaciones realizadas (2026-10-13)
 

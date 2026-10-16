@@ -97,7 +97,7 @@ con la tabla 1.1 del informe:
 | Nueva | Tema | Opción elegida |
 |---|---|---|
 | N1 | Valores de retención antes de actualizar producción | a), con la secuencia segura |
-| N2 | Mantener los parches 1-4 hasta que el fabricante corrija PNS-81 | c) |
+| N2 | Mantener los parches 1-4 hasta que el fabricante corrija PNS-81, y el 5 hasta que corrija la compatibilidad con Gemini 3 (ver «N2 revisada (15/10/2026)») | c) |
 | N3 | ¿Es apta la 3.1.782 para algún cliente? | b) ahora; a) para producción |
 | N4 | ¿Se usa la mesa de entrega de claves por PIN? | a) no se usa |
 | N5 | Proveedor y datos para las 9 pruebas pendientes de staging | a); c) como puente |
@@ -1354,6 +1354,14 @@ local en lugar de informar): el parche existe y se informa a la vez.
 **Riesgos relacionados:** PNS-81; §7.3 del informe.
 
 Decisión: **c)** (Sergio) / Fecha: 14/10/2026
+
+**N2 revisada (15/10/2026):** se añade el **parche 5** (`openai_driver.py`, `iter_chat`: conservar
+`extra_content.google.thought_signature` en los `tool_calls`) por la incompatibilidad con Gemini 3
+por el protocolo OpenAI detectada en staging (HTTP 400 «Function call is missing a
+thought_signature» en la segunda ronda de herramientas). No es un problema de Odoo 14 ni de PNS-81,
+pero se gestiona igual que los parches 1-4: se mantiene en la rama, se comprueba en cada versión del
+fabricante y se le comunica. Ver [analisis_parche5_gemini.md](analisis_parche5_gemini.md) y
+[parches_pns_ai.md](parches_pns_ai.md), «Parche 5».
 
 ### N3 — ¿Es apta la versión 3.1.782 para algún cliente?
 
