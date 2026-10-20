@@ -276,8 +276,8 @@ seguir, comprobar que se trabaja en `pns_demo` y no en otra base de datos del VP
 ### 4.2 Proveedor y cadena del agente (guía §8)
 
 1. **Proveedor: Gemini** (N8), con una **clave nueva** creada solo para el staging (no la del
-   laboratorio, que debe estar revocada; §7.2). Sustituye a Anthropic, previsto en el
-   [traspaso](traspaso_pns_ai_staging.md): no hay clave de API de Anthropic. Referencia: en el
+   laboratorio, que debe estar revocada; §7.2). Sustituye a Anthropic, previsto
+   inicialmente: no hay clave de API de Anthropic. Referencia: en el
    laboratorio se usó Gemini con el protocolo compatible con OpenAI y `models/gemini-3.7-flash`
    ([verificación](verificacion_seguridad_pns_ai.md), fase 3b-2). Consecuencia: la **prueba 9b no
    aplica** (§5); queda para LIYBEN si allí se elige Anthropic (§8).

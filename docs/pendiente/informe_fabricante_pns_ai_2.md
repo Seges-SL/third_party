@@ -1,4 +1,4 @@
-# CONFIDENCIAL — Informe técnico de seguridad (segunda entrega): pns_base 1.2.32, pns_ai_mcp 3.1.782 y pns_ai_chatboo 2.1.453 (Odoo 14.0)
+# CONFIDENCIAL — Seguimiento del informe técnico de seguridad (continuación de la entrega del 15/10): pns_base 1.2.32, pns_ai_mcp 3.1.782 y pns_ai_chatboo 2.1.453 (Odoo 14.0)
 
 > **Borrador.** Pendiente de revisión interna antes de su envío.
 
@@ -8,6 +8,7 @@
 | **Módulos** | `pns_base` 1.2.32 · `pns_ai_mcp` 3.1.782 ("AI Engine") · `pns_ai_chatboo` 2.1.453 ("Chatboo") |
 | **Plataforma** | Odoo 14.0 |
 | **Informe anterior** | Informe técnico de seguridad del 2026-10-08 sobre `pns_base` 1.2.10, `pns_ai_mcp` 3.1.486 y `pns_ai_chatboo` 2.1.322 (PNS-01 a PNS-80) |
+| **Entrega intermedia** | Seguimiento del 2026-10-15 (PNS-01 a PNS-92). Esta entrega añade los resultados de las pruebas funcionales con un proveedor de IA externo que aquella dejaba pendientes y los hallazgos nuevos PNS-93 a PNS-96. |
 | **Fecha** | 2026-10-16 |
 | **Entorno de análisis** | Odoo 14.0 con Python 3.7.3 y Pillow 5.4.1 (imagen oficial de Odoo 14, Debian Buster). Entorno de laboratorio con bases de datos de prueba, y entorno de pruebas con datos de demostración, PostgreSQL 15, 2 workers y un proveedor de IA real (Google Gemini por el protocolo compatible con OpenAI). |
 | **Método** | Revisión del código de las versiones nuevas frente a las del informe anterior, hallazgo por hallazgo; comprobación en el entorno de laboratorio (control de acceso por RPC, actualización de una base de datos desde 3.1.486, compatibilidad con Odoo 14); y pruebas funcionales con el proveedor real en el entorno de pruebas. Para poder cargar y usar los módulos en Odoo 14 se aplicaron en ambos entornos correcciones mínimas equivalentes a las que sugerimos para PNS-81, PNS-93 y PNS-94. |
@@ -20,7 +21,7 @@
 1. Resumen
 2. Prioridades
 3. Respuesta a la primera entrega (PNS-01 a PNS-80)
-4. Hallazgos nuevos (PNS-81 a PNS-96)
+4. Hallazgos PNS-81 a PNS-96 (4.1 Hallazgos nuevos: PNS-93 a PNS-96 · 4.2 Hallazgos comunicados el 15/10: PNS-81 a PNS-92)
 5. Qué hemos probado y qué no
 6. Observaciones menores
 
@@ -28,9 +29,11 @@
 
 ## 1. Resumen
 
-1. Hemos revisado `pns_base` 1.2.32, `pns_ai_mcp` 3.1.782 y `pns_ai_chatboo` 2.1.453 frente a los 80
-   hallazgos del informe anterior. Agradecemos el trabajo: la versión nueva corrige o reduce todos los
-   hallazgos críticos y una parte importante de los altos, y añade tests negativos de seguridad.
+1. Esta entrega continúa la del 2026-10-15, en la que les enviamos el estado de los 80 hallazgos del
+   informe anterior y los hallazgos nuevos PNS-81 a PNS-92, y en la que dejamos pendientes las pruebas
+   funcionales con un proveedor de IA externo (§8 de aquella entrega). Ahora añadimos los resultados de
+   esas pruebas y cuatro hallazgos nuevos (PNS-93 a PNS-96). Las versiones revisadas son las mismas que
+   el 15/10.
 2. **Entorno.** Odoo 14.0 con Python 3.7.3 y Pillow 5.4.1, que son las versiones de la imagen oficial de
    Odoo 14 (Odoo 14 fija `Pillow==5.4.1` con Python ≤ 3.7 en su `requirements.txt:34`).
 3. **Método.** Tres niveles, indicados en cada hallazgo:
@@ -41,11 +44,14 @@
      pruebas con IA se completaron en el entorno de pruebas.
    - **Entorno de pruebas:** instalación nueva con datos de demostración y un proveedor de IA real.
      Turnos de Chatboo con varios usuarios de prueba (solo chat, con escritura, con URL externas).
-4. **Estado de los 80 hallazgos del informe anterior:** **31 corregidos, 33 parciales, 13 sin cambios,
-   2 ya no aplican y 1 dudoso.** Además, hemos encontrado **16 hallazgos nuevos** (PNS-81 a PNS-96):
-   9 en código nuevo o modificado de esta versión (PNS-81 a PNS-89), 3 en código que ya existía y que el
-   informe anterior no citaba (PNS-90 a PNS-92) y 4 observados en el entorno de pruebas con el
-   proveedor real (PNS-93 a PNS-96).
+
+   En la entrega del 15/10, «entorno de pruebas» designaba lo que aquí llamamos laboratorio.
+4. **Estado de los 80 hallazgos del informe anterior** (sin cambios de estado desde el 15/10): **31
+   corregidos, 33 parciales, 13 sin cambios, 2 ya no aplican y 1 dudoso.** Respecto al informe anterior
+   hay **16 hallazgos nuevos** (PNS-81 a PNS-96): 9 en código nuevo o modificado de esta versión
+   (PNS-81 a PNS-89) y 3 en código que ya existía y que el informe anterior no citaba (PNS-90 a PNS-92),
+   comunicados el 15/10, y 4 observados en el entorno de pruebas con el proveedor real (PNS-93 a
+   PNS-96), nuevos en esta entrega.
 
    | Gravedad | Corregido | Parcial | Sin cambios | Ya no aplica | Dudoso | Nuevo | Total |
    |---|---|---|---|---|---|---|---|
@@ -55,9 +61,14 @@
    | Baja | 9 | 6 | 3 | 1 | 1 | 5 | 25 |
    | **Total** | **31** | **33** | **13** | **2** | **1** | **16** | **96** |
 
+   **Respecto a la entrega del 15/10:** 4 hallazgos nuevos (PNS-93 a PNS-96: 1 de gravedad alta, 1 media
+   y 2 bajas). Ningún hallazgo cambia de estado; 10 cambian de verificación o de resultado con las
+   pruebas funcionales (PNS-05, PNS-12, PNS-16, PNS-22, PNS-36, PNS-46, PNS-59, PNS-60, PNS-61 y
+   PNS-81), señalados con «Desde el 15/10» en §3.1, §4.2 y §5.
+
 5. **Críticos del informe anterior.** Se han repetido en el laboratorio las pruebas A-D del informe
    anterior; las vías que reproducían están cerradas. Corregidos: PNS-03, PNS-04, PNS-05 (confirmado
-   también con turnos reales), PNS-06 y PNS-53. Parciales, con el resto acotado: PNS-01 y PNS-02 (un AI
+   ahora con turnos reales), PNS-06 y PNS-53. Parciales, con el resto acotado: PNS-01 y PNS-02 (un AI
    Administrator sin permisos de Ajustes sigue pudiendo conceder o quitar grupos de Odoo con un plan que
    él mismo confirma), PNS-07 (el sandbox no bloquea los métodos privados) y PNS-54 (confirmación sin
    token ligado a la interacción).
@@ -65,7 +76,7 @@
    1. El mismo patrón que causó PNS-01 (métodos públicos que trabajan en `sudo` sin comprobar grupo ni
       propiedad) sigue en cinco hallazgos explotables hoy, cuatro de ellos comprobados en el
       laboratorio y tres también por un usuario de portal: PNS-83, PNS-90, PNS-82, PNS-85 y PNS-91.
-   2. PNS-94: cualquier usuario de Chatboo deja Odoo sin servicio con solo adjuntar una imagen.
+   2. PNS-94 (nuevo en esta entrega): cualquier usuario de Chatboo deja Odoo sin servicio con solo adjuntar una imagen.
    3. PNS-81: en Odoo 14 con Python 3.7 o 3.8, `pns_ai_mcp` no se importa y la base de datos deja de
       cargar. **Pedimos una fecha prevista de corrección.**
    4. Los restos de PNS-01/02 y PNS-07/19.
@@ -90,6 +101,10 @@
 | 9 | Restos de PNS-07/19 | Crítica / Alta | El sandbox de la Caja A permite llamar a métodos privados con cursor propio y commit, y a uno que devuelve la clave del proveedor. Requiere que el LLM genere ese código. |
 | 10 | PNS-87 y PNS-88 | Baja | Pérdida de datos no avisada (registro de actividad, histórico de consumo, personalizaciones) en la primera actualización. Gravedad baja, pero irreversible y en cada instalación que actualice. |
 
+Respecto al orden propuesto el 15/10 cambian dos cosas: entra PNS-94 (nuevo) en el puesto 6, y los
+restos de PNS-01/02 y PNS-07/19 pasan detrás de PNS-81, porque requieren un rol de IA o que el LLM
+genere ese código.
+
 El resto de peticiones (los demás parciales de §3 y las observaciones de §6) es de menor urgencia.
 
 ### 2.2 Patrón común de 1 a 5 y corrección propuesta
@@ -110,7 +125,7 @@ El mismo patrón sigue presente en estos métodos:
 | PNS-82 | Alta | `chatboo.session.claim_turn_file_chips` (y `apply_assistant_download_chips`) | Cualquier usuario interno |
 | PNS-85 | Media | `ai.skill.param.cache.remember_for_skill`, `lookup_for_skill`; `ai.skill.remember_param_cache`, `lookup_param_cache` | Cualquier usuario autenticado (comprobado con un interno) |
 | PNS-91 | Media | `ai.url.whitelist.ensure_domain_whitelisted` | Cualquier usuario autenticado, incluido portal |
-| PNS-92 | Media | `ai.mcp.user.set_mcp_api_key`, `action_generate_mcp_api_key` | Hoy sin efecto por un motivo indirecto (§4) |
+| PNS-92 | Media | `ai.mcp.user.set_mcp_api_key`, `action_generate_mcp_api_key` | Hoy sin efecto por un motivo indirecto (entrega del 15/10, §6) |
 | PNS-30 (resto) | Media | `ai.log.create_log_entry` | Cualquier usuario autenticado (comprobado con un interno) |
 | PNS-37 (resto) | Media | `ai.change.journal.record_failed_plan` | Cualquier usuario autenticado |
 
@@ -142,88 +157,92 @@ laboratorio) · **Entorno de pruebas** (comprobado en el entorno de pruebas con 
 proveedor real). «(parte)» indica que solo se probó la parte corregida o solo una de las vías; «resto
 reproducido», que la prueba confirmó el resto pendiente.
 
-| PNS | Gravedad | Estado | Verificación | Nota |
-|---|---|---|---|---|
-| PNS-01 | Crítica | PARCIAL | Laboratorio (parte) | Vía RPC cerrada (métodos privados). Resto en §3.2. |
-| PNS-02 | Crítica | PARCIAL | Laboratorio (parte) | Todos los `apply_*`/`preview_*` privados. Resto en §3.2. |
-| PNS-03 | Crítica | CORREGIDO | Laboratorio | `write` fuera de `sudo` rechazado; sin creación directa por RPC. |
-| PNS-04 | Crítica | CORREGIDO | Código | `confirmed_uid` ignorado; `_can_resolve()` en todas las transiciones. La variante privada que recibe uid es resto de PNS-07. |
-| PNS-05 | Crítica | CORREGIDO | Entorno de pruebas | Un usuario no obtiene ningún dato de la operación de otro; la operación confirmada se ejecuta con los permisos de su dueño. |
-| PNS-06 | Crítica | CORREGIDO | Laboratorio (parte) | Ejecución de prueba en savepoint revertido; código de escritura rechazado al guardar (comprobado). Comparte el resto del sandbox de PNS-07. |
-| PNS-07 | Crítica | PARCIAL | Código | Resto en §3.2. |
-| PNS-08 | Alta | CORREGIDO | Laboratorio | Campos secretos solo para AI Administrator y vaciados en la exportación. |
-| PNS-09 | Alta | CORREGIDO | Laboratorio (parte) | `stdio` solo para administrador de Ajustes; entorno mínimo y timeout; `ensure_ai_admin` (comprobado en `action_test_connection`). |
-| PNS-10 | Alta | CORREGIDO | Laboratorio | La bandera solo vale en `sudo` o para el superusuario. |
-| PNS-11 | Alta | CORREGIDO | Laboratorio | `_require_bootstrap()` en los cinco métodos; `record_context_usage` privado. |
-| PNS-12 | Alta | CORREGIDO | Laboratorio y entorno de pruebas | Filtro por propietario en el modelo y en los turnos del chat. Por MCP solo se pudo comprobar con la corrección 4 de PNS-81 aplicada. |
-| PNS-13 | Alta | CORREGIDO | Laboratorio | Clave y usuario revalidados en cada mensaje; sesiones con caducidad. |
-| PNS-14 | Alta | PARCIAL | Laboratorio (resto reproducido) | Reglas nuevas en `ai.api.result.cache` y `ai.safe.choice`. Resto: PNS-90. |
-| PNS-15 | Alta | CORREGIDO | Código | Saneado o escape en todas las vías citadas. |
-| PNS-16 | Alta | PARCIAL | Entorno de pruebas (parte) | Sin auto-confirmación ni salida con las dos políticas de URL. Resto en §3.2. |
-| PNS-17 | Alta | PARCIAL | Código | `fetch_url` protegido salto a salto y con tope. Resto en §3.2. |
-| PNS-18 | Alta | PARCIAL | Laboratorio (parte) | `no_external_failover` comprobado. Resto en §3.2. |
-| PNS-19 | Alta | PARCIAL | Código | `sudo` y el cursor bloqueados en el sandbox. Resto en §3.2. |
-| PNS-20 | Alta | PARCIAL | Código | Exportación sin secretos por defecto y purga de 24 h. Resto en §3.2. |
-| PNS-21 | Alta | CORREGIDO | Laboratorio | `auth='user'` y URL sin token. Ver PNS-82. |
-| PNS-22 | Media | PARCIAL | Entorno de pruebas (parte) | Puerta `group_ai_writer` en el motor, comprobada por Chatboo. Resto en §3.2. |
-| PNS-23 | Alta | SIN CAMBIOS | Código | §3.3. |
-| PNS-24 | Alta | PARCIAL | Código | Ejecución con el usuario real y veto de cascadas. Resto en §3.2. |
-| PNS-25 | Alta | CORREGIDO | Código | Sin failover tras ejecutar efectos; ejecución idempotente. |
-| PNS-26 | Alta | PARCIAL | Código | `rollback` en `/mcp` si falla la herramienta. Resto en §3.2. |
-| PNS-27 | Alta | CORREGIDO | Código | Fuera SheetJS y las copias duplicadas; jsPDF 4.2.1. Ver PNS-60 (Showdown). |
-| PNS-28 | Media | PARCIAL | Laboratorio (parte) | Sin filas de `ai.log` para peticiones sin usuario. Resto en §3.2. |
-| PNS-29 | Media | PARCIAL | Laboratorio (parte) | El uso de las llamadas cortas se registra. Resto en §3.2. |
-| PNS-30 | Media | PARCIAL | Laboratorio (resto reproducido) | `ondelete='set null'`, ACL sin escritura y retención. Resto en §3.2. Ver PNS-87. |
-| PNS-31 | Media | SIN CAMBIOS | Código | §3.3. |
-| PNS-32 | Media | PARCIAL | Código | Sin borrados en disco. Resto en §3.2. |
-| PNS-33 | Media | SIN CAMBIOS | Código | §3.3. |
-| PNS-34 | Media | CORREGIDO | Código | Clave aleatoria por clase y restaurada al desmontar. |
-| PNS-35 | Media | SIN CAMBIOS | Código | §3.3. |
-| PNS-36 | Media | PARCIAL | Entorno de pruebas (resto reproducido) | Fuera `resources/*` y `system://info`. Resto en §3.2. |
-| PNS-37 | Media | SIN CAMBIOS | Código | §3.3. |
-| PNS-38 | Media | SIN CAMBIOS | Código | §3.3. |
-| PNS-39 | Media | PARCIAL | Código | 202 en `/mcp/message` y negociación de versión. Resto en §3.2. |
-| PNS-40 | Media | PARCIAL | Laboratorio (resto reproducido) | `temperature` omitible e imágenes en el formato de Anthropic. Resto en §3.2. |
-| PNS-41 | Media | CORREGIDO | Código | Sin reescritura de `website`; `iframe` con `sandbox` sin scripts. |
-| PNS-42 | Media | SIN CAMBIOS | Código | §3.3. |
-| PNS-43 | Baja | PARCIAL | Código | Aviso en el asistente de idioma. Resto en §3.2. |
-| PNS-44 | Baja | YA NO APLICA | Código | Sin escrituras en `ir.module.module` durante la carga. |
-| PNS-45 | Baja | CORREGIDO | Código | Cada fallo de carga de herramienta se registra con traza. |
-| PNS-46 | Baja | DUDOSO | Laboratorio y entorno de pruebas (no concluyente) | Ver §5 y PNS-95. |
-| PNS-47 | Baja | CORREGIDO | Código | El fallo de las fuentes de divisas se recuerda 15 minutos. |
-| PNS-48 | Baja | CORREGIDO | Código | Menú Settings con `base.group_system`; sin acciones duplicadas. |
-| PNS-49 | Baja | PARCIAL | Código | Resto en §3.2. |
-| PNS-50 | Baja | PARCIAL | Código | Tests negativos nuevos. Resto en §3.2. |
-| PNS-51 | Baja | SIN CAMBIOS | Código | §3.3. |
-| PNS-52 | Baja | CORREGIDO | Código | Defaults con recordset vacío y selecciones validadas. |
-| PNS-53 | Crítica | CORREGIDO | Laboratorio | Reglas por `user_id` y HTML saneado en el historial y el streaming. |
-| PNS-54 | Crítica | PARCIAL | Código | La tarjeta solo actúa para el dueño. Resto en §3.2. |
-| PNS-55 | Alta | PARCIAL | Laboratorio (parte) | Aislamiento de sesiones y trabajos comprobado. Resto en §3.2. |
-| PNS-56 | Alta | CORREGIDO | Laboratorio | La vía entre usuarios dependía de PNS-55, ya cerrada. |
-| PNS-57 | Alta | CORREGIDO | Laboratorio | `_spawn` privado; trabajos solo sobre sesión propia. |
-| PNS-58 | Alta | CORREGIDO | Laboratorio | `/chatboo/stream` con CSRF y sin `cors`. |
-| PNS-59 | Alta | PARCIAL | Laboratorio y entorno de pruebas (parte) | Con la política restringida, ni el navegador ni el servidor salen al exterior. Resto en §3.2. |
-| PNS-60 | Alta | PARCIAL | Laboratorio y entorno de pruebas (parte) | Saneado comprobado en el mensaje del usuario y en la respuesta (en directo, tras recargar, PDF y Word). Resto en §3.2. |
-| PNS-61 | Media | PARCIAL | Laboratorio y entorno de pruebas (resto reproducido) | Agente y proveedor fijados por el servidor (comprobado). Resto en §3.2. |
-| PNS-62 | Media | PARCIAL | Laboratorio (parte) | Tope por archivo comprobado. Resto en §3.2. |
-| PNS-63 | Media | CORREGIDO | Código | Purga global por cron. Ver la nota de actualización en §6. |
-| PNS-64 | Media | PARCIAL | Código | Se prefiere voz local. Resto en §3.2. |
-| PNS-65 | Media | PARCIAL | Código | HTML saneado y servido con `nosniff`. Resto en §3.2. |
-| PNS-66 | Media | SIN CAMBIOS | Laboratorio | §3.3. |
-| PNS-67 | Media | CORREGIDO | Código | `financial-health` y `customer-risk-analysis` corregidas; `analisis-financiero` retirada. |
-| PNS-68 | Media | SIN CAMBIOS | Código | §3.3. |
-| PNS-69 | Baja | CORREGIDO | Código | Listas de clase ampliadas en `__init__`. |
-| PNS-70 | Media | SIN CAMBIOS | Código | §3.3. |
-| PNS-71 | Baja | CORREGIDO | Laboratorio | `check_health` con clave y sin datos de infraestructura; estados HTTP correctos. |
-| PNS-72 | Baja | PARCIAL | Código | Fuera SheetJS y duplicados. Resto en §3.2. |
-| PNS-73 | Baja | SIN CAMBIOS | Código | §3.3. |
-| PNS-74 | Baja | PARCIAL | Código | `noopener` añadido. Resto en §3.2. |
-| PNS-75 | Baja | CORREGIDO | Código | Celdas con `=`, `+`, `-`, `@` prefijadas como texto. |
-| PNS-76 | Baja | PARCIAL | Código | Caché de menús vaciada al generar la clave. Resto en §3.2. |
-| PNS-77 | Baja | SIN CAMBIOS | Código | §3.3. |
-| PNS-78 | Baja | CORREGIDO | Código | Etiquetas distintas. |
-| PNS-79 | Baja | CORREGIDO | Código (prueba no concluyente) | Sin valor por defecto `SUPERUSER_ID`; usuario de la clave revalidado. |
-| PNS-80 | Alta | YA NO APLICA | Laboratorio | `read_progress` desaparece; el sondeo filtra por usuario (comprobado con un usuario con acceso a Chatboo sobre la sesión de otro). |
+Desde el 15/10: **Sí** indica que la verificación o el resultado cambian respecto a la entrega del
+15/10, casi siempre porque entonces la prueba quedaba pendiente de un proveedor real; «—», sin cambios.
+Ningún estado cambia.
+
+| PNS | Gravedad | Estado | Verificación | Nota | Desde el 15/10 |
+|---|---|---|---|---|---|
+| PNS-01 | Crítica | PARCIAL | Laboratorio (parte) | Vía RPC cerrada (métodos privados). Resto en §3.2. | — |
+| PNS-02 | Crítica | PARCIAL | Laboratorio (parte) | Todos los `apply_*`/`preview_*` privados. Resto en §3.2. | — |
+| PNS-03 | Crítica | CORREGIDO | Laboratorio | `write` fuera de `sudo` rechazado; sin creación directa por RPC. | — |
+| PNS-04 | Crítica | CORREGIDO | Código | `confirmed_uid` ignorado; `_can_resolve()` en todas las transiciones. La variante privada que recibe uid es resto de PNS-07. | — |
+| PNS-05 | Crítica | CORREGIDO | Entorno de pruebas | Un usuario no obtiene ningún dato de la operación de otro; la operación confirmada se ejecuta con los permisos de su dueño. | Sí: comprobado (pendiente el 15/10) |
+| PNS-06 | Crítica | CORREGIDO | Laboratorio (parte) | Ejecución de prueba en savepoint revertido; código de escritura rechazado al guardar (comprobado). Comparte el resto del sandbox de PNS-07. | — |
+| PNS-07 | Crítica | PARCIAL | Código | Resto en §3.2. | — |
+| PNS-08 | Alta | CORREGIDO | Laboratorio | Campos secretos solo para AI Administrator y vaciados en la exportación. | — |
+| PNS-09 | Alta | CORREGIDO | Laboratorio (parte) | `stdio` solo para administrador de Ajustes; entorno mínimo y timeout; `ensure_ai_admin` (comprobado en `action_test_connection`). | — |
+| PNS-10 | Alta | CORREGIDO | Laboratorio | La bandera solo vale en `sudo` o para el superusuario. | — |
+| PNS-11 | Alta | CORREGIDO | Laboratorio | `_require_bootstrap()` en los cinco métodos; `record_context_usage` privado. | — |
+| PNS-12 | Alta | CORREGIDO | Laboratorio y entorno de pruebas | Filtro por propietario en el modelo y en los turnos del chat. Por MCP solo se pudo comprobar con la corrección 4 de PNS-81 aplicada. | Sí: comprobado en los turnos del chat |
+| PNS-13 | Alta | CORREGIDO | Laboratorio | Clave y usuario revalidados en cada mensaje; sesiones con caducidad. | — |
+| PNS-14 | Alta | PARCIAL | Laboratorio (resto reproducido) | Reglas nuevas en `ai.api.result.cache` y `ai.safe.choice`. Resto: PNS-90. | — |
+| PNS-15 | Alta | CORREGIDO | Código | Saneado o escape en todas las vías citadas. | — |
+| PNS-16 | Alta | PARCIAL | Entorno de pruebas (parte) | Sin auto-confirmación ni salida con las dos políticas de URL. Resto en §3.2. | Sí: probado; la reinyección, no concluyente |
+| PNS-17 | Alta | PARCIAL | Código | `fetch_url` protegido salto a salto y con tope. Resto en §3.2. | — |
+| PNS-18 | Alta | PARCIAL | Laboratorio (parte) | `no_external_failover` comprobado. Resto en §3.2. | — |
+| PNS-19 | Alta | PARCIAL | Código | `sudo` y el cursor bloqueados en el sandbox. Resto en §3.2. | — |
+| PNS-20 | Alta | PARCIAL | Código | Exportación sin secretos por defecto y purga de 24 h. Resto en §3.2. | — |
+| PNS-21 | Alta | CORREGIDO | Laboratorio | `auth='user'` y URL sin token. Ver PNS-82. | — |
+| PNS-22 | Media | PARCIAL | Entorno de pruebas (parte) | Puerta `group_ai_writer` en el motor, comprobada por Chatboo. Resto en §3.2. | Sí: comprobado por Chatboo; `/mcp`, sin probar |
+| PNS-23 | Alta | SIN CAMBIOS | Código | §3.3. | — |
+| PNS-24 | Alta | PARCIAL | Código | Ejecución con el usuario real y veto de cascadas. Resto en §3.2. | — |
+| PNS-25 | Alta | CORREGIDO | Código | Sin failover tras ejecutar efectos; ejecución idempotente. | — |
+| PNS-26 | Alta | PARCIAL | Código | `rollback` en `/mcp` si falla la herramienta. Resto en §3.2. | — |
+| PNS-27 | Alta | CORREGIDO | Código | Fuera SheetJS y las copias duplicadas; jsPDF 4.2.1. Ver PNS-60 (Showdown). | — |
+| PNS-28 | Media | PARCIAL | Laboratorio (parte) | Sin filas de `ai.log` para peticiones sin usuario. Resto en §3.2. | — |
+| PNS-29 | Media | PARCIAL | Laboratorio (parte) | El uso de las llamadas cortas se registra. Resto en §3.2. | — (sigue pendiente; §5) |
+| PNS-30 | Media | PARCIAL | Laboratorio (resto reproducido) | `ondelete='set null'`, ACL sin escritura y retención. Resto en §3.2. Ver PNS-87. | — |
+| PNS-31 | Media | SIN CAMBIOS | Código | §3.3. | — |
+| PNS-32 | Media | PARCIAL | Código | Sin borrados en disco. Resto en §3.2. | — |
+| PNS-33 | Media | SIN CAMBIOS | Código | §3.3. | — |
+| PNS-34 | Media | CORREGIDO | Código | Clave aleatoria por clase y restaurada al desmontar. | — |
+| PNS-35 | Media | SIN CAMBIOS | Código | §3.3. | — |
+| PNS-36 | Media | PARCIAL | Entorno de pruebas (resto reproducido) | Fuera `resources/*` y `system://info`. Resto en §3.2. | Sí: resto reproducido |
+| PNS-37 | Media | SIN CAMBIOS | Código | §3.3. | — |
+| PNS-38 | Media | SIN CAMBIOS | Código | §3.3. | — |
+| PNS-39 | Media | PARCIAL | Código | 202 en `/mcp/message` y negociación de versión. Resto en §3.2. | — |
+| PNS-40 | Media | PARCIAL | Laboratorio (resto reproducido) | `temperature` omitible e imágenes en el formato de Anthropic. Resto en §3.2. | — |
+| PNS-41 | Media | CORREGIDO | Código | Sin reescritura de `website`; `iframe` con `sandbox` sin scripts. | — |
+| PNS-42 | Media | SIN CAMBIOS | Código | §3.3. | — |
+| PNS-43 | Baja | PARCIAL | Código | Aviso en el asistente de idioma. Resto en §3.2. | — |
+| PNS-44 | Baja | YA NO APLICA | Código | Sin escrituras en `ir.module.module` durante la carga. | — |
+| PNS-45 | Baja | CORREGIDO | Código | Cada fallo de carga de herramienta se registra con traza. | — |
+| PNS-46 | Baja | DUDOSO | Laboratorio y entorno de pruebas (no concluyente) | Ver §5 y PNS-95. | Sí: probado; sigue no concluyente |
+| PNS-47 | Baja | CORREGIDO | Código | El fallo de las fuentes de divisas se recuerda 15 minutos. | — |
+| PNS-48 | Baja | CORREGIDO | Código | Menú Settings con `base.group_system`; sin acciones duplicadas. | — |
+| PNS-49 | Baja | PARCIAL | Código | Resto en §3.2. | — |
+| PNS-50 | Baja | PARCIAL | Código | Tests negativos nuevos. Resto en §3.2. | — |
+| PNS-51 | Baja | SIN CAMBIOS | Código | §3.3. | — |
+| PNS-52 | Baja | CORREGIDO | Código | Defaults con recordset vacío y selecciones validadas. | — |
+| PNS-53 | Crítica | CORREGIDO | Laboratorio | Reglas por `user_id` y HTML saneado en el historial y el streaming. | — |
+| PNS-54 | Crítica | PARCIAL | Código | La tarjeta solo actúa para el dueño. Resto en §3.2. | — |
+| PNS-55 | Alta | PARCIAL | Laboratorio (parte) | Aislamiento de sesiones y trabajos comprobado. Resto en §3.2. | — |
+| PNS-56 | Alta | CORREGIDO | Laboratorio | La vía entre usuarios dependía de PNS-55, ya cerrada. | — |
+| PNS-57 | Alta | CORREGIDO | Laboratorio | `_spawn` privado; trabajos solo sobre sesión propia. | — |
+| PNS-58 | Alta | CORREGIDO | Laboratorio | `/chatboo/stream` con CSRF y sin `cors`. | — |
+| PNS-59 | Alta | PARCIAL | Laboratorio y entorno de pruebas (parte) | Con la política restringida, ni el navegador ni el servidor salen al exterior. Resto en §3.2. | Sí: comprobado con la política restringida |
+| PNS-60 | Alta | PARCIAL | Laboratorio y entorno de pruebas (parte) | Saneado comprobado en el mensaje del usuario y en la respuesta (en directo, tras recargar, PDF y Word). Resto en §3.2. | Sí: comprobadas la respuesta y la exportación |
+| PNS-61 | Media | PARCIAL | Laboratorio y entorno de pruebas (resto reproducido) | Agente y proveedor fijados por el servidor (comprobado). Resto en §3.2. | Sí: resto reproducido |
+| PNS-62 | Media | PARCIAL | Laboratorio (parte) | Tope por archivo comprobado. Resto en §3.2. | — |
+| PNS-63 | Media | CORREGIDO | Código | Purga global por cron. Ver la nota de actualización en §6. | — |
+| PNS-64 | Media | PARCIAL | Código | Se prefiere voz local. Resto en §3.2. | — |
+| PNS-65 | Media | PARCIAL | Código | HTML saneado y servido con `nosniff`. Resto en §3.2. | — |
+| PNS-66 | Media | SIN CAMBIOS | Laboratorio | §3.3. | — |
+| PNS-67 | Media | CORREGIDO | Código | `financial-health` y `customer-risk-analysis` corregidas; `analisis-financiero` retirada. | — |
+| PNS-68 | Media | SIN CAMBIOS | Código | §3.3. | — |
+| PNS-69 | Baja | CORREGIDO | Código | Listas de clase ampliadas en `__init__`. | — |
+| PNS-70 | Media | SIN CAMBIOS | Código | §3.3. | — |
+| PNS-71 | Baja | CORREGIDO | Laboratorio | `check_health` con clave y sin datos de infraestructura; estados HTTP correctos. | — |
+| PNS-72 | Baja | PARCIAL | Código | Fuera SheetJS y duplicados. Resto en §3.2. | — |
+| PNS-73 | Baja | SIN CAMBIOS | Código | §3.3. | — |
+| PNS-74 | Baja | PARCIAL | Código | `noopener` añadido. Resto en §3.2. | — |
+| PNS-75 | Baja | CORREGIDO | Código | Celdas con `=`, `+`, `-`, `@` prefijadas como texto. | — |
+| PNS-76 | Baja | PARCIAL | Código | Caché de menús vaciada al generar la clave. Resto en §3.2. | — |
+| PNS-77 | Baja | SIN CAMBIOS | Código | §3.3. | — |
+| PNS-78 | Baja | CORREGIDO | Código | Etiquetas distintas. | — |
+| PNS-79 | Baja | CORREGIDO | Código (prueba no concluyente) | Sin valor por defecto `SUPERUSER_ID`; usuario de la clave revalidado. | — |
+| PNS-80 | Alta | YA NO APLICA | Laboratorio | `read_progress` desaparece; el sondeo filtra por usuario (comprobado con un usuario con acceso a Chatboo sobre la sesión de otro). | — |
 
 **Recuento de PNS-01 a PNS-80:** CORREGIDO 31 · PARCIAL 33 · SIN CAMBIOS 13 · YA NO APLICA 2 ·
 DUDOSO 1.
@@ -616,359 +635,20 @@ Rutas relativas a la raíz de los módulos. Solo se describe lo que falta; lo co
 
 ---
 
-## 4. Hallazgos nuevos (PNS-81 a PNS-96)
+## 4. Hallazgos PNS-81 a PNS-96
 
-Mismo criterio de gravedad que el informe anterior. PNS-81 a PNS-89 están en código nuevo o modificado
-en esta versión; PNS-90 a PNS-92, en código que ya existía en 3.1.486 y que el informe anterior no
-citaba; PNS-93 a PNS-96 se observaron en el entorno de pruebas con el proveedor real.
+Mismo criterio de gravedad que el informe anterior.
+
+### 4.1 Hallazgos nuevos (PNS-93 a PNS-96)
+
+Observados en el entorno de pruebas con el proveedor real. No figuraban en la entrega del 15/10.
 
 | PNS | Gravedad | Módulo | Título | Verificación |
 |---|---|---|---|---|
-| PNS-81 | Alta | pns_ai_mcp, pns_base | Incompatibilidades con Odoo 14: el módulo no se importa y tres funciones fallan en ejecución | Laboratorio y entorno de pruebas |
-| PNS-82 | Alta | pns_ai_chatboo | `claim_turn_file_chips` se apropia de adjuntos ajenos | Laboratorio |
-| PNS-83 | Alta | pns_ai_mcp | `redeem_key_pin` entrega claves MCP sin grupo y sin límite efectivo de intentos | Laboratorio (acceso y contador); entrega de la clave, código |
-| PNS-84 | Media | pns_ai_mcp | PIN y clave MCP en claro en la base de datos y en el navegador | Código |
-| PNS-85 | Media | pns_ai_mcp | Caché de parámetros de skills escribible por cualquier usuario | Laboratorio (`remember_for_skill`) |
-| PNS-86 | Media | pns_ai_mcp | Generador OpenAPI sin control de hosts no públicos, redirecciones ni tamaño | Código |
-| PNS-87 | Baja | pns_ai_mcp | Pérdida de datos de consumo al actualizar | Laboratorio |
-| PNS-88 | Baja | pns_ai_mcp | Renombrados de XML ID que no se ejecutan en Odoo 14 y servidores heredados | Laboratorio |
-| PNS-89 | Baja | pns_ai_mcp | `/pns_ai_mcp/key_pin/stop` sin CSRF | Código |
-| PNS-90 | Alta | pns_ai_mcp | Caché de `fetch_url` legible y sobrescribible por cualquier usuario | Laboratorio |
-| PNS-91 | Media | pns_ai_mcp | Lista blanca de URL ampliable sin control de grupo | Laboratorio |
-| PNS-92 | Media | pns_ai_mcp | Clave MCP escrita en `sudo` sin control previo | Laboratorio (hoy sin efecto) |
 | PNS-93 | Media | pns_ai_mcp | El driver `openai` pierde la `thought_signature` de Gemini 3 | Entorno de pruebas |
 | PNS-94 | Alta | pns_ai_chatboo | Bloqueo de `chatboo_session` tras un turno con adjunto: denegación de servicio | Entorno de pruebas |
 | PNS-95 | Baja | pns_ai_chatboo, pns_ai_mcp | Formato de importes inconsistente y redondeo erróneo con usuarios `es_ES` | Entorno de pruebas |
 | PNS-96 | Baja | pns_ai_chatboo, pns_ai_mcp | Calidad de las respuestas con modelos `lite` | Entorno de pruebas |
-
-### PNS-81 — Incompatibilidades con Odoo 14: el módulo no se importa y tres funciones fallan en ejecución
-
-- **Gravedad:** Alta · **Verificación:** laboratorio y entorno de pruebas · **Módulos:** pns_ai_mcp,
-  pns_base
-- **Ubicación:** tabla siguiente.
-- **Comportamiento:** hemos analizado todos los `.py` de los tres módulos en busca de sintaxis y API
-  posteriores a Python 3.7 y de API de librerías que no están en la imagen oficial de Odoo 14. Resultado:
-  **1 fallo al importar y 3 fallos en ejecución**; los demás usos están protegidos (`try/except` o
-  `getattr`) y solo degradan funciones secundarias.
-
-  | # | Archivo:línea | Qué falla | Efecto | Corrección sugerida |
-  |---|---|---|---|---|
-  | 1 | `pns_ai_mcp/controllers/mcp_decorators.py:169` | Anotación de retorno `tuple[bool, Optional[str]]` (Python 3.9), evaluada al definir la función; el archivo no tiene `from __future__ import annotations`. | **Al importar:** `TypeError: 'type' object is not subscriptable`. No se importan `pns_ai_mcp` ni `pns_ai_chatboo`; una base de datos con los módulos instalados no carga. | Usar `typing.Tuple` (el archivo ya importa de `typing`) o añadir `from __future__ import annotations`. |
-  | 2 | `pns_ai_mcp/utils/relaxaicode_recipe.py:507` | `ast.get_source_segment` (Python 3.8). | **En ejecución:** desde `controllers/tools_relaxaicode.py:1867`, sin protección, la herramienta devuelve error cuando el código define a nivel de módulo una función con un parámetro cuyo nombre contiene `date`, `day`, `fecha`, `when` o `dia` (`_DATE_PARAM_HINTS`, `:206-209`): el caso típico de las consultas por rango de fechas. | Obtener la función con `getattr(ast, 'get_source_segment', None)` y, si no existe, usar `src`, la alternativa que la línea ya prevé. |
-  | 3 | `pns_base/utils/pdf_io.py:94` | `ImageOps.exif_transpose` (Pillow ≥ 6.0). | **En ejecución, sin aviso:** `_open_picture` lanza `AttributeError`, que las funciones de imagen capturan devolviendo `None`. `/pns_ai_mcp/remote_image` responde 404 a todas las imágenes y Chatboo reenvía al proveedor las imágenes previas sin reescalar (`pns_ai_chatboo/models/chatboo_async_request.py:1079-1094`). | Usar `exif_transpose` si existe; si no, girar la imagen leyendo la etiqueta EXIF de orientación (0x0112) o devolverla sin girar. |
-  | 4 | `pns_ai_mcp/controllers/main.py:1473` (`_mcp_prompts_list`) y `:1598` (`_mcp_prompts_get`) | `self._get_mcp_env().sudo()`: en Odoo 14 `Environment` no tiene `sudo()` (solo `__call__(…, su=…)`). Es un problema de la API de Odoo 14, no de Python. | **En ejecución, sin aviso:** el `AttributeError` se captura. `prompts/list` devuelve solo `system_prompt` y `prompts/get` de cualquier contexto responde «Prompt not found»: los clientes MCP no reciben ningún contexto. En 3.1.486 no ocurría (esas rutas no llamaban a `.sudo()`). | `self._get_mcp_env()(su=True)`, que conserva el uid del usuario de la clave y mantiene el filtro por propietario de PNS-12. |
-
-- **Cómo comprobarlo:** cargar los módulos con la imagen oficial de Odoo 14 (Python 3.7.3, Pillow
-  5.4.1). Sin correcciones, el servidor no arranca (fallo 1). Con la corrección 1, una consulta en el
-  chat que defina una función con un parámetro `date_from` devuelve error de la herramienta (fallo 2);
-  `remote_image` responde 404 a cualquier imagen permitida (fallo 3); y `prompts/list` por `/mcp` solo
-  devuelve `system_prompt`, con el `AttributeError` en el log (fallo 4).
-- **Resultado con las correcciones sugeridas aplicadas:** la actualización termina y el servidor arranca
-  (1); la consulta por rango de fechas responde sin error (2, entorno de pruebas); `remote_image`
-  devuelve la imagen y una foto con orientación EXIF adjunta en el chat llega derecha al modelo (3,
-  laboratorio y entorno de pruebas); `prompts/list` y `prompts/get` sirven los contextos compartidos y el
-  privado del usuario, no los de otros usuarios (4, laboratorio y entorno de pruebas).
-- **Versiones afectadas:** con Python 3.7 fallan los cuatro; con Python 3.8 y Pillow 8.1.1 siguen el 1 y
-  el 4.
-- **Impacto:** en un servidor Odoo 14 con Python 3.7 (imagen oficial) o 3.8, sustituir el código deja la
-  base de datos sin cargar, porque `pns_ai_mcp` está instalado y no se importa. Corregida la importación,
-  fallan en silencio las consultas con parámetros de fecha, las imágenes remotas y el reescalado, y
-  `prompts/*` por MCP.
-- **Degradaciones menores en Python 3.7** (no bloquean; para su valoración):
-  - `pns_ai_mcp/controllers/validators.py:434, 784, 1423` comprueban `ast.Constant` sin `ast.Str`/`ast.Num`,
-    que es como Python 3.7 representa los literales: la reparación de `%` no se aplica y un `key=` literal
-    en `sorted` se rechaza. Las comprobaciones de seguridad del validador sí contemplan 3.7.
-  - `pns_ai_mcp/utils/relaxaicode_recipe.py:32, 79, 97, 99` comprueban `ast.Constant`: en 3.7 un `None`
-    literal (`ast.NameConstant`) hace que no se recupere el dato extraído.
-  - `ast.unparse` (`validators.py:330, 466, 619, 1812`; `relaxaicode_recipe.py:177, 351`) y `ET.indent`
-    (`controllers/formatters.py:284`) están protegidos: en 3.7 no se aplican las reparaciones automáticas
-    y el XML sale sin sangría.
-- **Recomendación:** las cuatro correcciones de la tabla y una carga de los módulos con la imagen oficial
-  de Odoo 14 en su integración continua, que habría detectado los cuatro fallos. **¿Pueden indicarnos una
-  fecha prevista para la versión que corrija PNS-81?** Mientras tanto, cada versión nueva nos obliga a
-  repetir estas comprobaciones antes de poder instalarla.
-
-### PNS-82 — `chatboo.session.claim_turn_file_chips` se apropia de adjuntos ajenos sin `res_model` o sin `res_id`
-
-- **Gravedad:** Alta · **Verificación:** laboratorio · **Módulos:** pns_ai_chatboo, pns_ai_mcp
-  (relacionado con PNS-21 y PNS-55)
-- **Ubicación:** `pns_ai_chatboo/models/chatboo_session.py:415-441`; también desde el método público
-  `apply_assistant_download_chips` (`:401-413`).
-- **Comportamiento:**
-  - El método es público. Sobre una sesión propia (la regla por `user_id` lo exige), toma ids de adjunto
-    de la lista recibida o de la URL del chip.
-  - Con `ir.attachment` en `sudo`, reasigna a esa sesión cualquier adjunto al que le falte `res_model` o
-    `res_id`: solo se salta los que tienen los dos (`:436-437`). Entran también los adjuntos con
-    `res_model` y `res_id=0`, combinación que admite `write_export_attachment`
-    (`pns_base/utils/portable_io.py:342-361`). No comprueba quién lo creó ni que lo haya generado el
-    motor.
-  - Después, `_may_read` de `/pns_ai_mcp/session_file` lo entrega, porque el adjunto ya cuelga de una
-    sesión que el llamador puede leer (`pns_ai_mcp/controllers/session_file.py:20-32`); por la misma
-    razón lo sirve `/web/content`.
-  - Al borrar su sesión, el usuario borra en `sudo` todos los adjuntos que cuelgan de ella
-    (`chatboo_session.py:1326-1333`), también los reclamados.
-  - Adjuntos expuestos: las descargas del chat de otros usuarios y las copias de configuración de
-    `pns_ai_mcp`, que se guardan sin `res_model` y, si se exportan con secretos, llevan claves y tokens
-    durante su ventana de 24 h: Ajustes (`pns_ai_mcp/models/res_config_settings.py:212`), proveedores
-    (`models/ai_provider.py:1135`), usuarios MCP (`models/mcp_user.py:720`) y servidores externos
-    (`models/external_server.py:1423`). Los ids son secuenciales.
-- **Impacto:** cualquier usuario interno (el ACL de `chatboo.session` es `base.group_user`) puede leer o
-  borrar adjuntos de otros usuarios sin `res_model` o sin `res_id`, incluidas copias de configuración con
-  secretos.
-- **Cómo comprobarlo:** el usuario A genera una descarga en el chat; el usuario B, sobre su propia sesión,
-  invoca el método con el id de ese adjunto y después lo pide por `/pns_ai_mcp/session_file`. Hoy B lo
-  descarga (comprobado en el laboratorio); tras la corrección, el adjunto no debe cambiar de sesión.
-- **Corrección sugerida:** reclamar solo adjuntos creados por el propio usuario y marcados por el motor
-  como descarga de ese turno, no reasignar nunca un adjunto con `res_model`, y un test negativo con dos
-  usuarios.
-
-### PNS-83 — `ai.mcp.user.redeem_key_pin` entrega claves MCP por RPC sin grupo y sin límite efectivo de intentos
-
-- **Gravedad:** Alta · **Verificación:** laboratorio (acceso por RPC de un interno y de un portal a
-  `redeem_key_pin` y `release_all`; contador sin `ip`); la entrega de la clave, código · **Módulo:**
-  pns_ai_mcp (relacionado con PNS-07, PNS-33 y PNS-84)
-- **Ubicación:** `pns_ai_mcp/models/mcp_user.py:819-860`; `models/key_pin_block.py:36-73`;
-  `models/key_pin_desk.py:171-192`; `static/src/js/key_pin_desk_v14.js:93-118`; `utils/key_pin.py:13`.
-- **Comportamiento:**
-  - `redeem_key_pin(raw, ip=None)` es `@api.model`, público y sin comprobación de grupo, y no tiene
-    llamador en los tres módulos. Busca el PIN en `sudo` y, si hay una mesa de entrega abierta, devuelve
-    la clave MCP en claro del usuario dueño del PIN. La pestaña del administrador responde sola, sin
-    intervención.
-  - El contador de fallos depende del argumento `ip`, que por RPC elige quien llama; si va vacío, no se
-    cuenta ni se bloquea (`key_pin_block.py:38-40, 48-50`), aunque la respuesta indique `counted: true`.
-  - `ai.key.pin.block.release_all()` (`:68-73`), `note_failure(ip)` e `is_blocked(ip)` (`:36-66`) también
-    son públicos y trabajan en `sudo`: cualquier usuario autenticado puede levantar todos los bloqueos,
-    bloquear durante una hora (`DEFAULT_PIN_BLOCK_HOURS = 1`) la IP que quiera, impidiendo el canje
-    legítimo desde ella, o consultar si una IP está bloqueada.
-  - El canje no marca el PIN como usado: sigue válido hasta que se llama a `consume_key_pin` o el
-    administrador lo borra.
-  - Cada canje con PIN correcto ocupa un worker hasta 20 s (`key_pin_desk.py:185-192`).
-- **Impacto:** un usuario autenticado cualquiera, también de portal, puede probar PIN sin límite real.
-  Con un PIN vigente (8 dígitos por defecto; configurable hasta 4) y una mesa abierta, obtiene la clave
-  MCP de ese usuario, que puede ser un AI Administrator, y actúa por `/mcp` en su nombre. Es el patrón de
-  PNS-01 aplicado a credenciales.
-- **Cómo comprobarlo:** un interno sin grupos de IA y un usuario de portal invocan por RPC
-  `redeem_key_pin` (con un valor con forma de PIN) y `release_all`: hoy responden sin error de acceso;
-  tras la corrección deben recibir `AccessError`. Con un PIN erróneo y sin `ip`, no se crea ni incrementa
-  ninguna fila de `ai.key.pin.block`.
-- **Corrección sugerida:** hacer el método privado o comprobar el grupo; basar el contador de fallos en la
-  IP que determina el servidor, no en un argumento; hacer privados `release_all`, `note_failure` e
-  `is_blocked`; y marcar el PIN como usado al canjearlo.
-
-### PNS-84 — PIN y clave MCP en claro en la base de datos y en el navegador
-
-- **Gravedad:** Media · **Verificación:** código · **Módulo:** pns_ai_mcp (relacionado con PNS-33 y
-  PNS-83)
-- **Ubicación:** `pns_ai_mcp/models/mcp_user.py:142`; `models/key_pin_desk.py:154-239`;
-  `static/src/js/key_pin_desk_v14.js:38-48`.
-- **Comportamiento:**
-  - `ai.mcp.user.key_pin` guarda el PIN en claro (`Char`, indexado): lo ven todos los AI Administrator y
-    queda en copias de seguridad y réplicas.
-  - `ai.key.pin.ask.supplied_key` guarda la clave MCP en claro hasta que la recoge quien espera
-    (`:209-212`). Si la respuesta llega después de los 20 s, nadie la recoge, y la fila solo se borra en
-    el siguiente canje (`_drop_old`, `:164-169`, llamado solo desde `collect`): la clave puede quedarse en
-    la tabla indefinidamente.
-  - Cualquier AI Administrator puede leer `ai.key.pin.ask` (ACL `1,1,1,1`) y ver claves de otros usuarios
-    mientras están en la tabla.
-  - La pestaña de la mesa guarda en `sessionStorage` la lista completa de claves en claro. Cualquier XSS
-    en el backend mientras está abierta las leería todas (relación con PNS-54 y PNS-60).
-- **Impacto:** credenciales de acceso MCP en claro, fuera del hash que pedía PNS-33 y sin caducidad
-  garantizada.
-- **Cómo comprobarlo:** con una mesa abierta, provocar un canje cuya respuesta llegue tras el tiempo de
-  espera (por ejemplo, cerrando y reabriendo la pestaña) y consultar si `ai_key_pin_ask` conserva filas
-  con `supplied_key`.
-- **Corrección sugerida:** guardar el PIN como hash; borrar `supplied_key` al vencer la espera (por
-  ejemplo, con un cron) y restringir la lectura de `ai.key.pin.ask`; y no conservar la lista de claves en
-  el navegador más allá de lo imprescindible.
-
-### PNS-85 — Caché de parámetros de skills escribible por cualquier usuario autenticado
-
-- **Gravedad:** Media · **Verificación:** laboratorio (`remember_for_skill`); el resto, código ·
-  **Módulo:** pns_ai_mcp (relacionado con PNS-07)
-- **Ubicación:** `pns_ai_mcp/models/ai_skill_param_cache.py:125-154` (`remember_for_skill`) y `:91-107`
-  (`lookup_for_skill`); `models/ai_skill.py:329-345`; `utils/agent_engine.py:785`.
-- **Comportamiento:**
-  - `remember_for_skill(skill_id, leftover, norm)` es `@api.model` público. Crea la fila con un cursor
-    propio como `SUPERUSER_ID` y hace commit (`:143-148`). Acepta cualquier `skill_id`, también de skills
-    que el llamador no puede leer, y no sobrescribe una fila existente: gana el primero que escribe.
-  - Segundo punto de entrada público: `ai.skill.remember_param_cache(leftover, norm)`
-    (`ai_skill.py:338-345`), que solo usa `self.id`.
-  - La caché es global, sin usuario: `lookup_for_skill` busca en `sudo` por skill y frase normalizada, y
-    el motor la aplica en los turnos de todos los usuarios. `lookup_for_skill` y
-    `ai.skill.lookup_param_cache` (`ai_skill.py:329-336`) también son públicos.
-  - El ACL no interviene. Por el commit propio, si el sandbox llega al modelo, la escritura sobrevive al
-    rollback de la Caja A: la lista de PNS-07 (`controllers/validators.py:178-194`) no incluye estos
-    métodos.
-- **Impacto:** un usuario sin permisos de escritura puede fijar de antemano los parámetros (fechas,
-  filtros, empresa) con que se ejecutará una skill para una frase concreta cuando la use otro usuario, y
-  leer los parámetros cacheados de cualquier skill. Los resultados salen alterados sin aviso. Es
-  integridad, no escalada.
-- **Cómo comprobarlo:** un interno sin grupos de IA invoca por RPC `remember_for_skill` sobre una skill de
-  fábrica. Hoy la fila se crea a nombre del superusuario (comprobado en el laboratorio); tras la
-  corrección debe recibir `AccessError`.
-- **Corrección sugerida:** hacer privados los métodos en ambos modelos y, si la caché debe compartirse,
-  escribir en ella solo desde el motor tras una ejecución real.
-
-### PNS-86 — Generador OpenAPI: descarga sin control de hosts no públicos, redirecciones ni tamaño
-
-- **Gravedad:** Media · **Verificación:** código · **Módulo:** pns_ai_mcp (relacionado con PNS-17)
-- **Ubicación:** `pns_ai_mcp/services/openapi_spec_generator.py:579-610` (`fetch_documentation`);
-  `wizard/openapi_spec_generate_wizard.py:197-214`.
-- **Comportamiento:**
-  - Solo comprueba que el host inicial esté en la lista blanca `web`. Después hace `requests.get`, que
-    sigue redirecciones a cualquier host, sin `non_public_host_error`.
-  - Lee el cuerpo entero en memoria antes de truncarlo a `_MAX_DOC_CHARS` (`:19`, 120 000 caracteres).
-  - El texto se guarda en `docs_text` del asistente, que ve el administrador, y se envía al proveedor LLM.
-  - La lista blanca no rechaza IP ni nombres internos (`models/url_whitelist.py`), así que basta con
-    añadir un host interno; además, cualquier usuario autenticado puede ampliarla (PNS-91).
-- **Impacto:** un AI Administrator sin permisos de Ajustes puede leer servicios internos de la red del
-  servidor y enviarlos al proveedor LLM. Gravedad Media y no Alta como PNS-17 porque el generador solo lo
-  usa el AI Administrator.
-- **Cómo comprobarlo:** como AI Administrator, generar una especificación con una URL de documentación de
-  un host permitido que redirija a un host interno: hoy se sigue la redirección; tras la corrección debe
-  rechazarse con el mismo mensaje que `fetch_url`.
-- **Corrección sugerida:** reutilizar el bucle salto a salto con `non_public_host_error` y la lectura con
-  tope de `utils/fetch_url_safe.py`, como ya hace `fetch_url` (`controllers/safe_plan.py:1528-1585`).
-
-### PNS-87 — Pérdida de datos de consumo al actualizar: purga de `ai.log` a 30 días y borrado de `ai_provider_usage_day`
-
-- **Gravedad:** Baja · **Verificación:** laboratorio (actualización desde 3.1.486) · **Módulo:**
-  pns_ai_mcp (relacionado con PNS-30)
-- **Ubicación:** `pns_ai_mcp/data/ai_log_cron.xml`; `models/ai_log.py:17-18, 892-912`;
-  `utils/schema_fossils.py:15-28, 44-53`; `models/ai_schema_fossil.py:25-35`.
-- **Comportamiento:**
-  - **Purga de `ai.log`.** La actualización crea activo el cron diario de retención (`noupdate="1"`). Si
-    no existe el parámetro `pns_ai_mcp.log_retention_days`, aplica 30 días, y su primera ejecución borra
-    en `sudo`, en una sola transacción, todas las filas más antiguas: la auditoría y el historial de
-    consumo y coste que usa `get_user_usage_summary`. En el laboratorio la purga no esperó un día: se
-    ejecutó en la primera pasada del programador, unos minutos después de actualizar. El parámetro no
-    está en Ajustes y no hay aviso ni nota de actualización.
-  - **Borrado de `ai_provider_usage_day`.** `ai.schema.fossil.init()` ejecuta en cada actualización
-    `DROP TABLE IF EXISTS … CASCADE` de las tablas de `FOSSIL_TABLES`, entre ellas
-    `ai_provider_usage_day` (`schema_fossils.py:27`). No es una tabla de asistente: es el histórico diario
-    de tokens, coste y número de peticiones por proveedor (modelo `ai.provider.usage.day` de 3.1.486). No
-    hay migración que lo traslade, así que se pierde en la primera actualización. En la misma función se
-    borran columnas que el ORM ya no usa (`LEFTOVER_COLUMNS`, `:44-53`): `ai_log.operation_code`,
-    `ai_provider.cost_policy`, `ai_provider.is_on_premise`, `ai_context.is_shared`, `ai_skill.is_shared`,
-    `ai_agent.auto_link_mcp_nucleus`, `ai_agent.link_show_native` y `ai_agent.link_show_pinned`.
-- **Impacto:** pérdida de datos no avisada en instalaciones que usan el registro como auditoría o para
-  repartir costes, y pérdida del histórico de consumo por proveedor. En bases con mucho volumen, el primer
-  borrado puede ser largo. El informe anterior pedía retención (PNS-30): el defecto no es la purga, sino
-  el valor por defecto en una actualización, la falta de aviso y la pérdida del histórico.
-- **Cómo comprobarlo:** actualizar desde 3.1.486 una base de datos con filas de `ai.log` de más de 30 días
-  y datos en `ai_provider_usage_day`, y arrancar el servidor. En el laboratorio se observó que el cron se
-  ejecuta en la primera pasada y que la tabla se borra; el volumen borrado no se pudo medir porque las
-  tablas estaban vacías (§5).
-- **Corrección sugerida:** en actualizaciones, no purgar hasta que el administrador fije la retención (o
-  exponerla en Ajustes con un valor por defecto que no borre); trasladar `ai_provider_usage_day` al modelo
-  que lo sustituya antes de borrarla, o no borrarla; y documentar ambos cambios en las notas de versión.
-
-### PNS-88 — Renombrados de XML ID `mcp_*` que no se ejecutan en Odoo 14 y servidores de fábrica heredados
-
-- **Gravedad:** Baja · **Verificación:** laboratorio (actualización desde 3.1.486) · **Módulo:**
-  pns_ai_mcp
-- **Ubicación:** `pns_ai_mcp/migrations/3.1.518/pre-migrate.py` y `3.1.519/pre-migrate.py`;
-  `data/external_server_data.xml` y `data/external_server_openapi_data.xml` de la versión anterior.
-- **Comportamiento:**
-  - Los renombrados `mcp_*` → `ai_*` de reglas, accesos, menús, acciones y vistas de `ai.safe.operation`,
-    `ai.log`, `ai.context` y `ai.change.journal` (38 XML ID) solo están en esas migraciones. En Odoo 14 no
-    se ejecutan: las carpetas usan el formato `3.1.x` y Odoo 14 compara con `14.0.3.1.x` (§7.2 del
-    informe anterior, sin cambios en esta versión).
-  - Al actualizar, Odoo crea los registros `ai_*` como nuevos y borra los `mcp_*` al final. En el
-    laboratorio se borraron los 38 sin errores y se crearon 38 con ids nuevos: se pierden las
-    personalizaciones hechas sobre los antiguos (dominios de regla, menús, vistas, traducciones) y las
-    referencias a sus ids (favoritos o filtros guardados sobre esas acciones).
-  - Quedan en las bases de datos existentes los 5 servidores de fábrica que ya no están en los datos
-    (`noupdate="1"`, inactivos): `external_server_mcp_test`, `external_server_brave_search` y
-    `external_server_sequential_thinking` (`stdio` con `npx`), y `external_server_sesame` y
-    `external_server_cdmon` (OpenAPI).
-- **Impacto:** bajo, pero irreversible: personalizaciones y referencias por id perdidas en la primera
-  actualización, y servidores retirados que siguen en la base de datos.
-- **Cómo comprobarlo:** personalizar el dominio de una de las reglas `mcp_*` en una base de datos con
-  3.1.486, actualizar y comprobar que la regla `ai_*` equivalente tiene otro id y el dominio de fábrica.
-- **Corrección sugerida:** hacer los renombrados en código que también se ejecute en Odoo 14 (por
-  ejemplo, en `init()`) o publicar para Odoo 14 con versión `14.0.x.y.z` y carpetas de migración con ese
-  mismo formato; retirar o documentar los servidores heredados.
-
-### PNS-89 — `/pns_ai_mcp/key_pin/stop` sin CSRF
-
-- **Gravedad:** Baja · **Verificación:** código · **Módulo:** pns_ai_mcp (relacionado con PNS-83)
-- **Ubicación:** `pns_ai_mcp/controllers/key_pin.py:35-54` (`type='http'`, `POST`, `csrf=False`).
-- **Comportamiento:** el único efecto es cerrar la mesa cuyo token se envíe y avisar por el bus. El token
-  se genera en el navegador con `Date.now()` y `Math.random()`, no con un generador criptográfico, y vive
-  en el `sessionStorage` de la pestaña (`static/src/js/key_pin_desk_v14.js:20-30`); sin conocerlo no hay
-  efecto.
-- **Impacto:** mínimo hoy; es una excepción de CSRF innecesaria en una función sensible.
-- **Cómo comprobarlo:** revisión de código.
-- **Corrección sugerida:** si la ruta se usa con `sendBeacon` al cerrar la pestaña, enviar el
-  `csrf_token` en el cuerpo y quitar `csrf=False`; generar el token con `crypto.getRandomValues`.
-
-### PNS-90 — Caché de `fetch_url` legible y sobrescribible por cualquier usuario autenticado
-
-- **Gravedad:** Alta · **Verificación:** laboratorio · **Módulo:** pns_ai_mcp (resto de PNS-14;
-  relacionado con PNS-16 y PNS-17)
-- **Ubicación:** `pns_ai_mcp/models/fetch_cache.py:63-89` (`get_cached`) y `:91-123` (`store`);
-  `controllers/safe_plan.py:1493-1503` (clave de caché), `:1619` (lectura) y `:1667, 1723` (escritura).
-- **Comportamiento:**
-  - `get_cached(url)` y `store(url, result, ttl_seconds)` son `@api.model` públicos. Buscan, crean y
-    sobrescriben filas en `sudo`, sin comprobar grupo.
-  - La caché es global: la clave es la URL (más el hash del cuerpo en `QUERY`), sin usuario.
-  - `fetch_url` consulta esa caché antes de salir a la red; si hay una fila vigente, devuelve su cuerpo
-    como resultado de la herramienta.
-  - `store` acepta el contenido, el código de estado y el TTL que elija quien llama.
-  - El ACL de `ai.fetch.cache` (solo AI Administrator desde esta versión) no interviene.
-- **Impacto:** cualquier usuario autenticado, también de portal, puede leer el cuerpo cacheado de las URL
-  que consultaron otros usuarios y fijar de antemano el contenido que recibirá la herramienta `fetch_url`
-  de otro usuario para una URL, sin que la petición salga a la red. Ese contenido llega al modelo como
-  resultado de la herramienta: prompt injection entre usuarios (PNS-16).
-- **Cómo comprobarlo:** con una URL ficticia y contenido inocuo, un interno sin grupos de IA guarda una
-  entrada con `store`; un usuario de portal la lee con `get_cached` y la sobrescribe; el interno recibe
-  después el contenido del portal (comprobado en el laboratorio). Tras la corrección, ambas llamadas
-  deben fallar.
-- **Corrección sugerida:** `_get_cached` y `_store` (§2.2).
-
-### PNS-91 — `ai.url.whitelist.ensure_domain_whitelisted` amplía la lista blanca sin control de grupo
-
-- **Gravedad:** Media · **Verificación:** laboratorio (tipo `web`) · **Módulo:** pns_ai_mcp
-  (relacionado con PNS-16, PNS-59 y PNS-86)
-- **Ubicación:** `pns_ai_mcp/models/url_whitelist.py:235-266`; tipos admitidos en `:54-56`.
-- **Comportamiento:** `ensure_domain_whitelisted(hostname, notes, kind)` es `@api.model` público. Crea la
-  fila con `sudo().create` o reactiva una archivada con `sudo().write`, sin comprobar grupo. Admite los
-  tipos `web`, `mcp` y `openapi`. El ACL de internos es de solo lectura
-  (`security/ir.model.access.csv:6`) y el `create` directo se rechaza, pero el método no pasa por él.
-- **Impacto:** cualquier usuario autenticado, también de portal, puede añadir o reactivar hosts en la
-  lista blanca. Con la política de URL restringida, eso abre la salida del servidor hacia esos hosts
-  (`remote_image`, `fetch_url`) y debilita las correcciones de PNS-16, PNS-59 y PNS-86.
-- **Cómo comprobarlo:** un interno sin grupos de IA y un usuario de portal añaden cada uno un dominio
-  ficticio (`.invalid`) y el portal reactiva una entrada archivada (comprobado en el laboratorio); como
-  control, el `create` directo del interno da `AccessError`.
-- **Corrección sugerida:** `_ensure_domain_whitelisted`, llamado solo desde el flujo de confirmación del
-  plan.
-
-### PNS-92 — `set_mcp_api_key` y `action_generate_mcp_api_key` escriben la clave en `sudo` sin control previo
-
-- **Gravedad:** Media (defensa en profundidad) · **Verificación:** laboratorio (hoy sin efecto) ·
-  **Módulo:** pns_ai_mcp (relacionado con PNS-33 y PNS-83)
-- **Ubicación:** `pns_ai_mcp/models/mcp_user.py:450-466` (`set_mcp_api_key`), `:440-448`
-  (`action_generate_mcp_api_key`) → `:419-437` (`_do_generate_mcp_api_key`) → `:406-417`
-  (`_store_api_key_hash`).
-- **Comportamiento:**
-  - Los dos métodos son públicos y no comprueban grupo ni propiedad. Escriben el hash de la clave MCP con
-    `sudo()` (`:460-464` y `:410-414`).
-  - Hoy no tienen efecto para un usuario sin permisos por una razón indirecta: después de escribir, la
-    línea de log (`:465` y `:437`) lee `self.user_id` en el entorno del usuario que llama. Sin lectura
-    sobre `ai.mcp.user` (solo AI Administrator, `security/ir.model.access.csv:39`), esa lectura lanza
-    `AccessError` y deshace toda la transacción, incluida la escritura ya hecha.
-  - El único llamador legítimo es el asistente `ai.api.key.wizard` (`models/mcp_api_key_wizard.py:104,
-    113`), con ACL solo de AI Administrator.
-- **Impacto:** hoy ninguno comprobado. Cualquier cambio que dé lectura sobre `ai.mcp.user` a usuarios no
-  administradores, o que mueva o quite esa línea de log, dejaría a cualquier usuario autenticado fijar o
-  regenerar la clave MCP de otro, incluido un administrador. Sería Crítica.
-- **Cómo comprobarlo:** un interno sin grupos de IA y un usuario de portal invocan los dos métodos sobre
-  el registro de otro usuario: el hash no cambia, pero el `AccessError` sale de la línea del log, no de
-  un control previo (comprobado en el laboratorio en seis intentos).
-- **Corrección sugerida:** comprobar `group_ai_admin` (o la propiedad, si se quiere autoservicio) antes de
-  escribir, o hacer privados los métodos y llamarlos solo desde el asistente.
 
 ### PNS-93 — El driver `openai` pierde la `thought_signature` de Gemini 3 y todo turno con herramientas falla
 
@@ -1101,39 +781,81 @@ citaba; PNS-93 a PNS-96 se observaron en el entorno de pruebas con el proveedor 
   texto del modelo; traducir los errores de acceso a un mensaje para el usuario; y documentar los modelos
   mínimos recomendados.
 
+### 4.2 Hallazgos comunicados el 15/10 (PNS-81 a PNS-92)
+
+El detalle, el impacto y la corrección sugerida de cada uno están en la entrega del 15/10 (§2, §3, §4 y
+§6 de aquella). Aquí solo se indica su estado actual y lo que ha cambiado desde entonces. Estado
+**ABIERTO**: sin corregir en las versiones revisadas, que son las mismas que el 15/10.
+
+| PNS | Gravedad | Título | Estado actual | Desde el 15/10 |
+|---|---|---|---|---|
+| PNS-81 | Alta | Incompatibilidades con Odoo 14: el módulo no se importa y tres funciones fallan en ejecución | ABIERTO | **Sí:** correcciones 2 y 3 comprobadas con turnos reales (ver abajo) |
+| PNS-82 | Alta | `claim_turn_file_chips` se apropia de adjuntos ajenos | ABIERTO | — (entrega del 15/10, §2.4 y §6) |
+| PNS-83 | Alta | `redeem_key_pin` entrega claves MCP sin grupo y sin límite efectivo de intentos | ABIERTO | — (entrega del 15/10, §2.2 y §6) |
+| PNS-84 | Media | PIN y clave MCP en claro en la base de datos y en el navegador | ABIERTO | — (entrega del 15/10, §6) |
+| PNS-85 | Media | Caché de parámetros de skills escribible por cualquier usuario | ABIERTO | — (entrega del 15/10, §2.5 y §6) |
+| PNS-86 | Media | Generador OpenAPI sin control de hosts no públicos, redirecciones ni tamaño | ABIERTO | — (entrega del 15/10, §6) |
+| PNS-87 | Baja | Pérdida de datos de consumo al actualizar | ABIERTO | — (entrega del 15/10, §4.1 y §6) |
+| PNS-88 | Baja | Renombrados de XML ID que no se ejecutan en Odoo 14 y servidores heredados | ABIERTO | — (entrega del 15/10, §4.2 y §6) |
+| PNS-89 | Baja | `/pns_ai_mcp/key_pin/stop` sin CSRF | ABIERTO | — (entrega del 15/10, §6) |
+| PNS-90 | Alta | Caché de `fetch_url` legible y sobrescribible por cualquier usuario | ABIERTO | — (entrega del 15/10, §2.3 y §6) |
+| PNS-91 | Media | Lista blanca de URL ampliable sin control de grupo | ABIERTO | — (entrega del 15/10, §2.6 y §6) |
+| PNS-92 | Media | Clave MCP escrita en `sudo` sin control previo | ABIERTO | — (entrega del 15/10, §6) |
+
+**PNS-81 — Qué cambia desde el 15/10.** Las correcciones 2 y 3, que el 15/10 quedaban pendientes de un
+turno real, se han comprobado con el proveedor real. Con las cuatro correcciones sugeridas aplicadas:
+
+- la consulta por rango de fechas con una función con parámetros de fecha responde sin error
+  (corrección 2, entorno de pruebas);
+- una foto con orientación EXIF adjunta en el chat llega derecha al modelo (corrección 3, laboratorio y
+  entorno de pruebas);
+- `prompts/list` y `prompts/get` sirven los contextos compartidos y el privado del usuario, no los de
+  otros usuarios (corrección 4, ahora también en el entorno de pruebas).
+
+Las correcciones sugeridas no cambian. Seguimos pendientes de una fecha prevista para la versión que
+corrija PNS-81.
+
 **Recuento final:** 96 hallazgos. De PNS-01 a PNS-80: CORREGIDO 31 · PARCIAL 33 · SIN CAMBIOS 13 · YA NO
-APLICA 2 · DUDOSO 1. Nuevos: 16 (Alta 5, Media 6, Baja 5).
+APLICA 2 · DUDOSO 1, sin cambios de estado desde el 15/10. Nuevos respecto al informe anterior: 16 (Alta
+5, Media 6, Baja 5): 12 comunicados el 15/10 (PNS-81 a PNS-92, abiertos) y 4 nuevos en esta entrega
+(PNS-93 a PNS-96).
 
 ---
 
 ## 5. Qué hemos probado y qué no
 
 Las pruebas en el entorno de pruebas se hicieron con datos de demostración, textos inocuos y usuarios
-internos (sin portal; el portal solo se usó en el laboratorio). Estas comprobaciones no se hicieron o no
-fueron concluyentes:
+internos (sin portal; el portal solo se usó en el laboratorio).
 
-| Comprobación | Hallazgo | Situación y motivo |
-|---|---|---|
-| Tokens de escritura en la caché de prompt de Anthropic, frente a la consola del proveedor | PNS-29 | **No realizada:** el entorno de pruebas usaba Gemini. El resto se deduce del código (`llm_usage.py:94-99`). |
-| Reinyección del turno anterior como `system` con la política de URL restringida | PNS-16 | **No concluyente.** Con `open` no se manifestó (la tarjeta apareció también en el turno de reutilización). El resto se deduce del código. |
-| Imágenes externas en las respuestas con la política `open` | PNS-59 | **No concluyente:** el modelo no incluyó la imagen en la respuesta. |
-| Llamadas paralelas de Gemini sin `index` | PNS-93 | **No observadas** en las pruebas; el riesgo se deduce del código y de ejemplos públicos. Tampoco probamos la ausencia de regresión con otro proveedor compatible con OpenAI. |
-| Origen exacto del lock en los turnos con imagen | PNS-94 | **No confirmado:** no se activó el registro de sentencias de PostgreSQL. La corrección sugerida no depende de cuál sea la sentencia. |
-| Secuencia completa de actualización desde 3.1.486 con datos reales | PNS-87, PNS-88, PNS-63 | **Solo en el laboratorio**, con una base de datos de prueba. El entorno de pruebas fue una instalación nueva. |
-| Medida real de las purgas al actualizar (`ai.log`, `ai_provider_usage_day`, sesiones de Chatboo) | PNS-87, PNS-63 | **No medida:** las tablas estaban vacías. Se observó que los crons se ejecutan en la primera pasada; el volumen se deduce del código. |
-| Personalizaciones sobre los 38 registros `mcp_*` | PNS-88 | **No probada:** la base de datos de prueba no tenía personalizaciones; se observó el borrado y la recreación con ids nuevos. |
-| Presencia del glosario `es_ES` en lo que recibe el modelo | PNS-46, PNS-95 | **No concluyente:** `prompt_data` de `ai.log` no guarda el prompt de los turnos de Chatboo (el bucle de herramientas registra la petición sin él, `agent_engine.py:3134-3146`). En el laboratorio, la parte fija reconstruida no contenía el glosario para ningún idioma. Pedimos poder registrar el prompt. |
-| Escritura pedida por un usuario sin AI Writer por `/mcp` | PNS-22 | **No probada** (sí por Chatboo, corregido). El resto de `tools/call` se deduce del código. |
-| AI Administrator sin Ajustes que se concede `base.group_system` | PNS-01, PNS-02 | **No probada** a propósito; la verificaremos con la versión corregida. |
-| Llamada a métodos privados desde el sandbox | PNS-07, PNS-19 | **No probada;** se deduce del código y del docstring de `guarded_getattr`. |
-| Aceptación en servidor de `confirm`/`execute` sin espera para riesgo alto | PNS-54 | **No probada;** se deduce del código. |
-| `escapeHtml` sin comillas, lista negra del saneador y Showdown | PNS-60 | **No probados;** la parte probada (mensaje y respuesta, exportación) está corregida. |
-| `/mcp/message` con una sesión sin usuario | PNS-79 | **No concluyente:** no hemos encontrado un camino que cree una sesión sin usuario. |
-| Clave en `ai.key.pin.ask` tras vencer la espera | PNS-84 | **No probada;** no se abrió la mesa de entrega. |
-| Parámetro de retención de Chatboo creado a mano antes de actualizar | PNS-63 | **No probado:** según el código chocaría con `key_uniq` (§6). |
-| Batería de tests de `pns_ai_mcp` en 3.1.782 | PNS-50 | **No ejecutada** en esta versión. |
-| Avisos publicados para jsPDF 4.2.1 y versión de `jspdf.plugin.autotable.min.js` | PNS-27 | **No revisados.** |
-| Cursores propios en `ai_log.py`, `ai_change_journal.py`, `ai_provider.py`, `ai_agent.py`, `ai_context.py` y `ai_skill_param_cache.py` | PNS-07 | **No revisados uno a uno.** |
+De las 12 comprobaciones que la entrega del 15/10 dejaba pendientes (§8 de aquella), se completaron 7:
+PNS-05, PNS-12, PNS-36, PNS-61, PNS-81 (correcciones 2 y 3) y PNS-60 (respuesta y exportación). Cuatro
+dieron un resultado parcial o no concluyente (PNS-16, PNS-22, PNS-46 y PNS-59) y una no se hizo (PNS-29).
+
+Estas comprobaciones no se hicieron o no fueron concluyentes. «Desde el 15/10» indica si la situación
+cambia respecto a aquella entrega:
+
+| Comprobación | Hallazgo | Situación y motivo | Desde el 15/10 |
+|---|---|---|---|
+| Tokens de escritura en la caché de prompt de Anthropic, frente a la consola del proveedor | PNS-29 | **No realizada:** el entorno de pruebas usaba Gemini. El resto se deduce del código (`llm_usage.py:94-99`). | Sin cambios: sigue pendiente |
+| Reinyección del turno anterior como `system` con la política de URL restringida | PNS-16 | **No concluyente.** Con `open` no se manifestó (la tarjeta apareció también en el turno de reutilización). El resto se deduce del código. | Cambia: probada (pendiente el 15/10) |
+| Imágenes externas en las respuestas con la política `open` | PNS-59 | **No concluyente:** el modelo no incluyó la imagen en la respuesta. | Cambia: probada (pendiente el 15/10) |
+| Llamadas paralelas de Gemini sin `index` | PNS-93 | **No observadas** en las pruebas; el riesgo se deduce del código y de ejemplos públicos. Tampoco probamos la ausencia de regresión con otro proveedor compatible con OpenAI. | Nueva |
+| Origen exacto del lock en los turnos con imagen | PNS-94 | **No confirmado:** no se activó el registro de sentencias de PostgreSQL. La corrección sugerida no depende de cuál sea la sentencia. | Nueva |
+| Secuencia completa de actualización desde 3.1.486 con datos reales | PNS-87, PNS-88, PNS-63 | **Solo en el laboratorio**, con una base de datos de prueba. El entorno de pruebas fue una instalación nueva. | Sin cambios |
+| Medida real de las purgas al actualizar (`ai.log`, `ai_provider_usage_day`, sesiones de Chatboo) | PNS-87, PNS-63 | **No medida:** las tablas estaban vacías. Se observó que los crons se ejecutan en la primera pasada; el volumen se deduce del código. | Sin cambios |
+| Personalizaciones sobre los 38 registros `mcp_*` | PNS-88 | **No probada:** la base de datos de prueba no tenía personalizaciones; se observó el borrado y la recreación con ids nuevos. | Sin cambios |
+| Presencia del glosario `es_ES` en lo que recibe el modelo | PNS-46, PNS-95 | **No concluyente:** `prompt_data` de `ai.log` no guarda el prompt de los turnos de Chatboo (el bucle de herramientas registra la petición sin él, `agent_engine.py:3134-3146`). En el laboratorio, la parte fija reconstruida no contenía el glosario para ningún idioma. Pedimos poder registrar el prompt. | Cambia: probada (pendiente el 15/10) |
+| Escritura pedida por un usuario sin AI Writer por `/mcp` | PNS-22 | **No probada** (sí por Chatboo, corregido). El resto de `tools/call` se deduce del código. | Cambia: probada por Chatboo |
+| AI Administrator sin Ajustes que se concede `base.group_system` | PNS-01, PNS-02 | **No probada** a propósito; la verificaremos con la versión corregida. | Sin cambios |
+| Llamada a métodos privados desde el sandbox | PNS-07, PNS-19 | **No probada;** se deduce del código y del docstring de `guarded_getattr`. | Sin cambios |
+| Aceptación en servidor de `confirm`/`execute` sin espera para riesgo alto | PNS-54 | **No probada;** se deduce del código. | Sin cambios |
+| `escapeHtml` sin comillas, lista negra del saneador y Showdown | PNS-60 | **No probados;** la parte probada (mensaje y respuesta, exportación) está corregida. | Cambia: probadas la respuesta y la exportación |
+| `/mcp/message` con una sesión sin usuario | PNS-79 | **No concluyente:** no hemos encontrado un camino que cree una sesión sin usuario. | Sin cambios |
+| Clave en `ai.key.pin.ask` tras vencer la espera | PNS-84 | **No probada;** no se abrió la mesa de entrega. | Sin cambios |
+| Parámetro de retención de Chatboo creado a mano antes de actualizar | PNS-63 | **No probado:** según el código chocaría con `key_uniq` (§6). | Sin cambios |
+| Batería de tests de `pns_ai_mcp` en 3.1.782 | PNS-50 | **No ejecutada** en esta versión. | Sin cambios |
+| Avisos publicados para jsPDF 4.2.1 y versión de `jspdf.plugin.autotable.min.js` | PNS-27 | **No revisados.** | Sin cambios |
+| Cursores propios en `ai_log.py`, `ai_change_journal.py`, `ai_provider.py`, `ai_agent.py`, `ai_context.py` y `ai_skill_param_cache.py` | PNS-07 | **No revisados uno a uno.** | Sin cambios |
 
 Les comunicaremos cualquier resultado posterior que cambie lo dicho en este informe.
 
@@ -1141,7 +863,8 @@ Les comunicaremos cualquier resultado posterior que cambie lo dicho en este info
 
 ## 6. Observaciones menores
 
-Sin número. Ninguna es urgente; las recogemos para una próxima versión.
+Sin número. Ninguna es urgente; las recogemos para una próxima versión. Las 1 a 5 y la 12 ya figuraban
+en la entrega del 15/10; las demás son nuevas.
 
 1. **`system_prompt` duplicado en `prompts/list`.** Una vez corregido el fallo 4 de PNS-81,
    `system_prompt` aparece dos veces: la entrada fija del controlador
