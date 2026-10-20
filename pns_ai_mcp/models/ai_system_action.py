@@ -705,8 +705,21 @@ class AiSystemAction(models.AbstractModel):
             )
         return ''
 
+    # Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    def _check_may_change_user_groups(self):
+        """Native groups are Settings business: AI Administrator alone is not
+        enough. Checked on the real user before any sudo(), like stdio servers."""
+        user = self.env.user
+        if user._is_superuser() or user.has_group('base.group_system'):
+            return
+        raise UserError(_(
+            'Only a Settings administrator can add or remove user groups.'
+        ))
+
     @api.model
     def _preview_user_add_group(self, user_id=None, group=None, **_kw):
+        # Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self._check_may_change_user_groups()
         user = self._resolve_user(user_id)
         grp = self._resolve_group(group)
         return (
@@ -716,6 +729,8 @@ class AiSystemAction(models.AbstractModel):
 
     @api.model
     def _apply_user_add_group(self, user_id=None, group=None, **_kw):
+        # Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self._check_may_change_user_groups()
         user = self._resolve_user(user_id)
         grp = self._resolve_group(group)
         user_add_group(user, grp)
@@ -736,6 +751,8 @@ class AiSystemAction(models.AbstractModel):
 
     @api.model
     def _preview_user_remove_group(self, user_id=None, group=None, **_kw):
+        # Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self._check_may_change_user_groups()
         user = self._resolve_user(user_id)
         grp = self._resolve_group(group)
         return (
@@ -746,6 +763,8 @@ class AiSystemAction(models.AbstractModel):
 
     @api.model
     def _apply_user_remove_group(self, user_id=None, group=None, **_kw):
+        # Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self._check_may_change_user_groups()
         user = self._resolve_user(user_id)
         grp = self._resolve_group(group)
         user_remove_group(user, grp)
