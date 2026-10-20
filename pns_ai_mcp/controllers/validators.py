@@ -200,6 +200,9 @@ RELAXAICODE_SIDE_EFFECT_METHODS = frozenset({
     '_remember_param_cache', '_lookup_param_cache',
     # Seges: parche 10 (PNS-83, seguridad). Ver docs/pendiente/parches_pns_ai.md
     '_redeem_key_pin', '_release_all', '_note_failure', '_is_blocked',
+    # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    '_claim_turn_file_chips', '_apply_assistant_download_chips',
+    '_stage_assistant_download_chips', '_consume_staged_assistant_download_chips',
 })
 
 # RelaxAICode always runs as the asking user. These names hand out another

@@ -354,12 +354,13 @@ class ChatbooSession(models.Model):
                 merged[key] = value
         return merged
 
-    def stage_assistant_download_chips(self, chips):
+    # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    def _stage_assistant_download_chips(self, chips):
         """Accumulate download chips until the assistant message is saved."""
         self.ensure_one()
         if not chips:
             return
-        self.claim_turn_file_chips(chips)
+        self._claim_turn_file_chips(chips)
         existing = []
         if self.staged_assistant_files:
             try:
@@ -371,7 +372,8 @@ class ChatbooSession(models.Model):
             existing, default=str, ensure_ascii=False,
         )
 
-    def consume_staged_assistant_download_chips(self):
+    # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    def _consume_staged_assistant_download_chips(self):
         """Return staged download chips and clear the buffer."""
         self.ensure_one()
         # Staging may be committed by execute_safe_plan in another cursor while
@@ -398,23 +400,30 @@ class ChatbooSession(models.Model):
                 pass
         return chips
 
-    def apply_assistant_download_chips(self, chips):
+    # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    def _apply_assistant_download_chips(self, chips):
         """Append download chips to the last assistant message or stage them."""
         self.ensure_one()
         if not chips:
             return
-        self.claim_turn_file_chips(chips)
+        self._claim_turn_file_chips(chips)
         messages = self.get_messages()
         if messages and messages[-1].get('role') == 'assistant':
             existing = list(messages[-1].get('files') or [])
             messages[-1]['files'] = existing + list(chips)
             self.set_messages(messages)
         else:
-            self.stage_assistant_download_chips(chips)
+            # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            self._stage_assistant_download_chips(chips)
 
-    def claim_turn_file_chips(self, chips):
+    # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    def _claim_turn_file_chips(self, chips):
         """Hang engine-created attachments on this session."""
         self.ensure_one()
+        # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        uid = self.env.uid
+        if self.sudo().user_id.id != uid:
+            return
         Attachment = self.env['ir.attachment'].sudo()
         for chip in chips or []:
             if not isinstance(chip, dict):
@@ -434,6 +443,9 @@ class ChatbooSession(models.Model):
             if not att.exists():
                 continue
             if att.res_model and att.res_id:
+                continue
+            # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            if att.create_uid.id != uid:
                 continue
             att.write({
                 'res_model': self._name,
@@ -488,7 +500,8 @@ class ChatbooSession(models.Model):
         )
         if not chip:
             return False
-        self.claim_turn_file_chips([chip])
+        # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self._claim_turn_file_chips([chip])
         messages = self.get_messages()
         patched = False
         for msg in reversed(messages or []):
@@ -514,7 +527,8 @@ class ChatbooSession(models.Model):
         if patched:
             self.set_messages(messages)
         else:
-            self.apply_assistant_download_chips([chip])
+            # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            self._apply_assistant_download_chips([chip])
         self.notify_files_updated()
         return chip
 
@@ -1291,6 +1305,9 @@ class ChatbooSession(models.Model):
         tiene un job zombie bloqueado, fallamos YA con mensaje claro en vez de
         dejar el History colgado (el spinner va en shadow y parece que «no borra»).
         """
+        # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self.check_access_rights('unlink')
+        self.check_access_rule('unlink')
         if self.ids:
             # 1) Jobs async primero (FK ON DELETE CASCADE también esperaría el
             #    mismo lock; así controlamos timeout y mensaje).
@@ -1329,7 +1346,12 @@ class ChatbooSession(models.Model):
                     ('res_id', 'in', self.ids),
                 ])
                 if atts:
-                    atts.unlink()
+                    # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
+                    owner = {s.id: s.user_id.id for s in self.sudo()}
+                    own = atts.filtered(
+                        lambda a: a.create_uid.id in (False, owner.get(a.res_id)))
+                    (atts - own).write({'res_model': False, 'res_id': False})
+                    own.unlink()
             except Exception:
                 _logger.warning(
                     "Chatboo: no se pudieron borrar los adjuntos de las sesiones %s",

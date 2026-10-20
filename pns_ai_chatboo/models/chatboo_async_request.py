@@ -1583,7 +1583,8 @@ class ChatbooAsyncRequest(models.Model):
                     mimetype or _mt or 'application/octet-stream',
                 )
                 if chip:
-                    self.session_id.claim_turn_file_chips([chip])
+                    # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
+                    self.session_id._claim_turn_file_chips([chip])
                     chips.append({
                         'name': chip['name'],
                         'url': chip['url'],
@@ -1699,7 +1700,8 @@ class ChatbooAsyncRequest(models.Model):
                     c for g in groups for c in (g or [])
                     if isinstance(c, dict) and (c.get('url') or c.get('name'))
                 ]
-            _staged = session.consume_staged_assistant_download_chips()
+            # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            _staged = session._consume_staged_assistant_download_chips()
             _orphans = session.recover_orphan_download_chips(
                 messages=messages, since=self.started_at,
             )
@@ -1735,7 +1737,8 @@ class ChatbooAsyncRequest(models.Model):
                 _assistant_files = list(_assistant_files or []) + list(svg_chips)
                 _assistant_content = acc or ''
             if _assistant_files:
-                session.claim_turn_file_chips(_assistant_files)
+                # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
+                session._claim_turn_file_chips(_assistant_files)
             _done_show = (done_meta or {}).get('presentation_show_mode')
             if _done_show:
                 try:
