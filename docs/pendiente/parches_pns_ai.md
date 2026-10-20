@@ -52,7 +52,10 @@ Los marcadores de los parches 1 a 6 no se cambian: la ruta de este documento tam
 | 4 | PNS-81 | compatibilidad | `pns_ai_mcp/controllers/main.py` | — | rama `14.0-pns-ai-3` | En LIYBEN |
 | 5 | PNS-93 | compatibilidad | `pns_ai_mcp/lib/llm/drivers/openai_driver.py` | — | `27cadbb` | En LIYBEN |
 | 6 | PNS-94 | robustez | `pns_ai_chatboo/models/chatboo_async_request.py` | — | `63ee2dc` | En LIYBEN |
-| 7-10 | PNS-90, 91, 85, 83 (previsto) | seguridad | (spec de la entrega E1) | E1 | — | Pendiente |
+| 7 | PNS-90 | seguridad | `pns_ai_mcp/models/fetch_cache.py`, `pns_ai_mcp/controllers/safe_plan.py`, `pns_ai_mcp/controllers/validators.py` | E1 | — | Validado en laboratorio |
+| 8 | PNS-91 | seguridad | `pns_ai_mcp/models/url_whitelist.py`, `pns_ai_mcp/controllers/safe_plan.py`, `pns_ai_mcp/models/safe_operation.py`, `pns_ai_mcp/models/external_server.py`, `pns_ai_mcp/controllers/validators.py` | E1 | — | Validado en laboratorio |
+| 9 | PNS-85 | seguridad | `pns_ai_mcp/models/ai_skill_param_cache.py`, `pns_ai_mcp/models/ai_skill.py`, `pns_ai_mcp/utils/agent_engine.py`, `pns_ai_mcp/controllers/validators.py` | E1 | — | Validado en laboratorio |
+| 10 | PNS-83 | seguridad | `pns_ai_mcp/models/mcp_user.py`, `pns_ai_mcp/models/key_pin_block.py`, `pns_ai_mcp/models/res_config_settings.py`, `pns_ai_mcp/controllers/validators.py` | E1 | — | Validado en laboratorio |
 
 Estados: Pendiente → Aplicado → Validado en laboratorio → Validado en staging → En LIYBEN.
 
@@ -408,6 +411,125 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 
      En todos: sin conexiones colgadas (ni `idle in transaction` ni esperas de lock) y sin avisos en
      el log. El riesgo residual (lock en otro cursor del hilo) no se dio.
+
+## Parche 7: `ai.fetch.cache.get_cached` y `store` pasan a privados (`_get_cached`, `_store`)
+
+- **Fecha:** 2026-10-20.
+- **Estado:** **validado en laboratorio (20/10/2026)**; pendiente de staging (plan en el §9.3 de la [spec E1](../specs/correcciones_pns_ai_entrega1.md)).
+- **PNS:** PNS-90 del [seguimiento](seguimiento_informe_pns_ai.md). Spec: [spec E1](../specs/correcciones_pns_ai_entrega1.md) (entrega E1).
+- **Qué falla sin él:** cualquier usuario autenticado (interno o de portal) lee y escribe por RPC (`/web/dataset/call_kw`, `/jsonrpc`, `/xmlrpc/*`) la caché global de `fetch_url`: ambos métodos trabajan en `sudo()` sin comprobar grupo. Se puede envenenar la caché (que el motor sirva un cuerpo falso a todos) o leer respuestas cacheadas.
+- **Cambio:** los dos métodos se renombran con `_` (el core rechaza por RPC los nombres privados con `AccessError`) y se actualizan sus 3 llamadores en `controllers/safe_plan.py` (`_execute_fetch_url`). `ai.api.result.cache.get_cached`/`store` (otro modelo, `safe_plan.py:1815` y `:1871`) no se tocan. Se añaden además a `RELAXAICODE_SIDE_EFFECT_METHODS` (`controllers/validators.py`) los nombres nuevos, con su marcador, para que el sandbox de relaxaicode no los alcance (el sandbox deja llamar a métodos con un guion bajo). Diff completo: [spec E1](../specs/correcciones_pns_ai_entrega1.md), §5.4.
+- **Qué se degrada:** nada en la interfaz ni en el motor. Un cliente externo que usara la caché por RPC dejaría de poder (no se conoce ninguno). En el sandbox tampoco se pueden usar `res.lang._get_cached` ni `website._get_cached`, que coinciden en el nombre.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -nE "def _?(get_cached|store)\b" pns_ai_mcp/models/fetch_cache.py
+  ```
+  Corregido si solo salen `_get_cached`/`_store`, o si `get_cached`/`store` empiezan con
+  `ensure_ai_admin`/`has_group`. No confundirlo con `models/api_result_cache.py` (otro modelo).
+- **Comprobaciones realizadas (2026-10-20):**
+  1. `py_compile` de los archivos cambiados con Python 3.7.3, en la imagen `odoo-dev:14-lab_pns_ai`.
+  2. `odoo_lint.py --revisar --base 14.0-pns-ai-3 pns_ai_mcp/`: sin incidencias nuevas (salvo la que
+     se indica en la nota general de la entrega E1, más abajo).
+  3. `odoo-dev 14 tests pns_ai_mcp` (contexto `lab_pns_ai`): 198 tests, 18 nuevos en verde
+     (`test_seges_rpc_access.py`) y el resto igual que la línea base (14 fallos y 31 errores, mismos
+     nombres).
+  4. `grep` de llamadores del §5.4 de la spec: vacío. `grep -rn "Seges: parche [0-9]* (PNS-" pns_ai_mcp`:
+     30 líneas (parche 7: 6; parche 8: 9; parche 9: 7; parche 10: 8).
+
+## Parche 8: `ai.url.whitelist.ensure_domain_whitelisted` pasa a privado (`_ensure_domain_whitelisted`)
+
+- **Fecha:** 2026-10-20.
+- **Estado:** **validado en laboratorio (20/10/2026)**; pendiente de staging (plan en el §9.3 de la [spec E1](../specs/correcciones_pns_ai_entrega1.md)).
+- **PNS:** PNS-91 del [seguimiento](seguimiento_informe_pns_ai.md). Spec: [spec E1](../specs/correcciones_pns_ai_entrega1.md) (entrega E1).
+- **Qué falla sin él:** cualquier usuario autenticado (también portal) puede añadir dominios a la lista blanca de `fetch_url` o reactivar los archivados por RPC: el método usa `sudo()` sin comprobar grupo, con lo que se salta el ACL (solo AI Administrator escribe).
+- **Cambio:** el método se renombra con `_` y se actualizan sus 7 llamadores: `controllers/safe_plan.py` (`_ensure_fetch_url_whitelist`, 2), `models/safe_operation.py` (`_maybe_auto_whitelist`, 2; `action_add_to_whitelist`, 1) y `models/external_server.py` (2). Los llamadores ya deciden la política antes de llamarlo. Se añaden además a `RELAXAICODE_SIDE_EFFECT_METHODS` (`controllers/validators.py`) los nombres nuevos, con su marcador, para que el sandbox de relaxaicode no los alcance (el sandbox deja llamar a métodos con un guion bajo). Diff completo: [spec E1](../specs/correcciones_pns_ai_entrega1.md), §5.4.
+- **Qué se degrada:** nada. El AI Administrator sigue gestionando la lista por la interfaz y con el botón «Whitelist». El alta automática con la política `open` y al confirmar no cambia.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "def _\?ensure_domain_whitelisted" pns_ai_mcp/models/url_whitelist.py
+  ```
+  Corregido si es privado, o si público comprueba `group_ai_admin` (o la política `open` más el
+  grupo de URL externa) antes del `sudo()`.
+- **Comprobaciones realizadas (2026-10-20):**
+  1. `py_compile` de los archivos cambiados con Python 3.7.3, en la imagen `odoo-dev:14-lab_pns_ai`.
+  2. `odoo_lint.py --revisar --base 14.0-pns-ai-3 pns_ai_mcp/`: sin incidencias nuevas (salvo la que
+     se indica en la nota general de la entrega E1, más abajo).
+  3. `odoo-dev 14 tests pns_ai_mcp` (contexto `lab_pns_ai`): 198 tests, 18 nuevos en verde
+     (`test_seges_rpc_access.py`) y el resto igual que la línea base (14 fallos y 31 errores, mismos
+     nombres).
+  4. `grep` de llamadores del §5.4 de la spec: vacío. `grep -rn "Seges: parche [0-9]* (PNS-" pns_ai_mcp`:
+     30 líneas (parche 7: 6; parche 8: 9; parche 9: 7; parche 10: 8).
+
+## Parche 9: `ai.skill.param.cache` y `ai.skill`: `remember_for_skill`, `lookup_for_skill`, `remember_param_cache`, `lookup_param_cache` pasan a privados
+
+- **Fecha:** 2026-10-20.
+- **Estado:** **validado en laboratorio (20/10/2026)**; pendiente de staging (plan en el §9.3 de la [spec E1](../specs/correcciones_pns_ai_entrega1.md)).
+- **PNS:** PNS-85 del [seguimiento](seguimiento_informe_pns_ai.md). Spec: [spec E1](../specs/correcciones_pns_ai_entrega1.md) (entrega E1).
+- **Qué falla sin él:** cualquier usuario autenticado (también portal) escribe por RPC en la caché de parámetros de skills (`remember_*`, con cursor propio de superusuario y commit) o lee sus filas (`lookup_*`, en `sudo()`), sin comprobar grupo ni propiedad de la skill.
+- **Cambio:** los cuatro métodos se renombran con `_`; se actualizan la delegación de `ai.skill` a `ai.skill.param.cache` (`models/ai_skill.py`) y las dos referencias por nombre en `utils/agent_engine.py` (`getattr(skill, '_lookup_param_cache', None)` y `'_remember_param_cache'`: si no se actualizaran fallarían en silencio). Se añaden además a `RELAXAICODE_SIDE_EFFECT_METHODS` (`controllers/validators.py`) los nombres nuevos, con su marcador, para que el sandbox de relaxaicode no los alcance (el sandbox deja llamar a métodos con un guion bajo). Diff completo: [spec E1](../specs/correcciones_pns_ai_entrega1.md), §5.4.
+- **Qué se degrada:** nada funcional. La caché sigue siendo global por skill y frase, y gana la primera fila (diseño del fabricante). La edición manual por ORM (`param_cache_ids`) no cambia.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -nE "def _?(remember_for_skill|lookup_for_skill)\b" pns_ai_mcp/models/ai_skill_param_cache.py
+  grep -nE "def _?(remember|lookup)_param_cache\b" pns_ai_mcp/models/ai_skill.py
+  grep -n "param_cache'" pns_ai_mcp/utils/agent_engine.py
+  ```
+  Corregido si los cuatro son privados, o si públicos comprueban AI Writer o AI Administrator y la
+  lectura de la skill antes del cursor de superusuario.
+- **Comprobaciones realizadas (2026-10-20):**
+  1. `py_compile` de los archivos cambiados con Python 3.7.3, en la imagen `odoo-dev:14-lab_pns_ai`.
+  2. `odoo_lint.py --revisar --base 14.0-pns-ai-3 pns_ai_mcp/`: sin incidencias nuevas (salvo la que
+     se indica en la nota general de la entrega E1, más abajo).
+  3. `odoo-dev 14 tests pns_ai_mcp` (contexto `lab_pns_ai`): 198 tests, 18 nuevos en verde
+     (`test_seges_rpc_access.py`) y el resto igual que la línea base (14 fallos y 31 errores, mismos
+     nombres).
+  4. `grep` de llamadores del §5.4 de la spec: vacío. `grep -rn "Seges: parche [0-9]* (PNS-" pns_ai_mcp`:
+     30 líneas (parche 7: 6; parche 8: 9; parche 9: 7; parche 10: 8).
+
+## Parche 10: `ai.mcp.user.redeem_key_pin` y `ai.key.pin.block.release_all`, `note_failure`, `is_blocked` pasan a privados
+
+- **Fecha:** 2026-10-20.
+- **Estado:** **validado en laboratorio (20/10/2026)**; pendiente de staging (plan en el §9.3 de la [spec E1](../specs/correcciones_pns_ai_entrega1.md)).
+- **PNS:** PNS-83 del [seguimiento](seguimiento_informe_pns_ai.md). Spec: [spec E1](../specs/correcciones_pns_ai_entrega1.md) (entrega E1).
+- **Qué falla sin él:** cualquier usuario autenticado (también portal) puede canjear un PIN de clave API por RPC con la IP que indique (`redeem_key_pin`, `sudo`), bloquear la IP que quiera (`note_failure`, denegación de servicio), consultar el estado de cualquier IP (`is_blocked`) o levantar todos los bloqueos (`release_all`).
+- **Cambio:** los cuatro métodos se renombran con `_`; se actualizan `models/mcp_user.py` (2 llamadas), `models/key_pin_block.py` (1 llamada interna) y `models/res_config_settings.py` (`action_key_pin_release`, que sigue público y comprueba `ensure_ai_admin`). `redeem_key_pin` no tenía llamador. Se añaden además a `RELAXAICODE_SIDE_EFFECT_METHODS` (`controllers/validators.py`) los nombres nuevos, con su marcador, para que el sandbox de relaxaicode no los alcance (el sandbox deja llamar a métodos con un guion bajo). Diff completo: [spec E1](../specs/correcciones_pns_ai_entrega1.md), §5.4.
+- **Qué se degrada:** el canje de PIN se queda sin ningún punto de entrada (no tenía llamador; encaja con N4 a: no usar la mesa de entrega). El botón «Release PIN blocks» sigue funcionando.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -nE "def _?(redeem_key_pin|consume_key_pin)\b" pns_ai_mcp/models/mcp_user.py
+  grep -nE "def _?(release_all|note_failure|is_blocked)\b" pns_ai_mcp/models/key_pin_block.py
+  ```
+  Corregido si son privados, o si el canje pasa a un controlador que toma la IP de la petición y no
+  del llamador, y `release_all` comprueba `ensure_ai_admin`.
+- **Comprobaciones realizadas (2026-10-20):**
+  1. `py_compile` de los archivos cambiados con Python 3.7.3, en la imagen `odoo-dev:14-lab_pns_ai`.
+  2. `odoo_lint.py --revisar --base 14.0-pns-ai-3 pns_ai_mcp/`: sin incidencias nuevas (salvo la que
+     se indica en la nota general de la entrega E1, más abajo).
+  3. `odoo-dev 14 tests pns_ai_mcp` (contexto `lab_pns_ai`): 198 tests, 18 nuevos en verde
+     (`test_seges_rpc_access.py`) y el resto igual que la línea base (14 fallos y 31 errores, mismos
+     nombres).
+  4. `grep` de llamadores del §5.4 de la spec: vacío. `grep -rn "Seges: parche [0-9]* (PNS-" pns_ai_mcp`:
+     30 líneas (parche 7: 6; parche 8: 9; parche 9: 7; parche 10: 8).
+
+### Notas de la entrega E1 (parches 7 a 10)
+
+- **Lista del sandbox:** `controllers/validators.py` lleva un bloque con marcador por parche dentro
+  de `RELAXAICODE_SIDE_EFFECT_METHODS`. Vigilancia: si el fabricante bloquea de forma general los
+  métodos con `_` en `guarded_getattr` y en el AST, esa parte sobra:
+  ```sh
+  grep -n "RELAXAICODE_SIDE_EFFECT_METHODS\|startswith('_')" pns_ai_mcp/controllers/validators.py pns_ai_mcp/controllers/context_builder.py
+  ```
+- **Hueco que no cierra E1:** el alias sin llamada (`f = m._metodo; f()`) sigue sin bloquearse, como con
+  los 15 nombres previos; queda para E3 (D-2).
+- **Lint:** el renombrado de `_redeem_key_pin` marca como «nueva» una incidencia ya existente de esa
+  línea de `def` (`R0911 too-many-return-statements`, 8/6). Es el mismo método y no se refactoriza.
+- **Test de la caché de parámetros:** `test_skill_param_cache_roundtrip` fuerza `_own_cursor_env` a
+  `False`, porque `TransactionCase` de Odoo 14 usa un cursor real y la escritura haría commit en un
+  cursor propio.
+- **Test de control:** `test_control_session_ok` usa `res.users.context_get` (cambio aprobado
+  respecto al §9.1 de la spec, que proponía `is_domain_whitelisted`).
+- **Pruebas:** `odoo-dev 14 tests pns_ai_mcp` en el contexto `lab_pns_ai`: 198 tests. Resultado: 148
+  pasados, 5 saltados, 14 fallidos y 31 errores (línea base 130/5/14/31 más los 18 tests nuevos).
 
 ## Comprobaciones realizadas (2026-10-13)
 
