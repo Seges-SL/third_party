@@ -1648,3 +1648,70 @@ certificado, DNS y clave de Gemini). Durante la ejecución ya se restauró la po
 | Bloqueo de `chatboo_session` con adjuntos | — | parche 6 eficaz (5 casos) | PNS-94 nuevo (Alta) |
 | Calidad con modelos `lite` | — | observada | PNS-96 nuevo |
 | `ai.provider.api_key` para internos | — | protegida (`groups` en el campo) | ninguno |
+
+## Línea base de tests (3.1.782, parches 1-6)
+
+- **Fecha:** 2026-10-20. **Rama:** `14.0-pns-ai-correcciones` (= `14.0-pns-ai-3` con los parches
+  1-6, commit `884d33f`). **Contexto:** `lab_pns_ai` (imagen `odoo-dev:14-lab_pns_ai`).
+- **Qué se hizo:** `odoo-dev 14 tests pns_ai_mcp` y después `odoo-dev 14 tests pns_ai_chatboo`,
+  sin cambiar código. Cada orden crea una BD de tests nueva (`test_lab_pns_ai_14`) con
+  `-i <módulo> --test-tags /<módulo>`. Logs: `~/odoo-dev/14.0/logs/tests-20261020-103702.log`
+  (`pns_ai_mcp`) y `tests-20261020-104010.log` (`pns_ai_chatboo`).
+- **Diferencia con F23 (fase 2):** esta vez la BD de tests de `pns_ai_mcp` solo tiene el módulo y
+  sus dependencias (22 módulos: sin `pns_ai_chatboo`, `hr`, `product` ni `crm`). En la fase 2
+  estaban también `pns_ai_chatboo` y `hr`.
+- Ningún archivo implicado en los fallos lo tocan los parches 1-6 (el parche 1 solo cambia una
+  anotación de tipos en `mcp_decorators.py`), así que la línea base es la de 3.1.782.
+
+### Resultado
+
+| Módulo | Total | Pasados | Saltados | Fallidos | Errores |
+|---|---|---|---|---|---|
+| `pns_ai_mcp` | 180 | 130 | 5 | 14 | 31 |
+| `pns_ai_chatboo` | 0 | 0 | 0 | 0 | 0 |
+
+`pns_ai_chatboo` no tiene carpeta `tests` (el analizador da OK con 0 tests). Fase 2 (F23):
+125 tests → 110 / 4 / 5 / 6.
+
+**Saltados (5):** los 4 de F23 (`test_chatboo_mcp_pack_is_imported` y
+`test_default_skill_codes_at_module_includes_empty_agent_codes` en `test_knowledge_composition`;
+`test_private_context_not_in_other_user_prompt` y `test_skill_visibility_get_for_agent` en
+`test_knowledge_ownership`) y uno nuevo,
+`TestRequiredFieldsLive.test_a_pending_field_is_left_on_the_record_itself`. Los `skipTest` de
+esos archivos dependen de la BD (sin `pns_ai_chatboo`, sin segundo usuario interno, sin `crm`):
+ambientales.
+
+### Fallos y errores por causa (45)
+
+| # | Tests | Causa | ¿Ambiental? | Comparación con F23 |
+|---|---|---|---|---|
+| 25 E | `test_set_skill_parameters` (5) y `test_skill_capture_replace` (20) | `ValidationError` de `ai.skill._check_code_body_contract` (`models/ai_skill.py:470`): los datos de prueba crean skills con `code_body` que termina en `result = 1`, y 3.1.782 exige que `result` sea un dict (`data`, `formatted_text` o `propose_steps`). | No: tests desfasados respecto a la restricción nueva. | Nuevo (no estaban en la fase 2). |
+| 4 F | `test_mcp_http`: `test_mcp_initialize`, `test_mcp_resources_methods_not_found`, `test_mcp_server_discover_stateless`, `test_mcp_stateless_tools_list` | `MCP error -32000 'Conversational AI is not allowed for this user.'`: la clave de los fixtures es la del admin, que no tiene el grupo nuevo `pns_ai_mcp.group_ai_conversational` (`utils/conversational.py`). | No: tests desfasados respecto a la puerta nueva de 3.1.782. | Nuevo. |
+| 3 (2 F + 1 E) | `test_mcp_agent`: `test_api_key_for_inference_without_admin_acl`, `test_get_providers_for_agent_without_admin_acl`, `test_resolve_inference_via_feature_key` | Sin `ai.provider` en la BD de tests y sin el agente `pns_ai_chatboo` (`UserError: Inference agent 'pns_ai_chatboo' is not configured or inactive`). | **Sí** (sin proveedor de IA y sin `pns_ai_chatboo` instalado). | Igual que F23; se añade `test_api_key_for_inference_without_admin_acl`. |
+| 2 (1 F + 1 E) | `test_relaxaicode_model_stamp`: `test_related_models_from_product_id`, `test_stamp_both_sibling_lists_with_env` | `KeyError: 'product.product'` / `'product.product' not found in set()`. | **Sí** (`product` no instalado). | Igual que F23. |
+| 1 F | `test_relaxaicode_model_stamp.test_a_car_name_in_the_model_column_does_not_steal_the_picture` | La URL de imagen generada es `/web/image/res.partner/14/image_1920` y el test espera `image_128`. | No: discrepancia entre código y test (sin analizar a fondo; probablemente test desfasado). | Nuevo. |
+| 2 F | `test_knowledge_composition`: `test_composition_origin_four_tokens`, `test_composition_read_orders_by_origin` | `AssertionError: 'extra' != 'imported'` (origen de composición del contexto). | **No.** Falla también sin `pns_ai_chatboo` instalado. | Igual fallo, pero **corrige la atribución de F23**, que lo achacaba a los contextos «extra» de `pns_ai_chatboo`. |
+| 2 E | `test_safe_plan_atomicity`: `test_failed_execute_cancels_authorization_no_replay`, `test_normal_execution_marks_executed_and_applies_mutation` | `PermissionError: … the user is not in the AI Writer group` (`controllers/safe_plan.py:773`): el usuario del test no tiene `group_ai_writer`. | No: datos de prueba incompletos. | Igual que F23. |
+| 2 E | `test_system_action`: `test_accept_choice_creates_verification`, `test_field_required_propose_opens_choice` | `IntegrityError` en la FK `ai_safe_choice_user_id_fkey`: `create_field_required_choice` (`utils/field_required_plan.py:249-255`) crea la elección en un cursor propio (`env.registry.cursor()`), donde no existe el usuario creado en la transacción del test (probable). | No. | **Corrige F23**, que lo atribuía al aviso `NOT NULL on column 'comment'` (ambiental). Ese aviso sigue saliendo (×2), pero no es la causa. |
+| 2 F | `test_context_unlink`: `test_core_context_cannot_be_unlinked`, `test_factory_file_context_cannot_be_unlinked` | `UserError not raised`: el test hace `unlink()` con `self.env`, que en Odoo 14 es el superusuario, y `factory_lock_open` (`utils/knowledge_ownership.py:45`) deja paso al superusuario a propósito. | No: el test no prueba la protección (le falta `with_user`). No indica por sí solo un defecto. | Nuevo. |
+| 1 F | `test_chatboo_pending_cards.test_expired_pending_is_not_restored` | El test hace que la operación caduque escribiendo `create_date` y `expires_at` en el pasado. En Odoo 14, `write()` ignora `create_date` (`LOG_ACCESS_COLUMNS`), pero `modified(vals)` sí la incluye, así que `expires_at` se recalcula desde la fecha real (+15 min) y la tarjeta sigue viva. El filtro de `chatboo_pending_card_payloads` (`expires_at > now`) es correcto. | No: el test no es compatible con el ORM de 14. | Nuevo. |
+| 1 F | `test_bundle_locale.test_resolve_import_agent_codes_nucleus_defaults_to_mcp_only` | `_resolve_import_agent_codes` devuelve `['pns_ai_mcp', 'pns_ai_admin', 'pns_ai_decision']` y el test espera solo `['pns_ai_mcp']`. | No: test desfasado (3.1.782 añade los agentes `pns_ai_admin` y `pns_ai_decision`). | Nuevo. |
+
+F = fallo (`FAIL`), E = error (`ERROR`). **Ambientales: 5 de 45** (`test_mcp_agent` ×3 y
+`product` ×2), más los 5 saltados. Los otros 40 no dependen del laboratorio: 33 son tests
+desfasados respecto a 3.1.782 (contrato de `code_body`, grupo conversacional, agentes nuevos,
+imagen, origen de composición), 2 tienen datos de prueba incompletos (`AI Writer`) y 5 no
+encajan con Odoo 14 o con el diseño del código (superusuario en `unlink`, ORM de `create_date`
+y cursor propio de `ai.safe.choice`). Ninguno lleva a un defecto de seguridad nuevo, pero la
+protección de borrado de contextos (`test_context_unlink`) y la de tarjetas caducadas quedan
+**sin cobertura efectiva** en Odoo 14.
+
+### Tests de PNS-50
+
+| Test | ¿Se ejecuta? | Motivo |
+|---|---|---|
+| `test_change_journal` | **No** | No se importa en `tests/__init__.py` (sí se importa y ejecuta `test_change_journal_menu`, que es otro archivo). |
+| `test_presentation_mode` | **No** | Se importa, pero es un `unittest.TestCase` con `@tagged('post_install', '-at_install')`: sin la etiqueta `standard`, que la especificación `/pns_ai_mcp` exige implícitamente en Odoo 14 (`TagsSelector`, `odoo/tests/common.py:2639-2640`). |
+| `test_session_download` | **No** | Igual que `test_presentation_mode`. |
+
+PNS-50 sigue **PARCIAL** y sin cambios en 3.1.782.

@@ -1,28 +1,75 @@
-# Parches de compatibilidad con Odoo 14 en los módulos pns_ai
+# Parches de Seges en los módulos pns_ai
 
-- **Rama:** `14.0-pns-ai-3`
-- **Fecha:** 2026-10-13
-- **Versión del fabricante parcheada:** `pns_base` 14.0.1.2.32 · `pns_ai_mcp` 14.0.3.1.782 ·
-  `pns_ai_chatboo` 14.0.2.1.453
+- **Ramas:** `14.0-pns-ai-3` (parches 1 a 6) · `14.0-pns-ai-correcciones` (parches 7 en adelante,
+  [plan de corrección](plan_correccion_pns_ai.md))
+- **Fecha:** 2026-10-13 (parches 1 a 3) · actualizado el 2026-10-20 (N11 y N12)
+- **Versión del fabricante, base propia de Seges desde el 20/10/2026 (N12):** `pns_base` 14.0.1.2.32 ·
+  `pns_ai_mcp` 14.0.3.1.782 · `pns_ai_chatboo` 14.0.2.1.453
+- **Licencia:** Apache-2.0 (`LICENSE` y `NOTICE` de cada módulo, que se conservan sin cambios).
 - **Entorno objetivo:** imagen oficial de Odoo 14 (Debian Buster): Python 3.7.3 y Pillow 5.4.1
   (`requirements.txt:34` de Odoo 14 fija `Pillow==5.4.1` con Python ≤ 3.7).
-- **Contexto:** `docs/pendiente/seguimiento_informe_pns_ai.md`, PNS-81 y sección «Compatibilidad con
-  Odoo 14».
+- **Contexto:** [decisiones](pns_ai_decisiones.md) N11 y N12 (§10);
+  [seguimiento](seguimiento_informe_pns_ai.md), PNS-81 y «Compatibilidad con Odoo 14».
 
-> **Regla:** estos parches no se envían al fabricante como código: se le comunican como hallazgo;
-> cuando su versión los corrija, se revierte el commit del parche.
+> **Regla (N11 y N12, 20/10/2026):**
+> - Seges corrige en la rama los hallazgos PNS (seguridad, robustez y compatibilidad; lo funcional,
+>   después) y mantiene la 3.1.782 como base propia. **Los parches son permanentes**: no se retiran
+>   por una versión del fabricante, porque no se adoptan sus versiones.
+> - Cambio mínimo, sin dependencias nuevas, sin tocar `version`, `depends` ni
+>   `external_dependencies` de los manifest, ni `i18n`; `ir.model.access.csv` solo si no hay otra
+>   forma (no admite el marcador).
+> - Un parche por PNS, un commit por parche y un commit para los tests de cada entrega.
+> - Nada se envía al fabricante como código. La 2.ª entrega del informe se envía al final del plan de
+>   corrección, sin diffs (D2).
 >
-> Al sustituir el código por una versión nueva del fabricante, los parches desaparecen con él.
-> Antes de probarla en Odoo 14, ejecuta la comprobación de cada entrada. Si alguna sigue dando
-> resultado, vuelve a aplicar ese parche (mismo cambio, mismo comentario `# Seges: …`).
+> Sustituye a la regla anterior («cuando su versión los corrija, se revierte el commit del parche»).
 
-Cada cambio lleva junto a él un comentario con el prefijo común
-`# Seges: parche de compatibilidad con Odoo 14`, seguido de un paréntesis con el motivo y de
-`Ver docs/pendiente/parches_pns_ai.md`. El paréntesis es `(Python 3.7 / Pillow 5.4)` en los parches 1
-a 3 y `(API de Odoo 14: Environment sin sudo)` en el 4. El parche 5 no es de Odoo 14 sino de
-compatibilidad con Gemini, y su comentario es `# Seges: parche de compatibilidad (Gemini 3 por el
-protocolo OpenAI: thought_signature)`. El parche 6 tampoco es de Odoo 14, y su comentario es
-`# Seges: parche de compatibilidad (bloqueo de chatboo_session)`. El `grep` lista los dos igual. Para listarlos: `grep -rn "Seges: parche de compatibilidad" pns_base pns_ai_mcp pns_ai_chatboo`.
+## Marcadores
+
+Cada cambio lleva junto a él un comentario que empieza por `Seges: parche`, y todos se listan con:
+
+```sh
+grep -rn "Seges: parche" pns_base pns_ai_mcp pns_ai_chatboo
+```
+
+| Parches | Marcador |
+|---|---|
+| 1 a 3 | `# Seges: parche de compatibilidad con Odoo 14 (Python 3.7 / Pillow 5.4). Ver docs/pendiente/parches_pns_ai.md` |
+| 4 | `# Seges: parche de compatibilidad con Odoo 14 (API de Odoo 14: Environment sin sudo). Ver docs/pendiente/parches_pns_ai.md` |
+| 5 | `# Seges: parche de compatibilidad (Gemini 3 por el protocolo OpenAI: thought_signature)` |
+| 6 | `# Seges: parche de compatibilidad (bloqueo de chatboo_session)` |
+| 7 en adelante | `# Seges: parche N (PNS-XX, <tipo>). Ver docs/pendiente/parches_pns_ai.md`, con `<tipo>` = `seguridad`, `robustez`, `compatibilidad` o `funcional`; `// …` en JS y `<!-- … -->` en XML |
+
+Los marcadores de los parches 1 a 6 no se cambian: la ruta de este documento tampoco, porque la citan.
+
+## Índice de parches
+
+| N.º | PNS | Tipo | Archivos | Entrega | Commit | Estado |
+|---|---|---|---|---|---|---|
+| 1 | PNS-81 | compatibilidad | `pns_ai_mcp/controllers/mcp_decorators.py` | — | `ce6790b` | En LIYBEN |
+| 2 | PNS-81 | compatibilidad | `pns_base/utils/pdf_io.py` | — | `ce6790b` | En LIYBEN |
+| 3 | PNS-81 | compatibilidad | `pns_ai_mcp/utils/relaxaicode_recipe.py` | — | `ce6790b` | En LIYBEN |
+| 4 | PNS-81 | compatibilidad | `pns_ai_mcp/controllers/main.py` | — | rama `14.0-pns-ai-3` | En LIYBEN |
+| 5 | PNS-93 | compatibilidad | `pns_ai_mcp/lib/llm/drivers/openai_driver.py` | — | `27cadbb` | En LIYBEN |
+| 6 | PNS-94 | robustez | `pns_ai_chatboo/models/chatboo_async_request.py` | — | `63ee2dc` | En LIYBEN |
+| 7-10 | PNS-90, 91, 85, 83 (previsto) | seguridad | (spec de la entrega E1) | E1 | — | Pendiente |
+
+Estados: Pendiente → Aplicado → Validado en laboratorio → Validado en staging → En LIYBEN.
+
+## Versiones nuevas del fabricante (vigilancia, N12)
+
+Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique una:
+
+1. Se descomprime **fuera del repo** (por ejemplo, `~/pns_fabricante/<versión>/`).
+2. Un agente compara esa carpeta con la base (`git show` de los archivos de `14.0` o un `diff -ru`
+   contra la copia de trabajo, descontando los parches de Seges) y busca **solo correcciones de
+   seguridad**: comprobaciones de grupo o propiedad nuevas, métodos que pasan a privados, saneado,
+   controles de URL, sandbox. No se buscan funciones nuevas.
+3. Resultado en `docs/pendiente/vigilancia_pns_ai_<versión>.md`: candidatas, con archivo y línea, y
+   si alguna corresponde a un PNS ya parcheado por Seges. Para estas, el apartado «Cómo comprobar si el fabricante ya lo
+   ha corregido» de cada parche sigue sirviendo: dice si su versión trae una corrección equivalente.
+4. Las que se aprueben se traen como parches nuevos de este documento, con el motivo «traída de la
+   versión X.Y.Z del fabricante».
 
 ## Parche 1: `pns_ai_mcp/controllers/mcp_decorators.py:171` (antes `:169`)
 

@@ -9,8 +9,10 @@ de compatibilidad 1 a 6 de Seges (N2 revisada; staging 16/10/2026).
 >
 > Decisión **N3** (14/10/2026): la 3.1.782 se puede instalar **solo en el VPS de pruebas**, sin
 > usuarios de portal, con usuarios técnicos de confianza y con las mitigaciones de §2. **No se
-> instala en ninguna base de datos con usuarios reales** hasta que el fabricante corrija
-> **PNS-82, PNS-83, PNS-85, PNS-90 y PNS-91** y se repitan las pruebas (§15).
+> instala en ninguna base de datos con usuarios reales** hasta que **PNS-82, PNS-83, PNS-85, PNS-90 y
+> PNS-91** y los restos de PNS-01/02 y PNS-07 estén corregidos y se repitan las pruebas (§15). Desde la
+> reunión del 19/10/2026 los corrige **Seges** en la rama, que mantiene la 3.1.782 (N11 y N12;
+> [../pendiente/plan_correccion_pns_ai.md](../pendiente/plan_correccion_pns_ai.md)).
 >
 > Excepción: LIYBEN, base de datos interna de Seges con datos antiguos de la empresa, la tiene
 > instalada desde el 16/10/2026 por la decisión N7 (condiciones de N3 b); registro en
@@ -79,8 +81,9 @@ Anthropic) y la secuencia de actualización de §5 (§16).
 ## 2. Estado de la versión 3.1.782 (N3)
 
 **Decisión N3:** opción b) ahora (apta solo para el VPS de pruebas) y opción a) para producción (no
-apta hasta que el fabricante corrija PNS-82, 83, 85, 90 y 91). Bloqueantes vigentes: D1, D3, D4, D9,
-D10 y PB-2 siempre; además D33 y D46 si se instala Chatboo. **D29 deja de ser bloqueante (staging
+apta hasta que estén corregidos PNS-82, 83, 85, 90 y 91; desde el 19/10/2026, por Seges en la rama,
+N11). Bloqueantes vigentes tras la reunión del 19/10/2026: D1, D9 y PB-2 siempre; D4 fuera de LIYBEN;
+con Chatboo, D33 y D46 fuera de LIYBEN. D10 quedó aceptada y D3 CERRADA (N12). **D29 deja de ser bloqueante (staging
 16/10/2026):** la prueba 8 salió CORREGIDO en los cuatro casos; queda el riesgo residual del saneador
 (PNS-60 sigue PARCIAL), que se decide como riesgo aceptado o no, sin bloquear la instalación. El
 staging no cambia N3: los hallazgos nuevos PNS-93 y PNS-94 tienen parche (5 y 6) y PNS-95 y PNS-96

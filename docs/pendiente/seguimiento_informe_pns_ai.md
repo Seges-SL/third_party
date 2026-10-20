@@ -38,6 +38,12 @@
 > su detalle; «(staging)» marca lo probado en el VPS. «—» significa que no se probó ni en el
 > laboratorio ni en el staging.
 
+> **Desde el 20/10/2026 (N11 y N12):** Seges corrige los hallazgos en la rama
+> `14.0-pns-ai-correcciones` y mantiene la 3.1.782 ([plan de corrección](plan_correccion_pns_ai.md)).
+> La columna «Estado» sigue describiendo el **código del fabricante** (lo que se le comunica en el
+> informe). Lo corregido por Seges se añadirá en una columna «Rama Seges» (parche, laboratorio y
+> staging) a medida que se validen las entregas.
+
 Estados: **CORREGIDO** (el cambio cubre el hallazgo y sus puntos de entrada) · **PARCIAL** (cubre
 una parte; queda un resto concreto) · **SIN CAMBIOS** · **YA NO APLICA** (el código desapareció) ·
 **DUDOSO** (no se puede decidir sin prueba en el laboratorio) · **NUEVO** (hallazgo que no estaba en

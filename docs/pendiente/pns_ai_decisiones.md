@@ -22,7 +22,9 @@ bloques C1-C3 de `pns_ai_chatboo`.
 bloque «Tras 3.1.782 (14/10/2026)» con su estado, lo que la motivaba ahora (por PNS) y, si cambia, el
 nuevo alcance. Las CERRADA no necesitan decisión. Las decisiones nuevas N1 a N5 están en la
 [sección 8](#8-decisiones-nuevas-tras-la-versión-31782-n1-n5), y las del staging y LIYBEN (N6 a N10,
-15/10/2026), en la [sección 9](#9-staging-y-liyben-n6-n10).
+15/10/2026), en la [sección 9](#9-staging-y-liyben-n6-n10). La reunión del 19/10/2026 (N11 y N12: Seges corrige los PNS y
+mantiene la 3.1.782) está en la [sección 10](#10-reunión-del-19102026-corrección-por-seges-n11-y-n12),
+con un bloque «Tras la reunión del 19/10/2026» en cada decisión afectada.
 
 **Correspondencia riesgo → PNS.** El informe al fabricante no numera los riesgos (su tabla 1.1 no
 tiene esa columna). La correspondencia se ha hecho comparando los títulos del §4 de los consolidados
@@ -106,6 +108,8 @@ con la tabla 1.1 del informe:
 | N8 | Proveedor externo del staging | Gemini; LIYBEN, en la demostración (15/10/2026) |
 | N9 | Copias de `pns_demo` | No se guardan (15/10/2026) |
 | N10 | Montaje del staging | Servicio, PostgreSQL y despliegue propios (15/10/2026) |
+| N11 | ¿Quién corrige los PNS? | a) Seges, con parches numerados y tests (19-20/10/2026) |
+| N12 | Versiones futuras del fabricante | b) con vigilancia: se mantiene la 3.1.782 (20/10/2026) |
 
 ### Bloqueantes vigentes
 
@@ -114,6 +118,10 @@ con la tabla 1.1 del informe:
 - **Ya no bloqueante:** D29, desde el 16/10/2026: la prueba 8 de staging (PNS-60, respuesta y
   exportación) salió CORREGIDO en los cuatro casos (ver D29, «Tras el staging»).
 - PB-1 deja de ser bloqueante (CERRADA).
+- **Tras la reunión del 19/10/2026:** D10 ACEPTADA (deja de ser bloqueante); D4 y D46 decididas para
+  LIYBEN (siguen abiertas para BD de clientes); D3 CERRADA (N12, parches 1-4 permanentes). D1 y D33
+  se desbloquean también con la rama de Seges validada (N11). Vigentes: **D1, D9 y PB-2** siempre;
+  **D4** fuera de LIYBEN; con Chatboo, **D33** y **D46** fuera de LIYBEN.
 
 > La tabla «Tema · Decisiones · Bloqueantes» de «Cómo leer este documento» es la original del
 > 2026-10-08; la vigente es la de esta sección.
@@ -191,6 +199,8 @@ Decisión: ____ / Fecha: ____
 - **Lo que la motivaba:** PNS-01 a PNS-07, PNS-53 y PNS-54 (riesgos n.º 1-7, 54 y 55). Las vías de las pruebas A-D están cerradas: PNS-01 y PNS-02 CORREGIDO en la vía RPC (3b-1), PNS-03 CORREGIDO (3b-1), PNS-04 corregido en código, PNS-05 corregido en código (prueba 6 pendiente de staging), PNS-06 CORREGIDO (3b-1) y PNS-53 CORREGIDO (3b-1). Quedan restos: PNS-01/02 (un AI Administrator sin Ajustes se da `base.group_system` con un plan que él mismo confirma), PNS-07 (el sandbox no bloquea los métodos privados) y PNS-54 (un script en la página confirma sin pasar por la tarjeta).
 - **Nuevo alcance:** el bloqueo se mantiene por los hallazgos nuevos con el mismo patrón que PNS-01 (métodos públicos en `sudo` sin control de grupo, invocables por cualquier usuario autenticado): PNS-82 (adjuntos ajenos, internos), PNS-83 (claves MCP por PIN, también portal), PNS-85 (caché de parámetros de skills, VULNERABLE en 3b-1), PNS-90 (caché de `fetch_url`, VULNERABLE con portal en 3c) y PNS-91 (lista blanca, VULNERABLE con portal en 3c); más los restos de PNS-01/02 y PNS-07. Criterio de desbloqueo: una versión que los corrija y la repetición de las pruebas de 3b-1 y 3c y de las 9 pendientes de staging. PNS-92 (protegido solo por rebote) no lleva decisión: va al informe al fabricante (D2). Sigue siendo **BLOQUEANTE**; qué se permite mientras tanto, en N3.
 
+**Tras la reunión del 19/10/2026:** **SIGUE BLOQUEANTE.** Cambia el criterio de desbloqueo: una versión del fabricante **o la rama de Seges** (N11) que corrija PNS-82, 83, 85, 90 y 91 y los restos de PNS-01/02 y PNS-07, validada con los tests de Seges y con la repetición de las pruebas de 3b-1, 3c y staging (entregas E1 a E3 del [plan de corrección](plan_correccion_pns_ai.md)). (ver [§10](#10-reunión-del-19102026-corrección-por-seges-n11-y-n12))
+
 ### D33 — ¿Se bloquea Chatboo hasta que el fabricante aísle las conversaciones de cada usuario? — **BLOQUEANTE si se instala Chatboo**
 
 **Contexto:** Chatboo no tiene reglas de registro: cualquier usuario interno, tenga o no clave
@@ -223,6 +233,8 @@ Decisión: ____ / Fecha: ____
 **Tras 3.1.782 (14/10/2026): CAMBIA.**
 - **Lo que la motivaba:** PNS-53 a PNS-57 (riesgos n.º 54-58). PNS-53, PNS-56 y PNS-57 CORREGIDO (3b-1); PNS-55 PARCIAL, con el aislamiento de sesiones y trabajos CORREGIDO (3b-1); PNS-54 PARCIAL (ver D26 y D29). Además, PNS-80 (`read_progress`) YA NO APLICA (3c).
 - **Nuevo alcance:** las conversaciones ya están aisladas. El bloqueo de Chatboo queda limitado a PNS-82: cualquier interno puede engancharse a su propia sesión adjuntos sin `res_model` o sin `res_id` (descargas del chat de otros usuarios y copias de configuración, que pueden llevar secretos) y descargarlos. Resto menor de PNS-55: el ACL de los trabajos sigue con `create` y `write`. Sigue siendo **BLOQUEANTE si se instala Chatboo**.
+
+**Tras la reunión del 19/10/2026:** **SIGUE BLOQUEANTE si se instala Chatboo.** Se desbloquea con la corrección de PNS-82 en la rama de Seges (entrega E2 del [plan de corrección](plan_correccion_pns_ai.md)), validada en staging. (ver [§10](#10-reunión-del-19102026-corrección-por-seges-n11-y-n12))
 
 ### D18 — ¿Qué otros módulos `pns_*` con conocimiento de IA se instalarán?
 
@@ -455,6 +467,8 @@ Decisión: ____ / Fecha: ____
 - **Lo que la motivaba:** PNS-06 CORREGIDO (3b-1: se rechaza al guardar una escritura con `sudo`); PNS-09 CORREGIDO (servidores `stdio` solo para el administrador de Ajustes); PNS-10 CORREGIDO (3b-1); PNS-23 SIN CAMBIOS. Además: resto de PNS-01/02 (un AI Administrator sin Ajustes se da `base.group_system` con un plan propio), PNS-84 (el AI Administrator lee PIN y claves en claro) y PNS-86 (generador OpenAPI con SSRF y lectura, solo AI Administrator).
 - **Nuevo alcance:** AI Writer baja a riesgo medio: ya no escala al guardar ni escribe en el prompt de todos; sigue activando skills sin revisión (D27). AI Administrator equivale a administrador de Odoo: solo para personal técnico que ya lo sea. Sigue siendo **BLOQUEANTE**.
 
+**Tras la reunión del 19/10/2026:** **Decidida para LIYBEN:** AI Administrator solo para `fran.odoo@seges.es` y `sguerrero@liyben.com`, que ya tienen `base.group_system` ([instalación](instalacion_liyben_pns_ai.md) §3.5). En LIYBEN el resto de PNS-01/02 queda cubierto hasta la entrega E2. Para BD de clientes sigue abierta. (ver [§10](#10-reunión-del-19102026-corrección-por-seges-n11-y-n12))
+
 ### D46 — ¿A qué usuarios se generará la clave MCP para usar Chatboo? — **BLOQUEANTE si se instala Chatboo**
 
 **Contexto:** Chatboo no tiene grupo propio: la clave MCP ("carnet") que se genera por usuario
@@ -495,6 +509,8 @@ Chatboo**; con esto se puede decidir (plan de staging, §6.2).
   - hallazgo nuevo PNS-94: cualquier usuario de Chatboo podía dejar Odoo sin servicio adjuntando una
     imagen. Corregido con el parche 6 (N2), validado en staging: toda instalación con Chatboo debe
     llevarlo.
+
+**Tras la reunión del 19/10/2026:** **Decidida para LIYBEN:** clave MCP solo para los dos usuarios de la reunión, con el grupo AI Administrator (claves generadas en la reunión). Para BD de clientes sigue abierta. (ver [§10](#10-reunión-del-19102026-corrección-por-seges-n11-y-n12))
 
 ### D5 — ¿Quién debe poder abrir AI Engine → Settings?
 
@@ -652,6 +668,8 @@ Decisión: ____ / Fecha: ____
 - **Lo que la motivaba:** PNS-16 PARCIAL; PNS-18 PARCIAL (nuevo campo `no_external_failover`, comprobado en 3b-2); PNS-19 PARCIAL (métodos privados desde el sandbox); PNS-62 PARCIAL (tope de 15 MB por archivo; documentos leídos a trozos).
 - **Nuevo alcance:** la opción 2 (solo proveedor local) ya se puede garantizar marcando el proveedor local con «No external failover» (N3). Sigue sin haber filtro por modelo, campo o empresa. Sigue siendo **BLOQUEANTE**.
 
+**Tras la reunión del 19/10/2026:** **ACEPTADA:** se acepta el envío de datos reales a los proveedores externos actuales (Gemini y OVH) y futuros. Gemini se usa en el nivel gratuito: según las condiciones de la API de Gemini, en ese nivel Google puede usar el contenido enviado para mejorar sus productos; queda aceptado con esta decisión. Deja de ser bloqueante. (ver [§10](#10-reunión-del-19102026-corrección-por-seges-n11-y-n12))
+
 ### D11 — ¿Qué proveedor, modelo y clave se configurarán?
 
 **Contexto:** el módulo envía siempre parámetros que algunos modelos recientes rechazan; cuando
@@ -692,6 +710,8 @@ Decisión: ____ / Fecha: ____
 **Tras 3.1.782 (14/10/2026): CAMBIA.**
 - **Lo que la motivaba:** PNS-29 PARCIAL (sin topes; no se cuentan los `cache_creation_input_tokens` de Anthropic); PNS-61 PARCIAL (el `provider_id` del navegador ya no se acepta, 3b-2); PNS-62 PARCIAL (15 MB por archivo; sin tope de número de archivos ni del total).
 - **Nuevo alcance:** el usuario ya no elige el proveedor. El tope de gasto se controla en la cuenta del proveedor: el módulo no lo trae.
+
+**Tras la reunión del 19/10/2026:** **Decidida:** sin tope de gasto por ahora (Gemini en el nivel gratuito). (ver [§10](#10-reunión-del-19102026-corrección-por-seges-n11-y-n12))
 
 ### D13 — ¿Qué retención se quiere para el registro de actividad, las cachés y las exportaciones del chat?
 
@@ -881,6 +901,8 @@ Decisión: ____ / Fecha: ____
 
 **Observación (15/10/2026):** el VPS de staging (imagen `odoo-web`) tiene Python 3.7.3, con `openpyxl` 3.1.3, `reportlab` 3.5.13 y `requests` 2.31.0; por tanto, los parches 1 a 4 son necesarios (N2). Ver el plan de staging, §2.1.
 
+**Tras la reunión del 19/10/2026:** **Con N12, los parches 1 a 4 son permanentes**: Python 3.7 queda resuelto en la rama de Seges. **CERRADA** (Sergio, 20/10/2026). (ver [§10](#10-reunión-del-19102026-corrección-por-seges-n11-y-n12))
+
 ### D14 — ¿Hay salida a Internet desde el servidor?
 
 **Contexto:** sin Internet, cada comprobación de estado espera hasta 8 segundos por las fuentes de
@@ -926,6 +948,8 @@ Decisión: ____ / Fecha: ____
 **Tras 3.1.782 (14/10/2026): SIGUE ABIERTA.**
 - **Lo que la motivaba:** riesgo n.º 35 (rendimiento; no tiene PNS en el informe), sin cambios; PNS-39 PARCIAL. F26 y F44 siguen sin probar. Dato nuevo: cada canje de PIN ocupa un worker hasta 20 s (PNS-83; no aplica si no se usa la mesa, N4).
 - **Alcance:** el mismo; es una decisión de infraestructura.
+
+**Tras la reunión del 19/10/2026:** **Se decide más adelante.** (ver [§10](#10-reunión-del-19102026-corrección-por-seges-n11-y-n12))
 
 ### D16 — ¿La carpeta de módulos está montada en solo lectura?
 
@@ -1048,6 +1072,8 @@ Decisión: ____ / Fecha: ____
 **Tras 3.1.782 (14/10/2026): CAMBIA.**
 - **Lo que la motivaba:** el informe (PNS-01 a PNS-80) tuvo respuesta en 3.1.782: 31 CORREGIDO, 33 PARCIAL, 13 SIN CAMBIOS, 2 YA NO APLICA y 1 DUDOSO, más 12 hallazgos nuevos (PNS-81 a PNS-92), todo en [seguimiento_informe_pns_ai.md](seguimiento_informe_pns_ai.md).
 - **Nuevo alcance:** decidir el envío del seguimiento. Prioridad: PNS-83, 90, 82, 85 y 91 (el patrón de PNS-01), los restos de PNS-01/02 y PNS-07/19, PNS-81 (compatibilidad) y PNS-87/88 (pérdida de datos al actualizar). Incluye también PNS-92 (sin decisión propia), los restos de PNS-28 y PNS-30 (D21) y lo que piden D27, D28, D34 y D44. **PB-9** (parche local en lugar de informar): ver N2.
+
+**Tras la reunión del 19/10/2026:** **Decidida:** la 2.ª entrega del informe al fabricante **se envía solo al final**, cuando termine el plan de corrección, sin código ni diffs. Hasta entonces no se envía nada. Antes de enviarla se actualiza con el estado de entonces. (ver [§10](#10-reunión-del-19102026-corrección-por-seges-n11-y-n12))
 
 ### D28 — ¿Se pide corregir `platform` en el sandbox y el anuncio de `zoneinfo` en el prompt?
 
@@ -1408,6 +1434,8 @@ versión del fabricante y se le comunica. Validado en staging el 16/10/2026 (5 c
 [parches_pns_ai.md](parches_pns_ai.md), «Parche 6»). Análisis en
 [analisis_bloqueo_chatboo_session.md](analisis_bloqueo_chatboo_session.md).
 
+**Tras la reunión del 19/10/2026:** **Absorbida por N11 y N12:** los parches 1 a 6 son **permanentes** (Seges mantiene la 3.1.782) y ya no se espera fecha del fabricante; la opción c) deja de aplicar. (ver [§10](#10-reunión-del-19102026-corrección-por-seges-n11-y-n12))
+
 ### N3 — ¿Es apta la versión 3.1.782 para algún cliente?
 
 **Contexto:** los críticos del informe están corregidos o reducidos (D1), pero hay hallazgos nuevos
@@ -1452,6 +1480,8 @@ comprobados con portal en 3c); PNS-85, por cualquier usuario autenticado (probad
 **Riesgos relacionados:** PNS-01, 07, 16, 18, 19, 20, 54, 60, 82 a 86, 89 a 92.
 
 Decisión: **b)** ahora y **a)** para producción (Sergio) / Fecha: 14/10/2026
+
+**Tras la reunión del 19/10/2026:** **Cambia el criterio de la opción a):** la 3.1.782 será apta para BD con usuarios reales cuando PNS-82, 83, 85, 90 y 91 y los restos de PNS-01/02 y PNS-07 estén **corregidos en la rama de Seges** (N11, entregas E1 a E3) y validados, y con D1, D4, D9 y PB-2 decididas (y D33 y D46 si se instala Chatboo; D3 ya está CERRADA). (ver [§10](#10-reunión-del-19102026-corrección-por-seges-n11-y-n12))
 
 ### N4 — ¿Se usa la mesa de entrega de claves por PIN?
 
@@ -1540,6 +1570,8 @@ Decisión: **a)** (Sergio) / Fecha: 15/10/2026. Si el staging empeora algún PNS
 obligatorio si se instala Chatboo (PNS-94); el 5 es inocuo para otros proveedores y necesario con
 Gemini. El proveedor se estudia con OVH (N8).
 
+**Tras la reunión del 19/10/2026:** **Usuarios de portal: se archivan los 18** (pendiente de ejecutar; [instalación](instalacion_liyben_pns_ai.md) §6). LIYBEN recibe cada entrega del plan de corrección después de validarla en staging. (ver [§10](#10-reunión-del-19102026-corrección-por-seges-n11-y-n12))
+
 ### N8 — ¿Qué proveedor externo se usa en el staging (y en LIYBEN)?
 
 **Contexto:** el traspaso del staging preveía Anthropic, necesario para la prueba 9b (PNS-29: tokens de
@@ -1564,6 +1596,8 @@ prueba 9b; si es Gemini, antes se comprueban las condiciones de uso de datos del
 nuevos y el nivel gratuito admite 20 peticiones al día por modelo. Para **LIYBEN se estudia OVH**; si
 al final fuera Gemini, valorar el nivel de pago, además de las condiciones de uso de datos (plan de
 staging, §7.2).
+
+**Tras la reunión del 19/10/2026:** **LIYBEN:** proveedores **Gemini** (nivel gratuito) y **OVH**, configurados en la reunión. Cadena del agente con failover: primero Gemini y después OVH, sin «No external failover» (los dos son externos; si se marcara en Gemini, el agente no pasaría a OVH). Pendiente: comprobarlo en la ficha del proveedor. (ver [§10](#10-reunión-del-19102026-corrección-por-seges-n11-y-n12))
 
 ### N9 — ¿Se guardan copias de `pns_demo`?
 
@@ -1598,6 +1632,134 @@ clientes (Odoo 11 y Odoo 8), cada una con su PostgreSQL. El VPS no tiene swap.
 **Riesgos relacionados:** D9, D15, D16 (código en solo lectura).
 
 Decisión: **a)** (Sergio) / Fecha: 15/10/2026. Hecho y comprobado el 15/10/2026 (plan de staging §2).
+
+---
+
+
+## 10. Reunión del 19/10/2026: corrección por Seges (N11 y N12)
+
+Reunión de seguimiento del 19/10/2026 (Sergio y su responsable), tras la instalación en LIYBEN.
+Registrado el 20/10/2026. Plan de trabajo en el [plan de corrección](plan_correccion_pns_ai.md);
+registro de cambios en el código en [parches_pns_ai.md](parches_pns_ai.md).
+
+### 10.1 Resultados de la reunión
+
+| Tema | Resultado |
+|---|---|
+| Claves MCP (instalación §5 a) | Generadas para `fran.odoo@seges.es` y `sguerrero@liyben.com` |
+| Proveedores (N8; instalación §5 b) | Gemini (nivel gratuito) y OVH configurados en LIYBEN. Cadena del agente con failover: primero Gemini y después OVH |
+| D10 | **Aceptada:** datos reales hacia los proveedores externos actuales y futuros (incluidas las condiciones del nivel gratuito de Gemini) |
+| D46 y D4 (LIYBEN) | Clave MCP y grupo AI Administrator solo para los dos usuarios de la reunión, que ya tienen `base.group_system` |
+| Usuarios de portal (N7) | **Se archivan los 18** (pendiente de ejecutar) |
+| D12 (presupuesto) | Sin tope de gasto por ahora |
+| D2 | La 2.ª entrega del informe se envía **solo al final** del plan de corrección, sin código ni diffs |
+| D15 (infraestructura) | Se decide más adelante |
+| Verificación del guion (instalación §5 c, d y e) | No se hizo; no hay resultados que registrar |
+| Limpieza del staging | Al terminar todas las entregas del plan de corrección (el staging valida cada una) |
+| Corrección de los PNS | Seges corrige los hallazgos (N11) y se queda con la 3.1.782 (N12) |
+
+### N11 — ¿Quién corrige los hallazgos PNS: el fabricante o Seges?
+
+**Contexto:** la 3.1.782 no es apta para producción por PNS-82, 83, 85, 90 y 91 y los restos de
+PNS-01/02 y PNS-07 (D1, N3). Hasta ahora la regla era no modificar el código de terceros, con la
+excepción de los parches de compatibilidad 1 a 6 (N2). Esperar al fabricante deja el plazo fuera de
+nuestro control.
+
+**Licencia:** los tres módulos son **Apache-2.0** (SPDX en los manifest, `LICENSE` y `NOTICE`; las
+líneas MIT son de librerías JS incluidas, que no se modifican). Permite modificar el código. Al
+distribuirlo (instalarlo en el servidor de un cliente) hay que conservar `LICENSE` y `NOTICE` y marcar
+de forma visible los archivos modificados (§4 b): lo cubren los marcadores y el registro de parches.
+Para uso interno (LIYBEN) no impone obligaciones. Queda por revisar si las condiciones comerciales o
+de soporte con el fabricante dicen algo del código modificado.
+
+**Opciones:**
+1. **a) Seges corrige** en la rama los hallazgos, con el procedimiento de abajo. — *Impacto:* plazo
+   propio; Seges mantiene los cambios.
+2. **b) Esperar al fabricante.** — *Impacto:* sin producción hasta una versión corregida.
+
+**Alcance de a):**
+- Solo `pns_base`, `pns_ai_mcp` y `pns_ai_chatboo`.
+- Primero los hallazgos PNS de seguridad, robustez y compatibilidad; **lo funcional, después**, como
+  fase aparte del plan.
+- Cambio mínimo: la corrección del informe cuando la hay. Sin refactorizaciones, sin limpieza de
+  estilo ni de avisos de lint previos, sin dependencias nuevas y sin tocar `version`, `depends` ni
+  `external_dependencies` de los manifest (una versión propia se confundiría con las del fabricante).
+- Sin tocar `ir.model.access.csv` salvo que no haya otra forma (no admite el marcador).
+- Mensajes nuevos en inglés con `_()`, sin tocar `i18n`.
+
+**Trazabilidad:**
+- Un parche numerado por PNS (del 7 en adelante); cada parche, un commit; los tests de cada entrega,
+  otro commit.
+- Marcador junto a cada cambio: `# Seges: parche N (PNS-XX, seguridad). Ver docs/pendiente/parches_pns_ai.md`
+  (`//` en JS, `<!-- -->` en XML). Los marcadores de los parches 1 a 6 no cambian.
+- Entrada en [parches_pns_ai.md](parches_pns_ai.md) con el formato de los parches 5 y 6 y un test
+  negativo en los tests de Seges.
+- Rama de trabajo `14.0-pns-ai-correcciones`, desde `14.0-pns-ai-3`; integración en `14.0` con merge
+  commit (sin squash), para conservar un commit por parche.
+
+**Estados de cada parche:** aplicado → validado en laboratorio → validado en staging → en LIYBEN. Con
+N12 no hay retirada por versión del fabricante.
+
+**Riesgos relacionados:** PNS-01, 07, 19, 30, 37, 82 a 85, 89 a 92, 94; D1, D33, N2, N3.
+
+Decisión: **a)** (reunión del 19/10/2026); alcance, trazabilidad y licencia aprobados por Sergio /
+Fecha: 20/10/2026
+
+### N12 — ¿Qué se hace con las versiones futuras del fabricante?
+
+**Contexto:** con N11, cada versión nueva del fabricante sustituiría el código y se llevaría los
+parches. El fabricante, además de corregir, incorpora funciones nuevas en cada versión.
+
+**Opciones:**
+1. **a) Reaplicar:** importar cada versión intacta y volver a aplicar los parches que sigan haciendo
+   falta. — *Impacto:* se reciben sus correcciones y sus funciones nuevas (y sus hallazgos nuevos).
+2. **b) Mantener la 3.1.782 como base propia.** — *Impacto:* no llegan las correcciones del
+   fabricante; Seges asume los hallazgos pendientes, la compatibilidad con proveedores nuevos y lo
+   funcional.
+3. **c) Reaplicar con criterio de salida** (pasar a b) si el fabricante deja de publicar, no integra
+   las correcciones o reaplicar cuesta demasiado).
+
+**Variante elegida, b) con vigilancia:** cuando el fabricante publique una versión, no se incorpora al
+repo. Se compara fuera del repo con la 3.1.782 (como el
+[inventario de cambios](../specs/cambios_pns_ai_3-1-782.md)) solo para localizar **correcciones de
+seguridad** y traerlas como parches de Seges (motivo: «traída de la versión X.Y.Z del fabricante»).
+Resultado en `docs/pendiente/vigilancia_pns_ai_<versión>.md`. Procedimiento en
+[parches_pns_ai.md](parches_pns_ai.md), «Versiones nuevas del fabricante».
+
+**Consecuencias:**
+- Los parches 1 a 6 y los nuevos son **permanentes**.
+- Los hallazgos pendientes «de fondo» (restos de PNS-54/60, 59, 86, 84, 55, 61…) y los parches
+  globales sobre Odoo (D9, PB-2) solo los resuelve Seges, o se aceptan.
+- Lo funcional (por ejemplo, PNS-67 y PNS-95) y la compatibilidad con proveedores nuevos (como PNS-93)
+  pasan a ser de Seges.
+- Los tests del módulo son de Seges: la [línea base](verificacion_seguridad_pns_ai.md) («Línea base de
+  tests (3.1.782, parches 1-6)») tiene 45 fallos y errores en `pns_ai_mcp`, la mayoría por tests
+  desfasados; `pns_ai_chatboo` no tiene tests.
+
+**Riesgos relacionados:** todos los PNS abiertos; PNS-50, 81, 93.
+
+Decisión: **b) con vigilancia** (Sergio, 20/10/2026; sustituye a la opción c) aprobada esa misma
+mañana) / Fecha: 20/10/2026
+
+### 10.2 Efecto sobre las decisiones anteriores
+
+Cada decisión afectada lleva además un bloque «Tras la reunión del 19/10/2026».
+
+| Decisión | Efecto |
+|---|---|
+| D1 | Sigue BLOQUEANTE; se desbloquea también con la rama de Seges (E1 a E3) validada |
+| D33 | Sigue BLOQUEANTE si se instala Chatboo; se desbloquea con PNS-82 corregido en la rama (E2) |
+| D2 | El informe se envía solo al final, sin código |
+| D3 | CERRADA: parches 1 a 4 permanentes |
+| D4, D46 | Decididas para LIYBEN; abiertas para BD de clientes |
+| D10 | ACEPTADA |
+| D12 | Sin tope por ahora |
+| D15 | Más adelante |
+| N2 | Absorbida por N11 y N12: parches permanentes |
+| N3 | a) con el criterio nuevo: corregido en la rama de Seges y validado, más D1, D4, D9 y PB-2 decididas |
+| N7 | Portal: se archivan; cada entrega llega a LIYBEN tras el staging |
+| N8 | Gemini y OVH en LIYBEN, con failover |
+| Regla de no modificar código de terceros (Resumen, punto 8) y regla de `parches_pns_ai.md` | Sustituidas por N11 y N12 |
 
 ---
 

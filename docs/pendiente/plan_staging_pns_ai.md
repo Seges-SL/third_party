@@ -761,6 +761,10 @@ LIYBEN es el objetivo final.
 
 ## 9. Limpieza al terminar
 
+> **Aplazada (reunión del 19/10/2026):** el staging se conserva, con su clave de Gemini, para validar
+> cada entrega del [plan de corrección](plan_correccion_pns_ai.md) (N11). La limpieza se hace al
+> terminar todas las entregas.
+
 Al terminar el staging (después del §6), en este orden. Son operaciones destructivas: se describen,
 no se dan listas para pegar. Las hace quien administra el VPS. **No se guarda ninguna copia de
 `pns_demo`** (N9).

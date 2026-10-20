@@ -7,8 +7,9 @@
 - **Origen:** [plan de staging](plan_staging_pns_ai.md), §8 (camino A, N6), con las condiciones de N7.
   Configuración según la [guía de configuración](../specs/guia_configuracion_pns_ai.md); este registro
   remite a sus secciones (§) y no las copia.
-- **Otras fuentes:** [decisiones](pns_ai_decisiones.md) (N2, N3, N4, N6, N7, N8, D2, D9, D10, D20, D46,
-  PB-2), [parches](parches_pns_ai.md) (1 a 6) y [seguimiento](seguimiento_informe_pns_ai.md).
+- **Otras fuentes:** [decisiones](pns_ai_decisiones.md) (N2, N3, N4, N6, N7, N8, N11, N12, D2, D9, D10,
+  D20, D46, PB-2), [parches](parches_pns_ai.md) (1 a 6) y [seguimiento](seguimiento_informe_pns_ai.md).
+- **Actualizado el 20/10/2026** con la reunión del 19/10/2026 (§6).
 - Lo que no tiene respaldo en lo comprobado está marcado **«Pendiente»** (§6).
 - **Sin secretos en este registro:** ni contraseñas, ni claves MCP, ni claves de proveedor, ni PIN.
 
@@ -38,11 +39,13 @@ revisada), desplegados con la rama `14.0-pns-ai-3` en el clon de `third_party` d
 | Nginx: `/chatboo/stream` y `/mcp` (§3.3) | CONFORME |
 | Instalación y log (§3.4) | CONFORME |
 | Retención, política de URL y grupos (§3.5) | CONFORME |
-| Claves MCP (§3.5) | **Pendiente** |
-| Proveedor y cadena del agente | **Pendiente** (reunión, §5 b) |
-| Verificación con el proveedor (parches 5 y 6) | **Pendiente** (reunión, §5 d) |
+| Claves MCP (§3.5) | HECHA en la reunión del 19/10/2026 (§6) |
+| Proveedor y cadena del agente | HECHA en la reunión: Gemini y OVH, con failover (§6) |
+| Verificación con el proveedor (parches 5 y 6) | No se hizo (§6) |
 
-Hasta que haya proveedor, Chatboo está instalado pero no responde: hay **0 proveedores**.
+Tras la reunión del 19/10/2026, Seges corrige los PNS en la rama y mantiene la 3.1.782 (decisiones
+N11 y N12). LIYBEN recibe cada entrega del [plan de corrección](plan_correccion_pns_ai.md) después de
+validarla en el staging (registro en el §6.2).
 
 ---
 
@@ -225,19 +228,30 @@ Anotar el resultado de cada paso en este documento (§6).
 
 ---
 
-## 6. Pendiente
+## 6. Resultados de la reunión y pendiente
+
+### 6.1 Reunión del 19/10/2026
+
+Detalle y decisiones en [decisiones](pns_ai_decisiones.md), §10.
+
+| Paso del guion (§5) | Resultado |
+|---|---|
+| a) Claves MCP | Generadas para `fran.odoo@seges.es` y `sguerrero@liyben.com` (con el asistente; sin PIN) |
+| b) Proveedor y cadena | Gemini (nivel gratuito) y OVH configurados. Cadena del agente con failover: primero Gemini y después OVH |
+| c) Lista blanca (Open-Meteo) | No se registró |
+| d) Verificación (parches 5 y 6, `pg_stat_activity`) | No se hizo |
+| e) Uso por portal | No se hizo |
+| f) Decisiones | D10 aceptada (proveedores actuales y futuros); D46 y D4: clave MCP y AI Administrator solo para los dos usuarios; portal: se archivan los 18; D12: sin tope por ahora; D2: informe al final, sin código; D15: más adelante; limpieza del staging al terminar el plan de corrección; Seges corrige los PNS (N11) y mantiene la 3.1.782 (N12) |
+
+### 6.2 Pendiente
 
 | Tema | Estado | Dónde |
 |---|---|---|
-| Claves MCP | Pendiente | §5 a |
-| Proveedor, clave y cadena del agente | Pendiente | §5 b, §4 |
-| Lista blanca (Open-Meteo) | Pendiente | §5 c |
-| Verificación de los parches 5 y 6 en LIYBEN | Pendiente | §5 d |
-| Uso por portal antes de la demo | Pendiente | §5 e |
-| D10, D46, usuarios de portal, proveedor definitivo, presupuesto, D2 | Pendiente (reunión) | §5 f |
-| Integrar `14.0-pns-ai-3` en `14.0` (PR) y volver el clon a `14.0` | Pendiente | §4 |
-| Limpieza del staging | Pendiente | plan de staging, §9 |
-| Resultados de la reunión | | |
+| Archivar los 18 usuarios de portal | Pendiente de ejecutar (en la interfaz; anotar la fecha aquí) | N7 |
+| Despliegue de cada entrega del plan de corrección | Pendiente (se registra aquí: entrega, commit, fecha y comprobación) | [plan de corrección](plan_correccion_pns_ai.md) |
+| Integrar en `14.0` (merge commit) y volver el clon a `14.0` | Al terminar el plan de corrección | §4; plan de corrección §3 |
+| Limpieza del staging | Al terminar el plan de corrección | plan de staging, §9 |
+| D15 (infraestructura) | Se decide más adelante | decisiones, D15 |
 
 ---
 
