@@ -1015,7 +1015,8 @@ class ExternalAPIServer(models.Model):
         if not host:
             return
         try:
-            self.env['ai.url.whitelist'].ensure_domain_whitelisted(
+            # Seges: parche 8 (PNS-91, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            self.env['ai.url.whitelist']._ensure_domain_whitelisted(
                 host,
                 notes='Documentation URL for external API server "%s"' % self.code,
                 kind='web',
@@ -1077,7 +1078,8 @@ class ExternalAPIServer(models.Model):
         Whitelist = self.env['ai.url.whitelist']
         for host in self._server_hostnames():
             try:
-                Whitelist.ensure_domain_whitelisted(
+                # Seges: parche 8 (PNS-91, seguridad). Ver docs/pendiente/parches_pns_ai.md
+                Whitelist._ensure_domain_whitelisted(
                     host,
                     notes='Auto-added for external API server "%s"' % self.code,
                     kind=self.api_type,

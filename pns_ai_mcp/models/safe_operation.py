@@ -1066,14 +1066,16 @@ class SafeOperation(models.Model):
             return
         Whitelist = self.env['ai.url.whitelist'].sudo()
         if Whitelist.is_url_access_open():
-            Whitelist.ensure_domain_whitelisted(
+            # Seges: parche 8 (PNS-91, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            Whitelist._ensure_domain_whitelisted(
                 domain,
                 notes='Auto-added on fetch_url (open URL policy) — %s' % self.verification_id,
             )
             return
         if not self.env.user.has_group('pns_ai_mcp.group_ai_admin'):
             return
-        Whitelist.ensure_domain_whitelisted(
+        # Seges: parche 8 (PNS-91, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        Whitelist._ensure_domain_whitelisted(
             domain,
             notes='Added by AI Administrator on confirm of %s' % self.verification_id,
         )
@@ -1104,7 +1106,8 @@ class SafeOperation(models.Model):
                 'success',
                 sticky=False,
             )
-        Whitelist.ensure_domain_whitelisted(
+        # Seges: parche 8 (PNS-91, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        Whitelist._ensure_domain_whitelisted(
             domain,
             notes='Added from operation %s' % self.verification_id,
         )

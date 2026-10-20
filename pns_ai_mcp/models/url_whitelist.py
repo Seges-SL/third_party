@@ -232,8 +232,9 @@ class URLWhitelist(models.Model):
                 ) % {'domain': hostname}
         return True, None
 
+    # Seges: parche 8 (PNS-91, seguridad). Ver docs/pendiente/parches_pns_ai.md
     @api.model
-    def ensure_domain_whitelisted(self, hostname, notes='', kind='web'):
+    def _ensure_domain_whitelisted(self, hostname, notes='', kind='web'):
         """Add hostname to the whitelist for *kind*, or reactivate a disabled row."""
         hostname = (hostname or '').lower().strip()
         if not hostname or self.is_domain_whitelisted(hostname, kind=kind):
