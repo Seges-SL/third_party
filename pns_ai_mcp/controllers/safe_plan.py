@@ -747,14 +747,16 @@ def _ensure_fetch_url_whitelist(env, step):
     if not hostname:
         return
     if Whitelist.is_url_access_open():
-        Whitelist.ensure_domain_whitelisted(
+        # Seges: parche 8 (PNS-91, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        Whitelist._ensure_domain_whitelisted(
             hostname,
             notes='Auto-added on fetch_url (open URL policy)',
         )
         return
     entry = Whitelist._match_whitelist_entry(hostname)
     if entry and not entry.active:
-        Whitelist.ensure_domain_whitelisted(
+        # Seges: parche 8 (PNS-91, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        Whitelist._ensure_domain_whitelisted(
             hostname,
             notes='Reactivated on fetch_url confirm',
         )
@@ -1616,7 +1618,8 @@ def _execute_fetch_url(env, step):
     # si no autoriza caché, no se guarda. Ver _cache_ttl_from_headers.
     cache_key = _fetch_cache_key(url, method, body)
     try:
-        cached = env['ai.fetch.cache'].get_cached(cache_key)
+        # Seges: parche 7 (PNS-90, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        cached = env['ai.fetch.cache']._get_cached(cache_key)
         if cached is not None:
             # La etiqueta (ciudad) vive en el step, no en la caché HTTP.
             cached['url'] = url
@@ -1664,7 +1667,8 @@ def _execute_fetch_url(env, step):
                         k: v for k, v in result.items()
                         if k not in ('city', 'name', 'label')
                     }
-                    env['ai.fetch.cache'].store(cache_key, cache_payload, ttl)
+                    # Seges: parche 7 (PNS-90, seguridad). Ver docs/pendiente/parches_pns_ai.md
+                    env['ai.fetch.cache']._store(cache_key, cache_payload, ttl)
             return result
 
         from ..utils.session_download import (
@@ -1720,7 +1724,8 @@ def _execute_fetch_url(env, step):
                     k: v for k, v in result.items()
                     if k not in ('city', 'name', 'label')
                 }
-                env['ai.fetch.cache'].store(cache_key, cache_payload, ttl)
+                # Seges: parche 7 (PNS-90, seguridad). Ver docs/pendiente/parches_pns_ai.md
+                env['ai.fetch.cache']._store(cache_key, cache_payload, ttl)
         return result
     except _requests.RequestException as e:
         return {

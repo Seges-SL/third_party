@@ -60,8 +60,9 @@ class AIFetchCache(models.Model):
 
     # ── read / write ──────────────────────────────────────────────
 
+    # Seges: parche 7 (PNS-90, seguridad). Ver docs/pendiente/parches_pns_ai.md
     @api.model
-    def get_cached(self, url):
+    def _get_cached(self, url):
         """Return the cached result dict for ``url`` if fresh, else None.
 
         The returned dict mirrors the successful ``_execute_fetch_url`` shape
@@ -88,8 +89,9 @@ class AIFetchCache(models.Model):
             '_from_cache': True,
         }
 
+    # Seges: parche 7 (PNS-90, seguridad). Ver docs/pendiente/parches_pns_ai.md
     @api.model
-    def store(self, url, result, ttl_seconds):
+    def _store(self, url, result, ttl_seconds):
         """Upsert a fresh cache entry for ``url`` from a fetch result dict.
 
         Only successful results with a positive ``ttl_seconds`` are stored.

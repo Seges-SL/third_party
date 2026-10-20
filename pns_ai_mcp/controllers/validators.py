@@ -191,6 +191,15 @@ RELAXAICODE_SIDE_EFFECT_METHODS = frozenset({
     'button_immediate_install',
     'button_immediate_upgrade',
     'button_immediate_uninstall',
+    # Seges: parche 7 (PNS-90, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    '_get_cached', '_store',
+    # Seges: parche 8 (PNS-91, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    '_ensure_domain_whitelisted',
+    # Seges: parche 9 (PNS-85, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    '_remember_for_skill', '_lookup_for_skill',
+    '_remember_param_cache', '_lookup_param_cache',
+    # Seges: parche 10 (PNS-83, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    '_redeem_key_pin', '_release_all', '_note_failure', '_is_blocked',
 })
 
 # RelaxAICode always runs as the asking user. These names hand out another
