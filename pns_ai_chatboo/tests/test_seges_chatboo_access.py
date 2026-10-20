@@ -366,6 +366,29 @@ class TestSegesChatbooFlows(_SegesChatbooData, HttpCase):
             chip_own['attachment_id'],
             [f.get('attachment_id') for f in last.get('files') or []])
 
+    def test_cron_unlink_sudo_keeps_foreign(self):
+        """Borrado de varias sesiones a la vez en sudo (como `_cleanup_old_sessions`)."""
+        Attachment = self.env['ir.attachment']
+        vals = {'mimetype': 'image/png'}
+        own_a = Attachment.with_user(self.user_a).create(dict(
+            vals, name='seges-e2-cron-a.png', datas=base64.b64encode(b'cron-a'),
+            res_model='chatboo.session', res_id=self.cs_a.id))
+        own_b = Attachment.with_user(self.user_b).create(dict(
+            vals, name='seges-e2-cron-b.png', datas=base64.b64encode(b'cron-b'),
+            res_model='chatboo.session', res_id=self.cs_b.id))
+        # Adjunto de otro creador (admin) enganchado a la sesión de B, en sudo.
+        self.att_cfg.sudo().write({
+            'res_model': 'chatboo.session', 'res_id': self.cs_b.id})
+        own_ids = (own_a.id, own_b.id)
+        (self.cs_a + self.cs_b).sudo().unlink()
+        for att_id in own_ids:
+            self.assertIsNone(self._att_row(att_id))
+        row = self._att_row(self.att_cfg.id)
+        self.assertIsNotNone(row)
+        self.assertFalse(row[0])
+        self.assertFalse(row[1])
+        self.assertEqual(row[2], self.user_admin.id)
+
     def test_public_names_gone(self):
         model = type(self.env['chatboo.session'])
         for old, new in RENAMED:

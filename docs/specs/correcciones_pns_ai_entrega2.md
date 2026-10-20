@@ -628,6 +628,7 @@ test y ve los usuarios creados en él.
 | `test_claim_filters_in_python` | (a) `cs_b.with_user(B)._claim_turn_file_chips([{'attachment_id': att_a.id}])`; (b) lo mismo con `.sudo()` (`cs_b.with_user(B).sudo()`); (c) `env['chatboo.session'].with_user(B).browse(cs_a.id)._claim_turn_file_chips([<adjunto huérfano de B>])`; (d) control: `cs_a.with_user(A)._claim_turn_file_chips([{'attachment_id': att_a.id}, {'url': '/web/content/%d' % att_a_rm0.id}])` | (a), (b) y (c): nada cambia (el `sudo` no levanta el filtro; no se engancha a una sesión ajena). (d): los dos de A quedan en `cs_a` |
 | `test_fulfill_client_export_claims_own` | `cs_a.with_user(A).fulfill_client_export('seges-e2.pdf', 'application/pdf', base64.b64encode(b'%PDF-1.4 seges'), kind='pdf')`; después `cs_a.with_user(A)._consume_staged_assistant_download_chips()` | Devuelve el chip; adjunto colgado de `cs_a` con `create_uid = A`; el consumo devuelve ese chip y deja `staged_assistant_files` vacío. Cubre `chatboo_session.py:491`, `:517`, `:413`, `:362` y el consumo |
 | `test_save_to_session_claims_only_own` | `job = env['chatboo.async.request'].with_user(A).create({'session_id': cs_a.id, 'prompt': 'seges e2', 'files': json.dumps([{'name': 'seges-e2.csv', 'mimetype': 'text/csv', 'data': 'data:text/csv;base64,' + base64.b64encode(b'a;b').decode()}])})`; `chip_own = persist_turn_file(env_a, …)`; `job._save_to_session('ok', {'assistant_files': [chip_own, {'attachment_id': att_cfg.id, 'url': '/pns_ai_mcp/session_file/%d' % att_cfg.id}]}, error=None)` | El CSV del clip (`:1586`) y `chip_own` (`:1738`) quedan en `cs_a`; `att_cfg` sigue huérfano. El último mensaje del asistente lleva los chips en `files`. Camino real del worker, sin LLM |
+| `test_cron_unlink_sudo_keeps_foreign` | Sesiones `cs_a` y `cs_b`, cada una con un adjunto propio colgado (creado por su dueño); a `cs_b` se le cuelga además en `sudo` `att_cfg` (creador distinto). `(cs_a + cs_b).sudo().unlink()` en una sola llamada, como `_cleanup_old_sessions` | Los dos propios, borrados. `att_cfg` sigue existiendo, con `res_model` y `res_id` vacíos y `create_uid` intacto |
 | `test_public_names_gone` | `hasattr(type(env['chatboo.session']), nombre)` para los 4 antiguos y los 4 nuevos | Antiguos `False`, nuevos `True` |
 | `test_no_caller_uses_public_names` | Recorre los `.py`, `.js` y `.xml` de `pns_ai_chatboo` y `pns_ai_mcp` (sin `tests/`; `get_module_path`) con la expresión del §5.5 | Ninguna coincidencia. Guarda contra un llamador olvidado |
 
@@ -637,7 +638,7 @@ test y ve los usuarios creados en él.
 |---|---|
 | `test_names_in_denylist` | Los 4 nombres nuevos están en `RELAXAICODE_SIDE_EFFECT_METHODS` y `guarded_getattr(object(), nombre)` lanza `AttributeError` |
 
-Total previsto: **14 tests** en `pns_ai_chatboo` (línea base: 0).
+Total previsto: **15 tests** en `pns_ai_chatboo` (línea base: 0).
 
 ### 9.2 B) `pns_ai_mcp/tests/test_seges_user_groups.py` (archivo nuevo; D-8)
 
@@ -688,7 +689,7 @@ y lo anota en «Notas de implementación».
   resto igual que tras E1: 148 + 7 = 155 pasados, 5 saltados, 14 fallidos y 31 errores, **con los
   mismos nombres**. En particular, siguen igual `test_system_action.test_user_group_preview`
   (superusuario) y `test_internal_user_cannot_reach_system_action_through_trusted_action`.
-- `odoo-dev 14 tests pns_ai_chatboo`: **14 tests**, todos en verde (línea base 0).
+- `odoo-dev 14 tests pns_ai_chatboo`: **15 tests**, todos en verde (línea base 0).
 - `python3 ~/.claude/hooks/odoo_lint.py --revisar --base 14.0-pns-ai-3`: sin incidencias nuevas. No
   se corrigen avisos previos del fabricante.
 - `py_compile` con Python 3.7.3 (imagen `odoo-dev:14-lab_pns_ai`) de los 4 archivos de producto y los 4
@@ -931,7 +932,7 @@ pns_ai_chatboo/
 │   └── chatboo_async_request.py      (parche 11: líneas 1586, 1702, 1738)
 └── tests/                            (NUEVA)
     ├── __init__.py                   (NUEVO)
-    └── test_seges_chatboo_access.py  (NUEVO, 14 tests)
+    └── test_seges_chatboo_access.py  (NUEVO, 15 tests)
 pns_ai_mcp/
 ├── controllers/
 │   └── validators.py                 (parche 11: RELAXAICODE_SIDE_EFFECT_METHODS)
@@ -984,7 +985,9 @@ el prompt; D-8 archivo nuevo; D-9 sin código; D-10 `base.group_system`; D-11 un
   - `test_claim_filters_in_python` usa para el caso (c) un huérfano propio de B (`att_b`, creado en el
     `setUp`).
   - Se ha comprobado a mano que, con los dos filtros de `_claim_turn_file_chips` y el de `unlink`
-    neutralizados temporalmente, fallan 4 de los 14 tests; después se restauró el código.
+    neutralizados temporalmente, fallan 4 de los 14 tests iniciales; después se restauró el código.
+  - Tras la revisión se añadió `test_cron_unlink_sudo_keeps_foreign` (borrado de dos sesiones a la vez
+    en `sudo`, como el cron `_cleanup_old_sessions`): el total pasa de 14 a 15 tests, todos en verde.
   - Lint: f-strings en lugar de `%` y `# pylint: disable=too-many-instance-attributes` en el mixin de
     datos, porque son archivos nuevos y el hook cuenta como nuevas todas sus incidencias.
 - **Entorno:** `odoo-dev 14 estado` indica `REPO=/home/soporte/GitHub/lab_pns_ai` con `third_party` como

@@ -563,8 +563,8 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
   1. `py_compile` de los archivos cambiados y nuevos con Python 3.7.3, en la imagen `odoo-dev:14-lab_pns_ai`.
   2. `odoo_lint.py --revisar --base 14.0-pns-ai-3 pns_ai_mcp/ pns_ai_chatboo/`: sin incidencias nuevas
      (salvo la R0911 de `mcp_user.py` ya aceptada en E1).
-  3. `odoo-dev 14 tests pns_ai_chatboo` (contexto `lab_pns_ai`): 14 tests nuevos
-     (`test_seges_chatboo_access.py`), todos en verde. Con el filtro de dueño/creador y el de `unlink`
+  3. `odoo-dev 14 tests pns_ai_chatboo` (contexto `lab_pns_ai`): 15 tests nuevos
+     (`test_seges_chatboo_access.py`, incluido `test_cron_unlink_sudo_keeps_foreign`), todos en verde. Con el filtro de dueño/creador y el de `unlink`
      neutralizados temporalmente, 4 de ellos fallan (comprobado y restaurado).
   4. `odoo-dev 14 tests pns_ai_mcp`: 205 tests, sin cambios en los fallos de la línea base (ver parche 12).
   5. `grep` de llamadores del §5.5 de la spec: vacío. `grep -rn "Seges: parche 1[12] (PNS-" pns_ai_mcp pns_ai_chatboo`:
