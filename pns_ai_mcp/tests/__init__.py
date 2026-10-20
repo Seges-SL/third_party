@@ -32,3 +32,5 @@ from . import test_flow_legend
 from . import test_server_identity_detection
 # Seges: parches 7 a 10 (tests de la entrega E1). Ver docs/pendiente/parches_pns_ai.md
 from . import test_seges_rpc_access
+# Seges: parche 12 (tests de la entrega E2). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_user_groups

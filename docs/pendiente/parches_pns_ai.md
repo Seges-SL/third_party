@@ -56,6 +56,8 @@ Los marcadores de los parches 1 a 6 no se cambian: la ruta de este documento tam
 | 8 | PNS-91 | seguridad | `pns_ai_mcp/models/url_whitelist.py`, `pns_ai_mcp/controllers/safe_plan.py`, `pns_ai_mcp/models/safe_operation.py`, `pns_ai_mcp/models/external_server.py`, `pns_ai_mcp/controllers/validators.py` | E1 | (ver `git log`) | Validado en staging |
 | 9 | PNS-85 | seguridad | `pns_ai_mcp/models/ai_skill_param_cache.py`, `pns_ai_mcp/models/ai_skill.py`, `pns_ai_mcp/utils/agent_engine.py`, `pns_ai_mcp/controllers/validators.py` | E1 | (ver `git log`) | Validado en staging |
 | 10 | PNS-83 | seguridad | `pns_ai_mcp/models/mcp_user.py`, `pns_ai_mcp/models/key_pin_block.py`, `pns_ai_mcp/models/res_config_settings.py`, `pns_ai_mcp/controllers/validators.py` | E1 | (ver `git log`) | Validado en staging |
+| 11 | PNS-82 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_async_request.py`, `pns_ai_mcp/controllers/validators.py` | E2 | (ver `git log`) | Validado en laboratorio |
+| 12 | PNS-01, PNS-02 | seguridad | `pns_ai_mcp/models/ai_system_action.py` | E2 | (ver `git log`) | Validado en laboratorio |
 
 Estados: Pendiente → Aplicado → Validado en laboratorio → Validado en staging → En LIYBEN.
 LIYBEN recibe los parches 7 en adelante de una vez, al terminar el plan de corrección (decisión del
@@ -536,6 +538,63 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 - **Staging (20/10/2026):** validados los cuatro parches con el commit `2bb4f51`: pruebas 1 a 6 de
   seguridad CORREGIDO (también con portal y por `/jsonrpc`) y no regresión R1 a R7 con Gemini. Detalle
   en la [verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E1».
+
+## Parche 11: `chatboo.session`: el flujo de chips de descarga pasa a privado y solo engancha adjuntos del dueño (PNS-82)
+
+- **Fecha:** 2026-10-20.
+- **Estado:** **validado en laboratorio (20/10/2026)**. Pendiente de validar en staging. En LIYBEN se desplegará al terminar el [plan de corrección](plan_correccion_pns_ai.md).
+- **PNS:** PNS-82 del [seguimiento](seguimiento_informe_pns_ai.md). Spec: [spec E2](../specs/correcciones_pns_ai_entrega2.md) (entrega E2).
+- **Qué falla sin él:** `claim_turn_file_chips` (y `apply_`/`stage_`/`consume_*_chips`) engancha en `sudo` a una sesión cualquier adjunto huérfano (sin `res_model` o sin `res_id`), sea de quien sea, incluidas las copias de configuración exportadas por un administrador. Después `/pns_ai_mcp/session_file` y `/web/content` lo sirven, y el borrado de la sesión lo borra. Se podía hacer por RPC directo (también con portal) o, sin método público, con el búfer `staged_assistant_files` más `request_cancel`.
+- **Cambio:**
+  - `models/chatboo_session.py`: los cuatro métodos se renombran con `_` (`_claim_turn_file_chips`, `_apply_assistant_download_chips`, `_stage_assistant_download_chips`, `_consume_staged_assistant_download_chips`) y se actualizan sus llamadores. `_claim_turn_file_chips` no hace nada si la sesión no es del usuario real (`self.env.uid`, que en `sudo` sigue siendo el real) y solo engancha adjuntos con `create_uid` igual a ese usuario. `unlink` comprueba `check_access_rights` y `check_access_rule('unlink')` antes de borrar en `sudo`, y de los adjuntos colgados solo borra los creados por el dueño de la sesión (o sin `create_uid`); los demás se desenganchan (`res_model` y `res_id` a `False`).
+  - `models/chatboo_async_request.py`: tres llamadores actualizados (`_persist_turn_files`, `_save_to_session` y su consumo del búfer).
+  - `controllers/validators.py` (`pns_ai_mcp`): los nombres nuevos se añaden a `RELAXAICODE_SIDE_EFFECT_METHODS`, con su marcador.
+  - Diff completo: [spec E2](../specs/correcciones_pns_ai_entrega2.md), §5.5.
+- **Qué se degrada:** un adjunto creado por un usuario distinto del dueño de la sesión ya no se engancha a ella (los flujos actuales no lo hacen). Al borrar una sesión, los adjuntos ajenos que colgaran de ella se desenganchan en vez de borrarse y quedan como huérfanos de su creador. Cuatro nombres más en la lista negra del sandbox.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -nE "def _?(claim_turn_file_chips|apply_assistant_download_chips|stage_assistant_download_chips|consume_staged_assistant_download_chips)\b" pns_ai_chatboo/models/chatboo_session.py
+  grep -n "create_uid\|check_access_rule" pns_ai_chatboo/models/chatboo_session.py
+  ```
+  Corregido si `claim` (público o privado) compara el `create_uid` del adjunto con el usuario real y
+  comprueba que la sesión es suya antes de escribir en `sudo`, y el `unlink` no borra en `sudo`
+  adjuntos de otros creadores. No basta con que los métodos sean privados (búfer y `request_cancel`).
+- **Comprobaciones realizadas (2026-10-20):**
+  1. `py_compile` de los archivos cambiados y nuevos con Python 3.7.3, en la imagen `odoo-dev:14-lab_pns_ai`.
+  2. `odoo_lint.py --revisar --base 14.0-pns-ai-3 pns_ai_mcp/ pns_ai_chatboo/`: sin incidencias nuevas
+     (salvo la R0911 de `mcp_user.py` ya aceptada en E1).
+  3. `odoo-dev 14 tests pns_ai_chatboo` (contexto `lab_pns_ai`): 14 tests nuevos
+     (`test_seges_chatboo_access.py`), todos en verde. Con el filtro de dueño/creador y el de `unlink`
+     neutralizados temporalmente, 4 de ellos fallan (comprobado y restaurado).
+  4. `odoo-dev 14 tests pns_ai_mcp`: 205 tests, sin cambios en los fallos de la línea base (ver parche 12).
+  5. `grep` de llamadores del §5.5 de la spec: vacío. `grep -rn "Seges: parche 1[12] (PNS-" pns_ai_mcp pns_ai_chatboo`:
+     20 líneas (parche 11: 15; parche 12: 5).
+
+## Parche 12: `ai.system.action`: dar o quitar grupos nativos exige `base.group_system` (PNS-01 y PNS-02, resto)
+
+- **Fecha:** 2026-10-20.
+- **Estado:** **validado en laboratorio (20/10/2026)**. Pendiente de validar en staging. En LIYBEN se desplegará al terminar el [plan de corrección](plan_correccion_pns_ai.md).
+- **PNS:** PNS-01 y PNS-02 (resto común) del [seguimiento](seguimiento_informe_pns_ai.md). Un solo parche para los dos (misma causa y mismo archivo; excepción a «un parche por PNS» aprobada, D-11 de la spec). Spec: [spec E2](../specs/correcciones_pns_ai_entrega2.md) (entrega E2).
+- **Qué falla sin él:** `user.add_group` y `user.remove_group` solo exigen `group_ai_admin`, y `_apply_user_add_group` / `_apply_user_remove_group` resuelven y escriben en `sudo`. Un AI Administrator sin Ajustes se puede dar `base.group_system` (o quitárselo a un administrador) con un plan que él mismo confirma.
+- **Cambio:** método nuevo `_check_may_change_user_groups()` en `models/ai_system_action.py` (superusuario o `has_group('base.group_system')` sobre `self.env.user`, y si no `UserError`), llamado al principio de `_preview_user_add_group`, `_apply_user_add_group`, `_preview_user_remove_group` y `_apply_user_remove_group`, antes de resolver usuario y grupo en `sudo`. La comprobación va en Python (no en `data/trusted_actions_system.xml`: el AI Administrator edita `ai.trusted.action` y `group_ids` significa «al menos uno»). Diff completo: [spec E2](../specs/correcciones_pns_ai_entrega2.md), §5.5.
+- **Qué se degrada:** un AI Administrator sin Ajustes ya no puede dar ni quitar ningún grupo por un plan, tampoco los de IA (para esos tiene los indicadores de `ai.mcp.user`). El mensaje nuevo («Only a Settings administrator can add or remove user groups.») sale en inglés sin traducir (no se toca `i18n`, D-6). El prompt del sistema no cambia (D-7). `view.*` y `field_required` no cambian.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -nE "group_system|_is_system|is_system\(\)" pns_ai_mcp/models/ai_system_action.py pns_ai_mcp/models/ai_trusted_action.py
+  grep -n "group_system" pns_ai_mcp/data/trusted_actions_system.xml
+  ```
+  Corregido si `_apply_user_add_group` / `_apply_user_remove_group` (o `_resolve_user`) comprueban
+  `base.group_system` sobre `self.env.user` antes del `sudo()`. No vale añadir `base.group_system` a
+  `group_ids` en el XML ni `self.env.is_system()` (es `True` en `sudo`).
+- **Comprobaciones realizadas (2026-10-20):**
+  1. `py_compile` de los archivos cambiados y nuevos con Python 3.7.3, en la imagen `odoo-dev:14-lab_pns_ai`.
+  2. `odoo_lint.py --revisar --base 14.0-pns-ai-3 pns_ai_mcp/ pns_ai_chatboo/`: sin incidencias nuevas
+     (salvo la R0911 de `mcp_user.py` ya aceptada en E1).
+  3. `odoo-dev 14 tests pns_ai_mcp` (contexto `lab_pns_ai`): 205 tests, 7 nuevos en verde
+     (`test_seges_user_groups.py`) y el resto igual que la línea base: 155 pasados, 5 saltados, 14
+     fallidos y 31 errores, con los mismos nombres. `test_user_group_preview` sigue igual.
+  4. `grep -rn "_check_may_change_user_groups" pns_ai_mcp --include=*.py` (sin tests): 5 líneas.
+     `grep -rn "Seges: parche [0-9]* (PNS-" pns_ai_mcp`: 36 líneas; en `pns_ai_chatboo`: 14.
 
 ## Comprobaciones realizadas (2026-10-13)
 
