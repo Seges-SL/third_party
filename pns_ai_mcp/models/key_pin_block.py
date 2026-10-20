@@ -33,8 +33,9 @@ class KeyPinBlock(models.Model):
             return None
         return fields.Datetime.to_datetime(record.blocked_until)
 
+    # Seges: parche 10 (PNS-83, seguridad). Ver docs/pendiente/parches_pns_ai.md
     @api.model
-    def is_blocked(self, ip):
+    def _is_blocked(self, ip):
         ip = (ip or '').strip()
         if not ip:
             return False
@@ -42,13 +43,14 @@ class KeyPinBlock(models.Model):
         until = self._until_of(rec)
         return bool(until and until > self._now())
 
+    # Seges: parche 10 (PNS-83, seguridad). Ver docs/pendiente/parches_pns_ai.md
     @api.model
-    def note_failure(self, ip):
+    def _note_failure(self, ip):
         """Count one missed PIN. Return True when this IP is now paused."""
         ip = (ip or '').strip()
         if not ip:
             return False
-        if self.is_blocked(ip):
+        if self._is_blocked(ip):
             return True
         rec = self.sudo().search([('ip', '=', ip)], limit=1)
         if not rec:
@@ -65,8 +67,9 @@ class KeyPinBlock(models.Model):
         rec.write(vals)
         return paused
 
+    # Seges: parche 10 (PNS-83, seguridad). Ver docs/pendiente/parches_pns_ai.md
     @api.model
-    def release_all(self):
+    def _release_all(self):
         rows = self.sudo().search([])
         if rows:
             rows.write({'failures': 0, 'blocked_until': False})

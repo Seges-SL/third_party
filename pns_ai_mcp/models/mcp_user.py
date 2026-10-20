@@ -816,8 +816,9 @@ class MCPUser(models.Model):
             'key_pin_killed': False,
         })
 
+    # Seges: parche 10 (PNS-83, seguridad). Ver docs/pendiente/parches_pns_ai.md
     @api.model
-    def redeem_key_pin(self, raw, ip=None):
+    def _redeem_key_pin(self, raw, ip=None):
         """Hand the existing API key for a live PIN, via the open browser tab.
 
         Does not mark the PIN used. A value that is not PIN-shaped is not
@@ -828,7 +829,8 @@ class MCPUser(models.Model):
         if not pin_shaped(raw, length):
             return {'ok': False, 'error': 'invalid', 'counted': False}
         Block = self.env['ai.key.pin.block'].sudo()
-        if Block.is_blocked(ip):
+        # Seges: parche 10 (PNS-83, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        if Block._is_blocked(ip):
             return {'ok': False, 'error': 'blocked', 'counted': False}
         rec = self.sudo().search([
             ('key_pin', '=', raw),
@@ -836,7 +838,8 @@ class MCPUser(models.Model):
             ('key_pin_killed', '=', False),
         ], limit=1)
         if not rec:
-            paused = Block.note_failure(ip)
+            # Seges: parche 10 (PNS-83, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            paused = Block._note_failure(ip)
             return {
                 'ok': False,
                 'error': 'blocked' if paused else 'invalid',

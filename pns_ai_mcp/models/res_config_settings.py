@@ -346,7 +346,8 @@ class ResConfigSettings(models.TransientModel):
         self.ensure_one()
         from ..utils.import_export_guard import ensure_ai_admin
         ensure_ai_admin(self.env)
-        self.env['ai.key.pin.block'].sudo().release_all()
+        # Seges: parche 10 (PNS-83, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self.env['ai.key.pin.block'].sudo()._release_all()
         return mcp_ui.client_notification(
             _('Temporary key PIN'),
             _('PIN blocks released.'),
