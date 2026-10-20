@@ -45,7 +45,8 @@ revisada), desplegados con la rama `14.0-pns-ai-3` en el clon de `third_party` d
 
 Tras la reunión del 19/10/2026, Seges corrige los PNS en la rama y mantiene la 3.1.782 (decisiones
 N11 y N12). LIYBEN recibe cada entrega del [plan de corrección](plan_correccion_pns_ai.md) después de
-validarla en el staging (registro en el §6.2).
+validarla en el staging. **Decisión del 20/10/2026:** LIYBEN se actualiza de una vez, al terminar
+todas las entregas y con todo validado en el staging (registro en el §6.2).
 
 ---
 
@@ -248,7 +249,7 @@ Detalle y decisiones en [decisiones](pns_ai_decisiones.md), §10.
 | Tema | Estado | Dónde |
 |---|---|---|
 | Archivar los 18 usuarios de portal | Pendiente de ejecutar (en la interfaz; anotar la fecha aquí) | N7 |
-| Despliegue de cada entrega del plan de corrección | Pendiente (se registra aquí: entrega, commit, fecha y comprobación) | [plan de corrección](plan_correccion_pns_ai.md) |
+| Despliegue de las correcciones (parches 7 en adelante) | Al terminar el plan, de una vez y con todo validado en el staging (se registra aquí: commit, fecha y comprobación) | [plan de corrección](plan_correccion_pns_ai.md), §3 |
 | Integrar en `14.0` (merge commit) y volver el clon a `14.0` | Al terminar el plan de corrección | §4; plan de corrección §3 |
 | Limpieza del staging | Al terminar el plan de corrección | plan de staging, §9 |
 | D15 (infraestructura) | Se decide más adelante | decisiones, D15 |

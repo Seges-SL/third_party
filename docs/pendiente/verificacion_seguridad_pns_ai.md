@@ -1715,3 +1715,86 @@ protección de borrado de contextos (`test_context_unlink`) y la de tarjetas cad
 | `test_session_download` | **No** | Igual que `test_presentation_mode`. |
 
 PNS-50 sigue **PARCIAL** y sin cambios en 3.1.782.
+
+## Staging — entrega E1 (20/10/2026)
+
+- **Qué se valida:** parches 7 a 10 (PNS-90, 91, 85 y 83), según el §9.3 de la
+  [spec E1](../specs/correcciones_pns_ai_entrega1.md). Laboratorio: 198 tests, 148 / 5 / 14 / 31
+  (los 18 nuevos en verde y los 45 fallos y errores de la línea base, con los mismos nombres; log
+  `tests-20261020-122202.log`); revisión de `odoo-reviewer`: APROBADO.
+- **Despliegue en `pns_demo`:** commit `2bb4f51` de `14.0-pns-ai-correcciones` (`git archive` de los
+  tres módulos). Huella SHA-256 `348c0fd83ab05bceca898a8cf2db75d8bbd6c934cd9e4fa98c71da63ae5c276a`,
+  idéntica en el equipo y en el VPS. `diff -rq` con el despliegue anterior (`63ee2dc`): solo los 12
+  `.py` de la spec, `tests/__init__.py` y el test nuevo; 30 marcadores. Copia previa en
+  `/opt/odoo/pns_staging/addons_antes_E1`. Sustitución con `rsync` y reinicio de `odoo14_pns`, sin `-u`;
+  arranque sin errores.
+- **Usuarios de prueba:** A (`e1_interno`, interno sin grupos de IA, id 12) y P (`e1_portal`, portal,
+  id 13), creados por RPC como `admin` con `preparar_e1.py` y borrados al terminar (D-5). Dominio
+  archivado de prueba `e1-archivado.invalid`. Contraseña de `admin`: sin cambios.
+- **Scripts:** `pruebas_e1_rpc.py` (pruebas 1 a 4 y 6) y `pruebas_e1_mcp.py` (prueba 5 y R7), solo con
+  la biblioteca estándar y sin guardar contraseñas ni claves.
+
+### Pruebas de seguridad
+
+| # | Prueba | Quién | Resultado |
+|---|---|---|---|
+| 1 | 3c-1 (PNS-90): `get_cached`/`store` y sus privados | A y P | **CORREGIDO**: nombre antiguo → `AttributeError`; privado → `AccessError` |
+| 2 | 3c-2 (PNS-91): `ensure_domain_whitelisted`, alta y reactivación; controles del ACL | A y P | **CORREGIDO**; A lee la lista blanca y no puede crear (`AccessError`) |
+| 3 | 3b-1 (PNS-85): los cuatro métodos de la caché de parámetros | A | **CORREGIDO** |
+| 4 | 3b-1 (PNS-83): `redeem_key_pin`, `release_all`, `note_failure`, `is_blocked` | A y P | **CORREGIDO** |
+| 6 | `/jsonrpc`, `execute_kw` de `ai.fetch.cache._store` | A | **CORREGIDO** (`AccessError`) |
+| — | Control: `res.users.context_get` | A y P | Responde: la sesión y la ruta funcionan |
+
+En total, 46 comprobaciones correctas. Huellas (`md5` de las filas completas) de `ai_fetch_cache`,
+`ai_url_whitelist`, `ai_skill_param_cache` y `ai_key_pin_block`, idénticas antes y después.
+
+| # | Prueba 5 (sandbox, por `/mcp` con la clave de UW, sin LLM) | Resultado |
+|---|---|---|
+| 5a | `env['ai.skill.param.cache']._remember_for_skill(…)` literal | **Rechazada** sin ejecutar: «relaxaicode es SOLO LECTURA» (`requires_write`) |
+| 5b | `getattr(…, '_get_' + 'cached')` | **Rechazada** sin ejecutar |
+| 5c | `getattr(…, ''.join(['_get', '_cached']))` | **Rechazada** en ejecución: «Method '_get_cached' writes outside RelaxAICode's rollback…» |
+| R7 | `env['res.partner'].search_count([])` | Responde (`"data": 42`): la lista negra no bloquea consultas normales |
+
+La caché de parámetros sigue vacía tras 5a.
+
+### No regresión con Gemini
+
+| # | Caso | Quién | Resultado |
+|---|---|---|---|
+| R2a | `fetch_url` a `httpbin.org` (fuera de la lista) y confirmación | ADM | Alta con «Added by AI Administrator on confirm of FURL00000005» (`safe_operation.py`, `_maybe_auto_whitelist`) |
+| R2b | Botón «➕ Whitelist» sobre una operación de `example.org` | ADM | Notificación y alta («Added from operation FURL00000006») |
+| R2c | `httpbin.org` archivado; mismo turno y confirmación | ADM | Reactivado sin duplicar; la nota acumula FURL00000005 y FURL00000007 |
+| R2d | Servidor OpenAPI nuevo e inactivo «E1 prueba» (`code` `e1_prueba`, base y docs en `petstore3.swagger.io`) | ADM | Alta `petstore3.swagger.io` (`openapi`, «Auto-added for external API server "e1_prueba"»); sin `could not whitelist` en el log. La URL de documentación está en el mismo dominio: no hay una segunda fila |
+| R1 | Dos turnos con `fetch_url` a `https://httpbin.org/cache/600` | U3 | 1.º (FURL00000008): sale a la red y guarda (`fetched_at` 14:44:55). 2.º (FURL00000009): `_from_cache: true`, sin salir. Además, FURL00000007 se sirvió de la caché de R2a hasta que caducó |
+| R3 | `/annual_billing del año dos mil veinticinco`, dos veces | U1 | 1.º: fila en la caché (`{"year": 2025}`), con cursor propio y commit; 355 tokens. 2.º: el mismo resultado con **0 tokens** (sale de la caché) |
+| R4 | Turno con imagen, sin recargar (parche 6) | U1 | Respuesta completa; 0 conexiones `idle in transaction` o esperando lock |
+| R5 | Ajustes → «Release PIN blocks» | ADM | «Bloqueos de PIN soltados» |
+| R6 | Log desde las 13:55 UTC | — | Sin `AttributeError`, `could not whitelist` ni `param cache remember skipped`. 9 `Traceback`, todos del proveedor: 6 `HTTP 503` de Gemini (saturación) y un tiempo de espera de 45 s (3 líneas encadenadas) |
+
+**Resultado:** parches 7 a 10 **validados en staging**. PNS-83, 85, 90 y 91: CORREGIDO en la rama de
+Seges.
+
+### Observaciones (ajenas a E1)
+
+- **Política `whitelist_only` (diseño del fabricante):** un usuario sin AI Administrator no puede
+  proponer un `fetch_url` a un dominio fuera de la lista: «Propose failed: No tienes acceso a la URL
+  externa «httpbin.org»: su dominio no está en la lista blanca. Pide a un administrador de IA que lo
+  añada». No se crea tarjeta. Por eso R2a-c las hace ADM (la spec ya lo preveía).
+- **`ai_log`:** no tiene la columna `tool_name`. La herramienta va en `category` (`query`,
+  `verification`…) y el tipo en `primitive` (`tool`, `llm`); el uso de la caché de parámetros se ve
+  por los tokens del turno.
+- **`annual_billing`** se ofrece aunque `account` no esté instalado, y falla con «Skill bootstrap
+  failed… KeyError: 'account.move'» (el motor lo gestiona sin colgarse). Para la fase funcional.
+- **Entorno: sesiones caducadas cada minuto en Chrome** (con `admin` y con U3; no en otro navegador).
+  Causa probable: una cookie `session_id` compartida con `liyben.com`. Ajeno a los parches; pendiente
+  de confirmar con F12.
+- **Clave MCP de `admin`:** generada para R2 y revocada en la limpieza.
+
+### Limpieza
+
+`preparar_e1.py --limpiar` (A, P y `e1-archivado.invalid`); en la interfaz, el servidor «E1 prueba»,
+los dominios `httpbin.org`, `example.org` y `petstore3.swagger.io`, los grupos AI Conversational y
+External URL añadidos a `admin` y su clave MCP; por SQL, las filas de prueba de `ai_fetch_cache` y
+`ai_skill_param_cache`. Recuentos finales esperados de `ai_fetch_cache`, `ai_skill_param_cache`,
+`ai_url_whitelist` y `ai_key_pin_block`: 0 (**pendiente de anotar el resultado**). Temporales del despliegue en `/tmp`, borrados.
+`addons_antes_E1` se conserva hasta la limpieza final del staging.

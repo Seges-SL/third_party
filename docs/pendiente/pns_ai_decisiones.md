@@ -1570,7 +1570,7 @@ Decisión: **a)** (Sergio) / Fecha: 15/10/2026. Si el staging empeora algún PNS
 obligatorio si se instala Chatboo (PNS-94); el 5 es inocuo para otros proveedores y necesario con
 Gemini. El proveedor se estudia con OVH (N8).
 
-**Tras la reunión del 19/10/2026:** **Usuarios de portal: se archivan los 18** (pendiente de ejecutar; [instalación](instalacion_liyben_pns_ai.md) §6). LIYBEN recibe cada entrega del plan de corrección después de validarla en staging. (ver [§10](#10-reunión-del-19102026-corrección-por-seges-n11-y-n12))
+**Tras la reunión del 19/10/2026:** **Usuarios de portal: se archivan los 18** (pendiente de ejecutar; [instalación](instalacion_liyben_pns_ai.md) §6). LIYBEN recibe las correcciones **de una vez, al terminar el plan de corrección**, con todo validado en el staging (Sergio, 20/10/2026). (ver [§10](#10-reunión-del-19102026-corrección-por-seges-n11-y-n12))
 
 ### N8 — ¿Qué proveedor externo se usa en el staging (y en LIYBEN)?
 
@@ -1757,7 +1757,7 @@ Cada decisión afectada lleva además un bloque «Tras la reunión del 19/10/202
 | D15 | Más adelante |
 | N2 | Absorbida por N11 y N12: parches permanentes |
 | N3 | a) con el criterio nuevo: corregido en la rama de Seges y validado, más D1, D4, D9 y PB-2 decididas |
-| N7 | Portal: se archivan; cada entrega llega a LIYBEN tras el staging |
+| N7 | Portal: se archivan; las correcciones llegan a LIYBEN de una vez, al terminar el plan |
 | N8 | Gemini y OVH en LIYBEN, con failover |
 | Regla de no modificar código de terceros (Resumen, punto 8) y regla de `parches_pns_ai.md` | Sustituidas por N11 y N12 |
 

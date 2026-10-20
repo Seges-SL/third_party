@@ -1,8 +1,8 @@
 # Spec: correcciones_pns_ai_entrega1 (Odoo 14.0)
 
 - **Entrega:** E1 del [plan de corrección](../pendiente/plan_correccion_pns_ai.md) · **Parches:** 7 a 10
-- **Rama:** `14.0-pns-ai-correcciones` · **Fecha:** 20/10/2026 · **Estado:** aprobada por
-  Sergio (20/10/2026). Implementada; revisión APROBADO (20/10/2026)
+- **Rama:** `14.0-pns-ai-correcciones` · **Fecha:** 20/10/2026 · **Estado:** aprobada por Sergio (20/10/2026); implementada; revisión APROBADO; **validada en
+  staging (20/10/2026)**
 - **Módulo afectado:** solo `pns_ai_mcp` (3.1.782, Apache-2.0, base propia de Seges por N12)
 - **Decisiones de las que parte:** N3, N4, N11 y N12 ([decisiones](../pendiente/pns_ai_decisiones.md))
 - **Versión:** Odoo 14.0 (`CLAUDE.md` del repo). Imagen de pruebas `odoo-dev:14-lab_pns_ai`
@@ -905,3 +905,24 @@ Sin cambios en `__manifest__.py`, `security/ir.model.access.csv`, vistas, datos,
   fabricante que sale como nuevo por la línea `def` renombrada (`_redeem_key_pin`).
 - **`_own_cursor_env`:** se simula en `test_skill_param_cache_roundtrip`; el camino real con
   cursor propio lo cubre R3 en staging.
+
+## Ajustes en la ejecución del staging (20/10/2026)
+
+Resultado completo en la [verificación](../pendiente/verificacion_seguridad_pns_ai.md), «Staging —
+entrega E1». Diferencias con el §9.3:
+
+- **Preparación:** A, P y el dominio archivado se crean por RPC como `admin` (`preparar_e1.py`), que es
+  el único administrador de Odoo en `pns_demo`. Las pruebas 1 a 4 y 6 se ejecutan con
+  `pruebas_e1_rpc.py`, y la prueba 5 y R7 con `pruebas_e1_mcp.py` (llamada directa a `relaxaicode`, sin
+  LLM). Comparación de la BD con la huella `md5` de las filas completas de las cuatro tablas.
+- **R2:** con `whitelist_only`, un usuario sin AI Administrator no puede **proponer** un `fetch_url` a
+  un dominio fuera de la lista («Propose failed»), así que R2a-c las hace ADM, como preveía este
+  apartado. ADM necesita para ello AI Conversational y clave MCP (retirados en la limpieza).
+- **R2d:** `pns_demo` es una instalación nueva y no tiene servidores OpenAPI de fábrica (PNS-88): se
+  crea uno inactivo («E1 prueba», `code` obligatorio `e1_prueba`) y se borra al terminar.
+- **R3:** `ai_log` no tiene `tool_name`. La reutilización de la caché se comprueba por los tokens del
+  turno: el primero llama al modelo (355 tokens) y el segundo no (0 tokens).
+- **R1:** el campo `_from_cache` aparece en el resultado aunque sea `false`; hay que mirar su valor.
+- **LIYBEN:** no se despliega al cerrar E1. Recibe todas las correcciones al terminar el plan
+  (decisión de Sergio del 20/10/2026).
+

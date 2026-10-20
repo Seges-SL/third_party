@@ -41,8 +41,8 @@
 > **Desde el 20/10/2026 (N11 y N12):** Seges corrige los hallazgos en la rama
 > `14.0-pns-ai-correcciones` y mantiene la 3.1.782 ([plan de corrección](plan_correccion_pns_ai.md)).
 > La columna «Estado» sigue describiendo el **código del fabricante** (lo que se le comunica en el
-> informe). Lo corregido por Seges se añadirá en una columna «Rama Seges» (parche, laboratorio y
-> staging) a medida que se validen las entregas.
+> informe). La columna «Rama Seges» de la tabla resumen recoge lo corregido o previsto por Seges
+> (parche, entrega y validación). Actualizada el 20/10/2026 con la entrega E1 (PNS-83, 85, 90 y 91).
 
 Estados: **CORREGIDO** (el cambio cubre el hallazgo y sus puntos de entrada) · **PARCIAL** (cubre
 una parte; queda un resto concreto) · **SIN CAMBIOS** · **YA NO APLICA** (el código desapareció) ·
@@ -57,104 +57,104 @@ prueba que solo comprueba otro rol o el ACL estándar).
 
 ## Tabla resumen
 
-| PNS | Gravedad | Estado | Laboratorio y staging |
-|---|---|---|---|
-| PNS-01 | Crítica | PARCIAL | CORREGIDO (parte probada: vía RPC cerrada, 3b-1) |
-| PNS-02 | Crítica | PARCIAL | CORREGIDO (parte probada: vía RPC cerrada, 3b-1) |
-| PNS-03 | Crítica | CORREGIDO | CORREGIDO (3b-1) |
-| PNS-04 | Crítica | CORREGIDO | — |
-| PNS-05 | Crítica | CORREGIDO | CORREGIDO (staging, prueba 6) |
-| PNS-06 | Crítica | CORREGIDO | CORREGIDO (parte probada: rechazo al guardar de una escritura con `sudo`, 3b-1) |
-| PNS-07 | Crítica | PARCIAL | — |
-| PNS-53 | Crítica | CORREGIDO | CORREGIDO (3b-1) |
-| PNS-54 | Crítica | PARCIAL | — |
-| PNS-08 | Alta | CORREGIDO | CORREGIDO (3b-1) |
-| PNS-09 | Alta | CORREGIDO | CORREGIDO (parte probada: `action_test_connection` de un interno, 3b-1) |
-| PNS-10 | Alta | CORREGIDO | CORREGIDO (3b-1) |
-| PNS-11 | Alta | CORREGIDO | CORREGIDO (3b-1) |
-| PNS-12 | Alta | CORREGIDO | CORREGIDO en el modelo (3c); por HTTP CORREGIDO con el parche 4 (ver PNS-81; confirmado en staging, §4.4); en los turnos del chat, CORREGIDO (staging, prueba 10) |
-| PNS-13 | Alta | CORREGIDO | CORREGIDO (3b-1) |
-| PNS-14 | Alta | PARCIAL | VULNERABLE en `ai.fetch.cache` (3c, PNS-90); el resto, CORREGIDO (3b-1) |
-| PNS-15 | Alta | CORREGIDO | — |
-| PNS-16 | Alta | PARCIAL | CORREGIDO (parte probada: tarjeta sin auto-confirmación ni salida, con las dos políticas; staging, prueba 3); resto (reinyección como `system`), NO CONCLUYENTE |
-| PNS-17 | Alta | PARCIAL | — |
-| PNS-18 | Alta | PARCIAL | CORREGIDO (parte probada: `no_external_failover`, 3b-2) |
-| PNS-19 | Alta | PARCIAL | — |
-| PNS-20 | Alta | PARCIAL | — |
-| PNS-21 | Alta | CORREGIDO | CORREGIDO (3c) |
-| PNS-23 | Alta | SIN CAMBIOS | — |
-| PNS-24 | Alta | PARCIAL | — |
-| PNS-25 | Alta | CORREGIDO | — |
-| PNS-26 | Alta | PARCIAL | — |
-| PNS-27 | Alta | CORREGIDO | — |
-| PNS-55 | Alta | PARCIAL | CORREGIDO (parte probada: aislamiento de sesiones y jobs, 3b-1) |
-| PNS-56 | Alta | CORREGIDO | CORREGIDO (3b-1) |
-| PNS-57 | Alta | CORREGIDO | CORREGIDO (3b-1) |
-| PNS-58 | Alta | CORREGIDO | CORREGIDO (3b-1) |
-| PNS-59 | Alta | PARCIAL | CORREGIDO (parte probada: 404 sin salida para un host no permitido, 3b-2; navegador con `whitelist_only`, staging, prueba 9a); con `open`, NO CONCLUYENTE |
-| PNS-60 | Alta | PARCIAL | CORREGIDO (parte probada: mensaje del usuario, 3b-2; respuesta en directo, tras recargar, PDF y Word, staging, prueba 8) |
-| PNS-80 | Alta | YA NO APLICA | CORREGIDO (3c) |
-| PNS-22 | Media | PARCIAL | CORREGIDO (parte probada: por chat, staging, prueba 5) |
-| PNS-28 | Media | PARCIAL | CORREGIDO (parte probada: sin filas de `ai.log` sin clave, 3b-1) |
-| PNS-29 | Media | PARCIAL | PARCIAL (3b-2) |
-| PNS-30 | Media | PARCIAL | SIN CAMBIOS (resto reproducido, 3b-1) |
-| PNS-31 | Media | SIN CAMBIOS | — |
-| PNS-32 | Media | PARCIAL | — |
-| PNS-33 | Media | SIN CAMBIOS | — |
-| PNS-34 | Media | CORREGIDO | — |
-| PNS-35 | Media | SIN CAMBIOS | — |
-| PNS-36 | Media | PARCIAL | SIN CAMBIOS (resto reproducido: nombre de la BD y campos sin valores, staging, prueba 7) |
-| PNS-37 | Media | SIN CAMBIOS | — |
-| PNS-38 | Media | SIN CAMBIOS | — |
-| PNS-39 | Media | PARCIAL | — |
-| PNS-40 | Media | PARCIAL | SIN CAMBIOS (resto reproducido, 3b-2) |
-| PNS-41 | Media | CORREGIDO | — |
-| PNS-42 | Media | SIN CAMBIOS | — |
-| PNS-61 | Media | PARCIAL | CORREGIDO (parte probada: `provider_id`, 3b-2 y staging, prueba 4b); historial, SIN CAMBIOS (staging, prueba 4a) |
-| PNS-62 | Media | PARCIAL | CORREGIDO (parte probada: archivo único, 3b-2) |
-| PNS-63 | Media | CORREGIDO | — |
-| PNS-64 | Media | PARCIAL | — |
-| PNS-65 | Media | PARCIAL | — |
-| PNS-66 | Media | SIN CAMBIOS | SIN CAMBIOS (3b-2) |
-| PNS-67 | Media | CORREGIDO | — |
-| PNS-68 | Media | SIN CAMBIOS | — |
-| PNS-70 | Media | SIN CAMBIOS | — |
-| PNS-43 | Baja | PARCIAL | — |
-| PNS-44 | Baja | YA NO APLICA | — |
-| PNS-45 | Baja | CORREGIDO | — |
-| PNS-46 | Baja | DUDOSO | NO CONCLUYENTE (3b-1 y staging, prueba 11; síntoma en PNS-95) |
-| PNS-47 | Baja | CORREGIDO | — |
-| PNS-48 | Baja | CORREGIDO | — |
-| PNS-49 | Baja | PARCIAL | — |
-| PNS-50 | Baja | PARCIAL | — |
-| PNS-51 | Baja | SIN CAMBIOS | — |
-| PNS-52 | Baja | CORREGIDO | — |
-| PNS-69 | Baja | CORREGIDO | — |
-| PNS-71 | Baja | CORREGIDO | CORREGIDO (3b-1) |
-| PNS-72 | Baja | PARCIAL | — |
-| PNS-73 | Baja | SIN CAMBIOS | — |
-| PNS-74 | Baja | PARCIAL | — |
-| PNS-75 | Baja | CORREGIDO | — |
-| PNS-76 | Baja | PARCIAL | — |
-| PNS-77 | Baja | SIN CAMBIOS | — |
-| PNS-78 | Baja | CORREGIDO | — |
-| PNS-79 | Baja | CORREGIDO | NO CONCLUYENTE (3b-1) |
-| PNS-81 | Alta | NUEVO | importación resuelta con el parche 1 (3a); parche 2 eficaz (3b-2 y staging, prueba 2); parche 3 eficaz (staging, prueba 1); `prompts/*`: parche 4 en la rama, eficaz (prueba del parche 4 y staging, §4.4) |
-| PNS-82 | Alta | NUEVO | VULNERABLE (3b-1) |
-| PNS-83 | Alta | NUEVO | VULNERABLE (3b-1) |
-| PNS-84 | Media | NUEVO | — |
-| PNS-85 | Media | NUEVO | VULNERABLE (3b-1) |
-| PNS-86 | Media | NUEVO | — |
-| PNS-87 | Baja | NUEVO | CONFIRMADO (3a: purga al primer arranque) |
-| PNS-88 | Baja | NUEVO | CONFIRMADO (3a: 38 XML ID y 5 servidores) |
-| PNS-89 | Baja | NUEVO | — |
-| PNS-90 | Alta | NUEVO | VULNERABLE (3c) |
-| PNS-91 | Media | NUEVO | VULNERABLE (3c) |
-| PNS-92 | Media | NUEVO | protegido solo por rebote (3c) |
-| PNS-93 | Media | NUEVO | CONFIRMADO (staging); parche 5 eficaz |
-| PNS-94 | Alta | NUEVO | CONFIRMADO (staging); parche 6 eficaz (5 casos) |
-| PNS-95 | Baja | NUEVO | CONFIRMADO (staging, prueba 11) |
-| PNS-96 | Baja | NUEVO | CONFIRMADO (staging, con modelos `lite`) |
+| PNS | Gravedad | Estado | Laboratorio y staging | Rama Seges |
+|---|---|---|---|---|
+| PNS-01 | Crítica | PARCIAL | CORREGIDO (parte probada: vía RPC cerrada, 3b-1) | Previsto en E2 |
+| PNS-02 | Crítica | PARCIAL | CORREGIDO (parte probada: vía RPC cerrada, 3b-1) | Previsto en E2 |
+| PNS-03 | Crítica | CORREGIDO | CORREGIDO (3b-1) | — |
+| PNS-04 | Crítica | CORREGIDO | — | — |
+| PNS-05 | Crítica | CORREGIDO | CORREGIDO (staging, prueba 6) | — |
+| PNS-06 | Crítica | CORREGIDO | CORREGIDO (parte probada: rechazo al guardar de una escritura con `sudo`, 3b-1) | — |
+| PNS-07 | Crítica | PARCIAL | — | Parcial (E1): los 11 métodos privatizados, en la lista negra del sandbox; resto (métodos con `_`, alias): E3 |
+| PNS-53 | Crítica | CORREGIDO | CORREGIDO (3b-1) | — |
+| PNS-54 | Crítica | PARCIAL | — | — |
+| PNS-08 | Alta | CORREGIDO | CORREGIDO (3b-1) | — |
+| PNS-09 | Alta | CORREGIDO | CORREGIDO (parte probada: `action_test_connection` de un interno, 3b-1) | — |
+| PNS-10 | Alta | CORREGIDO | CORREGIDO (3b-1) | — |
+| PNS-11 | Alta | CORREGIDO | CORREGIDO (3b-1) | — |
+| PNS-12 | Alta | CORREGIDO | CORREGIDO en el modelo (3c); por HTTP CORREGIDO con el parche 4 (ver PNS-81; confirmado en staging, §4.4); en los turnos del chat, CORREGIDO (staging, prueba 10) | — |
+| PNS-13 | Alta | CORREGIDO | CORREGIDO (3b-1) | — |
+| PNS-14 | Alta | PARCIAL | VULNERABLE en `ai.fetch.cache` (3c, PNS-90); el resto, CORREGIDO (3b-1) | Resto de `ai.fetch.cache`: parche 7 (E1), CORREGIDO |
+| PNS-15 | Alta | CORREGIDO | — | — |
+| PNS-16 | Alta | PARCIAL | CORREGIDO (parte probada: tarjeta sin auto-confirmación ni salida, con las dos políticas; staging, prueba 3); resto (reinyección como `system`), NO CONCLUYENTE | — |
+| PNS-17 | Alta | PARCIAL | — | — |
+| PNS-18 | Alta | PARCIAL | CORREGIDO (parte probada: `no_external_failover`, 3b-2) | — |
+| PNS-19 | Alta | PARCIAL | — | Previsto en E3 |
+| PNS-20 | Alta | PARCIAL | — | — |
+| PNS-21 | Alta | CORREGIDO | CORREGIDO (3c) | — |
+| PNS-23 | Alta | SIN CAMBIOS | — | — |
+| PNS-24 | Alta | PARCIAL | — | — |
+| PNS-25 | Alta | CORREGIDO | — | — |
+| PNS-26 | Alta | PARCIAL | — | — |
+| PNS-27 | Alta | CORREGIDO | — | — |
+| PNS-55 | Alta | PARCIAL | CORREGIDO (parte probada: aislamiento de sesiones y jobs, 3b-1) | — |
+| PNS-56 | Alta | CORREGIDO | CORREGIDO (3b-1) | — |
+| PNS-57 | Alta | CORREGIDO | CORREGIDO (3b-1) | — |
+| PNS-58 | Alta | CORREGIDO | CORREGIDO (3b-1) | — |
+| PNS-59 | Alta | PARCIAL | CORREGIDO (parte probada: 404 sin salida para un host no permitido, 3b-2; navegador con `whitelist_only`, staging, prueba 9a); con `open`, NO CONCLUYENTE | — |
+| PNS-60 | Alta | PARCIAL | CORREGIDO (parte probada: mensaje del usuario, 3b-2; respuesta en directo, tras recargar, PDF y Word, staging, prueba 8) | — |
+| PNS-80 | Alta | YA NO APLICA | CORREGIDO (3c) | — |
+| PNS-22 | Media | PARCIAL | CORREGIDO (parte probada: por chat, staging, prueba 5) | — |
+| PNS-28 | Media | PARCIAL | CORREGIDO (parte probada: sin filas de `ai.log` sin clave, 3b-1) | — |
+| PNS-29 | Media | PARCIAL | PARCIAL (3b-2) | — |
+| PNS-30 | Media | PARCIAL | SIN CAMBIOS (resto reproducido, 3b-1) | Resto (`create_log_entry`): previsto en E4 |
+| PNS-31 | Media | SIN CAMBIOS | — | — |
+| PNS-32 | Media | PARCIAL | — | — |
+| PNS-33 | Media | SIN CAMBIOS | — | — |
+| PNS-34 | Media | CORREGIDO | — | — |
+| PNS-35 | Media | SIN CAMBIOS | — | — |
+| PNS-36 | Media | PARCIAL | SIN CAMBIOS (resto reproducido: nombre de la BD y campos sin valores, staging, prueba 7) | — |
+| PNS-37 | Media | SIN CAMBIOS | — | Resto (`record_failed_plan`): previsto en E4 |
+| PNS-38 | Media | SIN CAMBIOS | — | — |
+| PNS-39 | Media | PARCIAL | — | — |
+| PNS-40 | Media | PARCIAL | SIN CAMBIOS (resto reproducido, 3b-2) | — |
+| PNS-41 | Media | CORREGIDO | — | — |
+| PNS-42 | Media | SIN CAMBIOS | — | — |
+| PNS-61 | Media | PARCIAL | CORREGIDO (parte probada: `provider_id`, 3b-2 y staging, prueba 4b); historial, SIN CAMBIOS (staging, prueba 4a) | — |
+| PNS-62 | Media | PARCIAL | CORREGIDO (parte probada: archivo único, 3b-2) | — |
+| PNS-63 | Media | CORREGIDO | — | — |
+| PNS-64 | Media | PARCIAL | — | — |
+| PNS-65 | Media | PARCIAL | — | — |
+| PNS-66 | Media | SIN CAMBIOS | SIN CAMBIOS (3b-2) | — |
+| PNS-67 | Media | CORREGIDO | — | — |
+| PNS-68 | Media | SIN CAMBIOS | — | — |
+| PNS-70 | Media | SIN CAMBIOS | — | — |
+| PNS-43 | Baja | PARCIAL | — | — |
+| PNS-44 | Baja | YA NO APLICA | — | — |
+| PNS-45 | Baja | CORREGIDO | — | — |
+| PNS-46 | Baja | DUDOSO | NO CONCLUYENTE (3b-1 y staging, prueba 11; síntoma en PNS-95) | — |
+| PNS-47 | Baja | CORREGIDO | — | — |
+| PNS-48 | Baja | CORREGIDO | — | — |
+| PNS-49 | Baja | PARCIAL | — | — |
+| PNS-50 | Baja | PARCIAL | — | Batería de tests al día: previsto en ET |
+| PNS-51 | Baja | SIN CAMBIOS | — | — |
+| PNS-52 | Baja | CORREGIDO | — | — |
+| PNS-69 | Baja | CORREGIDO | — | — |
+| PNS-71 | Baja | CORREGIDO | CORREGIDO (3b-1) | — |
+| PNS-72 | Baja | PARCIAL | — | — |
+| PNS-73 | Baja | SIN CAMBIOS | — | — |
+| PNS-74 | Baja | PARCIAL | — | — |
+| PNS-75 | Baja | CORREGIDO | — | — |
+| PNS-76 | Baja | PARCIAL | — | — |
+| PNS-77 | Baja | SIN CAMBIOS | — | — |
+| PNS-78 | Baja | CORREGIDO | — | — |
+| PNS-79 | Baja | CORREGIDO | NO CONCLUYENTE (3b-1) | — |
+| PNS-81 | Alta | NUEVO | importación resuelta con el parche 1 (3a); parche 2 eficaz (3b-2 y staging, prueba 2); parche 3 eficaz (staging, prueba 1); `prompts/*`: parche 4 en la rama, eficaz (prueba del parche 4 y staging, §4.4) | Parches 1-4 (compatibilidad), en LIYBEN |
+| PNS-82 | Alta | NUEVO | VULNERABLE (3b-1) | Previsto en E2 |
+| PNS-83 | Alta | NUEVO | VULNERABLE (3b-1) | **Parche 10 (E1): CORREGIDO** (laboratorio y staging, 20/10/2026) |
+| PNS-84 | Media | NUEVO | — | — |
+| PNS-85 | Media | NUEVO | VULNERABLE (3b-1) | **Parche 9 (E1): CORREGIDO** (laboratorio y staging, 20/10/2026) |
+| PNS-86 | Media | NUEVO | — | — |
+| PNS-87 | Baja | NUEVO | CONFIRMADO (3a: purga al primer arranque) | Sin código (E6): retención por parámetro |
+| PNS-88 | Baja | NUEVO | CONFIRMADO (3a: 38 XML ID y 5 servidores) | Sin código (E6) |
+| PNS-89 | Baja | NUEVO | — | Previsto en E4 |
+| PNS-90 | Alta | NUEVO | VULNERABLE (3c) | **Parche 7 (E1): CORREGIDO** (laboratorio y staging, 20/10/2026) |
+| PNS-91 | Media | NUEVO | VULNERABLE (3c) | **Parche 8 (E1): CORREGIDO** (laboratorio y staging, 20/10/2026) |
+| PNS-92 | Media | NUEVO | protegido solo por rebote (3c) | Previsto en E4 |
+| PNS-93 | Media | NUEVO | CONFIRMADO (staging); parche 5 eficaz | Parche 5, validado en staging; en LIYBEN |
+| PNS-94 | Alta | NUEVO | CONFIRMADO (staging); parche 6 eficaz (5 casos) | Parche 6, validado en staging; en LIYBEN. Corrección de fondo: E5 |
+| PNS-95 | Baja | NUEVO | CONFIRMADO (staging, prueba 11) | — |
+| PNS-96 | Baja | NUEVO | CONFIRMADO (staging, con modelos `lite`) | — |
 
 **Recuento:** CORREGIDO 31 · PARCIAL 33 · SIN CAMBIOS 13 · YA NO APLICA 2 · DUDOSO 1 (80 del
 informe) · NUEVO 16 (total 96). Por gravedad:
@@ -1644,6 +1644,7 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
 ### PNS-83 — `ai.mcp.user.redeem_key_pin` entrega claves MCP por RPC sin grupo y sin límite efectivo de intentos
 
 - **Gravedad:** Alta · **Estado:** NUEVO (relacionado con PNS-07, PNS-33 y PNS-84).
+- **Rama Seges (20/10/2026):** **CORREGIDO con el parche 10 (E1)**: `redeem_key_pin`, `release_all`, `note_failure` e `is_blocked` pasan a privados; por RPC (interno, portal y `/jsonrpc`) se rechazan sin cambios en la BD (laboratorio y staging); el botón «Release PIN blocks» sigue funcionando. **Resto con el mismo patrón (decisión D-3 de la spec E1), previsto en E4:** `ai.mcp.user.consume_key_pin`; `ai.key.pin.desk.touch`, `close`, `any_open` y `notify_changed`; `ai.key.pin.ask.collect` y `supply` (públicos, en `sudo`); `ai.api.result.cache.get_cached`/`store` (públicos en `sudo`, aunque la clave incluye el uid); `ai.fetch.cache.gc_expired` y `ai.api.result.cache.gc_expired`.
 - **Ubicación:** `pns_ai_mcp/models/mcp_user.py:819-860`; `models/key_pin_block.py:36-73`;
   `models/key_pin_desk.py:171-192`; `static/src/js/key_pin_desk_v14.js:93-118`.
 - **Comportamiento:**
@@ -1701,6 +1702,7 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
 ### PNS-85 — Caché de parámetros de skills escribible por cualquier usuario autenticado
 
 - **Gravedad:** Media · **Estado:** NUEVO (relacionado con PNS-07).
+- **Rama Seges (20/10/2026):** **CORREGIDO con el parche 9 (E1)**: los cuatro métodos pasan a privados y a la lista negra del sandbox; por RPC se rechazan (laboratorio y staging). En staging, la caché se guarda en el primer turno de una skill y el segundo la usa sin llamar al modelo (0 tokens). Queda abierto el alias en el sandbox (`f = m._metodo; f()`), que cierra E3.
 - **Ubicación:** `pns_ai_mcp/models/ai_skill_param_cache.py:125-154` (`remember_for_skill`) y
   `:91-107` (`lookup_for_skill`); `models/ai_skill.py:329-345`; `utils/agent_engine.py:785`.
 - **Comportamiento:**
@@ -1843,6 +1845,7 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
 
 - **Gravedad:** Alta · **Estado:** NUEVO (ya existía en 3.1.486; resto de PNS-14; relacionado con
   PNS-16 y PNS-17).
+- **Rama Seges (20/10/2026):** **CORREGIDO con el parche 7 (E1)**: `get_cached` y `store` pasan a privados; un interno y un portal ya no leen ni escriben la caché por RPC (prueba 1 de 3c repetida en staging: CORREGIDO). `fetch_url` sigue cacheando y sirviendo desde la caché (staging, R1).
 - **Ubicación:** `pns_ai_mcp/models/fetch_cache.py:63-89` (`get_cached`) y `:91-123` (`store`);
   `controllers/safe_plan.py:1493-1503` (clave de caché), `:1619` (lectura) y `:1667, 1723`
   (escritura).
@@ -1870,6 +1873,7 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
 
 - **Gravedad:** Media · **Estado:** NUEVO (ya existía en 3.1.486; relacionado con PNS-16, PNS-59 y
   PNS-86).
+- **Rama Seges (20/10/2026):** **CORREGIDO con el parche 8 (E1)**: `ensure_domain_whitelisted` pasa a privado; un interno y un portal ya no añaden ni reactivan dominios (prueba 2 de 3c repetida en staging: CORREGIDO). Siguen funcionando el alta al confirmar un AI Administrator, el botón «➕ Whitelist», la reactivación y el alta de servidores externos (staging, R2).
 - **Ubicación:** `pns_ai_mcp/models/url_whitelist.py:235-266`; tipos admitidos en `:54-56`.
 - **Comportamiento:**
   - `ensure_domain_whitelisted(hostname, notes, kind)` es `@api.model` público. Crea la fila con

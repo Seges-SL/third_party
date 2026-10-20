@@ -52,12 +52,14 @@ Los marcadores de los parches 1 a 6 no se cambian: la ruta de este documento tam
 | 4 | PNS-81 | compatibilidad | `pns_ai_mcp/controllers/main.py` | — | rama `14.0-pns-ai-3` | En LIYBEN |
 | 5 | PNS-93 | compatibilidad | `pns_ai_mcp/lib/llm/drivers/openai_driver.py` | — | `27cadbb` | En LIYBEN |
 | 6 | PNS-94 | robustez | `pns_ai_chatboo/models/chatboo_async_request.py` | — | `63ee2dc` | En LIYBEN |
-| 7 | PNS-90 | seguridad | `pns_ai_mcp/models/fetch_cache.py`, `pns_ai_mcp/controllers/safe_plan.py`, `pns_ai_mcp/controllers/validators.py` | E1 | — | Validado en laboratorio |
-| 8 | PNS-91 | seguridad | `pns_ai_mcp/models/url_whitelist.py`, `pns_ai_mcp/controllers/safe_plan.py`, `pns_ai_mcp/models/safe_operation.py`, `pns_ai_mcp/models/external_server.py`, `pns_ai_mcp/controllers/validators.py` | E1 | — | Validado en laboratorio |
-| 9 | PNS-85 | seguridad | `pns_ai_mcp/models/ai_skill_param_cache.py`, `pns_ai_mcp/models/ai_skill.py`, `pns_ai_mcp/utils/agent_engine.py`, `pns_ai_mcp/controllers/validators.py` | E1 | — | Validado en laboratorio |
-| 10 | PNS-83 | seguridad | `pns_ai_mcp/models/mcp_user.py`, `pns_ai_mcp/models/key_pin_block.py`, `pns_ai_mcp/models/res_config_settings.py`, `pns_ai_mcp/controllers/validators.py` | E1 | — | Validado en laboratorio |
+| 7 | PNS-90 | seguridad | `pns_ai_mcp/models/fetch_cache.py`, `pns_ai_mcp/controllers/safe_plan.py`, `pns_ai_mcp/controllers/validators.py` | E1 | (ver `git log`) | Validado en staging |
+| 8 | PNS-91 | seguridad | `pns_ai_mcp/models/url_whitelist.py`, `pns_ai_mcp/controllers/safe_plan.py`, `pns_ai_mcp/models/safe_operation.py`, `pns_ai_mcp/models/external_server.py`, `pns_ai_mcp/controllers/validators.py` | E1 | (ver `git log`) | Validado en staging |
+| 9 | PNS-85 | seguridad | `pns_ai_mcp/models/ai_skill_param_cache.py`, `pns_ai_mcp/models/ai_skill.py`, `pns_ai_mcp/utils/agent_engine.py`, `pns_ai_mcp/controllers/validators.py` | E1 | (ver `git log`) | Validado en staging |
+| 10 | PNS-83 | seguridad | `pns_ai_mcp/models/mcp_user.py`, `pns_ai_mcp/models/key_pin_block.py`, `pns_ai_mcp/models/res_config_settings.py`, `pns_ai_mcp/controllers/validators.py` | E1 | (ver `git log`) | Validado en staging |
 
 Estados: Pendiente → Aplicado → Validado en laboratorio → Validado en staging → En LIYBEN.
+LIYBEN recibe los parches 7 en adelante de una vez, al terminar el plan de corrección (decisión del
+20/10/2026).
 
 ## Versiones nuevas del fabricante (vigilancia, N12)
 
@@ -415,7 +417,7 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 ## Parche 7: `ai.fetch.cache.get_cached` y `store` pasan a privados (`_get_cached`, `_store`)
 
 - **Fecha:** 2026-10-20.
-- **Estado:** **validado en laboratorio (20/10/2026)**; pendiente de staging (plan en el §9.3 de la [spec E1](../specs/correcciones_pns_ai_entrega1.md)).
+- **Estado:** **validado en staging (20/10/2026)**, con el commit `2bb4f51` ([verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E1»). En LIYBEN se desplegará al terminar el [plan de corrección](plan_correccion_pns_ai.md).
 - **PNS:** PNS-90 del [seguimiento](seguimiento_informe_pns_ai.md). Spec: [spec E1](../specs/correcciones_pns_ai_entrega1.md) (entrega E1).
 - **Qué falla sin él:** cualquier usuario autenticado (interno o de portal) lee y escribe por RPC (`/web/dataset/call_kw`, `/jsonrpc`, `/xmlrpc/*`) la caché global de `fetch_url`: ambos métodos trabajan en `sudo()` sin comprobar grupo. Se puede envenenar la caché (que el motor sirva un cuerpo falso a todos) o leer respuestas cacheadas.
 - **Cambio:** los dos métodos se renombran con `_` (el core rechaza por RPC los nombres privados con `AccessError`) y se actualizan sus 3 llamadores en `controllers/safe_plan.py` (`_execute_fetch_url`). `ai.api.result.cache.get_cached`/`store` (otro modelo, `safe_plan.py:1815` y `:1871`) no se tocan. Se añaden además a `RELAXAICODE_SIDE_EFFECT_METHODS` (`controllers/validators.py`) los nombres nuevos, con su marcador, para que el sandbox de relaxaicode no los alcance (el sandbox deja llamar a métodos con un guion bajo). Diff completo: [spec E1](../specs/correcciones_pns_ai_entrega1.md), §5.4.
@@ -439,7 +441,7 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 ## Parche 8: `ai.url.whitelist.ensure_domain_whitelisted` pasa a privado (`_ensure_domain_whitelisted`)
 
 - **Fecha:** 2026-10-20.
-- **Estado:** **validado en laboratorio (20/10/2026)**; pendiente de staging (plan en el §9.3 de la [spec E1](../specs/correcciones_pns_ai_entrega1.md)).
+- **Estado:** **validado en staging (20/10/2026)**, con el commit `2bb4f51` ([verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E1»). En LIYBEN se desplegará al terminar el [plan de corrección](plan_correccion_pns_ai.md).
 - **PNS:** PNS-91 del [seguimiento](seguimiento_informe_pns_ai.md). Spec: [spec E1](../specs/correcciones_pns_ai_entrega1.md) (entrega E1).
 - **Qué falla sin él:** cualquier usuario autenticado (también portal) puede añadir dominios a la lista blanca de `fetch_url` o reactivar los archivados por RPC: el método usa `sudo()` sin comprobar grupo, con lo que se salta el ACL (solo AI Administrator escribe).
 - **Cambio:** el método se renombra con `_` y se actualizan sus 7 llamadores: `controllers/safe_plan.py` (`_ensure_fetch_url_whitelist`, 2), `models/safe_operation.py` (`_maybe_auto_whitelist`, 2; `action_add_to_whitelist`, 1) y `models/external_server.py` (2). Los llamadores ya deciden la política antes de llamarlo. Se añaden además a `RELAXAICODE_SIDE_EFFECT_METHODS` (`controllers/validators.py`) los nombres nuevos, con su marcador, para que el sandbox de relaxaicode no los alcance (el sandbox deja llamar a métodos con un guion bajo). Diff completo: [spec E1](../specs/correcciones_pns_ai_entrega1.md), §5.4.
@@ -463,7 +465,7 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 ## Parche 9: `ai.skill.param.cache` y `ai.skill`: `remember_for_skill`, `lookup_for_skill`, `remember_param_cache`, `lookup_param_cache` pasan a privados
 
 - **Fecha:** 2026-10-20.
-- **Estado:** **validado en laboratorio (20/10/2026)**; pendiente de staging (plan en el §9.3 de la [spec E1](../specs/correcciones_pns_ai_entrega1.md)).
+- **Estado:** **validado en staging (20/10/2026)**, con el commit `2bb4f51` ([verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E1»). En LIYBEN se desplegará al terminar el [plan de corrección](plan_correccion_pns_ai.md).
 - **PNS:** PNS-85 del [seguimiento](seguimiento_informe_pns_ai.md). Spec: [spec E1](../specs/correcciones_pns_ai_entrega1.md) (entrega E1).
 - **Qué falla sin él:** cualquier usuario autenticado (también portal) escribe por RPC en la caché de parámetros de skills (`remember_*`, con cursor propio de superusuario y commit) o lee sus filas (`lookup_*`, en `sudo()`), sin comprobar grupo ni propiedad de la skill.
 - **Cambio:** los cuatro métodos se renombran con `_`; se actualizan la delegación de `ai.skill` a `ai.skill.param.cache` (`models/ai_skill.py`) y las dos referencias por nombre en `utils/agent_engine.py` (`getattr(skill, '_lookup_param_cache', None)` y `'_remember_param_cache'`: si no se actualizaran fallarían en silencio). Se añaden además a `RELAXAICODE_SIDE_EFFECT_METHODS` (`controllers/validators.py`) los nombres nuevos, con su marcador, para que el sandbox de relaxaicode no los alcance (el sandbox deja llamar a métodos con un guion bajo). Diff completo: [spec E1](../specs/correcciones_pns_ai_entrega1.md), §5.4.
@@ -489,7 +491,7 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 ## Parche 10: `ai.mcp.user.redeem_key_pin` y `ai.key.pin.block.release_all`, `note_failure`, `is_blocked` pasan a privados
 
 - **Fecha:** 2026-10-20.
-- **Estado:** **validado en laboratorio (20/10/2026)**; pendiente de staging (plan en el §9.3 de la [spec E1](../specs/correcciones_pns_ai_entrega1.md)).
+- **Estado:** **validado en staging (20/10/2026)**, con el commit `2bb4f51` ([verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E1»). En LIYBEN se desplegará al terminar el [plan de corrección](plan_correccion_pns_ai.md).
 - **PNS:** PNS-83 del [seguimiento](seguimiento_informe_pns_ai.md). Spec: [spec E1](../specs/correcciones_pns_ai_entrega1.md) (entrega E1).
 - **Qué falla sin él:** cualquier usuario autenticado (también portal) puede canjear un PIN de clave API por RPC con la IP que indique (`redeem_key_pin`, `sudo`), bloquear la IP que quiera (`note_failure`, denegación de servicio), consultar el estado de cualquier IP (`is_blocked`) o levantar todos los bloqueos (`release_all`).
 - **Cambio:** los cuatro métodos se renombran con `_`; se actualizan `models/mcp_user.py` (2 llamadas), `models/key_pin_block.py` (1 llamada interna) y `models/res_config_settings.py` (`action_key_pin_release`, que sigue público y comprueba `ensure_ai_admin`). `redeem_key_pin` no tenía llamador. Se añaden además a `RELAXAICODE_SIDE_EFFECT_METHODS` (`controllers/validators.py`) los nombres nuevos, con su marcador, para que el sandbox de relaxaicode no los alcance (el sandbox deja llamar a métodos con un guion bajo). Diff completo: [spec E1](../specs/correcciones_pns_ai_entrega1.md), §5.4.
@@ -530,6 +532,10 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
   respecto al §9.1 de la spec, que proponía `is_domain_whitelisted`).
 - **Pruebas:** `odoo-dev 14 tests pns_ai_mcp` en el contexto `lab_pns_ai`: 198 tests. Resultado: 148
   pasados, 5 saltados, 14 fallidos y 31 errores (línea base 130/5/14/31 más los 18 tests nuevos).
+
+- **Staging (20/10/2026):** validados los cuatro parches con el commit `2bb4f51`: pruebas 1 a 6 de
+  seguridad CORREGIDO (también con portal y por `/jsonrpc`) y no regresión R1 a R7 con Gemini. Detalle
+  en la [verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E1».
 
 ## Comprobaciones realizadas (2026-10-13)
 
