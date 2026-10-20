@@ -326,21 +326,23 @@ class AISkill(models.Model):
         self.ensure_one()
         return ((self.command or '').strip() or (self.code or '').strip())
 
-    def lookup_param_cache(self, leftover):
+    # Seges: parche 9 (PNS-85, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    def _lookup_param_cache(self, leftover):
         """Cached hybrid params for leftover prose, or None."""
         self.ensure_one()
         if not self.id:
             return None
-        return self.env['ai.skill.param.cache'].lookup_for_skill(
+        return self.env['ai.skill.param.cache']._lookup_for_skill(
             self.id, leftover,
         )
 
-    def remember_param_cache(self, leftover, norm):
+    # Seges: parche 9 (PNS-85, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    def _remember_param_cache(self, leftover, norm):
         """Store leftover → IA params if this phrase is new."""
         self.ensure_one()
         if not self.id:
             return self.env['ai.skill.param.cache']
-        return self.env['ai.skill.param.cache'].remember_for_skill(
+        return self.env['ai.skill.param.cache']._remember_for_skill(
             self.id, leftover, norm,
         )
 

@@ -782,7 +782,8 @@ class AgentEngine:
             return finalize_skill_params(det or {}, schema) or None
 
         cached = None
-        lookup = getattr(skill, 'lookup_param_cache', None)
+        # Seges: parche 9 (PNS-85, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        lookup = getattr(skill, '_lookup_param_cache', None)
         if unresolved and callable(lookup):
             try:
                 cached = lookup(unresolved)
@@ -865,7 +866,8 @@ class AgentEngine:
         merged = finalize_skill_params(merged, schema)
         if isinstance(merged, dict) and merged.get('_skill_args_reject'):
             return merged
-        remember = getattr(skill, 'remember_param_cache', None)
+        # Seges: parche 9 (PNS-85, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        remember = getattr(skill, '_remember_param_cache', None)
         if unresolved and callable(remember):
             try:
                 remember(unresolved, norm)
