@@ -2,7 +2,8 @@
 
 - **Ramas:** `14.0-pns-ai-3` (parches 1 a 6) · `14.0-pns-ai-correcciones` (parches 7 en adelante,
   [plan de corrección](plan_correccion_pns_ai.md))
-- **Fecha:** 2026-10-13 (parches 1 a 3) · actualizado el 2026-10-20 (N11 y N12)
+- **Fecha:** 2026-10-13 (parches 1 a 3) · actualizado el 2026-10-20 (N11 y N12) y el 2026-10-21
+  (staging de E2)
 - **Versión del fabricante, base propia de Seges desde el 20/10/2026 (N12):** `pns_base` 14.0.1.2.32 ·
   `pns_ai_mcp` 14.0.3.1.782 · `pns_ai_chatboo` 14.0.2.1.453
 - **Licencia:** Apache-2.0 (`LICENSE` y `NOTICE` de cada módulo, que se conservan sin cambios).
@@ -18,7 +19,8 @@
 > - Cambio mínimo, sin dependencias nuevas, sin tocar `version`, `depends` ni
 >   `external_dependencies` de los manifest, ni `i18n`; `ir.model.access.csv` solo si no hay otra
 >   forma (no admite el marcador).
-> - Un parche por PNS, un commit por parche y un commit para los tests de cada entrega.
+> - Un parche por PNS, salvo causa común documentada en el propio parche (como el 12, PNS-01/02);
+>   un commit por parche y un commit para los tests de cada entrega.
 > - Nada se envía al fabricante como código. La 2.ª entrega del informe se envía al final del plan de
 >   corrección, sin diffs (D2).
 >
@@ -54,12 +56,13 @@ Los marcadores de los parches 1 a 6 no se cambian: la ruta de este documento tam
 | 6 | PNS-94 | robustez | `pns_ai_chatboo/models/chatboo_async_request.py` | — | `63ee2dc` | En LIYBEN |
 | 7 | PNS-90 | seguridad | `pns_ai_mcp/models/fetch_cache.py`, `pns_ai_mcp/controllers/safe_plan.py`, `pns_ai_mcp/controllers/validators.py` | E1 | (ver `git log`) | Validado en staging |
 | 8 | PNS-91 | seguridad | `pns_ai_mcp/models/url_whitelist.py`, `pns_ai_mcp/controllers/safe_plan.py`, `pns_ai_mcp/models/safe_operation.py`, `pns_ai_mcp/models/external_server.py`, `pns_ai_mcp/controllers/validators.py` | E1 | (ver `git log`) | Validado en staging |
-| 9 | PNS-85 | seguridad | `pns_ai_mcp/models/ai_skill_param_cache.py`, `pns_ai_mcp/models/ai_skill.py`, `pns_ai_mcp/utils/agent_engine.py`, `pns_ai_mcp/controllers/validators.py` | E1 | (ver `git log`) | Validado en staging |
-| 10 | PNS-83 | seguridad | `pns_ai_mcp/models/mcp_user.py`, `pns_ai_mcp/models/key_pin_block.py`, `pns_ai_mcp/models/res_config_settings.py`, `pns_ai_mcp/controllers/validators.py` | E1 | (ver `git log`) | Validado en staging |
-| 11 | PNS-82 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_async_request.py`, `pns_ai_mcp/controllers/validators.py` | E2 | (ver `git log`) | Validado en laboratorio |
-| 12 | PNS-01, PNS-02 | seguridad | `pns_ai_mcp/models/ai_system_action.py` | E2 | (ver `git log`) | Validado en laboratorio |
+| 9 | PNS-85 | seguridad | `pns_ai_mcp/models/ai_skill_param_cache.py`, `pns_ai_mcp/models/ai_skill.py`, `pns_ai_mcp/utils/agent_engine.py`, `pns_ai_mcp/controllers/validators.py` | E1 | `ba9e9d8` | Validado en staging |
+| 10 | PNS-83 | seguridad | `pns_ai_mcp/models/mcp_user.py`, `pns_ai_mcp/models/key_pin_block.py`, `pns_ai_mcp/models/res_config_settings.py`, `pns_ai_mcp/controllers/validators.py` | E1 | `fae47d7` | Validado en staging |
+| 11 | PNS-82 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_async_request.py`, `pns_ai_mcp/controllers/validators.py` | E2 | `2cb5343` | Validado en staging |
+| 12 | PNS-01, PNS-02 | seguridad | `pns_ai_mcp/models/ai_system_action.py` | E2 | `1cac02c` | Validado en staging |
 
 Estados: Pendiente → Aplicado → Validado en laboratorio → Validado en staging → En LIYBEN.
+Tests de cada entrega: E1 `2bb4f51`; E2 `422d2d7` y `792481c` (test del cron).
 LIYBEN recibe los parches 7 en adelante de una vez, al terminar el plan de corrección (decisión del
 20/10/2026).
 
@@ -542,7 +545,7 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 ## Parche 11: `chatboo.session`: el flujo de chips de descarga pasa a privado y solo engancha adjuntos del dueño (PNS-82)
 
 - **Fecha:** 2026-10-20.
-- **Estado:** **validado en laboratorio (20/10/2026)**. Pendiente de validar en staging. En LIYBEN se desplegará al terminar el [plan de corrección](plan_correccion_pns_ai.md).
+- **Estado:** **validado en staging (21/10/2026)**, con el commit `792481c` ([verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E2»). En LIYBEN se desplegará al terminar el [plan de corrección](plan_correccion_pns_ai.md).
 - **PNS:** PNS-82 del [seguimiento](seguimiento_informe_pns_ai.md). Spec: [spec E2](../specs/correcciones_pns_ai_entrega2.md) (entrega E2).
 - **Qué falla sin él:** `claim_turn_file_chips` (y `apply_`/`stage_`/`consume_*_chips`) engancha en `sudo` a una sesión cualquier adjunto huérfano (sin `res_model` o sin `res_id`), sea de quien sea, incluidas las copias de configuración exportadas por un administrador. Después `/pns_ai_mcp/session_file` y `/web/content` lo sirven, y el borrado de la sesión lo borra. Se podía hacer por RPC directo (también con portal) o, sin método público, con el búfer `staged_assistant_files` más `request_cancel`.
 - **Cambio:**
@@ -569,11 +572,16 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
   4. `odoo-dev 14 tests pns_ai_mcp`: 205 tests, sin cambios en los fallos de la línea base (ver parche 12).
   5. `grep` de llamadores del §5.5 de la spec: vacío. `grep -rn "Seges: parche 1[12] (PNS-" pns_ai_mcp pns_ai_chatboo`:
      20 líneas (parche 11: 15; parche 12: 5).
+- **Staging (21/10/2026):** PNS-82 CORREGIDO por RPC directo (interno y portal), por la vía del búfer
+  con `request_cancel` y en la descarga; al borrar una sesión, el adjunto propio se borra y el ajeno
+  enganchado (simulado por SQL) se desengancha y su creador lo sigue descargando. Sin regresión en las
+  descargas del chat. Los adjuntos del PDF, el Word, el clip y el SVG quedan huérfanos por causas del
+  fabricante, no de este parche (PNS-98 del [seguimiento](seguimiento_informe_pns_ai.md)).
 
 ## Parche 12: `ai.system.action`: dar o quitar grupos nativos exige `base.group_system` (PNS-01 y PNS-02, resto)
 
 - **Fecha:** 2026-10-20.
-- **Estado:** **validado en laboratorio (20/10/2026)**. Pendiente de validar en staging. En LIYBEN se desplegará al terminar el [plan de corrección](plan_correccion_pns_ai.md).
+- **Estado:** **validado en staging (21/10/2026)**, con el commit `792481c` ([verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E2»). En LIYBEN se desplegará al terminar el [plan de corrección](plan_correccion_pns_ai.md).
 - **PNS:** PNS-01 y PNS-02 (resto común) del [seguimiento](seguimiento_informe_pns_ai.md). Un solo parche para los dos (misma causa y mismo archivo; excepción a «un parche por PNS» aprobada, D-11 de la spec). Spec: [spec E2](../specs/correcciones_pns_ai_entrega2.md) (entrega E2).
 - **Qué falla sin él:** `user.add_group` y `user.remove_group` solo exigen `group_ai_admin`, y `_apply_user_add_group` / `_apply_user_remove_group` resuelven y escriben en `sudo`. Un AI Administrator sin Ajustes se puede dar `base.group_system` (o quitárselo a un administrador) con un plan que él mismo confirma.
 - **Cambio:** método nuevo `_check_may_change_user_groups()` en `models/ai_system_action.py` (superusuario o `has_group('base.group_system')` sobre `self.env.user`, y si no `UserError`), llamado al principio de `_preview_user_add_group`, `_apply_user_add_group`, `_preview_user_remove_group` y `_apply_user_remove_group`, antes de resolver usuario y grupo en `sudo`. La comprobación va en Python (no en `data/trusted_actions_system.xml`: el AI Administrator edita `ai.trusted.action` y `group_ids` significa «al menos uno»). Diff completo: [spec E2](../specs/correcciones_pns_ai_entrega2.md), §5.5.
@@ -595,6 +603,9 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
      fallidos y 31 errores, con los mismos nombres. `test_user_group_preview` sigue igual.
   4. `grep -rn "_check_may_change_user_groups" pns_ai_mcp --include=*.py` (sin tests): 5 líneas.
      `grep -rn "Seges: parche [0-9]* (PNS-" pns_ai_mcp`: 36 líneas; en `pns_ai_chatboo`: 14.
+- **Staging (21/10/2026):** un AI Administrator sin Ajustes es rechazado al proponer (por `/mcp`) y al
+  confirmar un plan propuesto por `admin`, al dar y al quitar grupos; `admin`, con Ajustes, quita y
+  vuelve a poner un grupo; `view.set_field_readonly` sigue disponible sin Ajustes.
 
 ## Comprobaciones realizadas (2026-10-13)
 

@@ -236,6 +236,11 @@ Decisión: ____ / Fecha: ____
 
 **Tras la reunión del 19/10/2026:** **SIGUE BLOQUEANTE si se instala Chatboo.** Se desbloquea con la corrección de PNS-82 en la rama de Seges (entrega E2 del [plan de corrección](plan_correccion_pns_ai.md)), validada en staging. (ver [§10](#10-reunión-del-19102026-corrección-por-seges-n11-y-n12))
 
+**Tras el staging de E2 (21/10/2026):** **se cumple el criterio de desbloqueo**: PNS-82 está
+corregido en la rama de Seges (parche 11) y validado en staging. Queda que Sergio la dé por
+desbloqueada; para instalar Chatboo siguen D46 (y D29). En LIYBEN la corrección llega con el despliegue
+único al terminar el plan. (ver [§10.3](#103-efecto-de-la-entrega-e2-21102026))
+
 ### D18 — ¿Qué otros módulos `pns_*` con conocimiento de IA se instalarán?
 
 **Contexto:** `pns_ai_mcp` es infraestructura: el chat lo aporta `pns_ai_chatboo`, y hay otros
@@ -468,6 +473,12 @@ Decisión: ____ / Fecha: ____
 - **Nuevo alcance:** AI Writer baja a riesgo medio: ya no escala al guardar ni escribe en el prompt de todos; sigue activando skills sin revisión (D27). AI Administrator equivale a administrador de Odoo: solo para personal técnico que ya lo sea. Sigue siendo **BLOQUEANTE**.
 
 **Tras la reunión del 19/10/2026:** **Decidida para LIYBEN:** AI Administrator solo para `fran.odoo@seges.es` y `sguerrero@liyben.com`, que ya tienen `base.group_system` ([instalación](instalacion_liyben_pns_ai.md) §3.5). En LIYBEN el resto de PNS-01/02 queda cubierto hasta la entrega E2. Para BD de clientes sigue abierta. (ver [§10](#10-reunión-del-19102026-corrección-por-seges-n11-y-n12))
+
+**Tras el staging de E2 (21/10/2026):** con el parche 12 (validado en staging), un AI Administrator
+sin Ajustes ya no puede dar ni quitar grupos nativos: en ese punto deja de equivaler a administrador de
+Odoo. Siguen PNS-84 (lee PIN y claves en claro), PNS-86 (generador OpenAPI) y PNS-97 (edita el
+registro `ai.trusted.action`), así que para BD de clientes sigue abierta. En LIYBEN no cambia: los dos
+AI Administrator ya tienen Ajustes. (ver [§10.3](#103-efecto-de-la-entrega-e2-21102026))
 
 ### D46 — ¿A qué usuarios se generará la clave MCP para usar Chatboo? — **BLOQUEANTE si se instala Chatboo**
 
@@ -872,6 +883,12 @@ Decisión: ____ / Fecha: ____
 **Tras 3.1.782 (14/10/2026): CAMBIA.**
 - **Lo que la motivaba:** PNS-20 PARCIAL: exportación sin secretos por defecto (se pregunta desde Ajustes) y purga de los adjuntos a las 24 h; la importación sigue sobrescribiendo, sin resumen previo. Nuevo PNS-82: durante esas 24 h, cualquier interno puede apropiarse de una copia (se guardan sin `res_model`).
 - **Nuevo alcance:** la custodia es más sencilla, pero mientras siga PNS-82 no se exportan copias con secretos (N3).
+
+**Tras el staging de E2 (21/10/2026):** con el parche 11 (validado en staging), otro usuario ya no
+puede engancharse una copia de configuración: solo la reclama quien la exportó. Donde esté desplegada
+la rama de Seges se puede levantar la restricción «no exportar copias con secretos mientras siga
+PNS-82»; la decisión es de Sergio. En LIYBEN sigue vigente hasta el despliegue único al terminar el
+plan. (ver [§10.3](#103-efecto-de-la-entrega-e2-21102026))
 
 ---
 
@@ -1760,6 +1777,18 @@ Cada decisión afectada lleva además un bloque «Tras la reunión del 19/10/202
 | N7 | Portal: se archivan; las correcciones llegan a LIYBEN de una vez, al terminar el plan |
 | N8 | Gemini y OVH en LIYBEN, con failover |
 | Regla de no modificar código de terceros (Resumen, punto 8) y regla de `parches_pns_ai.md` | Sustituidas por N11 y N12 |
+
+### 10.3 Efecto de la entrega E2 (21/10/2026)
+
+E2 (parches 11 y 12: PNS-82 y restos de PNS-01/02) quedó validada en staging el 21/10/2026
+([verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E2»). Cada decisión afectada
+lleva un bloque «Tras el staging de E2 (21/10/2026)». Ninguna se da por cerrada aquí: son de Sergio.
+
+| Decisión | Efecto |
+|---|---|
+| D33 | Se cumple el criterio de desbloqueo (PNS-82 corregido y validado); para Chatboo siguen D46 y D29 |
+| D8 | Se puede levantar «no exportar copias con secretos mientras siga PNS-82» donde esté la rama; en LIYBEN, tras el despliegue único |
+| D4 | AI Administrator ya no da ni quita grupos nativos sin Ajustes; siguen PNS-84, PNS-86 y PNS-97 (abierta para BD de clientes) |
 
 ---
 

@@ -1796,5 +1796,117 @@ Seges.
 los dominios `httpbin.org`, `example.org` y `petstore3.swagger.io`, los grupos AI Conversational y
 External URL añadidos a `admin` y su clave MCP; por SQL, las filas de prueba de `ai_fetch_cache` y
 `ai_skill_param_cache`. Recuentos finales esperados de `ai_fetch_cache`, `ai_skill_param_cache`,
-`ai_url_whitelist` y `ai_key_pin_block`: 0 (**pendiente de anotar el resultado**). Temporales del despliegue en `/tmp`, borrados.
+`ai_url_whitelist` y `ai_key_pin_block`: 0 (el resultado no se anotó en su momento). Temporales del despliegue en `/tmp`, borrados.
 `addons_antes_E1` se conserva hasta la limpieza final del staging.
+
+## Staging — entrega E2 (21/10/2026)
+
+- **Qué se valida:** parches 11 (PNS-82) y 12 (restos de PNS-01/02), según el §9.3 de la
+  [spec E2](../specs/correcciones_pns_ai_entrega2.md). Laboratorio: `pns_ai_mcp` 205 tests, 155 / 5 /
+  14 / 31 (los 7 nuevos en verde y los 45 fallos y errores de la línea base, con los mismos nombres);
+  `pns_ai_chatboo` 15 tests, todos en verde; revisión de `odoo-reviewer`: APROBADO.
+- **Despliegue en `pns_demo`:** commit `792481c` de `14.0-pns-ai-correcciones` (`git archive` de los
+  tres módulos). Huella SHA-256 `3ee9623d618a6a27f8b3e53e961ea18f9bf3468e9df84cbc7d4901c5b7eb865f`,
+  idéntica en el equipo y en el VPS. `diff -rq` con el despliegue anterior (`2bb4f51`): solo
+  `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_async_request.py`,
+  `pns_ai_mcp/controllers/validators.py`, `pns_ai_mcp/models/ai_system_action.py` y
+  `pns_ai_mcp/tests/__init__.py` distintos, y `pns_ai_chatboo/tests/` y
+  `pns_ai_mcp/tests/test_seges_user_groups.py` nuevos; 20 marcadores `Seges: parche 1[12] (PNS-`
+  fuera de los tests. **Auditoría previa** (adjuntos colgados de sesiones de otro dueño, consulta del
+  §9.3): 0 filas. Copia previa en `/opt/odoo/pns_staging/addons_antes_E2`. Sustitución con `rsync`
+  como el usuario `ubuntu` (1000, dueño de `addons`) y reinicio de `odoo14_pns`, sin `-u`; arranque sin
+  errores (11:04 UTC).
+- **Usuarios y datos de prueba** (`preparar_e2.py`, por RPC como `admin`): A2 (`e2_interno_a`, id 14),
+  B (`e2_interno_b`, 15), P (`e2_portal`, portal, 16), E2ADM (`e2_aiadmin`, AI Administrator y AI
+  Conversational **sin** Ajustes, 17) y T (`e2_objetivo`, con Creación de contactos, 18). X = adjunto
+  huérfano de A2 (308); CS_B = sesión de B (31); Y = adjunto huérfano de `admin` que simula una copia
+  de configuración (309). `admin`, temporalmente con AI Conversational y clave MCP; clave MCP de
+  E2ADM. Línea base: 12 filas en `ai_safe_operation`. Contraseña de `admin`: sin cambios.
+- **Scripts:** `preparar_e2.py`, `pruebas_e2_rpc.py` (pruebas 1 a 5), `pruebas_e2_mcp.py` (pruebas 6 a
+  9, por `/mcp` sin LLM) y `prueba4_bis_e2.py`, solo con la biblioteca estándar; contraseñas y claves en
+  variables de entorno cargadas con `read -s`, sin guardarlas.
+
+### Pruebas de seguridad
+
+| # | Prueba | Quién | Resultado |
+|---|---|---|---|
+| 1 | PNS-82, RPC directo: `claim_turn_file_chips`, `apply_`, `stage_` y `consume_staged_…`, públicos y privados | B y P | **CORREGIDO**: público → `AttributeError`; privado → `AccessError` (16 comprobaciones); X e Y sin cambios |
+| 2 | PNS-82, vía del búfer (H-2): `write` de `staged_assistant_files` con X e Y, `create` de un job y `request_cancel` | B | **CORREGIDO**: las tres llamadas responden y X e Y siguen huérfanos |
+| 3 | Descarga de X e Y por `/pns_ai_mcp/session_file` y `/web/content` | B | **CORREGIDO**: 404 en los cuatro casos. Control: A2 descarga X (200) |
+| 4 | Borrado en cascada (R3) | `admin` y B | Incompleta: `admin` no pudo enganchar X a CS_B (`AccessError`: la regla de registro de `chatboo.session` por `user_id` también se aplica a `admin`). Sí se comprobó que Z, adjunto propio de B colgado de CS_B, se borra con la sesión. Se repite como 4 bis |
+| 4 bis | B crea CS_B2 (33); X se engancha a ella por SQL (`UPDATE 1`, caso de la auditoría: datos anteriores al parche); B cuelga Z2 y borra CS_B2 | B | **CORREGIDO**: Z2 borrado; X existe con `res_model` vacío, `res_id` 0 y `create_uid` 14 (SQL); A2 descarga X (200) y B no (404) |
+| 5 | `unlink` de una sesión ajena (29) | B | `AccessError`; la sesión sigue |
+| 6 | PNS-01, propuesta por `/mcp`: `user.add_group` de `base.group_system` para sí mismo | E2ADM | **CORREGIDO**: `{"success": false, "error": "Step 1: Only a Settings administrator can add or remove user groups."}`; sin operación nueva (SQL); E2ADM sin Ajustes |
+| 7 | PNS-01, plan confirmado: `admin` propone (`SAFE00000001`) y E2ADM confirma en la interfaz | `admin` y E2ADM | **CORREGIDO**: `{"error": "Only a Settings administrator can add or remove user groups.", "_executing": false}`; operación `cancelled`; E2ADM sin Ajustes |
+| 8 | PNS-02: quitar Creación de contactos a T, propuesto por E2ADM y, en otro plan, propuesto por `admin` (`SAFE00000002`) y confirmado por E2ADM | E2ADM | **CORREGIDO**: rechazado en los dos casos con el mismo mensaje; operación `cancelled`; T conserva el grupo |
+| 9 | `view.set_field_readonly` sobre `res.partner.comment` (R5 de la spec) | E2ADM | La propuesta pasa (`SAFE00000003`, pendiente) y E2ADM la cancela: `view.*` sigue disponible sin Ajustes |
+| — | Control: `res.users.context_get` | B y P | Responde |
+
+Desde el despliegue se crearon exactamente 3 operaciones (13 a 15, las de 7 a 9); las propuestas
+rechazadas de 6 y 8 no dejaron fila. Las tres terminaron en `cancelled`.
+
+### No regresión con Gemini
+
+| # | Caso | Quién | Resultado |
+|---|---|---|---|
+| R1 | Exportación a Excel del motor | U1 | Chip y descarga correctos; adjunto 316 de U1, enganchado a la sesión 34 |
+| R2 | «Ahora en PDF» (montado en el navegador) | U1 | El chip pendiente se sustituye y descarga. El adjunto (317) queda huérfano: ver observaciones |
+| R2b | Lo mismo en Word | U1 | Igual que R2 (318) |
+| R3 | CSV adjuntado con el clip | U1 | Chip clicable y respuesta correcta; adjuntos 319 y 321 huérfanos (observaciones) |
+| R3b | SVG en línea | U1 | El SVG se ve dentro de la respuesta; adjunto 320 huérfano (observaciones) |
+| R4 | Recarga y reapertura desde History | U1 | Los chips siguen y descargan |
+| R5 | Borrar la sesión 34 desde History | U1 | Sin error; la sesión y sus adjuntos enganchados desaparecen (316 borrado); 317 a 321 siguen como huérfanos |
+| R5b | Borrado masivo de dos sesiones desde History | U1 | Sin error |
+| R6 | Plan de grupos con Ajustes: quitar y volver a poner Creación de contactos a T | `admin` | Operaciones 16 y 17 `executed`; T termina con el grupo |
+| R7 | «Añádeme el grupo Ajustes» en el chat | E2ADM | Sin tarjeta ni operación; E2ADM sin Ajustes. El turno se detuvo antes de proponer, por el control de acceso del core: «No puedes ingresar a los registros 'Aplicación' (ir.module.category)» (exige Derechos de acceso). El rechazo del parche al proponer queda cubierto por la prueba 6 |
+| R8 | Log desde las 11:04 UTC | — | Solo los rechazos provocados (prueba 1 a las 11:25; pruebas 7 y 8 a las 11:39). Ningún «no se pudieron borrar los adjuntos». Además, los conflictos de serialización de las observaciones |
+
+**Resultado:** parches 11 y 12 **validados en staging**. PNS-82 y los restos de PNS-01 y PNS-02:
+CORREGIDO en la rama de Seges.
+
+### Observaciones (ajenas a E2)
+
+- **Adjuntos del chat que quedan huérfanos (fabricante; nuevo PNS-98 en el seguimiento).** El PDF y el
+  Word montados en el navegador (`fulfill_client_export`), los ficheros del clip y el SVG en línea se
+  crean con el usuario del turno (`create_uid = 8`) pero no se enganchan a la sesión; el Excel del
+  motor sí. Causas, en el código del fabricante:
+  - PDF y Word: el adjunto se crea en un cursor aparte con commit (`_run_on_committed_cursor`,
+    `pns_ai_mcp/utils/session_download.py`) y la reclamación lo busca con el cursor de la petición, que
+    no lo ve (`REPEATABLE READ`): `att.exists()` da `False` y no se engancha. El propio comentario de
+    la función lo advierte («Downloads created on that cursor are invisible there»).
+  - Clip y SVG: `_finalize fresh-cursor failed` con `could not serialize access due to concurrent
+    update` al escribir `chatboo_async_request.done_meta` (jobs 141, 145 y 146; 11:58:37, 12:00:56 y
+    12:04:07 UTC). La vía de respaldo deja el job en `done` y guarda el turno, pero no reclama los
+    adjuntos.
+
+  El parche 11 no influye: sus dos filtros (sesión del usuario real y adjunto creado por él) se
+  cumplen en estos casos y, superados, el método hace lo mismo que el original; tampoco toca
+  `_finalize`. Conclusión por análisis del código y del log, sin repetir la prueba con el código
+  anterior (decisión de Sergio, 21/10/2026). No afecta a la seguridad (un huérfano solo lo leen su
+  creador y los administradores), pero esos adjuntos no se borran con la sesión. Desde el 15/10 no
+  había en `pns_demo` adjuntos de estos tipos anteriores a E2 con los que comparar.
+- **Conflictos de serialización con ficheros (PNS-94 de fondo, E5).** Además de los tres de
+  `_finalize`, a las 17:11:04 UTC (R6) `UPDATE chatboo_session SET last_used_date … WHERE id IN (37)`
+  falló con el mismo error, sin efecto visible en el turno. La validación del parche 6 (16/10) se hizo
+  con imágenes y el log salió limpio; con ficheros del clip y SVG aparecen estas trazas.
+- **Regla de registro de `chatboo.session`:** por `user_id`, también para `admin` (no es el
+  superusuario): no puede escribir en sesiones ajenas, enganchar adjuntos a ellas ni borrarlas. Por eso
+  la prueba 4 se rehízo con SQL y la limpieza borra las sesiones con cada usuario.
+- **`ai.safe.operation`:** el estado está en `status` (no `state`) y las operaciones se crean con
+  `create_uid = 1` (en `sudo`); quien las resuelve queda en `write_uid`. `ai_change_journal` registra
+  también los intentos rechazados (entradas 4 y 5, `confirmed_by_uid = 17`).
+- **R7:** con un AI Administrator sin Derechos de acceso, el modelo no llega a proponer el plan de
+  grupos porque antes consulta `ir.module.category` y el core se lo deniega.
+
+### Limpieza
+
+`preparar_e2.py --limpiar` (corregido: cada usuario de prueba borra sus sesiones y las operaciones se
+listan por `status`): sesión 38 de E2ADM borrada; adjuntos X e Y borrados; A2, B, P y T borrados con
+sus contactos. **E2ADM (`e2_aiadmin`, id 17) queda archivado:** no se puede borrar porque
+`ai_change_journal.confirmed_by_uid` lo referencia (entradas 4 y 5); se elimina con la limpieza final
+del staging. Por RPC como `admin`: adjuntos huérfanos 317 a 321, operaciones 13 a 17 y la sesión 37 de
+`admin`, borrados. En la interfaz: AI Conversational retirado a `admin`; claves MCP de `admin` y de
+E2ADM revocadas. Recuentos finales: `ai_safe_operation` 12 (línea base); adjuntos de prueba 0; `admin`
+sin AI Conversational; ninguna sesión creada desde el despliegue; único usuario `e2_*`, `e2_aiadmin`
+inactivo. Temporales del despliegue en `/tmp`, borrados. `addons_antes_E2` se conserva hasta la
+limpieza final del staging.

@@ -993,3 +993,27 @@ el prompt; D-8 archivo nuevo; D-9 sin código; D-10 `base.group_system`; D-11 un
 - **Entorno:** `odoo-dev 14 estado` indica `REPO=/home/soporte/GitHub/lab_pns_ai` con `third_party` como
   repo compartido (copia de trabajo `/home/soporte/GitHub/third_party`, rama `14.0-pns-ai-correcciones`);
   no hubo aviso de carpeta fuera del contexto.
+
+## Ajustes en la ejecución del staging (21/10/2026)
+
+Resultado completo en la [verificación](../pendiente/verificacion_seguridad_pns_ai.md), «Staging —
+entrega E2». Diferencias con el §9.3:
+
+- **Despliegue:** `rsync` como el usuario `ubuntu` (1000, dueño de `addons`), sin `sudo`. Commit
+  desplegado `792481c` (incluye el test del cron).
+- **Prueba 4:** `admin` no puede enganchar X a la sesión de B: la regla de registro de
+  `chatboo.session` por `user_id` también se aplica a `admin`, que no es el superusuario. Se repitió
+  como **4 bis** (`prueba4_bis_e2.py`): B crea otra sesión, X se engancha a ella por SQL (el caso de la
+  auditoría previa) y B la borra. Resultado: CORREGIDO.
+- **Pruebas 7 y 8:** `pruebas_e2_mcp.py` buscaba las operaciones con el campo `state`, que no existe
+  (es `status`), y no llegó a confirmarlas. E2ADM las confirmó en la interfaz (y canceló la de la prueba
+  9); resultado comprobado por SQL. Las operaciones se crean con `create_uid = 1`.
+- **Prueba 6 («sin operación nueva»):** comprobada por SQL (por el mismo fallo del script).
+- **R2b, R3b y R5b** (añadidos por el revisor): Word, SVG en línea y borrado masivo, correctos.
+- **R7:** el turno se detiene antes de proponer, por el control de acceso del core sobre
+  `ir.module.category` (E2ADM sin Derechos de acceso); el rechazo del parche al proponer lo cubre la
+  prueba 6.
+- **R1 a R5:** los adjuntos del PDF, el Word, el clip y el SVG quedan huérfanos por causas del
+  fabricante, no del parche 11 (nuevo PNS-98; verificación, «Observaciones»).
+- **Limpieza:** `e2_aiadmin` queda archivado (`ai_change_journal.confirmed_by_uid`); las sesiones de
+  prueba las borra cada usuario (`preparar_e2.py --limpiar` corregido).

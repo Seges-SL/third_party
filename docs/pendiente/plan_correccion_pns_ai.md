@@ -6,7 +6,7 @@
 - **Registro de los cambios en el código:** [parches_pns_ai.md](parches_pns_ai.md).
 - **Estado de cada hallazgo:** [seguimiento](seguimiento_informe_pns_ai.md). Pruebas y resultados en
   la [verificación](verificacion_seguridad_pns_ai.md).
-- **Estado del plan:** E0 y E1 hechas (20/10/2026); siguiente, E2.
+- **Estado del plan:** E0 y E1 hechas (20/10/2026); E2 hecha (21/10/2026); siguiente, ET.
 
 ## 1. Cómo se trabaja
 
@@ -35,13 +35,17 @@
 parches 1-6)»): `pns_ai_mcp` 180 tests, 130 pasados, 5 saltados, 14 fallidos y 31 errores;
 `pns_ai_chatboo` sin tests. Criterio de cada entrega: los tests nuevos pasan y el resto queda igual que
 en la línea base. **Tras E1:** 198 tests, 148 / 5 / 14 / 31 (los 18 de `test_seges_rpc_access.py` en
-verde).
+verde). **Tras E2:** `pns_ai_mcp` 205 tests, 155 / 5 / 14 / 31 (los 7 de
+`test_seges_user_groups.py` en verde); `pns_ai_chatboo` 15 tests, en verde.
 
 **Staging:** los scripts de E1 (`preparar_e1.py`, `pruebas_e1_rpc.py` y `pruebas_e1_mcp.py`, solo con la
 biblioteca estándar) sirven de modelo para preparar datos y repetir pruebas por RPC y por `/mcp` sin
 gastar cuota del proveedor. Con `whitelist_only`, solo un AI Administrator puede proponer un
 `fetch_url` a un dominio fuera de la lista. En Chrome, el staging pierde la sesión cada minuto (cookie
-compartida con `liyben.com`, probable): usar otro navegador o una ventana de incógnito.
+compartida con `liyben.com`, probable): usar otro navegador o una ventana de incógnito. Los scripts de
+E2 (`preparar_e2.py`, `pruebas_e2_rpc.py`, `pruebas_e2_mcp.py` y `prueba4_bis_e2.py`) añaden: la regla
+de registro de `chatboo.session` también se aplica a `admin` (para enganchar adjuntos a sesiones
+ajenas, SQL); `ai.safe.operation` usa `status`, no `state`, y se crea con `create_uid = 1`.
 
 **Límites comunes:** los de N11 (cambio mínimo, Python 3.7.3, sin dependencias nuevas, sin tocar
 `version`/`depends`/`external_dependencies`, `i18n` ni, salvo necesidad, `ir.model.access.csv`;
@@ -55,14 +59,14 @@ Esfuerzos orientativos, con agentes, revisión y validación.
 |---|---|---|---|---|---|---|
 | **E0** | N11 y N12; documentos; licencia; rama; línea base de tests | — | Nulo | ½ día | Línea base registrada y documentos subidos | Hecha (20/10/2026) |
 | **E1** | Patrón común (informe 2, §2.2) en `pns_ai_mcp`: PNS-90, 91, 85 y 83, y los métodos que pasen a privados añadidos a la lista negra del sandbox | 7-10 | Medio-bajo: un llamador sin actualizar rompería la caché de `fetch_url`, el alta de dominios o la caché de skills | 1-1½ días | Tests nuevos en verde y resto como la línea base; revisor APROBADO; staging: pruebas de 3b-1 (83, 85) y 3c (1, 2) CORREGIDO y sin regresión con Gemini | Hecha: validada en staging el 20/10/2026 (commit `2bb4f51`) |
-| **E2** | PNS-82 (adjuntos de Chatboo; tests nuevos en `pns_ai_chatboo/tests/`) y restos de PNS-01/02 (`base.group_system`, además de AI Administrator, para dar o quitar grupos) | 11-12 | Medio: las descargas propias del chat deben seguir funcionando | 1 día | B no reclama el adjunto de A y A lo sigue descargando; un AI Administrator sin Ajustes es rechazado; staging: descargas del chat | Pendiente |
+| **E2** | PNS-82 (adjuntos de Chatboo; tests nuevos en `pns_ai_chatboo/tests/`) y restos de PNS-01/02 (`base.group_system`, además de AI Administrator, para dar o quitar grupos) | 11-12 | Medio: las descargas propias del chat deben seguir funcionando | 1 día | B no reclama el adjunto de A y A lo sigue descargando; un AI Administrator sin Ajustes es rechazado; staging: descargas del chat | Hecha: validada en staging el 21/10/2026 (commit `792481c`) |
 | **ET** | Batería de tests al día: los 33 desfasados respecto a 3.1.782, los 2 con datos de prueba incompletos y los 5 que no encajan con Odoo 14 (revisión caso a caso); PNS-50 (los tres que no se ejecutan). Solo tests, sin código del producto | — | Bajo | 1 día | Batería en verde salvo los ambientales documentados | Pendiente (aprobada el 20/10/2026) |
-| **E3** | Restos de PNS-07/19: el sandbox bloquea los métodos privados (con lista de permitidos), incluido `_api_key_for_inference` | 13 | Alto: puede rechazar código legítimo del LLM | 1½-2 días | Tests del sandbox (del fabricante y de Seges) y batería de consultas relaxaicode en staging | Pendiente |
+| **E3** | Restos de PNS-07/19: el sandbox bloquea los métodos privados (con lista de permitidos), incluido `_api_key_for_inference`; `fulfill_client_export` (D-3 de la spec E2) | 13 | Alto: puede rechazar código legítimo del LLM | 1½-2 días | Tests del sandbox (del fabricante y de Seges) y batería de consultas relaxaicode en staging | Pendiente |
 | **Hito: producción (N3)** | — | — | — | — | E1, E2 y E3 validados en staging; D1, D4, D9 y PB-2 decididas (y D33 y D46 con Chatboo; D3 CERRADA) | — |
-| **E4** | Resto del patrón común: PNS-92, restos de PNS-30 y PNS-37, PNS-89 (CSRF) y los métodos de D-3 de la spec E1 (`consume_key_pin`; `ai.key.pin.desk.touch`/`close`/`any_open`/`notify_changed`; `ai.key.pin.ask.collect`/`supply`; `ai.api.result.cache.get_cached`/`store`; los dos `gc_expired`) | 14-17 | Bajo-medio: `create_log_entry` tiene muchos llamadores | 1 día | Tests negativos; la auditoría sigue registrando | Pendiente |
-| **E5** | PNS-94 de fondo: `lock_timeout` en las escrituras de la sesión, no tragar un commit fallido, detectar y cerrar un job colgado | 18+ | Medio-alto: concurrencia | 1½ días | Staging: los 5 casos del parche 6 y un lock forzado | Pendiente |
+| **E4** | Resto del patrón común: PNS-92, restos de PNS-30 y PNS-37, PNS-89 (CSRF) y los métodos de D-3 de la spec E1 (`consume_key_pin`; `ai.key.pin.desk.touch`/`close`/`any_open`/`notify_changed`; `ai.key.pin.ask.collect`/`supply`; `ai.api.result.cache.get_cached`/`store`; los dos `gc_expired`); D-3 de la spec E2 (`recover_orphan_download_chips`, `cron_maintenance` público); PNS-97 (`ai.trusted.action` editable por AI Administrator) | 14-17 | Bajo-medio: `create_log_entry` tiene muchos llamadores | 1 día | Tests negativos; la auditoría sigue registrando | Pendiente |
+| **E5** | PNS-94 de fondo: `lock_timeout` en las escrituras de la sesión, no tragar un commit fallido, detectar y cerrar un job colgado; los conflictos de serialización de `_finalize` con ficheros del clip y SVG (staging de E2) | 18+ | Medio-alto: concurrencia | 1½ días | Staging: los 5 casos del parche 6 y un lock forzado | Pendiente |
 | **E6** | PNS-87/88: sin código. Solo afectan a quien actualiza desde 3.1.486 (N1: ningún entorno); la retención se fija con un parámetro (D13, guía) | — | — | — | Se reabre si aparece una actualización desde versiones anteriores | Sin código |
-| **Después** | Restos de fondo de seguridad (54/60, 59 con la política `open`, 86, 84, 55, 61, 36, 40, ampliaciones de 93) y, al terminar, **lo funcional** (PNS-67, 95, skills que se ofrecen sin su módulo, como `annual_billing` sin `account`…), como fase aparte | — | — | — | Se priorizan al terminar E5 | Pendiente |
+| **Después** | Restos de fondo de seguridad (54/60, 59 con la política `open`, 86, 84, 55, 61, 36, 40, ampliaciones de 93) y, al terminar, **lo funcional** (PNS-67, 95, skills que se ofrecen sin su módulo, como `annual_billing` sin `account`; el prompt que dice que basta AI Administrator para los grupos, D-7 de la spec E2; PNS-98, adjuntos del chat que quedan huérfanos), como fase aparte | — | — | — | Se priorizan al terminar E5 | Pendiente |
 
 **Por qué ET va antes de E3:** con N12 la batería de tests es de Seges, y con 45 fallos y errores no
 detecta regresiones. E3 es la entrega de más riesgo y la que más se apoya en los tests del sandbox.

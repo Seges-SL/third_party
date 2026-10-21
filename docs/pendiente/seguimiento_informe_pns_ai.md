@@ -19,7 +19,7 @@
   del fabricante) (ver PNS-81, PNS-93, PNS-94 y «Compatibilidad con Odoo 14»).
 - **Alcance:** primer bloque, hallazgos de gravedad crítica y alta (35); segundo bloque, de gravedad
   media y baja (45, con PNS-22, que pasó a Media en la revisión del informe, y PNS-79). Total: los
-  80 hallazgos del informe. Tercer bloque: hallazgos nuevos (PNS-81 a PNS-96) y compatibilidad con
+  80 hallazgos del informe. Tercer bloque: hallazgos nuevos (PNS-81 a PNS-98) y compatibilidad con
   Odoo 14 (Python 3.7 y librerías de la imagen).
 
 > **Fase 3 (laboratorio) hecha**, con el parche 1 aplicado para que los módulos se importen:
@@ -42,7 +42,8 @@
 > `14.0-pns-ai-correcciones` y mantiene la 3.1.782 ([plan de corrección](plan_correccion_pns_ai.md)).
 > La columna «Estado» sigue describiendo el **código del fabricante** (lo que se le comunica en el
 > informe). La columna «Rama Seges» de la tabla resumen recoge lo corregido o previsto por Seges
-> (parche, entrega y validación). Actualizada el 20/10/2026 con la entrega E1 (PNS-83, 85, 90 y 91).
+> (parche, entrega y validación). Actualizada el 20/10/2026 con la entrega E1 (PNS-83, 85, 90 y 91) y
+> el 21/10/2026 con la entrega E2 (PNS-82 y restos de PNS-01/02).
 
 Estados: **CORREGIDO** (el cambio cubre el hallazgo y sus puntos de entrada) · **PARCIAL** (cubre
 una parte; queda un resto concreto) · **SIN CAMBIOS** · **YA NO APLICA** (el código desapareció) ·
@@ -59,8 +60,8 @@ prueba que solo comprueba otro rol o el ACL estándar).
 
 | PNS | Gravedad | Estado | Laboratorio y staging | Rama Seges |
 |---|---|---|---|---|
-| PNS-01 | Crítica | PARCIAL | CORREGIDO (parte probada: vía RPC cerrada, 3b-1) | Previsto en E2 |
-| PNS-02 | Crítica | PARCIAL | CORREGIDO (parte probada: vía RPC cerrada, 3b-1) | Previsto en E2 |
+| PNS-01 | Crítica | PARCIAL | CORREGIDO (parte probada: vía RPC cerrada, 3b-1) | **Parche 12 (E2): CORREGIDO** (laboratorio y staging, 21/10/2026) |
+| PNS-02 | Crítica | PARCIAL | CORREGIDO (parte probada: vía RPC cerrada, 3b-1) | **Parche 12 (E2): CORREGIDO** (laboratorio y staging, 21/10/2026) |
 | PNS-03 | Crítica | CORREGIDO | CORREGIDO (3b-1) | — |
 | PNS-04 | Crítica | CORREGIDO | — | — |
 | PNS-05 | Crítica | CORREGIDO | CORREGIDO (staging, prueba 6) | — |
@@ -140,7 +141,7 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-78 | Baja | CORREGIDO | — | — |
 | PNS-79 | Baja | CORREGIDO | NO CONCLUYENTE (3b-1) | — |
 | PNS-81 | Alta | NUEVO | importación resuelta con el parche 1 (3a); parche 2 eficaz (3b-2 y staging, prueba 2); parche 3 eficaz (staging, prueba 1); `prompts/*`: parche 4 en la rama, eficaz (prueba del parche 4 y staging, §4.4) | Parches 1-4 (compatibilidad), en LIYBEN |
-| PNS-82 | Alta | NUEVO | VULNERABLE (3b-1) | Previsto en E2 |
+| PNS-82 | Alta | NUEVO | VULNERABLE (3b-1) | **Parche 11 (E2): CORREGIDO** (laboratorio y staging, 21/10/2026) |
 | PNS-83 | Alta | NUEVO | VULNERABLE (3b-1) | **Parche 10 (E1): CORREGIDO** (laboratorio y staging, 20/10/2026) |
 | PNS-84 | Media | NUEVO | — | — |
 | PNS-85 | Media | NUEVO | VULNERABLE (3b-1) | **Parche 9 (E1): CORREGIDO** (laboratorio y staging, 20/10/2026) |
@@ -155,23 +156,26 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-94 | Alta | NUEVO | CONFIRMADO (staging); parche 6 eficaz (5 casos) | Parche 6, validado en staging; en LIYBEN. Corrección de fondo: E5 |
 | PNS-95 | Baja | NUEVO | CONFIRMADO (staging, prueba 11) | — |
 | PNS-96 | Baja | NUEVO | CONFIRMADO (staging, con modelos `lite`) | — |
+| PNS-97 | Media | NUEVO | — (inventario de la spec E2) | Previsto en E4 |
+| PNS-98 | Baja | NUEVO | CONFIRMADO (staging de E2) | Fase posterior (sin entrega asignada) |
 
 **Recuento:** CORREGIDO 31 · PARCIAL 33 · SIN CAMBIOS 13 · YA NO APLICA 2 · DUDOSO 1 (80 del
-informe) · NUEVO 16 (total 96). Por gravedad:
+informe) · NUEVO 18 (total 98). Por gravedad:
 
 | Gravedad | Corregido | Parcial | Sin cambios | Ya no aplica | Dudoso | Nuevo | Total |
 |---|---|---|---|---|---|---|---|
 | Crítica | 5 | 4 | 0 | 0 | 0 | 0 | 9 |
 | Alta | 13 | 11 | 1 | 1 | 0 | 5 | 31 |
-| Media | 4 | 12 | 9 | 0 | 0 | 6 | 31 |
-| Baja | 9 | 6 | 3 | 1 | 1 | 5 | 25 |
-| **Total** | **31** | **33** | **13** | **2** | **1** | **16** | **96** |
+| Media | 4 | 12 | 9 | 0 | 0 | 7 | 32 |
+| Baja | 9 | 6 | 3 | 1 | 1 | 6 | 26 |
+| **Total** | **31** | **33** | **13** | **2** | **1** | **18** | **98** |
 
 Restos que se repiten en varios parciales:
 1. **El sandbox (caja A) bloquea por lista de nombres y no impide llamar a métodos privados**
    (`_metodo`). Afecta a PNS-07 y PNS-19 (y a lo que PNS-06 ejecuta al guardar).
 2. **Un AI Administrator sin permisos de Ajustes sigue pudiendo conceder o quitar grupos de Odoo**
    (incluido `base.group_system`) mediante un plan confirmado. Afecta a PNS-01 y PNS-02.
+   Corregido en la rama de Seges con el parche 12 (E2, validado en staging el 21/10/2026).
 3. **Los controles nuevos de URL (`remote_image`, `fetch_url`) dependen de la política de URL y de una
    lista blanca que cualquier usuario autenticado puede ampliar por RPC**: con la política `open`, el
    servidor descarga cualquier host público. Con la restringida, `ensure_domain_whitelisted` deja a
@@ -183,6 +187,11 @@ Restos que se repiten en varios parciales:
 ### PNS-01 — Escalada a `base.group_system` por `apply_user_add_group`
 
 - **Estado:** PARCIAL.
+- **Rama Seges (21/10/2026):** **CORREGIDO con el parche 12 (E2)**: dar o quitar grupos nativos exige
+  `base.group_system` sobre el usuario real, al proponer y al ejecutar. En staging, un AI Administrator
+  sin Ajustes es rechazado al proponerse `base.group_system` por `/mcp` y al confirmar un plan que
+  propuso `admin`; `admin` sigue pudiendo. El registro `ai.trusted.action`, que el AI Administrator
+  puede editar, no levanta la comprobación (está en el método); su edición es PNS-97.
 - **Evidencia:**
   - La vía del informe (RPC por cualquier interno o portal) está cerrada: `ai.system.action` ya no
     tiene métodos públicos. `apply_user_add_group` pasa a `_apply_user_add_group`
@@ -209,6 +218,9 @@ Restos que se repiten en varios parciales:
 ### PNS-02 — Resto de `apply_*` de `ai.system.action` sin control de permisos
 
 - **Estado:** PARCIAL.
+- **Rama Seges (21/10/2026):** **CORREGIDO con el parche 12 (E2)** (mismo parche que PNS-01):
+  `user.remove_group` exige `base.group_system`; en staging, rechazado al proponer y al confirmar para un
+  AI Administrator sin Ajustes. `view.*` sigue en `group_ai_admin` (diseño aceptado).
 - **Evidencia:**
   - Todos los `apply_*` y `preview_*` son privados (`ai_system_action.py:334-480`, `:605`, `:631`,
     `:708-765`); ya no hay ningún método público en el modelo. Los `preview` se llaman desde
@@ -1540,7 +1552,8 @@ PNS-81 a PNS-89: solo código nuevo o modificado en `git diff 14.0-analisis-pns-
 PNS-92: código que ya existía en 3.1.486 y que el informe no citaba; salieron en la revisión
 independiente del seguimiento y se comprobaron en el laboratorio (fase 3c). PNS-93 a PNS-96: observados
 en el staging (15-16/10/2026, `pns_demo`, proveedor Gemini; `verificacion_seguridad_pns_ai.md`,
-«Staging (15-16/10/2026)»); la gravedad es una propuesta. Mismo criterio de
+«Staging (15-16/10/2026)»); la gravedad es una propuesta. PNS-97 y PNS-98: de la entrega E2 (inventario
+de la spec, H-5, y staging del 21/10/2026); gravedad propuesta. Mismo criterio de
 gravedad que el informe. Antes de numerar cada uno se ha comprobado con Grep que no figuraba en el
 informe ni en este seguimiento; cuando era un resto ya citado, se indica la relación.
 
@@ -1610,11 +1623,21 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
 ### PNS-82 — `chatboo.session.claim_turn_file_chips` se apropia de adjuntos ajenos sin `res_model` o sin `res_id`
 
 - **Gravedad:** Alta · **Estado:** NUEVO (relacionado con PNS-55 y PNS-21).
+- **Rama Seges (21/10/2026):** **CORREGIDO con el parche 11 (E2)**: los cuatro métodos del flujo de
+  chips pasan a privados; `_claim_turn_file_chips` solo actúa sobre una sesión del usuario real y solo
+  engancha adjuntos creados por él; al borrar una sesión, los adjuntos ajenos se desenganchan en vez de
+  borrarse. En staging: RPC directo (interno y portal), vía del búfer con `request_cancel`, descarga y
+  borrado en cascada, CORREGIDO; descargas del chat sin regresión. **Resto, D-3 de la spec E2:**
+  `recover_orphan_download_chips` y `cron_maintenance` públicos (E4) y `fulfill_client_export` (E3).
 - **Ubicación:** `pns_ai_chatboo/models/chatboo_session.py:415-441`. También se llega desde el método
   público `apply_assistant_download_chips` (`:401-413`).
 - **Comportamiento:**
-  - El método es público. Sobre una sesión propia (la regla por `user_id` lo exige), toma ids de
-    adjunto de la lista recibida o de la URL del chip.
+  - El método es público. Toma ids de adjunto de la lista recibida o de la URL del chip. **No lee la
+    sesión**, así que la regla por `user_id` no se aplica: funciona con el id de **cualquier** sesión,
+    también para un usuario de **portal** (`call_kw` no comprueba el ACL), que puede mover huérfanos
+    ajenos a cualquier sesión aunque después no pueda descargarlos (H-1 de la spec E2; antes se decía
+    «sobre una sesión propia»). Sin método público, la misma reclamación se alcanza con el búfer
+    `staged_assistant_files` y `request_cancel` (H-2).
   - Con `ir.attachment` en `sudo`, reasigna a esa sesión (`res_model`/`res_id`) cualquier adjunto al
     que le falte `res_model` o `res_id`: solo se salta los que tienen los dos (`:436-437`). Así entran
     también los adjuntos con `res_model` y `res_id=0`, una combinación que admite
@@ -1966,6 +1989,11 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
   `63ee2dc`, 16/10/2026), validado en sus 5 casos (imagen con respuesta, imagen con error del
   proveedor, solo texto, cancelación y turno siguiente que recupera el contexto de pantalla), sin
   conexiones colgadas ni avisos en el log.
+- **Staging de E2 (21/10/2026):** con ficheros adjuntados con el clip y con SVG en línea,
+  `_finalize fresh-cursor failed: could not serialize access due to concurrent update` (jobs 141, 145 y
+  146); la vía de respaldo deja el job en `done`, pero no reclama los adjuntos (PNS-98). También un
+  conflicto igual en `chatboo_session.last_used_date`. Sin conexiones colgadas. Para la corrección de
+  fondo (E5).
 - **Corrección sugerida** (análisis, §5.2): cerrar la transacción de A antes de `_finalize` (el
   parche 6) y, de fondo, que toda escritura en la sesión durante el turno vaya en cursores cortos; no
   tragarse un commit fallido; `lock_timeout` en las escrituras de la sesión; no ejecutar trabajo largo
@@ -2001,6 +2029,45 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
 - **Corrección sugerida:** construir los enlaces a partir de los ids devueltos por la herramienta (no
   del texto del modelo), traducir los errores de acceso a un mensaje para el usuario y documentar los
   modelos mínimos recomendados.
+
+### PNS-97 — El registro `ai.trusted.action` es editable por cualquier AI Administrator
+
+- **Gravedad propuesta:** Media (requiere AI Administrator) · **Estado:** NUEVO (H-5 de la spec E2;
+  relacionado con PNS-01, PNS-02 y PNS-84).
+- **Descripción:** el AI Administrator tiene CRUD sobre `ai.trusted.action`: puede vaciar `group_ids`
+  de una acción o crear otra con otro `code` que apunte al mismo `apply_method` (por ejemplo
+  `_apply_user_add_group`), y así cambiar quién puede usar cada acción de confianza. `group_ids`
+  significa «al menos uno de estos grupos».
+- **Impacto:** el registro no es una barrera frente a un AI Administrator. Para los grupos nativos, el
+  parche 12 ya lo cubre (la comprobación de `base.group_system` está en el método); para las demás
+  acciones, el AI Administrator decide qué grupos las usan.
+- **Corrección sugerida:** en `create`/`write`/`unlink` de `ai.trusted.action`, exigir
+  `base.group_system` fuera de `sudo` (los datos XML se cargan como superusuario), sin tocar el ACL.
+- **Rama Seges:** previsto en E4.
+
+### PNS-98 — Adjuntos del chat que quedan huérfanos: PDF, Word, ficheros del clip y SVG en línea
+
+- **Gravedad propuesta:** Baja · **Estado:** NUEVO (observado en el staging de E2; relacionado con
+  PNS-82 y PNS-94).
+- **Descripción:** los adjuntos de estas vías se crean con el usuario del turno pero no se enganchan a
+  la sesión (`res_model` vacío); el Excel del motor sí se engancha.
+  - PDF y Word montados en el navegador (`chatboo_session.fulfill_client_export`): el adjunto se crea
+    en un cursor aparte con commit (`pns_ai_mcp/utils/session_download.py`,
+    `_run_on_committed_cursor`) y la reclamación lo busca con el cursor de la petición, que no lo ve
+    por el aislamiento `REPEATABLE READ`: `att.exists()` da `False`. El comentario de la función ya
+    advierte de que esas descargas son invisibles para el cursor que llama.
+  - Ficheros del clip y SVG en línea: `_finalize` en cursor nuevo falla por un conflicto de
+    serialización al escribir el job; la vía de respaldo guarda el turno, pero no reclama los adjuntos
+    (ver PNS-94).
+- **Impacto:** sin efecto de seguridad (un huérfano solo lo leen su creador y los administradores; el
+  usuario sigue descargando sus chips). Al borrar la sesión, esos adjuntos no se borran y quedan en la
+  base de datos sin caducidad.
+- **Staging (21/10/2026):** confirmado (adjuntos 317 a 321). El parche 11 no influye (análisis del
+  código; verificación, «Staging — entrega E2», «Observaciones»).
+- **Corrección sugerida:** reclamar el adjunto en el mismo cursor que lo crea (o pasar el id y
+  engancharlo con `res_model`/`res_id` al crearlo, cuando se conoce la sesión) y que la vía de respaldo
+  de `_finalize` también reclame los adjuntos del turno.
+- **Rama Seges:** sin entrega asignada (fase posterior).
 
 ### Candidatos evaluados y descartados
 
