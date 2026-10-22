@@ -111,6 +111,32 @@ con la tabla 1.1 del informe:
 | N11 | ¿Quién corrige los PNS? | a) Seges, con parches numerados y tests (19-20/10/2026) |
 | N12 | Versiones futuras del fabricante | b) con vigilancia: se mantiene la 3.1.782 (20/10/2026) |
 
+**Tras la versión 3.1.879 (22/10/2026).** N12 se revisa con la
+[comparación con 3.1.879](../specs/comparacion_pns_ai_3-1-879.md) (verificada por `odoo-reviewer`) y la
+[hoja de decisión](n12_decision_3879.md).
+
+- **Variante elegida, b′):** cambiar **una sola vez** de base a 3.1.879 y llevar a ella el trabajo de
+  Seges. A partir de ahí, igual que b): base propia con vigilancia, sin incorporar versiones nuevas.
+- **Condicionada a la fase 3 en laboratorio** (hoja, §5): paridad sin módulos que no se importan; tests
+  del fabricante sin regresiones graves frente a la línea base de 3.1.782; P-6 ampliada y P-70; P-9a,
+  P-9b y P-9e sobre una copia de `pns_demo`. Si falla alguna, se vuelve a b) sobre 3.1.782.
+- **Criterio de corrección:** lo Crítico y lo Alto se corrigen; lo Medio y lo Bajo se decide caso a caso
+  (corregir o aceptar).
+
+**Consecuencias:**
+- Los parches 1 a 9 se retiran (el fabricante los cubre); 10, 11 y 12 se adaptan (comparación §10.1).
+  Esto sustituye, solo para este cambio de base, a «con N12 no hay retirada por versión del fabricante»
+  de N11.
+- M10 (Crítica), M11, M12, PNS-97 y PNS-98 se corrigen sobre la base nueva.
+- `14.0-pns-ai-correcciones` queda como referencia (parches y tests). ET, cancelada.
+- Rama nueva `14.0-pns-ai-3879`.
+- LIYBEN sigue con 3.1.782 y los parches 1 a 6 hasta recibirlo todo de una vez. M10 no es explotable
+  hoy allí: ningún AI Administrator sin Ajustes (consulta del 22/10/2026).
+- El informe al fabricante sigue siendo al final, con todo.
+- Pendiente: comunicárselo al jefe.
+
+Decisión: **b′) cambiar una vez de base a 3.1.879** (Sergio, 22/10/2026) / Fecha: 22/10/2026
+
 ### Bloqueantes vigentes
 
 - **Siempre:** D1, D3, D4, D9, D10 y PB-2.
