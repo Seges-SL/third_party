@@ -16,9 +16,9 @@ import re
 
 _WEB_ID_RE = re.compile(r'/web#id=\d+', re.IGNORECASE)
 _TABLE_MARKERS = (
-    'o_chatboo_table_block',
-    'o_chatboo_data_table',
-    'o_chatboo_namelink',
+    'o_ai_table_block',
+    'o_ai_data_table',
+    'o_ai_namelink',
 )
 
 

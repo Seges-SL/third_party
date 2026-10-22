@@ -5,7 +5,7 @@
 
 {
     'name': 'PNS Base',
-    'version': '1.2.32',
+    'version': '1.2.47',
     'category': 'Technical',
     'summary': 'PNS ecosystem base layer: single-branch view compatibility and cross-version Odoo utilities (13-19+)',
     'description': """
@@ -40,6 +40,8 @@
           the host opens it with what it has; a larger copy replaces it.
         - Language/PO import guard (Odoo 13-15): dedupe code/model rows that
           would crash overwrite with CardinalityViolation (models/ir_translation.py).
+        - List many2one that keeps the row in the breadcrumb (widget
+          pns_row_link): opens this row's form, then the linked record.
 
         Other pns_* modules declare it in 'depends' and reuse these pieces.
     """,

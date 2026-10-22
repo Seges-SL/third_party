@@ -11,6 +11,7 @@ auto-confirmable steps. Writes are never inlined.
 """
 from __future__ import annotations
 
+import ast
 import json
 import re
 
@@ -78,6 +79,37 @@ def slash_from_skill_turn_logs(rows):
     return ''
 
 
+def same_invoke_slash(left, right):
+    """True when two typed slashes are the same token (ignore ``/`` and case)."""
+    def _norm(token):
+        text = (token or '').strip().lower().lstrip('/')
+        return text.replace('_', '-')
+
+    left_n = _norm(left)
+    right_n = _norm(right)
+    return bool(left_n and right_n and left_n == right_n)
+
+
+def capture_binds_catalog_slash(
+    name_hint, catalog_slash, name_command='', catalog_command='',
+):
+    """True when ``/create-skill`` reuses the slash the turn already ran.
+
+    A different name is a new skill. The catalog row may still lend Code;
+    it must not block or steal the identity.
+    """
+    if not (catalog_slash or catalog_command):
+        return False
+    if not (name_hint or name_command):
+        return True
+    return (
+        same_invoke_slash(name_hint, catalog_slash)
+        or same_invoke_slash(name_command, catalog_command)
+        or same_invoke_slash(name_hint, catalog_command)
+        or same_invoke_slash(name_command, catalog_slash)
+    )
+
+
 def last_result_literal(code):
     """Right-hand side of the last ``result = …`` line, or ``''``."""
     assigns = re.findall(r'^\s*result\s*=\s*(.+)$', code or '', flags=re.M)
@@ -93,6 +125,11 @@ def snippet_has_presentable_contract(code):
     """True when the snippet can paint or fetch on its own."""
     body = code or ''
     return any(tok in body for tok in _PRESENTABLE_TOKENS)
+
+
+def log_run_failed(result_data):
+    """True when relaxaicode refused or failed that code (``ERROR (code): …``)."""
+    return (result_data or '').lstrip().startswith('ERROR (')
 
 
 def snippet_is_probe_code(code):
@@ -270,6 +307,69 @@ def _merge_transform_and_present(transform_codes, present_code):
     return '\n'.join(inner_parts)
 
 
+# Looking these up is not the query. The sandbox rejects the whole skill
+# if one round of the turn did it.
+_CATALOGUE_MODELS = frozenset({
+    'ai.skill',
+    'ai.context',
+    'ai.api.server',
+})
+
+
+def _static_str(node):
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    value = getattr(node, 'value', None)
+    if isinstance(value, ast.Constant) and isinstance(value.value, str):
+        return value.value
+    return None
+
+
+def _is_env(node):
+    if isinstance(node, ast.Name) and node.id == 'env':
+        return True
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+        if node.func.attr in ('sudo', 'with_context', 'with_user', 'with_company'):
+            return _is_env(node.func.value)
+    return False
+
+
+def _env_model(node):
+    """Model name when ``node`` is ``env['model']`` or ``env.get('model')``."""
+    if isinstance(node, ast.Subscript) and _is_env(node.value):
+        return _static_str(node.slice)
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == 'get'
+        and node.args
+        and _is_env(node.func.value)
+    ):
+        return _static_str(node.args[0])
+    return None
+
+
+def snippet_reads_catalogue(code):
+    """True when the snippet reads the skill, context or API catalogue.
+
+    A string that merely mentions the name does not count: the page HTML
+    sits in the skill as text.
+    """
+    try:
+        tree = ast.parse(code or '')
+    except SyntaxError:
+        return False
+    for node in ast.walk(tree):
+        if _env_model(node) in _CATALOGUE_MODELS:
+            return True
+    return False
+
+
+def _without_catalogue_reads(codes):
+    kept = [code for code in codes if not snippet_reads_catalogue(code)]
+    return kept or list(codes)
+
+
 def compose_capture_pipeline(relaxaicode_codes, fetch_steps):
     """Build one capturable ``code_body`` from turn relaxaicode + fetch steps.
 
@@ -283,6 +383,7 @@ def compose_capture_pipeline(relaxaicode_codes, fetch_steps):
     ]
     if not codes:
         return '', True
+    codes = _without_catalogue_reads(codes)
 
     clean_fetch = sanitize_fetch_steps(fetch_steps or [])
 
@@ -295,6 +396,11 @@ def compose_capture_pipeline(relaxaicode_codes, fetch_steps):
 
     transforms = codes[:-1]
     present = codes[-1]
+    if not code_needs_prior_plan(present):
+        # Every round runs in a fresh sandbox. A last round that does not
+        # read ``previous_result`` brings its own query; the earlier ones
+        # were the model looking around.
+        return present, False
     merged_inner = _merge_transform_and_present(transforms, present)
     prefixed = _indent_code_block(merged_inner)
 
@@ -321,7 +427,7 @@ def compose_capture_pipeline(relaxaicode_codes, fetch_steps):
 
     incomplete = (
         not any('propose_steps' in code for code in codes)
-        and code_needs_prior_plan(present)
+        and code_needs_prior_plan(codes[0])
     )
     return merged_inner, incomplete
 

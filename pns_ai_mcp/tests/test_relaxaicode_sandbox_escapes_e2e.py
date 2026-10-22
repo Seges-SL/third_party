@@ -150,6 +150,7 @@ class TestRelaxAICodeSandboxEscapesE2E(TransactionCase):
         return resp, text
 
     def test_escape_payloads_fail_controlled(self):
+        """PAAP I9: Escape payloads fail under control on a live registry."""
         for code in ESCAPE_PAYLOADS:
             resp, text = self._run(code)
             # 1) Terminó en error controlado (nunca dict de éxito con datos).
@@ -181,7 +182,7 @@ class TestRelaxAICodeSandboxEscapesE2E(TransactionCase):
         self.assertNotIn('ERROR (', text, text[:400])
 
     def test_obfuscated_orm_write_rejected(self):
-        """A6: getattr/attrgetter hacia write no debe ejecutar en caja A."""
+        """PAAP I2 / A6: getattr/attrgetter hacia write no debe ejecutar en caja A."""
         for code in WRITE_BYPASS_PAYLOADS:
             resp, text = self._run(code)
             self.assertTrue(

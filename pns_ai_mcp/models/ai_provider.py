@@ -126,7 +126,7 @@ class AIProvider(models.Model):
           → ai.agent (e.g. 'chat', 'code', 'summary')
             → ai.agent.provider (priority-ordered list)
               → ai.provider (this model — gateway + credentials)
-                → LLM driver (openai_driver / anthropic_driver / ollama_driver)
+                → LLM driver (openai / openrouter / anthropic / systemone)
                   → HTTP POST to the LLM API
 
     The ai.execution.engine orchestrates this chain with failover: if the
@@ -158,12 +158,12 @@ class AIProvider(models.Model):
     active = fields.Boolean(
         default=True,
         help='Archived providers stay in the database but are skipped by '
-             'inference failovers and Chatboo. Prefer Archive over Delete.',
+             'inference failovers and the chat. Prefer Archive over Delete.',
     )
     alias = fields.Char(
         string='Alias',
-        help="Optional label shown in Chatboo's provider picker "
-             "(e.g. 'Grok 4.5 (normal use)'). When empty, Chatboo shows "
+        help="Optional label shown in the chat's provider picker "
+             "(e.g. 'Grok 4.5 (normal use)'). When empty, the chat shows "
              "the provider name. Does not change the fixed provider/model pair.",
     )
     protocol = fields.Selection([
@@ -195,6 +195,7 @@ class AIProvider(models.Model):
         string='API Key',
         help="Clave de autenticación que se envía al proveedor de IA.",
         groups="pns_ai_mcp.group_ai_admin",
+        copy=False,
     )
 
     def _api_key_for_inference(self):
@@ -234,6 +235,7 @@ class AIProvider(models.Model):
              'The decision agent chain only takes providers with this tick. '
              'The protocol must be able to choose.',
     )
+    fit_design = fields.Boolean(string='Design')
     fit_chips_html = fields.Html(
         string='Fits',
         compute='_compute_fit_chips_html',
@@ -266,7 +268,7 @@ class AIProvider(models.Model):
         return bool(self._driver().chats)
 
     @api.depends('fit_conversation', 'fit_audio', 'fit_vision', 'fit_video',
-                 'fit_decision', 'stt_support')
+                 'fit_decision', 'fit_design', 'stt_support')
     def _compute_fit_chips_html(self):
         from odoo.tools import html_escape
 
@@ -288,6 +290,8 @@ class AIProvider(models.Model):
                 chips.append(('video', _('Video'), ''))
             if rec.fit_decision:
                 chips.append(('decision', _('Decision'), ''))
+            if rec.fit_design:
+                chips.append(('design', _('Design'), ''))
             if not chips:
                 chips.append(('text', _('Text'), ''))
             rec.fit_chips_html = ''.join(
@@ -356,6 +360,22 @@ class AIProvider(models.Model):
              "file to the sibling /audio/transcriptions URL. Not guessed from "
              "the model name.",
     )
+    spend_cap_usd = fields.Float(
+        string='Monthly cap (USD)',
+        digits=(16, 4),
+        default=0,
+        help="Stop the next inference when this month's reported cost "
+             "reaches this amount. 0 = no money cap. If the vendor sends "
+             "no cost, the token cap is used instead.",
+    )
+    spend_cap_tokens = fields.Integer(
+        string='Monthly cap (tokens)',
+        default=0,
+        help="Stop the next inference when this month's input+output "
+             "tokens reach this amount. Used when the vendor sends no "
+             "cost. 0 = no token cap.",
+    )
+
     no_external_failover = fields.Boolean(
         string='No external failover',
         default=False,
@@ -406,18 +426,18 @@ class AIProvider(models.Model):
     context_window = fields.Integer(
         string='Context Window (Tokens)',
         default=32768,
-        help="Ventana de contexto física del modelo de este proveedor (en tokens): "
-             "la memoria máxima de conversación que envía el orquestador de "
-             "inferencia. Solo aplica en modo cliente de inferencia (Chatboo, OCR); "
-             "no tiene efecto cuando un cliente MCP externo (Cursor, Claude Desktop) "
-             "gobierna el modelo.\n\n"
-             "DEBE ser <= al contexto real con el que el backend cargó el modelo "
-             "(p. ej. LEMONADE_CTX_SIZE de Lemonade). Si se pone MÁS ALTO, los "
-             "prompts grandes desbordan el modelo y la petición hace failover al "
-             "siguiente proveedor de la cadena.\n\n"
-             "Cuando se supera el límite, el orquestador descarta primero los "
-             "turnos MÁS ANTIGUOS; el system prompt y la composición de contextos "
-             "del agente se conservan SIEMPRE (nunca se recortan).",
+        help="Physical context window of this provider's model (in tokens): "
+             "the largest conversation the inference orchestrator sends. "
+             "Applies only in inference-client mode (a chat, OCR); it has no "
+             "effect when an external MCP client (Cursor, Claude Desktop) "
+             "drives the model.\n\n"
+             "MUST be <= the real context the backend loaded the model with "
+             "(e.g. Lemonade's LEMONADE_CTX_SIZE). If set HIGHER, large prompts "
+             "overflow the model and the request fails over to the next "
+             "provider in the chain.\n\n"
+             "When the limit is exceeded, the orchestrator drops the OLDEST "
+             "turns first; the system prompt and the agent's context "
+             "composition are ALWAYS kept (never trimmed).",
     )
 
     context_window_display = fields.Char(
@@ -480,11 +500,19 @@ class AIProvider(models.Model):
             '<em>Browse</em> fills the selector from this gateway\'s catalogue. '
             'A chat model id is not valid on this URL.</p>'
         )
+        from ..lib.llm.drivers.openrouter_driver import OpenRouterDriver
+        openrouter_tpl = _(
+            '<p>This protocol uses one address. Choosing it fills the field below.</p>'
+            '<p><code>%s</code></p>'
+            '<p><em>Browse</em> derives <code>…/models</code> from this URL.</p>'
+        ) % OpenRouterDriver.default_endpoint
         for provider in self:
             if provider.protocol == 'anthropic':
                 provider.endpoint_setup_guide = anthropic_tpl
             elif provider.protocol == 'systemone':
                 provider.endpoint_setup_guide = systemone_tpl
+            elif provider.protocol == 'openrouter':
+                provider.endpoint_setup_guide = openrouter_tpl
             else:
                 provider.endpoint_setup_guide = openai_tpl
 
@@ -552,12 +580,16 @@ class AIProvider(models.Model):
             self.fit_vision = False
             self.fit_video = False
             self.fit_decision = True
+        fixed = getattr(driver, 'default_endpoint', None)
+        if fixed:
+            self.endpoint = fixed
 
     def _choose(self, state, criteria, instructions, timeout=3):
         """Ask this provider a closed Choice. Raises ``DecisionCallError``."""
         from ..utils.decision_choice import DecisionCallError
 
         self.ensure_one()
+        self.assert_spend_cap()
         driver = self._driver()
         if not driver.chooses:
             raise DecisionCallError(
@@ -858,7 +890,7 @@ class AIProvider(models.Model):
             ) % target_model)
         try:
             if 'ai.log' in self.env:
-                self.env['ai.log'].create_log_entry(
+                self.env['ai.log']._create_log_entry(
                     user_id=self.env.user.id,
                     operation_type='read',
                     tool_name='Test Connection Web',
@@ -903,13 +935,20 @@ class AIProvider(models.Model):
                 'endpoint': endpoint,
                 'api_key': self.api_key or '',
                 'model_name': model,
-                'temperature': self.temperature or 0.0,
+                'temperature': self.temperature_for_inference(),
             })
             if hasattr(driver, 'probe_temperature'):
                 return 'yes' if driver.probe_temperature(timeout=timeout) else 'no'
         except Exception as e:
             _logger.info("Temperature probe inconclusive for %s: %s", self.name, e)
         return 'unknown'
+
+    def temperature_for_inference(self):
+        """0 is a real value. Empty uses the field default (0.7)."""
+        val = self.temperature
+        if val in (None, False):
+            return 0.7
+        return float(val)
 
     def _test_decision_connection(self):
         """Probe a decision endpoint with a two-option Choice."""
@@ -936,7 +975,7 @@ class AIProvider(models.Model):
             self.usage_support = 'yes'
         try:
             if 'ai.log' in self.env:
-                self.env['ai.log'].create_log_entry(
+                self.env['ai.log']._create_log_entry(
                     user_id=self.env.user.id,
                     operation_type='read',
                     tool_name='Test Connection Web',
@@ -960,6 +999,81 @@ class AIProvider(models.Model):
             ),
             sticky=False,
         )
+
+    def _spend_month_start(self):
+        """First instant of this month in the user timezone, stored as UTC."""
+        from datetime import timezone
+
+        now = fields.Datetime.now()
+        local = fields.Datetime.context_timestamp(self, now)
+        start_local = local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        if getattr(start_local, 'tzinfo', None):
+            start_utc = start_local.astimezone(timezone.utc).replace(tzinfo=None)
+        else:
+            start_utc = start_local
+        return fields.Datetime.to_string(start_utc)
+
+    def month_usage(self):
+        """Tokens and cost of this provider since the start of the month."""
+        self.ensure_one()
+        start = self._spend_month_start()
+        if 'ai.log' not in self.env:
+            return {
+                'prompt_tokens': 0, 'completion_tokens': 0,
+                'total_tokens': 0, 'cost': 0.0, 'cost_usd': 0.0,
+                'since': start,
+            }
+        groups = self.env['ai.log'].sudo().read_group(
+            [
+                ('provider_id', '=', self.id),
+                ('primitive', '=', 'llm'),
+                ('timestamp', '>=', start),
+            ],
+            ['prompt_tokens', 'completion_tokens', 'total_tokens', 'cost_usd'],
+            [],
+        )
+        row = groups[0] if groups else {}
+        prompt = int(row.get('prompt_tokens') or 0)
+        completion = int(row.get('completion_tokens') or 0)
+        total = int(row.get('total_tokens') or 0) or (prompt + completion)
+        cost = float(row.get('cost_usd') or 0.0)
+        return {
+            'prompt_tokens': prompt,
+            'completion_tokens': completion,
+            'total_tokens': total,
+            'cost': cost,
+            'cost_usd': cost,
+            'since': start,
+        }
+
+    def spend_cap_reached(self):
+        self.ensure_one()
+        from ..utils.provider_spend import spend_cap_hit
+        return spend_cap_hit(
+            self.month_usage(),
+            cap_usd=self.spend_cap_usd,
+            cap_tokens=self.spend_cap_tokens,
+        )
+
+    def assert_spend_cap(self):
+        """Raise if the next inference on this key must not run."""
+        self.ensure_one()
+        if self.spend_cap_reached():
+            raise UserError(_(
+                'Provider "%s" has reached its monthly inference cap. '
+                'The next call does not run.'
+            ) % self.name)
+
+    def action_open_usage(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('This month'),
+            'res_model': 'ai.provider.usage.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_provider_id': self.id},
+        }
 
     def test_connection(self):
         """Test connection to the AI provider using LiteLLM"""
@@ -1004,7 +1118,7 @@ class AIProvider(models.Model):
             # LOG INTO DB ORCHESTRATOR
             try:
                 if 'ai.log' in self.env:
-                    self.env['ai.log'].create_log_entry(
+                    self.env['ai.log']._create_log_entry(
                         user_id=self.env.user.id,
                         operation_type='read',
                         tool_name='Test Connection Web',

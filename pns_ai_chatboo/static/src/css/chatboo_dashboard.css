@@ -1,5 +1,5 @@
 /* Chatboo dashboard — tarjetas movibles, grid fluido al ancho del cliente */
-.o_chatboo_dashboard {
+.o_ai_dashboard {
     margin: 0.75em 0 1em;
     width: 100%;
     max-width: none;
@@ -84,12 +84,12 @@
     user-select: none;
 }
 
-.o_chatboo_message--chart .o_chatboo_chart_host {
+.o_chatboo_message--chart .o_ai_chart_host {
     height: clamp(340px, 48vh, 560px);
     max-height: 640px;
 }
 
-.o_chatboo_dashboard_title {
+.o_ai_dashboard_title {
     margin: 0 0 0.65em 0;
     font-size: 1.35rem;
     font-weight: 700;
@@ -97,7 +97,7 @@
     color: #1a1a1a;
 }
 
-.o_chatboo_dashboard_toolbar {
+.o_ai_dashboard_toolbar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -141,7 +141,7 @@
 }
 
 /* Mosaico denso: 2–3 columnas en desktop; ninguna tarjeta a ancho completo por defecto. */
-.o_chatboo_dashboard_grid {
+.o_ai_dashboard_grid {
     display: grid;
     grid-template-columns: repeat(
         auto-fill,
@@ -153,7 +153,7 @@
     width: 100%;
 }
 
-.o_chatboo_dashboard_card {
+.o_ai_dashboard_card {
     background: #fff;
     border: 1px solid #dee2e6;
     border-radius: 10px;
@@ -162,14 +162,14 @@
     transition: box-shadow 0.15s ease, opacity 0.15s ease;
 }
 
-.o_chatboo_dashboard_card.o_chatboo_dashboard_card_dragging {
+.o_ai_dashboard_card.o_chatboo_dashboard_card_dragging {
     opacity: 0.95;
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
 }
 
-.o_chatboo_dashboard_card.o_chatboo_dashboard_card_floating {
+.o_ai_dashboard_card.o_chatboo_dashboard_card_floating {
     position: fixed;
-    z-index: 1050;
+    z-index: 1039;
     margin: 0;
     pointer-events: none;
     transition: none;
@@ -185,17 +185,17 @@
     pointer-events: none;
 }
 
-.o_chatboo_dashboard_placeholder.o_chatboo_dashboard_card_span2 {
+.o_chatboo_dashboard_placeholder.o_ai_dashboard_card_span2 {
     grid-column: span 2;
 }
 
 /* Tarjeta ancha: ocupa 2 celdas del grid (nunca toda la fila salvo móvil 1 col). */
-.o_chatboo_dashboard_card_span2 {
+.o_ai_dashboard_card_span2 {
     grid-column: span 2;
 }
 
 @media (max-width: 640px) {
-    .o_chatboo_dashboard_card_span2 {
+    .o_ai_dashboard_card_span2 {
         grid-column: span 1;
     }
 }
@@ -204,7 +204,7 @@
     display: none !important;
 }
 
-.o_chatboo_dashboard_card_header {
+.o_ai_dashboard_card_header {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -217,18 +217,18 @@
     touch-action: none;
 }
 
-.o_chatboo_dashboard_card_header:active {
+.o_ai_dashboard_card_header:active {
     cursor: grabbing;
 }
 
-.o_chatboo_dashboard_drag {
+.o_ai_dashboard_drag {
     color: #adb5bd;
     font-size: 14px;
     line-height: 1;
     letter-spacing: -2px;
 }
 
-.o_chatboo_dashboard_card_title {
+.o_ai_dashboard_card_title {
     flex: 1;
     font-weight: 600;
     font-size: 0.92rem;
@@ -238,7 +238,7 @@
     white-space: nowrap;
 }
 
-.o_chatboo_dashboard_card_actions {
+.o_ai_dashboard_card_actions {
     display: flex;
     gap: 0;
     flex-shrink: 0;
@@ -250,7 +250,7 @@
 }
 
 /* Cromado MDI / ventanas clásicas: minimizar · maximizar · cerrar. */
-.o_chatboo_dashboard_winbtn {
+.o_ai_dashboard_winbtn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -268,39 +268,39 @@
     box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #a0a0a0;
 }
 
-.o_chatboo_dashboard_winbtn:last-child {
+.o_ai_dashboard_winbtn:last-child {
     border-inline-end: 0;
 }
 
-.o_chatboo_dashboard_winbtn:hover {
+.o_ai_dashboard_winbtn:hover {
     background: linear-gradient(180deg, #ffffff 0%, #e8e8e8 100%);
     color: #000;
 }
 
-.o_chatboo_dashboard_winbtn:active {
+.o_ai_dashboard_winbtn:active {
     background: #cfcfcf;
     box-shadow: inset 1px 1px 0 #888, inset -1px -1px 0 #eee;
 }
 
-.o_chatboo_dashboard_winbtn svg {
+.o_ai_dashboard_winbtn svg {
     display: block;
     width: 11px;
     height: 11px;
     pointer-events: none;
 }
 
-.o_chatboo_dashboard_winbtn.o_chatboo_dashboard_close:hover {
+.o_ai_dashboard_winbtn.o_ai_dashboard_close:hover {
     background: #e81123;
     color: #fff;
     box-shadow: none;
 }
 
-.o_chatboo_dashboard_winbtn.o_chatboo_dashboard_close:hover svg {
+.o_ai_dashboard_winbtn.o_ai_dashboard_close:hover svg {
     stroke: #fff;
     fill: #fff;
 }
 
-.o_chatboo_dashboard_card_actions .btn-link {
+.o_ai_dashboard_card_actions .btn-link {
     padding: 0 6px;
     min-width: 28px;
     color: #6c757d;
@@ -308,11 +308,11 @@
     line-height: 1.2;
 }
 
-.o_chatboo_dashboard_card_actions .btn-link:hover {
+.o_ai_dashboard_card_actions .btn-link:hover {
     color: #0d6efd;
 }
 
-.o_chatboo_dashboard_card_body {
+.o_ai_dashboard_card_body {
     padding: 8px 10px 10px;
     /* Tamaño normal: sin barra de scroll; el gráfico se ajusta al hueco. */
     overflow: hidden;
@@ -322,29 +322,29 @@
     box-sizing: border-box;
 }
 
-.o_chatboo_dashboard_card.o_chatboo_dashboard_card_collapsed .o_chatboo_dashboard_card_body {
+.o_ai_dashboard_card.o_chatboo_dashboard_card_collapsed .o_ai_dashboard_card_body {
     display: none;
 }
 
 /* Maximizada: ancho completo del grid y más altura (opt-in explícito). */
-.o_chatboo_dashboard_card.o_chatboo_dashboard_card_maximized {
+.o_ai_dashboard_card.o_chatboo_dashboard_card_maximized {
     grid-column: 1 / -1;
     box-shadow: 0 4px 20px rgba(13, 110, 253, 0.12);
     border-color: #b6d4fe;
 }
 
-.o_chatboo_dashboard_card.o_chatboo_dashboard_card_maximized .o_chatboo_dashboard_card_body {
+.o_ai_dashboard_card.o_chatboo_dashboard_card_maximized .o_ai_dashboard_card_body {
     overflow: auto;
     max-height: min(720px, 75vh);
 }
 
-.o_chatboo_dashboard_card.o_chatboo_dashboard_card_maximized .o_chatboo_chart_host {
+.o_ai_dashboard_card.o_chatboo_dashboard_card_maximized .o_ai_chart_host {
     /* Fallback; JS relayout usa la misma fórmula que gráficos de chat. */
     height: clamp(340px, 48vh, 560px);
     max-height: 640px;
 }
 
-.o_chatboo_dashboard_card .o_chatboo_table_block {
+.o_ai_dashboard_card .o_ai_table_block {
     margin: 0;
     width: 100%;
     flex: 1 1 auto;
@@ -353,17 +353,17 @@
     flex-direction: column;
 }
 
-.o_chatboo_dashboard_card .o_chatboo_chart_toolbar {
+.o_ai_dashboard_card .o_ai_chart_toolbar {
     flex: 0 0 auto;
 }
 
-.o_chatboo_dashboard_card .table-responsive {
+.o_ai_dashboard_card .table-responsive {
     width: 100%;
     max-width: 100%;
     flex: 0 0 auto;
 }
 
-.o_chatboo_dashboard_card .o_chatboo_chart_host {
+.o_ai_dashboard_card .o_ai_chart_host {
     flex: 1 1 auto;
     width: 100%;
     /* Compacto: hueco fijo bajo; JS afina midiendo el body. */
@@ -373,10 +373,10 @@
 }
 
 /* Con tabla visible ("Ver datos") sí puede hacer falta scroll. */
-.o_chatboo_dashboard_card_body:has(.table-responsive:not(.o_chatboo_table_collapsed)) {
+.o_ai_dashboard_card_body:has(.table-responsive:not(.o_chatboo_table_collapsed)) {
     overflow: auto;
 }
 
-.o_chatboo_dashboard_footer {
+.o_ai_dashboard_footer {
     margin: 0.75em 0 0;
 }

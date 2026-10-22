@@ -21,6 +21,15 @@ import re
 import zipfile
 from pathlib import Path
 
+from . import engine_params
+from .engine_params import (
+    DEFAULT_XLSX_FLOAT_DECIMALS,
+    DEFAULT_XLSX_THOUSANDS,
+    ICP_XLSX_FLOAT_DECIMALS,
+    ICP_XLSX_THOUSANDS,
+    XLSX_FLOAT_DECIMALS_MAX,
+)
+
 _logger = logging.getLogger(__name__)
 
 _XLSX_MIME = (
@@ -30,13 +39,6 @@ _XLSX_MIME = (
 # Chatboo client assembles these (table + ECharts PNG). Excel/md stay here
 # (icon Excel uses this same writer).
 CLIENT_ASSEMBLED_KINDS = frozenset(('doc', 'pdf', 'html'))
-
-# Chatboo Settings (ICP). Engine reads keys; it does not import Chatboo.
-ICP_XLSX_FLOAT_DECIMALS = 'pns_ai_chatboo.xlsx_float_decimals'
-ICP_XLSX_THOUSANDS = 'pns_ai_chatboo.xlsx_thousands'
-DEFAULT_XLSX_FLOAT_DECIMALS = 2
-DEFAULT_XLSX_THOUSANDS = True
-XLSX_FLOAT_DECIMALS_MAX = 10
 
 # Canonical kind → extension + mimetype. excel/xls still emit xlsx.
 FORMAT_SPECS = {
@@ -91,7 +93,7 @@ SESSION_FILE_PROTOCOL = (
     'show-table / chart-table / table. show-chart without '
     '__show_table__ keeps the chart and hides the listing. Word, PDF, '
     'and HTML mirror this turn (table, chart, or both) and are '
-    'assembled by the Chatboo client (same file for the session card '
+    'assembled by the chat client (same file for the session card '
     'and the bubble icons; the canvas paints the chart). Do not '
     'rebuild those files in RelaxAICode. Word is a session download '
     '(Office HTML .doc). Optional __rich_doc__ true wraps this turn '
@@ -106,7 +108,7 @@ SESSION_FILE_META_PROTOCOL = (
     '__sheet_caption__, __column_labels__. Derived columns MUST keep '
     '__excel_formulas__. Word, '
     'PDF, and HTML with a '
-    'chart are assembled by the Chatboo client. Do not rebuild the '
+    'chart are assembled by the chat client. Do not rebuild the '
     'file in Python. Do not call safe_plan_request.'
 )
 
@@ -1206,7 +1208,7 @@ def _clip_cell(value):
 
 
 def clip_data_from_payload(payload=None, rows=None):
-    """JSON rows for bubble clip icons (same shape as data-chatboo-dataset)."""
+    """JSON rows for bubble clip icons (same shape as data-ai-dataset)."""
     public = public_rows(tabular_rows(payload, rows))
     if not public:
         return None
@@ -1455,28 +1457,16 @@ def xlsx_number_format(decimals, thousands, kind):
 
 
 def xlsx_number_style(env=None):
-    """``int_format`` / ``float_format`` from Chatboo ICP, or product defaults."""
+    """``int_format`` / ``float_format`` from the engine parameters, or defaults."""
     decimals = DEFAULT_XLSX_FLOAT_DECIMALS
     thousands = DEFAULT_XLSX_THOUSANDS
     if env is not None:
         try:
-            icp = env['ir.config_parameter'].sudo()
-            raw_d = icp.get_param(
-                ICP_XLSX_FLOAT_DECIMALS, DEFAULT_XLSX_FLOAT_DECIMALS,
-            )
-            try:
-                decimals = int(raw_d)
-            except (TypeError, ValueError):
-                decimals = DEFAULT_XLSX_FLOAT_DECIMALS
-            raw_t = icp.get_param(
-                ICP_XLSX_THOUSANDS,
-                'True' if DEFAULT_XLSX_THOUSANDS else 'False',
-            )
-            thousands = str(raw_t) not in ('False', 'false', '0', '')
+            decimals = engine_params.xlsx_float_decimals(env)
+            thousands = engine_params.xlsx_thousands(env)
         except Exception:
             decimals = DEFAULT_XLSX_FLOAT_DECIMALS
             thousands = DEFAULT_XLSX_THOUSANDS
-    decimals = max(0, min(XLSX_FLOAT_DECIMALS_MAX, int(decimals)))
     thousands = bool(thousands)
     return {
         'decimals': decimals,
@@ -1521,7 +1511,7 @@ def serialize_rows(rows, kind, title='Export', landscape=True, labels=None,
     if kind == 'xlsx':
         return _as_xlsx(
             public, title, labels=labels, caption=caption, formulas=formulas,
-            number_style=xlsx_number_style(env),
+            number_style=xlsx_number_style(env), env=env,
         )
     if kind == 'pdf':
         return _as_pdf(
@@ -1742,9 +1732,9 @@ def _as_html(rows, title, labels=None):
 
 
 _WORD_KILL_CLASS_RE = re.compile(
-    r'class="[^"]*(?:o_chatboo_chart_toolbar|o_chatboo_export_bar|'
-    r'o_chatboo_copy_btn|o_chatboo_noexport|o_chatboo_ts|'
-    r'o_chatboo_chart_host|o_chatboo_echarts_surface|echarts-tooltip)[^"]*"',
+    r'class="[^"]*(?:o_ai_chart_toolbar|o_ai_export_bar|'
+    r'o_ai_copy_btn|o_ai_noexport|o_ai_ts|'
+    r'o_ai_chart_host|o_ai_echarts_surface|echarts-tooltip)[^"]*"',
     re.I,
 )
 _WORD_TAG_RE = re.compile(r'<(/?)([a-zA-Z][\w:-]*)([^>]*)>', re.S)
@@ -1763,7 +1753,7 @@ _WORD_STYLE = (
     'vertical-align:middle;}'
     'tr:nth-child(even) td{background:#f8f9fa;}'
     'td img{max-width:72px;max-height:72px;}'
-    'p.o_chatboo_word_figure img{max-width:100%;width:100%;height:auto;}'
+    'p.o_ai_word_figure img{max-width:100%;width:100%;height:auto;}'
 )
 
 
@@ -1840,6 +1830,7 @@ def _word_cell_html(value, key, env=None):
 
 
 def _word_table_html(rows, title, labels=None, env=None):
+    rows = _printed_rows(rows, env)
     keys = public_columns(rows)
     labels = labels or {}
     title_h = html_lib.escape(str(title or 'Export'))
@@ -1881,7 +1872,7 @@ _MAX_XLSX_COLS = 256
 
 
 def _as_xlsx(rows, title, labels=None, caption=None, formulas=None,
-             number_style=None):
+             number_style=None, env=None):
     """Prefer styled openpyxl; always fall back to stdlib OOXML."""
     return serialize_xlsx_sheets([{
         'title': title,
@@ -1889,7 +1880,7 @@ def _as_xlsx(rows, title, labels=None, caption=None, formulas=None,
         'labels': labels,
         'caption': caption,
         'formulas': formulas,
-    }], number_style=number_style)
+    }], number_style=number_style, env=env)
 
 
 def serialize_xlsx_sheets(sheets, number_style=None, env=None):
@@ -1900,6 +1891,7 @@ def serialize_xlsx_sheets(sheets, number_style=None, env=None):
     style = number_style or xlsx_number_style(env)
     for spec in specs:
         spec['number_style'] = spec.get('number_style') or style
+        spec['env'] = env
     fmt = _load_formatters()
     if fmt is not None and hasattr(fmt, 'format_excel_workbook'):
         try:
@@ -1913,6 +1905,7 @@ def serialize_xlsx_sheets(sheets, number_style=None, env=None):
                     'widths': spec['widths'],
                     'cell_formulas': _cell_formulas(spec),
                     'number_style': spec.get('number_style') or style,
+                    'env': env,
                 }
                 for spec in specs
             ])
@@ -2119,6 +2112,7 @@ def _as_xlsx_openpyxl_book(specs):
     from openpyxl import Workbook
     from openpyxl.utils import get_column_letter
 
+    fmt = _load_formatters()
     wb = Workbook()
     first = True
     for spec in specs:
@@ -2127,6 +2121,7 @@ def _as_xlsx_openpyxl_book(specs):
             first = False
         else:
             ws = wb.create_sheet()
+        photos, photo_cols = _xlsx_sheet_photos(spec, fmt)
         ws.title = spec['title']
         keys = spec['keys']
         labels = spec['labels']
@@ -2146,17 +2141,29 @@ def _as_xlsx_openpyxl_book(specs):
         plan = spec.get('cells') or {}
         style = spec.get('number_style') or xlsx_number_style()
         for ridx, row in enumerate(spec['rows'], header_row + 1):
+            if photo_cols:
+                ws.row_dimensions[ridx].height = fmt._XLSX_IMG_ROW_PT
             for col, key in enumerate(keys, 1):
+                if col in photo_cols:
+                    photo = photos.get((ridx, col))
+                    if photo:
+                        fmt._excel_put_photo(
+                            ws, photo, ridx, col,
+                            _xlsx_photo_col_chars(spec, col, fmt),
+                        )
+                    continue
                 compiled = (plan.get((ridx, col)) or (None,))[0]
                 value = compiled if compiled else _excel_value(row.get(key))
                 cell = ws.cell(row=ridx, column=col, value=value)
-                fmt = _xlsx_cell_number_format(
+                num_fmt = _xlsx_cell_number_format(
                     value if not compiled else None,
                     formula=compiled, style=style,
                 )
-                if fmt:
-                    cell.number_format = fmt
+                if num_fmt:
+                    cell.number_format = num_fmt
         for col, width in enumerate(spec['widths'], 1):
+            if col in photo_cols:
+                width = _xlsx_photo_col_chars(spec, col, fmt)
             ws.column_dimensions[get_column_letter(col)].width = width
         ws.freeze_panes = 'A%d' % (header_row + 1)
     buf = io.BytesIO()
@@ -2168,6 +2175,7 @@ def _as_pdf(rows, title, landscape=True, labels=None, env=None, charts=True):
     fmt = _load_formatters()
     cfg = columns_config(rows, labels)
     chart_series = pdf_chart_series(rows, labels) if charts else None
+    rows = _printed_rows(rows, env)
     if fmt is not None:
         try:
             return fmt.format_data_as_pdf(
@@ -2233,7 +2241,7 @@ def _excel_value(value):
     number = _excel_number(value)
     if number is not None:
         return number
-    return _xlsx_plain_text(value)
+    return _xlsx_safe_text(_xlsx_plain_text(value))
 
 
 def _coerce_xlsx_bytes(raw):
@@ -2263,6 +2271,11 @@ _XLSX_NS_OD_REL = (
     'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
 )
 _XLSX_NS_TYPES = 'http://schemas.openxmlformats.org/package/2006/content-types'
+_XLSX_NS_XDR = (
+    'http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing'
+)
+_XLSX_NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main'
+_XLSX_EMU_PER_PX = 9525
 
 
 def _xlsx_sheet_title(title):
@@ -2311,6 +2324,13 @@ def _xlsx_plain_text(value):
     return ''.join(
         ch for ch in text if ord(ch) >= 32 or ch in '\t\n\r'
     )[:32767]
+
+
+def _xlsx_safe_text(text):
+    """Text a spreadsheet would read as a formula goes out quoted as text."""
+    if text and text.lstrip(' \t')[:1] in ('=', '+', '-', '@'):
+        return "'" + text
+    return text
 
 
 def _xlsx_xml_text(value):
@@ -2374,7 +2394,7 @@ def _xlsx_cell_xml(col, row, value, formula=None, number_style=None):
             value = ''
         else:
             return '<c r="%s"%s><v>%s</v></c>' % (ref, s_attr, repr(value))
-    text = _xlsx_xml_text(value)
+    text = _xlsx_xml_text(_xlsx_safe_text(_xlsx_plain_text(value)))
     return (
         '<c r="%s" t="inlineStr"><is><t xml:space="preserve">%s</t></is></c>'
         % (ref, text)
@@ -2412,7 +2432,82 @@ def _xlsx_styles_xml(number_style=None):
     ) % (_XLSX_NS_MAIN, int_fmt, float_fmt)
 
 
-def _xlsx_sheet_xml(spec):
+def _xlsx_sheet_photos(spec, fmt):
+    """``({(row, col): (png, w, h)}, photo columns)`` for the stdlib writer."""
+    if fmt is None or not hasattr(fmt, '_excel_photo_png'):
+        return {}, set()
+    keys = spec['keys']
+    rows = spec['rows'] or []
+    cols = {
+        col for col, key in enumerate(keys, 1)
+        if any(
+            isinstance(row, dict) and fmt._pdf_is_image_ref(row.get(key))
+            for row in rows
+        )
+    }
+    if not cols:
+        return {}, set()
+    header_row = 2 if spec['caption'] else 1
+    photos = {}
+    for ridx, row in enumerate(rows, header_row + 1):
+        if not isinstance(row, dict):
+            continue
+        for col in cols:
+            photo = fmt._excel_photo_png(row.get(keys[col - 1]), spec.get('env'))
+            if photo:
+                photos[(ridx, col)] = photo
+    return photos, cols
+
+
+def _xlsx_photo_col_chars(spec, col, fmt):
+    keys = spec['keys']
+    key = keys[col - 1] if col <= len(keys) else ''
+    return fmt._excel_photo_col_chars(spec['labels'].get(key))
+
+
+def _xlsx_drawing_parts(photos, first_image, col_chars, fmt):
+    """drawing XML, its rels XML and ``[(media path, png)]`` for one sheet."""
+    anchors = []
+    rels = []
+    media = []
+    for n, ((row, col), (png, width, height)) in enumerate(sorted(photos.items()), 1):
+        cx = int(width) * _XLSX_EMU_PER_PX
+        cy = int(height) * _XLSX_EMU_PER_PX
+        dx, dy = fmt._excel_photo_offsets(col_chars[col], width, height)
+        image_no = first_image + n - 1
+        anchors.append(
+            '<xdr:oneCellAnchor>'
+            '<xdr:from><xdr:col>%d</xdr:col><xdr:colOff>%d</xdr:colOff>'
+            '<xdr:row>%d</xdr:row><xdr:rowOff>%d</xdr:rowOff></xdr:from>'
+            '<xdr:ext cx="%d" cy="%d"/>'
+            '<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="%d" name="Picture %d"/>'
+            '<xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr>'
+            '</xdr:nvPicPr>'
+            '<xdr:blipFill><a:blip r:embed="rId%d"/>'
+            '<a:stretch><a:fillRect/></a:stretch></xdr:blipFill>'
+            '<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="%d" cy="%d"/>'
+            '</a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'
+            '</xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>'
+            % (col - 1, dx, row - 1, dy, cx, cy, n + 1, n, n, cx, cy)
+        )
+        rels.append(
+            '<Relationship Id="rId%d" Type="%s/image" '
+            'Target="../media/image%d.png"/>'
+            % (n, _XLSX_NS_OD_REL, image_no)
+        )
+        media.append(('xl/media/image%d.png' % image_no, png))
+    drawing = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<xdr:wsDr xmlns:xdr="%s" xmlns:a="%s" xmlns:r="%s">%s</xdr:wsDr>'
+    ) % (_XLSX_NS_XDR, _XLSX_NS_A, _XLSX_NS_OD_REL, ''.join(anchors))
+    drawing_rels = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="%s">%s</Relationships>'
+    ) % (_XLSX_NS_PKG_REL, ''.join(rels))
+    return drawing, drawing_rels, media
+
+
+def _xlsx_sheet_xml(spec, photos=None, photo_cols=(), fmt=None):
     keys = spec['keys']
     labels = spec['labels']
     caption = spec['caption']
@@ -2421,8 +2516,11 @@ def _xlsx_sheet_xml(spec):
     plan = spec.get('cells') or {}
     number_style = spec.get('number_style') or xlsx_number_style()
     header_row = 2 if caption else 1
+    photos = photos or {}
     col_bits = []
     for idx, width in enumerate(widths, 1):
+        if idx in photo_cols:
+            width = _xlsx_photo_col_chars(spec, idx, fmt)
         col_bits.append(
             '<col min="%d" max="%d" width="%.2f" customWidth="1"/>'
             % (idx, idx, float(width))
@@ -2456,12 +2554,25 @@ def _xlsx_sheet_xml(spec):
                 number_style=number_style,
             )
             for col, key in enumerate(keys, 1)
+            if col not in photo_cols
         )
-        body.append('<row r="%d">%s</row>' % (ridx, cells))
+        body.append(
+            '<row r="%d"%s>%s</row>' % (
+                ridx,
+                ' ht="%d" customHeight="1"' % fmt._XLSX_IMG_ROW_PT
+                if photo_cols else '',
+                cells,
+            )
+        )
+    drawing_xml = '<drawing r:id="rId1"/>' if photos else ''
     return (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-        '<worksheet xmlns="%s">%s%s<sheetData>%s</sheetData>%s</worksheet>'
-    ) % (_XLSX_NS_MAIN, freeze_xml, cols_xml, ''.join(body), merge_xml)
+        '<worksheet xmlns="%s" xmlns:r="%s">%s%s<sheetData>%s</sheetData>'
+        '%s%s</worksheet>'
+    ) % (
+        _XLSX_NS_MAIN, _XLSX_NS_OD_REL, freeze_xml, cols_xml, ''.join(body),
+        merge_xml, drawing_xml,
+    )
 
 
 def _as_xlsx_ooxml_book(specs):
@@ -2471,7 +2582,36 @@ def _as_xlsx_ooxml_book(specs):
     rel_tags = []
     override_tags = []
     files = []
+    fmt = _load_formatters()
+    drawings = 0
+    images = 0
     for idx, spec in enumerate(specs, 1):
+        photos, photo_cols = _xlsx_sheet_photos(spec, fmt)
+        if photos:
+            drawings += 1
+            drawing, drawing_rels, media = _xlsx_drawing_parts(
+                photos, images + 1,
+                {c: _xlsx_photo_col_chars(spec, c, fmt) for c in photo_cols},
+                fmt,
+            )
+            images += len(media)
+            files.append((
+                'xl/worksheets/_rels/sheet%d.xml.rels' % idx,
+                '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                '<Relationships xmlns="%s"><Relationship Id="rId1" '
+                'Type="%s/drawing" Target="../drawings/drawing%d.xml"/>'
+                '</Relationships>' % (_XLSX_NS_PKG_REL, _XLSX_NS_OD_REL, drawings),
+            ))
+            files.append(('xl/drawings/drawing%d.xml' % drawings, drawing))
+            files.append((
+                'xl/drawings/_rels/drawing%d.xml.rels' % drawings, drawing_rels,
+            ))
+            files.extend(media)
+            override_tags.append(
+                '<Override PartName="/xl/drawings/drawing%d.xml" ContentType="'
+                'application/vnd.openxmlformats-officedocument.drawing+xml"/>'
+                % drawings
+            )
         name = html_lib.escape(spec['title'], quote=True)
         sheet_tags.append(
             '<sheet name="%s" sheetId="%d" r:id="rId%d"/>' % (name, idx, idx)
@@ -2486,9 +2626,10 @@ def _as_xlsx_ooxml_book(specs):
             'application/vnd.openxmlformats-officedocument.spreadsheetml.'
             'worksheet+xml"/>' % idx
         )
-        files.append(
-            ('xl/worksheets/sheet%d.xml' % idx, _xlsx_sheet_xml(spec))
-        )
+        files.append((
+            'xl/worksheets/sheet%d.xml' % idx,
+            _xlsx_sheet_xml(spec, photos, photo_cols, fmt),
+        ))
     style = specs[0].get('number_style') or xlsx_number_style()
     style_rid = len(specs) + 1
     rel_tags.append(
@@ -2522,10 +2663,15 @@ def _as_xlsx_ooxml_book(specs):
         '<Default Extension="rels" ContentType="application/vnd.openxmlformats-'
         'package.relationships+xml"/>'
         '<Default Extension="xml" ContentType="application/xml"/>'
+        '%s'
         '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.'
         'openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
         '%s</Types>'
-    ) % (_XLSX_NS_TYPES, ''.join(override_tags))
+    ) % (
+        _XLSX_NS_TYPES,
+        '<Default Extension="png" ContentType="image/png"/>' if images else '',
+        ''.join(override_tags),
+    )
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
         def _put(name, data):
@@ -2540,6 +2686,42 @@ def _as_xlsx_ooxml_book(specs):
         for name, data in files:
             _put(name, data)
     return buf.getvalue()
+
+
+def _printed_rows(rows, env=None):
+    """Rows as the chat table prints them: a decimal column carries the
+    configured decimals with the user's separators. Integers and text stay."""
+    try:
+        from .relaxaicode_render import (
+            _column_has_decimals,
+            _fmt_number,
+            render_context_from_env,
+        )
+    except Exception:
+        return rows
+    keys = [k for k in public_columns(rows) if _column_has_decimals(rows, k)]
+    if not keys:
+        return rows
+    ctx = {}
+    if env is not None:
+        try:
+            ctx = render_context_from_env(env) or {}
+        except Exception:
+            ctx = {}
+    d_sep = ctx.get('pk_decimal_sep', '.')
+    t_sep = ctx.get('pk_thousands_sep', ',')
+    decimals = ctx.get('pk_float_decimals', 2)
+    out = []
+    for row in rows:
+        if not isinstance(row, dict):
+            out.append(row)
+            continue
+        row = dict(row)
+        for key in keys:
+            if _excel_number(row.get(key)) is not None:
+                row[key] = _fmt_number(row[key], d_sep, t_sep, decimals=decimals)
+        out.append(row)
+    return out
 
 
 def _cell(value):

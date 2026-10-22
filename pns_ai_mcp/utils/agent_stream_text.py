@@ -82,14 +82,17 @@ def user_visible_round_text(content, has_tool_calls):
 
 def should_block_progress_as_final(
     content, *, has_tool_calls, has_pending_retry, rounds_left,
+    has_hidden_reasoning=False,
 ):
-    """True when progress chatter must not end the turn after a tool failure.
+    """True when progress chatter must not end the turn.
 
-    Invariant: after a retryable tool error, a short progress-shaped line
-    without tool_calls is not a user answer (e.g. «Corrijo… y vuelvo a
-    generar el mapa» with no second relaxaicode call).
+    After a retryable tool error, or when the model hid a reasoning
+    channel (OpenRouter ``reasoning`` / ``<think>``) and only a short
+    progress line landed in ``content``, that line is not the answer.
     """
-    if has_tool_calls or not has_pending_retry or not rounds_left:
+    if has_tool_calls or not rounds_left:
+        return False
+    if not has_pending_retry and not has_hidden_reasoning:
         return False
     return pretool_progress_status(content) is not None
 
@@ -98,6 +101,13 @@ def should_block_progress_as_final(
 # Align with the protocol "under 150 words" so a scope/limits list can close
 # without collapsing to the greeting one-liner. Longer stall essays still bounce.
 _FINISHED_PROSE_MAX_CHARS = 1200
+
+PROGRESS_FILLER_NUDGE = (
+    "STOP: that line is not the answer the user should read. "
+    "Write the reply now. Do not describe that you are still composing. "
+    "If this turn is a greeting, who-you-are, or scope/limits, answer in "
+    "prose. If it needs data or an action, call a tool."
+)
 
 NO_TOOL_FINAL_NUDGE = (
     "STOP: the user may have agreed to what YOU just offered, not started "

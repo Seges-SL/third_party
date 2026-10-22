@@ -6,8 +6,9 @@
 - Install: factory knowledge + first-install shells (weather whitelist,
   ICP). No LLM provider ships: the instance adds its own.
 - Reinstall / ``-u``: ``maybe_sync_factory_knowledge`` (version stamp)
-  reseeds this addon's factory contexts and system skills. User-owned
-  rows stay.
+  reseeds this addon's factory contexts and system skills. One worker
+  holds the lock. Disk wins on text; the instance ``active`` flag stays.
+  A factory row whose file is gone is unlinked. User-owned rows stay.
 - Uninstall: drop factory rows of this module.
 
 Translations come from ``i18n/*.po``. Leftover Spanish after a rename:
@@ -22,6 +23,8 @@ _logger = logging.getLogger(__name__)
 # Stamp is every installed module that ships ai/contexts or ai/skills
 # (see knowledge_stamp.module_has_ai_knowledge). No fixed name list.
 ICP_FACTORY_STAMP = 'pns_ai.factory_knowledge_stamp'
+# One worker reseeds; the other eleven must not write the same rows.
+FACTORY_SYNC_LOCK_KEY = 87421032
 
 
 def post_init_hook(*args):
@@ -241,10 +244,25 @@ def factory_knowledge_stamp(env):
 
 
 def maybe_sync_factory_knowledge(env, reason='registry'):
-    """Sync when the knowledge-module version stamp changed (e.g. after ``-u``)."""
+    """Sync when the knowledge-module version stamp changed (e.g. after ``-u``).
+
+    Takes a transaction advisory lock so twelve HTTP workers do not reseed
+    the same rows. The winner re-reads the stamp under the lock. Content
+    comes from disk; a row's ``active`` flag is left to the instance.
+    """
     if 'ir.config_parameter' not in env or 'ai.context' not in env:
         return False
     try:
+        env.cr.execute(
+            'SELECT pg_try_advisory_xact_lock(%s)',
+            (FACTORY_SYNC_LOCK_KEY,),
+        )
+        if not env.cr.fetchone()[0]:
+            _logger.info(
+                'MCP: factory sync skipped, another worker holds the lock (%s)',
+                reason,
+            )
+            return False
         stamp = factory_knowledge_stamp(env)
         ICP = env['ir.config_parameter'].sudo()
         prev = (ICP.get_param(ICP_FACTORY_STAMP, '') or '').strip()

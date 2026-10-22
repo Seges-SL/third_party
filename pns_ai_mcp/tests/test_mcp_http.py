@@ -144,3 +144,40 @@ class TestMcpHttp(HttpCase):
         self.assertEqual(result.get('resultType'), 'complete')
         self.assertIn('tools', result)
         self.assertIn('ttlMs', result)
+
+    def test_mcp_notification_accepted(self):
+        payload = {
+            'jsonrpc': '2.0',
+            'method': 'notifications/initialized',
+            'params': {},
+        }
+        response = self.url_open(
+            mcp_test_url('/mcp', self.test_api_key),
+            data=json.dumps(payload).encode('utf-8'),
+            headers=mcp_test_headers(self.test_api_key),
+        )
+        self.assertEqual(
+            http_status_code(response), 202,
+            'notification: HTTP %s body=%r' % (
+                http_status_code(response), http_response_text(response)[:500],
+            ),
+        )
+
+    def test_mcp_invalid_key_is_401(self):
+        payload = {
+            'jsonrpc': '2.0',
+            'id': 1,
+            'method': 'initialize',
+            'params': {'protocolVersion': '2024-11-05', 'capabilities': {}},
+        }
+        response = self.url_open(
+            mcp_test_url('/mcp', 'not-a-valid-key'),
+            data=json.dumps(payload).encode('utf-8'),
+            headers=mcp_test_headers('not-a-valid-key'),
+        )
+        status = http_status_code(response)
+        text = http_response_text(response)
+        self.assertEqual(status, 401, 'invalid key: HTTP %s body=%r' % (status, text[:500]))
+        body = json.loads(text)
+        self.assertIn('error', body)
+        self.assertIn('API key', body['error'].get('message') or '')

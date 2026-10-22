@@ -8,6 +8,8 @@ import json
 from odoo import http
 from odoo.http import request
 
+from ..utils.compat import JSON_ROUTE_TYPE
+
 
 def _admin():
     user = request.env.user
@@ -18,14 +20,14 @@ def _admin():
 
 class KeyPinDeskController(http.Controller):
 
-    @http.route('/pns_ai_mcp/key_pin/desk', type='json', auth='user')
+    @http.route('/pns_ai_mcp/key_pin/desk', type=JSON_ROUTE_TYPE, auth='user')
     def key_pin_desk(self, token=None, **kwargs):
         user = _admin()
         if not user:
             return {'ok': False}
         return request.env['ai.key.pin.desk'].touch(token, user)
 
-    @http.route('/pns_ai_mcp/key_pin/supply', type='json', auth='user')
+    @http.route('/pns_ai_mcp/key_pin/supply', type=JSON_ROUTE_TYPE, auth='user')
     def key_pin_supply(self, ask_id=None, api_key=None, **kwargs):
         user = _admin()
         if not user:
@@ -34,7 +36,7 @@ class KeyPinDeskController(http.Controller):
 
     @http.route(
         '/pns_ai_mcp/key_pin/stop', type='http', auth='user',
-        methods=['POST'], csrf=False,
+        methods=['POST'],
     )
     def key_pin_stop(self, **kwargs):
         user = _admin()

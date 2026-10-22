@@ -4,11 +4,13 @@
         <xpath expr="." position="inside">
             <link rel="stylesheet" type="text/css" href="/pns_base/static/src/css/pns_module_index.css"/>
             <link rel="stylesheet" type="text/css" href="/pns_base/static/src/css/pns_required_readonly.css"/>
+            <link rel="stylesheet" type="text/css" href="/pns_base/static/src/css/pns_import_preview.css"/>
             <link rel="stylesheet" type="text/css" href="/pns_base/static/src/css/pns_image_viewer.css"/>
             <script type="text/javascript" src="/pns_base/static/src/js/pns_layer.js"/>
             <script type="text/javascript" src="/pns_base/static/src/js/pns_image_viewer.js"/>
             <script type="text/javascript" src="/pns_base/static/src/js/pns_module_index.js"/>
             <script type="text/javascript" src="/pns_base/static/src/js/pns_invalid_fields_dedupe.js"/>
+            <script type="text/javascript" src="/pns_base/static/src/js/pns_row_link_v14.js"/>
         </xpath>
     </template>
 </odoo>

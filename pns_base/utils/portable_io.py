@@ -187,6 +187,9 @@ def import_vals_from_dict(model_env, data, skip_fields=None, key_aliases=None):
             if _field_type(field) == 'boolean':
                 vals[orm_key] = bool(value)
             elif _field_type(field) == 'selection':
+                if value in (None, False, ''):
+                    vals[orm_key] = False
+                    continue
                 allowed = _selection_values(field, model_env)
                 if allowed is not None and value not in allowed:
                     warnings.append(

@@ -13,6 +13,8 @@ from .openai_driver import OpenAIDriver
 class OpenRouterDriver(OpenAIDriver):
     """Same chat and transcribe body as the OpenAI driver."""
 
+    default_endpoint = 'https://openrouter.ai/api/v1/chat/completions'
+
     @property
     def driver_name(self) -> str:
         return 'OpenRouterDriver'

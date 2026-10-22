@@ -48,7 +48,7 @@ def ensure_pin_token(raw, token):
 
 
 def own_self_pack_code(agent_code):
-    """Canonical identity pack: ``pns_ai_chatboo`` → ``self_chatboo``."""
+    """Canonical identity pack: ``pns_ai_mcp`` → ``self_mcp``."""
     token = (agent_code or '').strip().rsplit('_', 1)[-1]
     if not token:
         return ''

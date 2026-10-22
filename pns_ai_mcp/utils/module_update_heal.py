@@ -99,10 +99,33 @@ def module_update_args_from_steps(steps):
 
 
 def plan_has_module_update(steps):
+    return module_update_count(steps) > 0
+
+
+def module_update_count(steps):
+    n = 0
     for step in steps or []:
         if isinstance(step, dict) and step.get('action_code') == MODULE_UPDATE_CODE:
-            return True
-    return False
+            n += 1
+    return n
+
+
+def module_update_alone_error(steps):
+    """Error if ``module.update`` is mixed or repeated.
+
+    ``button_immediate_*`` reloads the registry. A second step — even another
+    ``module.update`` — runs on a dead cursor. Heal only looks at the first.
+    """
+    n = module_update_count(steps)
+    if n == 0:
+        return None
+    if n == 1 and len(steps or []) == 1:
+        return None
+    return (
+        "A module.update plan must contain that step only, once. "
+        "Install, upgrade or uninstall one module in its own plan; "
+        "do not mix it with other steps."
+    )
 
 
 def module_state_matches(operation, state, loaded=None):

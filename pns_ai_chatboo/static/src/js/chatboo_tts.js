@@ -22,6 +22,7 @@
     var MAX_CHARS = 12000;
 
     var _boundRoots = [];
+    var _allowRemote = null;
 
     function hasApi() {
         return typeof window !== "undefined"
@@ -56,6 +57,27 @@
         return (lang || "es-ES").replace("_", "-");
     }
 
+    function sessionAllowsRemote() {
+        try {
+            if (typeof odoo !== "undefined" && odoo.session_info
+                    && odoo.session_info.pns_chatboo_allow_remote_voices) {
+                return true;
+            }
+        } catch (e) { /* noop */ }
+        return false;
+    }
+
+    function allowRemoteVoices() {
+        if (_allowRemote !== null) {
+            return !!_allowRemote;
+        }
+        return sessionAllowsRemote();
+    }
+
+    function setAllowRemote(on) {
+        _allowRemote = on == null ? null : !!on;
+    }
+
     function pickVoice(lang) {
         if (!hasApi()) {
             return null;
@@ -64,20 +86,30 @@
         if (!voices.length) {
             return null;
         }
+        var allowRemote = allowRemoteVoices();
         var want = (lang || "es").slice(0, 2).toLowerCase();
         var remote = null;
+        var localAny = null;
         for (var i = 0; i < voices.length; i++) {
             var v = voices[i];
+            if (v.localService && !localAny) {
+                localAny = v;
+            }
             if (v.lang && v.lang.slice(0, 2).toLowerCase() === want) {
                 // A non-local voice sends the text to the vendor's server.
                 if (v.localService) {
                     return v;
                 }
-                remote = remote || v;
+                if (allowRemote) {
+                    remote = remote || v;
+                }
             }
         }
         if (remote) {
             return remote;
+        }
+        if (!allowRemote) {
+            return localAny;
         }
         for (var j = 0; j < voices.length; j++) {
             if (voices[j].default) {
@@ -108,9 +140,9 @@
         }
         var kill = [
             "script", "style", "button",
-            ".o_chatboo_noexport",
+            ".o_ai_noexport",
             ".o_chatboo_context_info",
-            ".o_chatboo_chart_toolbar",
+            ".o_ai_chart_toolbar",
         ];
         kill.forEach(function (sel) {
             var nodes = root.querySelectorAll(sel);
@@ -311,9 +343,10 @@
         var useLang = lang || resolveLang();
         utter.lang = useLang;
         var voice = pickVoice(useLang);
-        if (voice) {
-            utter.voice = voice;
+        if (!voice) {
+            return false;
         }
+        utter.voice = voice;
         try {
             window.speechSynthesis.speak(utter);
             return true;
@@ -395,6 +428,7 @@
             return this.setEnabled(!readEnabled());
         },
         cancel: cancel,
+        setAllowRemote: setAllowRemote,
         bindRoot: bindRoot,
         unbindRoot: unbindRoot,
         extractFullText: extractFullText,

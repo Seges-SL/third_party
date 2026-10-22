@@ -3,8 +3,8 @@ skill: forecast
 name: Weather forecast
 description: Company-city forecast for the next 7 days by default; optional other cities; sky column uses weather emojis.
 agent_codes: pns_ai_chatboo
-version: 4.5
-param_schema: {"lugar": {"type": "string", "desc": "City or cities (comma / and). Empty = company city (or state). Never invent a city.", "default": "company city"}, "fecha": {"type": "string", "desc": "today, tomorrow, next N days, or ISO YYYY-MM-DD. Empty = next 7 days.", "default": "7 days"}}
+version: 4.6
+param_schema: {"lugar": {"type": "string", "desc": "City or cities (comma / and). Empty = company city (or state). Never invent a city."}, "fecha": {"type": "string", "desc": "today, tomorrow, next N days, or ISO YYYY-MM-DD. Empty = next 7 days.", "default": "7 days"}}
 arg_hint: company city · 7 days
 args_policy: default
 sequence: 40

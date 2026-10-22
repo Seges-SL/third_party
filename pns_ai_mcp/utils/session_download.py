@@ -18,12 +18,14 @@ _logger = logging.getLogger(__name__)
 PERSIST_REASON_NO_SESSION = 'no_session'
 PERSIST_REASON_NO_BYTES = 'no_bytes'
 PERSIST_REASON_SIZE_LIMIT = 'size_limit'
-PERSIST_REASON_CHATBOO_UNAVAILABLE = 'chatboo_unavailable'
 PERSIST_REASON_SESSION_NOT_FOUND = 'session_not_found'
 PERSIST_REASON_CREATE_FAILED = 'create_failed'
 
-ICP_DOWNLOAD_MAX_BYTES = 'pns_ai_chatboo.download_max_bytes'
-DEFAULT_DOWNLOAD_MAX_BYTES = 15 * 1024 * 1024
+from .engine_params import (  # noqa: F401
+    DEFAULT_DOWNLOAD_MAX_BYTES,
+    ICP_DOWNLOAD_MAX_BYTES,
+    download_max_bytes as get_download_max_bytes,
+)
 
 _TEXTual_MIME_PREFIXES = ('text/',)
 _TEXTual_MIME_EXACT = frozenset({
@@ -35,16 +37,6 @@ _TEXTual_MIME_EXACT = frozenset({
     'application/x-javascript',
     'application/xhtml+xml',
 })
-
-
-def get_download_max_bytes(env):
-    try:
-        raw = env['ir.config_parameter'].sudo().get_param(
-            ICP_DOWNLOAD_MAX_BYTES, DEFAULT_DOWNLOAD_MAX_BYTES,
-        )
-        return max(0, int(raw))
-    except (TypeError, ValueError):
-        return DEFAULT_DOWNLOAD_MAX_BYTES
 
 
 def is_binary_content_type(content_type, content_disposition=None):
@@ -481,28 +473,12 @@ def persist_turn_file_detail(env, session_id, raw_bytes, filename,
         }
 
 
-def persist_chatboo_session_file_detail(env, session_id, raw_bytes, filename,
-                                        mimetype=None):
-    """Compat name. Same as persist_turn_file_detail (orphan attachment)."""
-    return persist_turn_file_detail(
-        env, session_id, raw_bytes, filename, mimetype=mimetype,
-    )
-
-
 def persist_turn_file(env, session_id, raw_bytes, filename, mimetype=None):
     """Store bytes as ir.attachment; return a download chip or None."""
     detail = persist_turn_file_detail(
         env, session_id, raw_bytes, filename, mimetype=mimetype,
     )
     return detail.get('chip') if detail.get('ok') else None
-
-
-def persist_chatboo_session_file(env, session_id, raw_bytes, filename,
-                                   mimetype=None):
-    """Compat name. Same as persist_turn_file."""
-    return persist_turn_file(
-        env, session_id, raw_bytes, filename, mimetype=mimetype,
-    )
 
 
 def build_binary_stored_meta(persist_detail, filename, size):
@@ -535,10 +511,7 @@ def build_binary_stored_meta(persist_detail, filename, size):
             'File response was empty; nothing was saved.'
         ),
         PERSIST_REASON_SIZE_LIMIT: (
-            'File exceeds the configured download limit (pns_ai_chatboo.download_max_bytes).'
-        ),
-        PERSIST_REASON_CHATBOO_UNAVAILABLE: (
-            'File received but could not be stored on this instance.'
+            'File exceeds the configured download limit (pns_ai.download_max_bytes).'
         ),
         PERSIST_REASON_SESSION_NOT_FOUND: (
             'File received but the turn is gone; nothing was saved.'
@@ -571,26 +544,20 @@ def collect_download_chips(results):
     return chips
 
 
-def chatboo_session_id_from_env(env):
-    """Resolve Chatboo session id from env context or operation_data."""
-    ctx = env.context or {}
-    sid = ctx.get('chatboo_session_id')
+def resolve_session_ref(env):
+    """The host's session id, from the context or the HTTP request, if any.
+
+    The engine only carries ``ai_session_ref``; what it points to is the
+    host's business.
+    """
+    sid = (env.context or {}).get('ai_session_ref')
     if sid:
         return int(sid)
-    return None
-
-
-def resolve_chatboo_session_id(env):
-    """Turn id the client put in context or on the HTTP request, if any."""
-    sid = chatboo_session_id_from_env(env)
-    if sid:
-        return sid
     try:
         from odoo.http import request as http_request
-        if http_request and getattr(http_request, 'chatboo_options', None):
-            sid = http_request.chatboo_options.get('chatboo_session_id')
-            if sid:
-                return int(sid)
+        sid = getattr(http_request, 'ai_session_ref', None) if http_request else None
+        if sid:
+            return int(sid)
     except Exception:
         pass
     return None
@@ -768,8 +735,3 @@ def extract_binary_from_mcp_blocks(blocks, tool_name=None, arguments=None):
         'url': '',
         'filename': filename,
     }
-
-
-def merge_download_chips_into_session(env, session_id, chips):
-    """No-op. The chat client hangs chips when it saves the turn."""
-    return

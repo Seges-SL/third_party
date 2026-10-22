@@ -22,6 +22,8 @@
                 <filter name="reverted" string="Reverted" domain="[('state', '=', 'reverted')]"/>
                 <filter name="reversible_now" string="Reversible"
                         domain="[('state', '=', 'applied'), ('reversible', '=', True), ('reverts_id', '=', False)]"/>
+                <filter name="in_trash" string="In trash"
+                        domain="[('op', '=', 'unlink'), ('state', '=', 'applied'), ('reversible', '=', True), ('reverts_id', '=', False)]"/>
                 <separator/>
                 <filter name="group_user" string="Requested by" context="{'group_by': 'user_id'}"/>
                 <filter name="group_confirmed" string="Confirmed by" context="{'group_by': 'confirmed_by_uid'}"/>
@@ -60,6 +62,10 @@
                         icon="fa-undo" class="btn-link"
                         confirm="Revert this change? This journal undo cannot be reverted again."
                         attrs="{'invisible': [('can_revert', '=', False)]}"/>
+                <button name="action_empty_one" type="object" string="Delete permanently"
+                        icon="fa-trash" class="btn-link"
+                        confirm="Permanently delete these records? This cannot be undone."
+                        attrs="{'invisible': ['|', ('op', '!=', 'unlink'), ('can_revert', '=', False)]}"/>
             </tree>
         </field>
     </record>
@@ -74,8 +80,16 @@
                             class="btn-primary"
                             confirm="Revert this change? This journal undo cannot be reverted again."
                             attrs="{'invisible': [('can_revert', '=', False)]}"/>
+                    <button name="action_empty_one" type="object" string="Delete permanently"
+                            class="btn-secondary"
+                            confirm="Permanently delete these records? This cannot be undone."
+                            attrs="{'invisible': ['|', ('op', '!=', 'unlink'), ('can_revert', '=', False)]}"/>
+                    <button name="action_empty_trash" type="object" string="Empty trash"
+                            class="btn-secondary"
+                            confirm="Permanently delete every archived Safe Plan record? This cannot be undone."/>
                     <field name="state" widget="statusbar" statusbar_visible="applied,reverted"/>
                     <field name="can_revert" invisible="1"/>
+                    <field name="op" invisible="1"/>
                 </header>
                 <sheet>
                     <group>

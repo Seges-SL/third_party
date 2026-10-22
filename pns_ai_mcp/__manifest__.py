@@ -5,7 +5,7 @@
 
 {
     'name': 'AI Engine',
-    'version': '3.1.782',
+    'version': '3.1.879',
     'category': 'Patanegra AI',
     'summary': 'Agent engine for Odoo apps: PAAP roles, providers, skills, governed writes',
     'description': """
@@ -86,6 +86,7 @@
         'wizard/import_servers_wizard_views.xml',
         'wizard/import_agents_wizard_views.xml',
         'wizard/ai_provider_tools_wizard_views.xml',
+        'wizard/ai_provider_usage_wizard_views.xml',
         'wizard/import_users_wizard_views.xml',
         'wizard/import_whitelist_wizard_views.xml',
         'wizard/import_external_servers_wizard_views.xml',
@@ -129,6 +130,7 @@
         'data/fetch_cache_cron.xml',
         'data/api_result_cache_cron.xml',
         'data/ai_log_cron.xml',
+        'data/journal_trash_cron.xml',
         'data/safe_operation_cron.xml',
         'data/trusted_actions_system.xml',
     ],

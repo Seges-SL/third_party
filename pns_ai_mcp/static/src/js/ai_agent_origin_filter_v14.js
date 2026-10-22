@@ -7,6 +7,7 @@
 odoo.define('pns_ai_mcp.ai_agent_origin_filter', function (require) {
     "use strict";
 
+    var FormRenderer = require('web.FormRenderer');
     var TOKENS = ['own', 'imported', 'inserted', 'extra'];
     var STORE = 'pns_origin_filter_';
     var flagsByAgent = {};
@@ -318,16 +319,7 @@ odoo.define('pns_ai_mcp.ai_agent_origin_filter', function (require) {
         return flags;
     }
 
-    function paintVisibleForms() {
-        document.querySelectorAll('.o_form_view').forEach(function (form) {
-            if (!form.querySelector('.o_pns_origin_filter_bar')) {
-                return;
-            }
-            paintOriginFilter(form, flagsFor(form), false);
-        });
-    }
-
-    document.addEventListener('click', function (ev) {
+    function onOriginClick(ev) {
         var closest = ev.target.closest && ev.target.closest.bind(ev.target);
         var th = closest ? closest('th') : null;
         var box = th ? listBox(th) : null;
@@ -370,13 +362,43 @@ odoo.define('pns_ai_mcp.ai_agent_origin_filter', function (require) {
             el.scrollTop = y;
             el.scrollLeft = x;
         }
-    }, true);
+    }
 
-    var observer = new MutationObserver(function () {
-        paintVisibleForms();
-        observer.takeRecords();
+    function bindOriginOn(el) {
+        if (!el || el._pnsOriginBound) {
+            return;
+        }
+        if (!el.querySelector('.o_pns_origin_filter_bar')) {
+            return;
+        }
+        el._pnsOriginBound = true;
+        el.addEventListener('click', onOriginClick, true);
+        var observer = new MutationObserver(function () {
+            paintOriginFilter(el, flagsFor(el), false);
+            observer.takeRecords();
+        });
+        observer.observe(el, {childList: true, subtree: true});
+        el._pnsOriginObserver = observer;
+        paintOriginFilter(el, flagsFor(el), false);
+    }
+
+    FormRenderer.include({
+        start: function () {
+            var self = this;
+            return this._super.apply(this, arguments).then(function () {
+                bindOriginOn(self.el);
+            });
+        },
+        destroy: function () {
+            if (this.el && this.el._pnsOriginObserver) {
+                this.el._pnsOriginObserver.disconnect();
+            }
+            if (this.el && this.el._pnsOriginBound) {
+                this.el.removeEventListener('click', onOriginClick, true);
+            }
+            return this._super.apply(this, arguments);
+        },
     });
-    observer.observe(document.documentElement, {childList: true, subtree: true});
 
     return {};
 });

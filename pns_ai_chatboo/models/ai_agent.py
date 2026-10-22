@@ -53,6 +53,14 @@ class AIAgent(models.Model):
         compute='_compute_chatboo_product_settings',
         inverse='_inverse_chatboo_download_max_mb',
     )
+    chatboo_allow_remote_voices = fields.Boolean(
+        string='Allow remote voices',
+        help='Unchecked: Chatboo only reads aloud with a voice installed on '
+             'this computer. Checked: if none is installed, the browser may '
+             'send the text to its vendor (Google, Microsoft, …).',
+        compute='_compute_chatboo_product_settings',
+        inverse='_inverse_chatboo_allow_remote_voices',
+    )
     chatboo_upload_max_mb = fields.Integer(
         string='Upload limit (MB)',
         help="Max size of each picture or file sent to the chat. "
@@ -72,6 +80,7 @@ class AIAgent(models.Model):
                 agent.chatboo_history_retention_days = product['history_retention_days']
                 agent.chatboo_download_max_mb = product['download_max_mb']
                 agent.chatboo_upload_max_mb = product['upload_max_mb']
+                agent.chatboo_allow_remote_voices = product['allow_remote_voices']
             else:
                 agent.chatboo_show_systray = False
                 agent.chatboo_dataset_cache_max_mb = 0
@@ -79,6 +88,7 @@ class AIAgent(models.Model):
                 agent.chatboo_history_retention_days = 0
                 agent.chatboo_download_max_mb = 0
                 agent.chatboo_upload_max_mb = 0
+                agent.chatboo_allow_remote_voices = False
 
     def _inverse_chatboo_show_systray(self):
         for agent in self.filtered(lambda a: a.code == CHATBOO_AGENT_CODE):
@@ -117,6 +127,13 @@ class AIAgent(models.Model):
             write_product_settings(
                 agent.env,
                 upload_max_mb=agent.chatboo_upload_max_mb,
+            )
+
+    def _inverse_chatboo_allow_remote_voices(self):
+        for agent in self.filtered(lambda a: a.code == CHATBOO_AGENT_CODE):
+            write_product_settings(
+                agent.env,
+                allow_remote_voices=agent.chatboo_allow_remote_voices,
             )
 
     def _module_factory_seed(self):

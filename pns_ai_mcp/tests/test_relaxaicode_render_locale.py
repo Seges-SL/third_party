@@ -54,11 +54,11 @@ class TestRelaxAICodeRenderLocale(TransactionCase):
             render_context=ctx,
         )
         self.assertIn('11.148.960,17', html)
-        self.assertIn('o_chatboo_num', html)
+        self.assertIn('o_ai_num', html)
         self.assertIn('text-end', html)
-        self.assertIn('o_chatboo_data_table', html)
-        self.assertIn('o_chatboo_table_block', html)
-        self.assertIn('data-chatboo-dataset=', html)
+        self.assertIn('o_ai_data_table', html)
+        self.assertIn('o_ai_table_block', html)
+        self.assertIn('data-ai-dataset=', html)
         self.assertIn('Grupo 1', html)
         self.assertNotIn('11,148,960.17', html)
 
@@ -137,7 +137,7 @@ class TestRelaxAICodeRenderLocale(TransactionCase):
         self.assertIn('By amount', html)
         self.assertIn('Alpha', html)
         self.assertIn('Beta', html)
-        self.assertIn('o_chatboo_namelink', html)
+        self.assertIn('o_ai_namelink', html)
         self.assertIn('/web#id=1', html)
         self.assertNotIn('fa-external-link', html)
 
@@ -158,13 +158,13 @@ class TestRelaxAICodeRenderLocale(TransactionCase):
         })
         self.assertIn('Uno', html)
         self.assertIn('Dos', html)
-        self.assertIn('o_chatboo_namelink', html)
+        self.assertIn('o_ai_namelink', html)
 
         plain = render_result_html({
             'data': rows,
             '__row_links__': False,
         })
-        self.assertNotIn('o_chatboo_namelink', plain)
+        self.assertNotIn('o_ai_namelink', plain)
         self.assertNotIn('fa-external-link', plain)
 
     def test_name_link_accepts_string_id(self):
@@ -178,7 +178,7 @@ class TestRelaxAICodeRenderLocale(TransactionCase):
                 'total': 1.0,
             }],
         })
-        self.assertIn('o_chatboo_namelink', html)
+        self.assertIn('o_ai_namelink', html)
         self.assertIn('/web#id=99', html)
 
     def test_fn_column_gets_name_link_not_icon_widget(self):
@@ -193,7 +193,7 @@ class TestRelaxAICodeRenderLocale(TransactionCase):
                 'FN': 'Tipos de Usuario / Usuario interno',
             }],
         })
-        self.assertIn('o_chatboo_namelink', html)
+        self.assertIn('o_ai_namelink', html)
         self.assertIn('/web#id=1', html)
         self.assertIn('Usuario interno', html)
         self.assertNotIn('fa-external-link', html)
@@ -211,7 +211,7 @@ class TestRelaxAICodeRenderLocale(TransactionCase):
                 'Rol': 'Oficina / Ciclo productivo',
             }],
         })
-        self.assertIn('o_chatboo_namelink', html)
+        self.assertIn('o_ai_namelink', html)
         self.assertIn('/web#id=33', html)
         self.assertIn('Ana Ejemplo', html)
         self.assertNotIn('fa-external-link', html)
@@ -258,7 +258,7 @@ class TestRelaxAICodeRenderLocale(TransactionCase):
             },
         ]
         html = render_result_html({'data': rows})
-        self.assertIn('o_chatboo_namelink', html)
+        self.assertIn('o_ai_namelink', html)
         self.assertIn('/web#id=101', html)
         self.assertIn('>DOC/2026/0001</a>', html)
         # Bucket must stay plain text (grouping), not the namelink target.
@@ -276,7 +276,7 @@ class TestRelaxAICodeRenderLocale(TransactionCase):
                 'total': 10.0,
             }],
         })
-        self.assertIn('o_chatboo_namelink', html)
+        self.assertIn('o_ai_namelink', html)
         self.assertIn('/web#id=42', html)
         self.assertNotIn('fa-external-link', html)
         self.assertNotIn('o_chatboo_rowlink', html)

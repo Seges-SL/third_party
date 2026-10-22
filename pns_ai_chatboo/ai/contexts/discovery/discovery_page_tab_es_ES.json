@@ -1,0 +1,28 @@
+{
+  "code": "discovery_page_tab_es_ES",
+  "tipo": "discovery",
+  "locale": "es_ES",
+  "target": "page_tab",
+  "priority": 80,
+  "soft_depends": [],
+  "source_module": "pns_ai_chatboo",
+  "triggers": [
+    "canvas",
+    "lienzo",
+    "cuadro de mando",
+    "en una pestana",
+    "en una pestaña",
+    "pestana aparte",
+    "pestaña aparte",
+    "nueva pestana",
+    "nueva pestaña",
+    "pagina",
+    "página",
+    "una pagina",
+    "una página",
+    "pagina aparte",
+    "página aparte",
+    "pagina bonita",
+    "página bonita"
+  ]
+}

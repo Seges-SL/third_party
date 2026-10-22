@@ -25,7 +25,7 @@
                     Upload a ZIP from "Export selected contexts to ZIP" (manifest scope sel-*). Only contexts listed in the manifest are imported. Protocol contexts are never overwritten.
                 </div>
                 <footer>
-                    <button name="action_import" type="object" string="Import" class="btn-primary"/>
+                    <button name="action_preview" type="object" string="Review" class="btn-primary"/>
                     <button string="Cancel" class="btn-secondary" special="cancel"/>
                 </footer>
             </form>

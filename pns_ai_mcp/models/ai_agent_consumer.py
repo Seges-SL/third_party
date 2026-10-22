@@ -25,9 +25,14 @@ class AIAgent(models.Model):
 
     def unlink(self):
         # A module's uninstall removes its own agent; links go with it (cascade).
+        # An agent the module no longer ships is a leftover: the person deletes
+        # the row, and its provider links and context links go with it. The
+        # context records stay in the catalog.
         if self.env.context.get(MODULE_UNINSTALL_FLAG):
             return super(AIAgent, self).unlink()
         for agent in self:
+            if agent.origin == 'module' and not agent._module_ships_agent(agent):
+                continue
             if agent.provider_ids:
                 raise UserError(_(
                     "Cannot delete agent '%s': remove provider failovers first."

@@ -70,6 +70,23 @@ def format_int_id_hint(error_msg):
     ) % text
 
 
+def format_bool_membership_hint(error_msg):
+    """Retry hint when code does ``x in field`` and the field is empty.
+
+    Odoo stores an empty Char/Text as False. ``in`` then raises
+    ``argument of type 'bool' is not iterable``.
+    """
+    text = (error_msg or '').strip()
+    if not text or "argument of type 'bool' is not iterable" not in text:
+        return None
+    return (
+        "Error executing code: %s\n"
+        "[HINT] An empty Char/Text is False, not ''. "
+        "Before `in` or a for-loop use (value or ''). "
+        "Do not test membership on the raw field."
+    ) % text
+
+
 def format_join_sequence_hint(error_msg):
     """Retry hint when ``str.join`` receives row dicts instead of strings."""
     text = (error_msg or '').strip()
@@ -92,9 +109,11 @@ _CATALOGUE_REJECT_MARKERS = (
     'CONTEXT_CATALOGUE',
     'API_CATALOGUE',
     'SKILL_CATALOGUE',
+    'ACTION_CATALOGUE',
     'cannot inspect ai.context',
     'cannot inspect ai.api.server',
     'cannot inspect ai.skill',
+    'cannot inspect ai.trusted.action',
 )
 
 _DEFAULT_RETRY_NUDGE = (
@@ -117,13 +136,39 @@ _CATALOGUE_RETRY_NUDGE = (
 
 _SKILL_CATALOGUE_RETRY_NUDGE = (
     "STOP: relaxaicode cannot inspect ai.skill. "
-    "Do NOT call relaxaicode again. A skill runs when the user types "
+    "Do NOT call relaxaicode again. Do not copy another skill's Code "
+    "or Procedure for a similar page; query the business models. "
+    "A skill runs when the user types "
     "/command, or when the engine matches the sentence to that skill's "
     "own trigger phrases; the model does not launch it. "
     "On the MCP endpoint you do not "
     "run slash skills — answer in prose that you serve tools and "
     "knowledge packs. Do not dump procedure or code_body."
 )
+
+_ACTION_CATALOGUE_RETRY_NUDGE = (
+    "STOP: relaxaicode cannot inspect ai.trusted.action. "
+    "Do NOT call relaxaicode again. The closed action_code list is "
+    "already in safe_plan_request. If a name the user gave did not "
+    "match, or the write still has a choice they did not give, show "
+    "the rows you have and ask ONE short sentence."
+)
+
+INSPECT_SPIN_AFTER = 2
+INSPECT_SPIN_NUDGE = (
+    "STOP: you already inspected. If a name the user gave did not "
+    "match, or the write still has a choice they did not give, show "
+    "the rows you have and ask ONE short sentence. Do not inspect "
+    "more models, wizards or catalogues. A write is safe_plan_request, "
+    "not another search."
+)
+
+
+def inspect_spin_nudge(inspect_count):
+    """Hint after too many inspect_result probes in the same turn."""
+    if inspect_count >= INSPECT_SPIN_AFTER:
+        return INSPECT_SPIN_NUDGE
+    return ''
 
 
 def is_catalogue_inspect_reject(raw):
@@ -171,6 +216,11 @@ def retry_nudge_after_tool_error(raw):
         return _GROUPBY_STORED_HINT
     if 'SKILL_CATALOGUE' in blob or 'cannot inspect ai.skill' in blob:
         return _SKILL_CATALOGUE_RETRY_NUDGE
+    if (
+        'ACTION_CATALOGUE' in blob
+        or 'cannot inspect ai.trusted.action' in blob
+    ):
+        return _ACTION_CATALOGUE_RETRY_NUDGE
     if is_catalogue_inspect_reject(raw):
         return _CATALOGUE_RETRY_NUDGE
     return _DEFAULT_RETRY_NUDGE

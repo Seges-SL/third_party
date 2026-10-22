@@ -7,11 +7,11 @@
             <form string="Create or edit skill">
                 <div class="alert alert-info" role="alert"
                      attrs="{'invisible': ['|', ('existing_skill_id', '!=', False), ('show_advanced', '=', False)]}">
-                    The query <b>logic</b> from your Chatboo session is captured as
+                    The query <b>logic</b> from your chat session is captured as
                     the skill's deterministic <b>Code</b>. Review the
                     <b>Help</b> text and the parameter list, set the name, then
                     create the skill — it will be available as
-                    <code>/&lt;code&gt;</code> in Chatboo.
+                    <code>/&lt;code&gt;</code> in the chat.
                     If the Code reads slash args, Argument hint and the list
                     are filled for you. An empty list means the skill takes
                     no parameters. Create or Save writes Help and parameter
@@ -37,7 +37,7 @@
                     every phase before publishing. Saving an incomplete skill is blocked.
                 </div>
                 <group>
-                    <field name="from_chatboo" invisible="1"/>
+                    <field name="from_chat" invisible="1"/>
                     <field name="warn_hardcoded_rows" invisible="1"/>
                     <field name="warn_incomplete_capture" invisible="1"/>
                     <field name="existing_skill_id" invisible="1"/>
@@ -55,7 +55,8 @@
                     <field name="agent_ids" widget="many2many_tags"
                            attrs="{'invisible': [('show_advanced', '=', False)]}"/>
                 </group>
-                <group string="Parameters">
+                <div class="alert alert-info o_skill_param_token_legend" role="status">__SKILL_PARAM_TOKEN_LEGEND__</div>
+                <group string="Parameters" col="1">
                     <field name="param_line_ids" nolabel="1">
                         <tree editable="bottom">
                             <field name="sequence" widget="handle"/>

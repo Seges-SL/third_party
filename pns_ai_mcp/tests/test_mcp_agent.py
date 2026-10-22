@@ -10,9 +10,7 @@ from odoo.addons.pns_ai_mcp.models.ai_agent_consumer import MCP_BARE_AGENT_CODE
 from odoo.addons.pns_ai_mcp.tests._helpers import create_test_user, ensure_test_agents
 from odoo.addons.pns_ai_mcp.utils.ai_agent_registry import (
     ADMIN_AGENT_CODE,
-    CHATBOO_AGENT_CODE,
     FEATURE_AGENT_CODES,
-    SECRETARY_AGENT_CODE,
 )
 
 
@@ -85,10 +83,6 @@ class TestMcpAgent(TransactionCase):
     def test_resolve_inference_via_feature_key(self):
         Agent = self.env['ai.agent']
         self.assertEqual(
-            Agent.resolve_inference_agent_code(None, consumer_key='chatboo'),
-            CHATBOO_AGENT_CODE,
-        )
-        self.assertEqual(
             Agent.resolve_inference_agent_code(None, consumer_key='admin'),
             ADMIN_AGENT_CODE,
         )
@@ -98,14 +92,8 @@ class TestMcpAgent(TransactionCase):
         with self.assertRaises(UserError):
             Agent.resolve_inference_agent_code(None)
 
-    def test_feature_agent_codes_chatboo(self):
-        self.assertEqual(FEATURE_AGENT_CODES['chatboo'], CHATBOO_AGENT_CODE)
-
     def test_feature_agent_codes_admin(self):
-        self.assertEqual(FEATURE_AGENT_CODES['admin'], ADMIN_AGENT_CODE)
-
-    def test_feature_agent_codes_secretary(self):
-        self.assertEqual(FEATURE_AGENT_CODES['secretary'], SECRETARY_AGENT_CODE)
+        self.assertEqual(FEATURE_AGENT_CODES, {'admin': ADMIN_AGENT_CODE})
 
     def test_admin_agent_exists_inference(self):
         agent = self.env['ai.agent'].search([
@@ -158,11 +146,11 @@ class TestMcpAgent(TransactionCase):
         self.assertEqual(action['res_id'], agent.id)
 
     def test_get_providers_for_agent_without_admin_acl(self):
-        """Chatboo users must resolve provider chains without AI Administrator."""
+        """Plain users must resolve provider chains without AI Administrator."""
         agent = self.env['ai.agent'].search([
-            ('code', '=', CHATBOO_AGENT_CODE), ('active', '=', True),
+            ('code', '=', ADMIN_AGENT_CODE), ('active', '=', True),
         ], limit=1)
-        self.assertTrue(agent, 'chatboo agent must exist')
+        self.assertTrue(agent, 'admin agent must exist')
         if not agent.provider_ids:
             provider = self.env['ai.provider'].search([], limit=1)
             self.assertTrue(provider, 'need at least one ai.provider for test')
@@ -174,9 +162,9 @@ class TestMcpAgent(TransactionCase):
 
         plain_user = create_test_user(self.env, prefix='ai_plain_user')
         engine = self.env['ai.execution.engine'].with_user(plain_user)
-        providers = engine.get_providers_for_agent(CHATBOO_AGENT_CODE)
+        providers = engine.get_providers_for_agent(ADMIN_AGENT_CODE)
         self.assertTrue(providers, 'plain user should resolve providers')
-        resolved = engine.resolve_provider(CHATBOO_AGENT_CODE)
+        resolved = engine.resolve_provider(ADMIN_AGENT_CODE)
         self.assertTrue(resolved)
 
         # Entering the agent form reads the One2many; that is not admin-only.

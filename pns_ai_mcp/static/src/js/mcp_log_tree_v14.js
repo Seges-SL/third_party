@@ -8,8 +8,40 @@ odoo.define('pns_ai_mcp.mcp_log_tree', function (require) {
 "use strict";
 
     var ListController = require('web.ListController');
+    var ListRenderer = require('web.ListRenderer');
+    require('web.EditableListRenderer');
     var ActionManager = require('web.ActionManager');
     var core = require('web.core');
+
+    // O14 takes an absolute `width` from the arch only as a minimum, then
+    // spreads the spare room over every column. O19 keeps it fixed.
+    ListRenderer.include({
+        _freezeColumnWidths: function () {
+            this._super.apply(this, arguments);
+            var cls = (this.arch && this.arch.attrs && this.arch.attrs.class) || '';
+            if (cls.split(/\s+/).indexOf('o_mcp_log_tree') < 0) {
+                return;
+            }
+            var self = this;
+            this.columns.forEach(function (column) {
+                var th = self._getColumnHeader(column);
+                if (!th) {
+                    return;
+                }
+                var width = column.attrs.width;
+                if (width && /^\d+px$/.test(width)) {
+                    var cs = window.getComputedStyle(th);
+                    var px = (parseFloat(width) + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight)) + 'px';
+                    ['width', 'min-width', 'max-width'].forEach(function (prop) {
+                        th.style.setProperty(prop, px, 'important');
+                    });
+                } else {
+                    th.style.removeProperty('width');
+                    th.style.removeProperty('max-width');
+                }
+            });
+        },
+    });
 
     ListController.include({
         renderButtons: function ($node) {

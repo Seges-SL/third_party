@@ -1015,7 +1015,6 @@ class ExternalAPIServer(models.Model):
         if not host:
             return
         try:
-            # Seges: parche 8 (PNS-91, seguridad). Ver docs/pendiente/parches_pns_ai.md
             self.env['ai.url.whitelist']._ensure_domain_whitelisted(
                 host,
                 notes='Documentation URL for external API server "%s"' % self.code,
@@ -1078,7 +1077,6 @@ class ExternalAPIServer(models.Model):
         Whitelist = self.env['ai.url.whitelist']
         for host in self._server_hostnames():
             try:
-                # Seges: parche 8 (PNS-91, seguridad). Ver docs/pendiente/parches_pns_ai.md
                 Whitelist._ensure_domain_whitelisted(
                     host,
                     notes='Auto-added for external API server "%s"' % self.code,
@@ -1245,7 +1243,7 @@ class ExternalAPIServer(models.Model):
             return client_notification(
                 _("Auth from spec"),
                 _("The spec has no unique apiKey header. Fill Authentication "
-                  "by hand, or ask Chatboo to propose a write."),
+                  "by hand, or ask the chat to propose a write."),
                 'warning',
                 sticky=True,
             )

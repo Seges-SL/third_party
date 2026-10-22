@@ -15,21 +15,27 @@ import logging
 _logger = logging.getLogger(__name__)
 
 LOG_RETENTION_PARAM = 'pns_ai_mcp.log_retention_days'
-DEFAULT_LOG_RETENTION_DAYS = 30
+
+# Endpoint any module uses to say an optional capability did not run, and
+# why. The row sits in its place inside the turn, greyed out: the step is
+# there, and visibly inert. Detail goes in ``result_summary``.
+CAPABILITY_SKIPPED = 'capability_skipped'
 
 
 class AILog(models.Model):
     """One row per AI/MCP operation, read or write.
 
     Every request that flows through the MCP layer leaves a row here, whether
-    it comes from the in-house Chatboo UI, an external MCP client (Cursor,
-    Claude, Antigravity...) or an internal process. Write operations are the
-    most important: they let us reconstruct altered, damaged or deleted records.
+    it comes from a host screen (each host adds its door), an external MCP
+    client (Cursor, Claude, Antigravity...) or an internal process. Write
+    operations are the most important: they let us reconstruct altered,
+    damaged or deleted records.
 
-    The row carries three orthogonal axes so the history is easy to read:
+    The row carries orthogonal axes so the history is easy to read:
 
-    * ``origin``    -- door token (in-house UI / MCP client / internal).
-    * ``agent_id`` / ``agent_display`` -- the agent that owned the turn.
+    * ``client_display`` -- WHO called: the name the program gave, else its door.
+    * ``origin``    -- door token behind it (host / MCP client / internal);
+      it decides the external flow and the "From ..." filters, not shown.
     * ``primitive`` + ``category`` -- WHAT kind of operation it was.
     * ``flow`` + ``flow_label``    -- the step's DIRECTION within the turn.
 
@@ -55,28 +61,22 @@ class AILog(models.Model):
     )
     origin = fields.Selection(
         [
-            ('chatboo', 'Chatboo'),
             ('mcp_client', 'MCP Client'),
             ('internal', 'Internal'),
         ],
         string='Door',
         readonly=True,
         index=True,
-        help='Which door the request used: Chatboo screen, an MCP client '
-             '(Cursor, Claude), or an internal process (walkie, cron).',
+        help='Which door the request used: an MCP client (Cursor, Claude), '
+             'a host screen that adds its own door, or an internal process (cron).',
     )
-    agent_id = fields.Many2one(
-        'ai.agent',
-        string='Agent',
-        readonly=True,
+    client_display = fields.Char(
+        string='Client',
+        compute='_compute_client_display',
+        store=True,
         index=True,
-        ondelete='set null',
-        help='Agent that owned this turn. The Agent column shows this name.',
-    )
-    agent_display = fields.Char(
-        string='Agent',
-        compute='_compute_agent_display',
-        help='Agent that owned this turn. If no agent was bound, shows the door label.',
+        help='Who called: the name the program gave (Cursor, Claude), '
+             'otherwise its door (a host screen, MCP Client, Internal).',
     )
     remote_ip = fields.Char(
         string='IP',
@@ -88,8 +88,8 @@ class AILog(models.Model):
         string='Client',
         readonly=True,
         index=True,
-        help='Program that called: Cursor, Claude, Chatboo, the walkie. '
-             'If the host sends no name, this copies the agent.',
+        help='Program that called, as it named itself (Cursor, Claude). '
+             'Empty if it said nothing.',
     )
 
     # ── When ─────────────────────────────────────────────────────────
@@ -137,7 +137,7 @@ class AILog(models.Model):
         help='Name of the executed MCP tool, resource URI or prompt.',
     )
     # Project-wide the executed tool is referred to as ``tool_name`` (the
-    # create_log_entry parameter, ai.safe.operation, AI-authored relaxaicode).
+    # _create_log_entry parameter, ai.safe.operation, AI-authored relaxaicode).
     # The stored column here is ``endpoint``; this read-only related alias keeps
     # ``tool_name`` valid to avoid AttributeError in code that uses that name.
     tool_name = fields.Char(
@@ -169,6 +169,14 @@ class AILog(models.Model):
         help='Model that processed the request (e.g. ollama/llama3.1_8B). For '
              'external MCP clients, the client name (the model runs on their side).',
     )
+    provider_id = fields.Many2one(
+        'ai.provider',
+        string='Provider',
+        readonly=True,
+        index=True,
+        ondelete='set null',
+        help='Inference provider that spent the tokens on this row, when known.',
+    )
 
     # ── Turn threading ───────────────────────────────────────────────
     turn = fields.Char(
@@ -194,6 +202,7 @@ class AILog(models.Model):
             ('turn_done',    'Turn completed'),
             ('failover',     'Provider failover'),
             ('external',     'MCP client -> Odoo'),
+            ('skipped',      'Not done'),
             ('other',        'Other'),
         ],
         string='Flow type',
@@ -388,12 +397,12 @@ class AILog(models.Model):
                         .replace('search_memory', 'memory')
                         .replace('domain_index', 'domains'))
 
-    @api.depends('agent_id', 'agent_id.name', 'origin')
-    def _compute_agent_display(self):
+    @api.depends('client_label', 'origin')
+    def _compute_client_display(self):
         labels = dict(self._fields['origin'].selection or [])
         for rec in self:
-            name = (rec.agent_id.name or '').strip()
-            rec.agent_display = name or labels.get(rec.origin) or rec.origin or ''
+            name = (rec.client_label or '').strip()
+            rec.client_display = name or labels.get(rec.origin) or rec.origin or ''
 
     @api.depends('origin', 'primitive', 'endpoint', 'access_mode', 'category', 'result_summary')
     def _compute_flow(self):
@@ -419,16 +428,17 @@ class AILog(models.Model):
                 continue
 
             # Internal orchestration (Chatboo / internal processes).
-            if ep == 'provider_failover':
+            if ep == CAPABILITY_SKIPPED:
+                rec.flow = 'skipped'
+                # Keep English: ai.log surface, shared with logs and AIs.
+                rec.flow_label = rs or 'Not done'
+            elif ep == 'provider_failover':
                 rec.flow = 'failover'
                 rec.flow_label = rs or 'Provider failover'
             elif ep == 'domain_index':
                 rec.flow = 'domain_index'
                 # Keep English: debug terminology shared with AIs / logs.
                 rec.flow_label = rs or 'Discovery'
-            elif ep == 'llm_tool_request':
-                rec.flow = 'llm_response'
-                rec.flow_label = 'LLM -> AI Engine (tool call)'
             elif ep == 'llm_response_hdr':
                 rec.flow = 'llm_response'
                 rec.flow_label = 'LLM -> AI Engine (intro/outro)'
@@ -502,6 +512,11 @@ class AILog(models.Model):
             '<line x1="21" y1="16" x2="3" y2="16"/>'
             '<polyline points="7,12 3,16 7,20"/>'
         ),
+        'capability_skipped': (
+            # A crossed-out circle: the step was offered and did not happen.
+            '<circle cx="12" cy="12" r="8.4"/>'
+            '<line x1="6.1" y1="17.9" x2="17.9" y2="6.1"/>'
+        ),
         'mcp_client_to_odoo': (
             # Same silhouette as Chatboo's fa-plug, rotated 90° CW so
             # the prongs do not read as cat ears at 15px.
@@ -523,6 +538,7 @@ class AILog(models.Model):
         'turn_done': 'turn_completed',
         'failover': 'provider_failover',
         'external': 'mcp_client_to_odoo',
+        'skipped': 'capability_skipped',
     }
     _FLOW_LEGEND = [
         ('#1565c0', '#ffffff', 'Discovery', False, 'discovery'),
@@ -536,6 +552,7 @@ class AILog(models.Model):
         ('#7b1fa2', '#ffffff', 'Provider failover', False, 'provider_failover'),
         ('#039BE5', '#ffffff', 'MCP client \u2192 Odoo', False,
          'mcp_client_to_odoo'),
+        ('#78909c', '#ffffff', 'Not done', True, 'capability_skipped'),
     ]
 
     @classmethod
@@ -666,7 +683,7 @@ class AILog(models.Model):
     # ── Logging entry point ──────────────────────────────────────────
 
     @api.model
-    def create_log_entry(self, user_id, operation_type, tool_name, prompt_data=None,
+    def _create_log_entry(self, user_id, operation_type, tool_name, prompt_data=None,
                          result_data=None, result_summary=None, additional_info=None,
                          user_prompt=None, code_to_execute=None, agent_llm=None,
                          request_size_bytes=None, response_size_bytes=None,
@@ -674,7 +691,7 @@ class AILog(models.Model):
                          total_tokens=None, cost_usd=None, usage=None,
                          turn=None, turn_step=None,
                          source_channel=None, remote_ip=None, client_label=None,
-                         agent_code=None,
+                         provider_id=None,
                          **legacy):
         """Create a log entry safely, on its own cursor, committing immediately.
 
@@ -689,8 +706,7 @@ class AILog(models.Model):
             operation_type: 'read' or 'write'.
             tool_name: MCP tool name, resource URI or prompt.
             request_type: MCP primitive ('system'/'tool'/'resource'/'prompt'/'llm').
-            source_channel: 'chatboo', 'mcp_client' or 'internal' (door).
-            agent_code: ``ai.agent.code`` for the Origin column (agent name).
+            source_channel: a token of ``origin`` (door).
             agent_llm: Model that processed the request.
 
         Returns:
@@ -702,7 +718,7 @@ class AILog(models.Model):
         if config['test_enable'] and type(self.env.cr).__name__ == 'TestCursor':
             return None
         try:
-            _logger.info(f"TRACE_MCP: create_log_entry START - Endpoint: {tool_name}, User: {user_id}")
+            _logger.info(f"TRACE_MCP: _create_log_entry START - Endpoint: {tool_name}, User: {user_id}")
             new_cr = self.env.registry.cursor()
             try:
                 env_log = api.Environment(new_cr, SUPERUSER_ID, {})
@@ -769,10 +785,10 @@ class AILog(models.Model):
 
                 # Capture remote IP centrally when the caller did not provide it.
                 from ..utils.mcp_logging import (
+                    known_doors,
                     normalize_remote_ip,
                     request_log_stamp,
                     resolve_client_label,
-                    resolve_log_agent,
                 )
                 remote_ip = normalize_remote_ip(remote_ip)
                 ctx = self.env.context or {}
@@ -788,22 +804,18 @@ class AILog(models.Model):
                         or stamp.get('client_label')
                     )
                 origin = source_channel or 'internal'
-                if origin not in ('chatboo', 'mcp_client', 'internal'):
+                if origin not in known_doors(env_log):
                     origin = 'internal'
-                # Isolated cursor has empty context — take the code from the
-                # caller env / request stamp / prompt before searching ai.agent.
-                if not agent_code:
-                    agent_code = (
-                        ctx.get('mcp_agent_code')
-                        or stamp.get('agent_code')
-                    )
-                if not agent_code and isinstance(prompt_data, dict):
-                    agent_code = prompt_data.get('agent_code')
-                agent = resolve_log_agent(env_log, agent_code)
                 client_label = resolve_client_label(
-                    env_log, user_id, origin,
-                    explicit=client_label, agent_code=agent_code,
+                    env_log, user_id, origin, explicit=client_label,
                 )
+
+                if provider_id in (None, False, 0) and isinstance(prompt_data, dict):
+                    provider_id = prompt_data.get('provider_id')
+                try:
+                    provider_id = int(provider_id) if provider_id else False
+                except (TypeError, ValueError):
+                    provider_id = False
 
                 log_entry = env_log['ai.log'].create({
                     'user_id': user_id,
@@ -811,6 +823,7 @@ class AILog(models.Model):
                     'access_mode': operation_type,
                     'primitive': primitive,
                     'endpoint': tool_name,
+                    'provider_id': provider_id,
                     'prompt_data': prompt_json,
                     'result_data': result_json,
                     'result_summary': result_summary[:5000] if result_summary and len(result_summary) > 5000 else result_summary,
@@ -827,7 +840,6 @@ class AILog(models.Model):
                     'turn': turn[:8] if turn else None,
                     'turn_step': turn_step or 0,
                     'origin': origin,
-                    'agent_id': agent.id if agent else False,
                     'remote_ip': remote_ip,
                     'client_label': client_label[:255] if client_label else None,
                 })
@@ -835,7 +847,7 @@ class AILog(models.Model):
                 log_id = log_entry.id
                 if new_cr:
                     new_cr.commit()
-                _logger.info(f"MCP: create_log_entry SUCCESS - ID: {log_id}")
+                _logger.info(f"MCP: _create_log_entry SUCCESS - ID: {log_id}")
                 return log_entry
             finally:
                 if new_cr:
@@ -891,15 +903,21 @@ class AILog(models.Model):
 
     @api.model
     def _cron_purge_old_logs(self):
-        """Delete rows older than ``pns_ai_mcp.log_retention_days`` (0 = keep)."""
+        """Delete rows older than the retention an admin set. Unset = keep.
+
+        Nothing is purged until a person fixes the days in Settings: an
+        update must not start deleting the audit trail on its own.
+        """
         from datetime import timedelta
         raw = self.env['ir.config_parameter'].sudo().get_param(
-            LOG_RETENTION_PARAM, DEFAULT_LOG_RETENTION_DAYS,
+            LOG_RETENTION_PARAM,
         )
+        if raw is None or raw is False or str(raw).strip() == '':
+            return 0
         try:
             days = int(raw)
         except (TypeError, ValueError):
-            days = DEFAULT_LOG_RETENTION_DAYS
+            return 0
         if days <= 0:
             return 0
         cutoff = fields.Datetime.now() - timedelta(days=days)
@@ -915,7 +933,6 @@ class AILog(models.Model):
     _USAGE_SUMMARY_EXCLUDE_ENDPOINTS = (
         'llm_orchestration',
         'llm_response',
-        'llm_tool_request',
         'llm_response_hdr',
         'provider_failover',
     )
@@ -981,7 +998,7 @@ class AILog(models.Model):
     # ── Export ───────────────────────────────────────────────────────
 
     _LOG_EXPORT_ONLY = (
-        'timestamp', 'origin', 'agent_id', 'access_mode', 'primitive', 'endpoint',
+        'timestamp', 'client_display', 'access_mode', 'primitive', 'endpoint',
         'category', 'flow', 'flow_label', 'turn', 'turn_step',
         'model_name', 'result_summary',
     )

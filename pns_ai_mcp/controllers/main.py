@@ -43,6 +43,7 @@ except ImportError:
 
 # Hash determinista para validar la API key entrante contra el hash almacenado.
 from ..utils.api_key import hash_api_key
+from ..utils.mcp_origin import ICP_MCP_ALLOWED_ORIGINS, origin_allowed
 from ..utils.mcp_protocol import (
     client_info_from_params,
     detect_mcp_era,
@@ -84,12 +85,6 @@ from ..utils.mcp_correlation import (
 )
 
 
-
-# Importar funciones de validación
-from .validators import (
-    validate_relaxaicode_source_ast,
-    detect_dangerous_operations
-)
 
 # Importar funciones de construcción de contexto
 from .context_builder import (
@@ -146,7 +141,7 @@ class MCPServerController(http.Controller):
                 else:
                     request_type = 'tool'
             
-            # Payload Subtype calculation is handled by create_log_entry if not provided
+            # Payload Subtype calculation is handled by _create_log_entry if not provided
             
             # context_type calculation can also be handled here or passed to additional info
             # For now, we keep the specific context_type logic or rely on model computation
@@ -156,7 +151,7 @@ class MCPServerController(http.Controller):
             # functional category from primitive + endpoint.
             if 'ai.log' in env:
                 turn_id, turn_step = self._resolve_mcp_log_turn()
-                env['ai.log'].create_log_entry(
+                env['ai.log']._create_log_entry(
                     user_id=mcp_user_id,
                     operation_type=operation_type,
                     tool_name=tool_name,
@@ -242,8 +237,10 @@ class MCPServerController(http.Controller):
         """
         Maneja peticiones OPTIONS (preflight CORS) para clientes HTTP MCP.
         """
+        if not self._mcp_origin_ok():
+            return Response(status=403)
         response = Response()
-        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Origin'] = self._mcp_cors_origin()
         response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, DELETE'
         response.headers['Access-Control-Allow-Headers'] = (
             'Content-Type, X-MCP-API-Key, Authorization, Accept, '
@@ -257,8 +254,10 @@ class MCPServerController(http.Controller):
     @http.route('/mcp/message', type='http', auth='none', save_session=False, methods=['OPTIONS'], csrf=False, cors='*')
     def mcp_sse_options(self, **kwargs):
         """OPTIONS para endpoints SSE standalone (CORS preflight)."""
+        if not self._mcp_origin_ok():
+            return Response(status=403)
         response = Response()
-        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Origin'] = self._mcp_cors_origin()
         response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, DELETE'
         response.headers['Access-Control-Allow-Headers'] = (
             'Content-Type, X-MCP-API-Key, Authorization, Accept, '
@@ -293,6 +292,37 @@ class MCPServerController(http.Controller):
     def mcp_endpoint_agent(self, agent_code, **kwargs):
         return self.mcp_endpoint(agent_code=agent_code, **kwargs)
 
+    def _mcp_request_origin(self):
+        try:
+            return request.httprequest.headers.get('Origin')
+        except Exception:
+            return None
+
+    def _mcp_origin_ok(self):
+        origin = self._mcp_request_origin()
+        if not origin:
+            return True
+        try:
+            icp = request.env['ir.config_parameter'].sudo()
+            allowed = icp.get_param(ICP_MCP_ALLOWED_ORIGINS, '')
+            base = icp.get_param('web.base.url', '')
+        except Exception:
+            allowed, base = '', ''
+        return origin_allowed(origin, allowed, base)
+
+    def _mcp_origin_error(self):
+        return self._mcp_json_http_response({
+            'jsonrpc': '2.0',
+            'error': {'code': -32000, 'message': 'Origin not allowed'},
+            'id': None,
+        }, status=403)
+
+    def _mcp_cors_origin(self):
+        # Entry points have already rejected a disallowed Origin; echo the
+        # caller's own Origin instead of '*'. No Origin (desktop clients)
+        # keeps '*'.
+        return self._mcp_request_origin() or '*'
+
     def _mcp_json_http_response(self, body, status=200, extra_headers=None):
         """Respuesta JSON-RPC explícita (Streamable HTTP / Cursor V2)."""
         response = Response(
@@ -300,7 +330,7 @@ class MCPServerController(http.Controller):
             status=status,
             mimetype='application/json',
         )
-        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Origin'] = self._mcp_cors_origin()
         response.headers['Access-Control-Expose-Headers'] = 'Mcp-Session-Id'
         if extra_headers:
             for key, value in extra_headers.items():
@@ -361,7 +391,7 @@ class MCPServerController(http.Controller):
             mimetype='text/event-stream',
             status=status,
         )
-        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Origin'] = self._mcp_cors_origin()
         return response
 
     def _resolve_mcp_log_turn(self, session=None):
@@ -401,8 +431,8 @@ class MCPServerController(http.Controller):
 
     def _extract_api_key(self):
         """
-        Extrae API key de la petición.
-        Orden: cabecera (X-MCP-API-Key, Authorization Bearer) primero, luego URL.
+        Extrae API key de la petición. Solo cabeceras:
+        X-MCP-API-Key o Authorization Bearer. La clave nunca viaja en la URL.
         """
         headers = request.httprequest.headers
         api_key = headers.get('X-MCP-API-Key') or headers.get('HTTP_X_MCP_API_KEY')
@@ -417,14 +447,12 @@ class MCPServerController(http.Controller):
                 auth_env = environ.get('HTTP_AUTHORIZATION') or ''
                 if auth_env.startswith('Bearer '):
                     api_key = auth_env[7:].strip()
-        if not api_key:
-            api_key = request.params.get('api_key') or request.httprequest.args.get('api_key')
         return api_key.strip() if api_key else None
 
     def _validate_api_key_sse(self):
         """
         Valida API key para SSE. Retorna (api_key, mcp_user_record) o (None, error_response).
-        Prioridad: cabecera (X-MCP-API-Key, Authorization Bearer) > URL.
+        La clave solo llega en cabecera (X-MCP-API-Key, Authorization Bearer).
         """
         api_key = self._extract_api_key()
 
@@ -491,19 +519,21 @@ class MCPServerController(http.Controller):
         GET: stream SSE (event:endpoint + event:message).
         POST: JSON-RPC directo en body (fallback para clientes que POSTean a serverUrl).
         """
+        if not self._mcp_origin_ok():
+            return self._mcp_origin_error()
         bind_err = self._bind_mcp_agent(agent_code)
         if bind_err:
             err_body = (
                 f'data: {{"jsonrpc":"2.0","error":{{"code":-32000,"message":"{bind_err}"}},"id":null}}\n\n'
             )
             resp = Response(err_body, mimetype='text/event-stream', status=404)
-            resp.headers['Access-Control-Allow-Origin'] = '*'
+            resp.headers['Access-Control-Allow-Origin'] = self._mcp_cors_origin()
             return resp
         if request.httprequest.method == 'POST':
             return self._mcp_sse_post_handler()
         valid, err_resp = self._validate_api_key_sse()
         if err_resp is not None:
-            err_resp.headers['Access-Control-Allow-Origin'] = '*'
+            err_resp.headers['Access-Control-Allow-Origin'] = self._mcp_cors_origin()
             return err_resp
         api_key, mcp_user_record = valid
         user = mcp_user_record.user_id
@@ -529,7 +559,7 @@ class MCPServerController(http.Controller):
             mimetype='text/event-stream',
             direct_passthrough=True
         )
-        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Origin'] = self._mcp_cors_origin()
         response.headers['Cache-Control'] = 'no-cache'
         response.headers['Connection'] = 'keep-alive'
         response.headers['X-Accel-Buffering'] = 'no'
@@ -540,18 +570,18 @@ class MCPServerController(http.Controller):
         Maneja POST a /mcp/sse (Antigravity envía initialize/tools a serverUrl).
         Respuesta JSON-RPC en body, igual que /mcp.
         """
-        def _json_error(code, msg, req_id=None):
+        def _json_error(code, msg, req_id=None, status=200):
             r = Response(
                 json.dumps({'jsonrpc': '2.0', 'error': {'code': code, 'message': msg}, 'id': req_id}),
-                mimetype='application/json', status=200
+                mimetype='application/json', status=status
             )
-            r.headers['Access-Control-Allow-Origin'] = '*'
+            r.headers['Access-Control-Allow-Origin'] = self._mcp_cors_origin()
             return r
 
         try:
             valid, err_resp = self._validate_api_key_sse()
             if err_resp is not None:
-                err_resp.headers['Access-Control-Allow-Origin'] = '*'
+                err_resp.headers['Access-Control-Allow-Origin'] = self._mcp_cors_origin()
                 return err_resp
             api_key, mcp_user_record = valid
             user = mcp_user_record.user_id
@@ -577,20 +607,23 @@ class MCPServerController(http.Controller):
             try:
                 result = self._handle_mcp_method(method, params, is_notification)
             except MCPJSONRPCError as e:
-                return _json_error(e.error_code, e.error_message, request_id)
+                return _json_error(
+                    e.error_code, e.error_message, request_id,
+                    status=e.http_status,
+                )
             except Exception as e:
                 _logger.exception("MCP SSE POST: Error in _handle_mcp_method")
                 return _json_error(-32603, str(e), request_id)
 
             if is_notification:
-                return Response('', status=204, mimetype='text/plain')
+                return Response('', status=202, mimetype='text/plain')
 
             if 'error' in result:
                 jrpc = {'jsonrpc': '2.0', 'id': request_id, 'error': result['error']}
             else:
                 jrpc = {'jsonrpc': '2.0', 'id': request_id, 'result': result}
             r = Response(json.dumps(jrpc, default=str), mimetype='application/json')
-            r.headers['Access-Control-Allow-Origin'] = '*'
+            r.headers['Access-Control-Allow-Origin'] = self._mcp_cors_origin()
             return r
         except Exception as e:
             _logger.exception("MCP SSE POST: Unhandled error")
@@ -602,13 +635,15 @@ class MCPServerController(http.Controller):
         Endpoint de mensajes para transporte SSE standalone.
         Recibe JSON-RPC por POST, encola respuesta para el stream SSE, devuelve 202.
         """
+        if not self._mcp_origin_ok():
+            return self._mcp_origin_error()
         bind_err = self._bind_mcp_agent(agent_code)
         if bind_err:
             r = Response(
                 json.dumps({'error': {'code': -32000, 'message': bind_err}}),
                 status=404, mimetype='application/json',
             )
-            r.headers['Access-Control-Allow-Origin'] = '*'
+            r.headers['Access-Control-Allow-Origin'] = self._mcp_cors_origin()
             return r
         session_id = request.params.get('session') or request.httprequest.args.get('session')
         if not session_id:
@@ -616,7 +651,7 @@ class MCPServerController(http.Controller):
                 json.dumps({'error': {'code': -32000, 'message': 'Missing session parameter'}}),
                 status=400, mimetype='application/json'
             )
-            r.headers['Access-Control-Allow-Origin'] = '*'
+            r.headers['Access-Control-Allow-Origin'] = self._mcp_cors_origin()
             return r
         store = SessionStore()
         session = store.get(session_id)
@@ -625,7 +660,7 @@ class MCPServerController(http.Controller):
                 json.dumps({'error': {'code': -32000, 'message': 'Invalid or expired session'}}),
                 status=400, mimetype='application/json'
             )
-            r.headers['Access-Control-Allow-Origin'] = '*'
+            r.headers['Access-Control-Allow-Origin'] = self._mcp_cors_origin()
             return r
 
         try:
@@ -636,7 +671,7 @@ class MCPServerController(http.Controller):
                 json.dumps({'error': {'code': -32700, 'message': f'Parse error: {str(e)}'}}),
                 status=400, mimetype='application/json'
             )
-            r.headers['Access-Control-Allow-Origin'] = '*'
+            r.headers['Access-Control-Allow-Origin'] = self._mcp_cors_origin()
             return r
 
         api_key = self._extract_api_key()
@@ -645,7 +680,7 @@ class MCPServerController(http.Controller):
                 json.dumps({'error': {'code': -32000, 'message': 'API key mismatch or missing'}}),
                 status=401, mimetype='application/json'
             )
-            r.headers['Access-Control-Allow-Origin'] = '*'
+            r.headers['Access-Control-Allow-Origin'] = self._mcp_cors_origin()
             return r
 
         # The stream may live for hours: a revoked key or a user switched off
@@ -661,7 +696,7 @@ class MCPServerController(http.Controller):
                 json.dumps({'error': {'code': -32000, 'message': 'Invalid API key'}}),
                 status=401, mimetype='application/json'
             )
-            r.headers['Access-Control-Allow-Origin'] = '*'
+            r.headers['Access-Control-Allow-Origin'] = self._mcp_cors_origin()
             return r
         request.mcp_user_id = user.id
         request.mcp_user = user
@@ -687,115 +722,30 @@ class MCPServerController(http.Controller):
             store.enqueue_response(session_id, jrpc)
 
         response = Response('', status=202, mimetype='text/plain')
-        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Origin'] = self._mcp_cors_origin()
         return response
 
     @http.route('/mcp', type='http', auth='none', save_session=False, methods=['GET'], csrf=False, cors='*')
     def mcp_endpoint_sse(self, agent_code=None, **kwargs):
+        """GET /mcp offers no server stream.
+
+        Streamable HTTP opens this GET and parses every SSE event as
+        JSON-RPC. A result with a null id is rejected and the client drops
+        the server. 405 means there is no stream; the client keeps POST.
+        The key is still required on POST. ``/mcp/sse`` is the other channel.
         """
-        Endpoint SSE (Server-Sent Events) para peticiones GET.
-        """
-        bind_err = self._bind_mcp_agent(agent_code)
-        if bind_err:
-            response = Response(
-                f'data: {{"jsonrpc":"2.0","error":{{"code":-32000,"message":"{bind_err}"}},"id":null}}\n\n',
-                mimetype='text/event-stream',
-                status=404,
-            )
-            response.headers['Access-Control-Allow-Origin'] = '*'
-            return response
-        try:
-            # Validar API key
-            api_key = None
-            headers = request.httprequest.headers
-            api_key = headers.get('X-MCP-API-Key')
-            if not api_key:
-                environ = request.httprequest.environ
-                api_key = environ.get('HTTP_X_MCP_API_KEY')
-            if not api_key:
-                api_key = request.params.get('api_key') or request.httprequest.args.get('api_key')
-            
-            # Validar API key
-            if api_key is None or (isinstance(api_key, str) and not api_key.strip()):
-                response = Response(
-                    'data: {"jsonrpc":"2.0","error":{"code":-32000,"message":"API key required"},"id":null}\n\n',
-                    mimetype='text/event-stream',
-                    status=401
-                )
-                response.headers['Access-Control-Allow-Origin'] = '*'
+        if not self._mcp_origin_ok():
+            return self._mcp_origin_error()
+        if agent_code is not None:
+            bind_err = self._bind_mcp_agent(agent_code)
+            if bind_err:
+                response = Response(status=404)
+                response.headers['Access-Control-Allow-Origin'] = self._mcp_cors_origin()
                 return response
-            
-            api_key = api_key.strip()
-            if not api_key or len(api_key) == 0:
-                response = Response(
-                    'data: {"jsonrpc":"2.0","error":{"code":-32000,"message":"API key required"},"id":null}\n\n',
-                    mimetype='text/event-stream',
-                    status=401
-                )
-                response.headers['Access-Control-Allow-Origin'] = '*'
-                return response
-            
-            # Validar usuario
-            try:
-                env_temp = request.env(user=SUPERUSER_ID)
-                if 'ai.mcp.user' not in env_temp:
-                    error_msg = 'MCP user model not available'
-                    response = Response(
-                        f'data: {{"jsonrpc":"2.0","error":{{"code":-32000,"message":"{error_msg}"}},"id":null}}\n\n',
-                        mimetype='text/event-stream',
-                        status=500
-                    )
-                    response.headers['Access-Control-Allow-Origin'] = '*'
-                    return response
-                
-                mcp_user_record = env_temp['ai.mcp.user'].search([
-                    ('mcp_api_key_hash', '=', hash_api_key(api_key))
-                ], limit=1)
-                
-                if not mcp_user_record or not mcp_user_record.user_id or not mcp_user_record.user_id.active:
-                    error_msg = 'Invalid API key'
-                    response = Response(
-                        f'data: {{"jsonrpc":"2.0","error":{{"code":-32000,"message":"{error_msg}"}},"id":null}}\n\n',
-                        mimetype='text/event-stream',
-                        status=401
-                    )
-                    response.headers['Access-Control-Allow-Origin'] = '*'
-                    return response
-                
-                user = mcp_user_record.user_id
-                denied = self._mcp_conversational_denied(user)
-                if denied:
-                    return self._mcp_sse_jsonrpc_error(denied, 403)
-                request.mcp_user = user
-                request.mcp_user_id = user.id
-            except Exception as e:
-                error_msg = f'Error validating API key: {str(e)}'
-                response = Response(
-                    f'data: {{"jsonrpc":"2.0","error":{{"code":-32000,"message":"{error_msg}"}},"id":null}}\n\n',
-                    mimetype='text/event-stream',
-                    status=500
-                )
-                response.headers['Access-Control-Allow-Origin'] = '*'
-                return response
-            
-            # Devolver handshake SSE
-            response = Response(
-                'data: {"jsonrpc":"2.0","result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{"listChanged":false},"prompts":{"listChanged":false}},"serverInfo":{"name":"pns_ai_mcp","version":"1.0.0"},"instructions":"Use prompts/get(name=\\"system_prompt\\") to load the system knowledge context and start dialogue."},"id":null}\n\n',
-                mimetype='text/event-stream'
-            )
-            response.headers['Access-Control-Allow-Origin'] = '*'
-            response.headers['Cache-Control'] = 'no-cache'
-            response.headers['Connection'] = 'keep-alive'
-            return response
-        except Exception as e:
-            _logger.exception("MCP: Error procesando petición SSE")
-            response = Response(
-                f'data: {{"jsonrpc":"2.0","error":{{"code":-32603,"message":"Internal error: {str(e)}"}},"id":null}}\n\n',
-                mimetype='text/event-stream',
-                status=500
-            )
-            response.headers['Access-Control-Allow-Origin'] = '*'
-            return response
+        response = Response(status=405)
+        response.headers['Allow'] = 'POST, OPTIONS'
+        response.headers['Access-Control-Allow-Origin'] = self._mcp_cors_origin()
+        return response
 
     @http.route('/mcp', type='http', auth='none', save_session=False, methods=['POST'], csrf=False, cors='*')
     def mcp_endpoint(self, agent_code=None, **kwargs):
@@ -803,8 +753,10 @@ class MCPServerController(http.Controller):
         Endpoint principal MCP (POST JSON-RPC).
         type='http' + envelope explícito: Odoo 19 type='jsonrpc' no envuelve result y Cursor V2
         (Streamable HTTP) valida result.serverInfo.
-        GET SSE: mcp_endpoint_sse.
+        GET /mcp is 405: that client drops a result whose id is null.
         """
+        if not self._mcp_origin_ok():
+            return self._mcp_origin_error()
         bind_err = self._bind_mcp_agent(agent_code)
         if bind_err:
             return self._mcp_json_http_response({
@@ -860,14 +812,8 @@ class MCPServerController(http.Controller):
                 api_key = self._extract_api_key()
             
             if api_key:
-                _logger.info(f"MCP Auth: Using X-Mcp-Token: {api_key[:10]}...")
-            
-            # Fallback para Cursor: query parameter api_key (Cursor no envía headers HTTP)
-            if not api_key:
-                api_key = request.params.get('api_key') or request.httprequest.args.get('api_key')
-                if api_key:
-                    _logger.info(f"MCP Auth: Using api_key query parameter: {api_key[:10]}...")
-            
+                _logger.info("MCP Auth: API key received in a header")
+
             # Validar que la API key esté presente y no esté vacía
             if api_key is None or (isinstance(api_key, str) and not api_key.strip()):
                 raise MCPJSONRPCError(-32000, 'API key required', payload.get('id') if payload else None)
@@ -981,8 +927,8 @@ class MCPServerController(http.Controller):
             result = self._handle_mcp_method(method, params, is_notification, era=era)
 
             if is_notification:
-                response = Response('', status=204, mimetype='text/plain')
-                response.headers['Access-Control-Allow-Origin'] = '*'
+                response = Response('', status=202, mimetype='text/plain')
+                response.headers['Access-Control-Allow-Origin'] = self._mcp_cors_origin()
                 return response
 
             extra_headers = {}
@@ -1036,7 +982,7 @@ class MCPServerController(http.Controller):
                 'jsonrpc': '2.0',
                 'id': e.request_id,
                 'error': {'code': e.error_code, 'message': e.error_message},
-            })
+            }, status=e.http_status)
         except (Unauthorized, BadRequest, InternalServerError):
             raise
 
@@ -1280,7 +1226,7 @@ class MCPServerController(http.Controller):
         arguments = params.get('arguments', {})
         
         # Guardar el prompt completo (params completo) para logging
-        # Se pasará directamente y create_log_entry lo serializará
+        # Se pasará directamente y _create_log_entry lo serializará
         prompt_data_full = params
 
         if not tool_name:
@@ -1293,19 +1239,15 @@ class MCPServerController(http.Controller):
 
             return error_response
 
-        # Determinar tipo de operación (por defecto lectura, excepto relaxaicode que se determina dinámicamente)
+        # Determinar tipo de operación desde el registro de la tool, no
+        # desde una lista de nombres. relaxaicode declara is_write pero
+        # decide dentro si el código escribe: la puerta de grupo la aplica
+        # ella misma al detectar escritura.
         operation_type = 'read'
-        write_tools = {
-            'confirm_write_operation',
-            'cancel_write_operation',
-        }
-        
-        if tool_name in write_tools:
+        tool_metadata = get_tool_metadata(tool_name) if tool_name else None
+        if tool_metadata and tool_metadata.get('is_write') and tool_name != 'relaxaicode':
             operation_type = 'write'
-        elif tool_name == 'relaxaicode':
-            # Para relaxaicode, el tipo se determina dentro de la tool
-            operation_type = 'read'  # Por defecto, se actualizará dentro de la tool si es escritura
-        
+
         # IMPORTANTE: Verificar permisos ANTES de ejecutar herramientas de escritura
         # Esto evita procesar operaciones innecesarias y consumir tokens cuando no hay permisos
         if operation_type == 'write':
@@ -1469,14 +1411,17 @@ class MCPServerController(http.Controller):
         # demand by prompts/get; get_context stays as a universal fallback for
         # clients with weak prompts support.
         try:
-            # sudo keeps the caller's uid: private contexts stay their owner's.
-            # Seges: parche de compatibilidad con Odoo 14 (API de Odoo 14: Environment sin sudo). Ver docs/pendiente/parches_pns_ai.md
+            # su keeps the caller's uid: private contexts stay their owner's.
+            # An Environment has no sudo(); that is the recordset method.
             env = self._get_mcp_env()(su=True)
             if 'ai.context' in env:
                 for ctx in env['ai.context'].get_listable_for_mcp():
+                    name = ctx.base_code or ctx.code
+                    if name == 'system_prompt':
+                        continue
                     prompts.append({
-                        'name': ctx.base_code or ctx.code,
-                        'title': ctx.base_code or ctx.code,
+                        'name': name,
+                        'title': name,
                         'description': ctx.description or (ctx.base_code or ctx.code),
                         'arguments': [],
                     })
@@ -1596,7 +1541,6 @@ class MCPServerController(http.Controller):
 
     # Buscar en base de datos usando virtualización
         try:
-            # Seges: parche de compatibilidad con Odoo 14 (API de Odoo 14: Environment sin sudo). Ver docs/pendiente/parches_pns_ai.md
             env = self._get_mcp_env()(su=True)
             blocked = refuse_foreign_identity_pack(self, env, prompt_name)
             if blocked:

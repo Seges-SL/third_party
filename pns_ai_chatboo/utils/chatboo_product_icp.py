@@ -1,75 +1,62 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Read/write Chatboo product settings stored in ir.config_parameter."""
+"""Read/write Chatboo product settings stored in ir.config_parameter.
+
+Charts, default layout, numbers and download limit are engine parameters:
+the keys and their normalizers live in ``pns_ai_mcp``. Chatboo only shows
+them on its settings screen.
+"""
+from odoo.addons.pns_ai_mcp.utils.engine_params import (
+    ICP_CHART_ENGINE,
+    ICP_DEFAULT_SHOW_MODE,
+    ICP_DOWNLOAD_MAX_BYTES,
+    ICP_XLSX_FLOAT_DECIMALS,
+    ICP_XLSX_THOUSANDS,
+    chart_engine as read_chart_engine,
+    currency_decimals,
+    download_max_bytes as read_download_max_bytes,
+    normalize_chart_engine,
+    normalize_layout_show_mode,
+    normalize_xlsx_float_decimals,
+    param_bool,
+    raw_default_show_mode as read_default_show_mode,
+    xlsx_float_decimals as read_xlsx_float_decimals,
+    xlsx_thousands as read_xlsx_thousands,
+)
 
 ICP_SHOW_SYSTRAY = 'pns_ai_chatboo.show_systray'
 ICP_DATASET_CACHE_MAX_BYTES = 'pns_ai_mcp.dataset_cache_max_bytes'
 ICP_QUERY_DATA_TTL_HOURS = 'pns_ai_chatboo.query_data_ttl_hours'
 ICP_HISTORY_RETENTION_DAYS = 'pns_ai_chatboo.history_retention_days'
-ICP_DOWNLOAD_MAX_BYTES = 'pns_ai_chatboo.download_max_bytes'
 ICP_UPLOAD_MAX_BYTES = 'pns_ai_chatboo.upload_max_bytes'
-ICP_CHART_ENGINE = 'pns_ai_chatboo.chart_engine'
-ICP_DEFAULT_SHOW_MODE = 'pns_ai_chatboo.default_show_mode'
-ICP_LEGACY_DEFAULT_SHOWMODE = 'pns_ai_chatboo.default_showmode'
-ICP_XLSX_FLOAT_DECIMALS = 'pns_ai_chatboo.xlsx_float_decimals'
-ICP_XLSX_THOUSANDS = 'pns_ai_chatboo.xlsx_thousands'
+ICP_ALLOW_REMOTE_VOICES = 'pns_ai_chatboo.allow_remote_voices'
 
 DEFAULT_DATASET_CACHE_BYTES = 8 * 1024 * 1024
 DEFAULT_QUERY_DATA_TTL_HOURS = 12
-DEFAULT_HISTORY_RETENTION_DAYS = 30
-DEFAULT_DOWNLOAD_MAX_BYTES = 15 * 1024 * 1024
 DEFAULT_UPLOAD_MAX_BYTES = 15 * 1024 * 1024
-DEFAULT_CHART_ENGINE = 'echarts'
-# Layout pair only (table-first / chart-first). Not result modes table|dashboard.
-DEFAULT_PRESENTATION_SHOW_MODE = 'show-table'
-DEFAULT_XLSX_FLOAT_DECIMALS = 2
-DEFAULT_XLSX_THOUSANDS = True
-XLSX_FLOAT_DECIMALS_MAX = 10
-
-VALID_CHART_ENGINES = frozenset({'echarts', 'chartjs'})
-VALID_PRESENTATION_SHOW_MODES = frozenset({'show-table', 'show-chart'})
-_SHOW_MODE_LEGACY = {
-    'table-chart': 'show-table',
-    'chart-table': 'show-chart',
-}
+# Hard caps a setting cannot switch off: how many files ride one message
+# and how much they may weigh together.
+MAX_UPLOAD_FILES = 20
+MAX_UPLOAD_TOTAL_BYTES = 50 * 1024 * 1024
 
 CHATBOO_AGENT_CODE = 'pns_ai_chatboo'
 
 
-def _icp_bool(icp, key, default=True):
-    val = icp.get_param(key, 'True' if default else 'False')
-    return val not in ('False', 'false', '0', '')
-
-
-def normalize_chart_engine(value, default=DEFAULT_CHART_ENGINE):
-    val = str(value or default).strip().lower()
-    return val if val in VALID_CHART_ENGINES else default
-
-
-def normalize_default_show_mode(value, default=DEFAULT_PRESENTATION_SHOW_MODE):
-    val = str(value or default).strip().lower()
-    val = _SHOW_MODE_LEGACY.get(val, val)
-    return val if val in VALID_PRESENTATION_SHOW_MODES else default
-
-
-def normalize_xlsx_float_decimals(value, default=DEFAULT_XLSX_FLOAT_DECIMALS):
-    try:
-        n = int(value)
-    except (TypeError, ValueError):
-        return default
-    return max(0, min(XLSX_FLOAT_DECIMALS_MAX, n))
-
-
 def upload_max_bytes(env):
-    """Per-file limit for pictures and files sent to the chat. 0 = no limit."""
+    """Per-file limit for pictures and files sent to the chat.
+
+    There is always a limit: an empty, invalid or 0 setting means the
+    default, never "no limit".
+    """
     raw = env['ir.config_parameter'].sudo().get_param(
         ICP_UPLOAD_MAX_BYTES, DEFAULT_UPLOAD_MAX_BYTES,
     )
     try:
-        return max(0, int(raw))
+        value = int(raw)
     except (TypeError, ValueError):
         return DEFAULT_UPLOAD_MAX_BYTES
+    return value if value > 0 else DEFAULT_UPLOAD_MAX_BYTES
 
 
 def _data_url_bytes(value):
@@ -84,8 +71,6 @@ def _data_url_bytes(value):
 def oversized_upload(env, images=None, files=None, image_names=None):
     """Name ('' if unnamed) of the first upload over the limit, else None."""
     limit = upload_max_bytes(env)
-    if not limit:
-        return None
     names = list(image_names or [])
     for idx, image in enumerate(images or []):
         if _data_url_bytes(image) > limit:
@@ -94,6 +79,30 @@ def oversized_upload(env, images=None, files=None, image_names=None):
         item = item if isinstance(item, dict) else {}
         if _data_url_bytes(item.get('data')) > limit:
             return item.get('name') or ''
+    return None
+
+
+def upload_violation(env, images=None, files=None, image_names=None):
+    """Why this turn's uploads are refused, or None when they may go up.
+
+    Returns {'kind': 'file'|'count'|'total', 'name': str, 'limit': int}:
+    one file over the per-file limit, too many files in one message, or
+    the files together over the total cap.
+    """
+    images = list(images or [])
+    files = list(files or [])
+    if len(images) + len(files) > MAX_UPLOAD_FILES:
+        return {'kind': 'count', 'name': '', 'limit': MAX_UPLOAD_FILES}
+    total = sum(_data_url_bytes(image) for image in images)
+    total += sum(
+        _data_url_bytes(item.get('data') if isinstance(item, dict) else None)
+        for item in files
+    )
+    if total > MAX_UPLOAD_TOTAL_BYTES:
+        return {'kind': 'total', 'name': '', 'limit': MAX_UPLOAD_TOTAL_BYTES}
+    name = oversized_upload(env, images, files, image_names)
+    if name is not None:
+        return {'kind': 'file', 'name': name, 'limit': upload_max_bytes(env)}
     return None
 
 
@@ -112,28 +121,18 @@ def read_product_settings(env):
         )
     except (TypeError, ValueError):
         ttl_hours = DEFAULT_QUERY_DATA_TTL_HOURS
-    try:
-        retention_days = int(
-            icp.get_param(
-                ICP_HISTORY_RETENTION_DAYS, DEFAULT_HISTORY_RETENTION_DAYS,
-            )
-        )
-    except (TypeError, ValueError):
-        retention_days = DEFAULT_HISTORY_RETENTION_DAYS
-    try:
-        download_bytes = int(
-            icp.get_param(ICP_DOWNLOAD_MAX_BYTES, DEFAULT_DOWNLOAD_MAX_BYTES)
-        )
-    except (TypeError, ValueError):
-        download_bytes = DEFAULT_DOWNLOAD_MAX_BYTES
+    raw_retention = icp.get_param(ICP_HISTORY_RETENTION_DAYS)
+    if raw_retention is None or raw_retention is False or str(raw_retention).strip() == '':
+        retention_days = 0
+    else:
+        try:
+            retention_days = int(raw_retention)
+        except (TypeError, ValueError):
+            retention_days = 0
+    download_bytes = read_download_max_bytes(env)
     upload_bytes = upload_max_bytes(env)
-    show_mode_raw = icp.get_param(ICP_DEFAULT_SHOW_MODE)
-    if not show_mode_raw:
-        show_mode_raw = icp.get_param(
-            ICP_LEGACY_DEFAULT_SHOWMODE, DEFAULT_PRESENTATION_SHOW_MODE,
-        )
     return {
-        'show_systray': _icp_bool(icp, ICP_SHOW_SYSTRAY, True),
+        'show_systray': param_bool(icp.get_param(ICP_SHOW_SYSTRAY, 'True')),
         'dataset_cache_max_bytes': 0 if cache_bytes <= 0 else cache_bytes,
         'dataset_cache_max_mb': (
             0 if cache_bytes <= 0 else max(1, cache_bytes // (1024 * 1024))
@@ -143,20 +142,15 @@ def read_product_settings(env):
         'download_max_mb': (
             0 if download_bytes <= 0 else max(1, download_bytes // (1024 * 1024))
         ),
-        'upload_max_mb': (
-            0 if upload_bytes <= 0 else max(1, upload_bytes // (1024 * 1024))
+        'upload_max_mb': max(1, upload_bytes // (1024 * 1024)),
+        'chart_engine': read_chart_engine(env),
+        'default_show_mode': normalize_layout_show_mode(
+            read_default_show_mode(env),
         ),
-        'chart_engine': normalize_chart_engine(
-            icp.get_param(ICP_CHART_ENGINE, DEFAULT_CHART_ENGINE),
-        ),
-        'default_show_mode': normalize_default_show_mode(show_mode_raw),
-        'xlsx_float_decimals': normalize_xlsx_float_decimals(
-            icp.get_param(
-                ICP_XLSX_FLOAT_DECIMALS, DEFAULT_XLSX_FLOAT_DECIMALS,
-            ),
-        ),
-        'xlsx_thousands': _icp_bool(
-            icp, ICP_XLSX_THOUSANDS, DEFAULT_XLSX_THOUSANDS,
+        'xlsx_float_decimals': read_xlsx_float_decimals(env),
+        'xlsx_thousands': read_xlsx_thousands(env),
+        'allow_remote_voices': param_bool(
+            icp.get_param(ICP_ALLOW_REMOTE_VOICES), False,
         ),
     }
 
@@ -173,6 +167,7 @@ def write_product_settings(
     default_show_mode=None,
     xlsx_float_decimals=None,
     xlsx_thousands=None,
+    allow_remote_voices=None,
 ):
     """Persist only the keys explicitly passed (partial update)."""
     icp = env['ir.config_parameter'].sudo()
@@ -204,14 +199,21 @@ def write_product_settings(
     if default_show_mode is not None:
         icp.set_param(
             ICP_DEFAULT_SHOW_MODE,
-            normalize_default_show_mode(default_show_mode),
+            normalize_layout_show_mode(default_show_mode),
         )
     if xlsx_float_decimals is not None:
+        decimals = normalize_xlsx_float_decimals(xlsx_float_decimals)
+        # Equal to the currency, nothing is stored: it keeps following it.
         icp.set_param(
             ICP_XLSX_FLOAT_DECIMALS,
-            str(normalize_xlsx_float_decimals(xlsx_float_decimals)),
+            False if decimals == currency_decimals(env) else str(decimals),
         )
     if xlsx_thousands is not None:
         icp.set_param(
             ICP_XLSX_THOUSANDS, 'True' if xlsx_thousands else 'False',
+        )
+    if allow_remote_voices is not None:
+        icp.set_param(
+            ICP_ALLOW_REMOTE_VOICES,
+            'True' if allow_remote_voices else 'False',
         )

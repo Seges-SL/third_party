@@ -263,7 +263,7 @@ def create_field_required_choice(env, steps, title):
         'title': title_s,
         'items': items,
         'message': (
-            '[PENDING] Pick the views in Chatboo. The ERP has NOT changed. '
+            '[PENDING] Pick the views in the chat. The ERP has NOT changed. '
             'Do not call write on ir.ui.view. Do not use op=action.'
         ),
     }

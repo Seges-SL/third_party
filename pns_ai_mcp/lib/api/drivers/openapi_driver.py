@@ -29,6 +29,24 @@ import requests
 
 from .base import APIDriver, APIDriverError, build_auth_headers
 
+
+def _request_public_http(*args, **kwargs):
+    """Follow redirects only onto public hosts. Loaded by path so unit tests
+    that import this driver as a top-level package still work."""
+    import importlib.util
+    import sys
+    from pathlib import Path
+
+    key = 'pns_ai_mcp_fetch_url_safe'
+    mod = sys.modules.get(key)
+    if mod is None:
+        path = Path(__file__).resolve().parents[3] / 'utils' / 'fetch_url_safe.py'
+        spec = importlib.util.spec_from_file_location(key, path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[key] = mod
+        spec.loader.exec_module(mod)
+    return mod.request_public_http(*args, **kwargs)
+
 _logger = logging.getLogger(__name__)
 
 # HTTP methods that can appear as OpenAPI path operations.
@@ -71,7 +89,8 @@ class OpenAPIDriver(APIDriver):
             raise APIDriverError(
                 "No spec URL configured for OpenAPI server '%s'" % server.code)
         try:
-            resp = requests.get(
+            resp = _request_public_http(
+                'GET',
                 spec_url,
                 timeout=(5, server.timeout or 30),
                 headers={
@@ -81,7 +100,7 @@ class OpenAPIDriver(APIDriver):
                 },
             )
             resp.raise_for_status()
-        except requests.RequestException as e:
+        except (ValueError, requests.RequestException) as e:
             raise APIDriverError('Fetching OpenAPI spec failed: %s' % e)
         try:
             spec = resp.json()
@@ -384,7 +403,7 @@ class OpenAPIDriver(APIDriver):
 
         url = self._base_url(server, spec) + path
         try:
-            resp = requests.request(
+            resp = _request_public_http(
                 method,
                 url,
                 params=query or None,
@@ -392,7 +411,7 @@ class OpenAPIDriver(APIDriver):
                 headers=headers,
                 timeout=(5, server.timeout or 30),
             )
-        except requests.RequestException as e:
+        except (ValueError, requests.RequestException) as e:
             raise APIDriverError('HTTP request to %s failed: %s' % (url, e))
         if resp.status_code >= 400:
             raise APIDriverError(

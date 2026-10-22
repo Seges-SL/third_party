@@ -4,22 +4,25 @@
         <field name="name">pns.operation.result.form</field>
         <field name="model">pns.operation.report.wizard</field>
         <field name="arch" type="xml">
-            <form string="Operation result">
+            <form string="Operation result" class="o_pns_op_result">
                 <field name="show_result" invisible="1"/>
                 <field name="result_status" invisible="1"/>
                 <group name="result_subtitle"/>
                 <group name="result_alerts">
                     <div name="alert_success" class="alert alert-success mb-0" role="alert"
                          attrs="{'invisible': [('result_status', '!=', 'success')]}">
-                        <i class="fa fa-check-circle"/> <strong>Operation completed successfully.</strong>
+                        <i class="fa fa-check-circle o_pns_alert_icon" title="Operation completed successfully."/>
+                        <strong>Operation completed successfully.</strong>
                     </div>
                     <div name="alert_warning" class="alert alert-warning mb-0" role="alert"
                          attrs="{'invisible': [('result_status', '!=', 'warning')]}">
-                        <i class="fa fa-exclamation-triangle"/> <strong>Operation completed with warnings.</strong>
+                        <i class="fa fa-exclamation-triangle o_pns_alert_icon" title="Operation completed with warnings."/>
+                        <strong>Operation completed with warnings.</strong>
                     </div>
                     <div name="alert_danger" class="alert alert-danger mb-0" role="alert"
                          attrs="{'invisible': [('result_status', '!=', 'danger')]}">
-                        <i class="fa fa-times-circle"/> <strong>Operation failed.</strong>
+                        <i class="fa fa-times-circle o_pns_alert_icon" title="Operation failed."/>
+                        <strong>Operation failed.</strong>
                     </div>
                 </group>
                 <group name="result_counts">
@@ -37,6 +40,94 @@
                 </group>
                 <footer>
                     <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_pns_import_preview_form" model="ir.ui.view">
+        <field name="name">pns.import.preview.form</field>
+        <field name="model">pns.operation.report.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Review this import" class="o_pns_import_preview">
+                <div class="o_pns_preview_lead">
+                    <strong>No data has been written.</strong>
+                    Confirm to apply the upload.
+                </div>
+                <div class="o_pns_preview_box"
+                     attrs="{'invisible': [('result_params', '=', False)]}">
+                    <div class="o_pns_preview_row">
+                        <span class="o_pns_preview_attr">Options</span>
+                        <field name="result_params" nolabel="1" readonly="1"/>
+                    </div>
+                </div>
+                <div class="o_pns_preview_box"
+                     attrs="{'invisible': [('result_created', '=', 0), ('result_updated', '=', 0), ('result_skipped', '=', 0), ('result_removed', '=', 0), ('result_linked', '=', 0), ('result_manifest', '=', False)]}">
+                    <div class="o_pns_preview_row"
+                         attrs="{'invisible': [('result_created', '=', 0)]}">
+                        <span class="o_pns_preview_attr">Will create</span>
+                        <field name="result_created_names" nolabel="1" readonly="1"
+                               attrs="{'invisible': [('result_created_names', '=', False)]}"/>
+                        <field name="result_created" nolabel="1" readonly="1"
+                               attrs="{'invisible': [('result_created_names', '!=', False)]}"/>
+                    </div>
+                    <div class="o_pns_preview_row"
+                         attrs="{'invisible': [('result_updated', '=', 0)]}">
+                        <span class="o_pns_preview_attr">Will replace</span>
+                        <field name="result_updated_names" nolabel="1" readonly="1"
+                               attrs="{'invisible': [('result_updated_names', '=', False)]}"/>
+                        <field name="result_updated" nolabel="1" readonly="1"
+                               attrs="{'invisible': [('result_updated_names', '!=', False)]}"/>
+                    </div>
+                    <div class="o_pns_preview_row"
+                         attrs="{'invisible': [('result_skipped', '=', 0)]}">
+                        <span class="o_pns_preview_attr">Will leave</span>
+                        <field name="result_skipped_names" nolabel="1" readonly="1"
+                               attrs="{'invisible': [('result_skipped_names', '=', False)]}"/>
+                        <field name="result_skipped" nolabel="1" readonly="1"
+                               attrs="{'invisible': [('result_skipped_names', '!=', False)]}"/>
+                    </div>
+                    <div class="o_pns_preview_row"
+                         attrs="{'invisible': [('result_removed', '=', 0)]}">
+                        <span class="o_pns_preview_attr">Removed</span>
+                        <field name="result_removed" nolabel="1" readonly="1"/>
+                    </div>
+                    <div class="o_pns_preview_row"
+                         attrs="{'invisible': [('result_linked', '=', 0)]}">
+                        <span class="o_pns_preview_attr">Linked</span>
+                        <field name="result_linked" nolabel="1" readonly="1"/>
+                    </div>
+                    <div class="o_pns_preview_row"
+                         attrs="{'invisible': [('result_manifest', '=', False)]}">
+                        <span class="o_pns_preview_attr">Manifest</span>
+                        <field name="result_manifest" nolabel="1" readonly="1"/>
+                    </div>
+                </div>
+                <div class="o_pns_preview_box"
+                     attrs="{'invisible': [('result_detail', '=', False)]}">
+                    <div class="o_pns_preview_row">
+                        <span class="o_pns_preview_attr">Section list</span>
+                        <field name="result_detail" nolabel="1" readonly="1"/>
+                    </div>
+                </div>
+                <div class="o_pns_preview_box o_pns_preview_warn"
+                     attrs="{'invisible': [('result_warnings', '=', False)]}">
+                    <div class="o_pns_preview_row">
+                        <span class="o_pns_preview_attr">Warnings</span>
+                        <field name="result_warnings" nolabel="1" readonly="1"/>
+                    </div>
+                </div>
+                <div class="o_pns_preview_box o_pns_preview_err"
+                     attrs="{'invisible': [('result_errors', '=', False)]}">
+                    <div class="o_pns_preview_row">
+                        <span class="o_pns_preview_attr">Errors</span>
+                        <field name="result_errors" nolabel="1" readonly="1"/>
+                    </div>
+                </div>
+                <footer>
+                    <button name="action_import" string="Apply the import"
+                            type="object" class="btn-primary"/>
+                    <button string="Discard" class="btn-secondary" special="cancel"/>
                 </footer>
             </form>
         </field>

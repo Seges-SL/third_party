@@ -26,6 +26,15 @@
                                     <div class="text-muted">Show the Chatboo launcher in the top bar.</div>
                                 </div>
                             </div>
+                            <div class="col-12 col-lg-6 o_setting_box">
+                                <div class="o_setting_left_pane">
+                                    <field name="chatboo_allow_remote_voices"/>
+                                </div>
+                                <div class="o_setting_right_pane">
+                                    <label for="chatboo_allow_remote_voices"/>
+                                    <div class="text-muted">If no voice is installed on this computer, the browser may send the text to its vendor (Google, Microsoft, …). Off: only a local voice is used.</div>
+                                </div>
+                            </div>
                         </div>
                         <h3 class="mt16 mb8">Conversation memory</h3>
                         <div class="row mt8 o_settings_container">
@@ -85,7 +94,7 @@
                                 <div class="o_setting_right_pane">
                                     <label for="chatboo_xlsx_float_decimals"/>
                                     <field name="chatboo_xlsx_float_decimals"/>
-                                    <div class="text-muted">Decimals for floats and formula cells in Excel (integers stay whole).</div>
+                                    <div class="text-muted">Decimals in the chat table, PDF, Word and Excel (integers stay whole). By default, those of the company currency.</div>
                                 </div>
                             </div>
                             <div class="col-12 col-lg-6 o_setting_box">

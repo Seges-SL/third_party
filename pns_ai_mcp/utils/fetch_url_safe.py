@@ -93,3 +93,86 @@ def validate_fetch_url_step(step, step_index=0):
                 "'content_type' (e.g. application/json)." % i
             )
     return True, None
+
+
+_AUTH_HEADER_NAMES = frozenset({
+    'authorization', 'cookie', 'proxy-authorization',
+    'x-api-key', 'x-mcp-api-key', 'x-mcp-token',
+})
+
+
+def _strip_auth_headers(headers):
+    if not headers:
+        return {}
+    return {
+        key: value for key, value in headers.items()
+        if str(key).lower() not in _AUTH_HEADER_NAMES
+    }
+
+
+def request_public_http(
+        method, url, headers=None, timeout=None, data=None, params=None,
+        max_bytes=None, max_redirects=None,
+):
+    """HTTP request that never follows a redirect onto a non-public host.
+
+    Auth headers stay on the first host only. The body is capped.
+    Returns the final ``requests.Response`` (content already loaded).
+    Raises ``ValueError`` with an English reason on refusal.
+    """
+    import requests
+    from urllib.parse import urljoin, urlsplit
+
+    method = (method or 'GET').upper()
+    headers = dict(headers or {})
+    timeout = timeout if timeout is not None else (5, 30)
+    cap = FETCH_URL_MAX_BYTES if max_bytes is None else int(max_bytes)
+    hops = FETCH_URL_MAX_REDIRECTS if max_redirects is None else int(max_redirects)
+    first_host = (urlsplit(url).hostname or '').lower()
+    kwargs = {}
+    if data is not None:
+        kwargs['data'] = data
+    if params is not None:
+        kwargs['params'] = params
+
+    for _hop in range(hops + 1):
+        refused = non_public_host_error(url)
+        if refused:
+            raise ValueError(refused)
+        scheme = (urlsplit(url).scheme or '').lower()
+        if scheme not in ('http', 'https'):
+            raise ValueError('Only http:// or https:// URLs are allowed.')
+        try:
+            resp = requests.request(
+                method, url, timeout=timeout, allow_redirects=False,
+                stream=True, headers=headers, **kwargs,
+            )
+        except requests.RequestException as exc:
+            raise ValueError('HTTP request failed: %s' % exc)
+        location = resp.headers.get('Location') if resp.is_redirect else None
+        if not location:
+            break
+        resp.close()
+        url = urljoin(url, location)
+        next_host = (urlsplit(url).hostname or '').lower()
+        if next_host != first_host:
+            headers = _strip_auth_headers(headers)
+        if resp.status_code == 303 and method != 'HEAD':
+            method = 'GET'
+            kwargs = {}
+    else:
+        raise ValueError('More than %d redirects.' % hops)
+
+    declared = resp.headers.get('Content-Length') or ''
+    if declared.isdigit() and int(declared) > cap:
+        resp.close()
+        raise ValueError('The response is larger than %d MB.' % (cap // (1024 * 1024)))
+    body = bytearray()
+    for chunk in resp.iter_content(chunk_size=65536):
+        body.extend(chunk)
+        if len(body) > cap:
+            resp.close()
+            raise ValueError('The response is larger than %d MB.' % (cap // (1024 * 1024)))
+    resp._content = bytes(body)
+    resp._content_consumed = True
+    return resp

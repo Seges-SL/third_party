@@ -91,13 +91,14 @@ _NOT_RESULT_PROTOCOL = frozenset((
     '__traceback__',
 ))
 
-# This file is the scanner, not a source of protocol names.
+# This file is the scanner, not a source of protocol names. The sandbox
+# guards (``validators*.py``) list forbidden dunders, not protocol ones.
 _SKIP_ENGINE_FILES = frozenset((
     'skill_engine_contract.py',
-    'validators.py',
     'context_builder.py',
     'controller_helpers.py',
 ))
+_SKIP_ENGINE_STEM = 'validators'
 
 _DUNDER_IN_SOURCE = re.compile(
     r"""(?:['"])(__[a-z0-9_]+__)(?:['"])"""
@@ -112,7 +113,7 @@ def _engine_scan_files():
         if not folder.is_dir():
             continue
         for path in sorted(folder.glob('*.py')):
-            if path.name in _SKIP_ENGINE_FILES:
+            if path.name in _SKIP_ENGINE_FILES or path.stem.split('_')[0] == _SKIP_ENGINE_STEM:
                 continue
             found.append(path)
     return found

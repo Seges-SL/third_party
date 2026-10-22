@@ -336,6 +336,13 @@ def format_excel_workbook(sheets):
         raise Exception("Error generando Excel: %s" % e)
 
 
+def _excel_safe_text(text):
+    """Text a spreadsheet would read as a formula goes out quoted as text."""
+    if text and text.lstrip(' \t')[:1] in ('=', '+', '-', '@'):
+        return "'" + text
+    return text
+
+
 def _fill_excel_sheet(ws, spec):
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
@@ -349,6 +356,14 @@ def _fill_excel_sheet(ws, spec):
     # {(excel_row, excel_col): '=…'}; positions count the row index column.
     cell_formulas = spec.get('cell_formulas') or {}
     style = spec.get('number_style') or {}
+    env = spec.get('env')
+    image_keys = {
+        cfg[0] for cfg in columns_config
+        if any(
+            isinstance(row, dict) and _pdf_is_image_ref(row.get(cfg[0]))
+            for row in data
+        )
+    }
     int_fmt = style.get('int_format') or '#,##0'
     float_fmt = style.get('float_format') or '#,##0.00'
     ws.title = str(title)[:31] or 'Export'
@@ -419,6 +434,15 @@ def _fill_excel_sheet(ws, spec):
                         center_align if formatter == 'number' else right_align
                     )
                 continue
+            if key in image_keys:
+                ws.row_dimensions[row_idx].height = _XLSX_IMG_ROW_PT
+                photo = _excel_photo_png(value, env)
+                if photo:
+                    _excel_put_photo(
+                        ws, photo, row_idx, col_idx,
+                        _excel_photo_col_chars(label),
+                    )
+                continue
             if formatter == 'currency':
                 cell.value = float(value) if value is not None and value != '' else 0.0
                 cell.number_format = '#,##0.00 €'
@@ -450,7 +474,9 @@ def _fill_excel_sheet(ws, spec):
                         cell.number_format = float_fmt
                     cell.alignment = right_align
                 else:
-                    cell.value = str(value) if value is not None else ''
+                    cell.value = _excel_safe_text(
+                        str(value) if value is not None else '',
+                    )
                     if align == 'center':
                         cell.alignment = center_align
                     elif align == 'right':
@@ -462,7 +488,9 @@ def _fill_excel_sheet(ws, spec):
         ws.column_dimensions[get_column_letter(1)].width = 5
     for col_off, (key, label, formatter, align) in enumerate(columns_config):
         col_idx = data_col0 + col_off
-        if widths and col_off < len(widths):
+        if key in image_keys:
+            width = _excel_photo_col_chars(label)
+        elif widths and col_off < len(widths):
             width = widths[col_off]
         elif formatter == 'currency':
             width = 15
@@ -475,6 +503,66 @@ def _fill_excel_sheet(ws, spec):
         ws.column_dimensions[get_column_letter(col_idx)].width = min(float(width), 50)
 
     ws.freeze_panes = 'A%d' % (header_row + 1)
+
+
+_XLSX_IMG_PX = 48
+_XLSX_IMG_ROW_PT = 40
+_XLSX_IMG_COL_CHARS = 9
+_XLSX_EMU_PER_PX = 9525
+
+
+def _excel_photo_col_chars(label):
+    """Width (characters) of a photo column: the photo or its header."""
+    return max(len(str(label or '')), _XLSX_IMG_COL_CHARS)
+
+
+def _excel_photo_offsets(col_chars, width_px, height_px):
+    """EMU offsets that centre a photo in its cell (column chars, photo row)."""
+    col_px = int(float(col_chars) * 7 + 5)
+    row_px = int(_XLSX_IMG_ROW_PT * 96 / 72)
+    dx = max(0, (col_px - int(width_px)) // 2)
+    dy = max(0, (row_px - int(height_px)) // 2)
+    return dx * _XLSX_EMU_PER_PX, dy * _XLSX_EMU_PER_PX
+
+
+
+def _excel_photo_png(value, env=None):
+    """``(png_bytes, width_px, height_px)`` for a photo cell, or None."""
+    raw = _pdf_image_bytes(value, env=env) if _pdf_is_image_ref(value) else None
+    if not raw:
+        return None
+    try:
+        from io import BytesIO
+        from PIL import Image as PilImage
+        pil = PilImage.open(BytesIO(raw))
+        pil.load()
+        if pil.mode not in ('RGB', 'RGBA'):
+            pil = pil.convert('RGBA')
+        pil.thumbnail((_XLSX_IMG_PX, _XLSX_IMG_PX))
+        buf = BytesIO()
+        pil.save(buf, format='PNG')
+        return buf.getvalue(), pil.width, pil.height
+    except Exception:
+        _logger.debug('MCP: xlsx image skipped', exc_info=True)
+        return None
+
+
+def _excel_put_photo(ws, photo, row, col, col_chars):
+    """Centre ``(png, w, h)`` in the 1-based cell. The cell never gets the URL."""
+    from io import BytesIO
+    from openpyxl.drawing.image import Image as XlImage
+    from openpyxl.drawing.spreadsheet_drawing import AnchorMarker, OneCellAnchor
+    from openpyxl.drawing.xdr import XDRPositiveSize2D
+    png, width, height = photo
+    dx, dy = _excel_photo_offsets(col_chars, width, height)
+    img = XlImage(BytesIO(png))
+    img.anchor = OneCellAnchor(
+        _from=AnchorMarker(col=col - 1, colOff=dx, row=row - 1, rowOff=dy),
+        ext=XDRPositiveSize2D(
+            int(width) * _XLSX_EMU_PER_PX, int(height) * _XLSX_EMU_PER_PX,
+        ),
+    )
+    ws.add_image(img)
 
 
 

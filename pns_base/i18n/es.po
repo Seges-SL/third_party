@@ -34,6 +34,21 @@ msgid "Close"
 msgstr "Cerrar"
 
 #. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid "Operation completed successfully."
+msgstr "Operación completada correctamente."
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid "Operation completed with warnings."
+msgstr "Operación completada con avisos."
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid "Operation failed."
+msgstr "La operación ha fallado."
+
+#. module: pns_base
 #: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_created
 msgid "Created"
 msgstr "Creados"
@@ -50,31 +65,37 @@ msgstr "Omitidos"
 
 #. module: pns_base
 #: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_removed
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
 msgid "Removed"
 msgstr "Eliminados"
 
 #. module: pns_base
 #: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_linked
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
 msgid "Linked"
 msgstr "Vinculados"
 
 #. module: pns_base
 #: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_manifest
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
 msgid "Manifest"
 msgstr "Manifiesto"
 
 #. module: pns_base
 #: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_errors
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
 msgid "Errors"
 msgstr "Errores"
 
 #. module: pns_base
 #: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_warnings
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
 msgid "Warnings"
 msgstr "Advertencias"
 
 #. module: pns_base
 #: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_detail
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
 msgid "Details"
 msgstr "Detalles"
 
@@ -291,3 +312,163 @@ msgstr "Traducciones"
 #: code:addons/pns_base/models/base_language_install.py:0
 msgid "%s duplicate translation rows were skipped so the language could load."
 msgstr "%s filas de traducción duplicadas se han saltado para que el idioma pueda cargarse."
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+msgid "Review import"
+msgstr "Revisar importación"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+msgid "Review this import"
+msgstr "Revisar esta importación"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "No data has been written."
+msgstr "No se ha escrito nada."
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Confirm to apply the upload."
+msgstr "Confirma para aplicar la subida."
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_created_names
+msgid "Will create"
+msgstr "Creará"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_updated_names
+msgid "Will replace"
+msgstr "Sustituirá"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_skipped_names
+msgid "Will leave"
+msgstr "Dejará"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_params
+msgid "Options"
+msgstr "Opciones"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Section list"
+msgstr "Lista por sección"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Apply the import"
+msgstr "Aplicar la importación"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Discard"
+msgstr "Descartar"
+
+#. module: pns_base
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+msgid "%s is on"
+msgstr "%s está activo"
+
+#. module: pns_base
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+msgid "%s is off"
+msgstr "%s está inactivo"
+
+#. module: pns_base
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+msgid "Review"
+msgstr "Revisar"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Nothing has been written yet."
+msgstr "Aún no se ha escrito nada."
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Confirm to apply this file."
+msgstr "Confirma para aplicar este archivo."
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "New"
+msgstr "Nuevo"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Overwrite"
+msgstr "Sobrescribir"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Keep (already here)"
+msgstr "Conservar (ya está)"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "What the file will do"
+msgstr "Qué hará el archivo"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Confirm import"
+msgstr "Confirmar importación"
+
+#. module: pns_base
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+msgid "This wizard has no import to review."
+msgstr "Este asistente no tiene una importación que revisar."
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_params
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Parameters"
+msgstr "Parámetros"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Will be created."
+msgstr "Se crearán."
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Matching rows will be written."
+msgstr "Se escribirán las filas coincidentes."
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Keep"
+msgstr "Conservar"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Left as they are."
+msgstr "Se dejan como están."
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Breakdown"
+msgstr "Desglose"
+
+#. module: pns_base
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+msgid "%s: yes"
+msgstr "%s: sí"
+
+#. module: pns_base
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+msgid "%s: no"
+msgstr "%s: no"

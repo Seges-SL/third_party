@@ -6,6 +6,8 @@ from odoo import models, fields, api, _
 from odoo.exceptions import AccessError, UserError
 
 from ..utils.change_journal import (
+    DEFAULT_TRASH_DAYS,
+    ICP_TRASH_DAYS,
     SCHEMA_VERSION,
     build_payload,
     classify_change_kind,
@@ -14,8 +16,10 @@ from ..utils.change_journal import (
     loads_payload,
     one_line_summary,
     redact_record,
+    trash_days_from_param,
     write_vals_from_before,
 )
+from ..utils.mcp_logging import known_doors
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -60,7 +64,6 @@ class AiChangeJournal(models.Model):
     )
     origin = fields.Selection(
         [
-            ('chatboo', 'Chatboo'),
             ('mcp_client', 'MCP Client'),
             ('internal', 'Internal'),
             ('revert', 'Revert'),
@@ -182,7 +185,30 @@ class AiChangeJournal(models.Model):
                     if current.get(name) != row.get(name):
                         return False
             return True
+        if self.op == 'unlink':
+            if not (after.get('meta') or {}).get('quarantine'):
+                return False
+            ids = after.get('ids') or []
+            if not ids or model not in self.env:
+                return False
+            recs = self.env[model].with_context(active_test=False).browse(ids).exists()
+            if len(recs) != len(ids):
+                return False
+            return all(not rec.active for rec in recs)
         return False
+
+    @api.model
+    def model_can_archive(self, model):
+        """True when a Safe Plan unlink can sit in the trash (``active``)."""
+        if not model or model not in self.env:
+            return False
+        field = self.env[model]._fields.get('active')
+        return bool(field) and field.type == 'boolean'
+
+    def _is_quarantine(self):
+        self.ensure_one()
+        after = loads_payload(self.after_json)
+        return bool((after.get('meta') or {}).get('quarantine'))
 
     @api.model
     def snapshot_records(self, recs, field_names=None):
@@ -251,6 +277,10 @@ class AiChangeJournal(models.Model):
                 after_records = self.snapshot_records(env[model].browse(rid))
         elif op == 'unlink':
             ids = list((result or {}).get('ids') or [])
+            if (result or {}).get('quarantine') and ids and model in env:
+                after_records = self.snapshot_records(
+                    env[model].with_context(active_test=False).browse(ids),
+                )
         elif op == 'action':
             ids = list(enrich.get('ids') or [])
             after_records = list(enrich.get('records') or [])
@@ -275,6 +305,8 @@ class AiChangeJournal(models.Model):
                 k: enrich[k] for k in ('change_kind', 'reversible', 'reversible_reason')
                 if k in enrich
             })
+        if (result or {}).get('quarantine'):
+            after_meta['quarantine'] = True
         after_payload = build_payload(
             op, model, ids, fields_list, after_records, meta=after_meta,
         )
@@ -307,7 +339,7 @@ class AiChangeJournal(models.Model):
             module_name = after_records[0].get('name') or ''
 
         origin = ctx.get(_JOURNAL_CTX['origin']) or 'internal'
-        if origin not in ('chatboo', 'mcp_client', 'internal', 'revert'):
+        if origin not in known_doors(env, 'ai.change.journal'):
             origin = 'internal'
         user_id = ctx.get(_JOURNAL_CTX['user_id']) or env.uid
         confirmed = ctx.get(_JOURNAL_CTX['confirmed_by_uid']) or env.uid
@@ -340,7 +372,7 @@ class AiChangeJournal(models.Model):
         })
 
     @api.model
-    def record_failed_plan(self, steps, error, env=None):
+    def _record_failed_plan(self, steps, error, env=None):
         """Persist failed attempt on a dedicated cursor (survives plan rollback)."""
         from odoo import SUPERUSER_ID, api as odoo_api
 
@@ -374,7 +406,7 @@ class AiChangeJournal(models.Model):
                     meta={
                         'change_kind': kind,
                         'error': err,
-                        'intended_values': step.get('values') or {},
+                        'intended_values': redact_record(step.get('values') or {}),
                     },
                 )
                 rec = Journal.create({
@@ -382,8 +414,8 @@ class AiChangeJournal(models.Model):
                     'confirmed_by_uid': ctx.get(_JOURNAL_CTX['confirmed_by_uid']) or src.uid,
                     'origin': (
                         ctx.get(_JOURNAL_CTX['origin'])
-                        if ctx.get(_JOURNAL_CTX['origin']) in (
-                            'chatboo', 'mcp_client', 'internal', 'revert',
+                        if ctx.get(_JOURNAL_CTX['origin']) in known_doors(
+                            src, 'ai.change.journal',
                         ) else 'internal'
                     ),
                     'safe_operation_id': ctx.get(_JOURNAL_CTX['safe_operation_id']) or False,
@@ -447,6 +479,19 @@ class AiChangeJournal(models.Model):
                 self.snapshot_records(self.env[model].browse(ids), before.get('fields')),
                 meta={'reverted': True},
             )
+        elif self.op == 'unlink' and (after.get('meta') or {}).get('quarantine'):
+            ids = after.get('ids') or []
+            if not ids or model not in self.env:
+                raise UserError(_('Cannot revert: archived record is missing.'))
+            recs = self.env[model].with_context(active_test=False).browse(ids).exists()
+            if len(recs) != len(ids):
+                raise UserError(_('Cannot revert: archived record is missing.'))
+            recs.write({'active': True})
+            after_undo = build_payload(
+                self.op, model, ids, [],
+                self.snapshot_records(self.env[model].browse(ids)),
+                meta={'reverted': True},
+            )
         else:
             raise UserError(_('This operation type cannot be reverted from the journal.'))
 
@@ -492,6 +537,100 @@ class AiChangeJournal(models.Model):
                 'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
+
+    @api.model
+    def _quarantined(self):
+        rows = self.search([
+            ('op', '=', 'unlink'),
+            ('state', '=', 'applied'),
+            ('reversible', '=', True),
+            ('reverts_id', '=', False),
+        ])
+        return rows.filtered(lambda row: row._is_quarantine())
+
+    def _empty_rows(self, rows):
+        """Really unlink archived records. The journal row stays, no longer reversible."""
+        emptied = 0
+        for row in rows:
+            if row.state != 'applied' or row.op != 'unlink' or not row._is_quarantine():
+                continue
+            after = loads_payload(row.after_json)
+            ids = after.get('ids') or []
+            model = row.model_name
+            if model in self.env and ids:
+                recs = self.env[model].with_context(active_test=False).browse(ids).exists()
+                try:
+                    recs.unlink()
+                except Exception:
+                    _logger.exception(
+                        'AI change journal: could not empty trash for %s %s',
+                        model, ids,
+                    )
+                    continue
+            row.write({
+                'reversible': False,
+                'reversible_reason': _('Emptied from the trash'),
+            })
+            emptied += 1
+        return emptied
+
+    def action_empty_trash(self):
+        """Permanently delete every archived Safe Plan record. Confirm in the view."""
+        _ensure_journal_manager(self.env.user)
+        count = self._empty_rows(self._quarantined())
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Trash emptied'),
+                'message': _('Permanently deleted %s change(s).') % count,
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            },
+        }
+
+    def action_empty_one(self):
+        """Permanently delete the archived records of this row."""
+        self.ensure_one()
+        _ensure_journal_manager(self.env.user)
+        count = self._empty_rows(self)
+        if not count:
+            raise UserError(_('This change is not in the trash.'))
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Trash emptied'),
+                'message': _('Permanently deleted %s change(s).') % count,
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            },
+        }
+
+    @api.model
+    def _cron_empty_journal_trash(self):
+        """Really unlink quarantined deletes older than the setting. 0 = keep."""
+        from datetime import timedelta
+
+        raw = self.env['ir.config_parameter'].sudo().get_param(
+            ICP_TRASH_DAYS, str(DEFAULT_TRASH_DAYS),
+        )
+        days = trash_days_from_param(raw)
+        if days <= 0:
+            return 0
+        cutoff = fields.Datetime.now() - timedelta(days=days)
+        rows = self._quarantined().filtered(
+            lambda row: row.create_date and row.create_date < cutoff,
+        )
+        count = self._empty_rows(rows)
+        if count:
+            _logger.info(
+                'ai.change.journal: emptied %s trash row(s) older than %s days',
+                count, days,
+            )
+        return count
 
     def unlink(self):
         if self.env.user._is_superuser():

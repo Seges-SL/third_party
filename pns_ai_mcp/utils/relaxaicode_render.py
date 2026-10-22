@@ -3,13 +3,72 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """HTML rendering of relaxaicode results (pure Python, no extra packages)."""
 
+import functools
 import html
 import json
 import logging
 import re
+from contextvars import ContextVar
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from urllib.parse import urlparse
 
+try:  # loaded on its own by the tests, with no Odoo runtime under it
+    from odoo import _ as _odoo_translate
+except ImportError:  # pragma: no cover
+    _odoo_translate = None
+
 _logger = logging.getLogger(__name__)
+
+_RENDER_CONTEXT = ContextVar('relaxaicode_render_context', default=None)
+
+
+def _t(source, env=None):
+    """English msgid in the language of the person the result is painted for."""
+    if _odoo_translate is None:
+        return source
+    rcx = _RENDER_CONTEXT.get()
+    if rcx is None and env is not None:
+        rcx = {'user_lang': env.user.lang or env.lang, 'env': env}
+    rcx = rcx or {}
+    # Odoo's ``_`` reads the language from its caller's locals: ``context``
+    # (O14 and O19) and ``cr`` (O14). The turn runs in a thread with no request.
+    context = {'lang': rcx.get('user_lang') or 'en_US'}  # noqa: F841
+    if rcx.get('env') is not None:
+        cr = rcx['env'].cr  # noqa: F841
+    return _odoo_translate(source)
+
+
+def _paints(func):
+    """Keep the caller's ``render_context`` for ``_t`` while ``func`` paints."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        rcx = kwargs.get('render_context')
+        if rcx is None:
+            return func(*args, **kwargs)
+        token = _RENDER_CONTEXT.set(rcx)
+        try:
+            return func(*args, **kwargs)
+        finally:
+            _RENDER_CONTEXT.reset(token)
+    return wrapper
+
+
+def _load_page_url_resolver():
+    """``result_page.page_url_on_result`` (Odoo package or bare file path)."""
+    try:
+        from .result_page import page_url_on_result
+        return page_url_on_result
+    except ImportError:
+        import importlib.util
+        import os
+        path = os.path.join(os.path.dirname(__file__), 'result_page.py')
+        spec = importlib.util.spec_from_file_location('_pns_result_page', path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod.page_url_on_result
+
+
+page_url_on_result = _load_page_url_resolver()
 
 
 # Claves de transporte / meta que nunca son "tablas de datos".
@@ -62,7 +121,7 @@ def _humanize_table_key(key):
     """by_units → By units; Más_vendidos → Más vendidos."""
     text = str(key).replace('_', ' ').strip()
     if not text:
-        return 'Tabla'
+        return _t('Table')
     return text[:1].upper() + text[1:]
 
 
@@ -271,9 +330,15 @@ def is_tabulable(result, force=False):
 
 def _fmt_number(val, d_sep, t_sep, decimals=2):
     try:
-        s = '{:,.{}f}'.format(val, decimals)
+        places = int(decimals)
+        if isinstance(val, bool):
+            return str(val)
+        quant = val if isinstance(val, Decimal) else Decimal(str(val))
+        q = (Decimal(10) ** -places) if places else Decimal(1)
+        quant = quant.quantize(q, rounding=ROUND_HALF_UP)
+        s = format(quant, ',.%df' % places)
         return s.replace(',', '\x00').replace('.', d_sep).replace('\x00', t_sep)
-    except Exception:
+    except (InvalidOperation, ValueError, TypeError, ArithmeticError):
         return str(val)
 
 
@@ -329,7 +394,7 @@ def _fmt_date(val, date_format):
         return str(val)
 
 
-def render_context_from_env(env, result=None, user_message=None):
+def render_context_from_env(env, result=None):
     """Locale de la sesión del usuario (res.lang) para formateo de tablas.
 
     Fuente de verdad: ``env.user.lang`` → ``res.lang``. No depende de
@@ -354,8 +419,6 @@ def render_context_from_env(env, result=None, user_message=None):
             d_sep = lang_rec.decimal_point or '.'
             t_sep = lang_rec.thousands_sep or ','
             date_fmt = lang_rec.date_format or '%Y-%m-%d'
-        elif lang.lower().startswith('es'):
-            d_sep, t_sep, date_fmt = ',', '.', '%d/%m/%Y'
     except Exception as exc:
         _logger.debug('render_context_from_env: %s', exc)
     show_mode = 'show-table'
@@ -367,15 +430,9 @@ def render_context_from_env(env, result=None, user_message=None):
             resolve_dual_axis_for_render,
             resolve_show_mode_for_render,
         )
-        if not user_message:
-            user_message = (env.context or {}).get('user_message')
-        show_mode = resolve_show_mode_for_render(
-            env, result=result, user_message=user_message,
-        )
+        show_mode = resolve_show_mode_for_render(env, result=result)
         chart_engine = resolve_chart_engine_for_render(env, result=result)
-        dual_axis = resolve_dual_axis_for_render(
-            env, result=result, user_message=user_message,
-        )
+        dual_axis = resolve_dual_axis_for_render(env, result=result)
     except Exception as exc:
         _logger.debug('render_context_from_env show_mode: %s', exc)
     user_tz = 'UTC'
@@ -387,9 +444,16 @@ def render_context_from_env(env, result=None, user_message=None):
         )
     except Exception:
         user_tz = (getattr(env, 'context', None) or {}).get('tz') or 'UTC'
+    float_decimals = 2
+    try:
+        from .engine_params import xlsx_float_decimals
+        float_decimals = xlsx_float_decimals(env)
+    except Exception as exc:
+        _logger.debug('render_context_from_env decimals: %s', exc)
     return {
         'pk_decimal_sep': d_sep,
         'pk_thousands_sep': t_sep,
+        'pk_float_decimals': float_decimals,
         'pk_date_format': date_fmt,
         'user_lang': lang,
         'user_tz': user_tz,
@@ -697,9 +761,10 @@ def _name_cell_link_html(item, text, inherit_color=False):
         link_style = 'color:#0d6efd;text-decoration:underline;'
     return (
         '<a href="%s" target="_blank" rel="noopener" '
-        'class="o_chatboo_namelink" title="Abrir registro" '
+        'class="o_ai_namelink" title="%s" '
         'style="%s">%s</a>'
-    ) % (url, link_style, html.escape(str(text)))
+    ) % (url, html.escape(_t('Open record'), quote=True), link_style,
+         html.escape(str(text)))
 
 
 def _is_blank_cell(val):
@@ -722,7 +787,7 @@ def _map_thumb_title(val):
     prov = (val.get('provider') or 'osm').lower()
     tiles = (val.get('tile_source') or '').lower()
     if prov == 'google' and tiles == 'osm':
-        return 'Vista OSM · abre en Google Maps'
+        return _t('OSM view · opens in Google Maps')
     if prov == 'google':
         return 'Google Maps'
     return 'OpenStreetMap'
@@ -731,23 +796,23 @@ def _map_thumb_title(val):
 def _render_map_thumb_cell(val):
     """Celda ``__map_thumb__``: miniatura PNG clicable (+ badge) o enlace texto."""
     href = _safe_card_href(val.get('href'))
-    alt = html.escape(str(val.get('alt') or 'mapa'), quote=True)
+    alt = html.escape(str(val.get('alt') or _t('Map')), quote=True)
     png = (val.get('png_b64') or '').strip()
     prov = (val.get('provider') or 'osm').lower()
     tiles = (val.get('tile_source') or ('google' if prov == 'google' else 'osm')).lower()
     badge = html.escape(str(val.get('alt') or ('GM' if prov == 'google' else 'OSM')))
     title = html.escape(_map_thumb_title(val), quote=True)
-    cls = ['o_chatboo_mapthumb']
+    cls = ['o_ai_mapthumb']
     if prov == 'google':
-        cls.append('o_chatboo_mapthumb_gm')
+        cls.append('o_ai_mapthumb_gm')
     else:
-        cls.append('o_chatboo_mapthumb_osm')
+        cls.append('o_ai_mapthumb_osm')
     if tiles == 'google':
-        cls.append('o_chatboo_mapthumb_tiles_gm')
+        cls.append('o_ai_mapthumb_tiles_gm')
     else:
-        cls.append('o_chatboo_mapthumb_tiles_osm')
+        cls.append('o_ai_mapthumb_tiles_osm')
     if prov == 'google' and tiles == 'osm':
-        cls.append('o_chatboo_mapthumb_hybrid')
+        cls.append('o_ai_mapthumb_hybrid')
     class_attr = ' '.join(cls)
 
     if png:
@@ -756,9 +821,9 @@ def _render_map_thumb_cell(val):
         else:
             src = 'data:image/png;base64,%s' % html.escape(png, quote=True)
         inner = (
-            '<span class="o_chatboo_mapthumb_wrap">'
+            '<span class="o_ai_mapthumb_wrap">'
             '<img src="%s" alt="%s" style="%s">'
-            '<span class="o_chatboo_mapthumb_badge">%s</span>'
+            '<span class="o_ai_mapthumb_badge">%s</span>'
             '</span>'
         ) % (src, alt, _MAP_THUMB_STYLE, badge)
         if href:
@@ -772,7 +837,7 @@ def _render_map_thumb_cell(val):
     if href:
         return (
             '<a href="%s" target="_blank" rel="noopener" '
-            'title="%s" class="o_chatboo_maplink %s">%s</a>'
+            'title="%s" class="o_ai_maplink %s">%s</a>'
         ) % (html.escape(href, quote=True), title, class_attr, label)
     return '<span class="text-muted small">%s</span>' % label
 
@@ -810,35 +875,36 @@ def _render_coords_cell(val):
     if href:
         safe_href = html.escape(href, quote=True)
         text_html = (
-            '<a class="o_chatboo_coords_link" href="%s" target="_blank" '
-            'rel="noopener noreferrer" title="Abrir en mapa">'
-            '<code class="o_chatboo_coords_text">%s</code></a>'
-        ) % (safe_href, safe_text)
+            '<a class="o_ai_coords_link" href="%s" target="_blank" '
+            'rel="noopener noreferrer" title="%s">'
+            '<code class="o_ai_coords_text">%s</code></a>'
+        ) % (safe_href, html.escape(_t('Open in map'), quote=True), safe_text)
     else:
         text_html = (
-            '<code class="o_chatboo_coords_text">%s</code>' % safe_text
+            '<code class="o_ai_coords_text">%s</code>' % safe_text
         )
     return (
-        '<span class="o_chatboo_coords" title="lat,lon (grados decimales)">'
+        '<span class="o_ai_coords" title="%s">'
         '%s'
-        '<button type="button" class="o_chatboo_cell_copy o_chatboo_noexport" '
-        'data-copy-text="%s" title="Copiar coordenadas" '
-        'aria-label="Copiar coordenadas">'
+        '<button type="button" class="o_ai_cell_copy o_ai_noexport" '
+        'data-copy-text="%s" title="%s" '
+        'aria-label="%s">'
         '<i class="fa fa-copy" aria-hidden="true"></i>'
         '</button>'
         '</span>'
-    ) % (text_html, safe_copy)
+    ) % (
+        html.escape(_t('lat,lon (decimal degrees)'), quote=True),
+        text_html, safe_copy,
+        html.escape(_t('Copy coordinates'), quote=True),
+        html.escape(_t('Copy coordinates'), quote=True),
+    )
 
 
-# Columnas de detalle geo por fila (B/C). Se quitan si hay mapa integral (A)
-# y el result no opta explícitamente con geo_coords / geo_thumbs.
-_GEO_COORD_COL_KEYS = frozenset({
-    'Coords', 'coords', 'Coordenadas', 'coordenadas',
-    'Lat', 'Lon', 'lat', 'lon', 'Latitude', 'Longitude',
-})
-_GEO_THUMB_COL_KEYS = frozenset({
-    'Mapa', 'Map', 'Mapa OSM', 'Mapa GM', 'Mapa Google', 'Miniatura',
-})
+# Per-row geo detail columns (B/C) go when there is a whole map (A) and the
+# result does not keep them with geo_coords / geo_thumbs. A column is told by
+# its cells (``__coords__`` / ``__map_thumb__``), never by the name the
+# skill gave it; bare numeric latitude/longitude only by these field tokens.
+_GEO_LATLON_KEYS = frozenset({'lat', 'lon', 'lng', 'latitude', 'longitude'})
 
 
 def _geo_flag_enabled(result, *keys):
@@ -846,9 +912,47 @@ def _geo_flag_enabled(result, *keys):
         return False
     for k in keys:
         v = result.get(k)
-        if v is True or v in (1, '1', 'true', 'True', 'yes', 'si', 'sí'):
+        if v is True or v in (1, '1', 'true', 'True'):
             return True
     return False
+
+
+def _geo_rows(result):
+    if isinstance(result.get('data'), list):
+        yield result['data']
+    for block in result.get('tables') or []:
+        if isinstance(block, dict):
+            yield block.get('data')
+    for block in result.get('groups') or []:
+        if isinstance(block, dict):
+            yield block.get('rows') or block.get('data')
+
+
+def _geo_column_keys(result, is_geo_cell):
+    keys = set()
+    for rows in _geo_rows(result):
+        for row in rows or []:
+            if not isinstance(row, dict):
+                continue
+            for k, cell in row.items():
+                if is_geo_cell(cell):
+                    keys.add(k)
+    return keys
+
+
+def _is_row_thumb(cell):
+    return _is_map_thumb(cell) and (
+        cell.get('lat') is not None or cell.get('png_b64')
+    )
+
+
+def _latlon_keys(result):
+    keys = set()
+    for rows in _geo_rows(result):
+        for row in rows or []:
+            if isinstance(row, dict):
+                keys |= {k for k in row if str(k).strip().lower() in _GEO_LATLON_KEYS}
+    return keys
 
 
 def _geo_hide_column_keys(result):
@@ -860,7 +964,9 @@ def _geo_hide_column_keys(result):
     if not isinstance(result, dict):
         return set()
     has_shared = bool(
-        result.get('map_url') or result.get('map_pins') or result.get('pins_url')
+        result.get('map_pins')
+        or result.get('map_cell')
+        or _is_map_href(page_url_on_result(result))
     )
     if not has_shared:
         return set()
@@ -874,32 +980,9 @@ def _geo_hide_column_keys(result):
         return set()
     hide = set()
     if not keep_coords:
-        hide |= _GEO_COORD_COL_KEYS
+        hide |= _geo_column_keys(result, _is_coords_cell) | _latlon_keys(result)
     if not keep_thumbs:
-        hide |= _GEO_THUMB_COL_KEYS
-
-        def _thumb_keys(rows):
-            keys = set()
-            for row in rows or []:
-                if not isinstance(row, dict):
-                    continue
-                for k, cell in row.items():
-                    if (
-                        isinstance(cell, dict)
-                        and cell.get('__map_thumb__')
-                        and (cell.get('lat') is not None or cell.get('png_b64'))
-                    ):
-                        keys.add(k)
-            return keys
-
-        if isinstance(result.get('data'), list):
-            hide |= _thumb_keys(result['data'])
-        for block in result.get('tables') or []:
-            if isinstance(block, dict):
-                hide |= _thumb_keys(block.get('data'))
-        for block in result.get('groups') or []:
-            if isinstance(block, dict):
-                hide |= _thumb_keys(block.get('rows') or block.get('data'))
+        hide |= _geo_column_keys(result, _is_row_thumb)
     return hide
 
 
@@ -994,13 +1077,14 @@ def _render_cell(key, val, ctx, numeric_column=False, item=None):
             return None
         return _name_cell_link_html(item, text, inherit_color=inherit_color)
 
-    # Enteros sin decimales (ids, contadores); floats con 2 (importes). bool va a texto.
+    # Enteros sin decimales (ids, contadores); floats con los del ajuste
+    # (por defecto, los de la moneda de la empresa). bool va a texto.
     parsed = _parse_numeric(val)
     decimal_col = key in (ctx.get('decimal_keys') or ())
     if parsed is not None and (numeric_column or isinstance(val, (int, float))):
         number, is_float = parsed
         if decimal_col or is_float or isinstance(val, float):
-            decimals = 2
+            decimals = ctx.get('pk_float_decimals', 2)
         else:
             decimals = 0
         formatted = _fmt_number(number, d_sep, t_sep, decimals=decimals)
@@ -1042,7 +1126,7 @@ def _style_is_inline_chip(style):
 
 
 def _cell_sort_atom(val, numeric_column=False):
-    """Raw value for ``data-chatboo-sort`` (number string or plain text)."""
+    """Raw value for ``data-ai-sort`` (number string or plain text)."""
     flat = _flatten_cell_value(val)
     parsed = _parse_numeric(flat)
     if parsed is not None and (
@@ -1084,9 +1168,9 @@ def _render_table(items, ctx, caption=None, section_title=None, title_bg=None):
         ctx['name_link_keys'] = name_link_keys
         ctx['decimal_keys'] = {k for k in numeric_keys if _column_has_decimals(items, k)}
     parts = [
-        '<table class="table table-bordered table-sm o_chatboo_data_table'
+        '<table class="table table-bordered table-sm o_ai_data_table'
         '%s" style="width:100%%;margin:0;">'
-        % (' o_chatboo_ficha_table' if section_title else '')
+        % (' o_ai_ficha_table' if section_title else '')
     ]
     if caption:
         parts.append(f'<caption class="h5">{caption}</caption>')
@@ -1095,7 +1179,7 @@ def _render_table(items, ctx, caption=None, section_title=None, title_bg=None):
         n = max(1, len(keys))
         safe_bg = _safe_title_bg(title_bg) or '#eef2f8'
         parts.append(
-            '<tr class="o_chatboo_ficha_title">'
+            '<tr class="o_ai_ficha_title">'
             '<th colspan="%d" style="background-color:%s;color:#1a1a1a;'
             'font-size:1.15rem;font-weight:700;line-height:1.3;'
             'text-align:start;text-transform:none;letter-spacing:0;'
@@ -1104,11 +1188,11 @@ def _render_table(items, ctx, caption=None, section_title=None, title_bg=None):
         )
     parts.append('<tr>')
     for idx, key in enumerate(keys):
-        classes = ['o_chatboo_th_sort']
+        classes = ['o_ai_th_sort']
         if key in numeric_keys:
-            classes.extend(['o_chatboo_num', 'text-end'])
+            classes.extend(['o_ai_num', 'text-end'])
         parts.append(
-            '<th class="%s" data-chatboo-sort-col="%d" aria-sort="none">%s</th>'
+            '<th class="%s" data-ai-sort-col="%d" aria-sort="none">%s</th>'
             % (
                 html.escape(' '.join(classes), quote=True),
                 idx,
@@ -1137,7 +1221,7 @@ def _render_table(items, ctx, caption=None, section_title=None, title_bg=None):
                 is_num = key in numeric_keys
                 classes = []
                 if is_num:
-                    classes.append('o_chatboo_num')
+                    classes.append('o_ai_num')
                     classes.append('text-end')
                 cell_class = item.get('_class_' + str(key))
                 if cell_class:
@@ -1162,7 +1246,7 @@ def _render_table(items, ctx, caption=None, section_title=None, title_bg=None):
                     td_attrs += ' style="%s"' % html.escape(style, quote=True)
                 sort_v = _cell_sort_atom(val, numeric_column=is_num)
                 if sort_v != '':
-                    td_attrs += ' data-chatboo-sort="%s"' % html.escape(
+                    td_attrs += ' data-ai-sort="%s"' % html.escape(
                         sort_v, quote=True,
                     )
                 cell_title = item.get('_title_' + str(key))
@@ -1170,10 +1254,10 @@ def _render_table(items, ctx, caption=None, section_title=None, title_bg=None):
                     tip = html.escape(str(cell_title), quote=True)
                     if ' class="' in td_attrs:
                         td_attrs = td_attrs.replace(
-                            ' class="', ' class="o_chatboo_tiptarget ', 1,
+                            ' class="', ' class="o_ai_tiptarget ', 1,
                         )
                     else:
-                        td_attrs += ' class="o_chatboo_tiptarget"'
+                        td_attrs += ' class="o_ai_tiptarget"'
                     td_attrs += ' data-tip="%s"' % tip
                 cell_html = _render_cell(
                     key, val, ctx, numeric_column=is_num, item=item,
@@ -1206,7 +1290,7 @@ def _render_table(items, ctx, caption=None, section_title=None, title_bg=None):
 
 
 def _json_safe_cell(val):
-    """Valor JSON-serializable para data-chatboo-dataset (sin base64 ni objetos)."""
+    """Valor JSON-serializable para data-ai-dataset (sin base64 ni objetos)."""
     if val is None or isinstance(val, (bool, int, float)):
         return val
     if isinstance(val, str):
@@ -1290,7 +1374,7 @@ def _normalize_show_mode_value(value, default='show-table'):
 
 
 def _charts_enabled(render_context=None, result=None):
-    """False ⇒ no data-chatboo-dataset / no toolbar de gráfico."""
+    """False ⇒ no data-ai-dataset / no toolbar de gráfico."""
     ctx = render_context or {}
     if ctx.get('charts') is False or ctx.get('__no_charts__') is True:
         return False
@@ -1319,11 +1403,11 @@ def _normalize_chart_engine_value(value, default='echarts'):
 
 
 def _dual_axis_attr(value):
-    """HTML fragment for data-chatboo-dual-axis, or empty when auto."""
+    """HTML fragment for data-ai-dual-axis, or empty when auto."""
     if value is None:
         return ''
     if isinstance(value, bool):
-        return ' data-chatboo-dual-axis="%s"' % ('1' if value else '0')
+        return ' data-ai-dual-axis="%s"' % ('1' if value else '0')
     try:
         from .presentation_mode import normalize_dual_axis
         normalized = normalize_dual_axis(value)
@@ -1336,7 +1420,7 @@ def _dual_axis_attr(value):
             normalized = True
     if normalized is None:
         return ''
-    return ' data-chatboo-dual-axis="%s"' % ('1' if normalized else '0')
+    return ' data-ai-dual-axis="%s"' % ('1' if normalized else '0')
 
 
 def _table_block_attrs(show_mode, chart_engine, dataset_attr='', dual_axis=None):
@@ -1345,19 +1429,19 @@ def _table_block_attrs(show_mode, chart_engine, dataset_attr='', dual_axis=None)
     da = _dual_axis_attr(dual_axis)
     if dataset_attr:
         return (
-            '<div class="o_chatboo_table_block" %s '
-            'data-chatboo-show-mode="%s" data-chatboo-chart-engine="%s"%s>'
+            '<div class="o_ai_table_block" %s '
+            'data-ai-show-mode="%s" data-ai-chart-engine="%s"%s>'
             % (dataset_attr, sm, ce, da)
         )
     return (
-        '<div class="o_chatboo_table_block" data-chatboo-show-mode="%s" '
-        'data-chatboo-chart-engine="%s"%s>'
+        '<div class="o_ai_table_block" data-ai-show-mode="%s" '
+        'data-ai-chart-engine="%s"%s>'
         % (sm, ce, da)
     )
 
 
 def _table_block_open(items, render_context=None):
-    """Abre wrapper con data-chatboo-dataset (JSON escapado) para charts en el cliente."""
+    """Abre wrapper con data-ai-dataset (JSON escapado) para charts en el cliente."""
     ctx = render_context or {}
     show_mode = _normalize_show_mode_value(
         ctx.get('show_mode') or ctx.get('showmode'),
@@ -1375,7 +1459,7 @@ def _table_block_open(items, render_context=None):
         payload = json.dumps(rows, ensure_ascii=False, separators=(',', ':'), default=str)
     except (TypeError, ValueError):
         return _table_block_attrs(show_mode, chart_engine, dual_axis=dual_axis)
-    dataset_attr = 'data-chatboo-dataset="%s"' % html.escape(payload, quote=True)
+    dataset_attr = 'data-ai-dataset="%s"' % html.escape(payload, quote=True)
     return _table_block_attrs(
         show_mode, chart_engine, dataset_attr=dataset_attr, dual_axis=dual_axis,
     )
@@ -1436,18 +1520,19 @@ def _map_banner_card_html(href, label, pin_count=0, provider='osm'):
     ) else 'osm'
     prov_name = 'Google Maps' if prov == 'gm' else 'OpenStreetMap'
     if n > 0:
+        pins = _t('1 pin') if n == 1 else _t('%d pins') % n
         count_html = (
-            '<span class="o_chatboo_map_banner_count">%d pin%s · %s</span>'
-            % (n, '' if n == 1 else 's', html.escape(prov_name))
+            '<span class="o_ai_map_banner_count">%s · %s</span>'
+            % (html.escape(pins), html.escape(prov_name))
         )
     else:
         count_html = (
-            '<span class="o_chatboo_map_banner_count">%s</span>'
+            '<span class="o_ai_map_banner_count">%s</span>'
             % html.escape(prov_name)
         )
     # Decorative pins (not geodata) — visual affordance only.
     pins_svg = (
-        '<svg class="o_chatboo_map_banner_pins" viewBox="0 0 120 72" '
+        '<svg class="o_ai_map_banner_pins" viewBox="0 0 120 72" '
         'aria-hidden="true" focusable="false">'
         '<ellipse cx="28" cy="48" rx="22" ry="10" fill="rgba(34,139,34,0.18)"/>'
         '<ellipse cx="78" cy="40" rx="28" ry="12" fill="rgba(70,130,180,0.16)"/>'
@@ -1463,21 +1548,22 @@ def _map_banner_card_html(href, label, pin_count=0, provider='osm'):
         '</svg>'
     )
     return (
-        '<div class="pns-result-map o_chatboo_map_banner '
-        'o_chatboo_map_banner_%s">'
-        '<a class="o_chatboo_map_banner_card" href="%s" target="_blank" '
+        '<div class="pns-result-map o_ai_map_banner '
+        'o_ai_map_banner_%s">'
+        '<a class="o_ai_map_banner_card" href="%s" target="_blank" '
         'rel="noopener noreferrer" title="%s">'
-        '<span class="o_chatboo_map_banner_preview" aria-hidden="true">'
+        '<span class="o_ai_map_banner_preview" aria-hidden="true">'
         '%s'
         '</span>'
-        '<span class="o_chatboo_map_banner_meta">'
-        '<span class="o_chatboo_map_banner_title">%s</span>'
+        '<span class="o_ai_map_banner_meta">'
+        '<span class="o_ai_map_banner_title">%s</span>'
         '%s'
-        '<span class="o_chatboo_map_banner_cta">Abrir mapa '
+        '<span class="o_ai_map_banner_cta">%s '
         '<i class="fa fa-external-link" aria-hidden="true"></i></span>'
         '</span>'
         '</a></div>'
-    ) % (prov, safe_href, safe_label, pins_svg, safe_label, count_html)
+    ) % (prov, safe_href, safe_label, pins_svg, safe_label, count_html,
+         html.escape(_t('Open map')))
 
 
 def _is_shared_geo_map_href(href):
@@ -1495,16 +1581,24 @@ def _is_shared_geo_map_href(href):
 
 
 
+def _is_map_href(href):
+    """True when this address is a map page (shared viewer, Google, OSM)."""
+    if not href:
+        return False
+    return bool(
+        _is_shared_geo_map_href(href)
+        or 'google.com/maps' in href
+        or 'openstreetmap' in href
+    )
+
+
 def _is_provider_badge_alt(alt):
     """True when alt is only a GM/OSM badge, not a human map title."""
     a = (alt or '').strip().lower()
     if not a:
         return True
     return bool(re.match(
-        r'^(mapa\s+)?'
-        r'(osm|gm|google(\s+maps)?|openstreetmap)'
-        r'(\s*\(\d+\))?'
-        r'(\s*\(pinchitos\))?$',
+        r'^(osm|gm|google(\s+maps)?|openstreetmap)(\s*\(\d+\))?$',
         a,
     ))
 
@@ -1519,10 +1613,39 @@ def _map_banner_context_label(result, alt=''):
             return val.strip()
     alt = (alt or '').strip()
     if alt and not _is_provider_badge_alt(alt):
-        if alt.lower().startswith('mapa'):
-            return alt
-        return 'Mapa %s' % alt
+        return alt
     return ''
+
+
+def _result_page_link_html(result):
+    """The page as a card. The chat shows it; the click opens the tab."""
+    href = page_url_on_result(result)
+    if not href:
+        return ''
+    label = result.get('title') or result.get('summary') or _t('Open')
+    safe_href = html.escape(href, quote=True)
+    safe_label = html.escape(str(label))
+    icon = (
+        '<svg class="o_ai_page_link_icon" viewBox="0 0 48 48" '
+        'aria-hidden="true" focusable="false">'
+        '<rect x="8" y="12" width="22" height="28" rx="2" fill="#fff" '
+        'stroke="#5b6b7a" stroke-width="2"/>'
+        '<rect x="16" y="8" width="22" height="28" rx="2" fill="#eef3fa" '
+        'stroke="#0d6efd" stroke-width="2"/>'
+        '</svg>'
+    )
+    return (
+        '<div class="o_ai_page_link">'
+        '<a class="o_ai_page_link_card" href="%s" target="_blank" '
+        'rel="noopener noreferrer" title="%s">'
+        '<span class="o_ai_page_link_preview" aria-hidden="true">%s</span>'
+        '<span class="o_ai_page_link_meta">'
+        '<span class="o_ai_page_link_title">%s</span>'
+        '<span class="o_ai_page_link_cta">%s '
+        '<i class="fa fa-external-link" aria-hidden="true"></i></span>'
+        '</span></a></div>'
+        % (safe_href, safe_label, icon, safe_label, html.escape(_t('Open')))
+    )
 
 
 def _result_map_banner_html(result):
@@ -1545,7 +1668,7 @@ def _result_map_banner_html(result):
             cell = val
             break
     href = ''
-    label = 'Mapa de pinchitos'
+    label = _t('Pin map')
     provider = 'osm'
     if cell is not None:
         href = (cell.get('href') or '').strip()
@@ -1555,18 +1678,16 @@ def _result_map_banner_html(result):
             label = (
                 _map_banner_context_label(result, alt)
                 or alt
-                or 'Mapa de ruta'
+                or _t('Route map')
             )
         elif _is_shared_geo_map_href(href):
             label = (
                 _map_banner_context_label(result, alt)
-                or 'Mapa compartido'
+                or _t('Shared map')
             )
             # Keep cell.provider (google/osm) for banner styling.
         elif alt:
-            label = alt if alt.lower().startswith('mapa') else (
-                'Mapa %s' % alt
-            )
+            label = alt
         # Prefer the map card over a tiny text thumb link when there is no PNG.
         if href and not (cell.get('png_b64') or '').strip():
             return _map_banner_card_html(
@@ -1577,36 +1698,42 @@ def _result_map_banner_html(result):
         if href or cell.get('png_b64'):
             inner = _render_map_thumb_cell(cell)
             return (
-                '<div class="pns-result-map o_chatboo_map_banner '
-                'o_chatboo_map_banner_thumb">'
+                '<div class="pns-result-map o_ai_map_banner '
+                'o_ai_map_banner_thumb">'
                 '%s</div>'
             ) % inner
-    for key in ('map_url', 'pins_url'):
-        val = result.get(key)
-        if isinstance(val, str) and (
-            val.strip().startswith('http') or val.strip().startswith('/')
-        ):
-            href = val.strip()
-            break
-    if not href:
+    href = page_url_on_result(result)
+    # The card is chosen by the content: only a map address gets the map
+    # card. Any other page is a plain link (``_result_page_link_html``).
+    if not _is_map_href(href):
         return ''
     context = _map_banner_context_label(result)
     if _is_shared_geo_map_href(href):
-        label = context or 'Mapa compartido'
+        label = context or _t('Shared map')
         # Without a cell, default neutral osm styling.
         provider = 'osm'
     elif 'google.com/maps' in href:
-        label = context or 'Mapa Google Maps (pinchitos)'
+        label = context or _t('Pin map')
         provider = 'google'
-    elif 'openstreetmap' in href:
-        label = context or 'Mapa OpenStreetMap (pinchitos)'
-        provider = 'osm'
     else:
-        label = context or 'Mapa de pinchitos'
+        label = context or _t('Pin map')
+        provider = 'osm'
     return _map_banner_card_html(
         href, label,
         pin_count=_map_banner_pin_count(result, cell),
         provider=provider,
+    )
+
+
+def _result_page_html(result):
+    """One painter for a result that is also a page.
+
+    A map address gets the map card; anything else gets the link. A module
+    that publishes a page only sets ``page_url``; nothing here names it.
+    """
+    return (
+        _result_map_banner_html(result if isinstance(result, dict) else {})
+        or _result_page_link_html(result if isinstance(result, dict) else {})
     )
 
 
@@ -1615,7 +1742,7 @@ def _title_html(title):
     if not title:
         return ''
     return (
-        '<h3 class="pns-result-title o_chatboo_result_title" '
+        '<h3 class="pns-result-title o_ai_result_title" '
         'style="margin:0;font-size:1.65rem;font-weight:700;'
         'line-height:1.2;color:#1a1a1a;">%s</h3>' % title
     )
@@ -1635,7 +1762,7 @@ def _block_title_html(title, bg=None):
     """Título compartido gráfico + tabla (primer hijo del table_block)."""
     if not title:
         return ''
-    # Margin/radius los controla CSS (.o_chatboo_titled_block) para pegar título+tabla.
+    # Margin/radius los controla CSS (.o_ai_titled_block) para pegar título+tabla.
     style = (
         'margin:0;font-size:1.15rem;font-weight:700;'
         'line-height:1.3;color:#1a1a1a;'
@@ -1647,7 +1774,7 @@ def _block_title_html(title, bg=None):
             % html.escape(safe_bg, quote=True)
         )
     return (
-        '<h3 class="pns-result-title o_chatboo_block_title" '
+        '<h3 class="pns-result-title o_ai_block_title" '
         'style="%s">%s</h3>' % (style, title)
     )
 
@@ -1672,7 +1799,7 @@ def _markdownish_to_html(text):
             return
         joined = _inline(' '.join(para))
         parts.append(
-            '<p class="o_chatboo_prose_p" style="margin:0.45em 0;line-height:1.5;">'
+            '<p class="o_ai_prose_p" style="margin:0.45em 0;line-height:1.5;">'
             '%s</p>' % joined
         )
         para.clear()
@@ -1687,7 +1814,7 @@ def _markdownish_to_html(text):
             _flush_para()
             level = min(len(hm.group(1)), 4)
             parts.append(
-                '<h%d class="o_chatboo_prose_h" style="margin:0.85em 0 0.35em 0;'
+                '<h%d class="o_ai_prose_h" style="margin:0.85em 0 0.35em 0;'
                 'font-weight:700;line-height:1.3;color:#1a1a1a;">%s</h%d>'
                 % (level, _inline(hm.group(2)), level)
             )
@@ -1696,7 +1823,7 @@ def _markdownish_to_html(text):
         if lm:
             _flush_para()
             parts.append(
-                '<p class="o_chatboo_prose_li" style="margin:0.2em 0 0.2em 0.85em;'
+                '<p class="o_ai_prose_li" style="margin:0.2em 0 0.2em 0.85em;'
                 'line-height:1.45;">• %s</p>' % _inline(lm.group(1))
             )
             continue
@@ -1704,7 +1831,7 @@ def _markdownish_to_html(text):
         if om:
             _flush_para()
             parts.append(
-                '<p class="o_chatboo_prose_li" style="margin:0.2em 0 0.2em 0.85em;'
+                '<p class="o_ai_prose_li" style="margin:0.2em 0 0.2em 0.85em;'
                 'line-height:1.45;">%s. %s</p>'
                 % (html.escape(om.group(1)), _inline(om.group(2)))
             )
@@ -1715,7 +1842,7 @@ def _markdownish_to_html(text):
 
 
 def _result_notices_html(result):
-    """Aviso blando (geocode miss, etc.): no corta el resultado."""
+    """Soft notice (geocode miss, etc.): it does not cut the result."""
     if not isinstance(result, dict):
         return ''
     raw = result.get('notices')
@@ -1743,13 +1870,13 @@ def _result_notices_html(result):
         '<li>%s</li>' % html.escape(m) for m in uniq
     )
     return (
-        '<div class="alert alert-warning o_chatboo_geo_notice" role="status" '
+        '<div class="alert alert-warning o_ai_geo_notice" role="status" '
         'style="margin:0.75em 0;padding:0.65em 0.9em;border-radius:4px;'
         'border:1px solid #f0d48a;background:#fff8e6;color:#5c4a1a;'
         'font-size:0.92rem;line-height:1.4;">'
-        '<strong>Aviso</strong><ul style="margin:0.35em 0 0 1.1em;padding:0;">'
+        '<strong>%s</strong><ul style="margin:0.35em 0 0 1.1em;padding:0;">'
         '%s</ul></div>'
-    ) % lis
+    ) % (html.escape(_t('Notice')), lis)
 
 
 def _footer_html(result):
@@ -1760,7 +1887,7 @@ def _footer_html(result):
     if not raw:
         return ''
     return (
-        '<div class="pns-result-footer o_chatboo_prose" style="margin:0.85em 0 0.25em 0;'
+        '<div class="pns-result-footer o_ai_prose" style="margin:0.85em 0 0.25em 0;'
         'padding:0.55em 0.75em;background:#f4f7fa;border-radius:4px;'
         'border:1px solid #dde5ec;line-height:1.45;font-size:0.92rem;'
         'color:#334;">%s</div>'
@@ -1768,31 +1895,34 @@ def _footer_html(result):
     )
 
 
+@_paints
 def fallback_table_html(result, summary='', render_context=None):
     """Renderizador HTML en Python puro para UNA tabla plana."""
     items = _result_items(result)
     if not items:
-        return None
+        return _result_page_html(result) or None
     ctx = render_context or {}
     # No meter URLs largas de mapa en el título (se escapan y no son clicables).
     raw_title = (
         summary
         or (result.get('title') if isinstance(result, dict) else '')
         or (result.get('summary') if isinstance(result, dict) else '')
-        or 'Resultados'
+        or ''
     )
     if isinstance(raw_title, str) and 'http' in raw_title:
         # Quitar URL cruda del título; el banner map_url la muestra bien.
-        raw_title = re.sub(r'https?://\S+', '', raw_title).strip(' .;:—-') or 'Resultados'
+        raw_title = re.sub(r'https?://\S+', '', raw_title).strip(' .;:—-')
     title = html.escape(raw_title)
     parts = [
         _table_block_open(items, render_context=ctx),
         _block_title_html(title),
         _result_notices_html(result if isinstance(result, dict) else {}),
-        _result_map_banner_html(result if isinstance(result, dict) else {}),
+        _result_page_html(result),
         '<div class="table-responsive" style="margin:1em 0;">',
         _render_table(items, ctx, caption=None),
-        f'<p class="text-muted small"><strong>Total: {len(items)} registros</strong></p>',
+        '<p class="text-muted small"><strong>%s</strong></p>' % html.escape(
+            _t('Total: %d records') % len(items),
+        ),
         _footer_html(result),
         '</div>',
         '</div>',
@@ -1801,11 +1931,11 @@ def fallback_table_html(result, summary='', render_context=None):
 
 
 def _group_map_payload(grp):
-    """Extract integral-map fields from a tables/groups entry (domain-agnostic)."""
+    """Extract per-section page/map fields from a tables/groups entry."""
     if not isinstance(grp, dict):
         return None
     out = {}
-    for key in ('map_url', 'pins_url', 'map_pins', 'map_cell'):
+    for key in ('page_url', 'map_url', 'pins_url', 'map_pins', 'map_cell'):
         if key in grp and grp[key] is not None:
             out[key] = grp[key]
     return out or None
@@ -1896,6 +2026,7 @@ def _dashboard_card_id(index, title):
     return 'c%d-%s' % (index, slug or 'block')
 
 
+@_paints
 def grouped_dashboard_html(result, summary='', render_context=None):
     """Dashboard layout: draggable/closable cards over grouped tables/charts."""
     sections = _result_groups(result)
@@ -1913,29 +2044,23 @@ def grouped_dashboard_html(result, summary='', render_context=None):
     if not dash_id:
         dash_id = _dashboard_id(result, sections)
 
-    lang = str(ctx.get('user_lang') or 'en_US').replace('-', '_').lower()
-    if lang.startswith('es'):
-        restore_label = 'Restaurar'
-        restore_title = 'Restaurar'
-    else:
-        restore_label = 'Restore'
-        restore_title = 'Restore'
+    restore_label = _t('Restore')
 
     parts = [
-        '<div class="o_chatboo_dashboard" data-chatboo-dashboard-id="%s" '
-        'data-chatboo-show-mode="dashboard" '
-        'data-chatboo-chart-engine="%s">' % (
+        '<div class="o_ai_dashboard" data-ai-dashboard-id="%s" '
+        'data-ai-show-mode="dashboard" '
+        'data-ai-chart-engine="%s">' % (
             html.escape(str(dash_id), quote=True),
             html.escape(chart_engine, quote=True),
         ),
-        '<div class="o_chatboo_dashboard_toolbar o_chatboo_noexport">',
-        '<button type="button" class="btn btn-sm btn-link o_chatboo_dashboard_reset" '
+        '<div class="o_ai_dashboard_toolbar o_ai_noexport">',
+        '<button type="button" class="btn btn-sm btn-link o_ai_dashboard_reset" '
         'title="%s">%s</button>' % (
-            html.escape(restore_title, quote=True),
+            html.escape(restore_label, quote=True),
             html.escape(restore_label),
         ),
         '</div>',
-        '<div class="o_chatboo_dashboard_grid">',
+        '<div class="o_ai_dashboard_grid">',
     ]
     top = html.escape(
         summary or (result.get('summary') if isinstance(result, dict) else '') or '',
@@ -1943,10 +2068,10 @@ def grouped_dashboard_html(result, summary='', render_context=None):
     if top:
         parts.insert(
             1,
-            '<h3 class="pns-result-title o_chatboo_dashboard_title">%s</h3>' % top,
+            '<h3 class="pns-result-title o_ai_dashboard_title">%s</h3>' % top,
         )
     # Banner multipunto a nivel raíz (también en dashboard agrupado).
-    banner = _result_map_banner_html(result if isinstance(result, dict) else {})
+    banner = _result_page_html(result)
     if banner:
         # Tras título (índice 1) o al inicio del contenido si no hay título.
         parts.insert(2 if top else 1, banner)
@@ -1979,46 +2104,42 @@ def grouped_dashboard_html(result, summary='', render_context=None):
                     )
         span = max(1, min(span, 2))
         span_cls = (
-            ' o_chatboo_dashboard_card_span2' if span >= 2 else ''
+            ' o_ai_dashboard_card_span2' if span >= 2 else ''
         )
-        safe_title = html.escape(title or ('Bloque %d' % (index + 1)))
+        safe_title = html.escape(title or (_t('Block %d') % (index + 1)))
         parts.append(
-            '<div class="o_chatboo_dashboard_card%s" data-card-id="%s">' % (
+            '<div class="o_ai_dashboard_card%s" data-card-id="%s">' % (
                 span_cls, html.escape(card_id, quote=True),
             )
         )
-        parts.append('<div class="o_chatboo_dashboard_card_header">')
+        parts.append('<div class="o_ai_dashboard_card_header">')
         parts.append(
-            '<span class="o_chatboo_dashboard_drag" aria-hidden="true" '
-            'title="Arrastrar">&#8942;&#8942;</span>'
+            '<span class="o_ai_dashboard_drag" aria-hidden="true" '
+            'title="%s">&#8942;&#8942;</span>' % html.escape(_t('Drag'), quote=True)
         )
-        parts.append('<span class="o_chatboo_dashboard_card_title">%s</span>' % safe_title)
-        parts.append('<div class="o_chatboo_dashboard_card_actions">')
+        parts.append('<span class="o_ai_dashboard_card_title">%s</span>' % safe_title)
+        parts.append('<div class="o_ai_dashboard_card_actions">')
         # Orden MDI clásico: minimizar · maximizar/restaurar · cerrar.
         # El JS rellena iconos geométricos; el HTML deja títulos accesibles.
-        parts.append(
-            '<button type="button" class="o_chatboo_dashboard_winbtn '
-            'o_chatboo_dashboard_collapse" aria-expanded="true" '
-            'title="Minimizar" aria-label="Minimizar"></button>'
-        )
-        parts.append(
-            '<button type="button" class="o_chatboo_dashboard_winbtn '
-            'o_chatboo_dashboard_maximize" aria-expanded="false" '
-            'title="Maximizar" aria-label="Maximizar"></button>'
-        )
-        parts.append(
-            '<button type="button" class="o_chatboo_dashboard_winbtn '
-            'o_chatboo_dashboard_close" title="Cerrar" '
-            'aria-label="Cerrar"></button>'
-        )
+        for kind, expanded, label in (
+            ('collapse', ' aria-expanded="true"', _t('Minimize')),
+            ('maximize', ' aria-expanded="false"', _t('Maximize')),
+            ('close', '', _t('Close')),
+        ):
+            safe_label = html.escape(label, quote=True)
+            parts.append(
+                '<button type="button" class="o_ai_dashboard_winbtn '
+                'o_ai_dashboard_%s"%s title="%s" aria-label="%s"></button>'
+                % (kind, expanded, safe_label, safe_label)
+            )
         parts.append('</div></div>')
-        parts.append('<div class="o_chatboo_dashboard_card_body">')
+        parts.append('<div class="o_ai_dashboard_card_body">')
         card_ctx = dict(ctx)
         card_ctx['show_mode'] = card_block_mode
         parts.append(_table_block_open(items, render_context=card_ctx))
         map_payload = (opts or {}).get('map_payload')
         if map_payload:
-            parts.append(_result_map_banner_html(map_payload))
+            parts.append(_result_page_html(map_payload))
         parts.append('<div class="table-responsive">')
         if items:
             parts.append(_render_table(items, card_ctx))
@@ -2026,9 +2147,11 @@ def grouped_dashboard_html(result, summary='', render_context=None):
         grand_total += len(items)
     parts.append('</div>')
     parts.append(
-        '<p class="text-muted small o_chatboo_dashboard_footer">'
-        '<strong>%d registros · %d tarjetas</strong></p>' % (
-            grand_total, len(sections),
+        '<p class="text-muted small o_ai_dashboard_footer">'
+        '<strong>%s</strong></p>' % html.escape(
+            _t('%(records)d records · %(cards)d cards') % {
+                'records': grand_total, 'cards': len(sections),
+            },
         )
     )
     parts.append(_footer_html(result))
@@ -2036,20 +2159,21 @@ def grouped_dashboard_html(result, summary='', render_context=None):
     return ''.join(parts)
 
 
+@_paints
 def grouped_table_html(result, summary='', render_context=None):
     """Renderiza el patrón repetido «título → tabla» por cada grupo."""
     sections = _result_groups(result)
     if not sections:
         return None
     ctx = render_context or {}
-    parts = ['<div class="o_chatboo_grouped_result" style="margin:0.25em 0 1em 0;">']
+    parts = ['<div class="o_ai_grouped_result" style="margin:0.25em 0 1em 0;">']
     top = html.escape(summary or (result.get('title') if isinstance(result, dict) else '') or '')
     if top:
         parts.append(_title_html(top))
     parts.append(_result_notices_html(result if isinstance(result, dict) else {}))
     # Root integral map (only if the root itself carries map_*).
     # Per-section maps (turn presentation basket) are rendered inside the loop.
-    parts.append(_result_map_banner_html(result if isinstance(result, dict) else {}))
+    parts.append(_result_page_html(result))
     grand_total = 0
     for section in sections:
         title, items = section[0], section[1]
@@ -2060,16 +2184,16 @@ def grouped_table_html(result, summary='', render_context=None):
         block_open = _table_block_open(items, render_context=ctx)
         if title:
             block_open = block_open.replace(
-                'class="o_chatboo_table_block"',
-                'class="o_chatboo_table_block o_chatboo_titled_block"',
+                'class="o_ai_table_block"',
+                'class="o_ai_table_block o_ai_titled_block"',
                 1,
             )
         parts.append(block_open)
         map_payload = (opts or {}).get('map_payload')
         if map_payload:
-            parts.append(_result_map_banner_html(map_payload))
+            parts.append(_result_page_html(map_payload))
         # Título dentro del <thead> ⇒ cero hueco con la cabecera de columnas.
-        parts.append('<div class="table-responsive o_chatboo_ficha">')
+        parts.append('<div class="table-responsive o_ai_ficha">')
         if items:
             parts.append(_render_table(
                 items,
@@ -2079,15 +2203,18 @@ def grouped_table_html(result, summary='', render_context=None):
             ))
         elif title:
             parts.append(
-                '<div class="o_chatboo_ficha_title" style="padding:0.55em 0.75em;'
+                '<div class="o_ai_ficha_title" style="padding:0.55em 0.75em;'
                 'font-weight:700;">%s</div>' % html.escape(title)
             )
         parts.append('</div>')
         parts.append('</div>')
         grand_total += len(items)
     parts.append(
-        '<p class="text-muted small"><strong>Total: %d registros · %d grupos'
-        '</strong></p>' % (grand_total, len(sections))
+        '<p class="text-muted small"><strong>%s</strong></p>' % html.escape(
+            _t('Total: %(records)d records · %(groups)d groups') % {
+                'records': grand_total, 'groups': len(sections),
+            },
+        )
     )
     parts.append(_footer_html(result))
     parts.append('</div>')
@@ -2385,6 +2512,7 @@ def apply_quartile_coloring(items, asked=False):
 # ---------------------------------------------------------------------------
 
 
+@_paints
 def render_result_html(result, summary='', render_context=None):
     """Renderiza el resultado a HTML con el renderer Python (server-side)."""
     if isinstance(result, list):
@@ -2501,7 +2629,7 @@ def _link_host_label(href):
 def _link_banner_mark_svg():
     """Decorative chain mark (not a fetched favicon)."""
     return (
-        '<svg class="o_chatboo_link_banner_mark" viewBox="0 0 120 72" '
+        '<svg class="o_ai_link_banner_mark" viewBox="0 0 120 72" '
         'aria-hidden="true" focusable="false">'
         '<rect x="22" y="18" width="44" height="36" rx="8" fill="none" '
         'stroke="#0d6efd" stroke-width="3"/>'
@@ -2528,21 +2656,22 @@ def _link_banner_card_html(card):
     host_html = ''
     if subtitle:
         host_html = (
-            '<span class="o_chatboo_link_banner_host">%s</span>'
+            '<span class="o_ai_link_banner_host">%s</span>'
             % html.escape(subtitle)
         )
     return (
-        '<a class="o_chatboo_link_banner_card" href="%s" target="_blank" '
+        '<a class="o_ai_link_banner_card" href="%s" target="_blank" '
         'rel="noopener noreferrer" title="%s">'
-        '<span class="o_chatboo_link_banner_preview" aria-hidden="true">'
+        '<span class="o_ai_link_banner_preview" aria-hidden="true">'
         '%s</span>'
-        '<span class="o_chatboo_link_banner_meta">'
-        '<span class="o_chatboo_link_banner_title">%s</span>'
+        '<span class="o_ai_link_banner_meta">'
+        '<span class="o_ai_link_banner_title">%s</span>'
         '%s'
-        '<span class="o_chatboo_link_banner_cta">Abrir '
+        '<span class="o_ai_link_banner_cta">%s '
         '<i class="fa fa-external-link" aria-hidden="true"></i></span>'
         '</span></a>'
-    ) % (safe_href, safe_title, _link_banner_mark_svg(), safe_title, host_html)
+    ) % (safe_href, safe_title, _link_banner_mark_svg(), safe_title, host_html,
+         html.escape(_t('Open')))
 
 
 def _normalize_clock_iso(iso, tz_name):
@@ -2625,8 +2754,9 @@ def collect_svg_cards(result, render_context=None):
     return out
 
 
+@_paints
 def render_svg_cards_html(result, render_context=None):
-    """HTML envelope ``data-chatboo-card``; Chatboo hydrates clock/fact SVG.
+    """HTML envelope ``data-ai-card``; Chatboo hydrates clock/fact SVG.
 
     ``kind=link`` is a real ``<a>`` banner (like the map card), painted here
     so it works without JS; the envelope remains for client re-hydrate.
@@ -2648,28 +2778,44 @@ def render_svg_cards_html(result, render_context=None):
             if not inner:
                 continue
             parts.append(
-                '<div class="o_chatboo_svg_card o_chatboo_link_banner" '
-                'data-chatboo-card="%s">%s</div>'
+                '<div class="o_ai_svg_card o_ai_link_banner" '
+                'data-ai-card="%s">%s</div>'
                 % (attr, inner)
             )
             continue
         parts.append(
-            '<div class="o_chatboo_svg_card" data-chatboo-card="%s"></div>'
+            '<div class="o_ai_svg_card" data-ai-card="%s"></div>'
             % attr
         )
     if not parts:
         return ''
-    return '<div class="o_chatboo_svg_cards">%s</div>' % ''.join(parts)
+    return '<div class="o_ai_svg_cards">%s</div>' % ''.join(parts)
 
 
+@_paints
 def maybe_attach_formatted_text(result, summary='', render_context=None, force=False):
     """Añade formatted_text al dict result si procede. Devuelve True si se renderizó."""
     if not isinstance(result, dict) or result.get('error'):
         return False
+    if page_url_on_result(result):
+        # A page or map in its own tab: the bubble is the card, like Geo.
+        # Discovery is not required; the url on the result is enough.
+        rendered = _result_page_html(result) or ''
+        if rendered:
+            result['formatted_text'] = rendered
+            result['__fmt_type__'] = 'server_side_python'
+            result['__phase__'] = 'presentation'
+            result['__presentation_complete__'] = True
+            result['__satisfied__'] = True
+            result['__return_direct__'] = True
+            result['__stop_after_direct__'] = True
+            result['__page_only__'] = True
+            result.pop('__records__', None)
+            return True
     card_html = render_svg_cards_html(result, render_context=render_context)
     existing = result.get('formatted_text')
     if existing:
-        if card_html and 'data-chatboo-card' not in existing:
+        if card_html and 'data-ai-card' not in existing:
             result['formatted_text'] = card_html + existing
             return True
         return False
@@ -2680,13 +2826,17 @@ def maybe_attach_formatted_text(result, summary='', render_context=None, force=F
         rendered = render_result_html(
             result, summary=summary, render_context=render_context,
         ) or ''
+    page_only = False
+    if not rendered and page_url_on_result(result):
+        rendered = _result_page_html(result) or ''
+        page_only = bool(rendered)
     if not rendered and not card_html:
         return False
     result['formatted_text'] = (card_html or '') + (rendered or '')
     result['__fmt_type__'] = 'server_side_python'
     result.pop('__records__', None)
     only_cards = bool(card_html) and not rendered
-    if force or only_cards:
+    if force or only_cards or page_only:
         result['__phase__'] = 'presentation'
         result['__presentation_complete__'] = True
         result['__satisfied__'] = True
@@ -2719,6 +2869,7 @@ def wrap_bare_images_clickable(html_content, env=None):
     """Envuelve <img> sueltas en enlaces target=_blank. Omite data: URI y imgs ya enlazadas."""
     if not html_content or '<img' not in html_content:
         return html_content
+    title = html.escape(_t('View full image', env), quote=True)
 
     def _wrap(m):
         img_tag = m.group(1)
@@ -2731,9 +2882,9 @@ def wrap_bare_images_clickable(html_content, env=None):
         if not href:
             return img_tag
         return (
-            '<a href="%s" target="_blank" rel="noopener" title="Ver imagen completa">'
+            '<a href="%s" target="_blank" rel="noopener" title="%s">'
             '%s</a>'
-        ) % (html.escape(href, quote=True), img_tag)
+        ) % (html.escape(href, quote=True), title, img_tag)
 
     out = re.sub(r'(<img\s[^>]*>)', _wrap, html_content)
     out = re.sub(
@@ -2744,6 +2895,7 @@ def wrap_bare_images_clickable(html_content, env=None):
     return out
 
 
+@_paints
 def render_for_direct_return(result, summary='', render_context=None):
     """HTML para retorno directo al chat (sin mutar result)."""
     if not isinstance(result, dict):

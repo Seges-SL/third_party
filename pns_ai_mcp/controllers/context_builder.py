@@ -7,13 +7,13 @@ import builtins as _builtins
 import operator as _operator
 import types as _types
 
-# Denylist ÚNICA de atributos peligrosos, compartida con el AST (validators.py).
+# Denylist ÚNICA de atributos peligrosos, compartida con el AST (validators_base.py).
 # Un solo sitio para que la capa estática (AST) y la dinámica (guarded_getattr)
 # no se desincronicen. En runtime Odoo se importa por su ruta de addon; en los
-# unit tests (que cargan este .py por ruta, sin Odoo) se carga validators.py
+# unit tests (que cargan este .py por ruta, sin Odoo) se carga validators_base.py
 # hermano por fichero.
 try:  # pragma: no cover - camino de runtime Odoo
-    from odoo.addons.pns_ai_mcp.controllers.validators import (
+    from odoo.addons.pns_ai_mcp.controllers.validators_base import (
         DANGEROUS_ATTR_NAMES,
         RELAXAICODE_DANGEROUS_MODULES,
         RELAXAICODE_FORBIDDEN_ORM_ATTRS,
@@ -24,12 +24,13 @@ try:  # pragma: no cover - camino de runtime Odoo
         RELAXAICODE_SAFE_MODULES,
         RELAXAICODE_SIDE_EFFECT_METHODS,
         _unsafe_import_error,
+        blocked_private_attr,
         catalogue_inspect_error,
     )
 except Exception:  # pragma: no cover - camino unit test / standalone
     import importlib.util as _ilu
     import os as _os
-    _vp = _os.path.join(_os.path.dirname(__file__), 'validators.py')
+    _vp = _os.path.join(_os.path.dirname(__file__), 'validators_base.py')
     _sp = _ilu.spec_from_file_location('_pns_relax_validators', _vp)
     _vm = _ilu.module_from_spec(_sp)
     _sp.loader.exec_module(_vm)
@@ -43,6 +44,7 @@ except Exception:  # pragma: no cover - camino unit test / standalone
     RELAXAICODE_SAFE_INTERNAL_MODULES = _vm.RELAXAICODE_SAFE_INTERNAL_MODULES
     RELAXAICODE_SIDE_EFFECT_METHODS = _vm.RELAXAICODE_SIDE_EFFECT_METHODS
     _unsafe_import_error = _vm._unsafe_import_error
+    blocked_private_attr = _vm.blocked_private_attr
     catalogue_inspect_error = _vm.catalogue_inspect_error
 
 try:  # pragma: no cover - Odoo runtime
@@ -64,7 +66,8 @@ except Exception:  # pragma: no cover - host unit test / standalone
 class GuardedSandboxEnv(object):
     """Sandbox ``env``: catalogue models stay off ORM (AST + runtime).
 
-    ``ai.api.server`` / ``ai.context`` / ``ai.skill`` are catalogues.
+    ``ai.api.server`` / ``ai.context`` / ``ai.skill`` /
+    ``ai.trusted.action`` are catalogues.
     List/load knowledge via ``get_context``; skills via ``/`` in Chatboo;
     external calls via ``api_call``. ``with_context`` / ``with_company``
     return another wrapper so the gate holds down the chain. Nothing here
@@ -99,6 +102,11 @@ class GuardedSandboxEnv(object):
         return model in self._env
 
     def __getattr__(self, name):
+        if blocked_private_attr(name):
+            raise AttributeError(
+                "Access to private attribute %r is not allowed in "
+                "RelaxAICode (sandbox)." % (name,)
+            )
         if name in RELAXAICODE_PRIVILEGE_ATTRS:
             raise AttributeError(RELAXAICODE_PRIVILEGE_HINT % (name,))
         attr = getattr(self._env, name)
@@ -131,10 +139,17 @@ def guarded_getattr(obj, name, *default):
       · cualquier dunder `__x__` (introspección de tipos/código/globals)
       · mutadores ORM (`create`/`write`/`unlink`/`copy`) vía getattr dinámico
       · métodos que escriben con cursor propio (`resolve_execute`, `cleanup_*`…)
-    Se permiten atributos ORM normales y de UN guion (name, _name, _fields,
-    __last_update —que NO termina en '__'—, etc.).
+    Se permiten los nombres públicos y unas pocas piezas de metadatos de
+    solo lectura (`_name`, `_fields`, `__last_update`…). Todo otro nombre
+    con `_` es maquinaria del motor: varios abren cursor propio y hacen
+    commit, fuera del alcance de esta caja de solo lectura.
     """
     if isinstance(name, str):
+        if blocked_private_attr(name):
+            raise AttributeError(
+                "Access to private attribute %r is not allowed in "
+                "RelaxAICode (sandbox)." % (name,)
+            )
         if name in RELAXAICODE_PRIVILEGE_ATTRS:
             raise AttributeError(RELAXAICODE_PRIVILEGE_HINT % (name,))
         if name in RELAXAICODE_FORBIDDEN_ORM_ATTRS:
@@ -172,7 +187,7 @@ def guarded_import(name, *args, **kwargs):
     """
     Guarda para bloquear imports peligrosos incluso si se llaman dinámicamente.
     Esta función se añade como __import__ al contexto para bloquear imports dinámicos.
-    Listas compartidas con el AST (validators.py).
+    Listas compartidas con el AST (validators_base.py).
     """
     # Obtener nombre del módulo (sin submódulos)
     module_name = name.split('.')[0] if '.' in name else name
@@ -220,6 +235,8 @@ _MODULE_FACADE_FORBIDDEN_CALLABLES = frozenset({
 
 def _module_facade_rejects(name, value):
     """Shared policy: True when a module attribute must not be exposed."""
+    if blocked_private_attr(name):
+        return True
     if name in DANGEROUS_ATTR_NAMES:
         return True
     if name in _MODULE_FACADE_FORBIDDEN_CALLABLES:
@@ -432,10 +449,8 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
         odoo_version = '14.0'
         odoo_series = '14.0'
 
-    try:
-        _dbname = env.cr.dbname or ''
-    except Exception:
-        _dbname = ''
+    # The database name is not published to the sandbox (PNS-36): instance
+    # facts the code may use are the version, the URL and the locale.
 
     # Public URL of the instance: the sandbox cannot read ir.config_parameter
     # (no sudo there), so the engine publishes this one non-secret fact.
@@ -547,9 +562,6 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
         'user_tz': env.context.get('tz') or user.tz or 'UTC',
         'user_name': user.name,
         'user_id': user.id,
-        'dbname': _dbname,
-        'db_name': _dbname,
-        'database': _dbname,
         'web_base_url': _web_base_url,
         'company_name': company.name,
         'company_id': company.id,

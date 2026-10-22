@@ -48,7 +48,7 @@ class AISkill(models.Model):
             )
 
     def _chatboo_confirm_session(self):
-        raw = self.env.context.get('chatboo_session_id')
+        raw = self.env.context.get('ai_session_ref')
         if not raw:
             return self.env['chatboo.session']
         try:
@@ -138,12 +138,12 @@ class AISkill(models.Model):
         )
 
     def _chatboo_after_catalog_change(self, op=None):
-        confirm = bool(op) and bool(self.env.context.get('chatboo_session_id'))
+        confirm = bool(op) and bool(self.env.context.get('ai_session_ref'))
         if confirm and op:
             self._chatboo_append_catalog_note(op)
         self._chatboo_notify_skills_changed(
             confirm=confirm,
-            session_id=self.env.context.get('chatboo_session_id'),
+            session_id=self.env.context.get('ai_session_ref'),
         )
 
     @api.model
@@ -198,7 +198,7 @@ class AISkill(models.Model):
             self._chatboo_append_catalog_note(op)
         res = super().unlink()
         self._chatboo_notify_skills_changed(
-            confirm=bool(op) and bool(self.env.context.get('chatboo_session_id')),
-            session_id=self.env.context.get('chatboo_session_id'),
+            confirm=bool(op) and bool(self.env.context.get('ai_session_ref')),
+            session_id=self.env.context.get('ai_session_ref'),
         )
         return res

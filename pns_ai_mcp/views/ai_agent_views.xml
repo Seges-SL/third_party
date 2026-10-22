@@ -140,6 +140,7 @@
                                     <field name="active" optional="show"/>
                                 </tree>
                             </field>
+                            <p class="text-muted">Empty list: every active provider, by id. For a role (vision, audio, decision, design, …) a provider with only that tick is tried before one that also does other jobs. The text turn keeps the order of this list.</p>
                         </page>
                         <page string="Cache" name="cache">
                             <group col="1">

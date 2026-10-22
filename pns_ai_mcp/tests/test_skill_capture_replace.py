@@ -145,7 +145,7 @@ class TestSkillCaptureReplace(TransactionCase):
             'description': 'help',
             'procedure': 'proc',
             'code_body': 'result = 1',
-            'from_chatboo': True,
+            'from_chat': True,
         })
         with self.assertRaises(UserError) as err:
             wiz.action_create_draft()
@@ -165,7 +165,7 @@ class TestSkillCaptureReplace(TransactionCase):
             'procedure': 'new procedure',
             'code_body': 'result = 99',
             'existing_skill_id': skill.id,
-            'from_chatboo': True,
+            'from_chat': True,
         })
         wiz.action_create_draft()
         skill.invalidate_cache()
@@ -197,7 +197,7 @@ class TestSkillCaptureReplace(TransactionCase):
             'procedure': 'new procedure',
             'code_body': code,
             'existing_skill_id': skill.id,
-            'from_chatboo': True,
+            'from_chat': True,
         })
         wiz.action_create_draft()
         skill.invalidate_cache()
@@ -223,7 +223,7 @@ class TestSkillCaptureReplace(TransactionCase):
             'param_schema': authored,
             'arg_hint': 'codes=ABC',
             'existing_skill_id': skill.id,
-            'from_chatboo': True,
+            'from_chat': True,
         })
         wiz.action_create_draft()
         skill.invalidate_cache()
@@ -250,7 +250,7 @@ class TestSkillCaptureReplace(TransactionCase):
             'param_prose': 'codes is a CSV of short codes',
             'args_policy': 'ask',
             'existing_skill_id': skill.id,
-            'from_chatboo': True,
+            'from_chat': True,
         })
         rewritten = self._code_reads('periodo', 'codes')
         wiz.with_context(
@@ -289,7 +289,7 @@ class TestSkillCaptureReplace(TransactionCase):
             'code_body': skill.code_body,
             'param_prose': 'codes from demo.item x_code',
             'existing_skill_id': skill.id,
-            'from_chatboo': True,
+            'from_chat': True,
         })
         rewritten = self._code_reads('codes')
         wiz.with_context(
@@ -326,7 +326,7 @@ class TestSkillCaptureReplace(TransactionCase):
             'param_schema': skill.param_schema,
             'param_prose': 'asdf qwerty',
             'existing_skill_id': skill.id,
-            'from_chatboo': True,
+            'from_chat': True,
         })
         wiz.with_context(param_author_extracted={
             '_reject': True,
@@ -362,7 +362,7 @@ class TestSkillCaptureReplace(TransactionCase):
             'procedure': 'proc',
             'code_body': 'result = 1',
             'existing_skill_id': skill.id,
-            'from_chatboo': True,
+            'from_chat': True,
         })
         wiz.action_create_draft()
         skill.invalidate_cache()
@@ -389,7 +389,7 @@ class TestSkillCaptureReplace(TransactionCase):
                 'key': 'periodo',
             }),
             'existing_skill_id': skill.id,
-            'from_chatboo': True,
+            'from_chat': True,
         })
         wiz.action_create_draft()
         skill.invalidate_cache()
@@ -458,6 +458,51 @@ class TestSkillCaptureReplace(TransactionCase):
         filled = self.env['ai.skill']._fill_missing_param_lines()
         self.assertFalse(skill in filled)
 
+    def test_skill_form_adding_lines_lifts_none(self):
+        skill = self._create_owned(
+            self.env(user=self.user_a), 'lift',
+            owner_id=self.user_a.id,
+            args_policy='none',
+            code_body=self._code_reads('year'),
+        )
+        skill.write({
+            'param_line_ids': [(0, 0, {
+                'label': 'Year',
+                'desc': 'Calendar year',
+                'key': 'year',
+            })],
+        })
+        skill.invalidate_cache()
+        self.assertEqual(skill.args_policy, 'default')
+        self.assertIn('year', json.loads(skill.param_schema or '{}'))
+
+    def test_wizard_lines_lift_none_policy(self):
+        skill = self._create_owned(
+            self.env(user=self.user_a), 'wizlift',
+            owner_id=self.user_a.id,
+            args_policy='none',
+        )
+        wiz = self.env['ai.skill.capture.wizard'].with_user(
+            self.user_a,
+        ).create({
+            'skill_code': skill.command,
+            'skill_name': 'Lift',
+            'description': 'help',
+            'procedure': 'proc',
+            'code_body': self._code_reads('year'),
+            'args_policy': 'none',
+            'param_line_ids': self._param_lines({
+                'label': 'Year',
+                'desc': 'Calendar year',
+                'key': 'year',
+            }),
+            'existing_skill_id': skill.id,
+            'from_chat': True,
+        })
+        wiz.action_create_draft()
+        skill.invalidate_cache()
+        self.assertEqual(skill.args_policy, 'default')
+
     def test_skill_form_empty_lines_sets_none(self):
         skill = self._create_owned(
             self.env(user=self.user_a), 'clear',
@@ -469,7 +514,7 @@ class TestSkillCaptureReplace(TransactionCase):
         self.assertFalse(skill.param_schema)
         self.assertEqual(skill.args_policy, 'none')
 
-    def test_wizard_create_rejects_unread_schema_keys(self):
+    def test_wizard_injects_unread_schema_keys(self):
         skill = self._create_owned(
             self.env(user=self.user_a), 'unread',
             owner_id=self.user_a.id,
@@ -484,14 +529,14 @@ class TestSkillCaptureReplace(TransactionCase):
             'code_body': 'result = 1',
             'param_prose': 'codes is a CSV of short codes',
             'existing_skill_id': skill.id,
-            'from_chatboo': True,
+            'from_chat': True,
         })
-        with self.assertRaises(UserError) as err:
-            wiz.with_context(param_author_extracted={
-                'codes': {'type': 'string', 'desc': 'CSV of codes.'},
-            }).action_create_draft()
-        self.assertIn('does not read the parameter keys', str(err.exception))
-        self.assertIn('codes', str(err.exception))
+        wiz.with_context(param_author_extracted={
+            'codes': {'type': 'string', 'desc': 'CSV of codes.'},
+        }).action_create_draft()
+        skill.invalidate_cache()
+        self.assertIn('codes = codes', skill.code_body)
+        self.assertIn('except NameError', skill.code_body)
 
     def test_wizard_adapts_code_from_schema_without_prose(self):
         skill = self._create_owned(
@@ -510,7 +555,7 @@ class TestSkillCaptureReplace(TransactionCase):
             'code_body': 'result = 1',
             'param_schema': skill.param_schema,
             'existing_skill_id': skill.id,
-            'from_chatboo': True,
+            'from_chat': True,
         })
         wiz.with_context(param_code_rewritten=rewritten).action_create_draft()
         skill.invalidate_cache()

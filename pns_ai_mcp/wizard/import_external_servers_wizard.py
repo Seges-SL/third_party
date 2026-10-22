@@ -66,6 +66,9 @@ class ImportExternalServersWizard(models.TransientModel):
         rows = _normalize_server_rows(data)
         Server = self.env['ai.api.server']
         created = updated = skipped = 0
+        created_names = []
+        updated_names = []
+        skipped_names = []
         errors = []
         warnings = list(extract_warnings)
         if not rows:
@@ -88,6 +91,7 @@ class ImportExternalServersWizard(models.TransientModel):
                 )
                 if existing and not self.replace_existing:
                     skipped += 1
+                    skipped_names.append(code)
                     continue
 
                 vals, field_warnings = import_vals_from_dict(Server, entry)
@@ -101,9 +105,11 @@ class ImportExternalServersWizard(models.TransientModel):
                 if existing:
                     existing.write(existing._keep_secrets_on_import(vals))
                     updated += 1
+                    updated_names.append(code)
                 else:
                     Server.create(vals)
                     created += 1
+                    created_names.append(code)
             except Exception as e:
                 errors.append("%s: %s" % (code, e))
                 _logger.error("External server import error for %s: %s", code, e)
@@ -115,4 +121,7 @@ class ImportExternalServersWizard(models.TransientModel):
             skipped=skipped,
             errors=errors,
             warnings=warnings,
+            created_names=created_names,
+            updated_names=updated_names,
+            skipped_names=skipped_names,
         )

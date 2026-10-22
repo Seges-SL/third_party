@@ -11,6 +11,11 @@ from . import ai_log
 from . import ai_change_journal
 from . import mcp_log_delete_menu
 from . import ai_context
+from . import ai_context_metadata
+from . import ai_context_zip
+from . import ai_context_disk
+from . import ai_context_discovery
+from . import ai_context_composition
 from . import ai_trusted_action
 from . import ai_view_policy
 from . import ai_system_action
@@ -21,6 +26,7 @@ from . import ai_fx_source
 from . import ai_agent
 from . import ai_agent_consumer
 from . import res_config_settings
+from . import skill_param_token_legend
 from . import ai_skill
 from . import ai_skill_param_line
 from . import ai_skill_param_cache
@@ -31,6 +37,7 @@ from . import api_result_cache
 from . import external_server
 from . import api_server_key
 from . import ir_ui_menu
+from . import ir_http
 from . import ir_model_fields_selection
 from . import ai_schema_fossil
 from . import secret_native_export

@@ -3,9 +3,10 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Temporary key PIN: length and the per-IP attempt budget.
 
-The PIN is a short number an admin reads out. While a browser tab on the
-user list is holding the key list, the PIN can hand that user's existing
-API key to an app. The list stays in the tab. Odoo keeps only the hash.
+The PIN is a short number an admin reads out. The browser tab holding the
+key list mints one PIN per person; while that tab is open, the PIN can hand
+that person's existing API key to an app. The list and the PINs stay in the
+tab. Odoo never stores a PIN, in clear or as a hash.
 """
 
 DEFAULT_PIN_LENGTH = 8
@@ -71,14 +72,6 @@ def pin_shaped(raw, length):
         return False
     text = raw.strip()
     return bool(text) and text.isdigit() and len(text) == length
-
-
-def format_pin(raw):
-    """Groups of four, so an 8-digit PIN can be read aloud."""
-    digits = ''.join(ch for ch in (raw or '') if ch.isdigit())
-    if not digits:
-        return ''
-    return ' '.join(digits[i:i + 4] for i in range(0, len(digits), 4))
 
 
 def failure_starts_block(failures, limit):

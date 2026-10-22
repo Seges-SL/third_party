@@ -6,18 +6,17 @@
 import json
 import logging
 import re
+import time
 from datetime import timedelta
 
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError
+from odoo.exceptions import RedirectWarning, UserError
 
 from odoo.addons.pns_ai_mcp.utils import record_marks
+from odoo.addons.pns_ai_mcp.utils.markup_rename import rename_stored_markup
 
 from ..utils import turn_documents
-from ..utils.chatboo_product_icp import (
-    DEFAULT_HISTORY_RETENTION_DAYS,
-    ICP_HISTORY_RETENTION_DAYS,
-)
+from ..utils.chatboo_product_icp import ICP_HISTORY_RETENTION_DAYS
 
 _logger = logging.getLogger(__name__)
 
@@ -77,6 +76,22 @@ class ChatbooSession(models.Model):
     last_screen_context = fields.Text(
         string='Last screen context (JSON)',
         help="Last Chatboo overlay screen (action_id, view_type, model).",
+    )
+    canvas_open = fields.Boolean(string='Canvas open')
+    canvas_design = fields.Text(string='Canvas design')
+    canvas_rev = fields.Integer(string='Canvas revision', default=0)
+    canvas_title = fields.Char(
+        string='Canvas title',
+        copy=False,
+        help="Title of the answer the page was laid out from. The browser "
+             "tab shows it.",
+    )
+    canvas_turn = fields.Char(
+        string='Canvas turn',
+        copy=False,
+        index=True,
+        help="Turn chip of the page that is open. /create-skill of that "
+             "turn keeps the page.",
     )
     last_query_code = fields.Text(
         string='Last successful data query',
@@ -170,6 +185,19 @@ class ChatbooSession(models.Model):
              "/show-table, /show-chart or phrasing. Suspended under compose-model. "
              "Not shown to the user; not an LLM selector.",
     )
+
+    # The Canvas button kept its build here before it was a chatboo.canvas.job.
+    _FOSSIL_COLUMNS = ('canvas_build_started', 'canvas_build_error')
+
+    def init(self):
+        super().init()
+        for column in self._FOSSIL_COLUMNS:
+            self.env.cr.execute(
+                'ALTER TABLE chatboo_session DROP COLUMN IF EXISTS "%s"' % column
+            )
+        rename_stored_markup(self.env.cr, self._table, 'messages')
+        rename_stored_markup(self.env.cr, self._table, 'canvas_design')
+
     @api.model
     def format_display_datetime(self, utc_dt=None):
         """Wall clock for Chatboo UI (user tz, else company, else UTC)."""
@@ -187,6 +215,28 @@ class ChatbooSession(models.Model):
         except (json.JSONDecodeError, TypeError) as e:
             _logger.error("Error deserializing messages of session %s: %s", self.id, e)
             return []
+
+    def get_model_history(self):
+        """History for the next turn, rebuilt from what the server saved.
+
+        The browser's copy is never trusted: no system lines and no
+        off-topic/local exchanges, matching what the client used to build.
+        """
+        out = []
+        for msg in self.get_messages():
+            if not isinstance(msg, dict) or msg.get('role') == 'system':
+                continue
+            meta = msg.get('meta') if isinstance(msg.get('meta'), dict) else {}
+            if msg.get('verification_ack') or meta.get('verification_ack'):
+                out.append(msg)
+                continue
+            if (
+                msg.get('offtopic') or msg.get('local_ack')
+                or meta.get('offtopic') or meta.get('local_ack')
+            ):
+                continue
+            out.append(msg)
+        return out
 
     def get_messages_for_chat(self):
         """Messages for the UI, with turn prompts filled from the MCP log.
@@ -354,13 +404,12 @@ class ChatbooSession(models.Model):
                 merged[key] = value
         return merged
 
-    # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
     def _stage_assistant_download_chips(self, chips):
         """Accumulate download chips until the assistant message is saved."""
         self.ensure_one()
+        chips = self._claim_turn_file_chips(chips)
         if not chips:
             return
-        self._claim_turn_file_chips(chips)
         existing = []
         if self.staged_assistant_files:
             try:
@@ -372,7 +421,6 @@ class ChatbooSession(models.Model):
             existing, default=str, ensure_ascii=False,
         )
 
-    # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
     def _consume_staged_assistant_download_chips(self):
         """Return staged download chips and clear the buffer."""
         self.ensure_one()
@@ -400,31 +448,30 @@ class ChatbooSession(models.Model):
                 pass
         return chips
 
-    # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
     def _apply_assistant_download_chips(self, chips):
         """Append download chips to the last assistant message or stage them."""
         self.ensure_one()
+        chips = self._claim_turn_file_chips(chips)
         if not chips:
             return
-        self._claim_turn_file_chips(chips)
         messages = self.get_messages()
         if messages and messages[-1].get('role') == 'assistant':
             existing = list(messages[-1].get('files') or [])
             messages[-1]['files'] = existing + list(chips)
             self.set_messages(messages)
         else:
-            # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
             self._stage_assistant_download_chips(chips)
 
-    # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
     def _claim_turn_file_chips(self, chips):
-        """Hang engine-created attachments on this session."""
+        """Hang engine-created attachments on this session. Return the chips it keeps.
+
+        Only an attachment with no record yet, created by this session's
+        owner, is hung here. A chip pointing at anyone else's file is dropped.
+        A chip without a file (a pending export) has nothing to take and stays.
+        """
         self.ensure_one()
-        # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        uid = self.env.uid
-        if self.sudo().user_id.id != uid:
-            return
         Attachment = self.env['ir.attachment'].sudo()
+        kept = []
         for chip in chips or []:
             if not isinstance(chip, dict):
                 continue
@@ -438,19 +485,22 @@ class ChatbooSession(models.Model):
                 if match:
                     att_id = int(match.group(1))
             if not att_id:
+                kept.append(chip)
                 continue
             att = Attachment.browse(int(att_id))
             if not att.exists():
                 continue
-            if att.res_model and att.res_id:
+            if att.res_model == self._name and att.res_id == self.id:
+                kept.append(chip)
                 continue
-            # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
-            if att.create_uid.id != uid:
+            if att.res_model or att.res_id or att.create_uid != self.user_id:
                 continue
             att.write({
                 'res_model': self._name,
                 'res_id': self.id,
             })
+            kept.append(chip)
+        return kept
 
     def notify_files_updated(self):
         """Ask open Chatboo clients to reload this session's messages."""
@@ -480,6 +530,14 @@ class ChatbooSession(models.Model):
                 self.id, exc_info=True,
             )
 
+    # The server decides the stored mimetype from the kind; the client's
+    # word is never stored (PNS-65).
+    _CLIENT_EXPORT_MIMETYPES = {
+        'doc': 'application/msword',
+        'html': 'text/html',
+        'pdf': 'application/pdf',
+    }
+
     def fulfill_client_export(self, filename, mimetype, datas, kind=None):
         """Replace a pending Word/PDF/HTML chip with client-assembled bytes."""
         self.ensure_one()
@@ -489,6 +547,9 @@ class ChatbooSession(models.Model):
             return False
         name = (filename or 'export')[:255]
         kind = (kind or '').strip().lower()
+        mimetype = self._CLIENT_EXPORT_MIMETYPES.get(kind)
+        if not mimetype:
+            return False
         try:
             from odoo.addons.pns_ai_mcp.utils.session_download import (
                 persist_turn_file,
@@ -500,7 +561,6 @@ class ChatbooSession(models.Model):
         )
         if not chip:
             return False
-        # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
         self._claim_turn_file_chips([chip])
         messages = self.get_messages()
         patched = False
@@ -527,7 +587,6 @@ class ChatbooSession(models.Model):
         if patched:
             self.set_messages(messages)
         else:
-            # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
             self._apply_assistant_download_chips([chip])
         self.notify_files_updated()
         return chip
@@ -535,6 +594,9 @@ class ChatbooSession(models.Model):
     def recover_orphan_download_chips(self, messages=None, since=None):
         """Build download chips from session attachments not yet in message history."""
         self.ensure_one()
+        # RPC-callable: only the owner of the session gets its chips.
+        if not self.env.su and self.user_id.id != self.env.uid:
+            return []
         messages = messages if messages is not None else self.get_messages()
         from odoo.addons.pns_ai_mcp.utils.session_download import (
             content_download_url,
@@ -682,8 +744,14 @@ class ChatbooSession(models.Model):
             raise UserError("Error saving history: %s" % e)
 
     def update_last_used(self):
+        """Stamp the session, unless a turn holds the row: a reload never waits for it."""
         self.ensure_one()
-        self.last_used_date = fields.Datetime.now()
+        self.env.cr.execute(
+            "SELECT id FROM chatboo_session WHERE id = %s FOR UPDATE SKIP LOCKED",
+            (self.id,),
+        )
+        if self.env.cr.fetchone():
+            self.last_used_date = fields.Datetime.now()
 
     # -- Cache de dataset (Nivel 2: reutilización sin re-consultar) --
 
@@ -749,16 +817,472 @@ class ChatbooSession(models.Model):
     @api.model
     def sandbox_helpers(self):
         """``read_document`` for the sandbox of a Chatboo turn."""
+        self._claim_page_turn()
         sessions = self
+
+        def _wrap(method_name):
+            method = getattr(self, method_name)
+
+            def _fn(*args, **kwargs):
+                return method(*args, **kwargs)
+
+            _fn.__name__ = method_name
+            return _fn
 
         def read_document(name, page=None, find=None):
             return sessions._read_document(name, page=page, find=find)
 
-        return {'read_document': read_document}
+        return {
+            'read_document': read_document,
+            'page_url': _wrap('page_url'),
+            'page_edit': _wrap('page_edit'),
+            'page_html': _wrap('page_html'),
+        }
+
+    def _claim_page_turn(self):
+        """If this sentence asked for a page, the bubble will be only the card."""
+        codes = (self.env.context or {}).get('matched_domain_codes') or []
+        if 'page_tab' not in codes:
+            return
+        try:
+            from odoo.addons.pns_ai_mcp.utils.result_page import (
+                note_page_waiting, note_page_wanted,
+            )
+        except Exception:
+            return
+        note_page_wanted(self.env)
+        instruction = ((self.env.context or {}).get('user_message') or '').strip()
+
+        def fulfill(env, rows):
+            from .chatboo_canvas import open_page
+            return open_page(
+                env['chatboo.session'], rows, instruction, new=True,
+            ) or ''
+
+        note_page_waiting(self.env, fulfill)
+
+    def _held_domain_codes(self):
+        """Packs this session keeps on every turn while its page is open.
+
+        A follow-up such as «add a tab with …» names the data, not the page.
+        Without ``page_tab`` the model never learns that ``page_edit`` exists.
+        """
+        self.ensure_one()
+        from .chatboo_canvas import has_open_page
+        return ['page_tab'] if has_open_page(self) else []
+
+    def page_url(self, rows=None, instruction='', new=False):
+        """Url of a page built from ``rows``, or '' when there is none.
+
+        Soft fail, like a geocode miss: an empty string never aborts the
+        turn. The cause is in ``ai.log``. The model must not invent one.
+
+        Nothing leaves this method as an exception. A helper that raises into
+        the sandbox gets swallowed by the model's own ``try``, and then no
+        one can tell why the page never appeared.
+        """
+        try:
+            from .chatboo_canvas import open_page
+            return open_page(self, rows, instruction, new=new) or ''
+        except Exception as exc:
+            try:
+                from .chatboo_canvas import log_no_page
+                return log_no_page(
+                    self.env, '%s: %s' % (type(exc).__name__, exc),
+                )
+            except Exception:
+                _logger.warning('Chatboo canvas failed', exc_info=True)
+                return ''
+
+    def page_html(self, html, rows=None, title=''):
+        """Open ``html`` as the page and fill ``rows``. No design call.
+
+        A captured skill brings the page that already worked. This stores
+        it and returns its url. An empty string never aborts the turn.
+        The publish check runs the code and must not leave a page behind.
+        """
+        try:
+            if (self.env.context or {}).get('skill_publish_check'):
+                return ''
+            from .chatboo_canvas import (
+                _blocks_for_page, _session_of_this_turn, log_no_page,
+                pictures_as_tokens, place_rows_on_page, swap_pictures,
+                sync_canvas_title_phrases,
+            )
+            html = (html or '').strip()
+            if not html:
+                return log_no_page(self.env, 'page_html got no document')
+            html = sync_canvas_title_phrases(html, title)
+            session = _session_of_this_turn(self)
+            if not session:
+                return ''
+            blocks = _blocks_for_page(rows)
+            blocks, images = pictures_as_tokens(session.env, blocks)
+            content = swap_pictures(
+                place_rows_on_page(
+                    html, blocks, captured=True, title=title,
+                ), images,
+            )
+            if not (content or '').strip():
+                return log_no_page(
+                    session.env, 'page_html produced nothing', session.id,
+                )
+            name = (title or '').strip()
+            rev = session._store_design(
+                content, title=name or None,
+            )
+            return session.canvas_public_url(rev=rev) or ''
+        except Exception as exc:
+            try:
+                from .chatboo_canvas import log_no_page
+                return log_no_page(
+                    self.env, '%s: %s' % (type(exc).__name__, exc),
+                )
+            except Exception:
+                _logger.warning('Chatboo canvas failed', exc_info=True)
+                return ''
+
+    def page_edit(self, instruction='', rows=None):
+        """Url of the open page after this change, or '' when there is none.
+
+        Without ``rows`` the figures already on the page stay: no query, and
+        Design writes only the changes. Same soft fail as ``page_url``.
+        """
+        try:
+            from .chatboo_canvas import edit_page
+            return edit_page(self, instruction, rows) or ''
+        except Exception as exc:
+            try:
+                from .chatboo_canvas import log_no_page
+                return log_no_page(
+                    self.env, '%s: %s' % (type(exc).__name__, exc),
+                )
+            except Exception:
+                _logger.warning('Chatboo canvas failed', exc_info=True)
+                return ''
+
+    def canvas_public_url(self, rev=None):
+        self.ensure_one()
+        if rev is None:
+            rev = self.canvas_rev or 0
+        return '/chatboo/canvas/%s?rev=%s' % (self.id, rev)
+
+    def _canvas_agent_code(self):
+        code = (self.env.context or {}).get('mcp_agent_code') or ''
+        return code or 'pns_ai_chatboo'
+
+    def _store_design(self, content, title=None):
+        """Persist the page outside the sandbox cursor. Returns the revision.
+
+        ``title=None`` keeps the tab title the open page already had.
+
+        A relaxaicode read runs on the caja-A READ ONLY cursor, which is
+        rolled back when the tool returns. Writing the page there fails, and
+        if it did not it would vanish and the url would 404. Same isolated
+        writable cursor + commit as ``geo.map.create_from_geojson``.
+        """
+        self.ensure_one()
+        from odoo import SUPERUSER_ID
+
+        turn = self._normalize_turn_id(
+            (self.env.context or {}).get('mcp_turn') or '',
+        )
+        new_cr = self.env.registry.cursor()
+        try:
+            env_w = api.Environment(new_cr, SUPERUSER_ID, {})
+            session = env_w['chatboo.session'].browse(self.id)
+            rev = (session.canvas_rev or 0) + 1
+            values = {
+                'canvas_open': True,
+                'canvas_design': content,
+                'canvas_rev': rev,
+            }
+            if turn:
+                values['canvas_turn'] = turn
+            if title is not None:
+                values['canvas_title'] = title or False
+            session.write(values)
+            new_cr.commit()
+            return rev
+        except Exception:
+            try:
+                new_cr.rollback()
+            except Exception:
+                pass
+            raise
+        finally:
+            try:
+                new_cr.close()
+            except Exception:
+                pass
+
+    def _store_title(self, title):
+        """Name the open page when it has none. Same cursor as ``_store_design``."""
+        self.ensure_one()
+        title = ' '.join(str(title or '').split())
+        if not title:
+            return False
+        from odoo import SUPERUSER_ID
+
+        new_cr = self.env.registry.cursor()
+        try:
+            env_w = api.Environment(new_cr, SUPERUSER_ID, {})
+            session = env_w['chatboo.session'].browse(self.id)
+            if (session.canvas_title or '').strip():
+                return False
+            session.write({'canvas_title': title})
+            new_cr.commit()
+            return True
+        except Exception:
+            try:
+                new_cr.rollback()
+            except Exception:
+                pass
+            _logger.debug('Chatboo canvas: could not name the page', exc_info=True)
+            return False
+        finally:
+            try:
+                new_cr.close()
+            except Exception:
+                pass
+
+    def paint_canvas(self, instruction, new_page=False, rows=None, title='',
+                     images=None):
+        """One design call. Returns the page url, or '' when there is none.
+
+        Lives on this model on purpose: ``page_url`` is already here, and a
+        second ``_inherit`` that the stack did not list left every call
+        as ``AttributeError`` while Design providers sat unused.
+
+        The tab is the page address, so a refinement reuses it. ``new_page``
+        only decides whether the open design is the base of this one. No
+        provider carries the Design tick: no page, and no borrowing the one
+        that holds the dialogue. The reason is in ``ai.log``.
+
+        A change to the open page asks Design for the changes only: writing
+        the whole document again is what takes minutes. Changes that do not
+        fit the page exactly get the whole document laid out again.
+        """
+        self.ensure_one()
+        from .chatboo_canvas import (
+            DESIGN_SYSTEM, EDIT_SYSTEM, apply_edits, design_figure_leaks,
+            design_figures_centralized, is_document, log_no_page, page_edits,
+            pictures_out, place_rows_on_page, strip_fence, swap_pictures,
+            sync_canvas_title_phrases,
+        )
+
+        instruction = (instruction or '').strip()
+        if not instruction and not new_page:
+            instruction = 'Update the open canvas.'
+        images = dict(images or {})
+        page = ''
+        if not new_page and (self.canvas_design or '').strip():
+            page = pictures_out(self.canvas_design, images)
+        prompt = instruction or 'Open a canvas.'
+        if page:
+            prompt += '\n\nCurrent page:\n' + page
+        try:
+            if page:
+                result = self._ask_design(EDIT_SYSTEM, prompt, 'changed the page')
+                raw = strip_fence((result or {}).get('content') or '')
+                edits = page_edits(raw)
+                changed = apply_edits(page, edits) if edits else None
+                if changed is not None and not design_figures_centralized(
+                    changed, rows, title,
+                ):
+                    _logger.info(
+                        'Chatboo canvas: edit mixed figures into the page; '
+                        'kept the layout',
+                    )
+                if changed is not None:
+                    result = dict(result, content=changed)
+                elif not (result or {}).get('error') and (
+                    edits or not is_document(raw)
+                ):
+                    _logger.info(
+                        'Chatboo canvas: %s; laying the page out again',
+                        'changes did not fit the page' if edits
+                        else 'no changes in the answer',
+                    )
+                    result = self._ask_design(
+                        DESIGN_SYSTEM, prompt, 'laid out the page again',
+                    )
+            else:
+                result = self._ask_design(DESIGN_SYSTEM, prompt, 'laid out the page')
+        except (UserError, RedirectWarning) as exc:
+            return log_no_page(
+                self.env, 'no design provider: %s' % exc, session_id=self.id,
+            )
+        except Exception as exc:
+            return log_no_page(
+                self.env,
+                'the design call broke: %s: %s' % (type(exc).__name__, exc),
+                session_id=self.id,
+            )
+        err = ((result or {}).get('error') or '').strip()
+        raw = strip_fence((result or {}).get('content') or '')
+        if raw and not is_document(raw):
+            raw = ''
+        elif raw and not design_figures_centralized(raw, rows, title):
+            leaks = design_figure_leaks(raw, rows, title)
+            _logger.info(
+                'Chatboo canvas: design mixed figures into the template%s; '
+                'asking again',
+                (': %s' % ', '.join(leaks[:5])) if leaks else '',
+            )
+            retry_prompt = prompt
+            if leaks:
+                retry_prompt += (
+                    '\n\nThe previous document baked these values outside '
+                    'const DATA: %s. Read them from DATA. Do not write them '
+                    'as literals.'
+                ) % ', '.join(leaks[:8])
+            else:
+                retry_prompt += (
+                    '\n\nThe previous document was not a reusable template. '
+                    'Write figures only as const DATA.'
+                )
+            again = self._ask_design(
+                DESIGN_SYSTEM, retry_prompt, 'laid out the page again',
+            )
+            raw2 = strip_fence((again or {}).get('content') or '')
+            if raw2 and is_document(raw2) and design_figures_centralized(
+                raw2, rows, title,
+            ):
+                raw = raw2
+                result = again
+            else:
+                _logger.info(
+                    'Chatboo canvas: design mixed figures into the template; '
+                    'kept the layout',
+                )
+        content = ''
+        if raw:
+            content = swap_pictures(place_rows_on_page(
+                sync_canvas_title_phrases(raw, title),
+                rows,
+                captured=True,
+                title=title,
+            ), images)
+        if err or not content:
+            return log_no_page(
+                self.env, err or 'the design model returned nothing',
+                session_id=self.id,
+            )
+        if self._canvas_build_cancelled():
+            _logger.info('Chatboo canvas: build cancelled, page dropped (session %s)', self.id)
+            return ''
+        try:
+            rev = self._store_design(
+                content, title=title if (title or new_page) else None,
+            )
+        except Exception as exc:
+            return log_no_page(
+                self.env, 'could not store the page: %s' % exc,
+                session_id=self.id,
+            )
+        return self.canvas_public_url(rev=rev)
+
+    def _ask_design(self, system, prompt, what):
+        """One call to the Design chain, metered and logged on the turn."""
+        from odoo.addons.pns_ai_mcp.utils.agent_engine import (
+            llm_completion_for_agent,
+        )
+        from odoo.addons.pns_ai_mcp.utils.inference_audit import inference_audit
+
+        turn = (self.env.context or {}).get('mcp_turn') or ''
+        started = time.monotonic()
+        with inference_audit(
+            self.env,
+            endpoint='llm_response',
+            source_channel='internal',
+            agent_code=self._canvas_agent_code(),
+            user_prompt=prompt[:480],
+            turn=turn,
+            additional_info={'need': 'design', 'session_id': self.id},
+            require_usage=False,
+            log_mode='accumulate' if turn else 'single',
+        ) as audit:
+            result = llm_completion_for_agent(
+                self.env, system, prompt,
+                agent_code=self._canvas_agent_code(), need='design',
+                max_tokens=32768, timeout=180,
+            )
+        try:
+            from odoo.addons.pns_ai_mcp.utils.llm_usage import (
+                note_turn_side_usage,
+            )
+            note_turn_side_usage((result or {}).get('usage'))
+        except Exception:
+            pass
+        if turn:
+            self._log_design_step(
+                audit, result, system, prompt, time.monotonic() - started, what,
+            )
+        return result
+
+    def _log_design_step(self, audit, result, system, prompt, seconds,
+                         what='laid out the page'):
+        """One row on the turn thread: who laid the page out, and what it cost.
+
+        Its spend is also in the turn total. The row is ``llm_response``,
+        which the usage summary does not add twice. It keeps the messages
+        the model got and the page it sent back, as written.
+        """
+        try:
+            engine = self.env['ai.execution.engine']
+            turn, turn_step = engine._resolve_log_threading()
+            result = result or {}
+            content = result.get('content') or ''
+            err = (result.get('error') or '').strip()
+            summary = (
+                'Design failed after %.0f s: %s' % (seconds, err) if err
+                else 'Design %s in %.0f s (%d chars)'
+                % (what, seconds, len(content))
+            )
+            engine.log_llm_inference(
+                getattr(audit, 'provider', None),
+                getattr(audit, 'usage_acc', None) or result.get('usage') or {},
+                endpoint='llm_response',
+                agent_code=self._canvas_agent_code(),
+                turn=turn,
+                turn_step=turn_step,
+                user_prompt=prompt[:480],
+                additional_info={'need': 'design', 'session_id': self.id},
+                prompt_data={'messages': [
+                    {'role': 'system', 'content': system or ''},
+                    {'role': 'user', 'content': prompt or ''},
+                ]},
+                result_data={'content': [{'type': 'text', 'text': content}]}
+                if content else None,
+                result_summary=summary,
+                status='error' if err else 'ok',
+            )
+        except Exception:
+            _logger.debug('Chatboo canvas: could not log the design step', exc_info=True)
+
+    # ── Canvas button: the tables of one answer, laid out as a page ──────
+    # The design call outlives an HTTP request, so it runs in a thread and
+    # the browser asks for the state. Callers check the owner first.
+
+    @api.model
+    def canvas_available(self):
+        """True when some provider on this agent's chain has the Design tick."""
+        try:
+            return bool(self.env['ai.execution.engine'].get_providers_for_agent(
+                self._canvas_agent_code(), need='design',
+            ))
+        except Exception:
+            return False
+
+    def _canvas_build_cancelled(self):
+        """True when the user cancelled the Canvas job this page is laid out for."""
+        job_id = (self.env.context or {}).get('chatboo_canvas_job')
+        return bool(job_id) and self.env['chatboo.canvas.job'].browse(job_id)._is_cancel_requested()
 
     @api.model
     def _read_document(self, name, page=None, find=None):
-        session_id = self.env.context.get('chatboo_session_id')
+        session_id = self.env.context.get('ai_session_ref')
         session = self.sudo().browse(int(session_id)).exists() if session_id else None
         if not session or session.user_id.id != self.env.uid:
             return turn_documents.read([], name)
@@ -924,8 +1448,12 @@ class ChatbooSession(models.Model):
         return raw.upper()
 
     def _relaxaicode_codes_for_turn(self, corr_id):
-        """Substantive relaxaicode snippets for a turn, chronological order."""
+        """Substantive relaxaicode snippets for a turn, chronological order.
+
+        A step the sandbox refused or that raised is not part of the skill.
+        """
         from odoo.addons.pns_ai_chatboo.utils.skill_capture_compose import (
+            log_run_failed,
             snippet_is_probe_code,
         )
         Log = self.env['ai.log'].sudo()
@@ -937,10 +1465,36 @@ class ChatbooSession(models.Model):
         ], order='id asc', limit=80)
         codes = []
         for log in logs:
+            if log_run_failed(log.result_data):
+                continue
             code = (log.code_to_execute or '').strip()
             if code and not snippet_is_probe_code(code):
                 codes.append(code)
         return codes
+
+    def _turn_user_prompt(self, corr, source_log=None):
+        """The human sentence of this turn, not the slash name.
+
+        The best relaxaicode log often has an empty ``user_prompt``; the
+        ``llm_response`` / ``domain_index`` row of the same turn still has it.
+        """
+        prompt = ''
+        if source_log:
+            prompt = (source_log.user_prompt or '').strip()
+        if prompt:
+            return prompt
+        if not corr:
+            return ''
+        logs = self.env['ai.log'].search([
+            ('user_id', '=', self.env.user.id),
+            ('turn', '=ilike', corr),
+            ('user_prompt', '!=', False),
+        ], limit=20, order='id asc')
+        for log in logs:
+            prompt = (log.user_prompt or '').strip()
+            if prompt:
+                return prompt
+        return ''
 
     def _find_best_capture_log_for_turn(self, corr_id):
         """Best own ``ai.log`` of a turn (any session), preferring relaxaicode."""
@@ -952,6 +1506,12 @@ class ChatbooSession(models.Model):
         ], limit=80, order='timestamp desc, id desc')
         if not logs:
             return Log.browse()
+        from odoo.addons.pns_ai_chatboo.utils.skill_capture_compose import (
+            log_run_failed,
+        )
+        ran = logs.filtered(lambda log: not log_run_failed(log.result_data))
+        if ran:
+            logs = ran
         relaxaicode_count = len(self._relaxaicode_codes_for_turn(corr_id))
         best = logs[0]
         best_score = -9999
@@ -979,6 +1539,35 @@ class ChatbooSession(models.Model):
             [(log.tool_name, log.prompt_data) for log in logs],
         )
 
+    def _catalog_skill_for_capture(self, slash):
+        """Row that can lend Code to this capture (active or archived)."""
+        Skill = self.env['ai.skill']
+        if not (slash or '').strip():
+            return Skill.browse()
+        found = Skill._find_by_invoke_token(slash)
+        if found:
+            return found
+        return Skill.sudo().with_context(active_test=False)._find_by_invoke_token(
+            slash,
+        )
+
+    def _capture_invoke_command(self, raw):
+        """Slash the instance prefixes would store for ``raw``."""
+        from odoo.addons.pns_ai_mcp.utils.skill_code_prefix import (
+            get_skill_code_prefix,
+            get_skill_command_prefix,
+            instance_identity,
+        )
+        token = (raw or '').strip()
+        if not token:
+            return ''
+        _code, command = instance_identity(
+            token,
+            get_skill_code_prefix(self.env),
+            get_skill_command_prefix(self.env),
+        )
+        return command or ''
+
     @api.model
     def compose_capture_code(self, code_body, corr):
         """Compose fetch + multi-phase relaxaicode into one capturable body.
@@ -1001,10 +1590,8 @@ class ChatbooSession(models.Model):
         )
         if not composed:
             composed = code_body or ''
-        incomplete = pipeline_incomplete or capture_is_incomplete(
-            composed, fetch_steps,
-        )
-        return composed, incomplete
+            return composed, capture_is_incomplete(composed, fetch_steps)
+        return composed, pipeline_incomplete
 
     def _fetch_steps_for_turn(self, corr):
         """Auto-confirmable fetch steps from every safe plan in this turn."""
@@ -1069,14 +1656,36 @@ class ChatbooSession(models.Model):
             )
         return '\n'.join(lines)
 
+    def _wrap_open_page(self, code, corr):
+        """The page open in this session is the one the skill will reopen.
+
+        ``corr`` is the chip the person named. The page is whichever is open
+        now: that is the one they just looked at. A skill without parameters
+        keeps that page as the turn showed it. Parameters still need a
+        reusable template at save.
+
+        Only when that turn painted the page or its Code calls a page
+        helper. A table turn later in the same session stays a table.
+        """
+        self.ensure_one()
+        design = (self.canvas_design or '').strip()
+        if not design:
+            return code
+        from .chatboo_canvas import code_touches_page, wrap_captured_page
+        turn = (self.canvas_turn or '').strip().upper()
+        if turn != (corr or '').strip().upper() and not code_touches_page(code):
+            return code
+        return wrap_captured_page(
+            code, design, self.canvas_title or '',
+        )
+
     def prepare_skill_capture_action(self, skill_code_hint=None, turn_id=None,
                                      param_prose=None):
         """Open the skill capture wizard pre-filled from a turn.
 
-        If the turn already ran a catalog skill, prefills that record's
-        Code/Procedure (no fetch wrap, no template). Otherwise captures
-        query *logic* (relaxaicode log for ``turn_id``), never the
-        session row cache (``last_query_data``).
+        The slash on the line is the new skill (or the one to replace if
+        the caller already owns it). A catalog skill the turn ran may
+        lend Code when there is no query log; it does not steal the name.
 
         ``turn_id`` is required (the 4-character chip on the line).
         The slash name is formatted with the instance prefixes from Settings.
@@ -1097,46 +1706,66 @@ class ChatbooSession(models.Model):
                 'The turn chip is required: /create-skill VWVN slash-name'
             ))
 
+        from odoo.addons.pns_ai_chatboo.utils.skill_capture_compose import (
+            capture_binds_catalog_slash,
+        )
         Skill = self.env['ai.skill']
         catalog_slash = self._catalog_slash_for_turn(corr)
-        catalog_skill = Skill.browse()
+        catalog_skill = self._catalog_skill_for_capture(catalog_slash)
+        name_command = self._capture_invoke_command(name_hint)
+        catalog_command = self._capture_invoke_command(
+            (catalog_skill.invoke_code() if catalog_skill else '')
+            or catalog_slash
+        )
+        binds_catalog = capture_binds_catalog_slash(
+            name_hint, catalog_slash, name_command, catalog_command,
+        )
         source_log = self.env['ai.log'].browse()
-        user_prompt = ''
         param_schema = ''
         arg_hint = ''
         capture_incomplete = False
+        used_catalog_body = False
+        code_body = ''
 
-        if catalog_slash:
-            catalog_skill = Skill._find_by_invoke_token(catalog_slash)
-            if not catalog_skill:
-                raise UserError(_(
-                    'Turn %s ran /%s, but that skill is no longer '
-                    'in the catalog.'
-                ) % (corr, catalog_slash))
+        if binds_catalog and catalog_skill:
             code_body = (catalog_skill.code_body or '').strip()
             if not code_body:
                 raise UserError(_(
                     'Skill /%s has no capturable Code.'
                 ) % (catalog_skill.invoke_code() or catalog_slash))
+            used_catalog_body = True
             param_schema = catalog_skill.param_schema or ''
             arg_hint = catalog_skill.arg_hint or ''
         else:
             source_log = self._find_best_capture_log_for_turn(corr)
-            if not source_log:
+            if source_log:
+                code_body = self._pick_capture_code(
+                    source_log.code_to_execute, source_log,
+                )
+            if code_body:
+                code_body, capture_incomplete = self.compose_capture_code(
+                    code_body, corr,
+                )
+            elif catalog_skill and (catalog_skill.code_body or '').strip():
+                code_body = (catalog_skill.code_body or '').strip()
+                used_catalog_body = True
+                param_schema = catalog_skill.param_schema or ''
+                arg_hint = catalog_skill.arg_hint or ''
+            elif catalog_slash and binds_catalog:
                 raise UserError(_(
-                    'No MCP log found for turn %s (or it is not yours).'
-                ) % corr)
-            code_body = self._pick_capture_code(
-                source_log.code_to_execute, source_log,
-            )
-            if not code_body:
+                    'Turn %s ran /%s, but that skill is no longer '
+                    'in the catalog.'
+                ) % (corr, catalog_slash))
+            elif source_log:
                 raise UserError(_(
                     'No capturable query code found for turn %s.'
                 ) % corr)
-            code_body, capture_incomplete = self.compose_capture_code(
-                code_body, corr,
-            )
-            user_prompt = (source_log.user_prompt or '').strip()
+            else:
+                raise UserError(_(
+                    'No MCP log found for turn %s (or it is not yours).'
+                ) % corr)
+
+        code_body = self._wrap_open_page(code_body, corr)
 
         if code_body:
             from odoo.addons.pns_ai_mcp.utils.skill_runtime import (
@@ -1153,7 +1782,7 @@ class ChatbooSession(models.Model):
             )
             skill_code = command
             skill_name = name_hint.strip()[:48]
-        elif catalog_skill:
+        elif binds_catalog and catalog_skill:
             token = catalog_skill.invoke_code() or catalog_slash
             _code, command, existing_skill = (
                 Skill.resolve_capture_identity(token)
@@ -1164,14 +1793,24 @@ class ChatbooSession(models.Model):
             skill_code = ''
             skill_name = ''
 
-        description = (
-            (catalog_skill.description if catalog_skill else '')
-            or user_prompt
-            or name_hint
-            or ''
-        )[:120]
-        has_hardcoded = self._code_has_hardcoded_rows(code_body)
+        from odoo.addons.pns_ai_mcp.utils.skill_runtime import capture_help_text
+        catalog_names = ()
         if catalog_skill:
+            catalog_names = (
+                catalog_skill.name, catalog_skill.code, catalog_skill.command,
+            )
+        description = capture_help_text(
+            catalog_help=(
+                catalog_skill.description
+                if used_catalog_body and catalog_skill else ''
+            ),
+            user_prompt=self._turn_user_prompt(corr, source_log),
+            name_hint=name_hint or '',
+            turn_id=corr,
+            names=catalog_names,
+        )
+        has_hardcoded = self._code_has_hardcoded_rows(code_body)
+        if used_catalog_body and catalog_skill:
             procedure = (catalog_skill.content or '').strip() or (
                 self._default_capture_procedure(has_hardcoded)
             )
@@ -1180,11 +1819,23 @@ class ChatbooSession(models.Model):
 
         warning = None
         notes = []
-        if catalog_skill:
+        if binds_catalog and catalog_skill:
             notes.append(_(
                 'This turn ran /%s. The wizard has that skill\'s Code '
                 'and Procedure (not a new query).'
             ) % (catalog_skill.invoke_code() or catalog_slash))
+        elif catalog_slash:
+            notes.append(_(
+                'This turn ran /%s. The wizard captures it as /%s.'
+            ) % (
+                catalog_skill.invoke_code() if catalog_skill else catalog_slash,
+                skill_code or name_hint or '',
+            ))
+        if 'page_html(' in (code_body or ''):
+            notes.append(_(
+                'This skill opens the page from that turn. Each run fills '
+                'it with live rows and does not call Design.'
+            ))
         if has_hardcoded:
             notes.append(_(
                 'The captured code contains pasted row literals (e.g. data = [{...}, ...]). '
@@ -1195,7 +1846,6 @@ class ChatbooSession(models.Model):
 
         ctx = {
             'form_view_initial_mode': 'edit',
-            'capture_from_chatboo': True,
             'default_source_log_id': source_log.id if source_log else False,
             'default_skill_code': skill_code,
             'default_skill_name': skill_name,
@@ -1205,10 +1855,10 @@ class ChatbooSession(models.Model):
             'default_param_schema': param_schema or False,
             'default_arg_hint': arg_hint or False,
             'default_args_policy': (
-                (catalog_skill.args_policy if catalog_skill else 'default')
+                (catalog_skill.args_policy if used_catalog_body and catalog_skill else 'default')
                 or 'default'
             ),
-            'default_from_chatboo': True,
+            'default_from_chat': True,
             'default_warn_hardcoded_rows': has_hardcoded,
             'default_warn_incomplete_capture': capture_incomplete,
             'default_existing_skill_id': existing_skill.id if existing_skill else False,
@@ -1217,7 +1867,7 @@ class ChatbooSession(models.Model):
                 if not self._normalize_turn_id(part)
             ).strip(),
             'default_source_turn_id': corr,
-            'chatboo_session_id': self.id,
+            'ai_session_ref': self.id,
             'default_chatboo_session_id': self.id,
         }
         chatboo_agent = self.env['ai.agent'].search(
@@ -1258,7 +1908,6 @@ class ChatbooSession(models.Model):
             slash = (skill.command or skill.code or '').strip()
         ctx = {
             'form_view_initial_mode': 'edit',
-            'capture_from_chatboo': True,
             'default_skill_code': slash,
             'default_skill_name': skill.name or slash,
             'default_description': skill.description or '',
@@ -1267,10 +1916,10 @@ class ChatbooSession(models.Model):
             'default_param_schema': skill.param_schema or False,
             'default_arg_hint': skill.arg_hint or False,
             'default_args_policy': skill.args_policy or 'default',
-            'default_from_chatboo': True,
+            'default_from_chat': True,
             'default_existing_skill_id': skill.id,
             'default_param_prose': (param_prose or '').strip() or '',
-            'chatboo_session_id': self.id,
+            'ai_session_ref': self.id,
             'default_chatboo_session_id': self.id,
         }
         chatboo_agent = self.env['ai.agent'].search(
@@ -1305,9 +1954,6 @@ class ChatbooSession(models.Model):
         tiene un job zombie bloqueado, fallamos YA con mensaje claro en vez de
         dejar el History colgado (el spinner va en shadow y parece que «no borra»).
         """
-        # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        self.check_access_rights('unlink')
-        self.check_access_rule('unlink')
         if self.ids:
             # 1) Jobs async primero (FK ON DELETE CASCADE también esperaría el
             #    mismo lock; así controlamos timeout y mensaje).
@@ -1346,12 +1992,7 @@ class ChatbooSession(models.Model):
                     ('res_id', 'in', self.ids),
                 ])
                 if atts:
-                    # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
-                    owner = {s.id: s.user_id.id for s in self.sudo()}
-                    own = atts.filtered(
-                        lambda a: a.create_uid.id in (False, owner.get(a.res_id)))
-                    (atts - own).write({'res_model': False, 'res_id': False})
-                    own.unlink()
+                    atts.unlink()
             except Exception:
                 _logger.warning(
                     "Chatboo: no se pudieron borrar los adjuntos de las sesiones %s",
@@ -1385,9 +2026,12 @@ class ChatbooSession(models.Model):
         Sessions whose user was deleted (``user_id`` empty) go the same way.
         """
         try:
-            retention_days = int(self.env['ir.config_parameter'].sudo().get_param(
-                RETENTION_PARAM, DEFAULT_HISTORY_RETENTION_DAYS,
-            ))
+            raw_retention = self.env['ir.config_parameter'].sudo().get_param(
+                RETENTION_PARAM,
+            )
+            if raw_retention is None or raw_retention is False or str(raw_retention).strip() == '':
+                return
+            retention_days = int(raw_retention)
             if retention_days <= 0:
                 return
             cutoff_date = fields.Datetime.now() - timedelta(days=retention_days)

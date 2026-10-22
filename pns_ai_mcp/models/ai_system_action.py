@@ -697,6 +697,16 @@ class AiSystemAction(models.AbstractModel):
                 return rec
         raise UserError(_('Unknown group: %s') % group)
 
+    def _resolve_group_below_cusp(self, group):
+        from ..utils.privilege_cusp import cusp_groups
+        grp = self._resolve_group(group)
+        if grp & cusp_groups(self.env):
+            raise UserError(_(
+                '%s is a maximum-privilege role. An AI plan does not add or '
+                'remove it; do it by hand in Settings → Users.'
+            ) % grp.display_name)
+        return grp
+
     def _acl_role_note(self):
         if 'acl.role' in self.env:
             return ' ' + _(
@@ -705,23 +715,10 @@ class AiSystemAction(models.AbstractModel):
             )
         return ''
 
-    # Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
-    def _check_may_change_user_groups(self):
-        """Native groups are Settings business: AI Administrator alone is not
-        enough. Checked on the real user before any sudo(), like stdio servers."""
-        user = self.env.user
-        if user._is_superuser() or user.has_group('base.group_system'):
-            return
-        raise UserError(_(
-            'Only a Settings administrator can add or remove user groups.'
-        ))
-
     @api.model
     def _preview_user_add_group(self, user_id=None, group=None, **_kw):
-        # Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        self._check_may_change_user_groups()
         user = self._resolve_user(user_id)
-        grp = self._resolve_group(group)
+        grp = self._resolve_group_below_cusp(group)
         return (
             _('Add group %s to user %s') % (grp.display_name, user.display_name)
             + self._acl_role_note()
@@ -729,10 +726,8 @@ class AiSystemAction(models.AbstractModel):
 
     @api.model
     def _apply_user_add_group(self, user_id=None, group=None, **_kw):
-        # Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        self._check_may_change_user_groups()
         user = self._resolve_user(user_id)
-        grp = self._resolve_group(group)
+        grp = self._resolve_group_below_cusp(group)
         user_add_group(user, grp)
         return {
             'ok': True,
@@ -751,10 +746,8 @@ class AiSystemAction(models.AbstractModel):
 
     @api.model
     def _preview_user_remove_group(self, user_id=None, group=None, **_kw):
-        # Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        self._check_may_change_user_groups()
         user = self._resolve_user(user_id)
-        grp = self._resolve_group(group)
+        grp = self._resolve_group_below_cusp(group)
         return (
             _('Remove group %s from user %s')
             % (grp.display_name, user.display_name)
@@ -763,10 +756,8 @@ class AiSystemAction(models.AbstractModel):
 
     @api.model
     def _apply_user_remove_group(self, user_id=None, group=None, **_kw):
-        # Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        self._check_may_change_user_groups()
         user = self._resolve_user(user_id)
-        grp = self._resolve_group(group)
+        grp = self._resolve_group_below_cusp(group)
         user_remove_group(user, grp)
         return {
             'ok': True,

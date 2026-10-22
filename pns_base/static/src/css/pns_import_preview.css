@@ -1,0 +1,61 @@
+/* Import review: one outlined group, bold attribute, plain value. */
+
+.o_pns_view .alert i.fa,
+.o_pns_op_result .alert i.fa,
+.o_pns_alert_icon {
+    margin-right: 0.4em;
+}
+
+.o_pns_import_preview .o_pns_preview_lead {
+    margin: 0 0 12px;
+}
+
+.o_pns_import_preview .o_pns_preview_box {
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 10px 12px;
+    margin: 0 0 12px;
+    background: #fff;
+}
+
+.o_pns_import_preview .o_pns_preview_row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 0 0 4px;
+}
+
+.o_pns_import_preview .o_pns_preview_row:last-child {
+    margin-bottom: 0;
+}
+
+.o_pns_import_preview .o_pns_preview_attr {
+    font-weight: 700;
+    flex: 0 0 auto;
+}
+
+.o_pns_import_preview .o_pns_preview_row .o_field_widget,
+.o_pns_import_preview .o_pns_preview_box .o_field_widget {
+    font-weight: 400;
+    flex: 1 1 auto;
+    white-space: pre-wrap;
+}
+
+.o_pns_import_preview .o_pns_preview_box input,
+.o_pns_import_preview .o_pns_preview_box textarea,
+.o_pns_import_preview .o_pns_preview_box .o_input {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    width: auto !important;
+    min-height: 0 !important;
+}
+
+.o_pns_import_preview .o_pns_preview_warn {
+    border-color: #8a6500;
+}
+
+.o_pns_import_preview .o_pns_preview_err {
+    border-color: #a33;
+}

@@ -165,7 +165,7 @@
       <li>Before Apps: in the Odoo Python, on Odoo 14 install <code>openpyxl&gt;=3.1.2</code> (Odoo 19 needs no extra). Then install <code>pns_base</code> and this module. Install <code>pns_geo</code> if maps or geocoding will be used.</li>
       <li>Open the <strong>AI Engine</strong> app. Create or open a provider, paste the API key, pick a model and save.</li>
       <li>On the Chatboo agent (or the agent your MCP user uses), set the provider and the failover chain. Order is on the agent, not in Chatboo.</li>
-      <li>If Cursor will call this instance: in <strong>AI Engine &rarr; Security &rarr; Users</strong>, create an MCP user and copy its API key. Point the client at <code>https://&lt;this-instance&gt;/mcp?api_key=&lt;that-key&gt;</code>. Whitelist any extra hostnames the tools need.</li>
+      <li>If Cursor will call this instance: in <strong>AI Engine &rarr; Security &rarr; Users</strong>, create an MCP user and copy its API key. Point the client at <code>https://&lt;this-instance&gt;/mcp</code> and send the key in the <code>X-MCP-API-Key</code> header (in Cursor, the <code>headers</code> field of the server entry in <code>mcp.json</code>). The key is not accepted in the URL. Whitelist any extra hostnames the tools need.</li>
       <li>If a customer pack exists, install it after the engine so its skills and connectors seed on top. Paste those tokens there, not here.</li>
     </ol>
   </section>

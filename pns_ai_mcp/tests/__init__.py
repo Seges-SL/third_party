@@ -22,15 +22,13 @@ from . import test_relaxaicode_imports
 from . import test_relaxaicode_sandbox_escapes_e2e
 from . import test_required_fields_live
 from . import test_safe_plan_atomicity
+from . import test_paap_core
 from . import test_friendly_skill_error
 from . import test_presentation_mode
 from . import test_system_action
-from . import test_chatboo_pending_cards
+from . import test_pending_cards
+from . import test_change_journal
 from . import test_change_journal_menu
 from . import test_session_download
 from . import test_flow_legend
 from . import test_server_identity_detection
-# Seges: parches 7 a 10 (tests de la entrega E1). Ver docs/pendiente/parches_pns_ai.md
-from . import test_seges_rpc_access
-# Seges: parche 12 (tests de la entrega E2). Ver docs/pendiente/parches_pns_ai.md
-from . import test_seges_user_groups

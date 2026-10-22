@@ -3,12 +3,12 @@
 # Copyright (C) 2026 Patanegra Soft <https://patanegra.com>
 """Which provider may take a turn.
 
-No ticks: a text turn may use it. A photo, a clip, a video or a closed
-choice may not. A tick admits only that kind of turn.
+No ticks: a text turn may use it. A photo, a clip, a video, a closed
+choice or a design may not. A tick admits only that kind of turn.
 """
 from __future__ import annotations
 
-FITS = ('conversation', 'audio', 'vision', 'video', 'decision')
+FITS = ('conversation', 'audio', 'vision', 'video', 'decision', 'design')
 
 
 def provider_fits(flags, need):
@@ -23,6 +23,19 @@ def provider_fits(flags, need):
             return True
         return bool(flags.get('conversation'))
     return bool((flags or {}).get(need))
+
+
+def is_specialist(flags, need):
+    """True when ``need`` is the only job this provider was ticked for.
+
+    A model picked for one role alone is cheaper and better at it than a
+    generalist that also holds the dialogue, so it is tried first even when
+    the human put the generalist earlier in the chain.
+    """
+    if not need:
+        return False
+    ticked = {key for key in FITS if (flags or {}).get(key)}
+    return ticked == {need}
 
 
 def fit_mismatches(ticks, known):

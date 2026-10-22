@@ -262,11 +262,8 @@ def http_response_text(response):
 
 
 def mcp_test_url(path, api_key):
-    """URL MCP con api_key en query (smoke + fallback si cabeceras no llegan)."""
-    from urllib.parse import urlencode
-
-    sep = '&' if '?' in path else '?'
-    return '%s%s%s' % (path, sep, urlencode({'api_key': api_key}))
+    """URL MCP sin clave: la clave viaja solo en las cabeceras de mcp_test_headers."""
+    return path
 
 
 def mcp_test_headers(api_key):

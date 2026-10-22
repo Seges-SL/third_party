@@ -230,6 +230,7 @@ class TestSystemTrustedActions(TransactionCase):
         self.assertIn('ir.model.fields', (err_f or ''))
 
     def test_propose_without_ai_admin_fails(self):
+        """PAAP I6: A system action needs the AI Administrator group."""
         writer = new_test_user(
             self.env, login='pns_writer_sysact',
             groups='base.group_user,pns_ai_mcp.group_ai_writer',
@@ -442,6 +443,7 @@ class TestSystemTrustedActions(TransactionCase):
             ).unlink_named_factory_skills(['not-a-real-skill'])
 
     def test_internal_user_cannot_reach_system_action_through_trusted_action(self):
+        """PAAP I6: A plain internal user cannot reach a system action."""
         user = new_test_user(
             self.env, login='pns_plain_internal_trusted',
             groups='base.group_user',
@@ -454,6 +456,62 @@ class TestSystemTrustedActions(TransactionCase):
         with self.assertRaises(PermissionError):
             trusted._apply(user_id=user.id, group='base.group_system')
         self.assertFalse(user.has_group('base.group_system'))
+
+    def test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin(self):
+        """PAAP I7: not even an AI Administrator gets a plan that touches Settings / Access Rights."""
+        from odoo.addons.pns_base.utils.compat import USER_GROUPS_FIELD
+
+        admin = new_test_user(
+            self.env, login='pns_aiadmin_cusp',
+            groups='base.group_user,pns_ai_mcp.group_ai_writer,pns_ai_mcp.group_ai_admin',
+        )
+        target = new_test_user(self.env, login='pns_cusp_target', groups='base.group_user')
+        env_a = api.Environment(self.env.cr, admin.id, {})
+        system = self.env.ref('base.group_system')
+        carrier = self.env['res.groups'].create({
+            'name': 'pns test group that carries Settings',
+            'implied_ids': [(4, system.id)],
+        })
+        plain = self.env['res.groups'].create({'name': 'pns test plain group'})
+
+        for group in ('base.group_system', 'base.group_erp_manager', carrier.id):
+            for code in ('user.add_group', 'user.remove_group'):
+                ok, err = validate_safe_plan([{
+                    'op': 'action', 'action_code': code,
+                    'args': {'user_id': target.id, 'group': group},
+                }], env_a)
+                self.assertFalse(ok, (code, group))
+                self.assertIn('maximum-privilege', err)
+        with self.assertRaises(UserError):
+            env_a['ai.trusted.action']._get('user.add_group')._apply(
+                user_id=target.id, group='base.group_system',
+            )
+        self.assertFalse(target.has_group('base.group_system'))
+
+        crud = [
+            {'op': 'write', 'model': 'res.users', 'ids': [target.id],
+             'values': {USER_GROUPS_FIELD: [[4, plain.id]]}},
+            {'op': 'create', 'model': 'res.groups',
+             'values': {'name': 'x', 'implied_ids': [[4, system.id]]}},
+            {'op': 'write', 'model': 'res.groups', 'ids': [plain.id],
+             'values': {'implied_ids': [[6, 0, [carrier.id]]]}},
+            {'op': 'write', 'model': 'res.groups', 'ids': [system.id],
+             'values': {'name': 'renamed'}},
+            {'op': 'unlink', 'model': 'res.groups', 'ids': [carrier.id]},
+        ]
+        for step in crud:
+            ok, err = validate_safe_plan([dict(step)], env_a)
+            self.assertFalse(ok, step)
+            with self.assertRaises(PermissionError):
+                execute_safe_plan(env_a, [dict(step)])
+        self.assertFalse(target.has_group('base.group_system'))
+        self.assertEqual(system.name, self.env.ref('base.group_system').name)
+
+        ok, err = validate_safe_plan([{
+            'op': 'action', 'action_code': 'user.add_group',
+            'args': {'user_id': target.id, 'group': plain.id},
+        }], env_a)
+        self.assertTrue(ok, err)
 
     def _unlink_choice(self, choice_id):
         if not choice_id:

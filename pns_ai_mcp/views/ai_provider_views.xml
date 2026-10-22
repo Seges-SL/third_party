@@ -8,6 +8,7 @@
             <form string="AI Provider">
                 <header>
                     <button name="test_connection" string="Test Connection" type="object" class="oe_highlight"/>
+                    <button name="action_open_usage" string="This month" type="object"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -17,7 +18,7 @@
                     </div>
                     <group>
                         <field name="active"/>
-                        <field name="alias" placeholder="e.g. Grok 4.5 (normal use) — shown in Chatboo picker"/>
+                        <field name="alias" placeholder="e.g. Grok 4.5 (normal use) — shown in the chat picker"/>
                     </group>
                     <group string="Connection" name="connection">
                         <field name="protocol"/>
@@ -53,6 +54,7 @@
                                attrs="{'invisible': [('protocol', '=', 'systemone')]}"/>
                         <field name="fit_video"
                                attrs="{'invisible': [('protocol', '=', 'systemone')]}"/>
+                        <field name="fit_design"/>
                         <field name="fit_decision"/>
                         <field name="decision_min_confidence"
                                attrs="{'invisible': [('fit_decision', '=', False)]}"/>
@@ -60,6 +62,10 @@
                                attrs="{'invisible': [('protocol', '=', 'systemone')]}"/>
                         <field name="stt_support"
                                attrs="{'invisible': [('protocol', '=', 'systemone')]}"/>
+                    </group>
+                    <group string="Monthly cap" name="spend_cap">
+                        <field name="spend_cap_usd"/>
+                        <field name="spend_cap_tokens"/>
                     </group>
                     <group name="chain">
                         <field name="no_external_failover"/>

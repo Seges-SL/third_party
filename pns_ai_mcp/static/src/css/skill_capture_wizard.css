@@ -67,3 +67,6 @@
     text-decoration: none;
     color: #1d1d1d;
 }
+.o_form_view .o_skill_param_token_legend {
+    margin: 0 0 8px 0;
+}

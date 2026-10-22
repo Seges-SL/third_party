@@ -85,25 +85,31 @@ class IrTranslation(models.Model):
                 )
             return ('other', id(row))
 
+        def ours(module):
+            return bool(module) and str(module).startswith('pns')
+
         seen = {}
         kept = []
         dropped = 0
         for row in rows:
             key = conflict_key(row)
             if key in seen:
-                dropped += 1
                 prev = kept[seen[key]]
-                _logger.warning(
-                    "pns_base: language import drop duplicate %s src=%r "
-                    "module=%s name=%s (keeping later; was module=%s name=%s)",
-                    key[0],
-                    (row[_IDX_SRC] or '')[:160],
-                    row[_IDX_MODULE],
-                    row[_IDX_NAME],
-                    prev[_IDX_MODULE],
-                    prev[_IDX_NAME],
-                )
-                kept[seen[key]] = row
+                if ours(row[_IDX_MODULE]) and ours(prev[_IDX_MODULE]):
+                    dropped += 1
+                    _logger.warning(
+                        "pns_base: language import drop duplicate %s src=%r "
+                        "module=%s name=%s (keeping later; was module=%s name=%s)",
+                        key[0],
+                        (row[_IDX_SRC] or '')[:160],
+                        row[_IDX_MODULE],
+                        row[_IDX_NAME],
+                        prev[_IDX_MODULE],
+                        prev[_IDX_NAME],
+                    )
+                    kept[seen[key]] = row
+                    continue
+                kept.append(row)
                 continue
             seen[key] = len(kept)
             kept.append(row)

@@ -58,19 +58,6 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-12 col-lg-6 o_setting_box" id="mcp_agent_pns_ai_decision">
-                            <div class="o_setting_right_pane">
-                                <div class="o_form_label">Decision</div>
-                                <div class="text-muted">
-                                    Module pns_ai_mcp · inference · code pns_ai_decision · closed Choice when a doubt needs a yes or a no. Providers with the Decision tick, in chain order.
-                                </div>
-                                <div class="mt8">
-                                    <button name="action_open_module_agent" type="object"
-                                            string="Configuration" class="btn-link" icon="fa-external-link"
-                                            context="{'agent_code': 'pns_ai_decision'}"/>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                     <div class="mt8">
                         <button name="action_open_module_inference_agents"
@@ -80,7 +67,7 @@
 
                     <h2>Consumption costs</h2>
                     <div class="text-muted mb-2">
-                        How Chatboo shows token spend. Vendors bill in USD; one display currency applies to every provider in the thread. Quote feeds convert at open time. Not the Safe Plan URL whitelist.
+                        How the chat shows token spend. Vendors bill in USD; one display currency applies to every provider in the thread. Quote feeds convert at open time. Not the Safe Plan URL whitelist.
                     </div>
                     <div class="row mt16 o_settings_container">
                         <div class="col-12 col-lg-6 o_setting_box">
@@ -91,6 +78,44 @@
                                 </div>
                                 <div class="mt8">
                                     <field name="display_currency"/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">Activity log retention (days)</div>
+                                <div class="text-muted">
+                                    Days the AI activity log is kept. Empty or 0 keeps everything: nothing is deleted until a person sets a number here.
+                                </div>
+                                <div class="mt8">
+                                    <field name="log_retention_days"/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">Change trash (days)</div>
+                                <div class="text-muted">
+                                    Days a Safe Plan delete stays archived before it is removed. 0 keeps it until someone empties the trash.
+                                </div>
+                                <div class="mt8">
+                                    <field name="journal_trash_days"/>
+                                </div>
+                                <div class="mt8">
+                                    <button name="action_empty_journal_trash" type="object"
+                                            string="Empty trash" class="btn-link" icon="fa-trash"
+                                            confirm="Permanently delete every archived Safe Plan record? This cannot be undone."/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <div class="o_form_label">MCP browser origins</div>
+                                <div class="text-muted">
+                                    Extra web origins allowed to call /mcp from a browser, one per line or comma separated. The address of this instance is always allowed. Desktop MCP clients send no Origin and are unaffected.
+                                </div>
+                                <div class="mt8">
+                                    <field name="mcp_allowed_origins"/>
                                 </div>
                             </div>
                         </div>

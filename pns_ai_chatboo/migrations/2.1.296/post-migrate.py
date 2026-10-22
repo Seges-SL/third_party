@@ -23,7 +23,13 @@ def migrate(cr, version):
         active_test=False,
         skip_hardcoded_restrictions=True,
     )
+    if hasattr(Skill, 'unlink_named_factory_skills'):
+        n = Skill.unlink_named_factory_skills(list(_RETIRED))
+        _logger.info('pns_ai_chatboo 2.1.296: unlinked named leftovers %s', n)
+        return
     rows = Skill.search([
+        '&',
+        ('owner_id', '=', False),
         '|', '|',
         ('command', 'in', _RETIRED),
         ('code', 'in', _RETIRED),

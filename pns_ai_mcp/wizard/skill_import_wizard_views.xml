@@ -15,7 +15,7 @@
                     Upload a skills export ZIP (manifest.json + skills/*.md). New skills are created; existing ones (same code) are skipped unless "Replace existing" is checked. Referenced contexts are linked only if they already exist.
                 </div>
 <footer>
-                    <button name="action_import" string="Import" type="object"
+                    <button name="action_preview" string="Review" type="object"
                             class="btn-primary" />
                     <button string="Cancel" class="btn-secondary" special="cancel" />
 </footer>

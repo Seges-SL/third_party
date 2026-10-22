@@ -4,11 +4,14 @@
 """Chatboo Settings fields: systray, dataset reuse, chart engine, Excel ICP."""
 from odoo import fields, models
 
-from ..utils.chatboo_product_icp import (
+from odoo.addons.pns_ai_mcp.utils.engine_params import (
     DEFAULT_CHART_ENGINE,
-    DEFAULT_PRESENTATION_SHOW_MODE,
+    DEFAULT_LAYOUT_SHOW_MODE,
     DEFAULT_XLSX_FLOAT_DECIMALS,
     DEFAULT_XLSX_THOUSANDS,
+)
+
+from ..utils.chatboo_product_icp import (
     read_product_settings,
     write_product_settings,
 )
@@ -80,14 +83,22 @@ class ResConfigSettings(models.TransientModel):
              'or show-chart. Stays until /show-table, /show-chart or phrasing '
              '(“show as chart” / “show as table”). Suspended under compose-model. '
              'Not a per-turn LLM choice.',
-        default=DEFAULT_PRESENTATION_SHOW_MODE,
+        default=DEFAULT_LAYOUT_SHOW_MODE,
         required=True,
     )
     chatboo_xlsx_float_decimals = fields.Integer(
-        string='Excel float decimals',
-        help='Decimal places for floating-point values and formula cells in '
-             'Excel exports. Integers stay whole. 0–10.',
+        string='Decimals',
+        help='Decimal places of decimal numbers in the chat table, PDF, Word '
+             'and Excel. Integers stay whole. Equal to the company currency '
+             '(EUR 2, KWD 3, JPY 0), it follows the currency. 0–10.',
         default=DEFAULT_XLSX_FLOAT_DECIMALS,
+    )
+    chatboo_allow_remote_voices = fields.Boolean(
+        string='Allow remote voices',
+        help='Unchecked: Chatboo only reads aloud with a voice installed on '
+             'this computer. Checked: if none is installed, the browser may '
+             'send the text to its vendor (Google, Microsoft, …).',
+        default=False,
     )
     chatboo_xlsx_thousands = fields.Boolean(
         string='Excel thousand separators',
@@ -111,6 +122,7 @@ class ResConfigSettings(models.TransientModel):
             'chatboo_default_show_mode': product['default_show_mode'],
             'chatboo_xlsx_float_decimals': product['xlsx_float_decimals'],
             'chatboo_xlsx_thousands': product['xlsx_thousands'],
+            'chatboo_allow_remote_voices': product['allow_remote_voices'],
         })
         return res
 
@@ -128,4 +140,5 @@ class ResConfigSettings(models.TransientModel):
             default_show_mode=self.chatboo_default_show_mode,
             xlsx_float_decimals=self.chatboo_xlsx_float_decimals,
             xlsx_thousands=self.chatboo_xlsx_thousands,
+            allow_remote_voices=self.chatboo_allow_remote_voices,
         )

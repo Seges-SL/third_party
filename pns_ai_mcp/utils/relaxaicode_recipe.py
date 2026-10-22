@@ -19,6 +19,14 @@ def _literal_collection_size(node: ast.AST) -> int:
     return 0
 
 
+def _is_none_literal(node: ast.AST) -> bool:
+    """``None`` written in the code (``NameConstant`` on 3.7, ``Constant`` on 3.8+)."""
+    try:
+        return ast.literal_eval(node) is None
+    except Exception:
+        return False
+
+
 def _try_eval_data_node(node: ast.AST):
     """Best-effort value from an AST data node (literals + round/arithmetic).
 
@@ -29,8 +37,6 @@ def _try_eval_data_node(node: ast.AST):
         return ast.literal_eval(node)
     except Exception:
         pass
-    if isinstance(node, ast.Constant):
-        return node.value
     if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
         v = _try_eval_data_node(node.operand)
         if isinstance(v, (int, float)):
@@ -76,14 +82,7 @@ def _try_eval_data_node(node: ast.AST):
         out = []
         for elt in node.elts:
             v = _try_eval_data_node(elt)
-            if v is None and not isinstance(elt, ast.Constant):
-                # Allow None constants only; failed fold → abort.
-                try:
-                    if ast.literal_eval(elt) is None:
-                        out.append(None)
-                        continue
-                except Exception:
-                    return None
+            if v is None and not _is_none_literal(elt):
                 return None
             out.append(v)
         return out if isinstance(node, ast.List) else tuple(out)
@@ -94,15 +93,9 @@ def _try_eval_data_node(node: ast.AST):
                 return None
             k = _try_eval_data_node(k_node)
             v = _try_eval_data_node(v_node)
-            if k is None and not isinstance(k_node, ast.Constant):
+            if k is None and not _is_none_literal(k_node):
                 return None
-            if v is None and not isinstance(v_node, ast.Constant):
-                try:
-                    if ast.literal_eval(v_node) is None:
-                        out[k] = None
-                        continue
-                except Exception:
-                    return None
+            if v is None and not _is_none_literal(v_node):
                 return None
             out[k] = v
         return out
@@ -504,9 +497,8 @@ def ensure_date_param_coercion(code: str) -> Tuple[str, bool]:
         first_real = body[0] if body else None
     if first_real is None:
         return src, False
-    # Seges: parche de compatibilidad con Odoo 14 (Python 3.7 / Pillow 5.4). Ver docs/pendiente/parches_pns_ai.md
-    get_segment = getattr(ast, 'get_source_segment', None)
-    already = (get_segment and get_segment(src, func)) or src
+    segment = getattr(ast, 'get_source_segment', None)  # Python 3.8+
+    already = (segment and segment(src, func)) or src
     pending = [
         n for n in names
         if ('fromisoformat(%s[:10])' % n) not in already

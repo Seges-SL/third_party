@@ -7,6 +7,7 @@ from . import tools_wizard_mixin
 from . import config_backup_wizard
 from . import ai_agent_tools_wizard
 from . import ai_provider_tools_wizard
+from . import ai_provider_usage_wizard
 from . import ai_provider_catalogue_copy
 from . import bundle_cache_rebuild_wizard
 from . import bundle_compose_wizard

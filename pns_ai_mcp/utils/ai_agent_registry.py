@@ -2,28 +2,23 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """
-Fixed agent codes for module-owned AI features.
+Fixed codes of the agents this module declares.
 
 Each product feature uses the agent declared by its Odoo module (origin=module).
-There is no runtime swap via settings or ir.config_parameter.
+There is no runtime swap via settings or ir.config_parameter. A host module
+(chat, voice, …) passes its own agent code; the engine does not list them.
 
 Extension: install a module that declares ``ai.agent`` in XML; it appears in
 AI Engine settings under Internal (inference) or External (endpoint).
 """
 
 MCP_BARE_AGENT_CODE = 'pns_ai_mcp'
-CHATBOO_AGENT_CODE = 'pns_ai_chatboo'
 ADMIN_AGENT_CODE = 'pns_ai_admin'
-SECRETARY_AGENT_CODE = 'pns_secretary'
-DECISION_AGENT_CODE = 'pns_ai_decision'
 
-# Legacy aliases (tests / imports).
+# Legacy alias (tests / imports).
 MCP_BARE_AGENT_CODE_DEFAULT = MCP_BARE_AGENT_CODE
-DEFAULT_INFERENCE_AGENT_CODE_DEFAULT = CHATBOO_AGENT_CODE
 
-# Feature key → fixed agent code (hard-bound at compile time per module).
+# Feature key → agent code, for the engine's own features.
 FEATURE_AGENT_CODES = {
-    'chatboo': CHATBOO_AGENT_CODE,
     'admin': ADMIN_AGENT_CODE,
-    'secretary': SECRETARY_AGENT_CODE,
 }

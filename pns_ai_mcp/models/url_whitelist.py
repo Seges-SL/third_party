@@ -168,12 +168,11 @@ class URLWhitelist(models.Model):
     def may_show_remote_image(self, hostname):
         """True if Odoo may fetch a picture from *hostname* for the page.
 
-        Same instance decision as fetch_url, without the admin confirmation
-        path: a web entry, or the open policy. Nothing is added to the list.
+        Only an explicit web whitelist entry qualifies. The open URL policy
+        does not stretch to pictures: those reach the user's browser, and a
+        host that was never listed is not fetched.
         """
-        if self.is_domain_whitelisted(hostname, kind='web'):
-            return True
-        return self.is_url_access_open()
+        return self.is_domain_whitelisted(hostname, kind='web')
 
     @api.model
     def _fetch_url_access_status(self, hostname, user=None):
@@ -181,7 +180,7 @@ class URLWhitelist(models.Model):
 
         allowed              — whitelisted, active and within valid window
         needs_reactivation   — row exists but active=False; admin may confirm to reactivate
-        open_add             — open policy: access + auto-add to whitelist
+        open_add             — open policy: access without adding to the list
         admin_add            — whitelist_only: admin may confirm add + access
         denied               — whitelist_only: blocked for non-admins
         """
@@ -232,7 +231,6 @@ class URLWhitelist(models.Model):
                 ) % {'domain': hostname}
         return True, None
 
-    # Seges: parche 8 (PNS-91, seguridad). Ver docs/pendiente/parches_pns_ai.md
     @api.model
     def _ensure_domain_whitelisted(self, hostname, notes='', kind='web'):
         """Add hostname to the whitelist for *kind*, or reactivate a disabled row."""

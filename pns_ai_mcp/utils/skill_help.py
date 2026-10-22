@@ -306,8 +306,8 @@ BUILTIN_SLASH_META = {
     },
     'compose-agent': {
         'code': 'compose-agent',
-        'name': 'Compose Chatboo',
-        'description': 'Chatboo composes tables and charts for this turn.',
+        'name': 'Compose agent',
+        'description': 'The agent composes tables and charts for this turn.',
         'args_policy': 'none',
         'arg_hint': 'optional question…',
         'owner_kind': 'common',

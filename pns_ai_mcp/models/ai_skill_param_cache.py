@@ -88,7 +88,6 @@ class AISkillParamCache(models.Model):
             return False
         return True
 
-    # Seges: parche 9 (PNS-85, seguridad). Ver docs/pendiente/parches_pns_ai.md
     @api.model
     def _lookup_for_skill(self, skill_id, leftover):
         """Cached IA params for leftover, or None."""
@@ -123,7 +122,6 @@ class AISkillParamCache(models.Model):
             ),
         })
 
-    # Seges: parche 9 (PNS-85, seguridad). Ver docs/pendiente/parches_pns_ai.md
     @api.model
     def _remember_for_skill(self, skill_id, leftover, norm):
         """Store leftover → IA params. Does not overwrite an existing row.

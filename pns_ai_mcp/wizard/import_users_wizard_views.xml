@@ -20,7 +20,7 @@
                     </group>
 </sheet>
                 <footer>
-                    <button name="action_import" string="Import" type="object" class="btn-primary" />
+                    <button name="action_preview" string="Review" type="object" class="btn-primary" />
                     <button string="Cancel" class="btn-secondary" special="cancel" />
 </footer>
             </form>

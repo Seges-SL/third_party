@@ -91,17 +91,18 @@ def _open_picture(raw):
     image = Image.open(io.BytesIO(raw))
     kind = (image.format or 'PNG').upper()
     image.load()
-    # Seges: parche de compatibilidad con Odoo 14 (Python 3.7 / Pillow 5.4). Ver docs/pendiente/parches_pns_ai.md
-    transpose = getattr(ImageOps, 'exif_transpose', None) or _exif_transpose_pil5
-    return transpose(image), kind
+    stand_up = getattr(ImageOps, 'exif_transpose', None) or _stand_up  # Pillow 6+
+    return stand_up(image), kind
 
 
-# Seges: parche de compatibilidad con Odoo 14 (Python 3.7 / Pillow 5.4). Ver docs/pendiente/parches_pns_ai.md
-def _exif_transpose_pil5(image):
-    """ImageOps.exif_transpose for Pillow < 6.0 (orientation from _getexif(), JPEG)."""
+_EXIF_ORIENTATION = 0x0112
+
+
+def _stand_up(image):
+    """ImageOps.exif_transpose for Pillow 5 (Odoo 14): JPEG orientation only."""
     from PIL import Image
     try:
-        orientation = (image._getexif() or {}).get(0x0112)
+        orientation = (image._getexif() or {}).get(_EXIF_ORIENTATION)
     except Exception:
         orientation = None
     method = {

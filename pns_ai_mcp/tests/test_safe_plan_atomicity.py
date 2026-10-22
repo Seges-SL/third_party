@@ -55,7 +55,7 @@ class TestSafePlanAtomicity(TransactionCase):
                 'plan': ['create 1 res.partner'], 'danger_level': 'low',
             },
         )
-        op.confirm_by_user()
+        op._confirm_by_user()
         cr.commit()
         return op.id
 
@@ -67,7 +67,7 @@ class TestSafePlanAtomicity(TransactionCase):
             cr.commit()
 
     def test_commit_failure_keeps_executed_false_and_no_mutation(self):
-        """Simulated failure of the final commit → no false 'executed'."""
+        """PAAP I8: Simulated failure of the final commit → no false 'executed'."""
         partner_name = 'pns-atomicity-fail-%s' % self.env.cr.dbname
         op_id = None
         with self.env.registry.cursor() as cr:
@@ -140,7 +140,7 @@ class TestSafePlanAtomicity(TransactionCase):
             self._cleanup(op_id, partner_name)
 
     def test_failed_execute_cancels_authorization_no_replay(self):
-        """Invalid module.update must cancel Confirm; a later execute is a no-op."""
+        """PAAP I8: Invalid module.update must cancel Confirm; a later execute is a no-op."""
         op_id = None
         steps = [{
             'op': 'action',
@@ -161,7 +161,7 @@ class TestSafePlanAtomicity(TransactionCase):
                     'plan': ['module.update'], 'danger_level': 'high',
                 },
             )
-            op.confirm_by_user()
+            op._confirm_by_user()
             cr.commit()
             op_id = op.id
             with self.assertRaises(UserError):

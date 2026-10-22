@@ -84,7 +84,7 @@ class AIApiResultCache(models.Model):
         return cache_key_for_api_call(server, tool, arguments, uid=self.env.uid)
 
     @api.model
-    def get_cached(self, server, tool, arguments):
+    def _get_cached(self, server, tool, arguments):
         """Return the cached full body if fresh, else None."""
         key = self._hash_key(server, tool, arguments)
         now = fields.Datetime.now()
@@ -97,7 +97,7 @@ class AIApiResultCache(models.Model):
         return rec.body or ''
 
     @api.model
-    def store(self, server, tool, arguments, body, ttl_seconds=None):
+    def _store(self, server, tool, arguments, body, ttl_seconds=None):
         """Upsert a fresh cache entry. Best-effort — never breaks the turn."""
         try:
             ttl = int(ttl_seconds or API_CALL_CACHE_TTL_SECONDS)

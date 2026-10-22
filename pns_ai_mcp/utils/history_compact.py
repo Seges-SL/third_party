@@ -38,13 +38,13 @@ _IMG_TAG_RE = re.compile(r'<img\b([^>]*)/?>', re.IGNORECASE | re.DOTALL)
 _IMG_SRC_RE = re.compile(r'''\bsrc\s*=\s*["']([^"']+)["']''', re.IGNORECASE)
 _IMG_ALT_RE = re.compile(r'''\balt\s*=\s*["']([^"']*)["']''', re.IGNORECASE)
 _DATASET_ATTR_RE = re.compile(
-    r'data-chatboo-dataset=(["\'])(.*?)\1',
+    r'data-ai-dataset=(["\'])(.*?)\1',
     re.IGNORECASE | re.DOTALL,
 )
 _TITLE_RE = re.compile(
     r'<h[1-3][^>]*>(.*?)</h[1-3]>'
     r'|<caption[^>]*>(.*?)</caption>'
-    r'|class="[^"]*o_chatboo_table_title[^"]*"[^>]*>(.*?)<',
+    r'|class="[^"]*o_ai_table_title[^"]*"[^>]*>(.*?)<',
     re.IGNORECASE | re.DOTALL,
 )
 _MD_SEP_RE = re.compile(r'^\s*\|?\s*[-:| ]+\s*\|?\s*$')
@@ -147,7 +147,8 @@ def inspect_payload(payload):
             html_meta['title'] = meta['title']
         return html_meta
     pins = payload.get('map_pins')
-    if payload.get('map_url') or payload.get('pins_url') or pins:
+    from .result_page import has_page_url
+    if has_page_url(payload) or pins:
         n = len(pins) if isinstance(pins, list) else 0
         meta['is_artifact'] = True
         meta['kind'] = 'map'
@@ -176,7 +177,7 @@ def inspect_content(text):
         if images:
             meta['images'] = images
         return meta
-    if 'o_chatboo_table_block' in text or '<table' in text.lower():
+    if 'o_ai_table_block' in text or '<table' in text.lower():
         tr = max(0, text.lower().count('<tr') - 1)
         meta['is_artifact'] = True
         meta['kind'] = 'table'
@@ -185,7 +186,7 @@ def inspect_content(text):
         if images:
             meta['images'] = images
         return meta
-    if 'o_chatboo_map' in text or 'map_url' in text:
+    if 'o_ai_map' in text or 'o_ai_page_link' in text or 'map_url' in text:
         meta['is_artifact'] = True
         meta['kind'] = 'map'
         return meta

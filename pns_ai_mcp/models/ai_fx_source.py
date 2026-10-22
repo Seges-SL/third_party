@@ -31,7 +31,8 @@ class AiFxSource(models.Model):
     url = fields.Char(
         required=True,
         help="HTTPS JSON feed with a USD-based 'rates' map. "
-             "Not subject to the Safe Plan URL whitelist.",
+             "Not subject to the Safe Plan URL whitelist. "
+             "Chatboo requests this feed when the chat opens.",
     )
     sequence = fields.Integer(default=10)
     active = fields.Boolean(default=True)

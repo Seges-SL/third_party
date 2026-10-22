@@ -15,13 +15,13 @@ import unicodedata
 
 _logger = logging.getLogger(__name__)
 
-# Decorative Chatboo chrome — not a drawing the user asked to keep.
+# Decorative chrome of the rendered card — not a drawing the user asked to keep.
 _DECORATIVE_MARKERS = (
-    'o_chatboo_map_banner_pins',
-    'o_chatboo_link_banner_mark',
-    'o_chatboo_chart_',
-    'o_chatboo_dashboard_',
-    'o_chatboo_export_bar',
+    'o_ai_map_banner_pins',
+    'o_ai_link_banner_mark',
+    'o_ai_chart_',
+    'o_ai_dashboard_',
+    'o_ai_export_bar',
 )
 
 _SVG_OPEN = re.compile(r'<svg\b[^>]*>', re.IGNORECASE)
@@ -451,14 +451,14 @@ def persist_inline_svgs_from_html(env, session_id, html, prompt=None, skill_code
     fence — same gesture as a PDF chip. If nothing is stored, html is unchanged.
     Chip names follow the user prompt or skill (``gato.svg``), not ``drawing-1``.
     """
-    from .session_download import persist_chatboo_session_file
+    from .session_download import persist_turn_file
 
     docs, cleaned = harvest_drawing_svgs(html)
     chips = []
     for index, svg in enumerate(docs, 1):
         raw = svg.encode('utf-8')
         name = svg_filename(svg, index, prompt=prompt, skill_code=skill_code)
-        chip = persist_chatboo_session_file(
+        chip = persist_turn_file(
             env, session_id, raw, name, mimetype='image/svg+xml',
         )
         if not chip:

@@ -82,8 +82,8 @@
     text-align: start;
 }
 
-.o_chatboo_content th.o_chatboo_num,
-.o_chatboo_content td.o_chatboo_num,
+.o_chatboo_content th.o_ai_num,
+.o_chatboo_content td.o_ai_num,
 .o_chatboo_content th.text-end,
 .o_chatboo_content td.text-end {
     text-align: end !important;
@@ -110,11 +110,11 @@
 .o_chatboo_content .table-responsive:has(td[data-tip]) {
     overflow: visible;
 }
-.o_chatboo_content td.o_chatboo_tiptarget[data-tip] {
+.o_chatboo_content td.o_ai_tiptarget[data-tip] {
     position: relative;
     cursor: help;
 }
-.o_chatboo_content td.o_chatboo_tiptarget[data-tip]:hover::after {
+.o_chatboo_content td.o_ai_tiptarget[data-tip]:hover::after {
     content: attr(data-tip);
     position: absolute;
     /* Near the letter / cursor: from cell mid-point, just above */
@@ -141,7 +141,7 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
     pointer-events: none;
 }
-.o_chatboo_content td.o_chatboo_tiptarget[data-tip]:hover::before {
+.o_chatboo_content td.o_ai_tiptarget[data-tip]:hover::before {
     content: "";
     position: absolute;
     inset-inline-start: 50%;
@@ -212,9 +212,9 @@
 .o_chatboo_content h3 { font-size: 1.0em; }
 
 .o_chatboo_content p,
-.o_chatboo_content .o_chatboo_prose_p,
-.o_chatboo_content .o_chatboo_prose_li,
-.o_chatboo_content .o_chatboo_prose,
+.o_chatboo_content .o_ai_prose_p,
+.o_chatboo_content .o_ai_prose_li,
+.o_chatboo_content .o_ai_prose,
 .o_chatboo_content .pns-result-footer {
     letter-spacing: normal;
     word-spacing: normal;
@@ -226,10 +226,10 @@
     line-height: 1.5;
 }
 
-.o_chatboo_content .o_chatboo_prose h1,
-.o_chatboo_content .o_chatboo_prose h2,
-.o_chatboo_content .o_chatboo_prose h3,
-.o_chatboo_content .o_chatboo_prose h4,
+.o_chatboo_content .o_ai_prose h1,
+.o_chatboo_content .o_ai_prose h2,
+.o_chatboo_content .o_ai_prose h3,
+.o_chatboo_content .o_ai_prose h4,
 .o_chatboo_content .pns-result-footer h1,
 .o_chatboo_content .pns-result-footer h2,
 .o_chatboo_content .pns-result-footer h3,
@@ -240,34 +240,34 @@
     margin-bottom: 0.35em;
 }
 
-.o_chatboo_content .o_chatboo_prose h1,
+.o_chatboo_content .o_ai_prose h1,
 .o_chatboo_content .pns-result-footer h1 { font-size: 1.25em; }
-.o_chatboo_content .o_chatboo_prose h2,
+.o_chatboo_content .o_ai_prose h2,
 .o_chatboo_content .pns-result-footer h2 { font-size: 1.15em; }
-.o_chatboo_content .o_chatboo_prose h3,
+.o_chatboo_content .o_ai_prose h3,
 .o_chatboo_content .pns-result-footer h3 { font-size: 1.05em; }
 
 /* Título resumen: sin hueco superior; tipografía más grande */
-.o_chatboo_content h3.o_chatboo_result_title,
-.o_chatboo_content h3.pns-result-title.o_chatboo_result_title {
+.o_chatboo_content h3.o_ai_result_title,
+.o_chatboo_content h3.pns-result-title.o_ai_result_title {
     margin: 0 !important;
     font-size: 1.65rem !important;
     font-weight: 700 !important;
     line-height: 1.2 !important;
 }
 
-.o_chatboo_content .o_chatboo_grouped_result {
+.o_chatboo_content .o_ai_grouped_result {
     margin-top: 0 !important;
 }
 
-.o_chatboo_content .o_chatboo_result_title + .o_chatboo_table_block.o_chatboo_titled_block,
-.o_chatboo_content .o_chatboo_grouped_result > .o_chatboo_table_block.o_chatboo_titled_block:first-of-type {
+.o_chatboo_content .o_ai_result_title + .o_ai_table_block.o_ai_titled_block,
+.o_chatboo_content .o_ai_grouped_result > .o_ai_table_block.o_ai_titled_block:first-of-type {
     margin-top: 0 !important;
     margin-bottom: 1.1em;
 }
 
-.o_chatboo_content .o_chatboo_ficha table,
-.o_chatboo_content table.o_chatboo_ficha_table {
+.o_chatboo_content .o_ai_ficha table,
+.o_chatboo_content table.o_ai_ficha_table {
     margin: 0 !important;
 }
 
@@ -289,7 +289,7 @@
 }
 
 /* Charts under server-rendered tables (Chart.js) */
-.o_chatboo_table_block {
+.o_ai_table_block {
     margin: 0.5em 0 1em 0;
     width: 100%;
     max-width: 100%;
@@ -297,15 +297,15 @@
     box-sizing: border-box;
 }
 
-.o_chatboo_data_table th.o_chatboo_th_sort {
+.o_ai_data_table th.o_ai_th_sort {
     cursor: pointer;
     user-select: none;
     white-space: nowrap;
 }
-.o_chatboo_data_table th.o_chatboo_th_sort:hover {
+.o_ai_data_table th.o_ai_th_sort:hover {
     background: rgba(0, 0, 0, 0.04);
 }
-.o_chatboo_data_table th.o_chatboo_th_sort::after {
+.o_ai_data_table th.o_ai_th_sort::after {
     content: "↕";
     display: inline-block;
     margin-left: 0.4em;
@@ -315,16 +315,16 @@
     color: #444;
     opacity: 1;
 }
-.o_chatboo_data_table th.o_chatboo_th_sort[aria-sort="ascending"]::after {
+.o_ai_data_table th.o_ai_th_sort[aria-sort="ascending"]::after {
     content: "▲";
     color: #111;
 }
-.o_chatboo_data_table th.o_chatboo_th_sort[aria-sort="descending"]::after {
+.o_ai_data_table th.o_ai_th_sort[aria-sort="descending"]::after {
     content: "▼";
     color: #111;
 }
 
-.o_chatboo_table_block .table-responsive,
+.o_ai_table_block .table-responsive,
 .o_chatboo_messages .table-responsive {
     position: relative;
 }
@@ -341,27 +341,27 @@
     z-index: 30;
 }
 
-.o_chatboo_data_table.o_chatboo_col_reordering,
-.o_chatboo_data_table.o_chatboo_col_reordering th {
+.o_ai_data_table.o_chatboo_col_reordering,
+.o_ai_data_table.o_chatboo_col_reordering th {
     cursor: grabbing;
 }
 
-.o_chatboo_data_table th.o_chatboo_th_sort.is-dragging {
+.o_ai_data_table th.o_ai_th_sort.is-dragging {
     opacity: 0.55;
 }
 
-.o_chatboo_block_title {
+.o_ai_block_title {
     margin: 0 0 0.45em 0 !important;
 }
 
 /* Ficha: título = 1ª fila del thead (pegada a columnas) */
-.o_chatboo_table_block.o_chatboo_titled_block {
+.o_ai_table_block.o_ai_titled_block {
     margin: 0.85em 0 1.1em 0;
     border: none;
     background: transparent;
 }
 
-.o_chatboo_table_block .table-responsive.o_chatboo_ficha {
+.o_ai_table_block .table-responsive.o_ai_ficha {
     margin: 0 !important;
     border: 1px solid #dde5ec;
     border-radius: 8px;
@@ -369,25 +369,25 @@
     background: #fff;
 }
 
-.o_chatboo_ficha_table {
+.o_ai_ficha_table {
     margin-bottom: 0 !important;
 }
 
-.o_chatboo_ficha_table thead tr.o_chatboo_ficha_title th {
+.o_ai_ficha_table thead tr.o_ai_ficha_title th {
     border-top: 0;
     border-bottom: 0;
     vertical-align: middle;
 }
 
-.o_chatboo_ficha_table thead tr:not(.o_chatboo_ficha_title) th {
+.o_ai_ficha_table thead tr:not(.o_ai_ficha_title) th {
     border-top: 0;
 }
 
-.o_chatboo_table_block .o_chatboo_chart_toolbar {
+.o_ai_table_block .o_ai_chart_toolbar {
     margin-top: 0.65em;
 }
 
-.o_chatboo_chart_toolbar {
+.o_ai_chart_toolbar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -395,8 +395,16 @@
     margin: 0.35em 0 0.5em 0;
 }
 
+.o_ai_chart_toolbar .o_chatboo_chart_controls {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 /* Contraste fijo: btn-outline-secondary se pierde sobre fondo blanco del chat. */
-.o_chatboo_chart_toolbar .o_chatboo_chart_toggle {
+.o_ai_chart_toolbar .o_chatboo_chart_toggle,
+.o_ai_chart_toolbar .o_chatboo_canvas_btn {
     color: #1a1a1a !important;
     background-color: #f1f3f5 !important;
     border: 1px solid #6c757d !important;
@@ -404,20 +412,44 @@
     opacity: 1 !important;
 }
 
-.o_chatboo_chart_toolbar .o_chatboo_chart_toggle:hover,
-.o_chatboo_chart_toolbar .o_chatboo_chart_toggle:focus {
+.o_ai_chart_toolbar .o_chatboo_chart_toggle:hover,
+.o_ai_chart_toolbar .o_chatboo_chart_toggle:focus,
+.o_ai_chart_toolbar .o_chatboo_canvas_btn:hover:not(:disabled),
+.o_ai_chart_toolbar .o_chatboo_canvas_btn:focus:not(:disabled) {
     color: #fff !important;
     background-color: #0d6efd !important;
     border-color: #0d6efd !important;
 }
 
-.o_chatboo_chart_toolbar .o_chatboo_chart_toggle[aria-pressed="true"] {
+.o_ai_chart_toolbar .o_chatboo_canvas_btn--building {
+    cursor: pointer;
+}
+
+.o_ai_chart_toolbar .o_chatboo_canvas_btn--building .o_chatboo_typing {
+    gap: 3px;
+}
+
+.o_ai_chart_toolbar .o_chatboo_canvas_btn--building .o_chatboo_typing > span {
+    width: 5px;
+    height: 5px;
+}
+
+.o_ai_chart_toolbar .o_chatboo_canvas_btn--building:hover .o_chatboo_typing > span,
+.o_ai_chart_toolbar .o_chatboo_canvas_btn--building:focus .o_chatboo_typing > span {
+    background: currentColor;
+}
+
+.o_ai_chart_toolbar .o_chatboo_canvas_btn--failed {
+    border-color: #dc3545 !important;
+}
+
+.o_ai_chart_toolbar .o_chatboo_chart_toggle[aria-pressed="true"] {
     color: #fff !important;
     background-color: #0d6efd !important;
     border-color: #0d6efd !important;
 }
 
-.o_chatboo_chart_toolbar .o_chatboo_chart_type {
+.o_ai_chart_toolbar .o_chatboo_chart_type {
     width: auto;
     min-width: 8rem;
     max-width: 12rem;
@@ -427,7 +459,7 @@
     border: 1px solid #6c757d;
 }
 
-.o_chatboo_chart_toolbar .o_chatboo_chart_rotate {
+.o_ai_chart_toolbar .o_chatboo_chart_rotate {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -439,18 +471,18 @@
     line-height: 1;
 }
 
-.o_chatboo_chart_toolbar .o_chatboo_chart_rotate:hover,
-.o_chatboo_chart_toolbar .o_chatboo_chart_rotate:focus {
+.o_ai_chart_toolbar .o_chatboo_chart_rotate:hover,
+.o_ai_chart_toolbar .o_chatboo_chart_rotate:focus {
     color: #fff !important;
     background-color: #0d6efd !important;
     border-color: #0d6efd !important;
 }
 
-.o_chatboo_chart_toolbar .o_chatboo_chart_rotate svg {
+.o_ai_chart_toolbar .o_chatboo_chart_rotate svg {
     display: block;
 }
 
-.o_chatboo_chart_host {
+.o_ai_chart_host {
     position: relative;
     width: 100%;
     max-width: 100%;
@@ -462,22 +494,22 @@
     margin: 0 0 0.75em 0;
 }
 
-.o_chatboo_chart_host canvas {
+.o_ai_chart_host canvas {
     display: block;
     /* Chart.js controla el box; max-width:100% deja un init 0×0 aplastado. */
 }
 
-.o_chatboo_chart_host .o_chatboo_echarts_surface {
+.o_ai_chart_host .o_ai_echarts_surface {
     width: 100%;
     height: 100%;
     min-height: 280px;
 }
 
-.o_chatboo_table_block .table-responsive.o_chatboo_table_collapsed {
+.o_ai_table_block .table-responsive.o_chatboo_table_collapsed {
     display: none;
 }
 
-.o_chatboo_table_block[data-chatboo-show-mode="chart-table"] .o_chatboo_chart_host {
+.o_ai_table_block[data-ai-show-mode="chart-table"] .o_ai_chart_host {
     margin-bottom: 0.35em;
 }
 
@@ -556,12 +588,12 @@
 /* ═══════════════════════════════════════════════════════════════════════
    COPY BUTTON — floating action on messages
    ═══════════════════════════════════════════════════════════════════════ */
-.o_chatboo_copy_btn {
+.o_ai_copy_btn {
     opacity: 0.5;
     transition: opacity var(--chatboo-transition), transform var(--chatboo-transition);
 }
 
-.o_chatboo_copy_btn:hover {
+.o_ai_copy_btn:hover {
     opacity: 1;
     transform: scale(1.1);
 }
@@ -580,12 +612,12 @@
     margin-top: 0.5rem;
 }
 
-.o_chatboo_ts_row .o_chatboo_ts {
+.o_chatboo_ts_row .o_ai_ts {
     margin-top: 0;
     min-width: 0;
 }
 
-.o_chatboo_ts_row .o_chatboo_export_bar {
+.o_chatboo_ts_row .o_ai_export_bar {
     margin-inline-start: auto;
     flex-shrink: 0;
 }
@@ -594,29 +626,29 @@
 /* ═══════════════════════════════════════════════════════════════════════
    MAP THUMBS + COORDS COPY
    ═══════════════════════════════════════════════════════════════════════ */
-.o_chatboo_mapthumb {
+.o_ai_mapthumb {
     display: inline-block;
     text-decoration: none;
     vertical-align: middle;
 }
-.o_chatboo_mapthumb_wrap {
+.o_ai_mapthumb_wrap {
     position: relative;
     display: inline-block;
     line-height: 0;
     border-radius: 4px;
     overflow: hidden;
 }
-.o_chatboo_mapthumb_tiles_osm .o_chatboo_mapthumb_wrap {
+.o_ai_mapthumb_tiles_osm .o_ai_mapthumb_wrap {
     border: 2px solid #6aa84f;
 }
-.o_chatboo_mapthumb_tiles_gm .o_chatboo_mapthumb_wrap {
+.o_ai_mapthumb_tiles_gm .o_ai_mapthumb_wrap {
     border: 2px solid #4285f4;
 }
-.o_chatboo_mapthumb_hybrid .o_chatboo_mapthumb_wrap {
+.o_ai_mapthumb_hybrid .o_ai_mapthumb_wrap {
     border: 2px dashed #4285f4;
     box-shadow: inset 0 0 0 1px #6aa84f;
 }
-.o_chatboo_mapthumb_badge {
+.o_ai_mapthumb_badge {
     position: absolute;
     inset-inline-end: 3px;
     bottom: 3px;
@@ -629,21 +661,21 @@
     background: rgba(33, 37, 41, 0.78);
     letter-spacing: 0.02em;
 }
-.o_chatboo_mapthumb_gm .o_chatboo_mapthumb_badge {
+.o_ai_mapthumb_gm .o_ai_mapthumb_badge {
     background: rgba(66, 133, 244, 0.92);
 }
-.o_chatboo_mapthumb_osm .o_chatboo_mapthumb_badge {
+.o_ai_mapthumb_osm .o_ai_mapthumb_badge {
     background: rgba(106, 168, 79, 0.92);
 }
-.o_chatboo_mapthumb_hybrid .o_chatboo_mapthumb_badge {
+.o_ai_mapthumb_hybrid .o_ai_mapthumb_badge {
     background: rgba(66, 133, 244, 0.92);
 }
 
 /* Shared multipin map banner (capa A) — looks like a map, not a bare link */
-.o_chatboo_map_banner {
+.o_ai_map_banner {
     margin: 0.35em 0 0.85em 0;
 }
-.o_chatboo_map_banner_card {
+.o_ai_map_banner_card {
     display: flex;
     align-items: stretch;
     gap: 0;
@@ -657,11 +689,11 @@
     box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
     transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
-.o_chatboo_map_banner_card:hover {
+.o_ai_map_banner_card:hover {
     border-color: #7aa2c4;
     box-shadow: 0 4px 14px rgba(16, 24, 40, 0.12);
 }
-.o_chatboo_map_banner_preview {
+.o_ai_map_banner_preview {
     position: relative;
     flex: 0 0 148px;
     min-height: 88px;
@@ -672,7 +704,7 @@
         linear-gradient(135deg, #d7e8d2 0%, #cfe0ef 48%, #e8f0e4 100%);
     background-size: auto, 18px 18px, 18px 18px, auto;
 }
-.o_chatboo_map_banner_gm .o_chatboo_map_banner_preview {
+.o_ai_map_banner_gm .o_ai_map_banner_preview {
     background:
         linear-gradient(160deg, rgba(255,255,255,0.35), rgba(255,255,255,0) 45%),
         linear-gradient(0deg, rgba(66, 133, 244, 0.10) 1px, transparent 1px),
@@ -680,13 +712,13 @@
         linear-gradient(135deg, #e8eef8 0%, #d5e3f7 48%, #eef3fa 100%);
     background-size: auto, 18px 18px, 18px 18px, auto;
 }
-.o_chatboo_map_banner_pins {
+.o_ai_map_banner_pins {
     position: absolute;
     inset: 8px 6px 4px 6px;
     width: calc(100% - 12px);
     height: calc(100% - 12px);
 }
-.o_chatboo_map_banner_meta {
+.o_ai_map_banner_meta {
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -694,34 +726,34 @@
     padding: 0.65rem 0.85rem;
     min-width: 0;
 }
-.o_chatboo_map_banner_title {
+.o_ai_map_banner_title {
     font-size: 0.95rem;
     font-weight: 700;
     color: #1a1a1a;
     line-height: 1.25;
 }
-.o_chatboo_map_banner_count {
+.o_ai_map_banner_count {
     font-size: 0.8rem;
     color: #5b6b7a;
 }
-.o_chatboo_map_banner_cta {
+.o_ai_map_banner_cta {
     margin-top: 0.15rem;
     font-size: 0.82rem;
     font-weight: 600;
     color: #0d6efd;
 }
-.o_chatboo_map_banner_card:hover .o_chatboo_map_banner_cta {
+.o_ai_map_banner_card:hover .o_ai_map_banner_cta {
     text-decoration: underline;
 }
-.o_chatboo_map_banner_thumb {
+.o_ai_map_banner_thumb {
     display: inline-block;
 }
 
-/* Link banner — same gesture as the map card (preview + title + CTA) */
-.o_chatboo_link_banner {
-    max-width: 420px;
+/* Page in its own tab — same card as the map, not a bare <a> */
+.o_ai_page_link {
+    margin: 0.35em 0 0.85em 0;
 }
-.o_chatboo_link_banner_card {
+.o_ai_page_link_card {
     display: flex;
     align-items: stretch;
     gap: 0;
@@ -735,11 +767,71 @@
     box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
     transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
-.o_chatboo_link_banner_card:hover {
+.o_ai_page_link_card:hover {
     border-color: #7aa2c4;
     box-shadow: 0 4px 14px rgba(16, 24, 40, 0.12);
 }
-.o_chatboo_link_banner_preview {
+.o_ai_page_link_preview {
+    position: relative;
+    flex: 0 0 148px;
+    min-height: 88px;
+    background:
+        linear-gradient(160deg, rgba(255,255,255,0.35), rgba(255,255,255,0) 45%),
+        linear-gradient(135deg, #e8eef8 0%, #d5e3f7 48%, #eef3fa 100%);
+}
+.o_ai_page_link_icon {
+    position: absolute;
+    inset: 16px;
+    width: calc(100% - 32px);
+    height: calc(100% - 32px);
+}
+.o_ai_page_link_meta {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.2rem;
+    padding: 0.65rem 0.85rem;
+    min-width: 0;
+}
+.o_ai_page_link_title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    line-height: 1.25;
+}
+.o_ai_page_link_cta {
+    margin-top: 0.15rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #0d6efd;
+}
+.o_ai_page_link_card:hover .o_ai_page_link_cta {
+    text-decoration: underline;
+}
+
+/* Link banner — same gesture as the map card (preview + title + CTA) */
+.o_ai_link_banner {
+    max-width: 420px;
+}
+.o_ai_link_banner_card {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    max-width: 420px;
+    text-decoration: none !important;
+    color: inherit;
+    border: 1px solid #c5d0da;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.o_ai_link_banner_card:hover {
+    border-color: #7aa2c4;
+    box-shadow: 0 4px 14px rgba(16, 24, 40, 0.12);
+}
+.o_ai_link_banner_preview {
     position: relative;
     flex: 0 0 148px;
     min-height: 88px;
@@ -750,13 +842,13 @@
         linear-gradient(135deg, #e8eef8 0%, #d5e3f7 48%, #eef3fa 100%);
     background-size: auto, 18px 18px, 18px 18px, auto;
 }
-.o_chatboo_link_banner_mark {
+.o_ai_link_banner_mark {
     position: absolute;
     inset: 8px 6px 4px 6px;
     width: calc(100% - 12px);
     height: calc(100% - 12px);
 }
-.o_chatboo_link_banner_meta {
+.o_ai_link_banner_meta {
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -764,26 +856,26 @@
     padding: 0.65rem 0.85rem;
     min-width: 0;
 }
-.o_chatboo_link_banner_title {
+.o_ai_link_banner_title {
     font-size: 0.95rem;
     font-weight: 700;
     color: #1a1a1a;
     line-height: 1.25;
 }
-.o_chatboo_link_banner_host {
+.o_ai_link_banner_host {
     font-size: 0.8rem;
     color: #5b6b7a;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.o_chatboo_link_banner_cta {
+.o_ai_link_banner_cta {
     margin-top: 0.15rem;
     font-size: 0.82rem;
     font-weight: 600;
     color: #0d6efd;
 }
-.o_chatboo_link_banner_card:hover .o_chatboo_link_banner_cta {
+.o_ai_link_banner_card:hover .o_ai_link_banner_cta {
     text-decoration: underline;
 }
 
@@ -889,13 +981,13 @@
     text-decoration: underline;
 }
 
-.o_chatboo_svg_cards {
+.o_ai_svg_cards {
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
     margin: 0.35em 0 0.85em 0;
 }
-.o_chatboo_svg_card {
+.o_ai_svg_card {
     max-width: 420px;
 }
 .o_chatboo_svg_card_btn {
@@ -920,19 +1012,19 @@
     height: auto;
 }
 
-.o_chatboo_coords {
+.o_ai_coords {
     display: inline-flex;
     align-items: center;
     gap: 4px;
     white-space: nowrap;
 }
-.o_chatboo_coords_text {
+.o_ai_coords_text {
     font-size: 11px;
     background: transparent;
     color: inherit;
     padding: 0;
 }
-.o_chatboo_cell_copy {
+.o_ai_cell_copy {
     border: 0;
     background: transparent;
     padding: 0 2px;
@@ -941,7 +1033,7 @@
     opacity: 0.45;
     color: inherit;
 }
-.o_chatboo_cell_copy:hover {
+.o_ai_cell_copy:hover {
     opacity: 1;
 }
 
@@ -1248,7 +1340,7 @@
     background-color: white;
     border-radius: 6px 6px 0 0;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-    z-index: 1050; /* Por encima de la mayoría de vistas de Odoo */
+    z-index: 1039; /* Debajo del modal de Odoo (1050) */
     display: flex;
     flex-direction: column;
     transition: transform 0.2s ease-in-out, height 0.2s;
@@ -1400,7 +1492,7 @@
 
 /* ─── Modal de historial de sesiones (diseño portado de O19) ───
    Modal propio (no el estándar de Bootstrap): ligero, redondeado y con
-   sombra. Se coloca por encima del overlay flotante de Chatboo (z-index 1050). */
+   sombra. Se coloca por encima del overlay flotante de Chatboo (z-index 1039). */
 .o_chatboo_session_modal_backdrop {
     position: fixed;
     inset: 0;

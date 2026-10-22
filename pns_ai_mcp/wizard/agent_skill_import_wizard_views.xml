@@ -17,7 +17,7 @@
                     <p>Imported skills are linked to this agent. Existing ones (same code) are skipped unless "Replace existing" is checked. Nothing is ever deleted.</p>
                 </div>
                 <footer>
-                    <button name="action_import" string="Import" type="object"
+                    <button name="action_preview" string="Review" type="object"
                             class="btn-primary"/>
                     <button string="Cancel" class="btn-secondary" special="cancel"/>
                 </footer>

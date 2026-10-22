@@ -275,9 +275,9 @@ def cancel_pending_verifications_for_user(user_id, reason="falta de permisos"):
     try:
         env_su = request.env(user=SUPERUSER_ID)
         verification_model = env_su['ai.safe.operation']
-        from odoo.addons.pns_ai_mcp.constants import PIN_EXPIRY_MINUTES
+        from odoo.addons.pns_ai_mcp.constants import PENDING_OPERATION_TTL_MINUTES
         
-        time_limit = fields.Datetime.now() - timedelta(minutes=PIN_EXPIRY_MINUTES)
+        time_limit = fields.Datetime.now() - timedelta(minutes=PENDING_OPERATION_TTL_MINUTES)
         pending_verifications = verification_model.search([
             ('user_id', '=', user_id),
             ('status', '=', 'pending'),

@@ -8,7 +8,7 @@ NO puede repetir un bloque tabular cuya huella de dataset ya salió en un
 mensaje assistant anterior, salvo que este mismo turno lo haya regenerado
 vía tool (``allow_fingerprints``).
 
-Sin hardcode de dominio: solo huella estructural de ``data-chatboo-dataset``.
+Sin hardcode de dominio: solo huella estructural de ``data-ai-dataset``.
 """
 from __future__ import annotations
 
@@ -18,11 +18,11 @@ import json
 import re
 
 _DATASET_ATTR_RE = re.compile(
-    r'data-chatboo-dataset=(["\'])(.*?)\1',
+    r'data-ai-dataset=(["\'])(.*?)\1',
     re.IGNORECASE | re.DOTALL,
 )
 _TABLE_OPEN_RE = re.compile(
-    r'<div\b[^>]*\bo_chatboo_table_block\b[^>]*>',
+    r'<div\b[^>]*\bo_ai_table_block\b[^>]*>',
     re.IGNORECASE,
 )
 
@@ -45,7 +45,7 @@ def fingerprint_dataset_payload(raw_json_or_obj) -> str:
 
 
 def extract_dataset_fingerprints(content: str) -> set:
-    """Huellas de todos los data-chatboo-dataset en un HTML/texto."""
+    """Huellas de todos los data-ai-dataset en un HTML/texto."""
     fps = set()
     if not content or not isinstance(content, str):
         return fps
@@ -98,8 +98,8 @@ def _find_div_block_end(text: str, start: int) -> int:
 
 
 def iter_table_block_spans(content: str):
-    """Yields (start, end, fingerprint|None) for each o_chatboo_table_block."""
-    if not content or 'o_chatboo_table_block' not in content:
+    """Yields (start, end, fingerprint|None) for each o_ai_table_block."""
+    if not content or 'o_ai_table_block' not in content:
         return
     for open_m in _TABLE_OPEN_RE.finditer(content):
         start = open_m.start()

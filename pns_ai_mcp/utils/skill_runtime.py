@@ -36,10 +36,13 @@ add post-fetch formatters. The engine ships none.
 from __future__ import annotations
 
 import ast
+import io
 import json
 import logging
 import re
 import shlex
+import tokenize
+from datetime import date as _date
 
 _logger = logging.getLogger(__name__)
 
@@ -142,11 +145,105 @@ def _schema_key_is_temporal(key, spec):
     return 'YYYY-MM-DD' in desc or 'YYYY-MM' in desc
 
 
+def _schema_key_takes_period(key, spec):
+    """Temporal slot, or a string key whose contract writes ``YYYY``."""
+    if _schema_key_is_temporal(key, spec):
+        return True
+    spec = spec if isinstance(spec, dict) else {}
+    if (spec.get('type') or 'string').lower() != 'string':
+        return False
+    desc = str(spec.get('desc') or spec.get('description') or '')
+    return 'YYYY' in desc
+
+
+_PERIOD_SHAPES = (
+    (re.compile(r'^\d{4}-\d{2}-\d{2}\.\.\d{4}-\d{2}-\d{2}$'),
+     re.compile(r'YYYY-MM-DD\.\.YYYY-MM-DD')),
+    (re.compile(r'^\d{8}-\d{8}$'), re.compile(r'YYYYMMDD-YYYYMMDD')),
+    (re.compile(r'^\d{4}-\d{2}-\d{2}$'),
+     re.compile(r'(?<![-\w.])YYYY-MM-DD(?![-\w]|\.\.)')),
+    (re.compile(r'^\d{4}-\d{2}$'), re.compile(r'(?<![-\w.])YYYY-MM(?![-\w])')),
+    (re.compile(r'^\d{4}-\d{4}$'), re.compile(r'YYYY-YYYY')),
+    (re.compile(r'^\d{4}$'),
+     re.compile(r'(?<![-\w.])YYYY(?![-\w])|YYYY-YYYY')),
+)
+
+
+def _contract_writes_shape(spec, tok):
+    """True when the key's desc writes the token's shape (``YYYY-MM`` …)."""
+    spec = spec if isinstance(spec, dict) else {}
+    desc = str(spec.get('desc') or spec.get('description') or '')
+    s = str(tok or '').strip().replace(' ', '')
+    s = s.replace('/', '-').replace('–', '-').replace('—', '-')
+    for token_re, desc_re in _PERIOD_SHAPES:
+        if token_re.match(s):
+            return bool(desc_re.search(desc))
+    return False
+
+
+def _period_fits_key(key, spec, tok):
+    """A period token fits a free key: canonical slot, or the shape it writes."""
+    if not _param_value_resolved(key, _coerce_schema_value(spec, tok), spec):
+        return False
+    if (
+        key in _CANONICAL_PARAM
+        or key == 'periodos'
+        or not _schema_key_takes_period(key, spec)
+    ):
+        return True
+    return _contract_writes_shape(spec, tok)
+
+
+def _period_as_date_pair(tok):
+    """``(first_day, last_day)`` ISO for a formal period token, or None."""
+    s = str(tok or '').strip().replace(' ', '')
+    s = s.replace('/', '-').replace('–', '-').replace('—', '-')
+    m = re.fullmatch(r'(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})', s)
+    if m:
+        return m.group(1), m.group(2)
+    m = re.fullmatch(r'(\d{4})(\d{2})(\d{2})-(\d{4})(\d{2})(\d{2})', s)
+    if m:
+        g = m.groups()
+        return '%s-%s-%s' % g[:3], '%s-%s-%s' % g[3:]
+    if re.fullmatch(r'\d{4}-\d{2}-\d{2}', s):
+        return s, s
+    m = re.fullmatch(r'(\d{4})-(\d{2})', s)
+    if m and 1 <= int(m.group(2)) <= 12:
+        import calendar
+        y, mo = int(m.group(1)), int(m.group(2))
+        last = calendar.monthrange(y, mo)[1]
+        return '%04d-%02d-01' % (y, mo), '%04d-%02d-%02d' % (y, mo, last)
+    m = re.fullmatch(r'(\d{4})(?:-(\d{4}))?', s)
+    if m:
+        a = int(m.group(1))
+        b = int(m.group(2) or a)
+        a, b = min(a, b), max(a, b)
+        return '%04d-01-01' % a, '%04d-12-31' % b
+    return None
+
+
+def _schema_key_is_year_slot(key, spec):
+    """True when the hole is a calendar year, not a count.
+
+    Structural: ``{year}`` / ``{year}-n`` default, a 4-digit integer
+    default, or the inferred year keys. A bare count (``24``) must not
+    land here.
+    """
+    spec = spec if isinstance(spec, dict) else {}
+    default = str(spec.get('default') or '').strip()
+    if _YEAR_SLOT_DEFAULT_RE.fullmatch(default):
+        return True
+    if _INT_DEFAULT.fullmatch(default) and len(default.lstrip('-')) == 4:
+        return True
+    return (key or '').strip().casefold() in ('year', 'anio')
+
+
 # Sandbox names that are never slash-arg keys (always injected or leftover).
 _SANDBOX_NON_PARAMS = frozenset({
     'env', 'result', 'user', 'company', 'odoo_version', 'odoo_series',
     'user_lang', 'lang', 'locale', 'previous_result', 'skill_state',
     'arguments',
+    'page_url',
 })
 _INFERRED_SPEC = {
     'fecha': {'type': 'string', 'desc': 'YYYY-MM-DD. Empty if absent.'},
@@ -256,11 +353,12 @@ def fill_capture_params(code, schema_txt='', hint=''):
             return schema_txt, hint
         if not isinstance(parsed, dict):
             return schema_txt, hint
-        dumped = json.dumps(parsed, ensure_ascii=False, separators=(',', ':'))
+        parsed = drop_result_param_keys(parsed)
+        dumped = json.dumps(parsed, ensure_ascii=False, separators=(',', ':')) if parsed else ''
         if not hint:
             hint = infer_arg_hint_from_schema(parsed)
         return dumped, hint
-    inferred = infer_param_schema_from_code(code)
+    inferred = drop_result_param_keys(infer_param_schema_from_code(code))
     if not inferred:
         return '', hint
     dumped = param_schema_to_json(inferred)
@@ -273,11 +371,17 @@ _INT_DEFAULT = re.compile(r'^-?\d+$')
 _NUM_DEFAULT = re.compile(r'^-?\d+\.\d+$')
 
 
+# ``{year}`` / ``{year}-n`` expand to a calendar year. ``{year}-01-01`` is a date.
+_YEAR_SLOT_DEFAULT_RE = re.compile(r'^\{year\}(?:-[1-9]\d*)?$')
+
+
 def infer_type_from_default(default):
-    """``string`` unless the default is an integer or number literal."""
+    """``string`` unless the default is an integer, a number, or a year token."""
     text = '' if default is None else str(default).strip()
     if not text:
         return 'string'
+    if _YEAR_SLOT_DEFAULT_RE.fullmatch(text):
+        return 'integer'
     if _INT_DEFAULT.fullmatch(text):
         return 'integer'
     if _NUM_DEFAULT.fullmatch(text):
@@ -327,16 +431,53 @@ def param_rows_fingerprint(rows):
     return json.dumps(parts, ensure_ascii=False)
 
 
+_TURN_CHIP_RE = re.compile(r'^[A-Za-z0-9]{4}(?:-\d+)?$')
+
+
+def help_without_turn_chips(text):
+    """Drop 4-character turn chips (``PMCZ``) from trainer/help prose."""
+    kept = [
+        part for part in (text or '').split()
+        if part and not _TURN_CHIP_RE.match(part)
+    ]
+    return ' '.join(kept).strip()
+
+
 def is_placeholder_skill_help(text, *names):
-    """True when Help is empty or only repeats a name/code."""
-    raw = (text or '').strip().casefold()
-    if not raw:
+    """True when Help is empty, only a name/code, or a name plus a turn chip."""
+    raw = help_without_turn_chips(text)
+    folded = raw.casefold()
+    if not folded:
         return True
+    compact = re.sub(r'[\s-]+', '', folded)
     for name in names:
-        n = (name or '').strip().casefold()
-        if n and raw == n:
+        n = help_without_turn_chips(name).casefold()
+        if n and folded == n:
             return True
+        n_compact = re.sub(r'[\s-]+', '', n)
+        if n_compact and compact == n_compact:
+            return True
+        if n_compact and compact.startswith(n_compact):
+            rest = compact[len(n_compact):]
+            if _TURN_CHIP_RE.match(rest):
+                return True
     return False
+
+
+def capture_help_text(catalog_help='', user_prompt='', name_hint='',
+                      turn_id='', names=()):
+    """Help for a new capture. The slash and the turn chip are not help."""
+    extra = tuple(
+        part for part in (name_hint, turn_id) + tuple(names or ()) if part
+    )
+    help_txt = (catalog_help or '').strip()
+    if is_placeholder_skill_help(help_txt, *extra):
+        help_txt = ''
+    if not help_txt:
+        help_txt = (user_prompt or '').strip()
+    if is_placeholder_skill_help(help_txt, *extra):
+        help_txt = ''
+    return help_txt[:120]
 
 
 def param_rows_need_author(rows):
@@ -528,7 +669,8 @@ _PROCEDURE_TEMPLATE_HEAD = (
 # ignore that placeholder; a real Procedure starts with a different line.
 _PROCEDURE_TEMPLATE = (
     "When to use: describe the user request this skill answers.\n"
-    "Parameters: describe them in Help if the slash takes args.\n"
+    "Parameters: always list them. Form Default or Code default; "
+    "required keys show Help, never a Code fallback.\n"
     "Output: explain how to present the result.\n"
     "Run the Code with relaxaicode; do not recompute its logic.\n"
     "\n"
@@ -808,57 +950,795 @@ def merge_authored_param_schema(existing, extracted, trainer_text):
     return out
 
 
-def schema_keys_unread_by_code(schema, code):
-    """Schema identifiers the Code does not read via ``try/except NameError``."""
-    if isinstance(schema, str):
-        schema = parse_param_schema_txt(schema)
-    if not isinstance(schema, dict):
-        return []
-    read = set(infer_param_keys_from_code(code))
-    unread = []
-    for key in schema:
-        if not isinstance(key, str) or not key.isidentifier() or key.startswith('_'):
+def _schema_key_has_default(spec):
+    spec = spec if isinstance(spec, dict) else {}
+    default = spec.get('default')
+    if default is None:
+        return False
+    if isinstance(default, str) and not default.strip():
+        return False
+    return True
+
+
+def _param_names_mentioned_in_code(code):
+    """Store/Load identifiers in the Code. Keyword arg names do not count."""
+    try:
+        tree = ast.parse(code or '')
+    except SyntaxError:
+        return set()
+    names = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name):
+            names.add(node.id)
+    return names
+
+
+def schema_keys_that_need_place(schema, code=None):
+    """Keys that must exist in the Code: default, required, or already used.
+
+    Unused keys without a default are ignored. A keyword ``months=-12``
+    does not count as using the ``months`` variable.
+    """
+    parsed = _schema_as_dict(schema)
+    if not parsed:
+        return [key for key in _schema_key_set(schema)]
+    mentioned = _param_names_mentioned_in_code(code)
+    needed = []
+    for key in parsed:
+        if not _is_slash_param_key(key):
             continue
-        if key not in read:
-            unread.append(key)
-    return unread
+        spec = parsed.get(key) if isinstance(parsed.get(key), dict) else {}
+        if (
+            _schema_key_has_default(spec)
+            or spec.get('required')
+            or key in mentioned
+        ):
+            needed.append(key)
+    return needed
+
+
+def schema_keys_unread_by_code(schema, code):
+    """Needed schema keys the Code does not read via ``try/except NameError``."""
+    needed = schema_keys_that_need_place(schema, code)
+    read = set(infer_param_keys_from_code(code))
+    return [key for key in needed if key not in read]
+
+
+def drop_result_param_keys(schema):
+    """Drop result helpers (``page_url``) that are not slash arguments."""
+    if isinstance(schema, str):
+        parsed = parse_param_schema_txt(schema)
+        if not parsed:
+            return {}
+        return drop_result_param_keys(parsed)
+    if not isinstance(schema, dict):
+        return {}
+    return {
+        key: spec for key, spec in schema.items()
+        if _is_slash_param_key(key)
+    }
+
+
+def param_read_stub(name):
+    """``try/except NameError`` read for one slash-arg key."""
+    if not _is_slash_param_key(name):
+        return ''
+    return (
+        'try:\n'
+        '    %s = %s\n'
+        'except NameError:\n'
+        '    %s = None\n' % (name, name, name)
+    )
+
+
+def inject_unread_param_reads(code, schema):
+    """Prepend NameError reads for schema keys the Code does not read yet."""
+    unread = schema_keys_unread_by_code(schema, code)
+    if not unread:
+        return code or ''
+    stubs = ''.join(param_read_stub(key) for key in unread)
+    body = (code or '').lstrip('\n')
+    if not stubs:
+        return body
+    if not body:
+        return stubs
+    return stubs + '\n' + body
+
+
+# ``yearall = 2026`` from a captured turn must not overwrite the sandbox.
+_LITERAL_ASSIGN_RE = re.compile(
+    r'^(\s*)([A-Za-z_][A-Za-z0-9_]*)\s*=\s*'
+    r'(-?\d+(?:\.\d+)?|'
+    r"'(?:\\.|[^'])*'|"
+    r'"(?:\\.|[^"])*"|'
+    r'True|False|None)'
+    r'\s*(#.*)?$'
+)
+
+
+def _schema_key_set(schema):
+    if isinstance(schema, dict):
+        return {key for key in schema if _is_slash_param_key(key)}
+    if isinstance(schema, str):
+        return _schema_key_set(parse_param_schema_txt(schema))
+    return {key for key in (schema or []) if _is_slash_param_key(key)}
+
+
+def drop_schema_literal_assigns(code, schema):
+    """Drop ``key = <literal>`` so the sandbox value of that key wins.
+
+    ``key = None`` is the NameError fallback, not a turn literal.
+    Only keys that need a place (default, required, or already used).
+    """
+    keys = set(schema_keys_that_need_place(schema, code))
+    if not keys:
+        keys = _schema_key_set(schema)
+    if not keys or not code:
+        return code or ''
+    kept = []
+    changed = False
+    for line in code.splitlines(True):
+        raw = line[:-1] if line.endswith('\n') else line
+        match = _LITERAL_ASSIGN_RE.match(raw)
+        if match and match.group(2) in keys:
+            value = (match.group(3) or '').strip()
+            if value not in ('None', 'True', 'False'):
+                changed = True
+                continue
+        kept.append(line)
+    if not changed:
+        return code
+    return ''.join(kept)
+
+
+def bind_code_to_schema_params(code, schema, env=None):
+    """NameError reads plus the schema names used in the query and title."""
+    return _replace_unique_default_literals(
+        drop_schema_literal_assigns(
+            inject_unread_param_reads(code, schema),
+            schema,
+        ),
+        schema,
+        env,
+    )
+
+
+def _schema_as_dict(schema):
+    if isinstance(schema, dict):
+        return schema
+    if isinstance(schema, str):
+        return parse_param_schema_txt(schema)
+    return {}
+
+
+def _schema_default_int_literal(spec, env=None):
+    """Expanded integer default, or None. Tokens stay tokens without ``env``."""
+    spec = spec if isinstance(spec, dict) else {}
+    raw = spec.get('default')
+    if raw in (None, ''):
+        return None
+    text = str(raw).strip()
+    if env is not None:
+        from .skill_param_tokens import expand_skill_param_text
+        text = expand_skill_param_text(text, env)
+    if _INT_DEFAULT.fullmatch(text):
+        return text
+    return None
+
+
+def _unique_int_default_map(schema, env=None):
+    """``{'12': 'months'}`` when exactly one key has that integer default."""
+    parsed = _schema_as_dict(schema)
+    hits = {}
+    for key in _schema_key_set(parsed):
+        lit = _schema_default_int_literal(parsed.get(key), env)
+        if lit is None:
+            continue
+        hits.setdefault(lit, []).append(key)
+    return {lit: names[0] for lit, names in hits.items() if len(names) == 1}
+
+
+def _replace_number_tokens(src, mapping, schema=None):
+    """Put the schema name in the parameter's slot, not in every matching number.
+
+    A count (``12``) only replaces ``months=12`` / ``months=-12`` and
+    ``else 12`` / ``or 12``. A year also replaces a bare 4-digit NUMBER
+    (``date(2026, 1, 1)``). ``if n > 12`` stays.
+    """
+    if not src or not mapping:
+        return src
+    parsed = _schema_as_dict(schema)
+    year_lits = set()
+    for lit, key in mapping.items():
+        if _schema_key_is_year_slot(key, parsed.get(key)):
+            year_lits.add(lit)
+    keys = set(mapping.values())
+    try:
+        tokens = list(tokenize.generate_tokens(io.StringIO(src).readline))
+    except (tokenize.TokenError, IndentationError):
+        return src
+    spans = []
+    n = len(tokens)
+    i = 0
+    while i < n:
+        tok = tokens[i]
+        if (
+            tok.type == tokenize.NAME
+            and tok.string in keys
+            and i + 1 < n
+            and tokens[i + 1].string == '='
+        ):
+            j = i + 2
+            if j < n and tokens[j].string == '-':
+                j += 1
+            if j < n and tokens[j].type == tokenize.NUMBER:
+                raw = tokens[j].string.lstrip('-')
+                if mapping.get(raw) == tok.string:
+                    spans.append((tokens[j].start, tokens[j].end, tok.string))
+                    i = j + 1
+                    continue
+        if (
+            tok.string in ('else', 'or')
+            and i + 1 < n
+            and tokens[i + 1].type == tokenize.NUMBER
+        ):
+            raw = tokens[i + 1].string.lstrip('-')
+            name = mapping.get(raw)
+            if name and raw not in year_lits:
+                spans.append((tokens[i + 1].start, tokens[i + 1].end, name))
+                i += 2
+                continue
+        if tok.type == tokenize.NUMBER:
+            raw = tok.string.lstrip('-')
+            name = mapping.get(raw)
+            if name and raw in year_lits:
+                spans.append((tok.start, tok.end, name))
+        i += 1
+    if not spans:
+        return src
+    lines = src.splitlines(True)
+    for (sr, sc), (er, ec), name in reversed(spans):
+        if sr != er or sr < 1 or sr > len(lines):
+            continue
+        line = lines[sr - 1]
+        lines[sr - 1] = line[:sc] + name + line[ec:]
+    return ''.join(lines)
+
+
+# Card title (``result['title']`` / ``summary``) and the wrap ``_page_title``.
+_TITLE_LINE_RE = re.compile(
+    r'^(\s*(?:'
+    r'_page_title\s*=\s*'
+    r'|result\s*\[\s*[\'"]title[\'"]\s*\]\s*=\s*'
+    r'|[\'"]title[\'"]\s*:\s*'
+    r'|[\'"]summary[\'"]\s*:\s*'
+    r'))([\'"])(.*)\2(\s*,?\s*)$',
+)
+
+_ISO_ASSIGN_RE = re.compile(
+    r'^([ \t]*)([A-Za-z_][A-Za-z0-9_]*)\s*=\s*[\'"](\d{4}-\d{2}-\d{2})[\'"][ \t]*$',
+    re.M,
+)
+_ISO_STR_RE = re.compile(r'[\'"](\d{4}-\d{2}-\d{2})[\'"]')
+
+
+def _is_title_line(line):
+    raw = line[:-1] if line.endswith('\n') else line
+    return bool(_TITLE_LINE_RE.match(raw))
+
+
+def _replace_title_literals(line, mapping):
+    """Title / summary / ``_page_title`` with ``12`` → ``%s`` % (months,)."""
+    raw = line[:-1] if line.endswith('\n') else line
+    match = _TITLE_LINE_RE.match(raw)
+    if not match or not mapping:
+        return line
+    prefix, quote, body, suffix = match.groups()
+    ordered = sorted(mapping, key=len, reverse=True)
+    pattern = re.compile(
+        r'(?<![0-9-])(%s)(?![0-9-])' % '|'.join(re.escape(lit) for lit in ordered),
+    )
+    names = []
+    pieces = []
+    last = 0
+    for hit in pattern.finditer(body):
+        pieces.append(body[last:hit.start()].replace('%', '%%'))
+        pieces.append('%s')
+        names.append(mapping[hit.group(1)])
+        last = hit.end()
+    if not names:
+        return line
+    pieces.append(body[last:].replace('%', '%%'))
+    fmt = '%s%s%s%s %% (%s,)%s' % (
+        prefix, quote, ''.join(pieces), quote, ', '.join(names), suffix,
+    )
+    if line.endswith('\n'):
+        fmt += '\n'
+    return fmt
+
+
+def _parse_iso_day(text):
+    parts = (text or '').split('-')
+    if len(parts) != 3:
+        return None
+    try:
+        return _date(int(parts[0]), int(parts[1]), int(parts[2]))
+    except ValueError:
+        return None
+
+
+def _month_span(start, end):
+    if end < start:
+        start, end = end, start
+    return (end.year - start.year) * 12 + (end.month - start.month)
+
+
+def _is_calendar_year_window(start, end):
+    if start > end:
+        start, end = end, start
+    return (
+        start.month == 1 and start.day == 1
+        and end.month == 12 and end.day >= 28
+        and start.year == end.year
+    )
+
+
+def _year_slot_key(mapping, schema):
+    parsed = _schema_as_dict(schema)
+    for _lit, key in mapping.items():
+        if _schema_key_is_year_slot(key, parsed.get(key)):
+            return key
+    for key, spec in parsed.items():
+        if _is_slash_param_key(key) and _schema_key_is_year_slot(key, spec):
+            return key
+    return None
+
+
+def _count_slot_key(mapping, schema):
+    """The months/count hole, even when the captured span is not that default."""
+    parsed = _schema_as_dict(schema)
+    preferred = []
+    others = []
+    seen = set()
+    names = list(mapping.values())
+    for key in parsed:
+        if key not in names:
+            names.append(key)
+    for key in names:
+        if not key or key in seen:
+            continue
+        if not _is_slash_param_key(key):
+            continue
+        if _schema_key_is_year_slot(key, parsed.get(key)):
+            continue
+        spec = parsed.get(key) if isinstance(parsed.get(key), dict) else {}
+        typ = str(spec.get('type') or '').strip().lower()
+        if typ and typ not in ('integer', 'number', 'int'):
+            continue
+        seen.add(key)
+        if (key or '').strip().casefold() in ('months', 'meses'):
+            preferred.append(key)
+        elif typ in ('integer', 'number', 'int') or key in mapping.values():
+            others.append(key)
+    return (preferred or others or [None])[0]
+
+
+def _count_key_for_span(span, mapping, schema):
+    parsed = _schema_as_dict(schema)
+    for lit, key in mapping.items():
+        if _schema_key_is_year_slot(key, parsed.get(key)):
+            continue
+        try:
+            n = int(lit)
+        except (TypeError, ValueError):
+            continue
+        if abs(span - n) <= 1:
+            return key
+    return _count_slot_key(mapping, schema)
+
+
+def _iso_assign_hits(head):
+    hits = []
+    for match in _ISO_ASSIGN_RE.finditer(head or ''):
+        day = _parse_iso_day(match.group(3))
+        if day:
+            hits.append((day, match))
+    return hits
+
+
+def _iso_window_plan(head, mapping, schema):
+    """How to bind a captured from/to ISO window, or None."""
+    if not head:
+        return None
+    mapping = mapping or {}
+    hits = _iso_assign_hits(head)
+    unique = sorted({day for day, _match in hits})
+    if not unique:
+        found = []
+        for match in _ISO_STR_RE.finditer(head):
+            if _iso_on_comment_line(head, match.start()):
+                continue
+            day = _parse_iso_day(match.group(1))
+            if day:
+                found.append(day)
+        unique = sorted(set(found))
+        hits = []
+    if not unique or len(unique) > 2:
+        return None
+    start = unique[0]
+    end = unique[-1]
+    ykey = _year_slot_key(mapping, schema)
+    if len(unique) == 1:
+        ckey = _count_key_for_span(
+            _month_span(start, _date.today()), mapping, schema,
+        )
+        if not ckey:
+            return None
+        start_match = hits[0][1] if hits else None
+        return {
+            'kind': 'year_or_count' if ykey else 'count',
+            'key': ckey,
+            'year_key': ykey,
+            'start_match': start_match,
+            'end_match': None,
+            'start_iso': start.isoformat(),
+            'end_iso': '',
+            'start_name': start_match.group(2) if start_match else 'date_from',
+            'end_name': '',
+        }
+    ckey = _count_key_for_span(_month_span(start, end), mapping, schema)
+    start_match = end_match = None
+    for day, match in hits:
+        if day == start:
+            start_match = match
+        if day == end:
+            end_match = match
+    base = {
+        'start_match': start_match,
+        'end_match': end_match,
+        'start_iso': start.isoformat(),
+        'end_iso': end.isoformat(),
+        'start_name': start_match.group(2) if start_match else 'date_from',
+        'end_name': end_match.group(2) if end_match else 'date_to',
+    }
+    if ykey and ckey:
+        base.update(kind='year_or_count', key=ckey, year_key=ykey)
+        return base
+    if _is_calendar_year_window(start, end) and ykey:
+        base.update(kind='year', key=ykey, year_key=ykey)
+        return base
+    if ckey:
+        base.update(kind='count', key=ckey)
+        return base
+    return None
+
+
+def _leading_ws(line):
+    text = line or ''
+    i = 0
+    while i < len(text) and text[i] in ' \t':
+        i += 1
+    return text[:i]
+
+
+def _line_span(text, pos):
+    start = (text or '').rfind('\n', 0, pos) + 1
+    end = (text or '').find('\n', pos)
+    if end < 0:
+        end = len(text or '')
+    return start, end
+
+
+def _iso_on_comment_line(text, pos):
+    start, end = _line_span(text, pos)
+    return (text or '')[start:end].lstrip().startswith('#')
+
+
+def _insert_before_statement(text, pos):
+    """Line start and indent of the statement that contains ``pos``."""
+    start, end = _line_span(text, pos)
+    cur_start = start
+    cur_indent = _leading_ws((text or '')[start:end])
+    scan = start
+    while scan > 0:
+        prev_start = text.rfind('\n', 0, scan - 1) + 1
+        pline = text[prev_start:scan].rstrip('\n')
+        raw = pline.strip()
+        if not raw or raw.startswith('#'):
+            scan = prev_start
+            continue
+        pindent = _leading_ws(pline)
+        if len(pindent) < len(cur_indent):
+            if raw.endswith(':'):
+                return cur_start, cur_indent
+            cur_start = prev_start
+            cur_indent = pindent
+        scan = prev_start
+    return cur_start, cur_indent
+
+
+def _iso_plan_block(plan, indent):
+    if plan['kind'] == 'year':
+        return _year_iso_block(
+            indent, plan['key'], plan['start_name'], plan['end_name'],
+        )
+    if plan['kind'] == 'year_or_count':
+        return _year_or_count_iso_block(
+            indent, plan['year_key'], plan['key'],
+            plan['start_name'], plan['end_name'],
+        )
+    return _rolling_iso_block(
+        indent, plan['key'], plan['start_name'], plan['end_name'],
+    )
+
+
+def _iso_assign_line_indexes(head, matches):
+    indexes = []
+    for match in matches:
+        if match is None:
+            continue
+        indexes.append(head[:match.start()].count('\n'))
+    return indexes
+
+
+def _rolling_iso_block(indent, key, start_name, end_name):
+    lines = [
+        '%s_end = today' % indent,
+        '%s_m = int(%s)' % (indent, key),
+        '%s_mi = _end.month - 1 - _m' % indent,
+        (
+            '%s%s = date(_end.year + _mi // 12, _mi %% 12 + 1, 1)'
+            '.strftime(\'%%Y-%%m-%%d\')'
+        ) % (indent, start_name),
+    ]
+    if end_name:
+        lines.append(
+            '%s%s = _end.strftime(\'%%Y-%%m-%%d\')' % (indent, end_name),
+        )
+    return '\n'.join(lines) + '\n'
+
+
+def _year_iso_block(indent, key, start_name, end_name):
+    lines = [
+        '%s%s = \'%%04d-01-01\' %% int(%s)' % (indent, start_name, key),
+    ]
+    if end_name:
+        lines.append(
+            '%s%s = \'%%04d-12-31\' %% int(%s)' % (indent, end_name, key),
+        )
+    return '\n'.join(lines) + '\n'
+
+
+def _year_or_count_iso_block(indent, year_key, count_key, start_name, end_name):
+    """``year`` if the slash set it, otherwise the months count."""
+    inner = indent + '    '
+    year_body = _year_iso_block(inner, year_key, start_name, end_name)
+    count_body = _rolling_iso_block(inner, count_key, start_name, end_name)
+    return '%sif %s:\n%s%selse:\n%s' % (
+        indent, year_key, year_body, indent, count_body,
+    )
+
+
+def _replace_iso_windows(head, mapping, schema):
+    """Turn a captured ``date_from = '2025-11-01'`` window into the param."""
+    plan = _iso_window_plan(head, mapping, schema)
+    if not plan:
+        return head
+    indent = ''
+    start_match = plan.get('start_match')
+    if start_match is not None:
+        indent = start_match.group(1)
+    elif plan.get('end_match') is not None:
+        indent = plan['end_match'].group(1)
+    drop = set(_iso_assign_line_indexes(
+        head, (plan.get('start_match'), plan.get('end_match')),
+    ))
+    lines = head.splitlines(True)
+    if drop:
+        block = _iso_plan_block(plan, indent)
+        out = []
+        inserted = False
+        for idx, line in enumerate(lines):
+            if idx in drop:
+                if not inserted:
+                    out.append(block)
+                    inserted = True
+                continue
+            out.append(line)
+        head = ''.join(out)
+    else:
+        first = None
+        for match in _ISO_STR_RE.finditer(head):
+            if match.group(1) not in (plan['start_iso'], plan['end_iso']):
+                continue
+            if _iso_on_comment_line(head, match.start()):
+                continue
+            first = match
+            break
+        if first is None:
+            return head
+        line_start, indent = _insert_before_statement(head, first.start())
+        block = _iso_plan_block(plan, indent)
+        head = head[:line_start] + block + head[line_start:]
+    if plan['start_iso']:
+        head = re.sub(
+            r'[\'"]%s[\'"]' % re.escape(plan['start_iso']),
+            plan['start_name'],
+            head,
+        )
+    if plan['end_iso'] and plan['end_name']:
+        head = re.sub(
+            r'[\'"]%s[\'"]' % re.escape(plan['end_iso']),
+            plan['end_name'],
+            head,
+        )
+    return head
+
+
+def _replace_unique_default_literals(code, schema, env=None):
+    """Use schema names in the query, titles and date window. Not the HTML."""
+    mapping = _unique_int_default_map(schema, env)
+    if not code:
+        return code or ''
+    if (
+        not mapping
+        and not _year_slot_key({}, schema)
+        and not _count_slot_key({}, schema)
+    ):
+        return code or ''
+    head, tail = split_page_html_skill_code(code)
+    head_out = []
+    for line in head.splitlines(True):
+        if _is_title_line(line):
+            head_out.append(_replace_title_literals(line, mapping))
+        else:
+            head_out.append(line)
+    head = _replace_iso_windows(''.join(head_out), mapping, schema)
+    head = _replace_number_tokens(head, mapping, schema)
+    kept = []
+    for line in tail.splitlines(True):
+        if _is_title_line(line):
+            kept.append(_replace_title_literals(line, mapping))
+        else:
+            kept.append(line)
+    return head + ''.join(kept)
+
+
+def _literal_assigns_remain(code, schema):
+    keys = set(schema_keys_that_need_place(schema, code))
+    if not keys:
+        keys = _schema_key_set(schema)
+    if not keys:
+        return False
+    for line in (code or '').splitlines():
+        match = _LITERAL_ASSIGN_RE.match(line)
+        if not match or match.group(2) not in keys:
+            continue
+        if (match.group(3) or '').strip() in ('None', 'True', 'False'):
+            continue
+        return True
+    return False
+
+
+def _unique_default_literals_remain(code, schema, env=None):
+    """True when a default still sits in its slot, title or date window."""
+    mapping = _unique_int_default_map(schema, env)
+    if not mapping or not code:
+        return False
+    head, tail = split_page_html_skill_code(code)
+    title = ''.join(
+        line for line in (head + tail).splitlines(True)
+        if _is_title_line(line)
+    )
+    if _iso_window_plan(head, mapping, schema):
+        return True
+    for lit, key in mapping.items():
+        slot = re.compile(
+            r'\b%s\s*=\s*-?%s\b' % (re.escape(key), re.escape(lit)),
+        )
+        if slot.search(head):
+            return True
+        if title and re.search(
+            r'(?<![0-9-])%s(?![0-9-])' % re.escape(lit),
+            title,
+        ):
+            return True
+    return False
+
+
+def schema_params_need_place(code, schema, env=None):
+    """True when a default/required key is unread, overwritten, or still a turn literal."""
+    if not schema_keys_that_need_place(schema, code):
+        return False
+    if schema_keys_unread_by_code(schema, code):
+        return True
+    if _literal_assigns_remain(code, schema):
+        return True
+    return _unique_default_literals_remain(code, schema, env)
+
+
+def split_page_html_skill_code(code):
+    """``(query head, page tail)``. Tail starts at ``_page_template`` / ``page_html``."""
+    text = code or ''
+    match = re.search(r'\n_page_template\s*=', text)
+    if match:
+        return text[:match.start()].rstrip(), text[match.start():]
+    idx = text.find('page_html(')
+    if idx < 0:
+        return text, ''
+    line_start = text.rfind('\n', 0, idx) + 1
+    return text[:line_start].rstrip(), text[line_start:]
+
+
+def query_head_for_param_rewrite(code):
+    """Query head plus ``_page_title``. The HTML template stays in the tail."""
+    head, tail = split_page_html_skill_code(code)
+    titles = []
+    rest = []
+    for line in tail.splitlines(True):
+        if _is_title_line(line) or line.lstrip().startswith('_page_title'):
+            titles.append(line)
+        else:
+            rest.append(line)
+    if titles:
+        block = ''.join(titles)
+        if head:
+            head = head.rstrip() + '\n' + block
+        else:
+            head = block
+    return head, ''.join(rest)
 
 
 _CODE_PARAM_REWRITE_SYSTEM = (
-    'Rewrite the skill Python so it reads every listed parameter key. '
+    'Rewrite the skill Python so every parameter WITH A DEFAULT exists in '
+    'the Code as a sandbox variable and is used in the query, result title '
+    'and _page_title. '
     'Return Python only: no markdown fences, no prose, no JSON. '
     'Keep the same models, searches, metrics and result shape. '
     'Do not add a model, field, or filter that is not already in the Code '
     'or named in the trainer description. '
-    'For each required key, the Code must read the sandbox global with:\n'
+    'For each of those keys, the Code must read the sandbox global with:\n'
     'try:\n'
     '    name = name\n'
     'except NameError:\n'
     '    name = None\n'
-    'Move hardcoded place or date literals from the original turn into '
-    'those variables. When a key is missing or empty, skip that filter '
-    '(do not keep a hardcoded place or date as a permanent default).'
+    'Replace the turn hardcoded numbers, ISO dates and title text with '
+    'those names. Use preloaded date, today and calendar. Do not import '
+    'dateutil. A required key has no fallback in the Code (not `else 12`): '
+    'empty shows Help. A key with no Default on the skill form MUST keep '
+    'a second-level default in the Code (the turn value). A form Default '
+    'already fills the sandbox: do not overwrite it. Parameters with no '
+    'default that the Code does not use may be omitted.'
 )
 
 
 def build_code_param_rewrite_prompt(code, schema, trainer_text=''):
-    """Short Python call: schema keys the Code does not read yet."""
+    """Short Python call: keys with a default must have a place in the Code."""
     unread = schema_keys_unread_by_code(schema, code)
-    if isinstance(schema, str):
-        parsed = parse_param_schema_txt(schema)
-    elif isinstance(schema, dict):
-        parsed = schema
-    else:
-        parsed = {}
-    keys = [k for k in parsed if isinstance(k, str) and k.isidentifier()]
+    parsed = _schema_as_dict(schema)
+    needed = schema_keys_that_need_place(schema, code)
+    optional = [
+        k for k in parsed
+        if _is_slash_param_key(k) and k not in needed
+    ]
     extra = ''
     if unread:
-        extra = ' Required keys the Code does not read yet: %s.' % ', '.join(unread)
-    elif keys:
-        extra = ' Required keys: %s.' % ', '.join(keys)
+        extra = ' Keys with a default the Code does not read yet: %s.' % (
+            ', '.join(unread),
+        )
+    elif needed:
+        extra = (
+            ' Keys that must be used (default or already in the Code), '
+            'including in _page_title: %s.' % ', '.join(needed)
+        )
     parts = []
-    if keys:
-        parts.append('Parameter keys: %s' % ', '.join(keys))
+    if needed:
+        parts.append('Parameters that need a place: %s' % ', '.join(needed))
+    if optional:
+        parts.append(
+            'Parameters with no default, unused — omit them: %s'
+            % ', '.join(optional)
+        )
     desc = (trainer_text or '').strip()
     if desc:
         parts.append('Trainer description:\n%s' % desc)
@@ -1079,7 +1959,8 @@ def deterministic_schema_hits(params, schema, raw=None):
         if not _param_value_resolved(key, val, spec):
             continue
         if (
-            not _schema_key_is_temporal(key, spec)
+            not _schema_key_takes_period(key, spec)
+            and not _schema_key_is_year_slot(key, spec)
             and _token_looks_canonical_temporal(val)
         ):
             continue
@@ -1573,8 +2454,13 @@ def schema_required_keys(schema):
     return keys
 
 
-def apply_schema_defaults(params, schema):
-    """Copy schema defaults onto empty keys. Does not invent values."""
+def apply_schema_defaults(params, schema, env=None):
+    """Copy schema defaults onto empty keys. Does not invent values.
+
+    Tokens from ``skill_param_token_specs`` (``{year}``, ``{year}-n``,
+    ``{ytd}``, …) expand when ``env`` is the asking user. Unknown stay.
+    """
+    from .skill_param_tokens import expand_skill_param_text
     out = dict(params or {})
     for key, spec in (schema or {}).items():
         if not isinstance(spec, dict):
@@ -1583,7 +2469,9 @@ def apply_schema_defaults(params, schema):
         if default in (None, ''):
             continue
         if not _param_value_resolved(key, out.get(key), spec):
-            out[key] = default
+            if env is not None and isinstance(default, str):
+                default = expand_skill_param_text(default, env)
+            out[key] = _coerce_schema_value(spec, default)
     return out
 
 
@@ -1691,6 +2579,40 @@ def _classify_positional(tokens):
     return period, code, integers, words
 
 
+def _bind_periods(params, schema, keys, toks):
+    """Each period token goes to the first free key it fits.
+
+    With ``start_date`` and ``end_date`` both free, a range, month, day or
+    year fills the pair. A token that fits no key leaves the whole bucket
+    unbound, so the short call sees the phrase.
+    """
+    free = list(keys)
+    plan = []
+    for tok in toks:
+        pair = None
+        if 'start_date' in free and 'end_date' in free:
+            pair = _period_as_date_pair(tok)
+        if pair:
+            plan.append(('start_date', pair[0], tok))
+            plan.append(('end_date', pair[1], tok))
+            free.remove('start_date')
+            free.remove('end_date')
+            continue
+        key = next(
+            (k for k in free if _period_fits_key(k, schema.get(k), tok)),
+            None,
+        )
+        if key is None:
+            return {}
+        plan.append((key, _coerce_schema_value(schema.get(key), tok), tok))
+        free.remove(key)
+    bound = {}
+    for key, val, tok in plan:
+        params[key] = val
+        bound[key] = tok
+    return bound
+
+
 def _bind_fitting_formal(params, schema, empty, period_toks, code_toks, int_toks):
     """Bind formal tokens that fit their slot. Words are never bound.
 
@@ -1700,25 +2622,35 @@ def _bind_fitting_formal(params, schema, empty, period_toks, code_toks, int_toks
     """
     temporal_empty = [
         k for k in empty
-        if _schema_key_is_temporal(k, schema.get(k))
+        if _schema_key_takes_period(k, schema.get(k))
+    ]
+    year_empty = [
+        k for k in empty
+        if k not in temporal_empty
+        and _schema_key_is_year_slot(k, schema.get(k))
     ]
     int_empty = [
         k for k in empty
-        if k not in temporal_empty and _schema_key_is_integer(schema.get(k))
+        if k not in temporal_empty
+        and k not in year_empty
+        and _schema_key_is_integer(schema.get(k))
     ]
-    # A 4-digit year on an integer key (``anio``) is still a period slot.
+    # A 4-digit year token belongs on a year slot, not on a count.
     if period_toks and not temporal_empty:
-        temporal_empty = list(int_empty)
-        int_empty = []
+        if year_empty:
+            temporal_empty = list(year_empty)
+        else:
+            temporal_empty = list(int_empty)
+            int_empty = []
     other_empty = [
         k for k in empty
-        if k not in temporal_empty and k not in int_empty
+        if k not in temporal_empty
+        and k not in int_empty
+        and k not in year_empty
     ]
     bound = {}
-    if period_toks and len(period_toks) <= len(temporal_empty):
-        for key, tok in zip(temporal_empty, period_toks):
-            params[key] = _coerce_schema_value(schema.get(key), tok)
-            bound[key] = tok
+    if period_toks:
+        bound.update(_bind_periods(params, schema, temporal_empty, period_toks))
     if code_toks:
         csv_keys = [
             k for k in other_empty
@@ -1811,7 +2743,7 @@ def skill_args_unmapped(raw, resolved_params, schema, args_policy='default'):
     return not resolved
 
 
-def merge_hybrid_params(det, norm, schema, raw, args_policy='default'):
+def merge_hybrid_params(det, norm, schema, raw, args_policy='default', env=None):
     """Combine deterministic fill + LLM JSON. ``_reject`` is not a veto.
 
     Returns the merged dict, or ``{'_skill_args_reject': True}`` only when
@@ -1838,15 +2770,17 @@ def merge_hybrid_params(det, norm, schema, raw, args_policy='default'):
     # Explicit nulls mean the sentence named no key, so the default is right.
     if not explicit_unset and skill_args_unmapped(raw, merged, schema, args_policy):
         return {'_skill_args_reject': True}
-    merged = apply_schema_defaults(merged, schema)
+    merged = apply_schema_defaults(merged, schema, env=env)
     return merged or None
 
 
-def finalize_skill_params(merged, schema):
+def finalize_skill_params(merged, schema, env=None):
     """Defaults + required gate after the last fill (cache or IA)."""
+    from .skill_param_tokens import expand_skill_param_values
     if not isinstance(merged, dict) or merged.get('_skill_args_reject'):
         return merged
-    out = apply_schema_defaults(merged, schema)
+    out = apply_schema_defaults(merged, schema, env=env)
+    out = expand_skill_param_values(out, env)
     out.pop('_relative', None)
     if missing_required_params(out, schema):
         return {'_skill_args_reject': True, '_skill_args_missing': True}
@@ -2009,7 +2943,7 @@ def skill_code_refusal(code, skill_code='skill'):
 
 def bootstrap_skill_code_body(env, code, arguments='', skill_code='skill',
                               extra_params=None, previous_result=None,
-                              diag=None):
+                              diag=None, param_schema=None):
     """Ejecuta code_body en sandbox seguro. Devuelve ``result`` dict o None.
 
     ``extra_params`` (opcional): claves ya resueltas por el schema. Se fusionan
@@ -2036,9 +2970,19 @@ def bootstrap_skill_code_body(env, code, arguments='', skill_code='skill',
             diag['bootstrap_error'] = refused
         _logger.warning('Skill bootstrap refused for %s: %s', skill_code, refused)
         return None
+    from .skill_param_tokens import expand_skill_param_values
     params = parse_skill_arguments(arguments)
     enrich_params_with_dates(params)
     params = overlay_resolved_params(params, extra_params)
+    params = expand_skill_param_values(params, env)
+    live = [
+        key for key, val in params.items()
+        if _is_slash_param_key(key) and val not in (None, '', [])
+    ]
+    if param_schema:
+        code = bind_code_to_schema_params(code, param_schema, env)
+    elif live:
+        code = drop_schema_literal_assigns(code, live)
     try:
         from ..controllers.context_builder import build_safe_context
 
@@ -2327,7 +3271,8 @@ def render_presentation_html(presentation, env=None):
 
 def try_skill_fast_path(env, bootstrap, title='Skill', *, code=None,
                         arguments='', skill_code='skill', extra_params=None,
-                        max_rounds=5, diag=None, probe=False):
+                        max_rounds=5, diag=None, probe=False,
+                        param_schema=None):
     """Ejecuta el ciclo determinista de un skill sin recurrir al LLM.
 
     Genérico y agnóstico de dominio. En cada ronda el ``code_body`` (ya
@@ -2390,6 +3335,7 @@ def try_skill_fast_path(env, bootstrap, title='Skill', *, code=None,
             bootstrap = bootstrap_skill_code_body(
                 env, code, arguments=arguments, skill_code=skill_code,
                 extra_params=extra_params, previous_result=prev, diag=_bd,
+                param_schema=param_schema,
             )
             if not isinstance(bootstrap, dict):
                 err = _bd.get('bootstrap_error')
@@ -2498,6 +3444,8 @@ def check_skill_fast_path_publishable(
     body = (code or '').strip()
     if not body or env is None:
         return None
+    if (getattr(env, 'context', None) or {}).get('skill_skip_body_check'):
+        return None
     if not getattr(env.registry, 'ready', False):
         return None
     policy = (args_policy or 'default').strip() or 'default'
@@ -2507,8 +3455,11 @@ def check_skill_fast_path_publishable(
             return None
     diag = {}
     try:
+        # A publish check must not open a page or spend a design call.
+        check_env = env(context=dict(env.context, skill_publish_check=True))
         bootstrap = bootstrap_skill_code_body(
-            env, body, arguments=arguments, skill_code=skill_code, diag=diag,
+            check_env, body, arguments=arguments, skill_code=skill_code,
+            diag=diag, param_schema=param_schema,
         )
     except Exception:
         return None
@@ -2517,6 +3468,7 @@ def check_skill_fast_path_publishable(
     fast = try_skill_fast_path(
         env, bootstrap, code=body, arguments=arguments,
         skill_code=skill_code, diag=diag, probe=True,
+        param_schema=param_schema,
     )
     from odoo import _
     label = skill_code or 'skill'

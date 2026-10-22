@@ -2,16 +2,16 @@
 /* Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com> */
 /* Rows that carry a record are pickable; a picked one has to look picked. */
 
-table.o_chatboo_data_table tbody tr:has(a.o_chatboo_namelink) {
+table.o_ai_data_table tbody tr:has(a.o_ai_namelink) {
     cursor: pointer;
 }
 
 /* The row tint comes inline from the renderer, the cells do not: tinting the
    cells wins on its own, without shouting over the row style. */
-table.o_chatboo_data_table tbody tr.o_chatboo_marked > td {
+table.o_ai_data_table tbody tr.o_chatboo_marked > td {
     background-color: rgba(13, 110, 253, 0.16);
 }
 
-table.o_chatboo_data_table tbody tr.o_chatboo_marked > td:first-child {
+table.o_ai_data_table tbody tr.o_chatboo_marked > td:first-child {
     border-left: 3px solid #0d6efd;
 }

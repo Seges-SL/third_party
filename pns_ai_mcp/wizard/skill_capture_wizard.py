@@ -15,7 +15,9 @@ from odoo.addons.pns_ai_mcp.utils.llm_usage import add_usage
 from odoo.addons.pns_ai_mcp.utils.skill_runtime import (
     apply_code_keys_to_rows,
     assign_extracted_keys_to_rows,
+    drop_result_param_keys,
     fill_capture_params,
+    help_without_turn_chips,
     infer_arg_hint_from_schema,
     infer_param_keys_from_code,
     is_placeholder_skill_help,
@@ -25,7 +27,7 @@ from odoo.addons.pns_ai_mcp.utils.skill_runtime import (
     param_schema_to_json,
     parse_param_schema_txt,
     procedure_for_help,
-    schema_keys_unread_by_code,
+    schema_params_need_place,
     schema_to_param_rows,
     skill_help_fingerprint,
 )
@@ -52,7 +54,9 @@ class AISkillCaptureParamLine(models.TransientModel):
     )
     default = fields.Char(
         string='Default',
-        help='Empty = the default lives in the Code.',
+        help='Value used when the slash omits this parameter. '
+             'Tokens from the legend expand when the skill runs. '
+             'Empty = the default lives in the Code.',
     )
     required = fields.Boolean(
         string='Required',
@@ -64,6 +68,7 @@ class AISkillCaptureParamLine(models.TransientModel):
 
 class AISkillCaptureWizard(models.TransientModel):
     _name = 'ai.skill.capture.wizard'
+    _inherit = ['ai.skill.param.token.legend.mixin']
     _description = 'Capture a successful execution as a draft skill'
 
     source_log_id = fields.Many2one(
@@ -95,7 +100,7 @@ class AISkillCaptureWizard(models.TransientModel):
     )
     arg_hint = fields.Char(
         string='Argument hint',
-        help='Placeholder shown in Chatboo when typing /<code>. '
+        help='Placeholder shown in the chat when typing /<code>. '
              'Filled from the Code when it reads slash args, or from '
              'the parameter list. Edit if you want a clearer example.',
     )
@@ -139,11 +144,12 @@ class AISkillCaptureWizard(models.TransientModel):
         string='Agents',
         help='Agents that will expose the skill. Leave empty for a global skill.',
     )
-    from_chatboo = fields.Boolean(
-        string='From Chatboo',
+    from_chat = fields.Boolean(
+        string='From a chat',
         default=False,
         readonly=True,
-        help='Set when opened via the /create-skill Chatboo command.',
+        help='Set when a chat opens the wizard (its /create-skill command): '
+             'the skill is born active and the wizard returns to the chat.',
     )
     warn_hardcoded_rows = fields.Boolean(
         string='Hardcoded rows warning',
@@ -175,30 +181,13 @@ class AISkillCaptureWizard(models.TransientModel):
         default=False,
         help='Show Help, Procedure and Code. Off by default.',
     )
-    _TURN_CHIP_RE = re.compile(r'^[A-Za-z0-9]{4}(?:-\d+)?$')
-
-    @classmethod
-    def _is_turn_chip(cls, text):
-        return bool(cls._TURN_CHIP_RE.match((text or '').strip()))
-
     @classmethod
     def _prose_without_turn_chips(cls, text):
-        kept = [
-            part for part in (text or '').split()
-            if not cls._is_turn_chip(part)
-        ]
-        return ' '.join(kept).strip()
+        return help_without_turn_chips(text)
 
     @api.model
     def default_get(self, fields_list):
         res = super().default_get(fields_list)
-        if not res.get('agent_ids') and (
-            self.env.context.get('capture_from_chatboo')
-            or self.env.context.get('default_from_chatboo')
-        ):
-            agent = self._chatboo_agent()
-            if agent and 'agent_ids' in fields_list:
-                res['agent_ids'] = [(6, 0, agent.ids)]
         code = res.get('code_body') or ''
         schema = res.get('param_schema') or ''
         hint = res.get('arg_hint') or ''
@@ -286,6 +275,8 @@ class AISkillCaptureWizard(models.TransientModel):
             desc = (line.desc or '').strip()
             default = (line.default or '').strip()
             key = (line.key or '').strip()
+            if key == 'page_url' or label == 'page_url':
+                continue
             if not label and not desc and not key:
                 continue
             rows.append({
@@ -297,25 +288,10 @@ class AISkillCaptureWizard(models.TransientModel):
             })
         return rows
 
-    @api.model
-    def _chatboo_agent(self):
-        try:
-            from odoo.addons.pns_ai_mcp.utils.ai_agent_registry import (
-                CHATBOO_AGENT_CODE,
-            )
-            code = CHATBOO_AGENT_CODE
-        except Exception:
-            code = 'pns_ai_chatboo'
-        return self.env['ai.agent'].search([('code', '=', code)], limit=1)
-
     def _resolve_agent_ids(self):
+        """Agents the new skill links to; a host may add its own default."""
         self.ensure_one()
-        if self.agent_ids:
-            return self.agent_ids.ids
-        if self.from_chatboo:
-            agent = self._chatboo_agent()
-            return agent.ids if agent else []
-        return []
+        return self.agent_ids.ids
 
     @staticmethod
     def _slugify(text):
@@ -336,7 +312,8 @@ class AISkillCaptureWizard(models.TransientModel):
         if not self.procedure:
             self.procedure = _(
                 "When to use: describe the user request this skill answers.\n"
-                "Parameters: describe them in Help if the slash takes args.\n"
+                "Parameters: always list them. Form Default or Code default; "
+                "required keys show Help, never a Code fallback.\n"
                 "Output: explain how to present the result.\n"
                 "Run the Code with relaxaicode; do not recompute its logic.\n"
                 "\n"
@@ -367,7 +344,7 @@ class AISkillCaptureWizard(models.TransientModel):
         try:
             from ..utils.agent_engine import resolve_providers_for_consumer
             providers = resolve_providers_for_consumer(
-                self.env, consumer_key='admin',
+                self.env, consumer_key='admin', need='conversation',
             )
             return providers[:1] if providers else self.env['ai.provider']
         except Exception:
@@ -550,6 +527,14 @@ class AISkillCaptureWizard(models.TransientModel):
             schema_txt = param_schema_to_json(schema_dict) or False
             hint = infer_arg_hint_from_schema(schema_dict) or False
 
+        cleaned = drop_result_param_keys(schema_txt)
+        schema_txt = param_schema_to_json(cleaned) or False
+        if cleaned:
+            hint = infer_arg_hint_from_schema(cleaned) or hint
+        rows = [
+            row for row in rows
+            if (row.get('key') or '').strip() != 'page_url'
+        ]
         fingerprint = param_rows_fingerprint(rows)
         help_txt, usage, chip, help_fp, help_wanted = self._author_help_sentence(
             rows, usage, chip, extracted,
@@ -569,12 +554,14 @@ class AISkillCaptureWizard(models.TransientModel):
         }
 
     def _adapt_code_to_schema(self, schema, usage, rows=None):
-        """Rewrite Code when schema keys are unread. Adds rewrite usage."""
+        """Rewrite Code so every schema key has a place. Conversation, not decision."""
         rewritten = self.env.context.get('param_code_rewritten')
         extracted = self.env.context.get('param_author_extracted')
-        unread = schema_keys_unread_by_code(schema, self.code_body)
+        need_place = schema_params_need_place(
+            self.code_body, schema, env=self.env,
+        )
         provider = None
-        if unread and rewritten is None and extracted is None:
+        if need_place and rewritten is None and extracted is None:
             provider = self._resolve_param_provider()
         prose = param_rows_to_prose(rows if rows is not None else self._param_rows())
         leftover = self._prose_without_turn_chips(self.param_prose)
@@ -685,7 +672,7 @@ class AISkillCaptureWizard(models.TransientModel):
         return self._step_reply(usage)
 
     def action_adapt_code(self):
-        """Wizard step: rewrite Code when schema keys are unread."""
+        """Wizard step: rewrite Code so schema keys have a place."""
         self.ensure_one()
         prior = self._author_bundle()
         prior_usage = dict(prior.get('usage') or {})
@@ -790,6 +777,8 @@ class AISkillCaptureWizard(models.TransientModel):
         args_policy = (
             'none' if captured['empty'] else (self.args_policy or 'default')
         )
+        if not captured['empty'] and args_policy == 'none':
+            args_policy = 'default'
         from odoo.addons.pns_ai_mcp.utils.skill_runtime import (
             check_skill_fast_path_publishable,
         )
@@ -819,6 +808,9 @@ class AISkillCaptureWizard(models.TransientModel):
             'args_policy': args_policy,
             'agent_ids': [(6, 0, agent_ids)],
         }
+        fixed_compose = (self.env.context or {}).get('skill_compose_fixed')
+        if fixed_compose in ('compose-agent', 'compose-model'):
+            vals['compose'] = fixed_compose
         replaced = bool(existing)
         Skill = Skill.with_context(skip_skill_form_author=True)
         if existing:
@@ -831,7 +823,7 @@ class AISkillCaptureWizard(models.TransientModel):
                 'command': command,
                 'name': self.skill_name or code,
                 'description': description or (self.skill_name or code),
-                'active': bool(self.from_chatboo),
+                'active': bool(self.from_chat),
                 'is_system': False,
             })
             skill = Skill.create(vals)
@@ -839,21 +831,21 @@ class AISkillCaptureWizard(models.TransientModel):
 
         if replaced:
             message = _(
-                'Skill "%(name)s" was updated — use /%(code)s in Chatboo.'
+                'Skill "%(name)s" was updated — use /%(code)s in the chat.'
             ) % {'name': skill.name, 'code': skill.invoke_code()}
             title = _('Skill saved')
         elif skill.active:
             message = _(
-                'Skill "%(name)s" is ready — use /%(code)s in Chatboo.'
+                'Skill "%(name)s" is ready — use /%(code)s in the chat.'
             ) % {'name': skill.name, 'code': skill.invoke_code()}
             title = _('Skill created')
         else:
             message = _(
-                'Draft "%(name)s" saved (inactive). Activate it to use /%(code)s in Chatboo.'
+                'Draft "%(name)s" saved (inactive). Activate it to use /%(code)s in the chat.'
             ) % {'name': skill.name, 'code': skill.invoke_code()}
             title = _('Skill created')
         action = client_notification_close(title, message, 'success')
-        if self.from_chatboo:
+        if self.from_chat:
             return action
         action['params']['next'] = {
             'type': 'ir.actions.act_window',

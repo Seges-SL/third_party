@@ -35,20 +35,6 @@ Owns OpenAPI generation from documentation, API-server detection triggers,
 and skill authoring. Uses the provider failover chain configured on this agent.
 Not an MCP endpoint and not the Chatboo chat agent.</field>
     </record>
-    <record id="ai_agent_decision" model="ai.agent">
-        <field name="name">Decision</field>
-        <field name="code">pns_ai_decision</field>
-        <field name="sequence">6</field>
-        <field name="agent_type">inference</field>
-        <field name="origin">module</field>
-        <field name="module_name">pns_ai_mcp</field>
-        <field name="description">Answers a closed Choice (yes or none, with a confidence)
-when a doubt needs a yes or a no: which context packs a sentence needs,
-whether two place names are the same establishment.
-Its chain only takes providers with the Decision tick, in priority order,
-failing over to the next. With no chain, every active provider with that tick.
-It does not write replies.</field>
-    </record>
     <!-- El antiguo agente semilla `ocr` se retiró. Un `-u pns_ai_mcp` NO borra
          el registro obsoleto; la purga idempotente está en `i_restore.py`. -->
 </odoo>

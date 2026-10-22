@@ -7,10 +7,6 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
-CLIENT_CHATBOO = 'Chatboo'
-CLIENT_INTERNAL = 'Internal'
-CLIENT_UNKNOWN = 'Unknown'
-
 
 def normalize_remote_ip(remote_ip=None):
     """Return caller IP (max 64 chars) from argument or current HTTP request."""
@@ -48,38 +44,19 @@ def request_log_stamp():
         return {}
 
 
-def resolve_log_agent(env, agent_code=None):
-    """``ai.agent`` row for this turn, or empty. Code comes from the caller."""
-    code = (agent_code or '').strip()
-    if not code and env is not None:
-        code = str((env.context or {}).get('mcp_agent_code') or '').strip()
-    if not code or env is None or 'ai.agent' not in env:
-        return env['ai.agent'] if env is not None and 'ai.agent' in env else None
-    return env['ai.agent'].sudo().search([('code', '=', code)], limit=1)
-
-
-def agent_log_label(agent):
-    """Agents-list name. Empty if the row is missing."""
-    if not agent:
-        return ''
-    return (agent.name or agent.code or '').strip()
-
-
-def resolve_client_label(env, user_id, origin, explicit=None, agent_code=None):
-    """Human client name for ai.log.client_label (stored, English base strings)."""
+def resolve_client_label(env, user_id, origin, explicit=None):
+    """The program that called, as it named itself. Empty if it said nothing."""
     if explicit:
         return str(explicit)[:255]
-    agent = resolve_log_agent(env, agent_code)
-    name = agent_log_label(agent)
-    if name:
-        return name[:255]
-    channel = origin or 'internal'
-    if channel == 'chatboo':
-        return CLIENT_CHATBOO
-    if channel == 'internal':
-        return CLIENT_INTERNAL
-    if channel == 'mcp_client':
+    if origin == 'mcp_client':
         from .session_store import MCPClientRegistry
         label = MCPClientRegistry().get(user_id, env=env)
-        return label or CLIENT_UNKNOWN
-    return CLIENT_UNKNOWN
+        return str(label)[:255] if label else None
+    return None
+
+
+def known_doors(env, model='ai.log'):
+    """Door tokens ``model.origin`` lists: the engine's plus each host's ``selection_add``."""
+    if env is None or model not in env:
+        return ('mcp_client', 'internal')
+    return tuple(env[model]._fields['origin'].get_values(env))

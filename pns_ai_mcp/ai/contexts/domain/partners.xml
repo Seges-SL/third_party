@@ -4,7 +4,7 @@
         <code>partners</code>
         <tipo>domain</tipo>
         <description>res.partner knowledge - customers, suppliers, location search</description>
-        <version>1.5</version>
+        <version>1.6</version>
         <created_at>2025-01-25</created_at>
         <created_by>Administrator</created_by>
         <modified_at>2026-09-20</modified_at>
@@ -35,30 +35,38 @@
                     </code_snippet>
                 </pattern>
                 <pattern name="clients_ranked_by_calendar_events_ytd">
-                    <description>Top-N clients by calendar events/visits YTD. Universe = posted-invoice clients; count via calendar.event.customer_id (event→client). Do not rank calendar.event.partner_ids attendees.</description>
+                    <description>Top-N clients by calendar events/visits YTD. Universe = posted-invoice clients. Standard calendar.event has no client field: discover a Many2one to res.partner that is not user_id. If none exists, say so. NEVER invent customer_id. NEVER rank partner_ids attendees as the client.</description>
                     <code_snippet>
                     from datetime import datetime
                     year_start = datetime(datetime.now().year, 1, 1).strftime('%Y-%m-%d 00:00:00')
                     N = 15  # or from user request
                     Move = env['account.move']
                     Ev = env['calendar.event']
-                    invs = Move.search([
-                        ('move_type', 'in', ('out_invoice', 'out_refund')),
-                        ('state', '=', 'posted'),
-                    ])
-                    client_ids = set(invs.mapped('partner_id').mapped('commercial_partner_id').ids)
-                    counts = {}
-                    for ev in Ev.search([('start', '>=', year_start), ('customer_id', '!=', False)]):
-                        cid = ev.customer_id.commercial_partner_id.id
-                        if cid in client_ids:
-                            counts[cid] = counts.get(cid, 0) + 1
-                    ranked = sorted(counts.items(), key=lambda x: (-x[1], x[0]))[:N]
-                    Partner = env['res.partner']
-                    rows = [
-                        {'partner_id': pid, 'name': Partner.browse(pid).display_name, 'events_ytd': n}
-                        for pid, n in ranked
-                    ]
-                    # result = rows
+                    client_field = next((
+                        name for name, field in Ev._fields.items()
+                        if field.type == 'many2one'
+                        and field.comodel_name == 'res.partner'
+                        and name != 'user_id'
+                    ), None)
+                    if not client_field:
+                        result = {'formatted_text': 'calendar.event has no client partner field in this instance.'}
+                    else:
+                        invs = Move.search([
+                            ('move_type', 'in', ('out_invoice', 'out_refund')),
+                            ('state', '=', 'posted'),
+                        ])
+                        client_ids = set(invs.mapped('partner_id').mapped('commercial_partner_id').ids)
+                        counts = {}
+                        for ev in Ev.search([(client_field, '!=', False), ('start', '>=', year_start)]):
+                            cid = ev[client_field].commercial_partner_id.id
+                            if cid in client_ids:
+                                counts[cid] = counts.get(cid, 0) + 1
+                        ranked = sorted(counts.items(), key=lambda x: (-x[1], x[0]))[:N]
+                        Partner = env['res.partner']
+                        result = [
+                            {'id': pid, 'name': Partner.browse(pid).display_name, 'events_ytd': n}
+                            for pid, n in ranked
+                        ]
                     </code_snippet>
                 </pattern>
                 <pattern name="approx_partner_name">

@@ -29,6 +29,8 @@ def migrate(cr, version):
         )
         return
     rows = Skill.search([
+        '&',
+        ('owner_id', '=', False),
         '|',
         ('command', 'in', _RETIRED),
         ('code', 'in', _RETIRED),

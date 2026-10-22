@@ -48,31 +48,6 @@
     max-width: 100px !important;
 }
 
-.o_mcp_log_tree .o_list_table th[data-name="turn"],
-.o_mcp_log_tree .o_list_table td[data-name="turn"],
-.o_mcp_log_tree .o_list_table th[data-field="turn"],
-.o_mcp_log_tree .o_list_table td[data-field="turn"] {
-    width: 72px !important;
-    min-width: 64px !important;
-    max-width: 88px !important;
-    font-family: ui-monospace, Consolas, monospace !important;
-    font-size: 11px !important;
-    font-weight: 600;
-}
-
-.o_mcp_log_tree .o_list_table th[data-name="turn_step"],
-.o_mcp_log_tree .o_list_table td[data-name="turn_step"],
-.o_mcp_log_tree .o_list_table th[data-field="turn_step"],
-.o_mcp_log_tree .o_list_table td[data-field="turn_step"] {
-    width: 48px !important;
-    min-width: 40px !important;
-    max-width: 56px !important;
-    font-family: ui-monospace, Consolas, monospace !important;
-    font-size: 11px !important;
-    font-weight: 600;
-    text-align: end;
-}
-
 .o_mcp_log_tree .o_list_table th[data-name="timestamp"],
 .o_mcp_log_tree .o_list_table td[data-name="timestamp"] {
     width: 155px !important;
@@ -85,16 +60,14 @@
    The generic td:not(:first-child) rule sets ellipsis — at 28px that
    "…" renders as a white dot after every icon. */
 .o_mcp_log_tree .o_mcp_flow_icon_cell,
+.o_mcp_log_tree .o_list_table .o_pns_html_readonly_cell,
 .o_mcp_log_tree .o_list_table th[data-name="flow_icon_html"],
 .o_mcp_log_tree .o_list_table td[data-name="flow_icon_html"],
 .o_mcp_log_tree .o_list_table td[data-field="flow_icon_html"],
 .o_mcp_log_tree table.o_list_table th[data-name="flow_icon_html"],
 .o_mcp_log_tree table.o_list_table td[data-name="flow_icon_html"],
 .o_mcp_log_tree table.o_list_table td[data-field="flow_icon_html"] {
-    width: 28px !important;
-    min-width: 28px !important;
-    max-width: 32px !important;
-    padding: 2px 4px !important;
+    padding: 2px !important;
     text-align: center;
     overflow: hidden !important;
     text-overflow: clip !important;
@@ -135,25 +108,6 @@
     overflow: visible !important;
     text-overflow: clip !important;
     font-weight: 500;
-}
-
-/* Ancho fijo para columnas de tamaño (request_size_bytes y response_size_bytes) */
-.o_mcp_log_tree .o_list_table th[data-name="request_size_bytes"],
-.o_mcp_log_tree .o_list_table td[data-name="request_size_bytes"],
-.o_mcp_log_tree table.o_list_table th[data-name="request_size_bytes"],
-.o_mcp_log_tree table.o_list_table td[data-name="request_size_bytes"] {
-    width: 80px !important;
-    min-width: 80px !important;
-    max-width: 80px !important;
-}
-
-.o_mcp_log_tree .o_list_table th[data-name="response_size_bytes"],
-.o_mcp_log_tree .o_list_table td[data-name="response_size_bytes"],
-.o_mcp_log_tree table.o_list_table th[data-name="response_size_bytes"],
-.o_mcp_log_tree table.o_list_table td[data-name="response_size_bytes"] {
-    width: 80px !important;
-    min-width: 80px !important;
-    max-width: 80px !important;
 }
 
 /* Widget JSON comprimido - evitar overflow */

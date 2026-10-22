@@ -8,6 +8,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
     "use strict";
 
     const core = require('web.core');
+    const session = require('web.session');
     const _t = core._t;
     const formatters = require('pns_ai_chatboo.formatters');
     const exportUtils = require('pns_ai_chatboo.export');
@@ -179,9 +180,6 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
      *   - context:      optional ({new_chat, show_history_modal, ...})
      */
     class ChatbooComponent extends Component {
-        // Constante configurable: número de decimales para formateo de números
-        static DEFAULT_DECIMAL_PLACES = 3;
-
         // ══════════════════════════════════════════════════════════════════════
         // 1. SETUP + LIFECYCLE
         // ══════════════════════════════════════════════════════════════════════
@@ -231,7 +229,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     margin-bottom: 0.3em !important; 
                     padding-left: 1.5em !important; 
                 }
-                .o_chatboo_copy_btn:hover {
+                .o_ai_copy_btn:hover {
                     opacity: 1 !important;
                 }
                 /* Tables: monospace + numeric columns align to inline-end (LTR/RTL) */
@@ -252,8 +250,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     border: 1px solid #dee2e6 !important;
                     text-align: start;
                 }
-                .o_chatboo_content table th.o_chatboo_num,
-                .o_chatboo_content table td.o_chatboo_num,
+                .o_chatboo_content table th.o_ai_num,
+                .o_chatboo_content table td.o_ai_num,
                 .o_chatboo_content table th.text-end,
                 .o_chatboo_content table td.text-end {
                     text-align: end !important;
@@ -312,6 +310,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             this.messages = useState([]);
             this.messagesRef = useRef("messages");
             this.chatInputRef = useRef("chatInput");
+            this._applyResultLabels();
             this._paintQueue = [];
             this._isMounted = false;
             this.promptMaxLines = CHATBOO_PROMPT_MAX_LINES;
@@ -344,6 +343,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             this.tipDownloadWord = _t('Download as Word');
             this.tipRestoreCardWidth = _t('Restore default width');
             this.tipDownloadFile = _t('Download');
+            this.tipPrepareFile = _t('Prepare and download');
             this.tipCopyContent = _t('Copy content');
             this.tipCopyMarkdown = _t('Copy as Markdown');
             this.tipGoToEnd = _t('Go to end of turn');
@@ -607,7 +607,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     return;
                 }
                 const href = a.getAttribute('href') || '';
-                if (!/^(https?:|\/web|\/odoo|\/pns_ai_mcp\/session_file\/)/.test(href)) {
+                if (!/^(https?:|\/web|\/odoo|\/chatboo\/|\/pns_ai_mcp\/session_file\/)/.test(href)) {
                     return;
                 }
                 ev.preventDefault();
@@ -717,26 +717,6 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             } catch (e) {
                 console.error('Error in session init:', e);
             }
-
-            // --- FASE 4: Restaurar Historial desde el Chat Flotante ---
-            if (!sessionLoaded) {
-                try {
-                    const storedHistory = window.sessionStorage.getItem('chatboo_floating_transfer_history');
-                    if (storedHistory) {
-                        const parsedHistory = JSON.parse(storedHistory);
-                        if (parsedHistory && parsedHistory.length > 0) {
-                            this.messages.splice(0, this.messages.length);
-                            parsedHistory.forEach(msg => {
-                                this.messages.push({ role: msg.role, content: msg.content, timestamp: formatters.formatWallclock(new Date()) });
-                            });
-                            this.scrollToBottom();
-                        }
-                    }
-                } catch (err) {
-                    console.error('Chatboo Floating Transfer Error:', err);
-                }
-            }
-            try { window.sessionStorage.removeItem('chatboo_floating_transfer_history'); } catch (_) { }
 
             // --- FASE 5: Multi-Tab Synchronization (Odoo Bus) ---
             this._setupBusListener();
@@ -1203,7 +1183,6 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
 
                     // Modal is handled independently — don't close/open it from here
                     this.scrollToBottom();
-                    this._fulfillPendingExportsInView();
                     return true;
                 }
             } catch (error) {
@@ -1310,7 +1289,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     content: m.role === 'user' ? this._plainUserContent(m.content) : (m.original_content || m.content || ''),
                     timestamp: m.timestamp || m.ts || '',
                 };
-                // Fuente cruda para el siguiente load (Showdown). Sin esto el
+                // Fuente cruda para el siguiente load (ChatbooMarkdown). Sin esto el
                 // save pisa el raw:true del worker y el historial queda tocho.
                 if (m.role === 'assistant') {
                     out.raw = true;
@@ -1659,6 +1638,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 this._defaultDisplayCurrency = (result && result.display_currency) || 'USD';
                 this._applyCardWidthRatio(result && result.card_width_ratio);
                 this._applyShowSeriesStats(result && result.show_series_stats);
+                this._applyCanvas(result && result.canvas_available);
                 this._refreshUsageChips();
 
                 if (result.status === 'error') {
@@ -1693,6 +1673,9 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
          */
         _initTtsUi() {
             const tts = window.__chatbooTts;
+            if (tts && tts.setAllowRemote) {
+                tts.setAllowRemote(!!session.pns_chatboo_allow_remote_voices);
+            }
             this.state.ttsSupported = !!(tts && tts.isSupported());
             this.state.ttsEnabled = this.state.ttsSupported && !!(tts && tts.isEnabled());
         }
@@ -1926,10 +1909,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         }
 
         _isOfftopicMessage(m) {
-            if (m && (m.verification_ack || (m.meta && m.meta.verification_ack))) {
-                return false;
-            }
-            return !!(m && (m.offtopic || m.local_ack || (m.meta && m.meta.local_ack)));
+            return ChatbooTurn.isOfftopic(m);
         }
 
         _lastUserPromptText() {
@@ -1943,9 +1923,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         }
 
         _messagesForModel(messages, excludeTail) {
-            const list = messages || [];
-            const base = excludeTail ? list.slice(0, -excludeTail) : list.slice();
-            return base.filter((m) => m && m.role !== 'system' && !this._isOfftopicMessage(m)).map((m) => {
+            return ChatbooTurn.modelTurns(messages, excludeTail).map((m) => {
                 if (m.role === 'user') {
                     let text = m.content;
                     if (typeof text === 'string' && text.includes('<')) {
@@ -1958,34 +1936,11 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         }
 
         _clipForLlm(text, limit) {
-            const s = (text == null) ? '' : String(text);
-            if (!limit || s.length <= limit) {
-                return s;
-            }
-            return s.slice(0, Math.max(0, limit - 1)).replace(/\s+$/, '') + '…';
+            return ChatbooTurn.clipForLlm(text, limit);
         }
 
         _contentForLlm(text) {
-            // Fallback when backend_history is missing: never replay on-screen
-            // tables (cell text saturates prefill). Matches history_compact.py.
-            const s = (text == null) ? '' : String(text);
-            if (s.indexOf('[On-screen artifact') === 0) {
-                return s;
-            }
-            const fat = s.length > 2500
-                || /<table\b/i.test(s)
-                || s.indexOf('o_chatboo_table_block') >= 0
-                || s.indexOf('data-chatboo-dataset') >= 0;
-            if (!fat) {
-                if (typeof s === 'string' && s.includes('<')) {
-                    return (formatters.textOfHtml(s) || s).trim();
-                }
-                return s;
-            }
-            return '[On-screen artifact | kind=table | ~' + s.length + ' characters]\n'
-                + 'The full document is already visible to the user. Do not reprint the rows. '
-                + 'Cached dataset is previous_result if you need to reformat or recompute. '
-                + 'Use tools for a new query.';
+            return ChatbooTurn.contentForLlm(text, (html) => formatters.textOfHtml(html));
         }
 
         _markLastUserOfftopic() {
@@ -2215,7 +2170,13 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         _showVerificationUI(evt) {
             const self = this;
             this._verificationPending = true;
-            if (document.getElementById('pns_verif_' + evt.verification_id)) { return; }
+            const existing = document.getElementById('pns_verif_' + evt.verification_id);
+            if (existing) {
+                if (evt.confirm_token) {
+                    existing.dataset.confirmToken = evt.confirm_token;
+                }
+                return;
+            }
 
             // ── Danger level → colors ──────────────────────────────────────
             const danger = evt.danger_level || 'medium';
@@ -2228,6 +2189,9 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
 
             const card = document.createElement('div');
             card.id = 'pns_verif_' + evt.verification_id;
+            if (evt.confirm_token) {
+                card.dataset.confirmToken = evt.confirm_token;
+            }
             card.style.cssText = 'position:fixed;right:24px;bottom:24px;z-index:20000;max-width:420px;background:#fff;border:1px solid ' + dc.border + ';border-left:5px solid ' + dc.border + ';border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.18);padding:14px 16px;font-family:system-ui,Segoe UI,sans-serif;font-size:13px;color:#222;';
 
             const title = document.createElement('div');
@@ -2303,7 +2267,10 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 // Fase A: solo confirm (rápido). Nunca execute en este HTTP.
                 self._callJsonRoute(
                     '/pns_ai_mcp/verification/confirm',
-                    { verification_id: evt.verification_id },
+                    {
+                        verification_id: evt.verification_id,
+                        confirm_token: card.dataset.confirmToken || evt.confirm_token || '',
+                    },
                     { timeoutMs: 8000 }
                 )
                     .then(function (res) {
@@ -2339,7 +2306,10 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                         status.textContent = _t('Confirmed — applying…');
                         return self._callJsonRoute(
                             '/pns_ai_mcp/verification/execute',
-                            { verification_id: evt.verification_id },
+                            {
+                                verification_id: evt.verification_id,
+                                confirm_token: card.dataset.confirmToken || evt.confirm_token || '',
+                            },
                             { timeoutMs: 20000 }
                         ).then(function (ex) {
                             const done = ex && ex.success !== false && ex.status === 'executed';
@@ -2477,6 +2447,15 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         // ══════════════════════════════════════════════════════════════════════
 
         /**
+         * Why the server refused the turn, in words the user can act on.
+         * @param {Response} resp
+         * @returns {Promise<string>}
+         */
+        async _streamRefusal(resp) {
+            return ChatbooTurn.refusal(resp, _t('Your session has changed. Reload the page (F5).'));
+        }
+
+        /**
          * Stream a chat turn via SSE (Server-Sent Events).
          *
          * Sends the user message + conversation history to /chatboo/stream
@@ -2535,36 +2514,18 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 }, STREAM_IDLE_MS);
             };
             try {
-                const screenContext = this._captureScreenContextForSend();
-                const payload = {
+                const payload = ChatbooTurn.buildPayload({
+                    sessionId: this.state.currentSessionId || null,
                     message: text,
                     history: historyForApi || [],
-                    session_id: this.state.currentSessionId || null,
-                    provider_id: this.state.selectedProviderId || null,
-                };
-                if (screenContext) {
-                    payload.screen_context = screenContext;
-                }
-                // Rows ticked in the answer: they go out with this sentence
-                // and are spent by it.
-                const marks = window.ChatbooRowMarks;
-                const refs = marks ? marks.take() : [];
-                if (refs.length) {
-                    payload.refs = refs;
-                }
-                if (images && images.length) {
-                    payload.images = images;
-                }
-                if (imageNames && imageNames.length) {
-                    payload.image_names = imageNames;
-                }
-                if (files && files.length) {
-                    payload.files = files;
-                }
+                    providerId: this.state.selectedProviderId,
+                    screenContext: this._captureScreenContextForSend(),
+                    images: images,
+                    imageNames: imageNames,
+                    files: files,
+                });
                 // The body is not a form: Odoo reads csrf_token from the query.
-                const streamUrl = '/chatboo/stream?csrf_token='
-                    + encodeURIComponent(odoo.csrf_token || '');
-                const resp = await fetch(streamUrl, {
+                const resp = await fetch(ChatbooTurn.streamUrl(odoo.csrf_token), {
                     // Odoo 14 enruta por Content-Type: 'application/json' fuerza un
                     // JsonRequest que choca con la ruta type='http' (BadRequest, body
                     // sin SSE). Con text/plain O14 lo trata como http; el controller
@@ -2576,86 +2537,70 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     body: JSON.stringify(payload),
                 });
                 if (!resp.ok || !resp.body) {
-                    throw new Error('HTTP ' + resp.status);
+                    throw new Error(await this._streamRefusal(resp));
                 }
-                const reader = resp.body.getReader();
-                const decoder = new TextDecoder('utf-8');
-                let buffer = "";
                 armIdle();
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    armIdle();
-                    buffer += decoder.decode(value, { stream: true });
-                    let sep;
-                    while ((sep = buffer.indexOf('\n\n')) !== -1) {
-                        const rawEvent = buffer.slice(0, sep);
-                        buffer = buffer.slice(sep + 2);
-                        const evt = ChatbooSse.parseSseBlock(rawEvent);
-                        if (!evt) continue;
-                        if (evt.event === 'token' && evt.content) {
+                await ChatbooTurn.readEvents(resp, (evt) => {
+                    if (evt.event === 'token' && evt.content) {
+                        if (_tFirst === null) {
+                            _tFirst = (typeof performance !== "undefined" ? performance.now() : Date.now());
+                        }
+                        ChatbooSse.applyToken(streamState, evt.content, formatFooter);
+                        acc = streamState.acc;
+                        const preview = this._formatContent(acc);
+                        if (ChatbooSse.hasVisibleContent(acc)) {
+                            this.state.streamingPreview = preview;
+                        }
+                        this.scrollToBottom();
+                    } else if (evt.event === 'replace' && evt.content) {
+                        if (_tFirst === null) {
+                            _tFirst = (typeof performance !== "undefined" ? performance.now() : Date.now());
+                        }
+                        ChatbooSse.applyReplace(streamState, evt.content);
+                        acc = streamState.acc;
+                        const preview = this._formatContent(acc);
+                        if (ChatbooSse.hasVisibleContent(acc)) {
+                            this.state.streamingPreview = preview;
+                        }
+                        this.scrollToBottom();
+                    } else if (evt.event === 'status' && evt.message) {
+                        this.state.statusLabel = evt.message;
+                    } else if (evt.event === 'meta') {
+                        // Auto-promoción: el servidor nos dice qué sesión/job creó/usó
+                        // el worker para poder recargarla como fuente de verdad, y el
+                        // request_id para ignorar el aviso de bus de ESTE turno.
+                        this._lastStreamSessionId = evt.session_id || this._lastStreamSessionId;
+                        this._lastStreamRequestId = evt.request_id || null;
+                    } else if (evt.event === 'done') {
+                        this._lastStreamMeta = evt;
+                        if (evt.compose === 'compose-model'
+                                || evt.compose === 'compose-agent') {
+                            this.state.effectiveFormattingMode = evt.compose;
+                        }
+                    } else if (evt.event === 'choice' && evt.choice_id) {
+                        this._showChoiceList(evt);
+                    } else if (evt.event === 'verification' && evt.verification_id) {
+                        // Caja B: la IA ha propuesto una escritura. Mostrar la
+                        // confirmación inline (no depende del bus/toast).
+                        this._showVerificationUI(evt);
+                    } else if (evt.event === 'error') {
+                        // Server-side error pushed via SSE — mark as error
+                        // so the badge shows the exclamation icon on red.
+                        this._lastSendWasError = true;
+                        // Also render the error content in the chat bubble
+                        if (evt.content) {
                             if (_tFirst === null) {
-                                _tFirst = (typeof performance !== "undefined" ? performance.now() : Date.now());
+                                _tFirst = (typeof performance !== 'undefined' ? performance.now() : Date.now());
                             }
-                            ChatbooSse.applyToken(streamState, evt.content, formatFooter);
-                            acc = streamState.acc;
+                            acc += evt.content;
                             const preview = this._formatContent(acc);
-                            if (ChatbooSse.hasVisibleContent(acc)) {
+                            if (preview && String(preview).replace(/<[^>]*>/g, '').trim()) {
                                 this.state.streamingPreview = preview;
                             }
                             this.scrollToBottom();
-                        } else if (evt.event === 'replace' && evt.content) {
-                            if (_tFirst === null) {
-                                _tFirst = (typeof performance !== "undefined" ? performance.now() : Date.now());
-                            }
-                            ChatbooSse.applyReplace(streamState, evt.content);
-                            acc = streamState.acc;
-                            const preview = this._formatContent(acc);
-                            if (ChatbooSse.hasVisibleContent(acc)) {
-                                this.state.streamingPreview = preview;
-                            }
-                            this.scrollToBottom();
-                        } else if (evt.event === 'status' && evt.message) {
-                            this.state.statusLabel = evt.message;
-                        } else if (evt.event === 'meta') {
-                            // Auto-promoción: el servidor nos dice qué sesión/job creó/usó
-                            // el worker para poder recargarla como fuente de verdad, y el
-                            // request_id para ignorar el aviso de bus de ESTE turno.
-                            this._lastStreamSessionId = evt.session_id || this._lastStreamSessionId;
-                            this._lastStreamRequestId = evt.request_id || null;
-                        } else if (evt.event === 'done') {
-                            // Metadatos del cierre: modelo/proveedor que respondió y
-                            // tokens reales (contexto usado). Los consume el llamador.
-                            this._lastStreamMeta = evt;
-                            if (evt.compose === 'compose-model'
-                                    || evt.compose === 'compose-agent') {
-                                this.state.effectiveFormattingMode = evt.compose;
-                            }
-                        } else if (evt.event === 'choice' && evt.choice_id) {
-                            this._showChoiceList(evt);
-                        } else if (evt.event === 'verification' && evt.verification_id) {
-                            // Caja B: la IA ha propuesto una escritura. Mostrar la
-                            // confirmación inline (no depende del bus/toast).
-                            this._showVerificationUI(evt);
-                        } else if (evt.event === 'error') {
-                            // Server-side error pushed via SSE — mark as error
-                            // so the badge shows the exclamation icon on red.
-                            this._lastSendWasError = true;
-                            // Also render the error content in the chat bubble
-                            if (evt.content) {
-                                if (_tFirst === null) {
-                                    _tFirst = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-                                }
-                                acc += evt.content;
-                                const preview = this._formatContent(acc);
-                                if (preview && String(preview).replace(/<[^>]*>/g, '').trim()) {
-                                    this.state.streamingPreview = preview;
-                                }
-                                this.scrollToBottom();
-                            }
                         }
                     }
-                }
+                }, armIdle);
                 const _tEnd = (typeof performance !== "undefined" ? performance.now() : Date.now());
                 this._lastStreamTiming = {
                     ttftMs: _tFirst !== null ? Math.round(_tFirst - _t0) : null,
@@ -2908,7 +2853,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 this._lastSendWasError = true;
                 this.messages.push({
                     role: "assistant",
-                    content: `<span class="text-danger">Communication Error: ${error.message || 'Unknown'}</span>`,
+                    content: `<span class="text-danger">Communication Error: ${this._escapeHtml(error.message || 'Unknown')}</span>`,
                     timestamp: this._formatTimestamp(startTime, new Date()),
                     context_info: this._makeContextInfo(null, 0, {}),
                 });
@@ -3190,20 +3135,6 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
 
                     const formattedHtml = this._formatContent(result.content || '');
                     const mainContent = formattedHtml;
-                    const lastUserMsg = this.messages.length > 0 ? this.messages[this.messages.length - 1] : null;
-                    const query = (lastUserMsg && lastUserMsg.role === 'user') ? (lastUserMsg.content || '') : '';
-                    let hasRawJson = false;
-                    let rawSaveData = null;
-                    try {
-                        const parsed = JSON.parse(result.content || '{}');
-                        if (parsed && typeof parsed === 'object' && !parsed.formatted_text) {
-                            const hasData = Array.isArray(parsed.data) || (Array.isArray(parsed) && parsed[0] && typeof parsed[0] === 'object');
-                            if (hasData) {
-                                hasRawJson = true;
-                                rawSaveData = { json: result.content, query: query };
-                            }
-                        }
-                    } catch (e) { }
 
                     const localAck = !!result.local_ack;
                     const contextInfoData = localAck ? null : this._makeContextInfo(
@@ -3236,14 +3167,11 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                         records: result.records || [],
                         speed_tps: result.speed_tps || 0,
                         prompt_speed_tps: result.prompt_speed_tps || 0,
-                        has_raw_json: hasRawJson,
-                        raw_save_data: rawSaveData,
                         backend_history: result.history || null,
                         files: __meta.assistant_files || result.assistant_files || [],
                         clip_data: __meta.clip_data || result.clip_data || null,
                     });
                     this._maybeSpeakLastAssistant();
-                    this._fulfillPendingExports(this.messages[this.messages.length - 1]);
 
                     // conversation_id is managed automatically by backend (agnostic)
                     // Backend will save it to session if provider is Router
@@ -3284,7 +3212,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 } else {
                     this.messages.push({
                         role: "assistant",
-                        content: `<span class="text-danger">Communication Error: ${error.message || 'Unknown'}</span>`,
+                        content: `<span class="text-danger">Communication Error: ${this._escapeHtml(error.message || 'Unknown')}</span>`,
                         timestamp: this._formatTimestamp(startTime, errorTime),
                         context_info: this._makeContextInfo(null, 0, {}),
                     });
@@ -3724,6 +3652,52 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             }
         }
 
+        _applyResultLabels() {
+            const charts = window.ChatbooCharts;
+            if (!charts || typeof charts.setLabels !== 'function') {
+                return;
+            }
+            charts.setLabels({
+                chart: _t("Chart"),
+                data: _t("Data"),
+                canvas: _t("Canvas"),
+                canvasTitle: _t("Lay out the tables of this answer as a page"),
+                canvasBuilding: _t("Building the page…"),
+                canvasOpen: _t("Open page"),
+                canvasFailed: _t("No page was built."),
+                canvasCancel: _t("Building the page. Click to cancel."),
+            });
+        }
+
+        /** Canvas button only when a provider has the Design tick. */
+        _applyCanvas(available) {
+            const charts = window.ChatbooCharts;
+            if (!charts || typeof charts.setCanvas !== 'function') {
+                return;
+            }
+            charts.setCanvas(available ? {
+                rpc: (route, params) => this.props.rpc({ route: route, params: params }),
+                sessionId: () => this.state.currentSessionId,
+                question: (msgIndex) => this._questionBefore(msgIndex),
+                confirmCancel: (yes) => {
+                    if (confirm(_t('Cancel the page in progress? It will not be built.'))) {
+                        yes();
+                    }
+                },
+            } : null);
+        }
+
+        _questionBefore(msgIndex) {
+            const messages = this.messages || [];
+            for (let i = Math.min(msgIndex, messages.length) - 1; i >= 0; i--) {
+                const msg = messages[i];
+                if (msg && msg.role === 'user') {
+                    return String(msg.content || '').slice(0, 2000);
+                }
+            }
+            return '';
+        }
+
         async _toggleShowSeriesStats() {
             const on = !this.state.showSeriesStats;
             this._applyShowSeriesStats(on);
@@ -3826,9 +3800,9 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 return true;
             }
             var html = String(msg.formatted_html || msg.content || '');
-            msg.wideCanvas = /data-chatboo-show-mode="(?:show-table|show-chart|chart-table|dashboard)"/.test(html)
-                || html.indexOf('o_chatboo_table_block') !== -1
-                || html.indexOf('o_chatboo_dashboard') !== -1
+            msg.wideCanvas = /data-ai-show-mode="(?:show-table|show-chart|chart-table|dashboard)"/.test(html)
+                || html.indexOf('o_ai_table_block') !== -1
+                || html.indexOf('o_ai_dashboard') !== -1
                 || /<table[\s>]/i.test(html);
             return msg.wideCanvas;
         }
@@ -4968,7 +4942,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             if (!overlay) {
                 return;
             }
-            overlay.style.zIndex = prevZ || '1050';
+            overlay.style.zIndex = prevZ || '1039';
         }
 
         async _openSkillWizard(action) {
@@ -5215,30 +5189,6 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             }
         }
 
-        /**
-         * Save the raw (pre-formatted) content of a message for use in
-         * OWL template rendering. Stores it in a parallel data structure.
-         * @param {Object} msg - Message object with role and content.
-         * @returns {Promise<void>}
-         */
-        async _saveRawForTemplate(msg) {
-            if (!msg || !msg.raw_save_data) return;
-            const { json, query } = msg.raw_save_data;
-            try {
-                const r = await this.props.rpc({
-                    route: '/chatboo/save_raw_for_template',
-                    params: { query, result_json: json }
-                });
-                if (r && r.status === 'ok') {
-                    if (this.props.notification) this.props.notification({ message: r.message || _t('Saved'), type: 'success', sticky: false });
-                } else {
-                    if (this.props.notification) this.props.notification({ message: r.message || _t('Error'), type: 'danger', sticky: true });
-                }
-            } catch (e) {
-                if (this.props.notification) this.props.notification({ message: (e && e.message) || _t('Error while saving'), type: 'danger', sticky: true });
-            }
-        }
-
         // ══════════════════════════════════════════════════════════════════════
         // 9. CONTENT FORMATTING — delegated to pns_ai_chatboo.formatters
         // ══════════════════════════════════════════════════════════════════════
@@ -5254,7 +5204,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         /** @see formatters.formatJsonWithLineBreaks */
         _formatJsonWithLineBreaks(obj, indent) { return formatters.formatJsonWithLineBreaks(obj, indent); }
         /** @see formatters.formatNumber */
-        _formatNumber(value, locale) { return formatters.formatNumber(value, locale, this.constructor.DEFAULT_DECIMAL_PLACES); }
+        _formatNumber(value, locale) { return formatters.formatNumber(value, locale, formatters.DEFAULT_DECIMAL_PLACES); }
         /** @see formatters.formatJsonAsTable */
         _formatJsonAsTable(data) { return formatters.formatJsonAsTable(data); }
         /** @see formatters.escapeHtml */
@@ -5622,30 +5572,41 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             };
         }
 
-        _fulfillPendingExports(msg) {
-            if (!msg || typeof exportUtils.fulfillPendingSessionDocuments !== 'function') {
+        // A pending document is built and stored only when its card is clicked:
+        // painting a message must not write to the server on its own.
+        _fulfillChipClick(ev) {
+            const el = ev.currentTarget;
+            const msgIndex = parseInt(el.getAttribute('data-msg-index'), 10);
+            const fileIndex = parseInt(el.getAttribute('data-file-index'), 10);
+            const msg = this.messages[msgIndex];
+            if (!msg || !msg.files || typeof exportUtils.fulfillPendingSessionDocuments !== 'function') {
                 return;
             }
-            const pending = (msg.files || []).some((f) => f && f.pending);
-            if (!pending) {
+            const chip = msg.files[fileIndex];
+            if (!chip || !chip.pending) {
                 return;
             }
-            const run = () => {
-                const idx = this.messages.indexOf(msg);
-                let sourceEl = null;
-                const root = this.messagesRef && this.messagesRef.el;
-                if (root && idx >= 0) {
-                    const node = root.querySelector('[data-msg-index="' + idx + '"]');
-                    sourceEl = node && (node.querySelector('.o_chatboo_content') || node);
-                }
-                exportUtils.fulfillPendingSessionDocuments(msg, sourceEl, this._exportCtx())
-                    .catch(() => {});
-            };
-            this._afterPaint(run);
-        }
-
-        _fulfillPendingExportsInView() {
-            (this.messages || []).forEach((msg) => this._fulfillPendingExports(msg));
+            let sourceEl = null;
+            const root = this.messagesRef && this.messagesRef.el;
+            if (root) {
+                const node = root.querySelector('[data-msg-index="' + msgIndex + '"]');
+                sourceEl = node && (node.querySelector('.o_chatboo_content') || node);
+            }
+            exportUtils.fulfillPendingSessionDocuments(msg, sourceEl, this._exportCtx(), chip)
+                .then(() => {
+                    if (!chip.pending && chip.url) {
+                        const a = document.createElement('a');
+                        a.href = this._fileDownloadHref(chip);
+                        const name = this._fileDownloadName(chip);
+                        if (name) {
+                            a.download = name;
+                        }
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                    }
+                })
+                .catch(() => {});
         }
 
         /** @see exportUtils.htmlToMarkdown */
@@ -5785,41 +5746,41 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                                  class="o_chatboo_card_resize"
                                  t-on-pointerdown="_onCardResizeStart"/>
                             <t t-if="msg.role === 'assistant'">
-                                <div t-attf-class="d-flex mb-1 o_chatboo_export_bar {{ msg.wideCanvas ? 'justify-content-between' : 'justify-content-end' }}" style="gap: 4px;">
+                                <div t-attf-class="d-flex mb-1 o_ai_export_bar {{ msg.wideCanvas ? 'justify-content-between' : 'justify-content-end' }}" style="gap: 4px;">
                                     <i t-if="msg.wideCanvas"
-                                       class="fa fa-compress o_chatboo_copy_btn text-muted o_chatboo_card_width_reset"
+                                       class="fa fa-compress o_ai_copy_btn text-muted o_chatboo_card_width_reset"
                                        t-att-title="tipRestoreCardWidth"
                                        t-on-click="_resetCardWidth"/>
                                     <span style="display:flex;gap:4px;">
-                                    <i class="fa fa-file-pdf-o o_chatboo_copy_btn text-danger" 
+                                    <i class="fa fa-file-pdf-o o_ai_copy_btn text-danger" 
                                        style="cursor: pointer; font-size: 1.09375em; opacity: 0.7; transition: opacity 0.2s;"
                                        t-att-title="tipDownloadPdf"
                                        t-att-data-msg-index="msg_index"
                                        t-on-click="_downloadAsPDF"/>
-                                    <i class="fa fa-file-excel-o o_chatboo_copy_btn text-success" 
+                                    <i class="fa fa-file-excel-o o_ai_copy_btn text-success" 
                                        style="cursor: pointer; font-size: 1.09375em; opacity: 0.7; transition: opacity 0.2s;"
                                        t-att-title="tipDownloadExcel"
                                        t-att-data-msg-index="msg_index"
                                        t-on-click="_downloadAsExcel"/>
-                                    <i class="fa fa-file-word-o o_chatboo_copy_btn"
+                                    <i class="fa fa-file-word-o o_ai_copy_btn"
                                        style="cursor: pointer; font-size: 1.09375em; opacity: 0.7; transition: opacity 0.2s; color: #2b579a;"
                                        t-att-title="tipDownloadWord"
                                        t-att-data-msg-index="msg_index"
                                        t-on-click="_downloadAsWord"/>
-                                    <i t-attf-class="fa fa-copy o_chatboo_copy_btn text-muted" 
+                                    <i t-attf-class="fa fa-copy o_ai_copy_btn text-muted" 
                                        style="cursor: pointer; font-size: 1.09375em; opacity: 0.7; transition: opacity 0.2s;"
                                        t-att-title="tipCopyContent"
                                        t-att-data-msg-index="msg_index"
                                        t-att-data-copy-type="'content'"
                                        t-on-click="_copyToClipboard"/>
                                     <span class="o_chatboo_md_col">
-                                    <i t-attf-class="fa fa-code o_chatboo_copy_btn text-muted" 
+                                    <i t-attf-class="fa fa-code o_ai_copy_btn text-muted" 
                                        style="cursor: pointer; font-size: 1.09375em; opacity: 0.7; transition: opacity 0.2s;"
                                        t-att-title="tipCopyMarkdown"
                                        t-att-data-msg-index="msg_index"
                                        t-att-data-copy-type="'markdown'"
                                        t-on-click="_copyToClipboard"/>
-                                    <i class="fa fa-chevron-down o_chatboo_copy_btn text-muted o_chatboo_turn_jump"
+                                    <i class="fa fa-chevron-down o_ai_copy_btn text-muted o_chatboo_turn_jump"
                                        style="cursor: pointer; font-size: 1.09375em; opacity: 0.7; transition: opacity 0.2s;"
                                        t-att-title="tipGoToEnd"
                                        t-att-data-edge="'end'"
@@ -5844,13 +5805,29 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                                                     <span class="o_chatboo_file_banner_cta" t-esc="tipDownloadFile"/>
                                                 </span>
                                             </a>
+                                            <span t-else="" t-att-class="_fileBannerCardClass(mfile)"
+                                                  t-att-title="mfile.name"
+                                                  t-att-data-msg-index="msg_index"
+                                                  t-att-data-file-index="mfile_index"
+                                                  t-att-style="mfile.pending ? 'cursor:pointer' : false"
+                                                  t-on-click="_fulfillChipClick">
+                                                <span class="o_chatboo_file_banner_preview" aria-hidden="true">
+                                                    <i t-att-class="_fileIconClass(mfile.name, mfile.mimetype)"/>
+                                                </span>
+                                                <span class="o_chatboo_file_banner_meta">
+                                                    <span class="o_chatboo_file_banner_title" t-esc="mfile.name"/>
+                                                    <span t-if="_fileSizeLabel(mfile)" class="o_chatboo_file_banner_size"
+                                                          t-esc="_fileSizeLabel(mfile)"/>
+                                                    <span t-if="mfile.pending" class="o_chatboo_file_banner_cta" t-esc="tipPrepareFile"/>
+                                                </span>
+                                            </span>
                                         </t>
                                     </div>
                                 </t>
                             </t>
                             <t t-if="msg.role === 'user'">
                                 <div class="d-flex justify-content-end mb-1" style="gap: 4px;">
-                                    <i t-attf-class="fa fa-copy o_chatboo_copy_btn text-white" 
+                                    <i t-attf-class="fa fa-copy o_ai_copy_btn text-white" 
                                        style="cursor: pointer; font-size: 1.09375em; opacity: 0.7; transition: opacity 0.2s;"
                                        t-att-title="tipCopyClipboard"
                                        t-att-data-msg-index="msg_index"
@@ -5892,7 +5869,11 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                                                 </span>
                                             </a>
                                             <span t-else="" t-att-class="_fileBannerCardClass(mfile)"
-                                                  t-att-title="mfile.name">
+                                                  t-att-title="mfile.name"
+                                                  t-att-data-msg-index="msg_index"
+                                                  t-att-data-file-index="mfile_index"
+                                                  t-att-style="mfile.pending ? 'cursor:pointer' : false"
+                                                  t-on-click="_fulfillChipClick">
                                                 <span class="o_chatboo_file_banner_preview" aria-hidden="true">
                                                     <i t-att-class="_fileIconClass(mfile.name, mfile.mimetype)"/>
                                                 </span>
@@ -5900,6 +5881,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                                                     <span class="o_chatboo_file_banner_title" t-esc="mfile.name"/>
                                                     <span t-if="_fileSizeLabel(mfile)" class="o_chatboo_file_banner_size"
                                                           t-esc="_fileSizeLabel(mfile)"/>
+                                                    <span t-if="mfile.pending" class="o_chatboo_file_banner_cta" t-esc="tipPrepareFile"/>
                                                 </span>
                                             </span>
                                         </t>
@@ -5908,38 +5890,38 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                             </t>
                             <div class="o_chatboo_content" t-raw="_safeHtml(msg.content)"/>
                             <div class="o_chatboo_ts_row">
-                                <div class="o_chatboo_ts" t-attf-style="font-size: 1.09375em; color: {{ msg.role === 'user' ? '#ffffff' : '#007cba' }};" t-esc="msg.timestamp"/>
+                                <div class="o_ai_ts" t-attf-style="font-size: 1.09375em; color: {{ msg.role === 'user' ? '#ffffff' : '#007cba' }};" t-esc="msg.timestamp"/>
                                 <t t-if="msg.role === 'assistant'">
-                                    <div class="d-flex o_chatboo_export_bar" style="gap: 4px;">
-                                        <i class="fa fa-file-pdf-o o_chatboo_copy_btn text-danger"
+                                    <div class="d-flex o_ai_export_bar" style="gap: 4px;">
+                                        <i class="fa fa-file-pdf-o o_ai_copy_btn text-danger"
                                            style="cursor: pointer; font-size: 1.09375em; opacity: 0.7; transition: opacity 0.2s;"
                                            t-att-title="tipDownloadPdf"
                                            t-att-data-msg-index="msg_index"
                                            t-on-click="_downloadAsPDF"/>
-                                        <i class="fa fa-file-excel-o o_chatboo_copy_btn text-success"
+                                        <i class="fa fa-file-excel-o o_ai_copy_btn text-success"
                                            style="cursor: pointer; font-size: 1.09375em; opacity: 0.7; transition: opacity 0.2s;"
                                            t-att-title="tipDownloadExcel"
                                            t-att-data-msg-index="msg_index"
                                            t-on-click="_downloadAsExcel"/>
-                                        <i class="fa fa-file-word-o o_chatboo_copy_btn"
+                                        <i class="fa fa-file-word-o o_ai_copy_btn"
                                            style="cursor: pointer; font-size: 1.09375em; opacity: 0.7; transition: opacity 0.2s; color: #2b579a;"
                                            t-att-title="tipDownloadWord"
                                            t-att-data-msg-index="msg_index"
                                            t-on-click="_downloadAsWord"/>
-                                        <i t-attf-class="fa fa-copy o_chatboo_copy_btn text-muted"
+                                        <i t-attf-class="fa fa-copy o_ai_copy_btn text-muted"
                                            style="cursor: pointer; font-size: 1.09375em; opacity: 0.7; transition: opacity 0.2s;"
                                            t-att-title="tipCopyContent"
                                            t-att-data-msg-index="msg_index"
                                            t-att-data-copy-type="'content'"
                                            t-on-click="_copyToClipboard"/>
                                         <span class="o_chatboo_md_col">
-                                        <i t-attf-class="fa fa-code o_chatboo_copy_btn text-muted"
+                                        <i t-attf-class="fa fa-code o_ai_copy_btn text-muted"
                                            style="cursor: pointer; font-size: 1.09375em; opacity: 0.7; transition: opacity 0.2s;"
                                            t-att-title="tipCopyMarkdown"
                                            t-att-data-msg-index="msg_index"
                                            t-att-data-copy-type="'markdown'"
                                            t-on-click="_copyToClipboard"/>
-                                        <i class="fa fa-chevron-up o_chatboo_copy_btn text-muted o_chatboo_turn_jump"
+                                        <i class="fa fa-chevron-up o_ai_copy_btn text-muted o_chatboo_turn_jump"
                                            style="cursor: pointer; font-size: 1.09375em; opacity: 0.7; transition: opacity 0.2s;"
                                            t-att-title="tipGoToStart"
                                            t-att-data-edge="'start'"

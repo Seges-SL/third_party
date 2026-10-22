@@ -23,9 +23,56 @@
             <field name="domain_force">[('user_id', '=', user.id)]</field>
             <field name="groups" eval="[(4, ref('base.group_user'))]"/>
             <field name="perm_read" eval="True"/>
-            <field name="perm_write" eval="True"/>
+            <field name="perm_write" eval="False"/>
             <field name="perm_create" eval="False"/>
             <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- A Canvas job: its owner reads it. Only the system writes it. -->
+        <record id="chatboo_canvas_job_user_rule" model="ir.rule">
+            <field name="name">Chatboo Canvas job: own rows</field>
+            <field name="model_id" ref="model_chatboo_canvas_job"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- A shared page: the owner and the users it names read it. -->
+        <record id="chatboo_canvas_page_read_rule" model="ir.rule">
+            <field name="name">Chatboo shared page: owner or named user reads</field>
+            <field name="model_id" ref="model_chatboo_canvas_page"/>
+            <field name="domain_force">['|', ('owner_id', '=', user.id), ('user_ids', 'in', [user.id])]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Only the owner creates, changes or deletes it. -->
+        <record id="chatboo_canvas_page_owner_rule" model="ir.rule">
+            <field name="name">Chatboo shared page: owner writes</field>
+            <field name="model_id" ref="model_chatboo_canvas_page"/>
+            <field name="domain_force">[('owner_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="False"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="chatboo_canvas_page_admin_rule" model="ir.rule">
+            <field name="name">Chatboo shared page: AI admin sees all</field>
+            <field name="model_id" ref="model_chatboo_canvas_page"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('pns_ai_mcp.group_ai_admin'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
         </record>
 
     </data>

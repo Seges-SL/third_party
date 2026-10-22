@@ -43,6 +43,7 @@
                         <field name="sequence"/>
                         <field name="active"/>
                         <field name="show_in_slash"/>
+                        <field name="required_group_ids" widget="many2many_tags"/>
                         <field name="owner_id" readonly="1" groups="pns_ai_mcp.group_ai_admin"/>
                         <field name="is_system" readonly="1"/>
                         <field name="rel_path" readonly="1"/>
@@ -63,12 +64,13 @@
                         <page string="Parameters" name="parameters">
                             <group>
                                 <field name="arg_hint" string="Argument hint"
-                                       placeholder="Short usage example shown as the Chatboo input placeholder, e.g. Seville tomorrow or mes=2025-01. Purely informative."/>
+                                       placeholder="Short usage example shown as the chat input placeholder, e.g. Seville tomorrow or mes=2025-01. Purely informative."/>
                                 <field name="args_policy" string="Empty-args policy"/>
                                 <field name="compose"/>
                                 <field name="param_schema" invisible="1"/>
                             </group>
-                            <group string="Parameter list">
+                            <div class="alert alert-info o_skill_param_token_legend" role="status">__SKILL_PARAM_TOKEN_LEGEND__</div>
+                            <group string="Parameter list" col="1">
                                 <field name="param_line_ids" nolabel="1">
                                     <tree editable="bottom">
                                         <field name="sequence" widget="handle"/>
@@ -80,7 +82,7 @@
                                     </tree>
                                 </field>
                             </group>
-                            <group string="Learned phrases">
+                            <group string="Learned phrases" col="1">
                                 <field name="param_cache_ids" nolabel="1">
                                     <tree editable="bottom">
                                         <field name="unresolved"/>

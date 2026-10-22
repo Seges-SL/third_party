@@ -1,5 +1,5 @@
 /**
- * Tools button, PIN soft-refresh and key-list chip for MCP Users (Odoo 14).
+ * Tools button, key-list refresh and chip for MCP Users (Odoo 14).
  *
  * SPDX-License-Identifier: Apache-2.0
  * Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
@@ -13,13 +13,6 @@ odoo.define('pns_ai_mcp.mcp_user_tree', function (require) {
     var _t = core._t;
 
     var VAULT = 'pns.key.pin.vault';
-
-    function isPinButton(attrs) {
-        return attrs && (
-            attrs.name === 'action_key_pin_regenerate'
-            || attrs.name === 'clear_key_pin'
-        );
-    }
 
     function heldCount() {
         if (typeof window.pnsKeyPinHeldCount === 'function') {
@@ -56,20 +49,6 @@ odoo.define('pns_ai_mcp.mcp_user_tree', function (require) {
 
     function refreshAfterPin() {
         return {
-            _callButtonAction: function (attrs, record) {
-                var self = this;
-                var pin = isPinButton(attrs) && this.modelName === 'ai.mcp.user';
-                var def = this._super.apply(this, arguments);
-                if (!pin) {
-                    return def;
-                }
-                // Soft reload of the list/form only — never a client page reload.
-                return Promise.resolve(def).then(function () {
-                    return self.reload();
-                }).then(function () {
-                    paintToolbarChip(self);
-                });
-            },
             start: function () {
                 var self = this;
                 var onChanged = function () {

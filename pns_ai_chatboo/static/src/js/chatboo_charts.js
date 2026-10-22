@@ -2,9 +2,9 @@
 /* Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com> */
 /**
  * Chatboo charts v2 — hydrate Chart.js or ECharts under server-rendered tables.
- * Engine: data-chatboo-chart-engine="echarts"|"chartjs" (default chartjs),
+ * Engine: data-ai-chart-engine="echarts"|"chartjs" (default chartjs),
  * or window.CHATBOO_CHART_ENGINE for global override (spike / QA).
- * Source of truth: data-chatboo-dataset JSON (not formatted DOM cells).
+ * Source of truth: data-ai-dataset JSON (not formatted DOM cells).
  */
 (function (global) {
     "use strict";
@@ -33,7 +33,18 @@
     var COUNT_KEY_RE =
         /\bcount\b|qty|cantidad|n[uú]mero|\bnum\b|n[º°]|uds?\b|units?|horas?|hours?|d[ií]as?|days?|\bitems?\b|\bn\b/i;
 
+    var ChartLib = null;
+    var EchartsLib = null;
     var showSeriesStats = false;
+
+    function bindEngines(chart, echarts) {
+        if (typeof chart === "function") {
+            ChartLib = chart;
+        }
+        if (echarts) {
+            EchartsLib = echarts;
+        }
+    }
 
     function setShowSeriesStats(value) {
         showSeriesStats = !!value;
@@ -41,6 +52,33 @@
 
     function getShowSeriesStats() {
         return !!showSeriesStats;
+    }
+
+    // English msgids; the chat client passes them through its own _t().
+    var LABELS = {
+        chart: "Chart",
+        data: "Data",
+        canvas: "Canvas",
+        canvasTitle: "Lay out the tables of this answer as a page",
+        canvasBuilding: "Building the page…",
+        canvasOpen: "Open page",
+        canvasFailed: "No page was built.",
+        canvasCancel: "Building the page. Click to cancel.",
+    };
+
+    function setLabels(labels) {
+        if (!labels || typeof labels !== "object") {
+            return;
+        }
+        Object.keys(LABELS).forEach(function (key) {
+            if (typeof labels[key] === "string" && labels[key]) {
+                LABELS[key] = labels[key];
+            }
+        });
+    }
+
+    function label(key) {
+        return LABELS[key] || key;
     }
 
     var TIME_KEY_RE = /^(year|año|ano|periodo|period|fecha|date|mes|month|trimestre|quarter|semana|week|h[12]|q[1-4]|m\d{1,2})$/i;
@@ -387,7 +425,7 @@
         return lo > 0 && hi / lo >= SCALE_RATIO_DUAL_EXTREME;
     }
 
-    /** Override desde data-chatboo-dual-axis o toggle UI; null = auto. */
+    /** Override desde data-ai-dual-axis o toggle UI; null = auto. */
     function parseDualAxisAttr(raw) {
         if (raw === null || raw === undefined) {
             return null;
@@ -444,7 +482,7 @@
         if (!meta || !block) {
             return meta;
         }
-        var forced = parseDualAxisAttr(block.getAttribute("data-chatboo-dual-axis"));
+        var forced = parseDualAxisAttr(block.getAttribute("data-ai-dual-axis"));
         if (forced === null && block._chatbooDualAxisForce !== undefined) {
             forced = block._chatbooDualAxisForce;
         }
@@ -631,31 +669,6 @@
         return pivoted.length ? pivoted : null;
     }
 
-    function emptyChartMeta(defaultMode) {
-        return {
-            categoryKey: "",
-            seriesKeys: [],
-            dominantKey: "",
-            labels: [],
-            series: [],
-            dualAxis: false,
-            temporal: false,
-            periodBuckets: false,
-            defaultMode: defaultMode || "bar",
-            pieOk: false,
-            categoricalPieOk: false,
-            stackedOk: false,
-            horizontalOk: false,
-            radarOk: false,
-        };
-    }
-
-    function mountChartTableShell(block) {
-        mountToolbar(block, emptyChartMeta("bar"));
-        setTableCollapsed(block, true);
-        updatePrimaryToggleLabel(block);
-    }
-
     function isPieLikeMode(mode) {
         return mode === "pie" || mode === "donut" || mode === "rose";
     }
@@ -675,7 +688,7 @@
         var inDash = !!(
             block &&
             block.closest &&
-            block.closest(".o_chatboo_dashboard_card")
+            block.closest(".o_ai_dashboard_card")
         );
         var maximized = !!(
             block &&
@@ -687,12 +700,12 @@
         // Maximizada → misma lógica que un gráfico de chat normal.
         if (inDash && !maximized) {
             var body =
-                block.closest && block.closest(".o_chatboo_dashboard_card_body");
+                block.closest && block.closest(".o_ai_dashboard_card_body");
             var toolbar = block.querySelector
-                ? block.querySelector(".o_chatboo_chart_toolbar")
+                ? block.querySelector(".o_ai_chart_toolbar")
                 : null;
             var title = block.querySelector
-                ? block.querySelector(".o_chatboo_block_title, .pns-result-title")
+                ? block.querySelector(".o_ai_block_title, .pns-result-title")
                 : null;
             var bodyH = body && body.clientHeight > 0 ? body.clientHeight : 0;
             var tbH = toolbar && toolbar.offsetHeight ? toolbar.offsetHeight : 34;
@@ -745,7 +758,7 @@
         var inDash = !!(
             block &&
             block.closest &&
-            block.closest(".o_chatboo_dashboard_card")
+            block.closest(".o_ai_dashboard_card")
         );
         var maximized = !!(
             block &&
@@ -767,18 +780,16 @@
         if (!root || !root.querySelectorAll) {
             return;
         }
-        var blocks = root.querySelectorAll(".o_chatboo_table_block");
+        var blocks = root.querySelectorAll(".o_ai_table_block");
         var i;
         for (i = 0; i < blocks.length; i++) {
             var block = blocks[i];
             var meta = block._chatbooChartMeta;
-            var host = block.querySelector(".o_chatboo_chart_host");
+            var host = block.querySelector(".o_ai_chart_host");
             if (!meta || !host) {
                 continue;
             }
-            var open =
-                block.getAttribute("data-chatboo-chart-open") === "1" ||
-                isChartTableMode(block);
+            var open = block.getAttribute("data-chatboo-chart-open") === "1";
             if (!open && host.style.display === "none") {
                 continue;
             }
@@ -1035,7 +1046,7 @@
     function resizeChartToHost(block) {
         var host =
             block && block.querySelector
-                ? block.querySelector(".o_chatboo_chart_host")
+                ? block.querySelector(".o_ai_chart_host")
                 : null;
         var chart = block && block._chatbooChart;
         if (!host || !chart || typeof chart.resize !== "function") {
@@ -1065,7 +1076,7 @@
     function observeChartHost(block) {
         disconnectHostObserver(block);
         var host = block && block.querySelector
-            ? block.querySelector(".o_chatboo_chart_host")
+            ? block.querySelector(".o_ai_chart_host")
             : null;
         if (!host || typeof global.ResizeObserver === "undefined") {
             return;
@@ -1615,21 +1626,21 @@
     }
 
     function blockChartEngine(block) {
-        var raw = (block.getAttribute("data-chatboo-chart-engine") || "").toLowerCase();
+        var raw = (block.getAttribute("data-ai-chart-engine") || "").toLowerCase();
         if (!raw && global.CHATBOO_CHART_ENGINE) {
             raw = String(global.CHATBOO_CHART_ENGINE).toLowerCase();
         }
-        if (raw === ENGINE_ECHARTS && global.echarts) {
+        if (raw === ENGINE_ECHARTS && EchartsLib) {
             return ENGINE_ECHARTS;
         }
-        if (raw === ENGINE_CHARTJS && typeof global.Chart === "function") {
+        if (raw === ENGINE_CHARTJS && typeof ChartLib === "function") {
             return ENGINE_CHARTJS;
         }
         if (!raw || raw === ENGINE_ECHARTS) {
-            if (typeof global.Chart === "function") {
+            if (typeof ChartLib === "function") {
                 return ENGINE_CHARTJS;
             }
-            if (global.echarts) {
+            if (EchartsLib) {
                 return ENGINE_ECHARTS;
             }
         }
@@ -1638,8 +1649,7 @@
 
     function blockShowMode(block) {
         var sm = (
-            block.getAttribute("data-chatboo-show-mode")
-            || block.getAttribute("data-chatboo-showmode")
+            block.getAttribute("data-ai-show-mode")
             || SHOW_MODE_TABLE_CHART
         ).toLowerCase();
         if (sm === "table-chart") {
@@ -1689,27 +1699,40 @@
         block.setAttribute("data-chatboo-table-collapsed", collapsed ? "1" : "0");
     }
 
+    /** One view at a time: the button names the other one. */
     function updatePrimaryToggleLabel(block) {
+        var open = block.getAttribute("data-chatboo-chart-open") === "1";
+        var controls = block.querySelector(".o_chatboo_chart_controls");
+        if (controls) {
+            controls.style.display = open ? "" : "none";
+        }
         var btn = block.querySelector(".o_chatboo_chart_toggle");
         if (!btn) {
             return;
         }
-        if (isChartTableMode(block)) {
-            var collapsed = block.getAttribute("data-chatboo-table-collapsed") !== "0";
-            btn.textContent = collapsed ? "Ver datos" : "Ocultar datos";
-            btn.setAttribute("aria-pressed", collapsed ? "false" : "true");
-            return;
+        btn.textContent = open ? label("data") : label("chart");
+        btn.setAttribute("aria-pressed", "false");
+    }
+
+    function showChartView(block, meta, mode) {
+        renderChart(block, meta, mode);
+        if (block.getAttribute("data-chatboo-chart-open") === "1") {
+            setTableCollapsed(block, true);
         }
-        var open = block.getAttribute("data-chatboo-chart-open") === "1";
-        btn.textContent = open ? "Ocultar gráfico" : "Gráfico";
-        btn.setAttribute("aria-pressed", open ? "true" : "false");
+        updatePrimaryToggleLabel(block);
+    }
+
+    function showTableView(block) {
+        hideChart(block);
+        setTableCollapsed(block, false);
+        updatePrimaryToggleLabel(block);
     }
 
     function prepareChartSurface(host, engine) {
         host.innerHTML = "";
         if (engine === ENGINE_ECHARTS) {
             var div = document.createElement("div");
-            div.className = "o_chatboo_echarts_surface";
+            div.className = "o_ai_echarts_surface";
             div.style.width = "100%";
             div.style.height = "100%";
             host.appendChild(div);
@@ -1792,7 +1815,7 @@
      * ResizeObserver when it gets one.
      */
     function relayoutChart(block) {
-        var host = block.querySelector(".o_chatboo_chart_host");
+        var host = block.querySelector(".o_ai_chart_host");
         var meta = block._chatbooChartMeta;
         if (host && meta) {
             block._chatbooChartLaidOut = hostInnerSize(host).w >= MIN_HOST_PX;
@@ -1811,7 +1834,7 @@
         if (!root || !root.querySelectorAll) {
             return;
         }
-        var blocks = root.querySelectorAll(".o_chatboo_table_block");
+        var blocks = root.querySelectorAll(".o_ai_table_block");
         var i;
         for (i = 0; i < blocks.length; i++) {
             resizeChartToHost(blocks[i]);
@@ -1834,7 +1857,7 @@
         var want = String(categoryKey).replace(/\s+/g, " ").trim();
         var i;
         for (i = 0; i < ths.length; i++) {
-            if (ths[i].closest && ths[i].closest("tr.o_chatboo_ficha_title")) {
+            if (ths[i].closest && ths[i].closest("tr.o_ai_ficha_title")) {
                 continue;
             }
             if (headerCellLabel(ths[i]) === want) {
@@ -1848,7 +1871,7 @@
         if (!block || !rows || !rows.length || !categoryKey) {
             return rows;
         }
-        var table = block.querySelector("table.o_chatboo_data_table");
+        var table = block.querySelector("table.o_ai_data_table");
         if (!table || !table.tBodies || !table.tBodies[0]) {
             return rows;
         }
@@ -1866,7 +1889,7 @@
             if (!cell) {
                 continue;
             }
-            var label = cell.getAttribute("data-chatboo-sort");
+            var label = cell.getAttribute("data-ai-sort");
             if (label == null || label === "") {
                 label = (cell.textContent || "").trim();
             }
@@ -1899,7 +1922,7 @@
             return meta;
         }
         var raw =
-            block && block.getAttribute && block.getAttribute("data-chatboo-dataset");
+            block && block.getAttribute && block.getAttribute("data-ai-dataset");
         if (!raw) {
             return meta;
         }
@@ -1944,7 +1967,7 @@
         }
         meta = applyVisibleRowOrder(block, meta);
         expandChartMessageCanvas(block);
-        var host = block.querySelector(".o_chatboo_chart_host");
+        var host = block.querySelector(".o_ai_chart_host");
         if (!host) {
             return;
         }
@@ -1973,14 +1996,14 @@
                 size.w >= MIN_HOST_PX && size.h >= MIN_HOST_PX
                     ? { width: size.w, height: size.h }
                     : undefined;
-            block._chatbooChart = global.echarts.init(surface, null, echartsInit);
+            block._chatbooChart = EchartsLib.init(surface, null, echartsInit);
             block._chatbooChart.setOption(buildEchartsOption(meta, mode), true);
             block._chatbooChartResize = function () {
                 resizeChartToHost(block);
             };
             global.addEventListener("resize", block._chatbooChartResize);
         } else {
-            block._chatbooChart = new global.Chart(
+            block._chatbooChart = new ChartLib(
                 surface.getContext("2d"),
                 buildChartConfig(meta, mode)
             );
@@ -2001,7 +2024,7 @@
 
     function hideChart(block) {
         destroyChart(block);
-        var host = block.querySelector(".o_chatboo_chart_host");
+        var host = block.querySelector(".o_ai_chart_host");
         if (host) {
             host.style.display = "none";
         }
@@ -2053,7 +2076,7 @@
     }
 
     function mountToolbar(block, meta) {
-        if (block.querySelector(".o_chatboo_chart_toolbar")) {
+        if (block.querySelector(".o_chatboo_chart_toggle")) {
             return;
         }
         applyDualAxisOverride(meta, block);
@@ -2061,15 +2084,26 @@
         block._chatbooChartMeta = meta;
         var engine = blockChartEngine(block) || ENGINE_CHARTJS;
 
-        var toolbar = document.createElement("div");
-        toolbar.className = "o_chatboo_chart_toolbar o_chatboo_noexport";
+        // The Canvas button may have opened the bar already.
+        var toolbar = ownToolbar(block);
+        if (toolbar) {
+            toolbar.classList.remove("o_chatboo_canvas_bar");
+            toolbar.remove();
+        } else {
+            toolbar = document.createElement("div");
+            toolbar.className = "o_ai_chart_toolbar o_ai_noexport";
+        }
         toolbar.setAttribute("data-engine", engine);
 
         var toggle = document.createElement("button");
         toggle.type = "button";
         toggle.className = "btn btn-sm o_chatboo_chart_toggle";
-        toggle.textContent = "Gráfico";
+        toggle.textContent = label("chart");
         toggle.setAttribute("aria-pressed", "false");
+
+        var controls = document.createElement("span");
+        controls.className = "o_chatboo_chart_controls";
+        controls.style.display = "none";
 
         var select = document.createElement("select");
         select.className = "form-select form-select-sm o_chatboo_chart_type";
@@ -2086,7 +2120,7 @@
         axisBtn.className = "btn btn-sm o_chatboo_chart_axis";
 
         var host = document.createElement("div");
-        host.className = "o_chatboo_chart_host";
+        host.className = "o_ai_chart_host";
         host.style.display = "none";
 
         function currentMode() {
@@ -2098,16 +2132,10 @@
         }
 
         toggle.addEventListener("click", function () {
-            if (isChartTableMode(block)) {
-                var collapsed = block.getAttribute("data-chatboo-table-collapsed") !== "0";
-                setTableCollapsed(block, !collapsed);
-                updatePrimaryToggleLabel(block);
-                return;
-            }
             if (block.getAttribute("data-chatboo-chart-open") === "1") {
-                hideChart(block);
+                showTableView(block);
             } else {
-                renderChart(block, currentMeta(), currentMode());
+                showChartView(block, currentMeta(), currentMode());
             }
         });
         select.addEventListener("change", function () {
@@ -2148,9 +2176,9 @@
             }
             m.dualAxis = !m.dualAxis;
             block._chatbooDualAxisForce = m.dualAxis;
-            block.setAttribute("data-chatboo-dual-axis", m.dualAxis ? "1" : "0");
+            block.setAttribute("data-ai-dual-axis", m.dualAxis ? "1" : "0");
             syncAxisToggle(block, m);
-            if (block.getAttribute("data-chatboo-chart-open") === "1" || isChartTableMode(block)) {
+            if (block.getAttribute("data-chatboo-chart-open") === "1") {
                 renderChart(block, m, currentMode());
             }
         });
@@ -2158,18 +2186,14 @@
         syncRotateControl(block, meta, meta.defaultMode);
         syncAxisToggle(block, meta);
 
+        controls.appendChild(select);
+        controls.appendChild(rotate);
+        controls.appendChild(axisBtn);
         toolbar.appendChild(toggle);
-        toolbar.appendChild(select);
-        toolbar.appendChild(rotate);
-        toolbar.appendChild(axisBtn);
-        var chartFirst = isChartTableMode(block);
-        // Título / tabla primero; barra y lienzo al final del bloque.
-        block.appendChild(toolbar);
+        toolbar.appendChild(controls);
+        // Title and table (or the chart) first. The buttons stay under them.
         block.appendChild(host);
-        if (chartFirst) {
-            setTableCollapsed(block, true);
-            updatePrimaryToggleLabel(block);
-        }
+        block.appendChild(toolbar);
     }
 
     function categoryAxisIsTemporal(meta, rows) {
@@ -2185,14 +2209,15 @@
         );
     }
 
-    function shouldAutoMountChartUi(block, meta, rows) {
-        // show-chart / explicit graphic request → always offer the toolbar
-        // (any numeric series, even absurd — user asked).
+    function shouldOfferChart(block, meta, rows) {
+        // show-chart / explicit graphic request → any numeric series
+        // (even absurd — user asked).
         if (isChartTableMode(block)) {
             return true;
         }
-        // show-table: money / % / count Y. X may be time or a short
-        // category list (areas, codes). CP / coords stay out via key shape.
+        // show-table: the Chart button only for money / % / count Y. X may
+        // be time or a short category list (areas, codes). CP / coords stay
+        // out via key shape.
         if (!meta || !meta.seriesKeys || !meta.seriesKeys.length) {
             return false;
         }
@@ -2202,7 +2227,7 @@
     function mountToolbarOrFallback(block, meta) {
         mountToolbar(block, meta);
         if (isChartTableMode(block)) {
-            renderChart(block, meta, meta.defaultMode);
+            showChartView(block, meta, meta.defaultMode);
         }
         if (showSeriesStats) {
             mountSeriesStats(block, meta);
@@ -2377,7 +2402,7 @@
         var wrap = document.createElement("div");
         wrap.innerHTML = html;
         var node = wrap.firstChild;
-        var host = block.querySelector(".o_chatboo_chart_host");
+        var host = block.querySelector(".o_ai_chart_host");
         if (host && host.parentNode) {
             if (host.nextSibling) {
                 host.parentNode.insertBefore(node, host.nextSibling);
@@ -2408,7 +2433,7 @@
         if (!td) {
             return { n: null, s: "" };
         }
-        var raw = td.getAttribute("data-chatboo-sort");
+        var raw = td.getAttribute("data-ai-sort");
         if (raw == null || raw === "") {
             raw = (td.textContent || "").trim();
         }
@@ -2436,7 +2461,7 @@
     }
 
     function refreshOpenChart(table) {
-        var block = table && table.closest && table.closest(".o_chatboo_table_block");
+        var block = table && table.closest && table.closest(".o_ai_table_block");
         if (
             block &&
             block.getAttribute("data-chatboo-chart-open") === "1" &&
@@ -2502,11 +2527,11 @@
         rows.forEach(function (tr) {
             tbody.appendChild(tr);
         });
-        var heads = table.querySelectorAll("thead th.o_chatboo_th_sort");
+        var heads = table.querySelectorAll("thead th.o_ai_th_sort");
         var i;
         for (i = 0; i < heads.length; i++) {
             var th = heads[i];
-            var idx = Number(th.getAttribute("data-chatboo-sort-col"));
+            var idx = Number(th.getAttribute("data-ai-sort-col"));
             if (idx === col && dir !== "none") {
                 th.setAttribute(
                     "aria-sort",
@@ -2520,7 +2545,7 @@
     }
 
     function cycleSortOnHeader(table, th) {
-        var col = Number(th.getAttribute("data-chatboo-sort-col"));
+        var col = Number(th.getAttribute("data-ai-sort-col"));
         if (isNaN(col)) {
             return;
         }
@@ -2560,7 +2585,7 @@
             var r;
             for (r = 0; r < section.rows.length; r++) {
                 var tr = section.rows[r];
-                if (tr.classList && tr.classList.contains("o_chatboo_ficha_title")) {
+                if (tr.classList && tr.classList.contains("o_ai_ficha_title")) {
                     continue;
                 }
                 rows.push(tr);
@@ -2604,15 +2629,15 @@
     }
 
     function reindexSortCols(table) {
-        var ths = table.querySelectorAll("thead th.o_chatboo_th_sort");
+        var ths = table.querySelectorAll("thead th.o_ai_th_sort");
         var map = {};
         var i;
         for (i = 0; i < ths.length; i++) {
-            var old = Number(ths[i].getAttribute("data-chatboo-sort-col"));
+            var old = Number(ths[i].getAttribute("data-ai-sort-col"));
             if (!isNaN(old)) {
                 map[old] = i;
             }
-            ths[i].setAttribute("data-chatboo-sort-col", String(i));
+            ths[i].setAttribute("data-ai-sort-col", String(i));
         }
         var state = table._chatbooSort;
         if (!state) {
@@ -2648,11 +2673,11 @@
     }
 
     function rewriteDatasetColumnOrder(table) {
-        var block = table.closest && table.closest(".o_chatboo_table_block");
+        var block = table.closest && table.closest(".o_ai_table_block");
         if (!block) {
             return;
         }
-        var raw = block.getAttribute("data-chatboo-dataset");
+        var raw = block.getAttribute("data-ai-dataset");
         if (!raw) {
             return;
         }
@@ -2666,7 +2691,7 @@
             return;
         }
         var keys = columnKeys(rows);
-        var ths = table.querySelectorAll("thead th.o_chatboo_th_sort");
+        var ths = table.querySelectorAll("thead th.o_ai_th_sort");
         var ordered = [];
         var used = {};
         var i;
@@ -2704,7 +2729,7 @@
             });
             return out;
         });
-        block.setAttribute("data-chatboo-dataset", JSON.stringify(next));
+        block.setAttribute("data-ai-dataset", JSON.stringify(next));
         var meta = block._chatbooChartMeta;
         if (meta && meta.seriesKeys && meta.seriesKeys.length) {
             var keep = {};
@@ -2747,7 +2772,7 @@
     }
 
     function dropIndexFromClientX(table, clientX) {
-        var ths = table.querySelectorAll("thead th.o_chatboo_th_sort");
+        var ths = table.querySelectorAll("thead th.o_ai_th_sort");
         var i;
         for (i = 0; i < ths.length; i++) {
             var box = ths[i].getBoundingClientRect();
@@ -2759,7 +2784,7 @@
     }
 
     function showColGuide(table, toIdx, fromIdx) {
-        var ths = table.querySelectorAll("thead th.o_chatboo_th_sort");
+        var ths = table.querySelectorAll("thead th.o_ai_th_sort");
         var th = ths[toIdx];
         var host = colReorderHost(table);
         if (!th || !host || !host.appendChild) {
@@ -2792,12 +2817,12 @@
             if (ev.target && ev.target.closest && ev.target.closest("a")) {
                 return;
             }
-            var fromIdx = Number(th.getAttribute("data-chatboo-sort-col"));
+            var fromIdx = Number(th.getAttribute("data-ai-sort-col"));
             var startX = ev.clientX;
             var startY = ev.clientY;
             var dragged = false;
             var lastTo = fromIdx;
-            var colCount = table.querySelectorAll("thead th.o_chatboo_th_sort").length;
+            var colCount = table.querySelectorAll("thead th.o_ai_th_sort").length;
             var onMove = function (e) {
                 if (
                     !dragged
@@ -2844,28 +2869,28 @@
         if (!root || !root.querySelectorAll) {
             return;
         }
-        var tables = root.querySelectorAll("table.o_chatboo_data_table");
+        var tables = root.querySelectorAll("table.o_ai_data_table");
         var t;
         for (t = 0; t < tables.length; t++) {
             var table = tables[t];
             if (table.getAttribute("data-chatboo-sort-bound") === "1") {
                 continue;
             }
-            var ths = table.querySelectorAll("thead th.o_chatboo_th_sort");
+            var ths = table.querySelectorAll("thead th.o_ai_th_sort");
             if (!ths.length) {
                 var plain = table.querySelectorAll(
                     "thead tr:last-child th"
                 );
                 var p;
                 for (p = 0; p < plain.length; p++) {
-                    if (plain[p].closest("tr.o_chatboo_ficha_title")) {
+                    if (plain[p].closest("tr.o_ai_ficha_title")) {
                         continue;
                     }
-                    plain[p].classList.add("o_chatboo_th_sort");
-                    plain[p].setAttribute("data-chatboo-sort-col", String(p));
+                    plain[p].classList.add("o_ai_th_sort");
+                    plain[p].setAttribute("data-ai-sort-col", String(p));
                     plain[p].setAttribute("aria-sort", "none");
                 }
-                ths = table.querySelectorAll("thead th.o_chatboo_th_sort");
+                ths = table.querySelectorAll("thead th.o_ai_th_sort");
             }
             if (!ths.length) {
                 continue;
@@ -2878,12 +2903,348 @@
         }
     }
 
+    // ── Canvas: every table of one answer laid out as a page ──
+    // The chat client sets the host only when a provider has the Design
+    // tick. ``rpc(route, params)`` returns a promise; ``sessionId()`` and
+    // ``question(msgIndex)`` read the client state.
+    var CANVAS_POLL_MS = 3000;
+    var CANVAS_WAIT_MS = 7 * 60 * 1000;
+    var canvasHost = null;
+    var canvasJobs = {};
+
+    function setCanvas(host) {
+        canvasHost = host && typeof host.rpc === "function" ? host : null;
+        if (typeof document !== "undefined") {
+            mountCanvasButtons(document);
+        }
+    }
+
+    function messageRowOf(block) {
+        return block && block.closest ? block.closest("[data-msg-index]") : null;
+    }
+
+    function canvasJobKey(row) {
+        var sid = canvasHost && canvasHost.sessionId ? canvasHost.sessionId() : "";
+        return String(sid || "") + ":" + row.getAttribute("data-msg-index");
+    }
+
+    function canvasTablesOf(row) {
+        var out = [];
+        var blocks = row.querySelectorAll(".o_ai_table_block[data-ai-dataset]");
+        for (var i = 0; i < blocks.length; i++) {
+            var rows;
+            try {
+                rows = JSON.parse(blocks[i].getAttribute("data-ai-dataset") || "[]");
+            } catch (e) {
+                continue;
+            }
+            if (!Array.isArray(rows) || !rows.length) {
+                continue;
+            }
+            var head = blocks[i].querySelector(
+                ".o_ai_block_title, .o_ai_ficha_title, .pns-result-title"
+            );
+            out.push({
+                title: head ? (head.textContent || "").replace(/\s+/g, " ").trim() : "",
+                rows: rows,
+            });
+        }
+        return out;
+    }
+
+    /** The answer's own heading, above its tables. */
+    function canvasTitleOf(row) {
+        var head = row.querySelector(".o_ai_result_title, .o_ai_dashboard_title");
+        return head ? (head.textContent || "").replace(/\s+/g, " ").trim() : "";
+    }
+
+    /** Every table of the answer shows the same page, so they share its state. */
+    function paintCanvasRow(row, job) {
+        var buttons = row && row.querySelectorAll
+            ? row.querySelectorAll(".o_chatboo_canvas_btn")
+            : [];
+        for (var i = 0; i < buttons.length; i++) {
+            paintCanvasButton(buttons[i], job);
+        }
+    }
+
+    function paintCanvasButton(btn, job) {
+        if (!btn) {
+            return;
+        }
+        var state = job ? job.state : "";
+        btn.classList.toggle("o_chatboo_canvas_btn--failed", state === "failed");
+        btn.classList.toggle("o_chatboo_canvas_btn--building", state === "building");
+        if (state === "building") {
+            var dots = document.createElement("span");
+            dots.className = "o_chatboo_typing";
+            for (var d = 0; d < 3; d++) {
+                dots.appendChild(document.createElement("span"));
+            }
+            btn.textContent = "";
+            btn.appendChild(dots);
+            btn.appendChild(document.createTextNode(" " + label("canvasBuilding")));
+            btn.setAttribute("title", label("canvasCancel"));
+        } else if (state === "done") {
+            btn.textContent = label("canvasOpen");
+            btn.setAttribute("title", job.url);
+        } else if (state === "failed") {
+            btn.textContent = label("canvas");
+            btn.setAttribute("title", job.error || label("canvasFailed"));
+        } else {
+            btn.textContent = label("canvas");
+            btn.setAttribute("title", label("canvasTitle"));
+        }
+    }
+
+    function waitForCanvas(jobId) {
+        var deadline = Date.now() + CANVAS_WAIT_MS;
+        return new Promise(function (resolve, reject) {
+            function tick() {
+                Promise.resolve(
+                    canvasHost.rpc("/chatboo/canvas/state", { job_id: jobId })
+                ).then(function (st) {
+                    if (!st || st.status !== "ok") {
+                        reject(new Error((st && st.message) || ""));
+                        return;
+                    }
+                    if (st.state === "done") {
+                        resolve(st.url);
+                        return;
+                    }
+                    if (st.state !== "building") {
+                        reject(new Error(st.error || ""));
+                        return;
+                    }
+                    if (Date.now() > deadline) {
+                        reject(new Error(""));
+                        return;
+                    }
+                    global.setTimeout(tick, CANVAS_POLL_MS);
+                }, reject);
+            }
+            global.setTimeout(tick, CANVAS_POLL_MS);
+        });
+    }
+
+    function followCanvas(job) {
+        waitForCanvas(job.jobId).then(function (url) {
+            if (job.cancelled) {
+                return;
+            }
+            job.state = "done";
+            job.url = url;
+            paintCanvasRow(job.row, job);
+        }, function (err) {
+            if (job.cancelled) {
+                return;
+            }
+            job.state = "failed";
+            job.error = (err && err.message) || "";
+            paintCanvasRow(job.row, job);
+        });
+    }
+
+    function startCanvas(row) {
+        if (!canvasHost) {
+            return;
+        }
+        var key = canvasJobKey(row);
+        var job = canvasJobs[key];
+        if (job && job.state === "done") {
+            global.open(job.url, "_blank", "noopener");
+            return;
+        }
+        if (job && job.state === "building") {
+            cancelCanvas(key, job);
+            return;
+        }
+        var sessionId = canvasHost.sessionId ? canvasHost.sessionId() : null;
+        var tables = canvasTablesOf(row);
+        if (!sessionId || !tables.length) {
+            return;
+        }
+        var msgIndex = parseInt(row.getAttribute("data-msg-index"), 10);
+        job = canvasJobs[key] = { state: "building", row: row };
+        paintCanvasRow(row, job);
+        Promise.resolve(canvasHost.rpc("/chatboo/canvas/build", {
+            session_id: sessionId,
+            tables: tables,
+            title: canvasTitleOf(row),
+            question: canvasHost.question ? (canvasHost.question(msgIndex) || "") : "",
+            msg_index: msgIndex,
+        })).then(function (res) {
+            if (!res || res.status !== "ok") {
+                throw new Error((res && res.message) || "");
+            }
+            job.jobId = res.job_id;
+            if (job.cancelled) {
+                cancelCanvasJob(job.jobId);
+                return;
+            }
+            if (res.state === "done") {
+                job.state = "done";
+                job.url = res.url;
+                paintCanvasRow(job.row, job);
+            } else if (res.state === "building") {
+                followCanvas(job);
+            } else {
+                throw new Error(res.error || "");
+            }
+        }).catch(function (err) {
+            if (job.cancelled) {
+                return;
+            }
+            job.state = "failed";
+            job.error = (err && err.message) || "";
+            paintCanvasRow(job.row, job);
+        });
+    }
+
+    /** A click while building asks first, like the chat; yes drops the page on the server. */
+    function cancelCanvas(key, job) {
+        if (!canvasHost.confirmCancel) {
+            return;
+        }
+        canvasHost.confirmCancel(function () {
+            if (canvasJobs[key] === job && job.state === "building") {
+                dropCanvas(key, job);
+            }
+        });
+    }
+
+    function dropCanvas(key, job) {
+        job.cancelled = true;
+        if (canvasJobs[key] === job) {
+            delete canvasJobs[key];
+        }
+        paintCanvasRow(job.row, null);
+        if (job.jobId) {
+            cancelCanvasJob(job.jobId);
+        }
+    }
+
+    function cancelCanvasJob(jobId) {
+        Promise.resolve(canvasHost.rpc("/chatboo/canvas/cancel", {
+            job_id: jobId,
+        })).catch(function () {});
+    }
+
+    /** After a reload, the pages still on their way show their dots again. */
+    var canvasResumed = {};
+
+    function resumeCanvas() {
+        var sessionId = canvasHost && canvasHost.sessionId ? canvasHost.sessionId() : null;
+        if (!sessionId || canvasResumed[sessionId]) {
+            return;
+        }
+        canvasResumed[sessionId] = true;
+        Promise.resolve(canvasHost.rpc("/chatboo/canvas/running", {
+            session_id: sessionId,
+        })).then(function (res) {
+            var jobs = (res && res.status === "ok" && res.jobs) || [];
+            jobs.forEach(function (st) {
+                var key = String(sessionId) + ":" + st.msg_index;
+                if (st.state !== "building" || canvasJobs[key]) {
+                    return;
+                }
+                var row = document.querySelector('[data-msg-index="' + st.msg_index + '"]');
+                var job = canvasJobs[key] = {
+                    state: "building",
+                    jobId: st.job_id,
+                    row: row,
+                };
+                paintCanvasRow(row, job);
+                followCanvas(job);
+            });
+        }).catch(function () {
+            delete canvasResumed[sessionId];
+        });
+    }
+
+    function dropCanvasButton(btn) {
+        var bar = btn.parentNode;
+        btn.remove();
+        if (bar && bar.classList.contains("o_chatboo_canvas_bar") && !bar.children.length) {
+            bar.remove();
+        }
+    }
+
+    function ownToolbar(block) {
+        for (var i = 0; i < block.children.length; i++) {
+            if (block.children[i].classList.contains("o_ai_chart_toolbar")) {
+                return block.children[i];
+            }
+        }
+        return null;
+    }
+
+    function canvasButtonIn(block) {
+        var bar = ownToolbar(block);
+        return bar ? bar.querySelector(".o_chatboo_canvas_btn") : null;
+    }
+
+    /** One page per answer, from every table. Each table carries the button. */
+    function mountCanvasButton(block) {
+        var row = messageRowOf(block);
+        if (!row) {
+            return;
+        }
+        var own = canvasButtonIn(block);
+        if (!canvasHost) {
+            if (own) {
+                dropCanvasButton(own);
+            }
+            return;
+        }
+        if (!canvasTablesOf(row).length) {
+            if (own) {
+                dropCanvasButton(own);
+            }
+            return;
+        }
+        if (own) {
+            return;
+        }
+        var bar = ownToolbar(block);
+        if (!bar) {
+            bar = document.createElement("div");
+            bar.className = "o_ai_chart_toolbar o_chatboo_canvas_bar o_ai_noexport";
+            block.appendChild(bar);
+        }
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn btn-sm o_chatboo_canvas_btn";
+        bar.insertBefore(btn, bar.firstChild);
+        var job = canvasJobs[canvasJobKey(row)];
+        if (job) {
+            job.row = row;
+        }
+        paintCanvasButton(btn, job);
+        btn.addEventListener("click", function () {
+            startCanvas(row);
+        });
+    }
+
+    function mountCanvasButtons(root) {
+        if (!root || !root.querySelectorAll) {
+            return;
+        }
+        if (canvasHost) {
+            resumeCanvas();
+        }
+        var blocks = root.querySelectorAll(".o_ai_table_block[data-ai-dataset]");
+        for (var i = 0; i < blocks.length; i++) {
+            mountCanvasButton(blocks[i]);
+        }
+    }
+
     function hydrateRoot(root) {
         if (!root || !root.querySelectorAll) {
             return;
         }
         bindSortableTables(root);
-        var blocks = root.querySelectorAll(".o_chatboo_table_block[data-chatboo-dataset]");
+        var blocks = root.querySelectorAll(".o_ai_table_block[data-ai-dataset]");
         for (var i = 0; i < blocks.length; i++) {
             var block = blocks[i];
             if (block.getAttribute("data-chatboo-chart-ready") === "1") {
@@ -2893,7 +3254,7 @@
                 block.setAttribute("data-chatboo-chart-ready", "1");
                 continue;
             }
-            var raw = block.getAttribute("data-chatboo-dataset");
+            var raw = block.getAttribute("data-ai-dataset");
             if (!raw) {
                 continue;
             }
@@ -2923,9 +3284,6 @@
                 }
             }
             if (!meta) {
-                if (explicitChart) {
-                    mountChartTableShell(block);
-                }
                 maybeMountSeriesStats(block, rows, null);
                 block.setAttribute("data-chatboo-chart-ready", "1");
                 continue;
@@ -2935,7 +3293,7 @@
                 block.setAttribute("data-chatboo-chart-ready", "1");
                 continue;
             }
-            if (!shouldAutoMountChartUi(block, meta, rows)) {
+            if (!shouldOfferChart(block, meta, rows)) {
                 maybeMountSeriesStats(block, rows, meta);
                 block.setAttribute("data-chatboo-chart-ready", "1");
                 continue;
@@ -2944,13 +3302,14 @@
             mountToolbarOrFallback(block, meta);
             block.setAttribute("data-chatboo-chart-ready", "1");
         }
+        mountCanvasButtons(root);
     }
 
     function destroyInRoot(root) {
         if (!root || !root.querySelectorAll) {
             return;
         }
-        var blocks = root.querySelectorAll(".o_chatboo_table_block");
+        var blocks = root.querySelectorAll(".o_ai_table_block");
         for (var i = 0; i < blocks.length; i++) {
             destroyChart(blocks[i]);
         }
@@ -3000,13 +3359,13 @@
         var surface =
             block &&
             block.querySelector &&
-            block.querySelector(".o_chatboo_echarts_surface");
+            block.querySelector(".o_ai_echarts_surface");
         if (
             surface &&
-            global.echarts &&
-            typeof global.echarts.getInstanceByDom === "function"
+            EchartsLib &&
+            typeof EchartsLib.getInstanceByDom === "function"
         ) {
-            return global.echarts.getInstanceByDom(surface);
+            return EchartsLib.getInstanceByDom(surface);
         }
         return null;
     }
@@ -3026,7 +3385,7 @@
         var raw =
             block &&
             block.getAttribute &&
-            block.getAttribute("data-chatboo-dataset");
+            block.getAttribute("data-ai-dataset");
         if (!raw) {
             return null;
         }
@@ -3058,7 +3417,7 @@
         if (!meta) {
             return null;
         }
-        if (!explicit && !shouldAutoMountChartUi(block, meta, rows)) {
+        if (!explicit && !shouldOfferChart(block, meta, rows)) {
             return null;
         }
         return meta;
@@ -3072,7 +3431,7 @@
         if (png) {
             return png;
         }
-        var host = block.querySelector && block.querySelector(".o_chatboo_chart_host");
+        var host = block.querySelector && block.querySelector(".o_ai_chart_host");
         png = canvasToPng(largestCanvas(host));
         if (png) {
             return png;
@@ -3087,7 +3446,7 @@
             png = chartInstancePng(resolveChartInstance(block));
             if (!png) {
                 png = canvasToPng(largestCanvas(
-                    block.querySelector && block.querySelector(".o_chatboo_chart_host")
+                    block.querySelector && block.querySelector(".o_ai_chart_host")
                 ));
             }
         } catch (e) {
@@ -3115,6 +3474,7 @@
     }
 
     global.ChatbooCharts = {
+        bindEngines: bindEngines,
         hydrate: hydrateRoot,
         destroyIn: destroyInRoot,
         analyze: analyzeDataset,
@@ -3125,7 +3485,9 @@
         isCountLikeKey: isCountLikeKey,
         isChartMetricKey: isChartMetricKey,
         categoryAxisIsTemporal: categoryAxisIsTemporal,
-        shouldAutoMountChartUi: shouldAutoMountChartUi,
+        shouldOfferChart: shouldOfferChart,
+        setLabels: setLabels,
+        setCanvas: setCanvas,
         resolveHostHeight: resolveChartHostHeightPx,
         relayout: relayoutChartsIn,
         softResize: softResizeChartsIn,
@@ -3138,7 +3500,7 @@
         getShowSeriesStats: getShowSeriesStats,
     };
 
-    // Copiar texto de celda (coords, etc.): data-copy-text en .o_chatboo_cell_copy
+    // Copiar texto de celda (coords, etc.): data-copy-text en .o_ai_cell_copy
     function bindCellCopyOnce() {
         if (global.__chatbooCellCopyBound) {
             return;
@@ -3151,7 +3513,7 @@
                 if (!el || !el.closest) {
                     return;
                 }
-                var btn = el.closest(".o_chatboo_cell_copy");
+                var btn = el.closest(".o_ai_cell_copy");
                 if (!btn) {
                     return;
                 }

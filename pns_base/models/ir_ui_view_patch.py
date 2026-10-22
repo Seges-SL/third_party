@@ -22,6 +22,8 @@ import html
 import re
 import logging
 
+from lxml import etree
+
 from odoo import models, api
 
 _logger = logging.getLogger(__name__)
@@ -47,6 +49,29 @@ def _module_from_xmlid(xml_id):
 def _is_pns_module(module):
     """True if the module name starts with the PNS prefix ('pns')."""
     return bool(module) and module.startswith(_PNS_MODULE_PREFIX)
+
+
+PNS_VIEW_CLASS = 'o_pns_view'
+
+
+def _add_pns_view_class(arch):
+    """Mark the arch root so CSS/JS only touch PNS views."""
+    if not arch or not isinstance(arch, str):
+        return arch
+    if PNS_VIEW_CLASS in arch[:500]:
+        return arch
+    try:
+        root = etree.fromstring(arch.encode('utf-8'))
+    except Exception:
+        return arch
+    cls = root.get('class') or ''
+    if PNS_VIEW_CLASS not in cls.split():
+        root.set('class', (cls + ' ' + PNS_VIEW_CLASS).strip())
+    return etree.tostring(root, encoding='unicode')
+
+
+def _view_is_pns_owned(view):
+    return bool(view) and _is_pns_module(_module_from_xmlid(view.xml_id))
 
 
 def _hint(value, hints):
@@ -326,6 +351,31 @@ class IrUiView(models.Model):
                     break
         return super(IrUiView, self).write(vals)
 
+    def _compute_arch(self):
+        """Convert a file arch before Odoo 19 validates it.
+
+        With ``--dev=xml`` (and on any read of ``arch_fs``), Odoo checks the
+        file, not the converted copy stored in ``arch_db``. The file keeps
+        ``attrs`` / ``<tree>``. The check then raises "attrs are no longer
+        used" even though the write path already rewrote the database copy.
+        """
+        super(IrUiView, self)._compute_arch()
+        from ..utils.compat import ODOO_VERSION
+        from ..utils.version_gates import applies_attrs_convert
+        if not applies_attrs_convert(ODOO_VERSION):
+            return
+        for view in self:
+            arch = view.arch
+            if not arch or ('attrs=' not in arch and '<tree' not in arch):
+                continue
+            if not (
+                _is_pns_module(_module_from_xmlid(view.xml_id))
+                or _hint(view.name, _PNS_NAME_HINTS)
+                or _hint(view.model, _PNS_MODEL_HINTS)
+            ):
+                continue
+            view.arch = view._auto_convert_attrs(arch)
+
     @api.model
     def _auto_convert_attrs(self, arch):
         """Core transformer: rewrite old-style XML arch for Odoo 17+ compatibility.
@@ -448,3 +498,17 @@ class IrUiMenu(models.Model):
     def write(self, vals):
         _alias_groups_vals(vals, self._fields)
         return super(IrUiMenu, self).write(vals)
+
+
+class Base(models.AbstractModel):
+    _inherit = 'base'
+
+    @api.model
+    def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu=False):
+        res = super(Base, self).fields_view_get(
+            view_id=view_id, view_type=view_type, toolbar=toolbar, submenu=submenu,
+        )
+        view = self.env['ir.ui.view'].browse(res.get('view_id'))
+        if _view_is_pns_owned(view):
+            res['arch'] = _add_pns_view_class(res.get('arch') or '')
+        return res

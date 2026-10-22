@@ -11,15 +11,26 @@ to external MCP servers.
 from odoo import models, fields, api, _
 from odoo.exceptions import AccessError, UserError, ValidationError
 from datetime import datetime, timedelta
+import hashlib
+import hmac
 import json
-import random
 import logging
-from ..constants import PIN_EXPIRY_MINUTES
+import random
+import secrets
+from ..constants import HIGH_CONFIRM_WAIT_SECONDS, PENDING_OPERATION_TTL_MINUTES
 from ..utils import mcp_ui
 from ..utils.import_export_guard import ensure_ai_admin
 from ..utils.portable_io import export_record_dict
 
 _logger = logging.getLogger(__name__)
+
+
+def _hash_confirm_token(raw):
+    """SHA-256 of the card token. Empty in, empty out."""
+    raw = (raw or '').strip()
+    if not raw:
+        return ''
+    return hashlib.sha256(raw.encode('utf-8')).hexdigest()
 
 class SafeOperation(models.Model):
     """AI Supervised Operation — the 'Safe Plan' (Caja B).
@@ -199,6 +210,21 @@ class SafeOperation(models.Model):
         help='Date and time when the verification was confirmed or cancelled'
     )
 
+    # One-use token painted on the chat card. Plaintext never hits the
+    # database: RelaxAICode reads as the asking user. Hash only, system-only.
+    confirm_token_hash = fields.Char(
+        string='Confirm token hash',
+        readonly=True,
+        copy=False,
+        groups='base.group_system',
+    )
+    confirm_token_at = fields.Datetime(
+        string='Confirm token issued at',
+        readonly=True,
+        copy=False,
+        groups='base.group_system',
+    )
+
     # ── Temporal scope (for fetch_url reuse) ──────────────────────────────
     valid_from = fields.Datetime(
         string='Valid from',
@@ -240,10 +266,10 @@ class SafeOperation(models.Model):
     
     @api.depends('create_date')
     def _compute_expires_at(self):
-        """Calcula la fecha de expiración del PIN (PIN_EXPIRY_MINUTES después de la creación)"""
+        """Pending operation expiry: PENDING_OPERATION_TTL_MINUTES after creation."""
         for record in self:
             base = record.create_date or fields.Datetime.now()
-            record.expires_at = base + timedelta(minutes=PIN_EXPIRY_MINUTES)
+            record.expires_at = base + timedelta(minutes=PENDING_OPERATION_TTL_MINUTES)
 
     @api.depends('expires_at', 'status', 'executed')
     def _compute_is_expired(self):
@@ -465,7 +491,7 @@ class SafeOperation(models.Model):
         operation_data_json = json.dumps(operation_data, default=str) if isinstance(operation_data, dict) else (operation_data or '')
 
         now = fields.Datetime.now()
-        expires_at = now + timedelta(minutes=PIN_EXPIRY_MINUTES)
+        expires_at = now + timedelta(minutes=PENDING_OPERATION_TTL_MINUTES)
 
         # Extract danger_level from changes_info or operation_data
         dl = 'medium'
@@ -510,12 +536,54 @@ class SafeOperation(models.Model):
             ))
         return super().write(vals)
 
-    def confirm_by_user(self, confirmed_uid=None):
+    def _mint_confirm_token(self):
+        """New plaintext token for the card. Stores only the hash.
+
+        Rotates on every paint so a restored card still has a token. The
+        browser that just received this payload is the one that can confirm.
+        """
+        self.ensure_one()
+        raw = secrets.token_urlsafe(32)
+        self.sudo().write({
+            'confirm_token_hash': _hash_confirm_token(raw),
+            'confirm_token_at': fields.Datetime.now(),
+        })
+        return raw
+
+    def _confirm_token_ok(self, raw):
+        """True when ``raw`` matches the hash painted on the card."""
+        self.ensure_one()
+        expected = (self.sudo().confirm_token_hash or '').strip()
+        got = _hash_confirm_token(raw)
+        if not expected or not got:
+            return False
+        return hmac.compare_digest(expected, got)
+
+    def _confirm_wait_elapsed(self):
+        """High-danger cards wait a few seconds after the last paint."""
+        self.ensure_one()
+        if self.danger_level != 'high':
+            return True
+        issued = self.sudo().confirm_token_at
+        if not issued:
+            return False
+        delta = fields.Datetime.now() - issued
+        return delta.total_seconds() >= HIGH_CONFIRM_WAIT_SECONDS
+
+    def _consume_confirm_token(self):
+        """Drop the hash after the card has confirmed and applied."""
+        self.ensure_one()
+        self.sudo().write({
+            'confirm_token_hash': False,
+            'confirm_token_at': False,
+        })
+
+    def _confirm_by_user(self, confirmed_uid=None):
         """
         Confirma la operación desde la sesión del navegador del humano.
 
-        Preferir ``resolve_confirm_and_execute`` (Autorizaciones y Secretary).
-        El toast Chatboo sigue en dos HTTP. Este método queda para compat.
+        Preferir ``_resolve_confirm_and_execute`` (Autorizaciones).
+        El toast Chatboo sigue en dos HTTP. Este método queda para tests.
         ``confirmed_uid`` se ignora: quien confirma es el usuario de la sesión.
         """
         self.ensure_one()
@@ -571,7 +639,7 @@ class SafeOperation(models.Model):
                 return False
             raise
 
-    def resolve_confirm(self, confirmed_uid=None):
+    def _resolve_confirm(self, confirmed_uid=None):
         """Fase A — SOLO confirmar (TX corta, NOWAIT). Nunca ejecuta el plan.
 
         Contrato robusto: el HTTP de Confirmar del toast solo llama esto.
@@ -706,7 +774,7 @@ class SafeOperation(models.Model):
             env=self.env,
         )
 
-    def resolve_execute(self, confirmed_uid=None):
+    def _resolve_execute(self, confirmed_uid=None):
         """Fase B — aplicar el plan (otra petición HTTP, con timeouts PG).
 
         Idempotente. Si otro worker tiene el claim o el destino está locked,
@@ -828,19 +896,19 @@ class SafeOperation(models.Model):
             env=self.env,
         )
 
-    def resolve_confirm_and_execute(self, confirmed_uid=None):
+    def _resolve_confirm_and_execute(self, confirmed_uid=None):
         """Una fila, un vuelo: confirmar y aplicar.
 
-        Autorizaciones y Secretary usan esto. El toast Chatboo sigue en
-        dos HTTP (confirm, luego execute). Entre fases hay que commitear:
-        el cursor de Odoo es REPEATABLE READ y, si no, execute ve pending.
-        Tras execute, otro commit: el host que lee la secuencia del
-        registro recién creado vería la fila ausente si se quedara en la
-        foto de antes.
+        Autorizaciones usan esto. El toast Chatboo sigue en dos HTTP
+        (confirm, luego execute). Entre fases hay que commitear: el cursor
+        de Odoo es REPEATABLE READ y, si no, execute ve pending. Tras
+        execute, otro commit: el host que lee la secuencia del registro
+        recién creado vería la fila ausente si se quedara en la foto de
+        antes.
         """
         from ..utils.compat import invalidate_recordset_fields
 
-        out = self.resolve_confirm(confirmed_uid=confirmed_uid)
+        out = self._resolve_confirm(confirmed_uid=confirmed_uid)
         if not out.get('success'):
             return out
         if out.get('status') == 'executed' or out.get('idempotent'):
@@ -851,7 +919,7 @@ class SafeOperation(models.Model):
         invalidate_recordset_fields(
             self, ['status', 'executed', 'result_info'],
         )
-        out = self.browse(self.id).resolve_execute(confirmed_uid=confirmed_uid)
+        out = self.browse(self.id)._resolve_execute(confirmed_uid=confirmed_uid)
         # Execute ran on another cursor. This one still sees the world from
         # before that write (REPEATABLE READ), so a host that reads the new
         # sequence would find the row missing. Sleep would not help.
@@ -1066,15 +1134,10 @@ class SafeOperation(models.Model):
             return
         Whitelist = self.env['ai.url.whitelist'].sudo()
         if Whitelist.is_url_access_open():
-            # Seges: parche 8 (PNS-91, seguridad). Ver docs/pendiente/parches_pns_ai.md
-            Whitelist._ensure_domain_whitelisted(
-                domain,
-                notes='Auto-added on fetch_url (open URL policy) — %s' % self.verification_id,
-            )
+            # Open policy lets the fetch run. Confirming does not grow the list.
             return
         if not self.env.user.has_group('pns_ai_mcp.group_ai_admin'):
             return
-        # Seges: parche 8 (PNS-91, seguridad). Ver docs/pendiente/parches_pns_ai.md
         Whitelist._ensure_domain_whitelisted(
             domain,
             notes='Added by AI Administrator on confirm of %s' % self.verification_id,
@@ -1106,7 +1169,6 @@ class SafeOperation(models.Model):
                 'success',
                 sticky=False,
             )
-        # Seges: parche 8 (PNS-91, seguridad). Ver docs/pendiente/parches_pns_ai.md
         Whitelist._ensure_domain_whitelisted(
             domain,
             notes='Added from operation %s' % self.verification_id,
@@ -1342,21 +1404,14 @@ class SafeOperation(models.Model):
         if not steps:
             self._release_execute_claim(error='no_plan_steps')
             return None
-        session_id = data.get('chatboo_session_id')
+        from ..utils.session_download import resolve_session_ref
+        session_ref = data.get('ai_session_ref') or resolve_session_ref(self.env)
         exec_env = self.env
-        if session_id:
+        if session_ref:
             exec_env = self.env(context=dict(
                 self.env.context or {},
-                chatboo_session_id=int(session_id),
+                ai_session_ref=int(session_ref),
             ))
-        else:
-            from ..utils.session_download import resolve_chatboo_session_id
-            resolved = resolve_chatboo_session_id(self.env)
-            if resolved:
-                exec_env = self.env(context=dict(
-                    self.env.context or {},
-                    chatboo_session_id=int(resolved),
-                ))
         vid = self.verification_id
         dbname = self.env.cr.dbname
         op_id = self.id
@@ -1443,7 +1498,7 @@ class SafeOperation(models.Model):
             except Exception:
                 pass
             try:
-                self.env['ai.change.journal'].sudo().record_failed_plan(
+                self.env['ai.change.journal'].sudo()._record_failed_plan(
                     steps, str(exc), env=exec_env,
                 )
             except Exception:
@@ -1564,11 +1619,10 @@ class SafeOperation(models.Model):
         self.ensure_one()
         data = self.get_operation_data() or {}
         origin = data.get('log_origin')
-        if origin in ('chatboo', 'mcp_client', 'internal'):
+        from ..utils.mcp_logging import known_doors
+        if origin in known_doors(self.env):
             return origin
         tn = (self.tool_name or '')
-        if tn.startswith('skill:'):
-            return 'chatboo'
         if tn in ('safe_plan_request', 'propose_safe_operations'):
             return 'mcp_client'
         return 'internal'
@@ -1613,7 +1667,7 @@ class SafeOperation(models.Model):
                 )
                 step = (last[0]['turn_step'] or 0) + 1 if last else 1
         try:
-            self.env['ai.log'].sudo().create_log_entry(
+            self.env['ai.log'].sudo()._create_log_entry(
                 user_id=self.user_id.id,
                 operation_type='write',
                 tool_name='execute_safe_plan',
@@ -1746,7 +1800,7 @@ class SafeOperation(models.Model):
                 'Operation %s has expired and can no longer be confirmed.'
             ) % self.verification_id)
 
-        out = self.resolve_confirm_and_execute(confirmed_uid=self.env.user.id)
+        out = self._resolve_confirm_and_execute(confirmed_uid=self.env.user.id)
         if out.get('busy') and not out.get('success'):
             raise UserError(_(
                 'Another session is confirming this operation. '
@@ -1946,8 +2000,8 @@ class SafeOperation(models.Model):
                 return None
         return None
 
-    def chatboo_card_payload(self):
-        """SSE-shaped dict for the Chatboo card (same row the Security menu shows)."""
+    def card_payload(self, mint_token=True):
+        """SSE-shaped dict for the host's card (same row the Security menu shows)."""
         self.ensure_one()
         data = self.get_operation_data() or {}
         changes = {}
@@ -1967,16 +2021,22 @@ class SafeOperation(models.Model):
             or self.danger_level
             or 'medium'
         )
-        return {
+        payload = {
             'verification_id': self.verification_id,
             'title': data.get('title') or '',
             'plan': plan,
             'danger_level': danger,
         }
+        if mint_token:
+            payload['confirm_token'] = self._mint_confirm_token()
+        return payload
 
     @api.model
-    def chatboo_pending_card_payloads(self):
-        """Live pending cards for the current user. Read-only; does not create rows."""
+    def pending_card_payloads(self, mint_token=True):
+        """Live pending cards for the current user. Read-only; does not create rows.
+
+        ``mint_token=False`` is a count/peek: it must not rotate the card token.
+        """
         self.refresh_expiry_statuses(limit=100)
         now = fields.Datetime.now()
         ops = self.search([
@@ -1985,7 +2045,7 @@ class SafeOperation(models.Model):
             ('executed', '=', False),
             ('expires_at', '>', now),
         ], order='id desc')
-        return [op.chatboo_card_payload() for op in ops]
+        return [op.card_payload(mint_token=mint_token) for op in ops]
 
     # ── Export ────────────────────────────────────────────────────────
 

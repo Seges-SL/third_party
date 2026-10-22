@@ -5,7 +5,6 @@
 pairs = [
     ('Odoo version', odoo_version),
     ('Series', odoo_series),
-    ('Database', dbname),
     ('Server date and time', now.strftime('%Y-%m-%d %H:%M:%S')),
     ('User timezone', user_tz),
     ('User language', lang),

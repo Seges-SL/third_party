@@ -9,7 +9,7 @@ from odoo.tests import tagged, TransactionCase
 from odoo.addons.pns_ai_mcp.controllers.safe_plan import execute_safe_plan
 
 
-@tagged('post_install', '-at_install', 'pns_ai_mcp')
+@tagged('standard', 'post_install', '-at_install', 'pns_ai_mcp')
 class TestChangeJournal(TransactionCase):
 
     def _exec(self, steps, **ctx):
@@ -59,6 +59,43 @@ class TestChangeJournal(TransactionCase):
 
         self.env['ai.change.journal'].browse(created.id).action_revert()
         self.assertFalse(self.env['res.partner'].browse(pid).exists())
+
+    def test_unlink_archives_then_revert_and_empty_trash(self):
+        name = 'pns-journal-trash-%s' % self.env.cr.dbname
+        partner = self.env['res.partner'].create({'name': name})
+        pid = partner.id
+        self._exec(
+            [{'op': 'unlink', 'model': 'res.partner', 'ids': [pid]}],
+            ai_journal_origin='internal',
+        )
+        archived = self.env['res.partner'].with_context(active_test=False).browse(pid)
+        self.assertTrue(archived.exists())
+        self.assertFalse(archived.active)
+        row = self.env['ai.change.journal'].search([
+            ('op', '=', 'unlink'),
+            ('record_ids_display', '=', str(pid)),
+        ], limit=1)
+        self.assertTrue(row.reversible)
+        self.assertTrue(row.can_revert)
+        row.action_revert()
+        live = self.env['res.partner'].browse(pid)
+        self.assertTrue(live.exists())
+        self.assertTrue(live.active)
+        self._exec(
+            [{'op': 'unlink', 'model': 'res.partner', 'ids': [pid]}],
+            ai_journal_origin='internal',
+        )
+        again = self.env['ai.change.journal'].search([
+            ('op', '=', 'unlink'),
+            ('record_ids_display', '=', str(pid)),
+            ('state', '=', 'applied'),
+            ('reversible', '=', True),
+        ], limit=1)
+        again.action_empty_one()
+        self.assertFalse(
+            self.env['res.partner'].with_context(active_test=False).browse(pid).exists()
+        )
+        self.assertFalse(again.reversible)
 
     def test_cancelled_safe_plan_does_not_journal(self):
         before = self.env['ai.change.journal'].search_count([])
@@ -111,7 +148,7 @@ class TestChangeJournal(TransactionCase):
                 },
                 turn='FAILTEST',
             )
-            op.confirm_by_user()
+            op._confirm_by_user()
             cr.commit()
             op_id = op.id
             try:

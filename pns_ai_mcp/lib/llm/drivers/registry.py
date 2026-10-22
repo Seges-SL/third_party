@@ -5,7 +5,7 @@
 registry.py — Driver registry (protocol → driver class).
 
 This module implements a simple dict-based registry that maps ``protocol``
-strings (like ``'openai'``, ``'anthropic'``, ``'ollama'``) to their driver
+strings (like ``'openai'``, ``'anthropic'``) to their driver
 classes. The orchestrator calls ``get_llm_driver(protocol)`` to get a
 fresh driver instance.
 
@@ -15,8 +15,9 @@ The registry key is exactly the value of the ``protocol`` field on the
 Registration happens at import time in ``drivers/__init__.py``::
 
     register_llm_driver('openai', OpenAIDriver)
+    register_llm_driver('openrouter', OpenRouterDriver)
     register_llm_driver('anthropic', AnthropicDriver)
-    register_llm_driver('ollama', OllamaDriver)
+    register_llm_driver('systemone', SystemOneDriver)
 
 Unknown protocols fall back to ``'openai'`` (since most providers
 use the OpenAI-compatible API). This means you can configure any
@@ -87,6 +88,6 @@ def list_llm_driver_types():
     Useful for diagnostics and for building UI selection dropdowns.
 
     Returns:
-        List of strings, e.g. ``['anthropic', 'ollama', 'openai']``.
+        List of strings, e.g. ``['anthropic', 'openai', 'openrouter']``.
     """
     return sorted(_REGISTRY.keys())

@@ -83,7 +83,28 @@ def _norm_dt(value):
 
 
 def _section():
-    return {'created': 0, 'updated': 0, 'skipped': 0}
+    return {
+        'created': 0, 'updated': 0, 'skipped': 0,
+        'created_names': [], 'updated_names': [], 'skipped_names': [],
+    }
+
+
+def _mark(sec, kind, name=None):
+    sec[kind] += 1
+    if name:
+        sec.setdefault(kind + '_names', []).append(name)
+
+
+def _should_write(sec, exists, replace_existing, name, dry_run):
+    """Count this row. True only when the caller must create or write."""
+    if exists and not replace_existing:
+        kind = 'skipped'
+    elif exists:
+        kind = 'updated'
+    else:
+        kind = 'created'
+    _mark(sec, kind, name)
+    return (not dry_run) and kind != 'skipped'
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -226,7 +247,7 @@ def _export_settings(env, include_secrets=True):
 # IMPORT
 # ─────────────────────────────────────────────────────────────────────────────
 
-def import_config(env, data, replace_existing=True):
+def import_config(env, data, replace_existing=True, dry_run=False):
     """Upsert the whole AI configuration from a portable dict.
 
     Resilient: per-row errors are collected, never abort the batch. Relations
@@ -235,6 +256,7 @@ def import_config(env, data, replace_existing=True):
     Args:
         env: Odoo environment.
         data: dict produced by :func:`export_config` (or an equivalent).
+        dry_run: count and name rows without writing.
 
     Returns:
         report dict: ``{'sections': {name: {created,updated,skipped}},
@@ -247,18 +269,48 @@ def import_config(env, data, replace_existing=True):
 
     # ── Pass 1: scalar upsert ────────────────────────────────────────────────
     replace = bool(replace_existing)
-    _import_providers(env, data.get('providers') or [], report, replace_existing=replace)
-    _import_contexts(env, data.get('contexts') or [], report, replace_existing=replace)
-    _import_skills(env, data.get('skills') or [], report, replace_existing=replace)
-    _import_servers(env, data.get('mcp_servers') or [], report, replace_existing=replace)
-    _import_whitelist(env, data.get('url_whitelists') or [], report, replace_existing=replace)
-    _import_users(env, data.get('mcp_users') or [], report, replace_existing=replace)
-    _import_agents_scalar(env, data.get('agents') or [], report, replace_existing=replace)
+    dry = bool(dry_run)
+    _import_providers(
+        env, data.get('providers') or [], report,
+        replace_existing=replace, dry_run=dry,
+    )
+    _import_contexts(
+        env, data.get('contexts') or [], report,
+        replace_existing=replace, dry_run=dry,
+    )
+    _import_skills(
+        env, data.get('skills') or [], report,
+        replace_existing=replace, dry_run=dry,
+    )
+    _import_servers(
+        env, data.get('mcp_servers') or [], report,
+        replace_existing=replace, dry_run=dry,
+    )
+    _import_whitelist(
+        env, data.get('url_whitelists') or [], report,
+        replace_existing=replace, dry_run=dry,
+    )
+    _import_users(
+        env, data.get('mcp_users') or [], report,
+        replace_existing=replace, dry_run=dry,
+    )
+    _import_agents_scalar(
+        env, data.get('agents') or [], report,
+        replace_existing=replace, dry_run=dry,
+    )
 
-    # ── Pass 2: relations ────────────────────────────────────────────────────
-    _wire_agent_relations(env, data.get('agents') or [], report, replace_existing=replace)
-    _wire_skill_relations(env, data.get('skills') or [], report, replace_existing=replace)
-    _import_settings(env, data.get('settings') or {}, report, replace_existing=replace)
+    # ── Pass 2: relations (nothing to count; skip on preview) ───────────────
+    if not dry:
+        _wire_agent_relations(
+            env, data.get('agents') or [], report, replace_existing=replace,
+        )
+        _wire_skill_relations(
+            env, data.get('skills') or [], report, replace_existing=replace,
+        )
+    _import_settings(
+        env, data.get('settings') or {}, report,
+        replace_existing=replace, dry_run=dry,
+    )
 
     return report
 
@@ -399,7 +451,7 @@ def export_selected_users(users, include_secrets=False):
     return out
 
 
-def _import_providers(env, rows, report, replace_existing=True):
+def _import_providers(env, rows, report, replace_existing=True, dry_run=False):
     Provider = env['ai.provider'].sudo().with_context(active_test=False)
     Model = env['ai.provider.model'].sudo()
     sec = report['sections'].setdefault('providers', _section())
@@ -418,16 +470,15 @@ def _import_providers(env, rows, report, replace_existing=True):
             )
             report['warnings'].extend('provider %s: %s' % (name, w) for w in warns)
             existing = Provider.search([('name', '=', name)], limit=1)
-            if existing and not replace_existing:
-                sec['skipped'] += 1
+            if not _should_write(
+                sec, bool(existing), replace_existing, name, dry_run,
+            ):
                 continue
             if existing:
                 existing.write(keep_existing_secrets(existing, vals))
                 provider = existing
-                sec['updated'] += 1
             else:
                 provider = Provider.create(vals)
-                sec['created'] += 1
             # The catalogue (prices, context, the other slugs) is fetched
             # again from the provider. The file only names the chosen model.
             sel = (row.get('selected_model') or '').strip()
@@ -446,7 +497,7 @@ def _import_providers(env, rows, report, replace_existing=True):
             _logger.exception("config_backup import provider %s", name)
 
 
-def _import_contexts(env, rows, report, replace_existing=True):
+def _import_contexts(env, rows, report, replace_existing=True, dry_run=False):
     Ctx = env['ai.context'].sudo().with_context(active_test=False)
     sec = report['sections'].setdefault('contexts', _section())
     for row in rows:
@@ -455,26 +506,25 @@ def _import_contexts(env, rows, report, replace_existing=True):
             report['errors'].append(_("Context without 'code' skipped."))
             continue
         if (row.get('context_type') or '') == 'core':
-            sec['skipped'] += 1  # module-owned, never overwritten
+            _mark(sec, 'skipped', code)  # module-owned, never overwritten
             continue
         try:
             vals, warns = import_vals_from_dict(Ctx, row, skip_fields={'id'})
             report['warnings'].extend('context %s: %s' % (code, w) for w in warns)
             existing = Ctx.search([('code', '=', code)], limit=1)
-            if existing and not replace_existing:
-                sec['skipped'] += 1
+            if not _should_write(
+                sec, bool(existing), replace_existing, code, dry_run,
+            ):
                 continue
             if existing:
                 existing.write(vals)
-                sec['updated'] += 1
             else:
                 Ctx.create(vals)
-                sec['created'] += 1
         except Exception as e:
             report['errors'].append("context %s: %s" % (code, e))
 
 
-def _import_skills(env, rows, report, replace_existing=True):
+def _import_skills(env, rows, report, replace_existing=True, dry_run=False):
     Skill = env['ai.skill'].sudo().with_context(active_test=False)
     sec = report['sections'].setdefault('skills', _section())
     for row in rows:
@@ -483,7 +533,7 @@ def _import_skills(env, rows, report, replace_existing=True):
             report['errors'].append(_("Skill without 'code' skipped."))
             continue
         if row.get('is_system'):
-            sec['skipped'] += 1  # module-owned
+            _mark(sec, 'skipped', code)  # module-owned
             continue
         try:
             vals, warns = import_vals_from_dict(
@@ -492,21 +542,20 @@ def _import_skills(env, rows, report, replace_existing=True):
             )
             report['warnings'].extend('skill %s: %s' % (code, w) for w in warns)
             existing = Skill.search([('code', '=', code)], limit=1)
-            if existing and not replace_existing:
-                sec['skipped'] += 1
+            if not _should_write(
+                sec, bool(existing), replace_existing, code, dry_run,
+            ):
                 continue
             if existing:
                 existing.write(vals)
                 existing._apply_slash_hidden_from_icp()
-                sec['updated'] += 1
             else:
                 Skill.create(vals)
-                sec['created'] += 1
         except Exception as e:
             report['errors'].append("skill %s: %s" % (code, e))
 
 
-def _import_servers(env, rows, report, replace_existing=True):
+def _import_servers(env, rows, report, replace_existing=True, dry_run=False):
     Srv = env['ai.api.server'].sudo().with_context(active_test=False)
     sec = report['sections'].setdefault('mcp_servers', _section())
     for row in rows:
@@ -518,20 +567,19 @@ def _import_servers(env, rows, report, replace_existing=True):
             vals, warns = import_vals_from_dict(Srv, row, skip_fields={'id'})
             report['warnings'].extend('server %s: %s' % (code, w) for w in warns)
             existing = Srv.search([('code', '=', code)], limit=1)
-            if existing and not replace_existing:
-                sec['skipped'] += 1
+            if not _should_write(
+                sec, bool(existing), replace_existing, code, dry_run,
+            ):
                 continue
             if existing:
                 existing.write(existing._keep_secrets_on_import(vals))
-                sec['updated'] += 1
             else:
                 Srv.create(vals)
-                sec['created'] += 1
         except Exception as e:
             report['errors'].append("server %s: %s" % (code, e))
 
 
-def _import_whitelist(env, rows, report, replace_existing=True):
+def _import_whitelist(env, rows, report, replace_existing=True, dry_run=False):
     W = env['ai.url.whitelist'].sudo().with_context(active_test=False)
     sec = report['sections'].setdefault('url_whitelists', _section())
     for row in rows:
@@ -547,20 +595,19 @@ def _import_whitelist(env, rows, report, replace_existing=True):
                 if k in vals and isinstance(vals[k], str) and vals[k]:
                     vals[k] = _norm_dt(vals[k])
             existing = W.search([('domain', '=', domain)], limit=1)
-            if existing and not replace_existing:
-                sec['skipped'] += 1
+            if not _should_write(
+                sec, bool(existing), replace_existing, domain, dry_run,
+            ):
                 continue
             if existing:
                 existing.write(vals)
-                sec['updated'] += 1
             else:
                 W.create(vals)
-                sec['created'] += 1
         except Exception as e:
             report['errors'].append("whitelist %s: %s" % (domain, e))
 
 
-def _import_users(env, rows, report, replace_existing=True):
+def _import_users(env, rows, report, replace_existing=True, dry_run=False):
     McpUser = env['ai.mcp.user'].sudo()
     Users = env['res.users'].sudo()
     sec = report['sections'].setdefault('mcp_users', _section())
@@ -574,14 +621,14 @@ def _import_users(env, rows, report, replace_existing=True):
             report['errors'].append(_("MCP user without 'login' skipped."))
             continue
         if not key_hash:
-            sec['skipped'] += 1  # nothing restorable
+            _mark(sec, 'skipped', login)  # nothing restorable
             continue
         try:
             user = Users.search([('login', '=', login)], limit=1)
             if not user:
                 report['warnings'].append(
                     _("Odoo user '%s' not found — API key not restored.") % login)
-                sec['skipped'] += 1
+                _mark(sec, 'skipped', login)
                 continue
             vals = {
                 'mcp_api_key_hash': key_hash,
@@ -594,21 +641,20 @@ def _import_users(env, rows, report, replace_existing=True):
                 vals['mcp_api_key_generated_date'] = fields.Datetime.now()
             mcp = McpUser.with_context(mcp_skip_ensure_all_users=True).search(
                 [('user_id', '=', user.id)], limit=1)
-            if mcp and not replace_existing:
-                sec['skipped'] += 1
+            if not _should_write(
+                sec, bool(mcp), replace_existing, login, dry_run,
+            ):
                 continue
             if mcp:
                 mcp.write(vals)
-                sec['updated'] += 1
             else:
                 vals['user_id'] = user.id
                 McpUser.with_context(mcp_skip_ensure_all_users=True).create(vals)
-                sec['created'] += 1
         except Exception as e:
             report['errors'].append("user %s: %s" % (login, e))
 
 
-def _import_agents_scalar(env, rows, report, replace_existing=True):
+def _import_agents_scalar(env, rows, report, replace_existing=True, dry_run=False):
     Agent = env['ai.agent'].sudo().with_context(active_test=False)
     sec = report['sections'].setdefault('agents', _section())
     for row in rows:
@@ -624,10 +670,9 @@ def _import_agents_scalar(env, rows, report, replace_existing=True):
                 report['warnings'].append(
                     _("Agent '%s' not present (install its module) — config "
                       "not applied.") % code)
-                sec['skipped'] += 1
+                _mark(sec, 'skipped', code)
                 continue
-            if not replace_existing:
-                sec['skipped'] += 1
+            if not _should_write(sec, True, replace_existing, code, dry_run):
                 continue
             vals, warns = import_vals_from_dict(
                 Agent, row,
@@ -639,7 +684,6 @@ def _import_agents_scalar(env, rows, report, replace_existing=True):
             report['warnings'].extend('agent %s: %s' % (code, w) for w in warns)
             if vals:
                 existing.write(vals)
-            sec['updated'] += 1
         except Exception as e:
             report['errors'].append("agent %s: %s" % (code, e))
 
@@ -731,11 +775,37 @@ def _wire_skill_relations(env, rows, report, replace_existing=True):
             report['errors'].append("skill %s relations: %s" % (code, e))
 
 
-def _import_settings(env, settings, report, replace_existing=True):
+def _import_settings(env, settings, report, replace_existing=True, dry_run=False):
     if not isinstance(settings, dict):
         return
     payload = dict(settings)
     hidden = payload.pop(ICP_SKILLS_SLASH_HIDDEN, None)
+    sec = report['sections'].setdefault('settings', _section())
+    if dry_run:
+        Settings = env['res.config.settings']
+        try:
+            catalog = list(sio.iter_settings_fields(
+                Settings, module=MODULE, icp_prefix=ICP_PREFIX,
+            ))
+            current = Settings.get_values() or {}
+        except Exception as exc:
+            report['warnings'].append(
+                _('Could not read current settings; preview skipped.')
+            )
+            _logger.warning('config_backup dry-run settings: %s', exc)
+            return
+        overlay, warnings, skipped, errors = sio.resolve_import_overlay(
+            payload, catalog, current, replace_existing=replace_existing,
+            icp_prefix=ICP_PREFIX,
+        )
+        report['warnings'].extend(warnings)
+        report['errors'].extend(errors)
+        sec['skipped'] += skipped
+        for fname in overlay:
+            _mark(sec, 'updated', fname)
+        if hidden is not None:
+            _mark(sec, 'updated', ICP_SKILLS_SLASH_HIDDEN)
+        return
     sub = sio.import_settings(
         env, {'settings': payload},
         module=MODULE, icp_prefix=ICP_PREFIX,
@@ -744,7 +814,6 @@ def _import_settings(env, settings, report, replace_existing=True):
     )
     report['warnings'].extend(sub.get('warnings') or [])
     report['errors'].extend(sub.get('errors') or [])
-    sec = report['sections'].setdefault('settings', _section())
     src = (sub.get('sections') or {}).get('settings') or {}
     sec['created'] += src.get('created', 0)
     sec['updated'] += src.get('updated', 0)

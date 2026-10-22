@@ -25,7 +25,6 @@ Third-party notices
 This distribution vendors JavaScript libraries that keep their own licenses.
 They are not Apache-2.0 unless stated below. See each file header.
 
-- showdown (Markdown) — MIT — Tivie / showdownjs
 - jsPDF — MIT — James Hall / yWorks GmbH
 - jsPDF AutoTable — MIT
 - Chart.js — MIT — Chart.js Contributors

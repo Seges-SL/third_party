@@ -47,6 +47,9 @@ class ImportAgentsWizard(models.TransientModel):
         imported_count = 0
         updated_count = 0
         skipped_count = 0
+        created_names = []
+        updated_names = []
+        skipped_names = []
         missing_providers = set()
         errors = []
 
@@ -61,6 +64,7 @@ class ImportAgentsWizard(models.TransientModel):
                 )
                 if existing and not self.replace_existing:
                     skipped_count += 1
+                    skipped_names.append(code)
                     continue
 
                 vals = {
@@ -75,12 +79,14 @@ class ImportAgentsWizard(models.TransientModel):
                     existing.write(vals)
                     agent_rec = existing
                     updated_count += 1
+                    updated_names.append(code)
                     Assignment.with_context(active_test=False).search(
                         [('agent_id', '=', agent_rec.id)]
                     ).unlink()
                 else:
                     agent_rec = Agent.create(vals)
                     imported_count += 1
+                    created_names.append(code)
 
                 for failover_entry in agent_data.get('failovers', []):
                     provider_name = failover_entry.get('provider')
@@ -108,5 +114,8 @@ class ImportAgentsWizard(models.TransientModel):
             updated=updated_count,
             skipped=skipped_count,
             errors=errors,
+            created_names=created_names,
+            updated_names=updated_names,
+            skipped_names=skipped_names,
             detail=', '.join(sorted(missing_providers)) if missing_providers else None,
         )

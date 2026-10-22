@@ -14,7 +14,7 @@ from datetime import timedelta
 
 from odoo import SUPERUSER_ID, api, fields, models
 
-from ..utils.key_pin import DESK_TTL_SECONDS
+from ..utils.key_pin import DESK_TTL_SECONDS, pin_length
 
 _logger = logging.getLogger(__name__)
 
@@ -114,10 +114,12 @@ class KeyPinDesk(models.Model):
         ])
         return {
             'ok': True,
+            'pin_length': pin_length(self.env),
             'asks': [{
                 'ask_id': ask.id,
                 'email': ask.email or '',
                 'login': ask.login or '',
+                'pin': ask.pin or '',
             } for ask in pending],
         }
 
@@ -148,6 +150,14 @@ class KeyPinDesk(models.Model):
             'ask_id': ask.id,
             'email': ask.email or '',
             'login': ask.login or '',
+            'pin': ask.pin or '',
+        })
+
+    def _notify_pin_spent(self, pin):
+        """The app logged in with this PIN: tabs holding it drop it."""
+        self._send(self.env, 'pns_key_pin_spent', {
+            'type': 'pns_key_pin_spent',
+            'pin': pin or '',
         })
 
 
@@ -157,9 +167,12 @@ class KeyPinAsk(models.Model):
 
     email = fields.Char()
     login = fields.Char()
+    pin = fields.Char(copy=False)
     mcp_user_id = fields.Many2one('ai.mcp.user')
     supplied_key = fields.Char(copy=False)
     failed = fields.Boolean(copy=False)
+    refused = fields.Integer(copy=False, default=0)
+    desks = fields.Integer(copy=False, default=0)
 
     @api.model
     def _drop_old(self):
@@ -171,15 +184,31 @@ class KeyPinAsk(models.Model):
     @api.model
     def collect(self, mcp_user, email, login):
         """Ask every open tab. Return the key, False if it does not match, or None."""
+        return self._collect({
+            'email': email or '',
+            'login': login or '',
+            'mcp_user_id': mcp_user.id,
+        })
+
+    @api.model
+    def collect_pin(self, pin):
+        """Ask every open tab whose PIN this is. Return the key it stands for.
+
+        The server does not know the PIN: the tab minted it next to the key.
+        False means a tab answered that the PIN is not theirs, None that no
+        tab answered in time.
+        """
+        return self._collect({'pin': pin or ''})
+
+    @api.model
+    def _collect(self, vals):
         self._drop_old()
         registry = self.env.registry
         with registry.cursor() as cr:
             env = api.Environment(cr, SUPERUSER_ID, {})
-            ask = env['ai.key.pin.ask'].sudo().create({
-                'email': email or '',
-                'login': login or '',
-                'mcp_user_id': mcp_user.id,
-            })
+            vals = dict(vals)
+            vals['desks'] = len(env['ai.key.pin.desk'].sudo()._live())
+            ask = env['ai.key.pin.ask'].sudo().create(vals)
             ask_id = ask.id
             env['ai.key.pin.desk']._notify_ask(env, ask)
         deadline = time.time() + ASK_WAIT_SECONDS
@@ -188,14 +217,15 @@ class KeyPinAsk(models.Model):
             if found is not None:
                 return found
             time.sleep(0.4)
-        self._take(ask_id)
-        return None
+        return self._take(ask_id, final=True)
 
     @api.model
-    def _take(self, ask_id):
+    def _take(self, ask_id, final=False):
         """Return the key, False on mismatch, or None if still waiting.
 
-        The row is removed as soon as it has an answer, key included.
+        The row is removed as soon as it has an answer, key included. A PIN
+        ask is only refused once every open tab has said the PIN is not
+        theirs, or when the wait ends with at least one refusal.
         """
         registry = self.env.registry
         with registry.cursor() as cr:
@@ -210,13 +240,21 @@ class KeyPinAsk(models.Model):
                 key = ask.supplied_key
                 ask.unlink()
                 return key
+            if ask.pin and ask.refused:
+                if (ask.desks and ask.refused >= ask.desks) or final:
+                    ask.unlink()
+                    return False
+            if final:
+                # The wait is over: drop the row so a key that arrives late
+                # has nowhere to land.
+                ask.unlink()
         return None
 
     @api.model
     def supply(self, ask_id, api_key, user):
         from ..utils.api_key import hash_api_key
         api_key = (api_key or '').strip()
-        if not ask_id or not api_key:
+        if not ask_id:
             return {'ok': False}
         desk = self.env['ai.key.pin.desk'].sudo().search([
             ('user_id', '=', user.id),
@@ -227,7 +265,20 @@ class KeyPinAsk(models.Model):
         ask = self.sudo().browse(int(ask_id))
         if not ask.exists() or ask.supplied_key or ask.failed:
             return {'ok': False}
-        owner = ask.mcp_user_id.sudo()
+        if ask.pin and not api_key:
+            # A tab answered: this PIN is not theirs. Other tabs may still
+            # hold it, so this only counts as one refusal.
+            ask.write({'refused': (ask.refused or 0) + 1})
+            return {'ok': False, 'error': 'unknown_pin'}
+        if not api_key:
+            return {'ok': False}
+        if ask.mcp_user_id:
+            owner = ask.mcp_user_id.sudo()
+        else:
+            # PIN ask: the tab named no user. The key itself says whose it is.
+            owner = self.env['ai.mcp.user'].sudo().search([
+                ('mcp_api_key_hash', '=', hash_api_key(api_key)),
+            ], limit=1)
         if not owner or hash_api_key(api_key) != (owner.mcp_api_key_hash or ''):
             ask.write({'failed': True, 'supplied_key': False})
             _logger.info(
@@ -235,5 +286,8 @@ class KeyPinAsk(models.Model):
                 owner.user_id.id if owner else 0,
             )
             return {'ok': False, 'error': 'mismatch'}
-        ask.write({'supplied_key': api_key})
+        vals = {'supplied_key': api_key}
+        if not ask.mcp_user_id:
+            vals['mcp_user_id'] = owner.id
+        ask.write(vals)
         return {'ok': True}

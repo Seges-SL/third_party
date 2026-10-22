@@ -21,20 +21,20 @@
             <tree string="My Activity" create="0" delete="0"
                   decoration-warning="flow in ('tool_call', 'tool_result', 'external')"
                   decoration-danger="access_mode == 'write'"
-                  decoration-it="flow in ('failover', 'external')"
+                  decoration-it="flow in ('failover', 'external', 'skipped')"
+                  decoration-muted="flow == 'skipped'"
                   decoration-bf="flow == 'domain_index'"
                   sample="1" class="o_mcp_log_tree o_pns_list" default_order="timestamp desc, turn_step desc">
-                <field name="flow_icon_html" string="Icon" readonly="1" widget="pns_html_readonly" optional="show" class="o_mcp_flow_icon_cell"/>
+                <field name="flow_icon_html" string="Icon" readonly="1" widget="pns_html_readonly" optional="show" class="o_mcp_flow_icon_cell" width="16px"/>
                 <field name="timestamp" string="Date/Time" readonly="1" optional="show"/>
-                <field name="turn" string="Turn" readonly="1" optional="show"/>
-                <field name="turn_step" string="Step" readonly="1" optional="show"/>
-                <field name="origin" string="Door" readonly="1" optional="show"/>
-                <field name="agent_display" string="Agent" readonly="1" optional="show"/>
-                <field name="client_label" string="Client" readonly="1" optional="show"/>
+                <field name="turn" string="Turn" readonly="1" optional="show" width="52px"/>
+                <field name="turn_step" string="Step" readonly="1" optional="show" width="36px"/>
+                <field name="client_display" string="Client" readonly="1" optional="show"/>
                 <field name="flow_label" string="Flow" readonly="1" optional="show"/>
                 <field name="endpoint" string="Action" readonly="1" optional="show"/>
+                <field name="user_prompt" string="User Prompt" readonly="1" optional="show"/>
                 <field name="result_summary_compressed" string="Summary" readonly="1" widget="mcp_json_compressed" optional="show"/>
-                <field name="remote_ip" string="IP" readonly="1" optional="show"/>
+                <field name="remote_ip" string="IP" readonly="1" optional="show" width="96px"/>
                 <field name="user_id" string="Log user" readonly="1" optional="hide" groups="pns_ai_mcp.group_ai_admin"/>
                 <field name="flow" invisible="1"/>
                 <field name="access_mode" invisible="1"/>
@@ -52,34 +52,36 @@
                   decoration-success="flow == 'llm_response'"
                   decoration-warning="flow in ('tool_call', 'tool_result', 'external')"
                   decoration-primary="flow == 'turn_done'"
-                  decoration-it="flow in ('failover', 'external')"
+                  decoration-it="flow in ('failover', 'external', 'skipped')"
+                  decoration-muted="flow == 'skipped'"
                   decoration-bf="flow == 'domain_index'"
                   decoration-danger="access_mode == 'write'"
                   sample="1" class="o_mcp_log_tree o_pns_list" default_order="timestamp desc, turn_step desc">
-                <field name="flow_icon_html" string="Icon" readonly="1" widget="pns_html_readonly" optional="show" class="o_mcp_flow_icon_cell"/>
+                <field name="flow_icon_html" string="Icon" readonly="1" widget="pns_html_readonly" optional="show" class="o_mcp_flow_icon_cell" width="16px"/>
                 <field name="timestamp" string="Date/Time" readonly="1" optional="show"/>
-                <field name="turn" string="Turn" readonly="1" optional="show"/>
-                <field name="turn_step" string="Step" readonly="1" optional="show"/>
-                <field name="origin" string="Door" readonly="1" optional="show"/>
-                <field name="agent_display" string="Agent" readonly="1" widget="badge"
-                       decoration-info="origin == 'chatboo'"
+                <field name="turn" string="Turn" readonly="1" optional="show" width="52px"/>
+                <field name="turn_step" string="Step" readonly="1" optional="show" width="36px"/>
+                <field name="client_display" string="Client" readonly="1" widget="badge"
+                       decoration-info="origin not in ('mcp_client', 'internal')"
                        decoration-warning="origin == 'mcp_client'"
                        decoration-muted="origin == 'internal'"
                        optional="show"/>
-                <field name="client_label" string="Client" readonly="1" optional="show"/>
+                <field name="origin" invisible="1"/>
                 <field name="user_id" string="Log user" readonly="1" optional="show"/>
-                <field name="remote_ip" string="IP" readonly="1" optional="show"/>
+                <field name="remote_ip" string="IP" readonly="1" optional="show" width="96px"/>
                 <field name="flow_label" string="Flow (who -&gt; who)" readonly="1" optional="show"/>
                 <!-- Needed by decoration-* but not shown as a column -->
                 <field name="flow" invisible="1"/>
                 <field name="endpoint" string="Endpoint" readonly="1" optional="show"/>
                 <field name="model_name" string="LLM model" readonly="1" optional="show"/>
+                <field name="provider_id" string="Provider" readonly="1" optional="hide"/>
                 <field name="prompt_tokens" string="Tok.Prompt" readonly="1" optional="show"/>
                 <field name="completion_tokens" string="Tok.Compl" readonly="1" optional="show"/>
-                <field name="cost_display" string="Cost" readonly="1" optional="show"/>
+                <field name="cost_display" string="Cost" readonly="1" optional="show" width="60px"/>
                 <field name="cost_usd" string="Cost (USD)" readonly="1" optional="hide"/>
-                <field name="request_size_bytes" readonly="1" optional="show"/>
-                <field name="response_size_bytes" readonly="1" optional="show"/>
+                <field name="request_size_bytes" readonly="1" optional="show" width="56px"/>
+                <field name="response_size_bytes" readonly="1" optional="show" width="56px"/>
+                <field name="user_prompt" string="User Prompt" readonly="1" optional="show"/>
                 <field name="prompt_data_compressed" string="Prompt/Args" readonly="1" widget="mcp_json_compressed" optional="show"/>
                 <field name="result_summary_compressed" string="Result" readonly="1" widget="mcp_json_compressed" optional="show"/>
                 <field name="primitive" string="Primitive" readonly="1" optional="hide"/>
@@ -152,10 +154,7 @@
                     <group>
                         <group>
                             <field name="user_id" string="Log user" readonly="1"/>
-                            <field name="client_label" string="Client" readonly="1"/>
-                            <field name="agent_display" string="Agent" readonly="1"/>
-                            <field name="agent_id" readonly="1"/>
-                            <field name="origin" string="Door" readonly="1"/>
+                            <field name="client_display" string="Client" readonly="1"/>
                             <field name="remote_ip" readonly="1"/>
                             <field name="turn" string="Turn" readonly="1"/>
                             <field name="turn_step" string="Step" readonly="1"/>
@@ -167,6 +166,7 @@
                             <field name="access_mode" readonly="1"/>
                             <field name="endpoint" readonly="1"/>
                             <field name="model_name" string="LLM model" readonly="1"/>
+                            <field name="provider_id" readonly="1"/>
                         </group>
                         <group>
                             <field name="request_size_bytes" readonly="1"/>
@@ -237,11 +237,8 @@
         <field name="arch" type="xml">
             <search string="AI Logs">
                 <field name="turn" string="Turn"/>
-                <field name="client_label" string="Client"/>
+                <field name="client_display" string="Client"/>
                 <field name="user_id" string="Log user"/>
-                <field name="agent_id" string="Agent"/>
-                <field name="agent_display" string="Agent"/>
-                <field name="origin" string="Door"/>
                 <field name="remote_ip" string="IP"/>
                 <field name="primitive"/>
                 <field name="category"/>
@@ -257,7 +254,6 @@
                 <filter string="Hide LLM plumbing" name="hide_llm_plumbing"
                         domain="[('primitive', '!=', 'llm')]"/>
                 <separator/>
-                <filter string="From Chatboo" name="src_chatboo" domain="[('origin', '=', 'chatboo')]"/>
                 <filter string="From MCP Client" name="src_mcp" domain="[('origin', '=', 'mcp_client')]"/>
                 <filter string="Internal" name="src_internal" domain="[('origin', '=', 'internal')]"/>
                 <separator/>
@@ -280,9 +276,7 @@
                 
                 <separator/>
                 <filter string="Turn" name="group_by_turn" context="{'group_by': 'turn'}"/>
-                <filter string="Client" name="group_by_client" context="{'group_by': 'client_label'}"/>
-                <filter string="Agent" name="group_source" context="{'group_by': 'agent_id'}"/>
-                <filter string="Door" name="group_door" context="{'group_by': 'origin'}"/>
+                <filter string="Client" name="group_by_client" context="{'group_by': 'client_display'}"/>
                 <filter string="Primitive" name="group_by_primitive" context="{'group_by': 'primitive'}"/>
                 <filter string="Category" name="group_by_category" context="{'group_by': 'category'}"/>
                 <filter string="Flow" name="group_by_flow" context="{'group_by': 'flow'}"/>

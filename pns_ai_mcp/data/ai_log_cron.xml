@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo noupdate="1">
     <!-- Purga el registro de IA más antiguo que pns_ai_mcp.log_retention_days
-         (30 por defecto; 0 = no purgar). Stack owl1 (Odoo 14): numbercall=-1. -->
+         (sin fijar o 0 = no se borra nada; los dias se fijan en Ajustes). Stack owl1 (Odoo 14): numbercall=-1. -->
     <record id="ir_cron_ai_log_retention" model="ir.cron">
         <field name="name">AI: purge activity log older than retention</field>
         <field name="model_id" ref="model_ai_log"/>

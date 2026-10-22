@@ -14,6 +14,24 @@ from urllib.parse import urlparse
 
 import requests
 
+
+def _request_public_http(*args, **kwargs):
+    """Same hop checks as fetch_url. Loaded by path so unit tests that
+    import this file as a top-level module still work."""
+    import importlib.util
+    import sys
+    from pathlib import Path
+
+    key = 'pns_ai_mcp_fetch_url_safe'
+    mod = sys.modules.get(key)
+    if mod is None:
+        path = Path(__file__).resolve().parents[1] / 'utils' / 'fetch_url_safe.py'
+        spec = importlib.util.spec_from_file_location(key, path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[key] = mod
+        spec.loader.exec_module(mod)
+    return mod.request_public_http(*args, **kwargs)
+
 _logger = logging.getLogger(__name__)
 
 _MAX_DOC_CHARS = 120_000
@@ -593,7 +611,8 @@ def fetch_documentation(env, url, timeout=30):
             % parsed.hostname)
 
     try:
-        resp = requests.get(
+        resp = _request_public_http(
+            'GET',
             url,
             timeout=(5, timeout),
             headers={
@@ -605,7 +624,7 @@ def fetch_documentation(env, url, timeout=30):
             },
         )
         resp.raise_for_status()
-    except requests.RequestException as exc:
+    except (ValueError, requests.RequestException) as exc:
         raise OpenAPISpecGeneratorError(
             'Could not reach the documentation URL: %s' % exc)
 

@@ -11,15 +11,13 @@ truth is the database. The SSE at /chatboo/stream only tails this job.
 import base64
 import json
 import logging
-import threading
 import time
-from datetime import timedelta
 
-import odoo
 from odoo import models, fields, api, _
-from odoo.exceptions import AccessError
 
-from ..utils import turn_documents
+from .chatboo_job import _env_manage, _get_registry, _is_test_mode
+from ..utils import file_text, turn_documents
+from ..utils.chatboo_product_icp import CHATBOO_AGENT_CODE
 from ..utils.turn_deliverable import done_meta_has_deliverable
 
 _logger = logging.getLogger(__name__)
@@ -31,119 +29,31 @@ _DOMAIN_CODES_LEAVE = object()
 
 # Intervalo de flush del progreso a BD (segundos). Granularidad del preview.
 FLUSH_INTERVAL = 0.3
-# Intervalo del LATIDO (heartbeat) independiente (segundos). Un hilo aparte
-# refresca write_date a este ritmo mientras el job corre, PASE lo que pase con el
-# motor: así un modelo lento que tarda minutos en emitir tokens no se confunde
-# nunca con un worker muerto. Debe ser < HEARTBEAT_STALE_SECONDS con holgura.
-HEARTBEAT_INTERVAL = 10.0
-# Antigüedad para considerar un job "colgado" (min) → lo reclama el cron. Gracias
-# al latido (write_date se refresca cada ~0.3s), un valor bajo es seguro: solo los
-# jobs realmente muertos (sin latido reciente) superan el umbral.
-STUCK_MINUTES = 3
-# Umbral de latido para el reclaim inmediato al abrir Chatboo (segundos). Un job
-# vivo late cada ~0.3s; si lleva más de esto sin latir, está muerto (reinicio).
-HEARTBEAT_STALE_SECONDS = 60
-# Retención de jobs terminados (horas) antes de purgarlos.
-GC_HOURS = 72
 # PDF adjunto: páginas de las que se lee el texto impreso, y páginas de un
 # escaneado que van como imágenes (cada una pesa en la llamada de visión).
 PDF_TEXT_PAGES = 200
 PDF_VISION_PAGES = 10
 NO_TEXT = 'NONE'
+# PostgreSQL lock_not_available: a ``lock_timeout`` ran out.
+_LOCK_NOT_AVAILABLE = '55P03'
 
 
-def _env_manage():
-    """Context manager de entornos thread-local.
-
-    Odoo 14 (owl1) exige ``Environment.manage()`` para crear un Environment con
-    cursor propio fuera del request. En Odoo 17+ (owl2) desapareció; devolvemos
-    un nullcontext para que el mismo código sirva en ambos stacks.
-    """
-    manage = getattr(api.Environment, 'manage', None)
-    if manage is not None:
-        return manage()
-
-    import contextlib
-    return contextlib.nullcontext()
-
-
-def _get_registry(dbname):
-    """Devuelve el Registry de la BD, compatible con Odoo 14 y 17+/19.
-
-    En Odoo 14 existe el helper ``odoo.registry(db)``. En Odoo 17+/19 se eliminó
-    (``module 'odoo' has no attribute 'registry'``) y hay que usar la clase
-    ``odoo.modules.registry.Registry(db)``.
-    """
-    reg = getattr(odoo, 'registry', None)
-    if callable(reg):
-        return reg(dbname)
-    from odoo.modules.registry import Registry
-    return Registry(dbname)
-
-
-def _is_pg_serialization_failure(exc):
-    """True for Postgres SQLSTATE 40001 (REPEATABLE READ concurrent update).
-
-    Odoo 14/psycopg2 and Odoo 19/psycopg3 expose this under different class
-    names; matching pgcode/sqlstate plus the well-known message covers both.
-    """
-    pgcode = getattr(exc, 'pgcode', None) or getattr(exc, 'sqlstate', None)
-    if pgcode == '40001':
-        return True
-    if type(exc).__name__ == 'SerializationFailure':
-        return True
-    msg = str(exc or '').lower()
-    return 'could not serialize access' in msg
-
-
-def _job_already_finished(dbname, rid):
-    """True si ``_finalize`` ya dejó el job en done/error (cursor fresco)."""
-    try:
-        with _get_registry(dbname).cursor() as cr:
-            cr.execute(
-                "SELECT state FROM chatboo_async_request WHERE id=%s",
-                (rid,),
-            )
-            row = cr.fetchone()
-            return bool(row and row[0] in ('done', 'error'))
-    except Exception:
-        return False
-
-
-def _is_test_mode(env):
-    """True si estamos en modo test, compatible con Odoo 14 y 17+/19.
-
-    En Odoo 14 el registry expone ``in_test_mode()``. En Odoo 19 ese método ya no
-    existe (``'Registry' object has no attribute 'in_test_mode'``), así que nos
-    apoyamos en el flag ``testing`` del hilo y solo llamamos a ``in_test_mode`` si
-    está disponible.
-    """
-    if getattr(threading.current_thread(), 'testing', False):
-        return True
-    fn = getattr(env.registry, 'in_test_mode', None)
-    if callable(fn):
-        try:
-            return bool(fn())
-        except Exception:
-            return False
+def _waited_for_lock(exc):
+    while exc is not None:
+        if getattr(exc, 'pgcode', None) == _LOCK_NOT_AVAILABLE:
+            return True
+        exc = exc.__cause__ or exc.__context__
     return False
 
 
 class ChatbooAsyncRequest(models.Model):
     """Turno de Chatboo ejecutado en segundo plano (desacoplado del request)."""
     _name = 'chatboo.async.request'
+    _inherit = 'chatboo.job.mixin'
     _description = 'Chatboo Async Request'
     _order = 'create_date desc'
     _rec_name = 'id'
 
-    session_id = fields.Many2one(
-        'chatboo.session', string='Session', required=True,
-        ondelete='cascade', index=True,
-    )
-    user_id = fields.Many2one(
-        'res.users', string='User', required=True, index=True,
-        default=lambda self: self.env.user,
-    )
     prompt = fields.Text(string='Prompt', required=True)
     history = fields.Text(string='History (JSON)')
     agent_code = fields.Char(string='Agent code')
@@ -165,18 +75,9 @@ class ChatbooAsyncRequest(models.Model):
     # {name, mimetype, data(dataURL base64)}). Su TEXTO extraído se inyecta en el
     # mensaje de ESTE turno hacia el LLM (transitorio, no entra en el historial);
     # el fichero se persiste como ir.attachment y el mensaje guarda un chip
-    # descargable (ver _persist_turn_files / _extract_file_text).
+    # descargable (ver _persist_turn_files / utils.file_text).
     files = fields.Text(string='Files (JSON)')
 
-    state = fields.Selection(
-        [
-            ('pending', 'Pending'),
-            ('running', 'Running'),
-            ('done', 'Done'),
-            ('error', 'Error'),
-        ],
-        string='State', default='pending', required=True, index=True,
-    )
     # Contenido visible acumulado (tokens/replace) para el preview y el guardado.
     partial = fields.Text(string='Partial content')
     # Eventos estructurados no-token (status, verification, ...) que el tail
@@ -185,43 +86,8 @@ class ChatbooAsyncRequest(models.Model):
     # Metadatos del evento 'done' del motor (usage, context_limit, speed, ...).
     done_meta = fields.Text(string='Done meta (JSON)')
     response = fields.Text(string='Final response')
-    error = fields.Text(string='Error')
     # True cuando un cliente ya recibió el resultado en vivo (SSE) o por poll.
     seen = fields.Boolean(string='Seen by client', default=False, index=True)
-    # El cliente pidió cancelar: el worker lo comprueba entre eventos y cierra.
-    cancel_requested = fields.Boolean(
-        string='Cancel requested', default=False, index=True,
-    )
-
-    started_at = fields.Datetime(string='Started at')
-    finished_at = fields.Datetime(string='Finished at')
-
-    # A job is born for the asking user in one of their own sessions, and
-    # never moves: the worker saves its answer into ``session_id``.
-    _OWNER_FIELDS = frozenset({'session_id', 'user_id'})
-
-    @api.model_create_multi
-    def create(self, vals_list):
-        if not self.env.su:
-            Session = self.env['chatboo.session']
-            for vals in vals_list:
-                vals['user_id'] = self.env.uid
-                sid = vals.get('session_id')
-                if not sid or not Session.search_count([
-                    ('id', '=', sid), ('user_id', '=', self.env.uid),
-                ]):
-                    raise AccessError(_(
-                        'A Chatboo turn can only run in your own session.'
-                    ))
-        return super().create(vals_list)
-
-    def write(self, vals):
-        if not self.env.su and self._OWNER_FIELDS.intersection(vals):
-            raise AccessError(_(
-                'A Chatboo turn can only run in your own session.'
-            ))
-        return super().write(vals)
-
     # ──────────────────────────── Cola (solo el controlador) ────────────────────────────
 
     @api.model
@@ -235,7 +101,9 @@ class ChatbooAsyncRequest(models.Model):
                 sc_json = screen_context
             else:
                 sc_json = json.dumps(screen_context, ensure_ascii=False)
-        return self.create({
+        # The user ACL on this model is read-only: jobs are created here, by
+        # the server, never by an RPC call from the client.
+        return self.sudo().create({
             'session_id': int(session_id),
             'user_id': self.env.uid,
             'prompt': message or '',
@@ -249,93 +117,8 @@ class ChatbooAsyncRequest(models.Model):
             'state': 'pending',
         })
 
-    def _spawn(self):
-        """Lanza el procesamiento en un hilo con cursor propio.
-
-        En modo test se ejecuta en línea (los hilos con cursor propio y el
-        TestCursor no se llevan bien).
-        """
-        self.ensure_one()
-        rid = self.id
-        dbname = self.env.cr.dbname
-        uid = self.env.uid
-        context = dict(self.env.context)
-
-        if _is_test_mode(self.env):
-            self._process()
-            return
-
-        def _runner():
-            # Patrón estándar de hilo de fondo Odoo: fijar dbname en el hilo (si
-            # no, sale "desnudo" -> el log muestra '?' y algunas rutas del ORM/log
-            # que lo esperan pueden fallar).
-            try:
-                threading.current_thread().dbname = dbname
-            except Exception:
-                pass
-            _logger.info("Chatboo async worker thread started (request %s, db %s)", rid, dbname)
-            try:
-                with _env_manage():
-                    db_registry = _get_registry(dbname)
-                    with db_registry.cursor() as cr:
-                        env = api.Environment(cr, uid, context)
-                        env['chatboo.async.request'].browse(rid)._process()
-            except Exception as exc:
-                # Commit del cursor del worker al salir del ``with``: un
-                # SerializationFailure (PG 40001) aquí NO es un fallo del
-                # motor — _finalize ya persistió en un cursor fresco. Pintar
-                # "MCP engine error" pisaría un turno bueno (tabla/texto ya
-                # emitidos por SSE).
-                if _is_pg_serialization_failure(exc):
-                    _logger.warning(
-                        "Chatboo async worker cursor raced after finalize "
-                        "(request %s): %s",
-                        rid, exc,
-                    )
-                    if _job_already_finished(dbname, rid):
-                        return
-                _logger.exception("Chatboo async worker crashed (request %s)", rid)
-                self._record_crash(dbname, uid, context, rid, exc)
-
-        thread = threading.Thread(
-            target=_runner, name='chatboo-async-%s' % rid, daemon=True,
-        )
-        thread.start()
-
-    @api.model
-    def _record_crash(self, dbname, uid, context, rid, exc):
-        """Marca un job como error tras un crash de bootstrap del hilo.
-
-        Intenta primero la vía ORM (guarda en sesión + avisa por bus); si el
-        propio Environment es lo que falla, cae a SQL crudo para al menos dejar el
-        estado en 'error' con el mensaje, que el tail SSE ya reemite al cliente.
-        """
-        if _job_already_finished(dbname, rid):
-            _logger.warning(
-                "Chatboo async: skip crash mark, job %s already finished", rid,
-            )
-            return
-        msg = '%s: %s' % (exc.__class__.__name__, exc) or 'worker crashed'
-        try:
-            # _env_manage() es imprescindible en Odoo 14 para crear un Environment
-            # fuera del request (si no: 'tuple' object has no attribute 'cache').
-            with _env_manage():
-                with _get_registry(dbname).cursor() as cr:
-                    env = api.Environment(cr, uid, context)
-                    env['chatboo.async.request'].browse(rid)._finalize('', [], {}, error=msg)
-                    return
-        except Exception:
-            _logger.exception("Chatboo async: _finalize on crash failed (request %s)", rid)
-        try:
-            with _get_registry(dbname).cursor() as cr:
-                cr.execute(
-                    "UPDATE chatboo_async_request "
-                    "SET state='error', error=%s, response='', "
-                    "finished_at=(now() at time zone 'UTC') WHERE id=%s",
-                    (msg, rid),
-                )
-        except Exception:
-            _logger.exception("Chatboo async: raw crash mark failed (request %s)", rid)
+    def _on_crash(self, msg):
+        self._finalize('', [], {}, error=msg)
 
     # ──────────────────────────── Ejecución ────────────────────────────
 
@@ -346,7 +129,11 @@ class ChatbooAsyncRequest(models.Model):
             "Chatboo async job %s: _process start (agent=%s, provider=%s)",
             self.id, self.agent_code or '-', self.provider_id or '-',
         )
-        self.write({'state': 'running', 'started_at': fields.Datetime.now()})
+        # The user ACL on this model is read-only (PNS-55). The worker
+        # still has to mark the row running; Canvas jobs already do this
+        # with sudo(). The thread runs as the asking uid, so a plain
+        # write() is AccessError before the engine starts.
+        self.sudo().write({'state': 'running', 'started_at': fields.Datetime.now()})
         self.env.cr.commit()
         self._notify('thinking')
 
@@ -387,6 +174,10 @@ class ChatbooAsyncRequest(models.Model):
             )
         except Exception:
             prior_domain_codes = []
+        try:
+            held_domain_codes = self.session_id._held_domain_codes()
+        except Exception:
+            held_domain_codes = []
         last_domain_codes = _DOMAIN_CODES_LEAVE
         # Layout showmode lives on this session. Chatboo writes it, not the engine.
         try:
@@ -395,15 +186,6 @@ class ChatbooAsyncRequest(models.Model):
                 self.session_id.write({'presentation_show_mode': 'show-table'})
             elif _raw_prompt.startswith('/show-chart'):
                 self.session_id.write({'presentation_show_mode': 'show-chart'})
-            else:
-                from odoo.addons.pns_ai_mcp.utils.presentation_mode import (
-                    apply_sticky_show_mode,
-                )
-                apply_sticky_show_mode(
-                    self.session_id,
-                    self.prompt or '',
-                    user_lang=self.env.user.lang,
-                )
         except Exception:
             _logger.debug(
                 'Chatboo async job %s: showmode sticky skipped',
@@ -517,6 +299,11 @@ class ChatbooAsyncRequest(models.Model):
                     'Chatboo async job %s: could not commit the session writes',
                     self.id,
                 )
+                self._release_turn_cursor()
+                self._finalize('', [], {}, error=_(
+                    'The conversation could not be saved before the reply. Try again.'
+                ))
+                return
         # Recuerdo acotado de imágenes previas (1c): reenviamos, con tope y
         # reescaladas, las últimas imágenes ya vistas en la conversación para
         # que el modelo pueda referirse a ellas (los LLM son sin estado: la
@@ -555,11 +342,7 @@ class ChatbooAsyncRequest(models.Model):
                     )
                 if self.session_id:
                     try:
-                        self.session_id.sudo().write({
-                            'last_screen_context': json.dumps(
-                                raw_sc, ensure_ascii=False,
-                            ),
-                        })
+                        self._store_last_screen(raw_sc)
                     except Exception:
                         _logger.debug(
                             'Chatboo async job %s: could not store last screen',
@@ -573,12 +356,9 @@ class ChatbooAsyncRequest(models.Model):
 
         try:
             from odoo.addons.pns_ai_mcp.utils.agent_engine import AgentEngine
-            from odoo.addons.pns_ai_chatboo.utils.chatboo_product_icp import (
-                CHATBOO_AGENT_CODE,
-            )
             engine_env = self.env(context=dict(
                 self.env.context or {},
-                chatboo_session_id=self.session_id.id,
+                ai_session_ref=self.session_id.id,
                 presentation_show_mode=(
                     self.session_id.presentation_show_mode or False
                 ),
@@ -603,8 +383,7 @@ class ChatbooAsyncRequest(models.Model):
                 engine = AgentEngine(engine_env, source_channel='chatboo')
             for evt in engine.run_stream(
                 message_for_engine, history, self.session_id.id,
-                agent_code=self.agent_code or None,
-                consumer_key='chatboo',
+                agent_code=self.agent_code or CHATBOO_AGENT_CODE,
                 provider_id=self.provider_id or None,
                 prior_query_code=prior_query_code,
                 prior_query_data=prior_query_data,
@@ -614,6 +393,7 @@ class ChatbooAsyncRequest(models.Model):
                 prior_domain_codes=prior_domain_codes,
                 images=images or None,
                 recall_images=recall_images or None,
+                held_domain_codes=held_domain_codes,
             ):
                 if self._is_cancel_requested():
                     _logger.info("Chatboo async job %s: cancel requested, stopping", self.id)
@@ -694,8 +474,7 @@ class ChatbooAsyncRequest(models.Model):
             domain_codes_out = last_domain_codes
             if domain_codes_out is _DOMAIN_CODES_LEAVE and releases_domain_codes:
                 domain_codes_out = []
-            # Seges: parche de compatibilidad (bloqueo de chatboo_session). Ver docs/pendiente/parches_pns_ai.md
-            self._release_worker_cursor()
+            self._release_turn_cursor()
             self._finalize(
                 acc, struct, done_meta, error=None,
                 query_code=last_query_code, query_data=last_query_data,
@@ -711,8 +490,7 @@ class ChatbooAsyncRequest(models.Model):
             )
             self._stop_heartbeat(beat)
             beat = None
-            # Seges: parche de compatibilidad (bloqueo de chatboo_session). Ver docs/pendiente/parches_pns_ai.md
-            self._release_worker_cursor()
+            self._release_turn_cursor()
             self._finalize(acc, struct, done_meta, error=str(exc) or exc.__class__.__name__)
         finally:
             # Parar el latido pase lo que pase (éxito o error).
@@ -728,50 +506,6 @@ class ChatbooAsyncRequest(models.Model):
                     self.env.cr.rollback()
                 except Exception:
                     pass
-
-    def _start_heartbeat(self):
-        """Lanza el hilo de latido y devuelve ``(Event, Thread)`` para pararlo.
-
-        Refresca ``write_date`` cada ``HEARTBEAT_INTERVAL`` en un cursor propio,
-        sin tocar el contenido. En modo test no se lanza (el TestCursor y los
-        hilos con cursor propio no se llevan bien): devuelve ``None``.
-        """
-        if _is_test_mode(self.env):
-            return None
-        stop_beat = threading.Event()
-        rid = self.id
-        dbname = self.env.cr.dbname
-
-        def _beat():
-            while not stop_beat.wait(HEARTBEAT_INTERVAL):
-                try:
-                    with _get_registry(dbname).cursor() as cr:
-                        cr.execute(
-                            "UPDATE chatboo_async_request "
-                            "SET write_date=(now() at time zone 'UTC') WHERE id=%s",
-                            (rid,),
-                        )
-                except Exception:
-                    _logger.debug("Chatboo async heartbeat failed (request %s)", rid, exc_info=True)
-
-        thread = threading.Thread(
-            target=_beat, name='chatboo-beat-%s' % rid, daemon=True,
-        )
-        thread.start()
-        return (stop_beat, thread)
-
-    @staticmethod
-    def _stop_heartbeat(beat):
-        """Detiene el latido y ESPERA a que termine, para que no escriba la fila
-        mientras ``_finalize`` la persiste (evita colisión de update concurrente)."""
-        if not beat:
-            return
-        stop_beat, thread = beat
-        try:
-            stop_beat.set()
-            thread.join(timeout=HEARTBEAT_INTERVAL + 2)
-        except Exception:
-            pass
 
     def _flush_progress(self, acc, struct):
         """Vuelca progreso parcial a BD en un cursor propio (visible para el tail).
@@ -789,6 +523,40 @@ class ChatbooAsyncRequest(models.Model):
                 )
         except Exception:
             _logger.debug("Chatboo async flush failed (request %s)", self.id, exc_info=True)
+
+    def _store_last_screen(self, raw_sc):
+        """Keep the screen of this turn in the session, committed at once.
+
+        Written on the turn cursor, the row stays locked until the turn ends,
+        and ``_finalize`` waits for it on the same thread.
+        """
+        with _get_registry(self.env.cr.dbname).cursor() as cr:
+            cr.execute("SET LOCAL lock_timeout = '3s'")
+            cr.execute(
+                "UPDATE chatboo_session SET last_screen_context=%s WHERE id=%s",
+                (json.dumps(raw_sc, ensure_ascii=False), self.session_id.id),
+            )
+
+    def _session_busy_error(self):
+        return _('The reply could not be saved in the conversation because it is busy. '
+                 'Reload the chat and ask again.')
+
+    def _release_turn_cursor(self):
+        """End the turn cursor's transaction before ``_finalize`` opens its own.
+
+        Whatever the turn still holds on it (a session row it flushed, a lock)
+        would make ``_finalize``, on this same thread, wait forever. Nothing
+        durable lives there: the ``finally`` of ``_process`` rolls it back too.
+        """
+        if _is_test_mode(self.env):
+            return
+        try:
+            self.env.cr.rollback()
+        except Exception:
+            _logger.warning(
+                "Chatboo async job %s: could not roll back the turn cursor",
+                self.id, exc_info=True,
+            )
 
     def _slash_releases_domain_codes(self):
         """True when this turn drops packs carried from the previous turn."""
@@ -810,11 +578,9 @@ class ChatbooAsyncRequest(models.Model):
 
     def _resolved_inference_agent_code(self):
         """Same agent the engine uses (empty job field → chatboo feature agent)."""
-        code = self.agent_code or None
+        code = self.agent_code or CHATBOO_AGENT_CODE
         try:
-            return self.env['ai.agent'].resolve_inference_agent_code(
-                code, consumer_key='chatboo',
-            )
+            return self.env['ai.agent'].resolve_inference_agent_code(code)
         except Exception:
             return code
 
@@ -835,35 +601,6 @@ class ChatbooAsyncRequest(models.Model):
             if fold(invoke) == folded or fold(rec.code) == folded:
                 return True
         return False
-
-    def _release_worker_cursor(self):
-        """Cierra la transacción del cursor del hilo antes de ``_finalize``.
-
-        ``_finalize`` escribe la sesión con otro cursor en este mismo hilo: si
-        este cursor tiene un lock sobre esa fila, el hilo se espera a sí mismo.
-        Las escrituras ORM pendientes (compartidas entre los cursores del hilo
-        en Odoo 14) se conservan para que las guarde ``_finalize``.
-        """
-        # Seges: parche de compatibilidad (bloqueo de chatboo_session). Ver docs/pendiente/parches_pns_ai.md
-        if _is_test_mode(self.env):
-            return
-        envs = self.env.all
-        tocompute = {field: set(ids) for field, ids in envs.tocompute.items()}
-        towrite = {
-            model: {rid: dict(vals) for rid, vals in id_vals.items()}
-            for model, id_vals in envs.towrite.items()
-        }
-        try:
-            self.env.cr.rollback()
-        except Exception:
-            _logger.warning(
-                "Chatboo async job %s: could not roll back the worker cursor",
-                self.id, exc_info=True,
-            )
-        envs.tocompute.update(tocompute)
-        for model, id_vals in towrite.items():
-            for rid, vals in id_vals.items():
-                envs.towrite[model][rid].update(vals)
 
     def _finalize(self, acc, struct, done_meta, error, query_code=None, query_data=None, active_skill=_SKILL_STATE_LEAVE, domain_codes=_DOMAIN_CODES_LEAVE, drop_query_cache=False):
         """Escribe estado final, persiste el turno en la sesión y avisa por bus."""
@@ -917,45 +654,57 @@ class ChatbooAsyncRequest(models.Model):
         try:
             with _env_manage():
                 with _get_registry(dbname).cursor() as cr:
+                    cr.execute("SET LOCAL lock_timeout = '10s'")
                     env = api.Environment(cr, uid, context)
                     job = env['chatboo.async.request'].browse(rid)
-                    job.write(vals)
+                    job.sudo().write(vals)
+                    # A failed statement aborts the transaction; without the
+                    # savepoint the commit below drops the job state as well
+                    # and the job stays running.
                     try:
-                        _chips = job._save_to_session(acc, done_meta, error, query_code=query_code, query_data=query_data, active_skill=active_skill, domain_codes=domain_codes, drop_query_cache=drop_query_cache)
-                        # The phone/client only reloads from the session when
-                        # this flag is on. Job done is not the same as the
-                        # bubbles being in the row.
-                        _merged = dict(done_meta or {})
-                        _merged['session_saved'] = True
-                        # Propagar los chips persistidos del turno de usuario al
-                        # done_meta (ya escrito en vals): el controlador vuelca
-                        # done_meta en el evento 'done' y el cliente parchea la
-                        # burbuja en vivo (base64 → /web/image, ficheros clicables).
-                        if _chips and (
-                            _chips.get('user_images')
-                            or _chips.get('user_files')
-                            or _chips.get('assistant_files')
-                            or _chips.get('assistant_content') is not None
-                        ):
-                            _merged.update(_chips)
-                        _write = {'done_meta': json.dumps(_merged, ensure_ascii=False)}
-                        if _chips and _chips.get('assistant_content') is not None:
-                            _write['response'] = _chips['assistant_content']
-                            _write['partial'] = _chips['assistant_content']
-                        job.write(_write)
-                    except Exception:
+                        with cr.savepoint():
+                            _chips = job._save_to_session(acc, done_meta, error, query_code=query_code, query_data=query_data, active_skill=active_skill, domain_codes=domain_codes, drop_query_cache=drop_query_cache)
+                            # The phone/client only reloads from the session when
+                            # this flag is on. Job done is not the same as the
+                            # bubbles being in the row.
+                            _merged = dict(done_meta or {})
+                            _merged['session_saved'] = True
+                            # Propagar los chips persistidos del turno de usuario al
+                            # done_meta (ya escrito en vals): el controlador vuelca
+                            # done_meta en el evento 'done' y el cliente parchea la
+                            # burbuja en vivo (base64 → /web/image, ficheros clicables).
+                            if _chips and (
+                                _chips.get('user_images')
+                                or _chips.get('user_files')
+                                or _chips.get('assistant_files')
+                                or _chips.get('assistant_content') is not None
+                            ):
+                                _merged.update(_chips)
+                            _write = {'done_meta': json.dumps(_merged, ensure_ascii=False)}
+                            if _chips and _chips.get('assistant_content') is not None:
+                                _write['response'] = _chips['assistant_content']
+                                _write['partial'] = _chips['assistant_content']
+                            job.sudo().write(_write)
+                    except Exception as exc:
                         _logger.exception(
                             "Chatboo async: failed to persist turn to session (job %s)", rid)
+                        if _waited_for_lock(exc):
+                            error = self._session_busy_error()
+                            job.sudo().write({'state': 'error', 'error': error})
                     cr.commit()
                     job._notify('error' if error else 'async_done')
             return
-        except Exception:
+        except Exception as exc:
             _logger.exception("Chatboo async: _finalize fresh-cursor failed (job %s)", rid)
+            if _waited_for_lock(exc):
+                vals['state'] = 'error'
+                error = self._session_busy_error()
 
         # Último recurso: dejar el estado final por SQL crudo para no colgar el job
         # (el tail SSE reemite el estado/error al cliente aunque no haya sesión).
         try:
             with _get_registry(dbname).cursor() as cr:
+                cr.execute("SET LOCAL lock_timeout = '10s'")
                 cr.execute(
                     "UPDATE chatboo_async_request "
                     "SET state=%s, error=%s, response=%s, partial=%s, "
@@ -972,22 +721,6 @@ class ChatbooAsyncRequest(models.Model):
         'image/svg+xml': '.svg', 'image/x-icon': '.ico',
         'image/vnd.microsoft.icon': '.ico',
     }
-
-    @staticmethod
-    def _split_data_url(data_url):
-        """Parte un data URL 'data:<mime>;base64,<b64>' en (mimetype, b64).
-
-        Si llega solo el base64 (sin prefijo), asume PNG.
-        """
-        s = data_url or ''
-        if s.startswith('data:'):
-            try:
-                head, b64 = s.split(',', 1)
-            except ValueError:
-                return 'image/png', ''
-            mimetype = head[5:].split(';', 1)[0] or 'image/png'
-            return mimetype, b64
-        return 'image/png', s
 
     def _persist_turn_images(self):
         """Persiste las imágenes del turno como ir.attachment y devuelve chips.
@@ -1016,7 +749,7 @@ class ChatbooAsyncRequest(models.Model):
         for idx, data_url in enumerate(imgs):
             if not data_url:
                 continue
-            mimetype, b64 = self._split_data_url(data_url)
+            mimetype, b64 = file_text.split_data_url(data_url)
             if not b64:
                 continue
             orig = names[idx] if idx < len(names) else None
@@ -1126,243 +859,6 @@ class ChatbooAsyncRequest(models.Model):
         except Exception:
             return ''
 
-    # ── Adjuntos de texto/datos del clip (Fase 1) ─────────────────────────────
-    # Política explícita: NUNCA truncar el contenido extraído de un adjunto.
-    # El modelo debe ver el fichero completo (todas las pestañas Excel incluidas).
-
-    @staticmethod
-    def _decode_text_bytes(raw):
-        """Decodifica bytes a texto probando utf-8/BOM y cayendo a latin-1/replace."""
-        for enc in ('utf-8-sig', 'utf-8', 'latin-1'):
-            try:
-                return raw.decode(enc)
-            except Exception:
-                continue
-        return raw.decode('utf-8', 'replace')
-
-    @staticmethod
-    def _peek_ooxml_kind(raw):
-        """Detecta OOXML real por firma ZIP + rutas internas (ignora la extensión).
-
-        Así un ``libro.xlsx`` renombrado a ``.xls`` (o un ``.docx`` a ``.doc``)
-        sigue extrayéndose bien; el fallo típico era caer a decode texto binario.
-        """
-        if not raw or raw[:2] != b'PK':
-            return None
-        import io
-        import zipfile
-        try:
-            with zipfile.ZipFile(io.BytesIO(raw)) as zf:
-                names = zf.namelist()
-        except Exception:
-            return None
-        if any(n.startswith('xl/') for n in names):
-            return 'xlsx'
-        if 'word/document.xml' in names or any(n.startswith('word/') for n in names):
-            return 'docx'
-        if any(n.startswith('ppt/') for n in names):
-            return 'pptx'
-        return 'zip'
-
-    @staticmethod
-    def _is_ole_cfb(raw):
-        """True si es Compound File Binary (``.xls`` / ``.doc`` antiguos)."""
-        return bool(raw) and raw[:4] == b'\xD0\xCF\x11\xE0'
-
-    @staticmethod
-    def _format_excel_sheets(sheet_rows):
-        """Une TODAS las pestañas con cabecera. Sin truncar filas ni hojas.
-
-        ``sheet_rows``: lista de (title, list[str] filas tabuladas).
-        """
-        total = len(sheet_rows)
-        titles = [t for t, _rows in sheet_rows]
-        intro = (
-            'Libro Excel: %d pestaña(s) — se listan TODAS (sin truncar): %s'
-            % (total, ', '.join(u'«%s»' % t for t in titles))
-        )
-        blocks = [intro]
-        for pos, (title, rows) in enumerate(sheet_rows, start=1):
-            header = '===== HOJA %d/%d: «%s» (%d fila(s) con datos) =====' % (
-                pos, total, title, len(rows),
-            )
-            body = '\n'.join(rows) if rows else '(hoja vacía)'
-            blocks.append('%s\n%s' % (header, body))
-        return '\n\n'.join(blocks)
-
-    @classmethod
-    def _xlsx_to_text(cls, raw):
-        """Vuelca un .xlsx/.xlsm a texto con TODAS las pestañas (visibles y ocultas).
-
-        Itera ``workbook.sheetnames`` (no solo la activa). Contenido completo,
-        sin truncar.
-        """
-        import io
-        try:
-            from openpyxl import load_workbook
-        except ImportError:
-            raise ImportError(
-                'openpyxl no está instalado en el servidor '
-                '(pip install openpyxl; ya declarado en pns_ai_mcp)'
-            )
-        # read_only: streaming; data_only: valores calculados si existen en el fichero.
-        wb = load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
-        try:
-            # sheetnames = TODAS las hojas del libro (incl. ocultas).
-            names = list(wb.sheetnames or [])
-            if not names:
-                return 'Libro Excel: 0 pestañas (vacío)'
-            sheet_rows = []
-            for title in names:
-                ws = wb[title]
-                rows = []
-                for row in ws.iter_rows(values_only=True):
-                    cells = ['' if c is None else str(c) for c in row]
-                    while cells and cells[-1] == '':
-                        cells.pop()
-                    if cells:
-                        rows.append('\t'.join(cells))
-                sheet_rows.append((title, rows))
-            return cls._format_excel_sheets(sheet_rows)
-        finally:
-            try:
-                wb.close()
-            except Exception:
-                pass
-
-    @classmethod
-    def _xls_to_text(cls, raw):
-        """Vuelca un .xls (BIFF/OLE) a texto con TODAS las pestañas vía xlrd."""
-        try:
-            import xlrd
-        except ImportError:
-            raise ImportError(
-                'xlrd no está instalado en el servidor '
-                '(pip install "xlrd>=1.2.0,<2" para .xls)'
-            )
-        book = xlrd.open_workbook(file_contents=raw, formatting_info=False)
-        n = book.nsheets
-        if n <= 0:
-            return 'Libro Excel: 0 pestañas (vacío)'
-        sheet_rows = []
-        for idx in range(n):
-            sh = book.sheet_by_index(idx)
-            title = sh.name or ('Hoja%d' % (idx + 1))
-            rows = []
-            for r in range(sh.nrows):
-                cells = []
-                for c in range(sh.ncols):
-                    val = sh.cell_value(r, c)
-                    if val is None or val == '':
-                        cells.append('')
-                    else:
-                        cells.append(str(val))
-                while cells and cells[-1] == '':
-                    cells.pop()
-                if cells:
-                    rows.append('\t'.join(cells))
-            sheet_rows.append((title, rows))
-        return cls._format_excel_sheets(sheet_rows)
-
-    @staticmethod
-    def _docx_to_text(raw):
-        """Extrae texto de un .docx SIN dependencias: unzip + strip de tags XML."""
-        import io
-        import re
-        import zipfile
-        import html as _html
-        with zipfile.ZipFile(io.BytesIO(raw)) as z:
-            xml = z.read('word/document.xml').decode('utf-8', 'replace')
-        # Saltos de párrafo/línea → \n antes de limpiar los tags.
-        xml = re.sub(r'</w:p>', '\n', xml)
-        xml = re.sub(r'<w:br\s*/?>', '\n', xml)
-        text = re.sub(r'<[^>]+>', '', xml)
-        return _html.unescape(text)
-
-    def _extract_file_text(self, name, mimetype, b64):
-        """Extrae el texto de un fichero de datos según su tipo. '' si no se puede."""
-        if not b64:
-            return ''
-        try:
-            raw = base64.b64decode(b64)
-        except Exception:
-            return ''
-        lname = (name or '').lower()
-        mt = (mimetype or '').lower()
-        ooxml = self._peek_ooxml_kind(raw)
-        is_ole = self._is_ole_cfb(raw)
-        # Extensiones "cortas" .xls/.doc (no .xlsx/.docx)
-        is_xls_ext = lname.endswith('.xls') and not lname.endswith('.xlsx')
-        is_doc_ext = lname.endswith('.doc') and not lname.endswith('.docx')
-        try:
-            # Excel OOXML (.xlsx / .xlsm) — por extensión, MIME o firma ZIP.
-            # Siempre vuelca TODAS las pestañas (ver _xlsx_to_text).
-            if (
-                lname.endswith('.xlsx')
-                or lname.endswith('.xlsm')
-                or 'spreadsheetml' in mt
-                or ooxml == 'xlsx'
-            ):
-                try:
-                    return self._xlsx_to_text(raw)
-                except ImportError as exc:
-                    return '[Excel %s: %s]' % (name, exc)
-                except Exception as exc:
-                    _logger.warning(
-                        'Chatboo async job %s: openpyxl falló en %s: %r',
-                        self.id, name, exc,
-                    )
-                    return '[Excel %s: no se pudo leer (%s)]' % (
-                        name, getattr(exc, 'args', [''])[0] or type(exc).__name__,
-                    )
-            # Excel BIFF (.xls real / OLE) — todas las pestañas vía xlrd.
-            if is_ole and (is_xls_ext or 'ms-excel' in mt or mt == 'application/vnd.ms-excel'):
-                try:
-                    return self._xls_to_text(raw)
-                except ImportError as exc:
-                    return (
-                        '[Excel %s: %s. Alternativa: guárdalo como .xlsx y adjúntalo.]'
-                        % (name, exc)
-                    )
-                except Exception as exc:
-                    _logger.warning(
-                        'Chatboo async job %s: xlrd falló en %s: %r',
-                        self.id, name, exc,
-                    )
-                    return '[Excel %s: no se pudo leer (.xls) (%s)]' % (
-                        name, getattr(exc, 'args', [''])[0] or type(exc).__name__,
-                    )
-            # Word OOXML (.docx)
-            if (
-                lname.endswith('.docx')
-                or 'wordprocessingml' in mt
-                or ooxml == 'docx'
-            ):
-                try:
-                    return self._docx_to_text(raw)
-                except Exception as exc:
-                    _logger.warning(
-                        'Chatboo async job %s: docx falló en %s: %r',
-                        self.id, name, exc,
-                    )
-                    return '[Word %s: no se pudo leer (%s)]' % (
-                        name, getattr(exc, 'args', [''])[0] or type(exc).__name__,
-                    )
-            if is_ole and (is_doc_ext or 'msword' in mt or mt == 'application/msword'):
-                return (
-                    '[Word %s: formato .doc antiguo (binario). '
-                    'Ábrelo en Word y guárdalo como .docx, luego adjúntalo de nuevo.]'
-                    % (name,)
-                )
-            # Resto: texto plano / datos (txt, md, csv, tsv, log, json, ...).
-            return self._decode_text_bytes(raw)
-        except Exception:
-            _logger.warning(
-                'Chatboo async job %s: no se pudo extraer texto de %s (%s)',
-                self.id, name, mimetype, exc_info=True,
-            )
-            return ''
-
     def _pdf_reading(self, b64):
         """``(page texts, pictures)`` of a PDF attachment; None if it is not a PDF.
 
@@ -1417,7 +913,7 @@ class ChatbooAsyncRequest(models.Model):
             )
         try:
             code = self.env['ai.agent'].resolve_inference_agent_code(
-                self.agent_code or None, consumer_key='chatboo',
+                self.agent_code or CHATBOO_AGENT_CODE,
             )
             response = self.env['ai.execution.engine'].sudo().chat_completion(
                 code,
@@ -1454,7 +950,7 @@ class ChatbooAsyncRequest(models.Model):
             return []
         shots = []
         for idx, data_url in enumerate(imgs):
-            mimetype, b64 = self._split_data_url(data_url or '')
+            mimetype, b64 = file_text.split_data_url(data_url or '')
             if not b64:
                 continue
             try:
@@ -1492,16 +988,16 @@ class ChatbooAsyncRequest(models.Model):
         )
 
     def _augment_prompt_with_files(self, base_message):
-        """Devuelve ``(mensaje, inline_file_text, páginas, documentos)``.
+        """Return ``(message, inline_file_text, pictures, documents)``.
 
-        No modifica self.prompt (lo que se muestra en la burbuja): el texto del
-        fichero viaja entero al LLM en este turno (todas las pestañas Excel
-        incluidas). ``documentos`` es ese mismo texto, página a página, para
-        que la sesión lo guarde y los turnos siguientes lo lean con
-        read_document. Un PDF escaneado se transcribe una vez; si no se puede,
-        sus páginas vuelven como imágenes solo para este turno.
-        ``inline_file_text`` es True si al menos un fichero dio texto o
-        páginas (un extracto fallido no es una lectura).
+        ``self.prompt`` (what the bubble shows) is left alone: the file's text
+        goes whole to the model in this turn, every Excel sheet included.
+        ``documents`` is that same text, page by page, for the session to keep
+        and later turns to read with read_document. A scanned PDF is
+        transcribed once; when that fails, its pages come back as pictures for
+        this turn only. ``inline_file_text`` is True when at least one file gave
+        text or pages (a failed extract is not a reading). The wrapping is in
+        English: it is for the model, which answers in the user's language.
         """
         try:
             files = json.loads(self.files) if self.files else []
@@ -1516,38 +1012,38 @@ class ChatbooAsyncRequest(models.Model):
         for f in files:
             name = (f or {}).get('name') or 'file'
             mimetype = (f or {}).get('mimetype') or ''
-            _mt, b64 = self._split_data_url((f or {}).get('data') or '')
+            _mt, b64 = file_text.split_data_url((f or {}).get('data') or '')
             reading = self._pdf_reading(b64)
             if reading is not None:
                 pages, scans = reading
                 if pages:
                     has_text = True
                     documents.append({'name': name, 'pages': pages})
-                    blocks.append('[Adjunto: %s]\n%s' % (name, self._paged(pages)))
+                    blocks.append('[Attachment: %s]\n%s' % (name, self._paged(pages)))
                 elif scans:
                     has_text = True
                     pictures.extend(scans)
                     blocks.append(
-                        '[Adjunto: %s] (scanned PDF: its pages are the attached pictures)' % name
+                        '[Attachment: %s] (scanned PDF: its pages are the attached pictures)' % name
                     )
                 else:
-                    blocks.append('[Adjunto: %s] (no se pudo extraer texto)' % name)
+                    blocks.append('[Attachment: %s] (no text could be extracted)' % name)
                 continue
-            text = self._extract_file_text(name, mimetype or _mt, b64)
+            text = file_text.file_text(name, mimetype or _mt, b64, ref=self.id)
             if not (text or '').strip():
-                blocks.append('[Adjunto: %s] (no se pudo extraer texto)' % name)
+                blocks.append('[Attachment: %s] (no text could be extracted)' % name)
                 continue
             has_text = True
             documents.append({'name': name, 'pages': [text]})
-            blocks.append('[Adjunto: %s]\n%s' % (name, text))
+            blocks.append('[Attachment: %s]\n%s' % (name, text))
         if not blocks:
             return base_message, False, [], []
         joined = '\n\n'.join(blocks)
         if (base_message or '').strip():
             return '%s\n\n%s' % (base_message, joined), has_text, pictures, documents
-        # Mensaje solo-fichero: instrucción mínima para el LLM.
+        # A message that is only files: the least the model needs.
         return (
-            'Analiza el/los archivo(s) adjunto(s):\n\n%s' % joined,
+            'Analyse the attached file(s):\n\n%s' % joined,
             has_text, pictures, documents,
         )
 
@@ -1573,7 +1069,7 @@ class ChatbooAsyncRequest(models.Model):
         for idx, f in enumerate(files):
             name = (f or {}).get('name') or ('archivo-%s' % (idx + 1))
             mimetype = (f or {}).get('mimetype') or ''
-            _mt, b64 = self._split_data_url((f or {}).get('data') or '')
+            _mt, b64 = file_text.split_data_url((f or {}).get('data') or '')
             if not b64:
                 continue
             try:
@@ -1583,7 +1079,6 @@ class ChatbooAsyncRequest(models.Model):
                     mimetype or _mt or 'application/octet-stream',
                 )
                 if chip:
-                    # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
                     self.session_id._claim_turn_file_chips([chip])
                     chips.append({
                         'name': chip['name'],
@@ -1700,7 +1195,6 @@ class ChatbooAsyncRequest(models.Model):
                     c for g in groups for c in (g or [])
                     if isinstance(c, dict) and (c.get('url') or c.get('name'))
                 ]
-            # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
             _staged = session._consume_staged_assistant_download_chips()
             _orphans = session.recover_orphan_download_chips(
                 messages=messages, since=self.started_at,
@@ -1737,8 +1231,7 @@ class ChatbooAsyncRequest(models.Model):
                 _assistant_files = list(_assistant_files or []) + list(svg_chips)
                 _assistant_content = acc or ''
             if _assistant_files:
-                # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
-                session._claim_turn_file_chips(_assistant_files)
+                _assistant_files = session._claim_turn_file_chips(_assistant_files)
             _done_show = (done_meta or {}).get('presentation_show_mode')
             if _done_show:
                 try:
@@ -1992,197 +1485,86 @@ class ChatbooAsyncRequest(models.Model):
             except Exception:
                 _logger.debug("Chatboo async mark_seen failed (request %s)", rec.id, exc_info=True)
 
-    def request_cancel(self):
-        """Marca el job para cancelación cooperativa (SSE abort + resume F5).
-
-        Si aún está ``pending``, se cierra al momento. Si ``running``, el worker
-        corta en el siguiente evento / flush y finaliza con aviso.
-        """
-        self.ensure_one()
-        if self.user_id.id != self.env.uid:
-            return False
-        if self.state not in ('pending', 'running'):
-            return False
-        self.write({'cancel_requested': True})
-        if self.state == 'pending':
-            msg = '⏹ ' + _('Generation cancelled.')
-            self.write({
-                'state': 'done',
-                'response': msg,
-                'partial': msg,
-                'finished_at': fields.Datetime.now(),
-                'seen': False,
-            })
-            try:
-                self._save_to_session(msg, {}, error=None)
-            except Exception:
-                _logger.debug(
-                    "Chatboo async: cancel persist failed (job %s)",
-                    self.id, exc_info=True,
-                )
-            try:
-                self._notify('async_done')
-            except Exception:
-                pass
-        return True
-
-    def _is_cancel_requested(self):
-        """Lee ``cancel_requested`` en cursor fresco (visible desde el worker)."""
+    def _cancel_pending(self):
+        """Cerrado antes de arrancar: el aviso queda como respuesta del turno."""
+        msg = '⏹ ' + _('Generation cancelled.')
+        self.sudo().write({
+            'state': 'done',
+            'response': msg,
+            'partial': msg,
+            'finished_at': fields.Datetime.now(),
+            'seen': False,
+        })
         try:
-            with _get_registry(self.env.cr.dbname).cursor() as cr:
-                cr.execute(
-                    "SELECT cancel_requested FROM chatboo_async_request WHERE id=%s",
-                    (self.id,),
-                )
-                row = cr.fetchone()
-                return bool(row and row[0])
+            self._save_to_session(msg, {}, error=None)
         except Exception:
-            return False
+            _logger.debug(
+                "Chatboo async: cancel persist failed (job %s)",
+                self.id, exc_info=True,
+            )
+        try:
+            self._notify('async_done')
+        except Exception:
+            pass
 
     # ──────────────────────────── Mantenimiento (cron) ────────────────────────────
 
-    @api.model
-    def _reclaim_stuck(self, minutes=None):
-        """Recupera los jobs colgados (worker muerto tras un reinicio).
-
-        Gracias al latido (``write_date`` se refresca en cada flush), solo caen
-        aquí los jobs REALMENTE muertos. En vez de marcarlos como error rojo,
-        RECUPERAMOS lo que se alcanzó a generar (``partial``) y lo guardamos en la
-        sesión como respuesta incompleta, cerrando el job como 'done' y avisando
-        como info (no como fallo). Así la campanita/respuesta sobrevive al reinicio.
-
-        ``minutes`` permite un umbral más corto para el reclaim inmediato al abrir
-        Chatboo (ver ``async_poll``); por defecto usa ``STUCK_MINUTES`` (cron).
-
-        SEGURIDAD: gracias al latido independiente (``_start_heartbeat``), un job
-        vivo refresca ``write_date`` cada ~10s, así que ``write_date < cutoff`` solo
-        cae en jobs REALMENTE muertos. No matamos nunca un job que sigue latiendo,
-        por lento que sea el modelo.
-
-        NO BLOQUEANTE: ``FOR UPDATE SKIP LOCKED`` + savepoint por job + ruta
-        ``reclaim=True`` (sin re-persistir base64). Un job zombie / prompt fallido
-        NUNCA puede colgar la apertura de Chatboo ni el cron de mantenimiento.
+    def _reclaim_one(self, timeout_ms):
+        """En vez de marcarlo como error rojo, RECUPERAMOS lo que se alcanzó a
+        generar (``partial``) y lo guardamos en la sesión como respuesta
+        incompleta, cerrando el job como 'done' y avisando como info. Así la
+        respuesta sobrevive al reinicio. Ruta ``reclaim=True``: sin re-persistir
+        base64.
         """
-        mins = STUCK_MINUTES if minutes is None else minutes
-        cutoff = fields.Datetime.now() - timedelta(minutes=mins)
-        timeout_ms = int(self.env.context.get('chatboo_reclaim_timeout_ms', 8000) or 8000)
-        cutoff_s = fields.Datetime.to_string(cutoff)
-        # Candidatos sin lock; cada uno se reclama con SKIP LOCKED (no esperar).
-        try:
-            candidates = self.search([
-                ('state', 'in', ('pending', 'running')),
-                ('write_date', '<', cutoff),
-            ]).ids
-        except Exception:
-            _logger.exception("Chatboo async: reclaim candidate search failed")
-            return
-
-        for rid in candidates:
+        partial = self.partial or ''
+        never_started = self.state == 'pending' and not partial
+        _logger.warning(
+            "Chatboo async: reclaiming stuck job %s (%s), recovering %s chars",
+            self.id, self.state, len(partial),
+        )
+        # Cerrar YA el estado dentro del savepoint; si el save a
+        # sesión falla/timeout, el fallback SQL deja el job done.
+        self.sudo().write({
+            'state': 'done',
+            'response': partial,
+            'error': False,
+            'finished_at': fields.Datetime.now(),
+        })
+        if timeout_ms > 0:
             try:
                 self.env.cr.execute(
-                    """
-                    SELECT id FROM chatboo_async_request
-                     WHERE id = %s
-                       AND state IN ('pending', 'running')
-                       AND write_date < %s
-                       FOR UPDATE SKIP LOCKED
-                    """,
-                    (rid, cutoff_s),
+                    "SET LOCAL statement_timeout = %s",
+                    (int(timeout_ms),),
                 )
-                if not self.env.cr.fetchone():
-                    continue
             except Exception:
-                _logger.exception(
-                    "Chatboo async: reclaim lock failed for job %s", rid,
-                )
-                continue
-
-            try:
-                with self.env.cr.savepoint():
-                    job = self.browse(rid)
-                    if not job.exists() or job.state not in ('pending', 'running'):
-                        continue
-                    partial = job.partial or ''
-                    never_started = job.state == 'pending' and not partial
-                    _logger.warning(
-                        "Chatboo async: reclaiming stuck job %s (%s), recovering %s chars",
-                        job.id, job.state, len(partial),
-                    )
-                    # Cerrar YA el estado dentro del savepoint; si el save a
-                    # sesión falla/timeout, el fallback SQL deja el job done.
-                    job.write({
-                        'state': 'done',
-                        'response': partial,
-                        'error': False,
-                        'finished_at': fields.Datetime.now(),
-                    })
-                    if timeout_ms > 0:
-                        try:
-                            self.env.cr.execute(
-                                "SET LOCAL statement_timeout = %s",
-                                (int(timeout_ms),),
-                            )
-                        except Exception:
-                            pass
-                    try:
-                        job._save_to_session(
-                            partial, {}, error=None, incomplete=True,
-                            not_started=never_started, reclaim=True,
-                        )
-                    finally:
-                        if timeout_ms > 0:
-                            try:
-                                self.env.cr.execute(
-                                    "SET LOCAL statement_timeout = DEFAULT",
-                                )
-                            except Exception:
-                                pass
-                    try:
-                        job._notify('async_done')
-                    except Exception:
-                        pass
-            except Exception:
-                _logger.exception("Chatboo async: reclaim failed for job %s", rid)
-                # Último recurso: SQL crudo en savepoint limpio para no dejar
-                # el zombie en running ni abortar la TX del caller (poll/cron).
+                pass
+        try:
+            self._save_to_session(
+                partial, {}, error=None, incomplete=True,
+                not_started=never_started, reclaim=True,
+            )
+        finally:
+            if timeout_ms > 0:
                 try:
-                    with self.env.cr.savepoint():
-                        self.env.cr.execute(
-                            """
-                            UPDATE chatboo_async_request
-                               SET state='done',
-                                   error=%s,
-                                   finished_at=(now() at time zone 'UTC')
-                             WHERE id=%s
-                               AND state IN ('pending', 'running')
-                            """,
-                            (
-                                'reclaim failed after server restart; please resend',
-                                rid,
-                            ),
-                        )
-                except Exception:
-                    _logger.exception(
-                        "Chatboo async: raw reclaim mark failed (job %s)", rid,
+                    self.env.cr.execute(
+                        "SET LOCAL statement_timeout = DEFAULT",
                     )
-    @api.model
-    def _gc_old(self):
-        """Purga jobs terminados antiguos."""
-        cutoff = fields.Datetime.now() - timedelta(hours=GC_HOURS)
-        old = self.search([
-            ('state', 'in', ('done', 'error')),
-            ('finished_at', '<', cutoff),
-        ])
-        if old:
-            old.unlink()
+                except Exception:
+                    pass
+        try:
+            self._notify('async_done')
+        except Exception:
+            pass
 
     @api.model
     def cron_maintenance(self):
         """Punto de entrada del cron: reclama colgados y purga viejos."""
-        try:
-            self._reclaim_stuck()
-        except Exception:
-            _logger.exception("Chatboo async: cron reclaim failed")
+        jobs = (self, self.env['chatboo.canvas.job'])
+        for model in jobs:
+            try:
+                model._reclaim_stuck()
+            except Exception:
+                _logger.exception("Chatboo jobs: cron reclaim failed (%s)", model._name)
         # Liberar locks antes del GC: un reclaim lento no debe retener el
         # ir.cron "busy" mientras purga (otros workers lo saltaban eternamente).
         if not _is_test_mode(self.env):
@@ -2190,10 +1572,11 @@ class ChatbooAsyncRequest(models.Model):
                 self.env.cr.commit()
             except Exception:
                 _logger.debug("Chatboo async: cron commit after reclaim failed", exc_info=True)
-        try:
-            self._gc_old()
-        except Exception:
-            _logger.exception("Chatboo async: cron GC failed")
+        for model in jobs:
+            try:
+                model._gc_old()
+            except Exception:
+                _logger.exception("Chatboo jobs: cron GC failed (%s)", model._name)
         # Nivel 2: purgar datasets cacheados obsoletos (por antigüedad) para que
         # no se acumulen en sesiones de larga vida. No debe tumbar el cron.
         try:

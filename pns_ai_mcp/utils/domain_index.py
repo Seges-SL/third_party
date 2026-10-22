@@ -315,17 +315,30 @@ def skill_domain_context_codes(
 def union_domain_codes(
     matched: Sequence[str],
     carried: Sequence[str],
+    keep_disjoint: bool = False,
 ) -> Dict[str, Any]:
-    """Union this-turn hits with packs carried from the previous turn.
+    """This sentence's packs, plus the previous turn only when it is the same topic.
+
+    A follow-up that matches nothing stays on the previous packs (sticky).
+    Overlap keeps those previous packs and adds the new ones.
+    A sentence that names packs and shares none with the previous turn
+    drops the previous packs: one topic at a time.
+
+    ``keep_disjoint=True`` is the skill path: the slash adds its packs
+    and still keeps the conversation packs.
 
     Matched codes stay first. Carried codes that are already matched are
-    not listed again under ``carried``. Never replaces a previous pack
-    just because this sentence hit another domain (follow-up ``ytd``).
+    not listed again under ``carried``.
     """
     matched_codes = parse_domain_codes(matched)
+    carried_codes = parse_domain_codes(carried)
+    if matched_codes and not keep_disjoint and not (
+        set(matched_codes) & set(carried_codes)
+    ):
+        carried_codes = []
     carried_only: List[str] = []
     seen = set(matched_codes)
-    for code in parse_domain_codes(carried):
+    for code in carried_codes:
         if code in seen:
             continue
         seen.add(code)
@@ -345,6 +358,23 @@ def union_domain_codes(
         'carried': carried_only,
         'mode': mode,
     }
+
+
+def hold_domain_codes(
+    codes: Sequence[str],
+    held: Optional[Sequence[str]] = None,
+) -> List[str]:
+    """``codes`` plus the packs the host keeps open this turn.
+
+    The host holds a pack because of its own state (an open page), not
+    because of the words. A topic change does not drop it, and it does
+    not count as matched by this sentence.
+    """
+    out = parse_domain_codes(codes)
+    for code in parse_domain_codes(held):
+        if code not in out:
+            out.append(code)
+    return out
 
 
 def format_inject_header(
@@ -521,6 +551,97 @@ PACK_CHOICE_INSTRUCTIONS = (
     'Pick none if it does not ask for any of these packs.'
 )
 NONE_PACK_TEXT = 'The message does not ask about any of these packs.'
+TOPIC_SAME_CHOICE = 'yes'
+TOPIC_CHOICE_INSTRUCTIONS = (
+    'Does this message continue the subject of the previous message? '
+    'Pick yes only if it refines, reorders, restyles or asks more about '
+    'the same subject. Pick none if it asks for something else.'
+)
+TOPIC_CHOICE_CRITERIA = {
+    TOPIC_SAME_CHOICE: 'The message continues the previous subject.',
+    NONE_PACK_CHOICE: 'The message is a new subject.',
+}
+
+
+def _message_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        parts = [
+            str(part.get('text') or '') for part in content
+            if isinstance(part, dict) and part.get('type') == 'text'
+        ]
+        return '\n'.join(p for p in parts if p).strip()
+    return ''
+
+
+def topic_choice_text(message: str, history: Optional[Sequence[Any]] = None) -> str:
+    """What the topic Choice reads: the previous user message, then this one.
+
+    Asked alone, «add three filter buttons» looks like a new subject. The
+    question is about the previous subject, so it has to see it.
+    """
+    previous = ''
+    for item in reversed(list(history or [])):
+        if isinstance(item, dict) and item.get('role') == 'user':
+            previous = _message_text(item.get('content'))
+            if previous:
+                break
+    message = (message or '').strip()
+    if not previous:
+        return message
+    return 'Previous message:\n%s\n\nThis message:\n%s' % (previous, message)
+
+
+def needs_topic_continuity(
+    matched: Optional[Sequence[str]] = None,
+    prior_codes: Optional[Any] = None,
+    has_prior_query: bool = False,
+) -> bool:
+    """True when this sentence hit no pack and the previous turn left state.
+
+    A miss is either a refine («sort it») or a new subject. The word list
+    cannot tell them apart. The caller asks a yes/none Choice.
+    """
+    if parse_domain_codes(matched):
+        return False
+    return bool(parse_domain_codes(prior_codes)) or bool(has_prior_query)
+
+
+def needs_topic_switch_check(
+    matched: Optional[Sequence[str]] = None,
+    prior_codes: Optional[Any] = None,
+    has_prior_query: bool = False,
+) -> bool:
+    """True when this sentence names packs, none of the previous turn's, and rows are left.
+
+    Another pack is often a new subject, and sometimes the same rows in
+    another shape («now put it in a page»). The word list cannot tell
+    them apart. The caller asks the same yes/none Choice as for a miss.
+    """
+    named = set(parse_domain_codes(matched))
+    prior = set(parse_domain_codes(prior_codes))
+    return bool(named) and bool(prior) and not (named & prior) and bool(
+        has_prior_query
+    )
+
+
+def accept_topic_same(answer: Optional[Dict[str, Any]], min_confidence: Any) -> bool:
+    """True only on an accepted yes. None, a miss, or a low bar is no."""
+    if not answer:
+        return False
+    choice = str(answer.get('choice') or '').strip()
+    if choice != TOPIC_SAME_CHOICE:
+        return False
+    try:
+        confidence = float(answer.get('confidence'))
+    except (TypeError, ValueError):
+        return False
+    try:
+        floor = float(min_confidence)
+    except (TypeError, ValueError):
+        floor = 0.7
+    return confidence >= floor
 
 
 def sentence_has_unique_winner(matches: Sequence[Dict[str, Any]]) -> bool:
@@ -612,7 +733,9 @@ def discovery_step_summary(
     declined: bool = False,
 ) -> str:
     """Visible Historial IA line for the discovery step."""
-    if route == 'decision' and not declined:
+    if route == 'topic':
+        head = 'topic · new' if declined else 'topic · same'
+    elif route == 'decision' and not declined:
         conf = ''
         if confidence is not None:
             try:

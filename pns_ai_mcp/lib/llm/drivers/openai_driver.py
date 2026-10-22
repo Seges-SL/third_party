@@ -17,6 +17,60 @@ _logger = logging.getLogger(__name__)
 
 _TRANSCRIBE_TIMEOUT = 60
 _SHAPE_STATUS = (400, 404, 415, 422)
+_REASONING_PART_TYPES = frozenset({'thinking', 'reasoning', 'thought'})
+
+
+def openai_max_output_tokens_key(model_name):
+    """Newer OpenAI chat models reject ``max_tokens``."""
+    name = (model_name or '').lower()
+    if name.startswith(('o1', 'o3', 'o4', 'gpt-5')):
+        return 'max_completion_tokens'
+    return 'max_tokens'
+
+
+def delta_user_text(delta):
+    """User-visible text in one SSE delta. Never chain-of-thought."""
+    if not isinstance(delta, dict):
+        return ''
+    raw = delta.get('content')
+    if isinstance(raw, str):
+        return raw
+    if isinstance(raw, list):
+        parts = []
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            kind = (item.get('type') or '').lower()
+            if kind in _REASONING_PART_TYPES:
+                continue
+            text = item.get('text')
+            if isinstance(text, str) and kind in ('', 'text', 'output_text'):
+                parts.append(text)
+        return ''.join(parts)
+    return ''
+
+
+def delta_reasoning_text(delta):
+    """Hidden reasoning in one SSE delta (OpenRouter / thinking models)."""
+    if not isinstance(delta, dict):
+        return ''
+    chunks = []
+    for key in ('reasoning', 'reasoning_content'):
+        val = delta.get(key)
+        if isinstance(val, str) and val:
+            chunks.append(val)
+    raw = delta.get('content')
+    if isinstance(raw, list):
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            kind = (item.get('type') or '').lower()
+            if kind not in _REASONING_PART_TYPES:
+                continue
+            text = item.get('text') or item.get('thinking') or ''
+            if isinstance(text, str) and text:
+                chunks.append(text)
+    return ''.join(chunks)
 
 
 def _audio_format(mime, filename=''):
@@ -114,6 +168,38 @@ def _http_error_message(resp):
     if isinstance(err, str) and err:
         return err
     return err_msg
+
+
+def _call_row(calls, tc, last):
+    """Key of the streamed tool call this delta belongs to.
+
+    Gemini may leave ``index`` out: a delta with a new ``id`` is a new call,
+    a delta without ``id`` continues the last one.
+    """
+    idx = tc.get('index')
+    if isinstance(idx, int):
+        return idx
+    if not calls:
+        return 0
+    call_id = tc.get('id')
+    if not call_id or calls[last].get('id') in ('', call_id):
+        return last
+    for key, row in calls.items():
+        if row.get('id') == call_id:
+            return key
+    return max(calls) + 1
+
+
+def _merge_extra(old, new):
+    """``extra_content`` of every delta of a call (Gemini: ``google.thought_signature``)."""
+    out = dict(old)
+    for key, value in new.items():
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key] = _merge_extra(out[key], value)
+        else:
+            out[key] = value
+    return out
+
 
 class OpenAIDriver(LLMDriver):
     """Driver for OpenAI and all OpenAI-compatible HTTP APIs.
@@ -446,6 +532,14 @@ class OpenAIDriver(LLMDriver):
             raise RuntimeError(uploaded.get('error'))
         return 'no'
 
+    def _apply_max_tokens(self, payload, max_tokens):
+        if max_tokens is None:
+            return
+        n = int(max_tokens)
+        if n <= 0:
+            return
+        payload[openai_max_output_tokens_key(self.model_name)] = n
+
     def _openai_chat(
         self, messages, tools, temperature=None, tool_choice=None,
         timeout=LLM_HTTP_DEFAULT, max_tokens=None, json_mode=False,
@@ -465,8 +559,7 @@ class OpenAIDriver(LLMDriver):
             "messages": self._with_images(messages, images),
             "temperature": temperature if temperature is not None else self.temperature,
         }
-        if max_tokens:
-            payload["max_tokens"] = int(max_tokens)
+        self._apply_max_tokens(payload, max_tokens)
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
         if disable_thinking:
@@ -587,9 +680,7 @@ class OpenAIDriver(LLMDriver):
             'stream': True,
             'stream_options': {'include_usage': True},
         }
-        max_tokens = kwargs.get('max_tokens')
-        if max_tokens:
-            payload['max_tokens'] = int(max_tokens)
+        self._apply_max_tokens(payload, kwargs.get('max_tokens'))
         if kwargs.get('json_mode'):
             payload['response_format'] = {'type': 'json_object'}
         if kwargs.get('disable_thinking'):
@@ -617,6 +708,7 @@ class OpenAIDriver(LLMDriver):
             self._raise_http(response)
         text = ''
         calls = {}
+        last = None
         usage = {}
         try:
             for raw in response.iter_lines():
@@ -638,13 +730,16 @@ class OpenAIDriver(LLMDriver):
                     usage = got
                 choices = chunk.get('choices') or []
                 delta = (choices[0].get('delta') or {}) if choices else {}
-                piece = delta.get('content') or ''
+                piece = delta_user_text(delta)
                 if piece:
                     text += piece
                     yield {'text': piece}
+                reason = delta_reasoning_text(delta)
+                if reason:
+                    yield {'reasoning': reason}
                 for tc in delta.get('tool_calls') or []:
-                    idx = tc.get('index', 0)
-                    row = calls.setdefault(idx, {
+                    last = _call_row(calls, tc, last)
+                    row = calls.setdefault(last, {
                         'id': '',
                         'type': 'function',
                         'function': {'name': '', 'arguments': ''},
@@ -656,15 +751,9 @@ class OpenAIDriver(LLMDriver):
                         row['function']['name'] += fn['name']
                     if fn.get('arguments'):
                         row['function']['arguments'] += fn['arguments']
-                    # Seges: parche de compatibilidad (Gemini 3 por el protocolo OpenAI:
-                    # thought_signature). Ver docs/pendiente/parches_pns_ai.md
-                    # Gemini exige devolver extra_content.google.thought_signature en el
-                    # tool_call; otros proveedores no lo envían y la fila no cambia.
                     extra = tc.get('extra_content')
                     if isinstance(extra, dict) and extra:
-                        merged = dict(row.get('extra_content') or {})
-                        merged.update(extra)
-                        row['extra_content'] = merged
+                        row['extra_content'] = _merge_extra(row.get('extra_content') or {}, extra)
         finally:
             response.close()
         message = {'role': 'assistant', 'content': text}

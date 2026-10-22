@@ -14,7 +14,7 @@
 (function (global) {
     "use strict";
 
-    var FOOTER_OPEN = '<div class="mt-2 o_chatboo_prose_host o_chatboo_prose" style="font-size:0.97em;">';
+    var FOOTER_OPEN = '<div class="mt-2 o_ai_prose_host o_ai_prose" style="font-size:0.97em;">';
     var FOOTER_CLOSE = "</div>";
 
     /**
@@ -364,7 +364,7 @@
             return null;
         }
         if (s.indexOf("<table") < 0 && s.indexOf("table-responsive") < 0
-                && s.indexOf("o_chatboo_data_table") < 0) {
+                && s.indexOf("o_ai_data_table") < 0) {
             return null;
         }
         var marker = "</div>";

@@ -50,7 +50,9 @@
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">Add a currency rate feed</p>
             <p>HTTPS JSON feeds with a USD-based rates map. The first active
-               source that answers wins; the next is failover. Not the Safe Plan whitelist.</p>
+               source that answers wins; the next is failover. Not the Safe Plan whitelist.
+               Chatboo requests this feed when the chat opens, so spend can show in the
+               company currency.</p>
         </field>
     </record>
 </odoo>

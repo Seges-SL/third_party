@@ -21,7 +21,7 @@
                     when "Replace composition" is checked.
                 </div>
 <footer>
-                    <button name="action_import" string="Import" type="object"
+                    <button name="action_preview" string="Review" type="object"
                             class="btn-primary" />
                     <button string="Cancel" class="btn-secondary" special="cancel" />
 </footer>

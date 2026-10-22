@@ -75,6 +75,17 @@ odoo.define('pns_base.invalid_fields_dedupe', function (require) {
                 return isEmptyValue(data[name]);
             });
         },
+        _pnsIsOurView: function () {
+            var $el = this.$el;
+            if (!$el || !$el.length) {
+                return false;
+            }
+            return Boolean(
+                $el.hasClass('o_pns_view')
+                || $el.find('.o_pns_view').length
+                || $el.closest('.o_pns_view').length
+            );
+        },
         _pnsNotifyRequiredFields: function (labels) {
             var title = requiredTitle(labels);
             if (this.displayNotification) {
@@ -87,6 +98,9 @@ odoo.define('pns_base.invalid_fields_dedupe', function (require) {
             this.do_warn(title, '');
         },
         _notifyInvalidFields: function (invalidFields) {
+            if (!this._pnsIsOurView()) {
+                return this._super.apply(this, arguments);
+            }
             var names = uniqueNames(invalidFields);
             if (names.length && this._pnsAllEmpty(names)) {
                 this._pnsNotifyRequiredFields(this._pnsFieldLabels(names));

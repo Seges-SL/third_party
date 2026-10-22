@@ -53,6 +53,7 @@ access_ai_provider_admin,AI Provider Admin,model_ai_provider,group_ai_admin,1,1,
 access_ai_provider_model_admin,AI Provider Model Admin,model_ai_provider_model,group_ai_admin,1,1,1,1
 access_ai_fx_source_admin,AI FX Source Admin,model_ai_fx_source,group_ai_admin,1,1,1,1
 access_ai_provider_tools_wizard_admin,AI Provider Tools Wizard Admin,model_ai_provider_tools_wizard,group_ai_admin,1,1,1,1
+access_ai_provider_usage_wizard_admin,AI Provider Usage Wizard Admin,model_ai_provider_usage_wizard,group_ai_admin,1,1,1,1
 access_ai_provider_catalogue_copy_admin,Model catalogue copy,model_ai_provider_catalogue_copy,group_ai_admin,1,1,1,1
 access_ai_agent_provider_admin,AI Agent Provider Admin,model_ai_agent_provider,group_ai_admin,1,1,1,1
 access_ai_context_agent_admin,AI Agent Admin,model_ai_agent,group_ai_admin,1,1,1,1

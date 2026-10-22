@@ -1,0 +1,21 @@
+{
+  "code": "discovery_page_tab",
+  "tipo": "discovery",
+  "target": "page_tab",
+  "priority": 80,
+  "soft_depends": [],
+  "source_module": "pns_ai_chatboo",
+  "triggers": [
+    "canvas",
+    "dashboard",
+    "in a tab",
+    "new tab",
+    "own tab",
+    "separate tab",
+    "page",
+    "a page",
+    "landing page",
+    "one pager",
+    "designed page"
+  ]
+}

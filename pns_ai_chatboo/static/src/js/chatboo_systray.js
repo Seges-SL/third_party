@@ -10,6 +10,7 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
     var Widget = require('web.Widget');
     var ActionManager = require('web.ActionManager');
     var core = require('web.core');
+    var session = require('web.session');
     var _t = core._t;
 
     var CHATBOO_CLIENT_TAGS = {
@@ -39,27 +40,15 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
             core.bus.on('chatboo_overlay_show', this, function (context) {
                 self._showOverlay(context || {});
             });
+            // A shared page reaches users without Chatboo too: listen before
+            // the access check. Chat replies still need access (_hasAccess).
+            this.call('bus_service', 'onNotification', this, this._onBusNotifications);
 
             return this._super.apply(this, arguments).then(function () {
-                return self._rpc({
-                    route: '/chatboo/check_health',
-                    params: {}
-                }).then(function (result) {
-                    if (!result || result.show_systray === false) {
-                        // Ocultación intencionada (sin acceso IA): olvida el flag.
-                        try { localStorage.removeItem('chatboo_has_access'); } catch (_) {}
-                        return;
-                    }
-                    // Recuerda que este usuario SÍ tiene acceso, para poder
-                    // recuperar el icono aunque un futuro check_health falle.
-                    try { localStorage.setItem('chatboo_has_access', '1'); } catch (_) {}
+                if (session.pns_chatboo_show_systray) {
                     self._enableSystray();
-                }).catch(function () {
-                    // Fail-closed: sin confirmación del servidor, no mostrar
-                    // Chatboo (evita que un localStorage viejo o un error RPC
-                    // den acceso a quien no tiene carnet MCP).
-                    try { localStorage.removeItem('chatboo_has_access'); } catch (_) {}
-                });
+                    return;
+                }
             });
         },
 
@@ -74,9 +63,6 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
             }
             this.el.style.display = '';
             this._hasAccess = true;
-
-            // Register bus listener (Odoo 14)
-            this.call('bus_service', 'onNotification', this, this._onBusNotifications);
 
             // Listen for SSE response completion (badge when overlay hidden)
             core.bus.on('chatboo_response_ready', this, function (payload) {
@@ -167,6 +153,13 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
                     try { payload = JSON.parse(payload); } catch (_) { continue; }
                 }
 
+                if (payload && payload.action === 'page_shared') {
+                    this._showSharedPage(payload);
+                    continue;
+                }
+                if (!this._hasAccess) {
+                    continue;
+                }
                 if (payload && typeof payload === 'object') {
                     var _isAsyncDone = payload.type === 'pns_chatboo_async_done'
                         || (payload.type === 'pns_chatboo_sync'
@@ -199,13 +192,6 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
 
             try {
                 core.bus.trigger('update_message_number');
-                this.call('mail_service', 'getMessaging').then(function (messaging) {
-                    if (messaging && messaging.rpc) {
-                        messaging.rpc({ route: '/mail/init_messaging' }).then(function (res) {
-                            core.bus.trigger('mail.chat.needaction_successful');
-                        });
-                    }
-                });
             } catch (e) {
                 console.warn("Could not auto-refresh Odoo notification badge", e);
             }
@@ -230,6 +216,29 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
             } else {
                 this.do_notify('Chatboo AI', _t('New Chatboo response ready'), false, 'o_chatboo_async_toast bg-info text-white');
             }
+        },
+
+        _showSharedPage: function (payload) {
+            var url = String(payload.url || '');
+            if (url.indexOf('/chatboo/page/') !== 0) {
+                return;
+            }
+            var open = function () {
+                window.open(url, '_blank', 'noopener');
+            };
+            this.displayNotification({
+                type: 'info',
+                title: payload.title || _t('Shared page'),
+                message: _t('%s shared a page with you').replace('%s', payload.owner || ''),
+                sticky: true,
+                buttons: [{
+                    name: _t('Open page'),
+                    text: _t('Open page'),
+                    primary: true,
+                    click: open,
+                    onClick: open,
+                }],
+            });
         },
 
         _showAuthNotification: function () {
@@ -369,16 +378,20 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
         },
 
         _showOverlay: function (context) {
-            this._clearBadge();
-            window.pnsLayer.claim('chatboo', this._hideOverlay.bind(this));
-            var overlay = document.getElementById('o_chatboo_persistent_overlay');
-            if (!overlay) {
-                this._createPersistentOverlay(context || {});
-                return;
-            }
-            overlay.classList.remove('d-none');
-            overlay.style.display = 'flex';
-            this._afterOverlayShown(context || {});
+            var self = this;
+            var libs = require('pns_ai_chatboo.heavy_libs');
+            return libs.loadHeavyLibs().then(function () {
+                self._clearBadge();
+                window.pnsLayer.claim('chatboo', self._hideOverlay.bind(self));
+                var overlay = document.getElementById('o_chatboo_persistent_overlay');
+                if (!overlay) {
+                    self._createPersistentOverlay(context || {});
+                    return;
+                }
+                overlay.classList.remove('d-none');
+                overlay.style.display = 'flex';
+                self._afterOverlayShown(context || {});
+            });
         },
 
         _afterOverlayShown: function (context) {
@@ -429,7 +442,7 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
                 'left: 0',
                 'right: 0',
                 'bottom: 0',
-                'z-index: 1050', /* Por encima del navbar/panel de control sticky de Odoo; pns_base lo oculta al pulsar el navbar */
+                'z-index: 1039', /* Debajo del modal de Odoo (1050); pns_base lo oculta al pulsar el navbar */
                 'display: flex',
                 'flex-direction: column',
                 'background-color: #fff',

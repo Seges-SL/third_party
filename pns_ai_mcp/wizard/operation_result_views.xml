@@ -488,6 +488,65 @@
         </field>
     </record>
 
+    <!-- ai.config.backup.wizard — preview before write -->
+    <record id="view_config_backup_preview_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.config_backup.wizard.preview</field>
+        <field name="model">ai.config.backup.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Review configuration import" class="o_pns_import_preview">
+                <field name="show_result" invisible="1"/>
+                <field name="result_status" invisible="1"/>
+                <field name="json_file" invisible="1"/>
+                <field name="filename" invisible="1"/>
+                <div class="alert alert-info o_pns_preview_lead mb-0" role="alert">
+                    <strong>Nothing has been written yet.</strong>
+                    Confirm to apply this file.
+                </div>
+                <div class="o_pns_preview_params">
+                    <div class="o_pns_preview_kicker">Parameters</div>
+                    <field name="replace_existing" readonly="1"/>
+                </div>
+                <div class="o_pns_preview_board">
+                    <div class="o_pns_preview_card o_pns_preview_new">
+                        <div class="o_pns_preview_kicker">New</div>
+                        <field name="result_created" nolabel="1" readonly="1"/>
+                        <div class="o_pns_preview_hint">Will be created.</div>
+                    </div>
+                    <div class="o_pns_preview_card o_pns_preview_overwrite">
+                        <div class="o_pns_preview_kicker">Overwrite</div>
+                        <field name="result_updated" nolabel="1" readonly="1"/>
+                        <div class="o_pns_preview_hint">Matching rows will be written.</div>
+                    </div>
+                    <div class="o_pns_preview_card o_pns_preview_keep">
+                        <div class="o_pns_preview_kicker">Keep</div>
+                        <field name="result_skipped" nolabel="1" readonly="1"/>
+                        <div class="o_pns_preview_hint">Left as they are.</div>
+                    </div>
+                </div>
+                <div class="o_pns_preview_section"
+                     attrs="{'invisible': [('result_detail', '=', False)]}">
+                    <div class="o_pns_preview_kicker">Breakdown</div>
+                    <field name="result_detail" nolabel="1" readonly="1"/>
+                </div>
+                <div class="o_pns_preview_section o_pns_preview_warn"
+                     attrs="{'invisible': [('result_warnings', '=', False)]}">
+                    <div class="o_pns_preview_kicker">Warnings</div>
+                    <field name="result_warnings" nolabel="1" readonly="1"/>
+                </div>
+                <div class="o_pns_preview_section o_pns_preview_err"
+                     attrs="{'invisible': [('result_errors', '=', False)]}">
+                    <div class="o_pns_preview_kicker">Errors</div>
+                    <field name="result_errors" nolabel="1" readonly="1"/>
+                </div>
+                <footer>
+                    <button name="action_import" string="Confirm import"
+                            type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
     <!-- ai.config.backup.wizard — full AI configuration restore -->
     <record id="view_config_backup_result_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.config_backup.wizard.result</field>

@@ -103,9 +103,13 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
      * @returns {string} HTML-safe string
      */
     function escapeHtml(text) {
-        var div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        // Quotes too: the result also lands inside attributes (data-slash-code).
+        return String(text === null || text === undefined ? '' : text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     /**
@@ -115,17 +119,36 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
      * no javascript: links, no image or CSS url from another origin.
      * Parsing happens in an inert document, where nothing loads or fires.
      */
-    var _UNSAFE_TAGS = {
+    var _ALLOWED_TAGS = {
+        A: 1, ABBR: 1, B: 1, BLOCKQUOTE: 1, BR: 1, BUTTON: 1, CAPTION: 1,
+        CIRCLE: 1, CLIPPATH: 1, CODE: 1, COL: 1, COLGROUP: 1, DD: 1, DEL: 1,
+        DEFS: 1, DIV: 1, DL: 1, DT: 1, ELLIPSE: 1, EM: 1, FIGCAPTION: 1,
+        FIGURE: 1, G: 1, H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1, HR: 1,
+        I: 1, IMG: 1, INS: 1, LI: 1, LINE: 1, LINEARGRADIENT: 1, MARK: 1,
+        OL: 1, P: 1, PATH: 1, POLYGON: 1, POLYLINE: 1, PRE: 1,
+        RADIALGRADIENT: 1, RECT: 1, S: 1, SMALL: 1, SPAN: 1, STOP: 1,
+        STRONG: 1, SUB: 1, SUP: 1, SVG: 1, TABLE: 1, TBODY: 1, TD: 1,
+        TFOOT: 1, TH: 1, THEAD: 1, TITLE: 1, TR: 1, TSPAN: 1, TEXT: 1,
+        U: 1, UL: 1, DESC: 1,
+    };
+    var _DROP_WITH_CHILDREN = {
         SCRIPT: 1, STYLE: 1, IFRAME: 1, FRAME: 1, FRAMESET: 1, OBJECT: 1,
         EMBED: 1, APPLET: 1, BASE: 1, LINK: 1, META: 1, FORM: 1, INPUT: 1,
         TEXTAREA: 1, SELECT: 1, OPTION: 1, NOSCRIPT: 1, TEMPLATE: 1, PORTAL: 1,
         MATH: 1, FOREIGNOBJECT: 1, ANIMATE: 1, ANIMATEMOTION: 1,
-        ANIMATETRANSFORM: 1, SET: 1, DISCARD: 1,
+        ANIMATETRANSFORM: 1, SET: 1, DISCARD: 1, VIDEO: 1, AUDIO: 1,
+        SOURCE: 1, TRACK: 1, USE: 1, IMAGE: 1,
     };
-    var _DROPPED_ATTRS = {
-        srcdoc: 1, srcset: 1, imagesrcset: 1, action: 1, formaction: 1,
-        ping: 1, background: 1, codebase: 1, longdesc: 1, cite: 1, data: 1,
-        dynsrc: 1, lowsrc: 1,
+    var _ALLOWED_ATTRS = {
+        alt: 1, 'aria-hidden': 1, 'aria-label': 1, class: 1, colspan: 1,
+        cx: 1, cy: 1, d: 1, dir: 1, disabled: 1, fill: 1, 'fill-opacity': 1,
+        height: 1, href: 1, id: 1, lang: 1, offset: 1, opacity: 1,
+        points: 1, preserveaspectratio: 1, r: 1, rel: 1, role: 1, rowspan: 1,
+        rx: 1, ry: 1, scope: 1, src: 1, 'stop-color': 1, 'stop-opacity': 1,
+        stroke: 1, 'stroke-opacity': 1, 'stroke-width': 1, style: 1, target: 1,
+        title: 1, transform: 1, type: 1, viewbox: 1, width: 1, x: 1, x1: 1,
+        x2: 1, xmlns: 1, y: 1, y1: 1, y2: 1, 'text-anchor': 1, 'font-size': 1,
+        gradientunits: 1, 'clip-path': 1,
     };
     var _LINK_PROTOCOLS = { 'http:': 1, 'https:': 1, 'mailto:': 1, 'tel:': 1 };
     var _CSS_FETCHERS_RE = /(?:image-set|image|cross-fade|element|src)\s*\(|expression\s*\(|@import|behavior\s*:|binding\s*:|\\/i;
@@ -186,7 +209,11 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
         }
         var local = true;
         var rest = css.replace(_CSS_URL_RE, function (all, quote, target) {
-            if (!_isLocalResource(target)) {
+            var t = String(target || '').trim();
+            if (t.charAt(0) === '#') {
+                return '';
+            }
+            if (!_isLocalResource(t)) {
                 local = false;
             }
             return '';
@@ -194,20 +221,30 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
         return local && !/url\s*\(/i.test(rest);
     }
 
+    function _isAllowedAttrName(name) {
+        if (name.indexOf('on') === 0) {
+            return false;
+        }
+        if (_ALLOWED_ATTRS[name]) {
+            return true;
+        }
+        return name.indexOf('data-') === 0 || name.indexOf('aria-') === 0;
+    }
+
     function _cleanAttributes(el, tag) {
         var attrs = Array.prototype.slice.call(el.attributes);
         for (var i = 0; i < attrs.length; i++) {
             var name = attrs[i].name.toLowerCase();
             var value = attrs[i].value;
-            var keep = true;
-            if (name.indexOf('on') === 0 || _DROPPED_ATTRS[name]) {
-                keep = false;
-            } else if (name === 'href' || name === 'xlink:href') {
-                keep = (tag === 'A' || tag === 'AREA') ? _isSafeLink(value) : _isLocalResource(value);
-            } else if (name === 'src' || name === 'poster') {
-                keep = _isLocalResource(value);
-            } else if (name === 'style' || /url\s*\(/i.test(value)) {
-                keep = _isLocalCss(value);
+            var keep = _isAllowedAttrName(name);
+            if (keep) {
+                if (name === 'href' || name === 'xlink:href') {
+                    keep = (tag === 'A' || tag === 'AREA') ? _isSafeLink(value) : _isLocalResource(value);
+                } else if (name === 'src' || name === 'poster') {
+                    keep = _isLocalResource(value);
+                } else if (name === 'style' || /url\s*\(/i.test(value)) {
+                    keep = _isLocalCss(value);
+                }
             }
             if (!keep) {
                 el.removeAttribute(attrs[i].name);
@@ -268,6 +305,15 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
         return link;
     }
 
+    function _unwrapElement(node, child) {
+        var first = child.firstChild;
+        while (child.firstChild) {
+            node.insertBefore(child.firstChild, child);
+        }
+        node.removeChild(child);
+        return first;
+    }
+
     function _sanitizePass(html) {
         var box = _inertContainer(html);
         var stack = [box];
@@ -280,8 +326,12 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
                     node.removeChild(child);
                 } else if (child.nodeType === 1) {
                     var tag = child.nodeName.toUpperCase();
-                    if (_UNSAFE_TAGS[tag]) {
+                    if (_DROP_WITH_CHILDREN[tag]) {
                         node.removeChild(child);
+                    } else if (!_ALLOWED_TAGS[tag]) {
+                        var first = _unwrapElement(node, child);
+                        child = first || next;
+                        continue;
                     } else if (tag === 'IMG' && !_isLocalResource(child.getAttribute('src'))) {
                         node.replaceChild(_imageThroughOdoo(child), child);
                     } else {
@@ -398,7 +448,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
 
     /**
      * Detect markdown tables whose cells contain long prose and convert
-     * them to plain paragraphs. This prevents Showdown from rendering
+     * them to plain paragraphs. This prevents ChatbooMarkdown from rendering
      * weather forecasts, descriptions, etc. as ugly HTML tables.
      *
      * Heuristic: if ANY data cell in the table exceeds PROSE_THRESHOLD
@@ -407,7 +457,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
      *
      * Visible length ignores Markdown links and bare URLs so remote-LLM
      * tables with Odoo form links (`[COR/…](/web#id=…)`) stay as tables.
-     * Server-side HTML tables (`o_chatboo_data_table`) never enter this path.
+     * Server-side HTML tables (`o_ai_data_table`) never enter this path.
      *
      * @param {string} md - Raw markdown
      * @returns {string} Cleaned markdown (tables may be replaced with paragraphs)
@@ -513,7 +563,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
     }
 
     /**
-     * Format Markdown content using Showdown.js (if available).
+     * Format Markdown content using ChatbooMarkdown (if available).
      * Falls back to manual regex-based formatting.
      *
      * Pre-processes the markdown to strip "prose tables" — markdown tables
@@ -527,37 +577,29 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
             var prep = ChatbooSse.prepareMarkdownForDisplay(content || '');
             content = prep.markdown;
         }
-        if (typeof showdown !== 'undefined') {
+        if (typeof ChatbooMarkdown !== 'undefined') {
             try {
-                // Pre-process: strip prose tables before Showdown sees them
                 content = _stripProseTables(content);
 
-                var converter = new showdown.Converter({
+                var html = ChatbooMarkdown.toHtml(content, {
                     tables: true,
                     strikethrough: true,
                     tasklists: true,
                     simpleLineBreaks: true,
                     openLinksInNewWindow: true,
-                    emoji: false,
-                    underline: false,
-                    headerLevelStart: 1,
-                    // snake_case (module/field ids): _word_ is italic unless mid-word
-                    literalMidWordUnderscores: true
                 });
-
-                var html = converter.makeHtml(content);
 
                 html = html
                     .replace(/<table>/g, '<div class="table-responsive" style="margin: 1em 0;"><table class="table table-bordered table-sm" style="width: 100%; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'Helvetica Neue\', Arial, sans-serif; font-size: 1.125em;">')
                     .replace(/<\/table>/g, '</table></div>')
-                    .replace(/<pre><code/g, '<pre class="bg-light p-3 rounded border" style="overflow-x: auto;"><code class="language-text"')
+                    .replace(/<pre><code/g, '<pre class="bg-light p-3 rounded border" style="overflow-x: auto;"><code')
                     .replace(/<code(?! class="language)/g, '<code class="bg-light px-1 rounded" style="font-family: monospace;">')
                     .replace(/<blockquote>/g, '<blockquote class="border-left pl-3 ml-3" style="border-left: 4px solid #dee2e6; margin: 1em 0;">')
                     .replace(/<a href="([^"]+)"(?! target)/g, '<a href="$1" target="_blank" rel="noopener noreferrer"');
 
-                return '<div class="o_chatboo_prose">' + html + '</div>';
+                return '<div class="o_ai_prose">' + html + '</div>';
             } catch (error) {
-                console.error('Error rendering markdown with Showdown.js:', error);
+                console.error('Error rendering markdown with ChatbooMarkdown:', error);
             }
         }
 
@@ -596,7 +638,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
 
         if (rows.length === 0) return '';
 
-        var html = '<div class="table-responsive"><table class="table table-sm table-bordered table-striped o_chatboo_data_table">';
+        var html = '<div class="table-responsive"><table class="table table-sm table-bordered table-striped o_ai_data_table">';
 
         var firstRow = rows[0];
         var numericCols = {};
@@ -617,7 +659,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
         }
         html += '<thead><tr>';
         firstRow.forEach(function (cell, idx) {
-            var cls = numericCols[idx] ? ' class="o_chatboo_num text-end"' : '';
+            var cls = numericCols[idx] ? ' class="o_ai_num text-end"' : '';
             html += '<th' + cls + '>' + escapeHtml(cell) + '</th>';
         });
         html += '</tr></thead>';
@@ -627,7 +669,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
             rows.slice(1).forEach(function (row) {
                 html += '<tr>';
                 row.forEach(function (cell, idx) {
-                    var cls = numericCols[idx] ? ' class="o_chatboo_num text-end"' : '';
+                    var cls = numericCols[idx] ? ' class="o_ai_num text-end"' : '';
                     html += '<td' + cls + '>' + escapeHtml(cell) + '</td>';
                 });
                 html += '</tr>';
@@ -712,11 +754,11 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
             var maxRows = 200;
             var displayData = data.slice(0, maxRows);
             var parts = [
-                '<div class="table-responsive"><table class="table table-sm table-bordered table-striped table-hover o_chatboo_data_table">',
+                '<div class="table-responsive"><table class="table table-sm table-bordered table-striped table-hover o_ai_data_table">',
                 '<thead class="thead-light"><tr>'
             ];
             headers.forEach(function (h) {
-                var cls = numericColumns.has(h) ? ' class="o_chatboo_num text-end"' : '';
+                var cls = numericColumns.has(h) ? ' class="o_ai_num text-end"' : '';
                 parts.push('<th' + cls + '>', escapeHtml(h), '</th>');
             });
             parts.push('</tr></thead><tbody>');
@@ -729,7 +771,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
                     else if (typeof val === 'object') val = JSON.stringify(val);
                     else if (typeof val === 'number') val = formatNumber(val);
                     else val = String(val);
-                    var cls = numericColumns.has(h) ? ' class="o_chatboo_num text-end"' : '';
+                    var cls = numericColumns.has(h) ? ' class="o_ai_num text-end"' : '';
                     parts.push('<td' + cls + '>', escapeHtml(val), '</td>');
                 });
                 parts.push('</tr>');
@@ -754,7 +796,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
 
         // Case 3: Flat Object -> Key-Value Table
         if (data && typeof data === 'object' && data !== null) {
-            var html = '<div class="table-responsive"><table class="table table-sm table-bordered o_chatboo_data_table" style="width: auto;">';
+            var html = '<div class="table-responsive"><table class="table table-sm table-bordered o_ai_data_table" style="width: auto;">';
             Object.entries(data).forEach(function (_ref) {
                 var k = _ref[0], v = _ref[1];
                 var valStr;
@@ -767,7 +809,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
                 } else {
                     valStr = String(v);
                 }
-                var cls = isNumber ? ' class="o_chatboo_num text-end"' : '';
+                var cls = isNumber ? ' class="o_ai_num text-end"' : '';
                 html += '<tr><th class="bg-light">' + escapeHtml(k) + '</th><td' + cls + '>' + escapeHtml(valStr) + '</td></tr>';
             });
             html += '</table></div>';
@@ -828,13 +870,13 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
         if (!table) {
             return false;
         }
-        if (table.classList && table.classList.contains('o_chatboo_data_table')) {
+        if (table.classList && table.classList.contains('o_ai_data_table')) {
             return true;
         }
-        if (table.getAttribute && table.getAttribute('data-chatboo-dataset')) {
+        if (table.getAttribute && table.getAttribute('data-ai-dataset')) {
             return true;
         }
-        if (table.closest && table.closest('.o_chatboo_table_block')) {
+        if (table.closest && table.closest('.o_ai_table_block')) {
             return true;
         }
         return false;
@@ -879,7 +921,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
                 continue;
             }
             var host = document.createElement('div');
-            host.className = 'o_chatboo_prose';
+            host.className = 'o_ai_prose';
             for (var p = 0; p < texts.length; p++) {
                 var para = document.createElement('p');
                 para.textContent = texts[p];
@@ -912,11 +954,11 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
         }
         var root = _inertContainer(html);
         _unwrapHtmlProseTables(root);
-        // Full-bubble Markdown report (no Chatboo tables): re-parse as Showdown
+        // Full-bubble Markdown report (no Chatboo tables): re-parse as ChatbooMarkdown
         // instead of leaving literal "#" in plain nodes.
         if (
-            !root.querySelector('.o_chatboo_table_block, table, .o_chatboo_data_table')
-            && !root.querySelector('h1, h2, h3, h4, h5, h6, .o_chatboo_prose_h')
+            !root.querySelector('.o_ai_table_block, table, .o_ai_data_table')
+            && !root.querySelector('h1, h2, h3, h4, h5, h6, .o_ai_prose_h')
             && /#{1,6}\s|\*\*[^*\n]{2,}|^[-*•]\s/m.test(root.textContent || '')
         ) {
             var cloneAll = root.cloneNode(true);
@@ -935,15 +977,15 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
                 }
             }
         }
-        var nodes = root.querySelectorAll('.pns-result-footer, .o_chatboo_prose_host');
+        var nodes = root.querySelectorAll('.pns-result-footer, .o_ai_prose_host');
         // Stream footer wrapper: last mt-2 after tables without nested table.
         var allMt = root.querySelectorAll('div.mt-2');
         for (var m = 0; m < allMt.length; m++) {
             var cand = allMt[m];
-            if (cand.querySelector('table, .o_chatboo_table_block')) {
+            if (cand.querySelector('table, .o_ai_table_block')) {
                 continue;
             }
-            if (cand.querySelector('h1, h2, h3, h4, h5, h6, .o_chatboo_prose_h, .o_chatboo_prose_p')) {
+            if (cand.querySelector('h1, h2, h3, h4, h5, h6, .o_ai_prose_h, .o_ai_prose_p')) {
                 continue;
             }
             var sample = (cand.textContent || '').trim();
@@ -958,9 +1000,9 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
                 continue;
             }
             seen.push(el);
-            if (el.querySelector && el.querySelector('h1, h2, h3, h4, h5, h6, .o_chatboo_prose_h')) {
-                // Already structured (server markdownish or prior Showdown).
-                el.classList.add('o_chatboo_prose');
+            if (el.querySelector && el.querySelector('h1, h2, h3, h4, h5, h6, .o_ai_prose_h')) {
+                // Already structured (server markdownish or prior ChatbooMarkdown).
+                el.classList.add('o_ai_prose');
                 continue;
             }
             // Keep newlines for ATX; do not collapse before detection.
@@ -984,7 +1026,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
             if (!rendered || rendered === md) {
                 continue;
             }
-            el.classList.add('o_chatboo_prose');
+            el.classList.add('o_ai_prose');
             el.innerHTML = rendered;
         }
         return root.innerHTML;
@@ -997,7 +1039,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
      *   0. Raw HTML from server -> pass through unchanged
      *   1. JSON object/array -> table or formatted JSON
      *   2. CSV-like lines -> HTML table
-     *   3. Markdown (with code blocks, tables, etc.) -> HTML via Showdown
+     *   3. Markdown (with code blocks, tables, etc.) -> HTML via ChatbooMarkdown
      *   4. Plain text -> escaped HTML with line breaks
      *
      * @param {string} content - Raw content from the assistant
@@ -1011,7 +1053,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
      *   0. Raw HTML from server -> pass through unchanged
      *   1. JSON object/array -> table or formatted JSON
      *   2. CSV-like lines -> HTML table
-     *   3. Markdown (with code blocks, tables, etc.) -> HTML via Showdown
+     *   3. Markdown (with code blocks, tables, etc.) -> HTML via ChatbooMarkdown
      *   4. Plain text -> escaped HTML with line breaks
      *
      * @param {string} content - Raw content from the assistant
@@ -1053,7 +1095,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
                         ft.includes('**') || /^\s*[-*+]\s/m.test(ft)
                     );
                     var formattedHtml;
-                    if (hasMarkdown && typeof showdown !== 'undefined') {
+                    if (hasMarkdown && typeof ChatbooMarkdown !== 'undefined') {
                         formattedHtml = _formatMarkdown(ft);
                     } else {
                         formattedHtml = escapeHtml(ft).replace(/\n/g, '<br/>');
@@ -1113,7 +1155,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
             }
         }
 
-        if (typeof showdown !== 'undefined') {
+        if (typeof ChatbooMarkdown !== 'undefined') {
             // Detect actual markdown structure (not just any character).
             // Avoid false positives: a paragraph mentioning "20-30 grados" is NOT markdown.
             var looksLikeMarkdown =

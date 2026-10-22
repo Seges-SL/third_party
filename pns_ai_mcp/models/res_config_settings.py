@@ -26,6 +26,11 @@ from ..utils.skill_code_prefix import (
     normalize_skill_command_prefix,
     prefix_stomps_slash,
 )
+from ..utils.change_journal import (
+    DEFAULT_TRASH_DAYS,
+    ICP_TRASH_DAYS,
+    trash_days_from_param,
+)
 from ..utils.domain_index import INJECT_ICP_KEY, icp_flag_enabled
 from ..utils.key_pin import (
     DEFAULT_PIN_ATTEMPTS,
@@ -48,9 +53,38 @@ class ResConfigSettings(models.TransientModel):
         default='USD',
         config_parameter=ICP_DISPLAY_CURRENCY,
         help=(
-            'Currency for inference cost in the Activity log and Chatboo chips. '
+            'Currency for inference cost in the Activity log and the chat cost chips. '
             'Vendors report USD; amounts convert at the loaded rate. '
             'Stored usage stays in USD.'
+        ),
+    )
+
+    log_retention_days = fields.Integer(
+        string='Activity log retention (days)',
+        config_parameter='pns_ai_mcp.log_retention_days',
+        help=(
+            'Days the AI activity log is kept. Empty or 0 keeps everything: '
+            'nothing is deleted until a person sets a number here.'
+        ),
+    )
+
+    journal_trash_days = fields.Integer(
+        string='Change trash (days)',
+        default=30,
+        config_parameter='pns_ai_mcp.journal_trash_days',
+        help=(
+            'Days a Safe Plan delete stays archived before it is removed. '
+            '0 keeps it until someone empties the trash.'
+        ),
+    )
+
+    mcp_allowed_origins = fields.Char(
+        string='MCP browser origins',
+        config_parameter='pns_ai_mcp.mcp_allowed_origins',
+        help=(
+            'Extra web origins allowed to call /mcp from a browser, one per '
+            'line or comma separated. The address of this instance is always '
+            'allowed. Desktop MCP clients send no Origin and are unaffected.'
         ),
     )
 
@@ -292,15 +326,20 @@ class ResConfigSettings(models.TransientModel):
         res['key_pin_block_hours'] = clamp_positive(
             ICP.get_param(ICP_PIN_BLOCK_HOURS), DEFAULT_PIN_BLOCK_HOURS,
         )
+        res['journal_trash_days'] = trash_days_from_param(
+            ICP.get_param(ICP_TRASH_DAYS, str(DEFAULT_TRASH_DAYS)),
+        )
         return res
 
     def set_values(self):
         super().set_values()
         ICP = self.env['ir.config_parameter'].sudo()
-        ICP.set_param(
-            'pns_ai_mcp.url_access_policy',
-            self.url_access_policy or 'whitelist_only',
+        new_policy = self.url_access_policy or 'whitelist_only'
+        old_policy = ICP.get_param(
+            'pns_ai_mcp.url_access_policy', 'whitelist_only',
         )
+        if new_policy != old_policy:
+            ICP.set_param('pns_ai_mcp.url_access_policy', new_policy)
         prev_inject = icp_flag_enabled(
             ICP.get_param(INJECT_ICP_KEY, 'True'), default=True,
         )
@@ -341,12 +380,18 @@ class ResConfigSettings(models.TransientModel):
             str(clamp_positive(self.key_pin_block_hours, DEFAULT_PIN_BLOCK_HOURS)),
         )
 
+    def action_empty_journal_trash(self):
+        """Permanently delete every archived Safe Plan record."""
+        self.ensure_one()
+        from ..utils.import_export_guard import ensure_ai_admin
+        ensure_ai_admin(self.env)
+        return self.env['ai.change.journal'].action_empty_trash()
+
     def action_key_pin_release(self):
         """Drop every temporary-PIN pause. The PINs themselves stay as they are."""
         self.ensure_one()
         from ..utils.import_export_guard import ensure_ai_admin
         ensure_ai_admin(self.env)
-        # Seges: parche 10 (PNS-83, seguridad). Ver docs/pendiente/parches_pns_ai.md
         self.env['ai.key.pin.block'].sudo()._release_all()
         return mcp_ui.client_notification(
             _('Temporary key PIN'),
@@ -390,6 +435,7 @@ class ResConfigSettings(models.TransientModel):
             (ICP_SKILL_CODE_PREFIX, DEFAULT_SKILL_CODE_PREFIX),
             (ICP_SKILL_COMMAND_PREFIX, DEFAULT_SKILL_COMMAND_PREFIX),
             (INJECT_ICP_KEY, 'True'),
+            (ICP_TRASH_DAYS, str(DEFAULT_TRASH_DAYS)),
         )
         ICP = self.env['ir.config_parameter'].sudo()
         for key, value in pairs:

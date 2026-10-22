@@ -14,8 +14,8 @@
 (function (global) {
     "use strict";
 
-    var ROW_SELECTOR = "table.o_chatboo_data_table tbody tr";
-    var LINK_SELECTOR = "a.o_chatboo_namelink[href*='/web#']";
+    var ROW_SELECTOR = "table.o_ai_data_table tbody tr";
+    var LINK_SELECTOR = "a.o_ai_namelink[href*='/web#']";
     var NO_MARK = "a, button, input, select, textarea, label";
 
     // key -> {model, id, label, row}

@@ -23,7 +23,7 @@ PROBE = 'probe'
 # Not a domain list: surfaces the renderer / banner already understand.
 PRESENTATION_KEYS = (
     'data', 'groups', 'sections', 'tables', 'formatted_text',
-    'map_url', 'map_pins', 'pins_url', 'summary', 'title', 'name',
+    'page_url', 'map_url', 'map_pins', 'pins_url', 'summary', 'title', 'name',
     'geo_coords', 'geo_thumbs', 'notices', 'show_mode',
     '__model', '__subtle_zebra__', '__no_charts__', '__row_links__',
     '__excel_formulas__',
@@ -70,13 +70,13 @@ def _nonempty_rows(payload):
     return False
 
 
-def _has_map_surface(payload):
+def _has_page_surface(payload):
+    """A page in its own tab (shared map, canvas, whatever comes next)."""
     if not isinstance(payload, dict):
         return False
-    for key in ('map_url', 'pins_url'):
-        val = payload.get(key)
-        if isinstance(val, str) and val.strip():
-            return True
+    from .result_page import has_page_url
+    if has_page_url(payload):
+        return True
     pins = payload.get('map_pins')
     if isinstance(pins, str) and pins.strip():
         return True
@@ -110,12 +110,12 @@ def _has_useful_html(payload):
 
 
 def is_hollow(payload):
-    """True when there is no user-facing surface (rows, map, chart, HTML)."""
+    """True when there is no user-facing surface (rows, page, chart, HTML)."""
     if not isinstance(payload, dict):
         return True
     if _nonempty_rows(payload):
         return False
-    if _has_map_surface(payload):
+    if _has_page_surface(payload):
         return False
     if _has_chart_surface(payload):
         return False
@@ -132,6 +132,10 @@ def is_complete_artifact(payload):
         return False
     if is_hollow(payload):
         return False
+    # A page in its own tab is the document, even with no rows and no
+    # presentation flag. Dropping it left the url in a later table rewrite.
+    if _has_page_surface(payload):
+        return True
     if (
         payload.get('__satisfied__')
         or payload.get('__presentation_complete__')
@@ -224,6 +228,25 @@ def _import_basket():
         return append_presentable, payload_to_basket_block
 
 
+def _carry_page_surface(primary, payload):
+    """Keep the open page when a restyle ships rows and forgets the url."""
+    if not isinstance(payload, dict):
+        return payload
+    if _has_page_surface(payload) or not _has_page_surface(primary):
+        return payload
+    from .result_page import PAGE_URL_KEYS
+    out = payload
+    for key in PAGE_URL_KEYS:
+        value = primary.get(key) if isinstance(primary, dict) else None
+        if isinstance(value, str) and value.strip():
+            out[key] = value
+            break
+    pins = primary.get('map_pins') if isinstance(primary, dict) else None
+    if pins and 'map_pins' not in out:
+        out['map_pins'] = copy.deepcopy(pins)
+    return out
+
+
 def apply(primary, basket, payload, code=''):
     """Mutate ``basket``. Return ``(new_primary, action)``.
 
@@ -243,7 +266,7 @@ def apply(primary, basket, payload, code=''):
             append_presentable(basket, new_primary)
         return new_primary, PIN
     if action == UPGRADE:
-        new_primary = copy.deepcopy(payload)
+        new_primary = _carry_page_surface(primary, copy.deepcopy(payload))
         if isinstance(basket, list):
             block = payload_to_basket_block(new_primary)
             if block and basket:

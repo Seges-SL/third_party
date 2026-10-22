@@ -3,7 +3,8 @@ skill: users-logged
 name: Logged-in users
 description: Users currently connected (bus online/away). If the bus is unavailable, last logins by date.
 agent_codes:
-version: 1.4
+version: 1.5
+required_groups: pns_ai_mcp.group_ai_admin
 args_policy: none
 sequence: 21
 active: true

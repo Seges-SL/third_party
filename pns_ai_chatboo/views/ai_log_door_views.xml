@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ai_log_search_chatboo_door" model="ir.ui.view">
+        <field name="name">ai.log.search.chatboo.door</field>
+        <field name="model">ai.log</field>
+        <field name="inherit_id" ref="pns_ai_mcp.view_ai_log_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='src_mcp']" position="before">
+                <filter string="From Chatboo" name="src_chatboo" domain="[('origin', '=', 'chatboo')]"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

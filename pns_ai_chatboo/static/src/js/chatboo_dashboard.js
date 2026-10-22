@@ -7,6 +7,13 @@
 (function (global) {
     "use strict";
 
+    function _t(msgid) {
+        if (global.odoo && typeof global.odoo._t === "function") {
+            return global.odoo._t(msgid);
+        }
+        return msgid;
+    }
+
     var STORAGE_PREFIX = "chatboo_dash_v1_";
 
     function storageKey(dashboardId) {
@@ -41,7 +48,7 @@
     }
 
     function cardIds(grid) {
-        var cards = grid.querySelectorAll(".o_chatboo_dashboard_card");
+        var cards = grid.querySelectorAll(".o_ai_dashboard_card");
         var ids = [];
         var i;
         for (i = 0; i < cards.length; i++) {
@@ -51,13 +58,13 @@
     }
 
     function collectLayout(dashboard) {
-        var grid = dashboard.querySelector(".o_chatboo_dashboard_grid");
+        var grid = dashboard.querySelector(".o_ai_dashboard_grid");
         if (!grid) {
             return { order: [], hidden: [], collapsed: [] };
         }
         var hidden = [];
         var collapsed = [];
-        var cards = grid.querySelectorAll(".o_chatboo_dashboard_card");
+        var cards = grid.querySelectorAll(".o_ai_dashboard_card");
         var i;
         for (i = 0; i < cards.length; i++) {
             var c = cards[i];
@@ -83,12 +90,12 @@
         if (!layout) {
             return;
         }
-        var grid = dashboard.querySelector(".o_chatboo_dashboard_grid");
+        var grid = dashboard.querySelector(".o_ai_dashboard_grid");
         if (!grid) {
             return;
         }
         var byId = {};
-        var cards = grid.querySelectorAll(".o_chatboo_dashboard_card");
+        var cards = grid.querySelectorAll(".o_ai_dashboard_card");
         var i;
         for (i = 0; i < cards.length; i++) {
             var id = cards[i].getAttribute("data-card-id");
@@ -115,7 +122,7 @@
                 "o_chatboo_dashboard_card_collapsed",
                 layout.collapsed && layout.collapsed.indexOf(cid) >= 0
             );
-            var collapseBtn = node.querySelector(".o_chatboo_dashboard_collapse");
+            var collapseBtn = node.querySelector(".o_ai_dashboard_collapse");
             if (collapseBtn) {
                 var isCollapsed = node.classList.contains(
                     "o_chatboo_dashboard_card_collapsed"
@@ -130,12 +137,12 @@
     }
 
     function saveLayout(dashboard) {
-        var id = dashboard.getAttribute("data-chatboo-dashboard-id");
+        var id = dashboard.getAttribute("data-ai-dashboard-id");
         writeLayout(id, collectLayout(dashboard));
     }
 
     function cardTitle(card) {
-        var titleEl = card.querySelector(".o_chatboo_dashboard_card_title");
+        var titleEl = card.querySelector(".o_ai_dashboard_card_title");
         return titleEl ? (titleEl.textContent || "").trim() : "";
     }
 
@@ -183,7 +190,7 @@
     function makeWinButton(cls, title) {
         var btn = global.document.createElement("button");
         btn.type = "button";
-        btn.className = "o_chatboo_dashboard_winbtn " + cls;
+        btn.className = "o_ai_dashboard_winbtn " + cls;
         btn.setAttribute("title", title);
         btn.setAttribute("aria-label", title);
         return btn;
@@ -193,38 +200,38 @@
         if (!card) {
             return;
         }
-        var actions = card.querySelector(".o_chatboo_dashboard_card_actions");
+        var actions = card.querySelector(".o_ai_dashboard_card_actions");
         if (!actions) {
             return;
         }
         actions.classList.add("o_chatboo_dashboard_mdi");
 
-        var collapse = actions.querySelector(".o_chatboo_dashboard_collapse");
-        var maximize = actions.querySelector(".o_chatboo_dashboard_maximize");
-        var closeBtn = actions.querySelector(".o_chatboo_dashboard_close");
+        var collapse = actions.querySelector(".o_ai_dashboard_collapse");
+        var maximize = actions.querySelector(".o_ai_dashboard_maximize");
+        var closeBtn = actions.querySelector(".o_ai_dashboard_close");
 
         if (!collapse) {
             collapse = makeWinButton(
-                "o_chatboo_dashboard_collapse",
-                "Minimizar"
+                "o_ai_dashboard_collapse",
+                _t("Minimize")
             );
         } else {
-            collapse.classList.add("o_chatboo_dashboard_winbtn");
+            collapse.classList.add("o_ai_dashboard_winbtn");
             collapse.classList.remove("btn", "btn-sm", "btn-link");
         }
         if (!maximize) {
             maximize = makeWinButton(
-                "o_chatboo_dashboard_maximize",
-                "Maximizar"
+                "o_ai_dashboard_maximize",
+                _t("Maximize")
             );
         } else {
-            maximize.classList.add("o_chatboo_dashboard_winbtn");
+            maximize.classList.add("o_ai_dashboard_winbtn");
             maximize.classList.remove("btn", "btn-sm", "btn-link");
         }
         if (!closeBtn) {
-            closeBtn = makeWinButton("o_chatboo_dashboard_close", "Cerrar");
+            closeBtn = makeWinButton("o_ai_dashboard_close", _t("Close"));
         } else {
-            closeBtn.classList.add("o_chatboo_dashboard_winbtn");
+            closeBtn.classList.add("o_ai_dashboard_winbtn");
             closeBtn.classList.remove("btn", "btn-sm", "btn-link");
         }
 
@@ -239,9 +246,9 @@
         if (!card) {
             return;
         }
-        var collapse = card.querySelector(".o_chatboo_dashboard_collapse");
-        var maximize = card.querySelector(".o_chatboo_dashboard_maximize");
-        var closeBtn = card.querySelector(".o_chatboo_dashboard_close");
+        var collapse = card.querySelector(".o_ai_dashboard_collapse");
+        var maximize = card.querySelector(".o_ai_dashboard_maximize");
+        var closeBtn = card.querySelector(".o_ai_dashboard_close");
         var collapsed = card.classList.contains(
             "o_chatboo_dashboard_card_collapsed"
         );
@@ -251,7 +258,7 @@
 
         if (collapse) {
             collapse.innerHTML = mdiSvg("min");
-            var minTitle = collapsed ? "Restaurar" : "Minimizar";
+            var minTitle = collapsed ? _t("Restore") : _t("Minimize");
             collapse.setAttribute("title", minTitle);
             collapse.setAttribute("aria-label", minTitle);
             collapse.setAttribute("aria-expanded", collapsed ? "false" : "true");
@@ -259,25 +266,25 @@
         if (maximize) {
             if (maximized) {
                 maximize.innerHTML = mdiSvg("restore");
-                maximize.setAttribute("title", "Tamaño estándar");
-                maximize.setAttribute("aria-label", "Tamaño estándar");
+                maximize.setAttribute("title", _t("Standard size"));
+                maximize.setAttribute("aria-label", _t("Standard size"));
                 maximize.setAttribute("aria-expanded", "true");
             } else {
                 maximize.innerHTML = mdiSvg("max");
-                maximize.setAttribute("title", "Maximizar");
-                maximize.setAttribute("aria-label", "Maximizar");
+                maximize.setAttribute("title", _t("Maximize"));
+                maximize.setAttribute("aria-label", _t("Maximize"));
                 maximize.setAttribute("aria-expanded", "false");
             }
         }
         if (closeBtn) {
             closeBtn.innerHTML = mdiSvg("close");
-            closeBtn.setAttribute("title", "Cerrar");
-            closeBtn.setAttribute("aria-label", "Cerrar");
+            closeBtn.setAttribute("title", _t("Close"));
+            closeBtn.setAttribute("aria-label", _t("Close"));
         }
     }
 
     function ensureAllCardChrome(dashboard) {
-        var cards = dashboard.querySelectorAll(".o_chatboo_dashboard_card");
+        var cards = dashboard.querySelectorAll(".o_ai_dashboard_card");
         var i;
         for (i = 0; i < cards.length; i++) {
             ensureCardChrome(cards[i]);
@@ -285,14 +292,14 @@
     }
 
     function hiddenTrayEl(dashboard) {
-        var toolbar = dashboard.querySelector(".o_chatboo_dashboard_toolbar");
+        var toolbar = dashboard.querySelector(".o_ai_dashboard_toolbar");
         if (!toolbar) {
             return null;
         }
         var tray = toolbar.querySelector(".o_chatboo_dashboard_hidden_tray");
         if (!tray) {
             tray = global.document.createElement("div");
-            tray.className = "o_chatboo_dashboard_hidden_tray o_chatboo_noexport";
+            tray.className = "o_chatboo_dashboard_hidden_tray o_ai_noexport";
             toolbar.insertBefore(tray, toolbar.firstChild);
         }
         return tray;
@@ -313,7 +320,7 @@
 
     function showAllHiddenCards(dashboard) {
         var cards = dashboard.querySelectorAll(
-            ".o_chatboo_dashboard_card.o_chatboo_dashboard_card_hidden"
+            ".o_ai_dashboard_card.o_chatboo_dashboard_card_hidden"
         );
         var i;
         for (i = 0; i < cards.length; i++) {
@@ -333,7 +340,7 @@
             return;
         }
         var hidden = dashboard.querySelectorAll(
-            ".o_chatboo_dashboard_card.o_chatboo_dashboard_card_hidden"
+            ".o_ai_dashboard_card.o_chatboo_dashboard_card_hidden"
         );
         while (tray.firstChild) {
             tray.removeChild(tray.firstChild);
@@ -355,7 +362,7 @@
                 var btn = global.document.createElement("button");
                 btn.type = "button";
                 btn.className = "btn btn-sm btn-outline-secondary o_chatboo_dashboard_restore";
-                btn.setAttribute("title", "Mostrar de nuevo");
+                btn.setAttribute("title", _t("Show again"));
                 btn.textContent = cardTitle(card) || card.getAttribute("data-card-id") || "Tarjeta";
                 btn.addEventListener("click", function (ev) {
                     ev.preventDefault();
@@ -368,7 +375,7 @@
         var showAll = global.document.createElement("button");
         showAll.type = "button";
         showAll.className = "btn btn-sm btn-link o_chatboo_dashboard_show_all";
-        showAll.textContent = "Mostrar todas";
+        showAll.textContent = _t("Show all");
         showAll.addEventListener("click", function (ev) {
             ev.preventDefault();
             showAllHiddenCards(dashboard);
@@ -378,7 +385,7 @@
 
     function demaximizeAll(dashboard, except) {
         var cards = dashboard.querySelectorAll(
-            ".o_chatboo_dashboard_card.o_chatboo_dashboard_card_maximized"
+            ".o_ai_dashboard_card.o_chatboo_dashboard_card_maximized"
         );
         var i;
         for (i = 0; i < cards.length; i++) {
@@ -410,13 +417,13 @@
     }
 
     function resetLayout(dashboard) {
-        var id = dashboard.getAttribute("data-chatboo-dashboard-id");
+        var id = dashboard.getAttribute("data-ai-dashboard-id");
         try {
             global.localStorage.removeItem(storageKey(id));
         } catch (e) {
             /* ignore */
         }
-        var cards = dashboard.querySelectorAll(".o_chatboo_dashboard_card");
+        var cards = dashboard.querySelectorAll(".o_ai_dashboard_card");
         var i;
         for (i = 0; i < cards.length; i++) {
             cards[i].classList.remove("o_chatboo_dashboard_card_hidden");
@@ -433,7 +440,7 @@
 
     function visibleCards(grid, except) {
         var nodes = grid.querySelectorAll(
-            ".o_chatboo_dashboard_card:not(.o_chatboo_dashboard_card_hidden)"
+            ".o_ai_dashboard_card:not(.o_chatboo_dashboard_card_hidden)"
         );
         var out = [];
         var i;
@@ -482,8 +489,8 @@
 
     function copySpanClasses(fromNode, toNode) {
         toNode.classList.toggle(
-            "o_chatboo_dashboard_card_span2",
-            fromNode.classList.contains("o_chatboo_dashboard_card_span2")
+            "o_ai_dashboard_card_span2",
+            fromNode.classList.contains("o_ai_dashboard_card_span2")
         );
     }
 
@@ -556,11 +563,11 @@
             if (ev.button !== 0 || active) {
                 return;
             }
-            var header = ev.target.closest(".o_chatboo_dashboard_card_header");
+            var header = ev.target.closest(".o_ai_dashboard_card_header");
             if (!header || ev.target.closest("button")) {
                 return;
             }
-            var card = header.closest(".o_chatboo_dashboard_card");
+            var card = header.closest(".o_ai_dashboard_card");
             if (
                 !card ||
                 card.classList.contains("o_chatboo_dashboard_card_hidden")
@@ -609,7 +616,7 @@
             global.document.addEventListener("pointercancel", onUp);
         });
 
-        var initCards = grid.querySelectorAll(".o_chatboo_dashboard_card");
+        var initCards = grid.querySelectorAll(".o_ai_dashboard_card");
         var ci;
         for (ci = 0; ci < initCards.length; ci++) {
             initCards[ci].setAttribute("draggable", "false");
@@ -618,9 +625,9 @@
 
     function bindCardActions(dashboard) {
         dashboard.addEventListener("click", function (ev) {
-            var closeBtn = ev.target.closest(".o_chatboo_dashboard_close");
+            var closeBtn = ev.target.closest(".o_ai_dashboard_close");
             if (closeBtn) {
-                var cardClose = closeBtn.closest(".o_chatboo_dashboard_card");
+                var cardClose = closeBtn.closest(".o_ai_dashboard_card");
                 if (cardClose) {
                     cardClose.classList.add("o_chatboo_dashboard_card_hidden");
                     saveLayout(dashboard);
@@ -628,9 +635,9 @@
                 }
                 return;
             }
-            var collapseBtn = ev.target.closest(".o_chatboo_dashboard_collapse");
+            var collapseBtn = ev.target.closest(".o_ai_dashboard_collapse");
             if (collapseBtn) {
-                var cardCol = collapseBtn.closest(".o_chatboo_dashboard_card");
+                var cardCol = collapseBtn.closest(".o_ai_dashboard_card");
                 if (!cardCol) {
                     return;
                 }
@@ -647,9 +654,9 @@
                 }
                 return;
             }
-            var maxBtn = ev.target.closest(".o_chatboo_dashboard_maximize");
+            var maxBtn = ev.target.closest(".o_ai_dashboard_maximize");
             if (maxBtn) {
-                var cardMax = maxBtn.closest(".o_chatboo_dashboard_card");
+                var cardMax = maxBtn.closest(".o_ai_dashboard_card");
                 if (!cardMax) {
                     return;
                 }
@@ -659,7 +666,7 @@
                 setCardMaximized(dashboard, cardMax, willMax);
                 return;
             }
-            var resetBtn = ev.target.closest(".o_chatboo_dashboard_reset");
+            var resetBtn = ev.target.closest(".o_ai_dashboard_reset");
             if (resetBtn) {
                 resetLayout(dashboard);
             }
@@ -674,7 +681,7 @@
             global.ChatbooCharts.relayout(dashboard);
             return;
         }
-        var blocks = dashboard.querySelectorAll(".o_chatboo_table_block");
+        var blocks = dashboard.querySelectorAll(".o_ai_table_block");
         var i;
         for (i = 0; i < blocks.length; i++) {
             var block = blocks[i];
@@ -752,7 +759,7 @@
     }
 
     function softResizeFallback(dashboard) {
-        var blocks = dashboard.querySelectorAll(".o_chatboo_table_block");
+        var blocks = dashboard.querySelectorAll(".o_ai_table_block");
         var i;
         for (i = 0; i < blocks.length; i++) {
             var block = blocks[i];
@@ -773,12 +780,12 @@
         ) {
             return;
         }
-        var grid = dashboard.querySelector(".o_chatboo_dashboard_grid");
+        var grid = dashboard.querySelector(".o_ai_dashboard_grid");
         if (!grid) {
             return;
         }
         expandMessageCanvas(dashboard);
-        var dashId = dashboard.getAttribute("data-chatboo-dashboard-id");
+        var dashId = dashboard.getAttribute("data-ai-dashboard-id");
         applyLayout(dashboard, readLayout(dashId));
         ensureAllCardChrome(dashboard);
         syncHiddenTray(dashboard);
@@ -796,7 +803,7 @@
         if (!root || !root.querySelectorAll) {
             return;
         }
-        var boards = root.querySelectorAll(".o_chatboo_dashboard");
+        var boards = root.querySelectorAll(".o_ai_dashboard");
         var i;
         for (i = 0; i < boards.length; i++) {
             hydrateDashboard(boards[i]);
@@ -807,7 +814,7 @@
         if (!root || !root.querySelectorAll) {
             return;
         }
-        var boards = root.querySelectorAll(".o_chatboo_dashboard");
+        var boards = root.querySelectorAll(".o_ai_dashboard");
         var i;
         for (i = 0; i < boards.length; i++) {
             if (boards[i]._chatbooDashboardRO) {

@@ -12,6 +12,8 @@ do run. Drop these names from ``ai.schema.fossil.init`` on every ``-u``.
 Do not add ``ai_safe_choice`` or ``ai_change_journal``.
 """
 
+from .engine_params import PREVIOUS_KEYS
+
 FOSSIL_TABLES = (
     'ai_agent_pns_ai_mcp_artifact_bundle_export_wizard_rel',
     'ai_api_server_pns_ai_mcp_artifact_bundle_export_wizard_rel',
@@ -24,7 +26,8 @@ FOSSIL_TABLES = (
     'pns_ai_mcp_relaxaicode_library',
     'pns_ai_mcp_relaxaicode_raw_result',
     'pns_ai_mcp_skill_capture_wizard',
-    'ai_provider_usage_day',
+    # Not 'ai_provider_usage_day': its daily totals are history. The table
+    # stays until a person moves or drops it (Seges PNS-87).
 )
 
 PROTECTED_TABLES = (
@@ -41,6 +44,8 @@ COMPOSE_VALUE_REMAP = (
 )
 
 # ORM-removed columns that may linger when O14 skips migrations/3.1.*.
+# Not ('ai_log', 'agent_id'): the agent code is history on old rows and
+# stays in the column until a person drops it (Seges PNS-87).
 LEFTOVER_COLUMNS = (
     ('ai_log', 'operation_code'),
     ('ai_agent', 'auto_link_mcp_nucleus'),
@@ -50,7 +55,63 @@ LEFTOVER_COLUMNS = (
     ('ai_provider', 'is_on_premise'),
     ('ai_agent', 'link_show_native'),
     ('ai_agent', 'link_show_pinned'),
+    # The temporary key PIN lived on the user until 3.1.838. It is now minted
+    # by the browser tab holding the key list and never reaches the database.
+    ('ai_mcp_user', 'key_pin'),
+    ('ai_mcp_user', 'key_pin_used'),
+    ('ai_mcp_user', 'key_pin_killed'),
 )
+
+
+# xmlids renamed when the models went from mcp_* to ai_* (3.1.519). Odoo 14
+# never runs that pre-migrate, so the rename runs here on every -u: the row
+# keeps its id, and a rule a person customised keeps the customisation.
+XMLID_RENAMES = (
+    ('mcp_log_user_rule', 'ai_log_user_rule'),
+    ('mcp_log_admin_rule', 'ai_log_admin_rule'),
+    ('menu_mcp_logs', 'menu_ai_log'),
+    ('menu_mcp_logs_admin', 'menu_ai_log_admin'),
+    ('action_mcp_logs', 'action_ai_log'),
+    ('action_mcp_logs_technical', 'action_ai_log_technical'),
+    ('action_mcp_logs_delete_menu_window', 'action_ai_log_delete_menu_window'),
+    ('view_mcp_log_tree_simple', 'view_ai_log_tree_simple'),
+    ('view_mcp_log_tree', 'view_ai_log_tree'),
+    ('view_mcp_log_form', 'view_ai_log_form'),
+    ('view_mcp_log_search', 'view_ai_log_search'),
+    ('access_mcp_log_user', 'access_ai_log_user'),
+    ('access_mcp_log_admin', 'access_ai_log_admin'),
+    ('menu_mcp_contexts', 'menu_ai_context'),
+    ('menu_mcp_contexts_writer', 'menu_ai_context_writer'),
+    ('action_mcp_contexts', 'action_ai_context'),
+    ('action_mcp_contexts_writer', 'action_ai_context_writer'),
+    ('view_mcp_context_tree', 'view_ai_context_tree'),
+    ('view_mcp_context_search', 'view_ai_context_search'),
+    ('view_mcp_context_form', 'view_ai_context_form'),
+    ('access_mcp_context_user', 'access_ai_context_user'),
+    ('access_mcp_context_writer', 'access_ai_context_writer'),
+    ('menu_mcp_change_journal', 'menu_ai_change_journal'),
+    ('action_mcp_change_journal', 'action_ai_change_journal'),
+    ('view_mcp_change_journal_search', 'view_ai_change_journal_search'),
+    ('view_mcp_change_journal_tree', 'view_ai_change_journal_tree'),
+    ('view_mcp_change_journal_form', 'view_ai_change_journal_form'),
+)
+
+
+def rename_leftover_xmlids(cr):
+    """Rename ``mcp_*`` xmlids to ``ai_*`` in place. Idempotent."""
+    for old, new in XMLID_RENAMES:
+        cr.execute(
+            "SELECT id FROM ir_model_data "
+            "WHERE module = 'pns_ai_mcp' AND name = %s",
+            (new,),
+        )
+        if cr.fetchone():
+            continue
+        cr.execute(
+            "UPDATE ir_model_data SET name = %s "
+            "WHERE module = 'pns_ai_mcp' AND name = %s",
+            (new, old),
+        )
 
 
 def _column_exists(cr, table, column):
@@ -198,3 +259,37 @@ def drop_leftover_columns(cr):
     """Drop ORM-removed columns (O19 leftovers 3.1.291 / 3.1.370 / 3.1.642)."""
     for table, column in LEFTOVER_COLUMNS:
         _drop_column_if_exists(cr, table, column)
+
+
+def promote_engine_params(cr):
+    """Move the engine's system parameters to their ``pns_ai.*`` names.
+
+    A value already stored under the new key wins; the old row goes. The
+    renamed row loses the external id of the module that seeded it, so
+    uninstalling that module does not take the engine's setting with it.
+    """
+    for old_key, new_key in PREVIOUS_KEYS:
+        cr.execute(
+            'SELECT id FROM ir_config_parameter WHERE key = %s', (old_key,),
+        )
+        row = cr.fetchone()
+        if not row:
+            continue
+        param_id = row[0]
+        cr.execute(
+            "DELETE FROM ir_model_data "
+            "WHERE model = 'ir.config_parameter' AND res_id = %s",
+            (param_id,),
+        )
+        cr.execute(
+            'SELECT 1 FROM ir_config_parameter WHERE key = %s', (new_key,),
+        )
+        if cr.fetchone():
+            cr.execute(
+                'DELETE FROM ir_config_parameter WHERE id = %s', (param_id,),
+            )
+        else:
+            cr.execute(
+                'UPDATE ir_config_parameter SET key = %s WHERE id = %s',
+                (new_key, param_id),
+            )

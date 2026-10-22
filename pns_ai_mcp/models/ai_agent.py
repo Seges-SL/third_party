@@ -48,7 +48,7 @@ class AIAgent(models.Model):
     every declaring agent at import time (no agent-to-agent inheritance).
 
     Typical agents:
-        code='pns_ai_chatboo'  →  inference (LLM via internal provider)
+        code='pns_ai_admin'    →  inference (LLM via internal provider)
         code='pns_ai_mcp'      →  endpoint (context+tools served to external LLM)
     """
     _name = 'ai.agent'
@@ -58,7 +58,7 @@ class AIAgent(models.Model):
     name = fields.Char(required=True, translate=True)
     code = fields.Char(
         required=True,
-        help="Technical identifier = module name: pns_ai_mcp, pns_ai_chatboo, …",
+        help="Technical identifier = module name: pns_ai_mcp, pns_ai_admin, …",
     )
     agent_type = fields.Selection(
         [('inference', 'Inference (internal LLM)'),
@@ -92,7 +92,7 @@ class AIAgent(models.Model):
         string='Owner module',
         readonly=True,
         help="Technical name of the module that owns this agent "
-             "(e.g. pns_ai_chatboo). Empty for user-created agents.",
+             "(e.g. pns_ai_mcp). Empty for user-created agents.",
     )
     provider_ids = fields.One2many(
         'ai.agent.provider',
@@ -249,29 +249,28 @@ class AIAgent(models.Model):
 
     @api.model
     def _drop_acl_security_factory_fossil(self):
-        """Old 3.1.281 seed wrote ``acl_security`` on an empty factory agent.
+        """Old seeds wrote ``acl_security`` on the empty factory agents.
 
-        The seed on disk is ``@pns_ai_mcp``. Drop that one token once, then
-        leave a later human edit alone.
+        Drop that one token on every module agent once, then leave a later
+        human edit alone. Each agent has its own stamp, named from its code.
         """
         icp = self.env['ir.config_parameter'].sudo()
-        stamp = 'pns_ai_mcp.fossil_acl_security_agent'
-        if icp.get_param(stamp):
-            return
-        agent = self.sudo().with_context(active_test=False).search(
-            [('code', '=', 'pns_ai_mcp')], limit=1,
-        )
-        if not agent:
-            return
-        lines = [
-            line.strip()
-            for line in (agent.default_context_codes or '').splitlines()
-            if line.strip()
-        ]
-        if 'acl_security' in lines:
-            kept = [line for line in lines if line != 'acl_security']
-            agent.write({'default_context_codes': '\n'.join(kept)})
-        icp.set_param(stamp, '1')
+        agents = self.sudo().with_context(active_test=False).search([
+            ('origin', '=', 'module'),
+        ])
+        for agent in agents:
+            stamp = '%s.fossil_acl_security_agent' % agent.code
+            if icp.get_param(stamp):
+                continue
+            lines = [
+                line.strip()
+                for line in (agent.default_context_codes or '').splitlines()
+                if line.strip()
+            ]
+            if 'acl_security' in lines:
+                kept = [line for line in lines if line != 'acl_security']
+                agent.write({'default_context_codes': '\n'.join(kept)})
+            icp.set_param(stamp, '1')
 
     @api.model
     def _clear_admin_auto_link_all_fossil(self):
@@ -376,11 +375,50 @@ class AIAgent(models.Model):
         if vals.get('origin', 'user') == 'user':
             vals['agent_type'] = 'inference'
 
+    def _module_ships_agent(self, agent):
+        """True when this module's data XML still declares ``agent.code``.
+
+        A factory row whose record left the XML is a leftover. A person
+        deletes it from the list. Agents the module still ships stay locked.
+        """
+        module_name = agent.module_name
+        if not module_name:
+            return True
+        from odoo.modules.module import get_module_path
+        root = get_module_path(module_name)
+        if not root:
+            return True
+        import os
+        codes = set()
+        for dirpath, dirnames, files in os.walk(root):
+            dirnames[:] = [
+                name for name in dirnames
+                if name not in ('i18n', 'static', 'tests', '__pycache__')
+            ]
+            for name in files:
+                if not name.endswith('.xml'):
+                    continue
+                path = os.path.join(dirpath, name)
+                try:
+                    text = open(path, encoding='utf-8').read()
+                except (OSError, UnicodeError):
+                    continue
+                if 'model="ai.agent"' not in text and "model='ai.agent'" not in text:
+                    continue
+                for chunk in text.split('<record '):
+                    if 'model="ai.agent"' not in chunk and "model='ai.agent'" not in chunk:
+                        continue
+                    for line in chunk.split('<field name="code">')[1:]:
+                        codes.add(line.split('<', 1)[0].strip())
+        return agent.code in codes
+
     def unlink(self):
-        """Prevent deletion of module-owned agents, except by their module's uninstall."""
+        """Prevent deletion of agents the module still ships, except on uninstall."""
         if self.env.context.get(MODULE_UNINSTALL_FLAG):
             return super().unlink()
-        protected = self.filtered(lambda a: a.origin == 'module')
+        protected = self.filtered(
+            lambda agent: agent.origin == 'module' and self._module_ships_agent(agent),
+        )
         if protected:
             names = ', '.join(protected.mapped('name'))
             raise UserError(_(
@@ -1258,7 +1296,7 @@ class AIAgent(models.Model):
             own_self_pack_code,
             parse_pin_tokens,
         )
-        factory_codes = ('pns_ai_mcp', 'pns_ai_chatboo')
+        Context = self.env['ai.context'].sudo().with_context(active_test=False)
         for agent in self:
             own = own_self_pack_code(agent.code)
             drop = {'self'}
@@ -1270,7 +1308,10 @@ class AIAgent(models.Model):
                     drop.add(token)
             vals = {}
             new_req = drop_pin_tokens(agent.required_context_codes, drop)
-            if agent.code in factory_codes and own:
+            if (
+                agent.origin == 'module' and own
+                and Context.search_count([('code', '=', own)])
+            ):
                 new_req = ensure_pin_token(new_req, own)
             if parse_pin_tokens(new_req) != parse_pin_tokens(
                 agent.required_context_codes

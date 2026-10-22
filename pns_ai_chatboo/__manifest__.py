@@ -4,7 +4,7 @@
 # Odoo reads this file with ast.literal_eval — no module docstring before `{`.
 {
     'name': 'Chatboo',
-    'version': '2.1.453',
+    'version': '2.1.538',
     'category': 'Patanegra AI',
     'summary': 'Conversational chat client (Chatboo) for the PNS AI MCP server.',
     'description': """
@@ -21,7 +21,7 @@ turn endpoint (SSE streaming) and the user interface.
     'website': '/pns_ai_chatboo/static/description/index.html',
     # Apache License 2.0 — see LICENSE file
     'license': 'Other OSI approved licence',
-    'depends': ['web', 'bus', 'pns_base', 'pns_ai_mcp'],
+    'depends': ['web', 'bus', 'mail', 'pns_base', 'pns_ai_mcp'],
     # openpyxl: extracción de .xlsx adjuntos (también en pns_ai_mcp; lo
     # declaramos aquí para que el deploy de Chatboo no se olvide en O14).
     'external_dependencies': {
@@ -34,11 +34,13 @@ turn endpoint (SSE streaming) and the user interface.
         'data/ai_agent_conversational.xml',
         'data/chatboo_context_data.xml',
         'data/chatboo_skill_data.xml',
-        'data/chatboo_icp_data.xml',
         'data/chatboo_async_cron.xml',
         'views/res_config_settings_mcp_agents_views.xml',
         'views/assets.xml',
         'views/chatboo_menus.xml',
+        'views/chatboo_canvas_page_views.xml',
+        'views/ai_log_door_views.xml',
+        'views/skill_capture_wizard_views.xml',
     ],
     'qweb': [
         'static/src/xml/chatboo_systray.xml',

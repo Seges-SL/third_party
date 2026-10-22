@@ -34,7 +34,9 @@ class AISkillParamLine(models.Model):
     )
     default = fields.Char(
         string='Default',
-        help='Empty = the default lives in the Code.',
+        help='Value used when the slash omits this parameter. '
+             'Tokens from the legend expand when the skill runs. '
+             'Empty = the default lives in the Code.',
     )
     required = fields.Boolean(
         string='Required',

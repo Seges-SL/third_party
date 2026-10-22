@@ -67,6 +67,9 @@ class ImportWhitelistWizard(models.TransientModel):
 
         Whitelist = self.env['ai.url.whitelist']
         created = updated = skipped = 0
+        created_names = []
+        updated_names = []
+        skipped_names = []
         errors = []
         warnings = list(extract_warnings)
 
@@ -81,6 +84,7 @@ class ImportWhitelistWizard(models.TransientModel):
                 )
                 if existing and not self.replace_existing:
                     skipped += 1
+                    skipped_names.append(domain)
                     continue
 
                 vals = {'domain': domain}
@@ -97,9 +101,11 @@ class ImportWhitelistWizard(models.TransientModel):
                 if existing:
                     existing.write(vals)
                     updated += 1
+                    updated_names.append(domain)
                 else:
                     Whitelist.create(vals)
                     created += 1
+                    created_names.append(domain)
             except Exception as e:
                 errors.append("%s: %s" % (domain, e))
                 _logger.error("Whitelist import error for %s: %s", domain, e)
@@ -111,4 +117,7 @@ class ImportWhitelistWizard(models.TransientModel):
             skipped=skipped,
             errors=errors,
             warnings=warnings,
+            created_names=created_names,
+            updated_names=updated_names,
+            skipped_names=skipped_names,
         )

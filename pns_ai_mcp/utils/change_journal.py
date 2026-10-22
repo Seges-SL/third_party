@@ -13,6 +13,9 @@ import json
 
 SCHEMA_VERSION = 1
 
+ICP_TRASH_DAYS = 'pns_ai_mcp.journal_trash_days'
+DEFAULT_TRASH_DAYS = 30
+
 MUTATING_OPS = frozenset({
     'create', 'write', 'copy', 'unlink', 'action', 'field_required',
 })
@@ -132,6 +135,10 @@ def initial_reversible(op, before_payload, after_payload):
             return True, 'write can restore before_json'
         return False, 'no before snapshot'
     if op == 'unlink':
+        meta = after.get('meta') or {}
+        ids = after.get('ids') or before.get('ids') or []
+        if meta.get('quarantine') and ids:
+            return True, 'unlink can restore archived records'
         return False, 'unlink revert is not supported in this version'
     if op == 'action':
         meta = after.get('meta') or {}
@@ -165,3 +172,16 @@ def one_line_summary(op, model, ids, change_kind=None):
     n = len(ids or [])
     kind = (' [%s]' % change_kind) if change_kind and change_kind != 'generic' else ''
     return '%s %s × %s%s' % (op or '?', model or '?', n, kind)
+
+
+def trash_days_from_param(raw, default=DEFAULT_TRASH_DAYS):
+    """Days a quarantined delete is kept. 0 = keep until someone empties."""
+    if raw is None or raw is False or str(raw).strip() == '':
+        return default
+    try:
+        days = int(raw)
+    except (TypeError, ValueError):
+        return default
+    if days < 0:
+        return default
+    return days

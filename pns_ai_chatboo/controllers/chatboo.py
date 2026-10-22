@@ -15,11 +15,16 @@ import logging
 import time
 
 from odoo import http, _
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 from odoo.http import request, Response
 
 from ..utils.chatboo_access import user_has_chatboo_access
-from ..utils.chatboo_product_icp import oversized_upload, upload_max_bytes
+from ..utils.chatboo_product_icp import (
+    CHATBOO_AGENT_CODE,
+    oversized_upload,
+    upload_max_bytes,
+    upload_violation,
+)
 from ..utils.compat import JSON_ROUTE_TYPE
 from ..utils.fx_rates import get_usd_fx
 
@@ -53,7 +58,7 @@ class ChatbooController(http.Controller):
             return {}
         if not session.exists() or session.user_id.id != request.env.uid:
             return {}
-        return {'chatboo_session_id': session.id}
+        return {'ai_session_ref': session.id}
 
     def _user_card_width_ratio(self):
         try:
@@ -67,11 +72,27 @@ class ChatbooController(http.Controller):
         except Exception:
             return False
 
+    def _canvas_available(self):
+        try:
+            return bool(request.env['chatboo.session'].canvas_available())
+        except Exception:
+            return False
+
     def _with_user_prefs(self, payload):
         data = dict(payload or {})
         data['card_width_ratio'] = self._user_card_width_ratio()
         data['show_series_stats'] = self._user_show_series_stats()
+        data['canvas_available'] = self._canvas_available()
         return data
+
+    def _own_session(self, session_id):
+        try:
+            session = request.env['chatboo.session'].browse(int(session_id))
+        except (TypeError, ValueError):
+            return request.env['chatboo.session'].browse()
+        if not session.exists() or session.user_id.id != request.env.uid:
+            return request.env['chatboo.session'].browse()
+        return session
 
     # ──────────────────────────── Salud / proveedor ────────────────────────────
 
@@ -322,6 +343,64 @@ class ChatbooController(http.Controller):
             _logger.error("Error fulfilling export %s: %s", session_id, e)
             return {'status': 'error', 'message': str(e)}
 
+    @http.route('/chatboo/canvas/build', type=JSON_ROUTE_TYPE, auth='user')
+    def canvas_build(self, session_id, tables=None, question=None, title=None, msg_index=None):
+        """Lay the tables of one answer out as a page, in the background."""
+        if not self._user_may_use_chatboo():
+            return self._chatboo_access_denied()
+        session = self._own_session(session_id)
+        if not session:
+            return {'status': 'error', 'message': _('Session not found')}
+        try:
+            return request.env['chatboo.canvas.job']._start(
+                session, tables, question=question, title=title,
+                msg_index=msg_index,
+            )
+        except Exception:
+            _logger.exception("Chatboo canvas button failed (session %s)", session.id)
+            return {'status': 'error', 'message': self._chatboo_failed()}
+
+    @http.route('/chatboo/canvas/state', type=JSON_ROUTE_TYPE, auth='user')
+    def canvas_state(self, job_id):
+        if not self._user_may_use_chatboo():
+            return self._chatboo_access_denied()
+        job = self._own_canvas_job(job_id)
+        if not job:
+            return {'status': 'error', 'message': _('Page not found')}
+        return job._client_state()
+
+    @http.route('/chatboo/canvas/running', type=JSON_ROUTE_TYPE, auth='user')
+    def canvas_running(self, session_id):
+        """Pages still on their way in this session, so a reload shows them again."""
+        if not self._user_may_use_chatboo():
+            return self._chatboo_access_denied()
+        session = self._own_session(session_id)
+        if not session:
+            return {'status': 'error', 'message': _('Session not found')}
+        Job = request.env['chatboo.canvas.job']
+        return {
+            'status': 'ok',
+            'jobs': [job._client_state() for job in Job._live_for(session)],
+        }
+
+    @http.route('/chatboo/canvas/cancel', type=JSON_ROUTE_TYPE, auth='user')
+    def canvas_cancel(self, job_id):
+        if not self._user_may_use_chatboo():
+            return self._chatboo_access_denied()
+        job = self._own_canvas_job(job_id)
+        if not job:
+            return {'status': 'error', 'message': _('Page not found')}
+        return {'status': 'ok', 'cancelled': bool(job.request_cancel())}
+
+    def _own_canvas_job(self, job_id):
+        try:
+            job_id = int(job_id)
+        except (TypeError, ValueError):
+            return False
+        return request.env['chatboo.canvas.job'].search([
+            ('id', '=', job_id), ('user_id', '=', request.env.uid),
+        ], limit=1)
+
     @http.route('/chatboo/export/xlsx', type=JSON_ROUTE_TYPE, auth='user')
     def export_xlsx(self, sections=None, filename=None):
         """Build an .xlsx with the same server writer as a named Excel download."""
@@ -352,6 +431,8 @@ class ChatbooController(http.Controller):
                 return {'status': 'error', 'message': 'Session not found'}
             if session.user_id.id != request.env.user.id:
                 return {'status': 'error', 'message': 'Access denied'}
+            # A turn finishing on this row must not hold the HTTP worker for good.
+            request.env.cr.execute("SET LOCAL lock_timeout = '10s'")
 
             if session.name and session.name.startswith('Session '):
                 first_user_prompt = None
@@ -428,26 +509,6 @@ class ChatbooController(http.Controller):
             return {'status': 'ok', 'deleted_count': count}
         except Exception as e:
             _logger.error("Error bulk deleting sessions: %s", e)
-            return {'status': 'error', 'message': str(e)}
-
-    @http.route('/chatboo/save_raw_for_template', type=JSON_ROUTE_TYPE, auth='user')
-    def save_raw_for_template(self, query, result_json):
-        """Guarda resultado JSON en bruto para crear plantillas. Solo MCP Managers."""
-        if not self._user_may_use_chatboo():
-            return self._chatboo_access_denied()
-        try:
-            if not request.env.user.has_group('pns_ai_mcp.group_ai_admin'):
-                return {'status': 'error', 'message': 'Solo administradores MCP pueden guardar resultados para plantillas.'}
-            if not result_json or not isinstance(result_json, (str, dict)):
-                return {'status': 'error', 'message': 'result_json requerido'}
-            json_str = result_json if isinstance(result_json, str) else json.dumps(result_json, ensure_ascii=False)
-            raw = request.env['pns_ai_mcp.relaxaicode_raw_result'].create({
-                'query': (query or '')[:500],
-                'result_json': json_str[:500000],
-            })
-            return {'status': 'ok', 'id': raw.id, 'message': 'Guardado. Ve a Resultados en bruto para crear la plantilla.'}
-        except Exception as e:
-            _logger.exception("Chatboo save_raw_for_template: %s", e)
             return {'status': 'error', 'message': str(e)}
 
     @http.route('/chatboo/dismiss_messages', type=JSON_ROUTE_TYPE, auth='user')
@@ -556,7 +617,7 @@ class ChatbooController(http.Controller):
             return self._chatboo_access_denied()
         try:
             agent_code = request.env['ai.agent'].resolve_inference_agent_code(
-                None, consumer_key='chatboo',
+                CHATBOO_AGENT_CODE,
             )
             Skill = request.env['ai.skill']
             skills = Skill.list_for_agent(agent_code)
@@ -681,7 +742,7 @@ class ChatbooController(http.Controller):
             providers = Provider.browse()
             try:
                 agent_code = request.env['ai.agent'].resolve_inference_agent_code(
-                    None, consumer_key='chatboo',
+                    CHATBOO_AGENT_CODE,
                 )
                 engine = request.env['ai.execution.engine']
                 failovers = engine.get_failovers(agent_code)
@@ -735,7 +796,9 @@ class ChatbooController(http.Controller):
             session_id = data.get('session_id')
             message = data.get('message')
             provider_id = data.get('provider_id')
-            history = data.get('history', [])
+            # The history comes from the saved session, never from the
+            # browser (PNS-61): it is read below, once the session is ours.
+            history = []
             screen_context = data.get('screen_context')
             images = data.get('images') or None
             image_names = data.get('image_names') or None
@@ -760,22 +823,33 @@ class ChatbooController(http.Controller):
             if not session:
                 session = Session.create({'user_id': request.env.uid})
             session_id = session.id
+            history = session.get_model_history()
             # Rows the user ticked in the answer. They travel with the
             # sentence: the worker says them to the engine and narrows the
             # dataset to them.
             session.remember_marks(data.get('refs'))
 
-            request.chatboo_options = {'chatboo_session_id': session_id}
+            request.ai_session_ref = session_id
+            request.mcp_source_channel = 'chatboo'
 
-            too_big = oversized_upload(request.env, images, files, image_names)
-            if too_big is not None:
-                mb = upload_max_bytes(request.env) // (1024 * 1024)
-                if too_big:
+            violation = upload_violation(request.env, images, files, image_names)
+            if violation is not None:
+                if violation['kind'] == 'count':
+                    _too_big_msg = _(
+                        'Too many files in one message (at most %s).'
+                    ) % violation['limit']
+                elif violation['kind'] == 'total':
+                    _too_big_msg = _(
+                        'The files together are larger than the upload limit (%s MB).'
+                    ) % (violation['limit'] // (1024 * 1024))
+                elif violation['name']:
                     _too_big_msg = _('"%(name)s" is larger than the upload limit (%(mb)s MB).') % {
-                        'name': too_big, 'mb': mb,
+                        'name': violation['name'],
+                        'mb': violation['limit'] // (1024 * 1024),
                     }
                 else:
-                    _too_big_msg = _('A file is larger than the upload limit (%s MB).') % mb
+                    _too_big_msg = _('A file is larger than the upload limit (%s MB).') % (
+                        violation['limit'] // (1024 * 1024))
 
                 def _too_big_stream():
                     yield self._sse_event('token', {'event': 'token', 'content': _too_big_msg})
@@ -788,7 +862,7 @@ class ChatbooController(http.Controller):
 
             # Comprobación rápida de proveedor → mensaje amable inmediato.
             resolved_code = request.env['ai.agent'].resolve_inference_agent_code(
-                None, consumer_key='chatboo',
+                CHATBOO_AGENT_CODE,
             )
             try:
                 _has_provider = bool(request.env['ai.execution.engine'].get_providers_for_agent(
@@ -942,7 +1016,7 @@ class ChatbooController(http.Controller):
         """
         try:
             agent_code = request.env['ai.agent'].resolve_inference_agent_code(
-                None, consumer_key='chatboo',
+                CHATBOO_AGENT_CODE,
             )
             agent = request.env['ai.agent'].search(
                 [('code', '=', agent_code)], limit=1,
@@ -1037,7 +1111,7 @@ class ChatbooController(http.Controller):
         """
         try:
             agent_code = request.env['ai.agent'].resolve_inference_agent_code(
-                None, consumer_key='chatboo',
+                CHATBOO_AGENT_CODE,
             )
             return request.env['ai.execution.engine'].resolve_provider(agent_code)
         except Exception:
@@ -1055,3 +1129,167 @@ class ChatbooController(http.Controller):
     def _sse_event(self, event_name, data_dict):
         payload = json.dumps(data_dict, ensure_ascii=False)
         return (f"event: {event_name}\ndata: {payload}\n\n").encode('utf-8')
+
+    @http.route(
+        '/chatboo/canvas/<int:session_id>', type='http', auth='user',
+        methods=['GET'],
+    )
+    def chatboo_canvas(self, session_id, **kwargs):
+        if not user_has_chatboo_access(request.env):
+            return request.not_found()
+        session = request.env['chatboo.session'].browse(session_id)
+        if not session.exists() or session.user_id.id != request.env.uid:
+            return request.not_found()
+        from odoo.addons.pns_ai_chatboo.models.chatboo_canvas import canvas_page
+        page = canvas_page(
+            session.canvas_design or '', session.canvas_title or '',
+            download_url='/chatboo/canvas/%s/download?rev=%s' % (
+                session.id, session.canvas_rev or 0,
+            ),
+            share_url='/chatboo/canvas/%s/share' % session.id,
+            csrf_token=request.csrf_token(),
+            people_url='/chatboo/share/people',
+        )
+        return request.make_response(
+            page, headers=[('Content-Type', 'text/html; charset=utf-8')],
+        )
+
+    def _shared_answer(self, shared):
+        return self._json_response({
+            'url': shared.url,
+            'people_url': '/chatboo/page/%s/people' % shared.id,
+            'people': shared.people(),
+        })
+
+    @http.route(
+        '/chatboo/share/people', type='http', auth='user', methods=['GET'],
+    )
+    def chatboo_share_people(self, q='', **kwargs):
+        """Internal users to pick from, read with the caller's own rights."""
+        if request.env.user.share:
+            return request.not_found()
+        return self._json_response(
+            request.env['chatboo.canvas.page'].people_matching(q),
+        )
+
+    @http.route(
+        '/chatboo/canvas/<int:session_id>/share', type='http', auth='user',
+        methods=['POST'],
+    )
+    def chatboo_canvas_share(self, session_id, user_ids='', **kwargs):
+        """A fixed copy of this canvas for the people picked in the panel."""
+        if not user_has_chatboo_access(request.env):
+            return request.not_found()
+        session = request.env['chatboo.session'].browse(session_id)
+        if not session.exists() or session.user_id.id != request.env.uid:
+            return request.not_found()
+        if not (session.canvas_design or '').strip():
+            return request.not_found()
+        pages = request.env['chatboo.canvas.page']
+        values = {
+            'design': session.canvas_design,
+            'owner_id': request.env.uid,
+            'user_ids': [(6, 0, pages.people_named(user_ids).ids)],
+        }
+        if (session.canvas_title or '').strip():
+            values['name'] = session.canvas_title.strip()
+        return self._shared_answer(pages.create(values))
+
+    @http.route(
+        '/chatboo/page/<int:page_id>/people', type='http', auth='user',
+        methods=['POST'],
+    )
+    def chatboo_shared_page_people(self, page_id, user_ids='', **kwargs):
+        """The owner changes who reads the page. Nobody else may."""
+        shared = self._readable_page(page_id)
+        if not shared or shared.owner_id.id != request.env.uid:
+            return request.not_found()
+        shared.write({
+            'user_ids': [(6, 0, shared.people_named(user_ids).ids)],
+        })
+        return self._shared_answer(shared)
+
+    def _readable_page(self, page_id):
+        """The shared page if the rules let this user read it, else empty."""
+        pages = request.env['chatboo.canvas.page']
+        try:
+            return pages.search([('id', '=', page_id)], limit=1)
+        except AccessError:
+            return pages.browse()
+
+    @http.route(
+        '/chatboo/page/<int:page_id>', type='http', auth='user',
+        methods=['GET'],
+    )
+    def chatboo_shared_page(self, page_id, **kwargs):
+        shared = self._readable_page(page_id)
+        if not shared:
+            return request.not_found()
+        from odoo.addons.pns_ai_chatboo.models.chatboo_canvas import canvas_page
+        owner = shared.owner_id.id == request.env.uid
+        sharing = {
+            'share_url': '/chatboo/page/%s/people' % shared.id,
+            'csrf_token': request.csrf_token(),
+            'people_url': '/chatboo/share/people',
+            'people': shared.people(),
+            'link': shared.url,
+        } if owner else {}
+        page = canvas_page(
+            shared.design or '', shared.name or '',
+            download_url='/chatboo/page/%s/download' % shared.id,
+            **sharing
+        )
+        return request.make_response(
+            page, headers=[('Content-Type', 'text/html; charset=utf-8')],
+        )
+
+    @http.route(
+        '/chatboo/page/<int:page_id>/download', type='http', auth='user',
+        methods=['GET'],
+    )
+    def chatboo_shared_page_download(self, page_id, **kwargs):
+        shared = self._readable_page(page_id)
+        if not shared or not (shared.design or '').strip():
+            return request.not_found()
+        from odoo.http import content_disposition
+        from odoo.addons.pns_ai_chatboo.models.chatboo_canvas import (
+            download_filename, downloadable_page,
+        )
+        return request.make_response(
+            downloadable_page(shared.design),
+            headers=[
+                ('Content-Type', 'text/html; charset=utf-8'),
+                ('Content-Disposition', content_disposition(
+                    download_filename(shared.name, shared.design),
+                )),
+                ('X-Content-Type-Options', 'nosniff'),
+            ],
+        )
+
+    @http.route(
+        '/chatboo/canvas/<int:session_id>/download', type='http', auth='user',
+        methods=['GET'],
+    )
+    def chatboo_canvas_download(self, session_id, **kwargs):
+        """The page as a file that opens anywhere, without Odoo."""
+        if not user_has_chatboo_access(request.env):
+            return request.not_found()
+        session = request.env['chatboo.session'].browse(session_id)
+        if not session.exists() or session.user_id.id != request.env.uid:
+            return request.not_found()
+        if not (session.canvas_design or '').strip():
+            return request.not_found()
+        from odoo.http import content_disposition
+        from odoo.addons.pns_ai_chatboo.models.chatboo_canvas import (
+            download_filename, downloadable_page,
+        )
+        return request.make_response(
+            downloadable_page(session.canvas_design),
+            headers=[
+                ('Content-Type', 'text/html; charset=utf-8'),
+                ('Content-Disposition', content_disposition(
+                    download_filename(session.canvas_title, session.canvas_design),
+                )),
+                ('X-Content-Type-Options', 'nosniff'),
+            ],
+        )

@@ -42,6 +42,9 @@ class ImportServersWizard(models.TransientModel):
         imported_count = 0
         updated_count = 0
         skipped_count = 0
+        created_names = []
+        updated_names = []
+        skipped_names = []
         errors = []
         import_warnings = list(extract_warnings)
 
@@ -57,13 +60,14 @@ class ImportServersWizard(models.TransientModel):
         }
 
         for server_data in json_data:
-            name = server_data.get('name')
+            name = server_data.get('name') or _('(no name)')
             try:
                 existing = server_model.with_context(active_test=False).search(
-                    [('name', '=', name)], limit=1
+                    [('name', '=', server_data.get('name'))], limit=1
                 )
                 if existing and not self.replace_existing:
                     skipped_count += 1
+                    skipped_names.append(name)
                     _logger.info("MCP: Servidor existente omitido: %s", name)
                     continue
 
@@ -101,9 +105,11 @@ class ImportServersWizard(models.TransientModel):
                     existing.write(vals)
                     target_server = existing
                     updated_count += 1
+                    updated_names.append(name)
                 else:
                     target_server = server_model.create(vals)
                     imported_count += 1
+                    created_names.append(name)
 
                 sel = server_data.get('selected_model')
                 if isinstance(sel, str):
@@ -132,4 +138,7 @@ class ImportServersWizard(models.TransientModel):
             skipped=skipped_count,
             errors=errors,
             warnings=import_warnings,
+            created_names=created_names,
+            updated_names=updated_names,
+            skipped_names=skipped_names,
         )

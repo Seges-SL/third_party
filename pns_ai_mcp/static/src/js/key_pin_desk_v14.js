@@ -10,10 +10,13 @@ odoo.define('pns_ai_mcp.key_pin_desk', function (require) {
     var WebClient = require('web.WebClient');
     var ajax = require('web.ajax');
     var core = require('web.core');
+    var session = require('web.session');
     var _t = core._t;
 
     var VAULT = 'pns.key.pin.vault';
+    var PINS = 'pns.key.pin.pins';
     var TOKEN = 'pns.key.pin.token';
+    var pinLen = 8;
     var inflight = {};
     var timer = null;
 
@@ -25,7 +28,7 @@ odoo.define('pns_ai_mcp.key_pin_desk', function (require) {
             return '';
         }
         if (!value) {
-            value = String(Date.now()) + Math.random().toString(16).slice(2);
+            value = deskToken();
             try {
                 sessionStorage.setItem(TOKEN, value);
             } catch (e2) {
@@ -33,6 +36,24 @@ odoo.define('pns_ai_mcp.key_pin_desk', function (require) {
             }
         }
         return value;
+    }
+
+    function deskToken() {
+        var buf = new Uint32Array(8);
+        if (window.crypto && crypto.getRandomValues) {
+            crypto.getRandomValues(buf);
+            var out = '';
+            for (var i = 0; i < buf.length; i++) {
+                out += ('00000000' + buf[i].toString(16)).slice(-8);
+            }
+            return out;
+        }
+        return String(Date.now()) + Math.random().toString(16).slice(2);
+    }
+
+    function stopUrl() {
+        var csrf = (window.odoo && window.odoo.csrf_token) || '';
+        return '/pns_ai_mcp/key_pin/stop?csrf_token=' + encodeURIComponent(csrf);
     }
 
     function vault() {
@@ -45,6 +66,82 @@ odoo.define('pns_ai_mcp.key_pin_desk', function (require) {
 
     function saveVault(map) {
         sessionStorage.setItem(VAULT, JSON.stringify(map || {}));
+    }
+
+    function pins() {
+        try {
+            return JSON.parse(sessionStorage.getItem(PINS) || '{}') || {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function savePins(map) {
+        sessionStorage.setItem(PINS, JSON.stringify(map || {}));
+    }
+
+    function makePin() {
+        var out = '';
+        var buf = new Uint32Array(pinLen);
+        if (window.crypto && crypto.getRandomValues) {
+            crypto.getRandomValues(buf);
+            for (var i = 0; i < pinLen; i++) {
+                out += String(buf[i] % 10);
+            }
+        } else {
+            for (var j = 0; j < pinLen; j++) {
+                out += String(Math.floor(Math.random() * 10));
+            }
+        }
+        return out;
+    }
+
+    function formatPin(raw) {
+        var digits = String(raw || '').replace(/\D/g, '');
+        return digits.replace(/(.{4})/g, '$1 ').trim();
+    }
+
+    // One PIN per person in the list, minted here. The server never sees a
+    // PIN until an app spends it, and never stores one.
+    function ensurePins() {
+        var rows = vault();
+        var map = pins();
+        var changed = false;
+        Object.keys(map).forEach(function (email) {
+            if (!(email in rows)) {
+                delete map[email];
+                changed = true;
+            }
+        });
+        Object.keys(rows).forEach(function (email) {
+            if (!map[email]) {
+                map[email] = makePin();
+                changed = true;
+            }
+        });
+        if (changed) {
+            savePins(map);
+        }
+        return map;
+    }
+
+    function dropPin(pin) {
+        var target = String(pin || '').replace(/\D/g, '');
+        if (!target) {
+            return;
+        }
+        var map = pins();
+        var changed = false;
+        Object.keys(map).forEach(function (email) {
+            if (map[email] === target) {
+                delete map[email];
+                changed = true;
+            }
+        });
+        if (changed) {
+            savePins(map);
+            renderPins();
+        }
     }
 
     function heldCount() {
@@ -97,9 +194,21 @@ odoo.define('pns_ai_mcp.key_pin_desk', function (require) {
         if (!payload || !payload.ask_id || inflight[payload.ask_id]) {
             return;
         }
-        var key = lookup(payload.email, payload.login);
-        if (!key) {
-            return;
+        var key = '';
+        if (payload.pin) {
+            var map = pins();
+            var holder = '';
+            Object.keys(map).forEach(function (email) {
+                if (map[email] === payload.pin) {
+                    holder = email;
+                }
+            });
+            key = holder ? (vault()[holder] || '') : '';
+        } else {
+            key = lookup(payload.email, payload.login);
+            if (!key) {
+                return;
+            }
         }
         inflight[payload.ask_id] = true;
         var done = function () {
@@ -129,6 +238,9 @@ odoo.define('pns_ai_mcp.key_pin_desk', function (require) {
         ajax.jsonRpc('/pns_ai_mcp/key_pin/desk', 'call', {
             token: current,
         }).then(function (result) {
+            if (result && result.pin_length >= 4 && result.pin_length <= 12) {
+                pinLen = result.pin_length;
+            }
             ((result && result.asks) || []).forEach(answer);
             if (after) {
                 after();
@@ -150,7 +262,9 @@ odoo.define('pns_ai_mcp.key_pin_desk', function (require) {
             '#pns-key-pin-layer{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:2000;',
             'display:flex;align-items:center;justify-content:center}',
             '#pns-key-pin-card{background:#fff;color:#1f1f1f;width:640px;max-width:92vw;',
-            'padding:16px;border-radius:8px}',
+            'padding:16px;border-radius:8px;',
+            'max-height:90vh;display:flex;flex-direction:column}',
+            '#pns-key-pin-card>*{flex-shrink:0}',
             '#pns-key-pin-card textarea{width:100%;min-height:220px;font-family:monospace}',
             '#pns-key-pin-card .row{margin-top:12px;text-align:right}',
             '#pns-key-pin-card .row button{margin-left:8px}',
@@ -161,6 +275,11 @@ odoo.define('pns_ai_mcp.key_pin_desk', function (require) {
             '#pns-key-pin-held:hover{background:#1558b0}',
             '#pns-key-pin-held .fa{font-size:16px}',
             '.o_mcp_key_pin_held_chip{margin-left:4px}',
+            '#pns-key-pin-card .pins{margin-top:12px;flex:1 1 auto;min-height:0;overflow-y:auto}',
+            '#pns-key-pin-card .pins .pinrow{display:flex;align-items:center;gap:8px;',
+            'padding:4px 0;border-top:1px solid #e0e0e0}',
+            '#pns-key-pin-card .pins .pinmail{flex:1;overflow:hidden;text-overflow:ellipsis}',
+            '#pns-key-pin-card .pins .pindigits{font-weight:700;letter-spacing:0.08em}',
         ].join('');
         document.head.appendChild(style);
     }
@@ -209,15 +328,67 @@ odoo.define('pns_ai_mcp.key_pin_desk', function (require) {
         }
         try {
             sessionStorage.removeItem(VAULT);
+            sessionStorage.removeItem(PINS);
         } catch (e) { /* ignore */ }
         paintHeld();
         tellList();
         if (current && navigator.sendBeacon) {
             navigator.sendBeacon(
-                '/pns_ai_mcp/key_pin/stop',
+                stopUrl(),
                 new Blob([JSON.stringify({token: current})], {type: 'application/json'})
             );
         }
+    }
+
+    function renderPins() {
+        var box = document.querySelector('#pns-key-pin-card .pins');
+        if (!box) {
+            return;
+        }
+        var map = ensurePins();
+        var emails = Object.keys(map).sort();
+        box.innerHTML = '';
+        if (!emails.length) {
+            return;
+        }
+        var head = document.createElement('h4');
+        head.textContent = _t('PINs in this tab');
+        box.appendChild(head);
+        var note = document.createElement('p');
+        note.className = 'hint';
+        note.textContent = _t('The PINs live only while this tab holds the list. Clear the list and they are gone.');
+        box.appendChild(note);
+        emails.forEach(function (email) {
+            var row = document.createElement('div');
+            row.className = 'pinrow';
+            var mail = document.createElement('span');
+            mail.className = 'pinmail';
+            mail.textContent = email;
+            var digits = document.createElement('span');
+            digits.className = 'pindigits';
+            digits.textContent = formatPin(map[email]);
+            var copy = document.createElement('button');
+            copy.type = 'button';
+            copy.className = 'btn btn-link o_key_pin_copy';
+            copy.setAttribute('data-pin', formatPin(map[email]));
+            copy.title = _t('Copy to clipboard');
+            copy.innerHTML = '<i class="fa fa-copy"></i>';
+            var again = document.createElement('button');
+            again.type = 'button';
+            again.className = 'btn btn-link';
+            again.textContent = _t('New PIN');
+            again.addEventListener('click', function () {
+                var fresh = pins();
+                fresh[email] = makePin();
+                savePins(fresh);
+                renderPins();
+            });
+            row.appendChild(mail);
+            row.appendChild(digits);
+            row.appendChild(copy);
+            row.appendChild(again);
+            box.appendChild(row);
+        });
     }
 
     function openLayer(onDone) {
@@ -231,6 +402,7 @@ odoo.define('pns_ai_mcp.key_pin_desk', function (require) {
         layer.innerHTML = [
             '<div id="pns-key-pin-card" role="dialog">',
             '<h3></h3><p></p><textarea></textarea><p class="hint"></p>',
+            '<div class="pins"></div>',
             '<div class="row">',
             '<button type="button" class="btn btn-secondary" data-act="clear"></button>',
             '<button type="button" class="btn btn-secondary" data-act="close"></button>',
@@ -272,6 +444,7 @@ odoo.define('pns_ai_mcp.key_pin_desk', function (require) {
         });
         layer.querySelector('[data-act=keep]').addEventListener('click', function () {
             saveVault(parseVault(area.value));
+            ensurePins();
             startDesk();
             shut();
             if (onDone) {
@@ -279,49 +452,49 @@ odoo.define('pns_ai_mcp.key_pin_desk', function (require) {
             }
         });
         document.body.appendChild(layer);
+        renderPins();
         area.focus();
     }
 
-    document.addEventListener('click', function (ev) {
-        var node = ev.target;
-        while (node && node !== document) {
-            if (node.classList && node.classList.contains('o_key_pin_copy')) {
-                ev.preventDefault();
-                ev.stopPropagation();
-                var text = node.getAttribute('data-pin') || '';
-                if (text && navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(text);
+    function bindDeskClicks() {
+        document.addEventListener('click', function (ev) {
+            var node = ev.target;
+            while (node && node !== document) {
+                if (node.classList && node.classList.contains('o_key_pin_copy')) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    var text = node.getAttribute('data-pin') || '';
+                    if (text && navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text);
+                    }
+                    return;
                 }
+                node = node.parentNode;
+            }
+        }, true);
+
+        document.addEventListener('click', function (ev) {
+            var node = ev.target;
+            while (node && node !== document) {
+                if (node.classList && node.classList.contains('o_mcp_key_pin_open')) {
+                    openLayer();
+                    return;
+                }
+                node = node.parentNode;
+            }
+        }, true);
+
+        window.addEventListener('pagehide', function () {
+            var current = token();
+            if (!current || !navigator.sendBeacon || !heldCount()) {
                 return;
             }
-            node = node.parentNode;
-        }
-    }, true);
-
-    document.addEventListener('click', function (ev) {
-        var node = ev.target;
-        while (node && node !== document) {
-            if (node.classList && node.classList.contains('o_mcp_key_pin_open')) {
-                openLayer();
-                return;
-            }
-            node = node.parentNode;
-        }
-    }, true);
-
-    window.pnsKeyPinOpen = openLayer;
-    window.pnsKeyPinHeldCount = heldCount;
-
-    window.addEventListener('pagehide', function () {
-        var current = token();
-        if (!current || !navigator.sendBeacon || !heldCount()) {
-            return;
-        }
-        navigator.sendBeacon(
-            '/pns_ai_mcp/key_pin/stop',
-            new Blob([JSON.stringify({token: current})], {type: 'application/json'})
-        );
-    });
+            navigator.sendBeacon(
+                stopUrl(),
+                new Blob([JSON.stringify({token: current})], {type: 'application/json'})
+            );
+        });
+    }
 
     function onBus(notifications) {
         (notifications || []).forEach(function (notif) {
@@ -340,28 +513,41 @@ odoo.define('pns_ai_mcp.key_pin_desk', function (require) {
             ) {
                 core.bus.trigger('pns_key_pin_changed');
             }
+            if (payload && payload.type === 'pns_key_pin_spent') {
+                dropPin(payload.pin);
+            }
             if (payload && (payload.type === 'pns_key_pin' || payload.ask_id)) {
                 answer(payload);
             }
         });
     }
 
-    WebClient.include({
-        start: function () {
-            var self = this;
-            return this._super.apply(this, arguments).then(function () {
-                try {
-                    self.call('bus_service', 'on', 'notification', self, onBus);
-                    self.call('bus_service', 'addChannel', 'partner');
-                    self.call('bus_service', 'startPolling');
-                } catch (e) { /* backend without bus */ }
-                paintHeld();
-                if (heldCount()) {
-                    startDesk();
-                }
-            });
-        },
-    });
+    function bootDesk() {
+        if (!session.pns_is_ai_admin) {
+            return;
+        }
+        bindDeskClicks();
+        window.pnsKeyPinOpen = openLayer;
+        window.pnsKeyPinHeldCount = heldCount;
+        WebClient.include({
+            start: function () {
+                var self = this;
+                return this._super.apply(this, arguments).then(function () {
+                    try {
+                        self.call('bus_service', 'on', 'notification', self, onBus);
+                        self.call('bus_service', 'addChannel', 'partner');
+                        self.call('bus_service', 'startPolling');
+                    } catch (e) { /* backend without bus */ }
+                    paintHeld();
+                    if (heldCount()) {
+                        startDesk();
+                    }
+                });
+            },
+        });
+    }
+
+    bootDesk();
 
     return {openLayer: openLayer, heldCount: heldCount};
 });

@@ -54,7 +54,7 @@
                     <field name="replace_existing"/>
                 </group>
                 <footer>
-                    <button name="action_import" string="Import bundle" type="object"
+                    <button name="action_preview" string="Review" type="object"
                             class="btn-primary" icon="fa-upload"/>
                     <button string="Cancel" special="cancel" class="btn-secondary"/>
                 </footer>

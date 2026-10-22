@@ -3,7 +3,8 @@ skill: users-all
 name: All users
 description: All system users (including archived) with login, name, email, type (internal/portal), active flag and last access.
 agent_codes:
-version: 1.3
+version: 1.4
+required_groups: pns_ai_mcp.group_ai_admin
 args_policy: none
 sequence: 22
 active: true

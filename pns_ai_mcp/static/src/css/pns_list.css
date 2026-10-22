@@ -7,9 +7,14 @@
     width: 100%;
 }
 
-.o_pns_list .o_list_table thead th,
 .o_pns_list .o_list_table tbody td {
     overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+}
+.o_pns_list .o_list_table thead th {
+    /* clip, not hidden: hidden on the sticky title drops the fixed header. */
+    overflow: clip;
     text-overflow: ellipsis;
     vertical-align: middle;
 }
@@ -41,18 +46,18 @@
 
 .o_pns_provider_list th[data-name="fit_chips_html"],
 .o_pns_provider_list td[data-name="fit_chips_html"] {
-    width: 15rem;
+    width: 22rem;
     overflow: visible;
     white-space: nowrap;
 }
 
 .o_pns_fit_chip {
     display: inline-block;
-    padding: 0 0.5rem;
-    margin-right: 0.25rem;
+    padding: 0.15rem 0.7rem;
+    margin-right: 0.35rem;
     border-radius: 999px;
-    font-size: 0.75rem;
-    line-height: 1.35rem;
+    font-size: 0.875rem;
+    line-height: 1.45rem;
     border: 1px solid transparent;
     color: #fff;
     background: #6c757d;
@@ -67,6 +72,7 @@
 .o_pns_fit_chip--vision { background: #28a745; }
 .o_pns_fit_chip--video { background: #fd7e14; }
 .o_pns_fit_chip--decision { background: #343a40; }
+.o_pns_fit_chip--design { background: #1565c0; }
 
 .o_pns_provider_list th[data-name="protocol"],
 .o_pns_provider_list td[data-name="protocol"] {
@@ -109,6 +115,24 @@
 .o_pns_context_list td[data-name="agent_ids"] {
     width: auto;
     min-width: 18rem;
+}
+
+/* MCP users: the flag columns give a quarter of their share to name and login. */
+.o_pns_mcp_user_list th[data-name="name"],
+.o_pns_mcp_user_list td[data-name="name"],
+.o_pns_mcp_user_list th[data-name="login"],
+.o_pns_mcp_user_list td[data-name="login"] {
+    /* important: Odoo writes a pixel width inline on every header. */
+    width: 18% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+}
+
+.o_pns_mcp_user_list th[data-name^="is_"],
+.o_pns_mcp_user_list td[data-name^="is_"] {
+    width: 8.3% !important;
+    min-width: 0 !important;
+    max-width: none !important;
 }
 
 /* Only the model catalogue sits above the Chatboo overlay (1050).

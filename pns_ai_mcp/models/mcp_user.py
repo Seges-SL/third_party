@@ -6,13 +6,12 @@
 import secrets
 import string
 from odoo import models, fields, api, _
-from odoo.tools import html_escape
 from odoo.exceptions import AccessError, UserError
 
 from ..utils import mcp_ui
 from ..utils.import_export_guard import ensure_ai_admin
 from ..utils.api_key import hash_api_key, normalize_to_hash
-from ..utils.key_pin import compact_pin, format_pin, pin_length, pin_shaped
+from ..utils.key_pin import compact_pin, pin_length, pin_shaped
 from ..utils.portable_io import export_record_dict, import_vals_from_dict
 from ..utils.compat import (
     USER_GROUPS_FIELD,
@@ -137,15 +136,9 @@ class MCPUser(models.Model):
         copy=False
     )
 
-    # Shown on the user list. The plaintext key is not stored here: a browser
-    # tab holding the admin's list answers with it when an app sends this PIN.
-    key_pin = fields.Char(string='PIN', copy=False, index=True)
-    key_pin_used = fields.Boolean(string='PIN used', copy=False, default=False)
-    key_pin_killed = fields.Boolean(string='PIN invalidated', copy=False, default=False)
-    key_pin_html = fields.Text(
-        string='PIN',
-        compute='_compute_key_pin_html',
-    )
+    # The temporary key PIN is not stored here, not even as a hash: it is
+    # minted by the browser tab holding the admin's key list, lives only in
+    # that tab, and dies with the list. See ai.key.pin.ask.
 
     # AI permission flags — synced with res.groups (compute + inverse).
     is_mcp_manager = fields.Boolean(
@@ -444,6 +437,7 @@ class MCPUser(models.Model):
         Returns:
             str: la API key en claro (mostrar una vez; solo se guarda su hash).
         """
+        self._ensure_key_admin()
         self.ensure_one()
         return self._do_generate_mcp_api_key()
 
@@ -454,6 +448,7 @@ class MCPUser(models.Model):
         Acepta tanto texto plano (se hashea) como un hash ya calculado
         proveniente de otra instancia (se guarda tal cual).
         """
+        self._ensure_key_admin()
         self.ensure_one()
         if not raw_key or not str(raw_key).strip():
             raise UserError(_("The API key value cannot be empty"))
@@ -635,7 +630,6 @@ class MCPUser(models.Model):
             self, user_data,
             skip_fields={
                 'user_id', 'mcp_api_key', 'api_key', 'mcp_api_key_hash',
-                'key_pin', 'key_pin_used', 'key_pin_killed', 'key_pin_html',
             },
         )
         warnings.extend(field_warnings)
@@ -655,8 +649,7 @@ class MCPUser(models.Model):
         """Export a single user record to a portable dict using dynamic fields."""
         try:
             data = export_record_dict(self, skip_fields={
-                'user_id', 'key_pin', 'key_pin_used', 'key_pin_killed',
-                'key_pin_html',
+                'user_id',
             }, include_secrets=include_secrets)
         except Exception:
             data = {'login': self.login or '', 'name': self.name or ''}
@@ -741,164 +734,63 @@ class MCPUser(models.Model):
             'target': 'new',
         }
 
-    def _ensure_pin_admin(self):
+    def _ensure_key_admin(self):
         if self.env.su or self.env.user._is_superuser():
             return
         if self.env.user.has_group('pns_ai_mcp.group_ai_admin'):
             return
-        raise AccessError(_(
-            'Only AI Administrators can manage temporary key PINs.'
-        ))
+        raise AccessError(_('Only AI Administrators can manage MCP API keys.'))
 
-    @api.depends('key_pin')
-    def _compute_key_pin_html(self):
-        desk = False
-        if 'ai.key.pin.desk' in self.env:
-            desk = self.env['ai.key.pin.desk'].sudo().any_open()
-        for rec in self:
-            shown = format_pin(rec.key_pin)
-            if not shown:
-                rec.key_pin_html = False
-                continue
-            # Live PIN only: spent ones are cleared, not painted grey/red.
-            color = '#1a73e8' if desk else '#1f1f1f'
-            rec.key_pin_html = (
-                '<span style="color:%s;font-weight:700;letter-spacing:0.08em">%s</span>'
-                '<button type="button" class="btn btn-link o_key_pin_copy" '
-                'data-pin="%s" title="%s" '
-                'style="padding:0 0 0 6px;vertical-align:baseline;">'
-                '<i class="fa fa-copy"></i></button>'
-                % (color, shown, shown, html_escape(_('Copy to clipboard')))
-            )
-
-    def _clear_key_pin(self):
-        """Wipe PIN digits and spent flags. Empty cell, like Delete API Key."""
-        self.write({
-            'key_pin': False,
-            'key_pin_used': False,
-            'key_pin_killed': False,
-        })
-
-    def action_key_pin_regenerate(self):
-        """New unused PIN. The previous one can no longer be handed out."""
-        self._ensure_pin_admin()
-        length = pin_length(self.env)
-        for rec in self:
-            rec._issue_key_pin(length)
-        if 'ai.key.pin.desk' in self.env:
-            self.env['ai.key.pin.desk'].sudo().notify_changed()
-        return False
-
-    def clear_key_pin(self):
-        """Delete the temporary PIN (same idea as Delete API Key)."""
-        self._ensure_pin_admin()
-        self._clear_key_pin()
-        if 'ai.key.pin.desk' in self.env:
-            self.env['ai.key.pin.desk'].sudo().notify_changed()
-        return False
-
-    def _issue_key_pin(self, length):
-        self.ensure_one()
-        pin = ''
-        for _try in range(30):
-            pin = ''.join(secrets.choice('0123456789') for _i in range(length))
-            clash = self.sudo().search([
-                ('id', '!=', self.id),
-                ('key_pin', '=', pin),
-            ], limit=1)
-            if not clash:
-                break
-        else:
-            raise UserError(_('Could not generate a free PIN. Try again.'))
-        self.write({
-            'key_pin': pin,
-            'key_pin_used': False,
-            'key_pin_killed': False,
-        })
-
-    # Seges: parche 10 (PNS-83, seguridad). Ver docs/pendiente/parches_pns_ai.md
     @api.model
     def _redeem_key_pin(self, raw, ip=None):
-        """Hand the existing API key for a live PIN, via the open browser tab.
+        """Hand the API key behind a temporary PIN, via the open browser tab.
 
-        Does not mark the PIN used. A value that is not PIN-shaped is not
-        an attempt. A correct API key must be checked by the caller first.
+        The PIN itself is never stored here: the tab holding the admin's key
+        list minted it and answers whose key it stands for. The server only
+        checks the shape, the per-IP budget, and that the supplied key's hash
+        belongs to an MCP user. Spending is not marked here:
+        ``_consume_key_pin`` tells the tab to drop the PIN once the app has
+        logged in. A value that is not PIN-shaped is not an attempt. A correct
+        API key must be checked by the caller first. *ip* is the address the
+        server saw, never one the client sent.
         """
         length = pin_length(self.env)
         raw = compact_pin(raw, length)
         if not pin_shaped(raw, length):
             return {'ok': False, 'error': 'invalid', 'counted': False}
         Block = self.env['ai.key.pin.block'].sudo()
-        # Seges: parche 10 (PNS-83, seguridad). Ver docs/pendiente/parches_pns_ai.md
         if Block._is_blocked(ip):
             return {'ok': False, 'error': 'blocked', 'counted': False}
-        rec = self.sudo().search([
-            ('key_pin', '=', raw),
-            ('key_pin_used', '=', False),
-            ('key_pin_killed', '=', False),
-        ], limit=1)
-        if not rec:
-            # Seges: parche 10 (PNS-83, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        if not self.env['ai.key.pin.desk'].sudo().any_open():
+            return {'ok': False, 'error': 'no_desk', 'counted': False}
+        got = self.env['ai.key.pin.ask'].sudo().collect_pin(raw)
+        if got is False:
             paused = Block._note_failure(ip)
             return {
                 'ok': False,
                 'error': 'blocked' if paused else 'invalid',
                 'counted': True,
             }
-        if not rec.mcp_api_key_hash:
-            return {'ok': False, 'error': 'no_key', 'counted': False}
-        if not self.env['ai.key.pin.desk'].sudo().any_open():
-            return {'ok': False, 'error': 'no_desk', 'counted': False}
-        email = (rec.email or '').strip().lower()
-        login = (rec.login or '').strip().lower()
-        got = self.env['ai.key.pin.ask'].sudo().collect(rec, email, login)
-        if got is False:
-            return {'ok': False, 'error': 'mismatch', 'counted': False}
         if not got:
             return {'ok': False, 'error': 'no_desk', 'counted': False}
+        owner = self.sudo().search([
+            ('mcp_api_key_hash', '=', hash_api_key(got)),
+        ], limit=1)
+        if not owner:
+            return {'ok': False, 'error': 'mismatch', 'counted': False}
         _logger.info(
             'MCP: temporary PIN handed the API key to an app for user %s',
-            rec.user_id.id,
+            owner.user_id.id,
         )
         return {'ok': True, 'api_key': got}
 
     @api.model
-    def consume_key_pin(self, raw, user):
-        """Wipe the PIN after the app has logged in with the key."""
+    def _consume_key_pin(self, raw, user):
+        """Tell the tab to drop the PIN, now the app has logged in with it."""
         raw = compact_pin(raw, pin_length(self.env))
         if not raw or not user:
             return False
-        rec = self.sudo().search([
-            ('key_pin', '=', raw),
-            ('key_pin_used', '=', False),
-            ('key_pin_killed', '=', False),
-            ('user_id', '=', user.id),
-        ], limit=1)
-        if not rec:
-            return False
-        rec._clear_key_pin()
         if 'ai.key.pin.desk' in self.env:
-            self.env['ai.key.pin.desk'].sudo().notify_changed()
+            self.env['ai.key.pin.desk'].sudo()._notify_pin_spent(raw)
         return True
-
-    @api.model
-    def _wipe_spent_key_pins(self):
-        """Leftover grey/red rows from older builds: clear them once."""
-        spent = self.sudo().search([
-            '|',
-            ('key_pin_used', '=', True),
-            ('key_pin_killed', '=', True),
-        ])
-        if spent:
-            spent._clear_key_pin()
-            _logger.info(
-                'MCP: wiped %s spent temporary key PIN(s)', len(spent),
-            )
-
-    def _register_hook(self):
-        super()._register_hook()
-        try:
-            self._wipe_spent_key_pins()
-        except Exception:
-            _logger.exception('MCP: wipe of spent key PINs skipped')
 

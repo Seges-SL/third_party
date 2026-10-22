@@ -62,6 +62,25 @@ _CTX_OVERFLOW_MARKERS = (
 )
 
 
+def _logged_tool_calls(tool_calls):
+    """Each tool call the model asked for, as ``{name, arguments}``.
+
+    Arguments come as the model wrote them, so a call the tool later
+    rejects, repairs or never runs is still on the row.
+    """
+    calls = []
+    for tc in tool_calls or ():
+        fn = (tc.get('function') or {}) if isinstance(tc, dict) else {}
+        args = fn.get('arguments')
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except ValueError:
+                pass
+        calls.append({'name': fn.get('name') or '', 'arguments': args})
+    return calls
+
+
 def _is_context_overflow(error):
     """True si el error indica que el prompt excede la ventana de contexto.
     En ese caso el failover es inútil: cualquier proveedor con ventana similar
@@ -82,7 +101,7 @@ class AIExecutionEngine(models.AbstractModel):
 
         engine = self.env['ai.execution.engine']
         response = engine.chat_completion(
-            agent_code='pns_ai_chatboo',
+            agent_code='pns_ai_admin',
             messages=[{'role': 'user', 'content': 'Hello!'}],
             tools=[...],  # optional MCP tool definitions
         )
@@ -91,7 +110,7 @@ class AIExecutionEngine(models.AbstractModel):
 
     Failover flow::
 
-        agent 'pns_ai_chatboo' → failovers sorted by priority
+        agent 'pns_ai_admin' → failovers sorted by priority
           → try provider A (priority=1) → HTTP 500 → log failover
           → try provider B (priority=2) → success → return response
 
@@ -194,8 +213,12 @@ class AIExecutionEngine(models.AbstractModel):
 
         ``need`` (one of ``provider_fit.FITS``) drops providers that do not
         admit it. No ``need`` is a text turn. No ticks: text only. A photo,
-        a clip, a video or a closed choice needs its own tick. An explicit
-        ``provider_id`` obeys the same ticks.
+        a clip, a video, a closed choice or a design needs its own tick. An
+        explicit ``provider_id`` obeys the same ticks.
+
+        A dialogue chain that admits nobody for that role is not a chain for
+        it. The active providers that carry the tick are the door, in id
+        order. No new failover link is created.
 
         Runtime use only: never ``Link.create`` the catalogue. Each inference
         agent owns its own failover chain. No agent borrows another agent's
@@ -226,9 +249,19 @@ class AIExecutionEngine(models.AbstractModel):
                 'AI: using %s system provider(s) for agent "%s" (no chain)',
                 len(found), agent_code,
             )
-        chain = self._without_external_after_local(
-            found.filtered(lambda provider: provider._fits(need)),
-        )
+        fitted = found.filtered(lambda provider: provider._fits(need))
+        uncapped = self._without_capped(fitted)
+        chain = self._without_external_after_local(uncapped)
+        # Text stays on the dialogue chain. A role that chain does not cover
+        # uses every active provider that admits it. No new link.
+        if not chain and need and need != 'conversation' and failovers:
+            found = self.env['ai.provider'].sudo().search(
+                [('active', '=', True)], order='id',
+            )
+            fitted = found.filtered(lambda provider: provider._fits(need))
+            uncapped = self._without_capped(fitted)
+            chain = self._without_external_after_local(uncapped)
+        chain = self._specialists_first(chain, need)
         # 1. A UI pick only narrows the chain; an id off the chain is ignored.
         if provider_id:
             try:
@@ -237,7 +270,37 @@ class AIExecutionEngine(models.AbstractModel):
                 picked = chain.browse()
             if picked:
                 return picked
+        if not chain and fitted and not uncapped:
+            raise UserError(_(
+                'No AI provider has available quota this month.'
+            ))
         return chain
+
+    @api.model
+    def _specialists_first(self, providers, need):
+        """A provider whose only job is this role goes first.
+
+        One tick means a model chosen for that role alone: cheaper and better
+        at it than a generalist that also holds the dialogue. Declared
+        priority still orders the specialists among themselves, and the
+        generalists among themselves.
+
+        The ordinary text turn is left exactly as the human wrote it: there
+        is no specialist in talking, and that chain is the one they tune.
+        """
+        from ..utils.provider_fit import is_specialist
+
+        if not need or need == 'conversation' or len(providers) < 2:
+            return providers
+        declared = {provider.id: idx for idx, provider in enumerate(providers)}
+        ranked = sorted(
+            providers,
+            key=lambda p: (
+                0 if is_specialist(p._fit_flags(), need) else 1,
+                declared[p.id],
+            ),
+        )
+        return providers.browse([provider.id for provider in ranked])
 
     @api.model
     def _without_external_after_local(self, providers):
@@ -252,26 +315,26 @@ class AIExecutionEngine(models.AbstractModel):
                 stop = True
         return providers.browse(kept)
 
-    def get_decision_providers(self):
-        """The decision agent chain, Decision tick only. Empty when none."""
-        from ..utils.ai_agent_registry import DECISION_AGENT_CODE
+    @api.model
+    def _without_capped(self, providers):
+        """Skip keys that already hit this month's inference cap."""
+        return providers.filtered(lambda provider: not provider.spend_cap_reached())
 
-        try:
-            return self.get_providers_for_agent(
-                DECISION_AGENT_CODE, need='decision',
-            )
-        except (UserError, RedirectWarning):
-            return self.env['ai.provider']
-
-    def choose(self, state, criteria, instructions, timeout=3):
-        """Ask the decision chain a closed Choice, in priority order.
+    def _choose(self, state, criteria, instructions, agent_code, timeout=3):
+        """Ask that agent's decision chain a closed Choice, in priority order.
 
         Returns ``(provider, answer)``. The provider is the one that answered;
         ``answer`` is ``None`` when every provider failed (provider = the
         last one tried) or there is none (empty provider).
         """
         provider = self.env['ai.provider']
-        for provider in self.get_decision_providers():
+        if not agent_code:
+            return provider, None
+        try:
+            chain = self.get_providers_for_agent(agent_code, need='decision')
+        except (UserError, RedirectWarning):
+            return provider, None
+        for provider in chain:
             try:
                 return provider, provider._choose(
                     state, criteria, instructions, timeout=timeout,
@@ -306,6 +369,7 @@ class AIExecutionEngine(models.AbstractModel):
         """
         from ..lib.llm.drivers import get_llm_driver
 
+        provider.assert_spend_cap()
         driver = get_llm_driver(provider.protocol)
         model_name = (provider.model_id.name if provider.model_id else None) or provider.model_name
         if not model_name:
@@ -325,7 +389,7 @@ class AIExecutionEngine(models.AbstractModel):
             'endpoint': endpoint,
             'api_key': provider._api_key_for_inference(),
             'model_name': model_name,
-            'temperature': provider.temperature or 0.7,
+            'temperature': provider.temperature_for_inference(),
             'send_temperature': provider.temperature_support != 'no',
             'stt_support': provider.stt_support or 'unknown',
             'context_window': provider.context_window or 32768,
@@ -334,6 +398,43 @@ class AIExecutionEngine(models.AbstractModel):
         return _LoggedProviderDriver(
             driver, self, provider, agent_code=agent_code,
         )
+
+    def log_role_without_provider(self, agent_code, need,
+                                  user_id=None, turn=None, turn_step=None,
+                                  source_channel=None, client_label=None):
+        """Persist that no provider carries the tick this call needed.
+
+        The user gets a soft notice inside the turn, but the person who can
+        tick the box reads the log. The row lands on the same turn thread,
+        so the Historial IA shows what was asked and what was missing.
+        """
+        if 'ai.log' not in self.env:
+            return
+        from .ai_log import CAPABILITY_SKIPPED
+        Log = self.env['ai.log'].sudo()
+        role = need or 'conversation'
+        turn, turn_step = self._resolve_log_threading(turn, turn_step)
+        agent_code, source_channel, client_label = self._bind_log_identity(
+            agent_code, source_channel, client_label,
+        )
+        try:
+            Log._create_log_entry(
+                user_id=user_id or self.env.user.id,
+                operation_type='read',
+                tool_name=CAPABILITY_SKIPPED,
+                request_type='LLM',
+                result_summary='No active provider carries the %s tick' % role,
+                prompt_data={'agent_code': agent_code, 'need': role},
+                turn=turn,
+                turn_step=turn_step,
+                source_channel=source_channel,
+                client_label=client_label,
+            )
+        except Exception as exc:
+            _logger.warning(
+                'AI engine: could not log the missing %s provider: %s',
+                role, exc,
+            )
 
     def log_provider_failover(self, agent_code, failed_provider, next_provider, error,
                               user_id=None, turn=None, turn_step=None,
@@ -362,7 +463,7 @@ class AIExecutionEngine(models.AbstractModel):
             agent_code, source_channel, client_label,
         )
         try:
-            Log.create_log_entry(
+            Log._create_log_entry(
                 user_id=user_id or self.env.user.id,
                 operation_type='read',
                 tool_name='provider_failover',
@@ -380,7 +481,6 @@ class AIExecutionEngine(models.AbstractModel):
                 turn=turn,
                 turn_step=turn_step,
                 source_channel=source_channel,
-                agent_code=agent_code,
                 client_label=client_label,
             )
         except Exception as exc:
@@ -392,6 +492,8 @@ class AIExecutionEngine(models.AbstractModel):
         Chatboo turns store ``mcp_turn`` in the env context because
         the SSE request object can be unbound mid-stream; prefer that over
         inventing a new id (which would orphan recipe-cache rows).
+        A context turn takes its step from the same counter as the engine,
+        so a row written from a job thread (no request) still gets one.
         """
         if turn is not None:
             return turn, turn_step
@@ -400,7 +502,7 @@ class AIExecutionEngine(models.AbstractModel):
         try:
             from odoo.http import request as http_request
             from ..utils.mcp_correlation import (
-                ensure_turn, next_turn_step,
+                claim_turn_step, ensure_turn, next_turn_step,
             )
             if ctx_turn:
                 turn = ctx_turn
@@ -408,11 +510,11 @@ class AIExecutionEngine(models.AbstractModel):
                     if http_request is not None:
                         if not getattr(http_request, 'mcp_turn', None):
                             http_request.mcp_turn = ctx_turn
-                        if not getattr(http_request, 'mcp_turn_step_counter', None):
-                            http_request.mcp_turn_step_counter = {}
-                        turn_step = next_turn_step(http_request, turn)
                 except Exception:
                     pass
+                turn_step = claim_turn_step(
+                    turn, seed=lambda: self._last_log_step(turn),
+                )
             else:
                 turn = ensure_turn(http_request)
                 turn_step = next_turn_step(http_request, turn)
@@ -420,6 +522,15 @@ class AIExecutionEngine(models.AbstractModel):
             if ctx_turn:
                 turn = ctx_turn
         return turn, turn_step
+
+    def _last_log_step(self, turn):
+        if not turn or 'ai.log' not in self.env:
+            return 0
+        last = self.env['ai.log'].sudo().search_read(
+            [('turn', '=', turn)], ['turn_step'],
+            order='turn_step desc', limit=1,
+        )
+        return (last[0]['turn_step'] or 0) if last else 0
 
     def _provider_model_label(self, provider, fallback=None):
         if not provider:
@@ -468,7 +579,7 @@ class AIExecutionEngine(models.AbstractModel):
                 num_tools,
             )
         try:
-            Log.create_log_entry(
+            Log._create_log_entry(
                 user_id=user_id or self.env.user.id,
                 operation_type='read',
                 tool_name='llm_orchestration',
@@ -479,7 +590,6 @@ class AIExecutionEngine(models.AbstractModel):
                 turn=turn,
                 turn_step=turn_step,
                 source_channel=source_channel,
-                agent_code=agent_code,
                 client_label=client_label,
             )
         except Exception as exc:
@@ -491,9 +601,13 @@ class AIExecutionEngine(models.AbstractModel):
         completion_tokens=None, total_tokens=None, cost_usd=None,
         usage=None, result_summary=None,
         result_data=None, user_id=None, turn=None, turn_step=None,
-        source_channel=None, client_label=None,
+        source_channel=None, client_label=None, tool_calls=None,
     ):
-        """Universal LLM → ORCH response row (endpoint ``llm_response``)."""
+        """Universal LLM → ORCH response row (endpoint ``llm_response``).
+
+        The row keeps the text and the tool calls (with their arguments)
+        the model sent back.
+        """
         if 'ai.log' not in self.env:
             return
         Log = self.env['ai.log'].sudo()
@@ -512,8 +626,16 @@ class AIExecutionEngine(models.AbstractModel):
                 result_summary = 'tool_calls: ' + ', '.join(tools)
             else:
                 result_summary = (preview[:300] if preview else '(empty)')
+        if result_data is None:
+            calls = _logged_tool_calls(tool_calls)
+            if preview or calls:
+                result_data = {}
+                if preview:
+                    result_data['content'] = preview
+                if calls:
+                    result_data['tool_calls'] = calls
         try:
-            Log.create_log_entry(
+            Log._create_log_entry(
                 user_id=user_id or self.env.user.id,
                 operation_type='read',
                 tool_name='llm_response',
@@ -524,9 +646,7 @@ class AIExecutionEngine(models.AbstractModel):
                     'provider': provider.name if provider else None,
                     'provider_id': provider.id if provider else None,
                 },
-                result_data=result_data if result_data is not None else (
-                    {'content': preview[:400]} if preview else None
-                ),
+                result_data=result_data,
                 agent_llm=model_label,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
@@ -536,7 +656,6 @@ class AIExecutionEngine(models.AbstractModel):
                 turn=turn,
                 turn_step=turn_step,
                 source_channel=source_channel,
-                agent_code=agent_code,
                 client_label=client_label,
             )
         except Exception as exc:
@@ -561,8 +680,14 @@ class AIExecutionEngine(models.AbstractModel):
         result_summary=None,
         status='ok',
         remote_ip=None,
+        prompt_data=None,
+        result_data=None,
     ):
-        """Universal gate: headless single row or ORCH↔LLM pair with tokens + USD."""
+        """Universal gate: headless single row or ORCH↔LLM pair with tokens + USD.
+
+        A single row keeps what the model was sent (``prompt_data``) and what
+        it answered (``result_data``) when the caller has them.
+        """
         if 'ai.log' not in self.env:
             return
         agent_code, source_channel, client_label = self._bind_log_identity(
@@ -601,16 +726,18 @@ class AIExecutionEngine(models.AbstractModel):
             extra['cost'] = cost_usd
         extra['status'] = status
         try:
-            self.env['ai.log'].sudo().create_log_entry(
+            self.env['ai.log'].sudo()._create_log_entry(
                 user_id=user_id or self.env.user.id,
                 operation_type='read',
                 tool_name=endpoint,
                 request_type='llm',
                 source_channel=source_channel,
-                agent_code=agent_code,
                 client_label=client_label,
+                provider_id=provider.id if provider else False,
                 agent_llm=model_label,
                 user_prompt=user_prompt,
+                prompt_data=prompt_data,
+                result_data=result_data,
                 result_summary=result_summary,
                 additional_info=json.dumps(extra, ensure_ascii=False) if extra else None,
                 prompt_tokens=ptok,
@@ -660,6 +787,7 @@ class AIExecutionEngine(models.AbstractModel):
         resp_step = (turn_step + 1) if turn_step is not None else None
         content = ''
         tool_names = []
+        tool_calls = []
         usage = {}
         try:
             message = (
@@ -673,7 +801,8 @@ class AIExecutionEngine(models.AbstractModel):
                     for part in content
                     if isinstance(part, dict)
                 )
-            for tc in (message.get('tool_calls') or []):
+            tool_calls = message.get('tool_calls') or []
+            for tc in tool_calls:
                 name = (tc.get('function') or {}).get('name')
                 if name:
                     tool_names.append(name)
@@ -688,6 +817,7 @@ class AIExecutionEngine(models.AbstractModel):
             agent_code=agent_code,
             content_preview=content,
             tool_names=tool_names,
+            tool_calls=tool_calls,
             model_label=model_label,
             prompt_tokens=ptok,
             completion_tokens=ctok,

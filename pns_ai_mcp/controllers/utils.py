@@ -59,12 +59,22 @@ class APIKeyLogFilter(logging.Filter):
 _logger.addFilter(APIKeyLogFilter())
 
 
+def mcp_jsonrpc_http_status(error_message, explicit=None):
+    """JSON-RPC body stays in the payload. Auth failures are HTTP 401."""
+    if explicit is not None:
+        return int(explicit)
+    if 'api key' in (error_message or '').lower():
+        return 401
+    return 200
+
+
 class MCPJSONRPCError(Exception):
     """Excepción personalizada para errores MCP con formato JSON-RPC"""
-    def __init__(self, error_code, error_message, request_id=None):
+    def __init__(self, error_code, error_message, request_id=None, http_status=None):
         self.error_code = error_code
         self.error_message = error_message
         self.request_id = request_id
+        self.http_status = mcp_jsonrpc_http_status(error_message, http_status)
         # Crear la respuesta JSON-RPC completa como string
         error_response = {
             'jsonrpc': '2.0',

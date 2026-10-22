@@ -1,9 +1,10 @@
 ---
 skill: sys-info
 name: System information
-description: Odoo version, series, database, server time, current user and company, user/company/module counts, and base URL.
+description: Odoo version, series, server time, current user and company, user/company/module counts, and base URL.
 agent_codes:
-version: 1.4
+version: 1.5
+required_groups: pns_ai_mcp.group_ai_admin
 args_policy: none
 sequence: 20
 active: true

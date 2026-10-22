@@ -166,8 +166,6 @@ def _extract_schema_from_function(func: Callable) -> Dict[str, Any]:
         }
 
 
-# Seges: parche de compatibilidad con Odoo 14 (Python 3.7 / Pillow 5.4). Ver docs/pendiente/parches_pns_ai.md
-# (tuple[...] -> Tuple[...]; Tuple añadido al import de typing de la línea 8)
 def _validate_arguments(schema: Dict[str, Any], arguments: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
     """
     Valida los argumentos contra el esquema.

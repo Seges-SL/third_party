@@ -5,10 +5,55 @@
 
 import random
 import string
+import threading
+from collections import OrderedDict
 
 _TURN_CHARS = string.ascii_uppercase + string.digits
 _TURN_BODY = 4
 _TURN_MAX = 8
+
+# Last step written per turn, in this process. The engine and the work it
+# starts (a tool, a side model call in a job thread) share no HTTP request,
+# so they count here to keep one order on the turn.
+_TURN_STEPS = OrderedDict()
+_TURN_STEPS_LOCK = threading.Lock()
+_TURN_STEPS_KEEP = 2000
+
+
+def open_turn_steps(turn_id):
+    """A turn starts: its steps count from 1 again."""
+    if not turn_id:
+        return
+    with _TURN_STEPS_LOCK:
+        _TURN_STEPS[turn_id] = 0
+        _TURN_STEPS.move_to_end(turn_id)
+        while len(_TURN_STEPS) > _TURN_STEPS_KEEP:
+            _TURN_STEPS.popitem(last=False)
+
+
+def claim_turn_step(turn_id, seed=None):
+    """Next step of ``turn_id``.
+
+    ``seed()`` returns the last step already stored, for a turn this
+    process has not counted yet.
+    """
+    if not turn_id:
+        return None
+    with _TURN_STEPS_LOCK:
+        known = turn_id in _TURN_STEPS
+    start = 0
+    if not known and seed is not None:
+        try:
+            start = int(seed() or 0)
+        except Exception:
+            start = 0
+    with _TURN_STEPS_LOCK:
+        step = _TURN_STEPS.get(turn_id, start) + 1
+        _TURN_STEPS[turn_id] = step
+        _TURN_STEPS.move_to_end(turn_id)
+        while len(_TURN_STEPS) > _TURN_STEPS_KEEP:
+            _TURN_STEPS.popitem(last=False)
+    return step
 
 
 def _clean_prefix(prefix):

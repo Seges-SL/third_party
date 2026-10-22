@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Chatboo card restore reads the same pending rows as Security."""
+"""Host card restore reads the same pending rows as Security."""
 from datetime import timedelta
 
 from odoo import api, fields
@@ -16,7 +16,7 @@ def _make_pending(env, user_id, title='card restore', vid_suffix='own'):
         records_count=1,
         changes_info={'plan': ['write partner'], 'danger_level': 'medium'},
         user_id=user_id,
-        tool_name='test_chatboo_pending_cards',
+        tool_name='test_pending_cards',
         operation_data={
             'plan_steps': [{
                 'op': 'write', 'model': 'res.partner',
@@ -30,7 +30,7 @@ def _make_pending(env, user_id, title='card restore', vid_suffix='own'):
 
 
 @tagged('post_install', '-at_install', 'pns_ai_mcp')
-class TestChatbooPendingCards(TransactionCase):
+class TestPendingCards(TransactionCase):
 
     def test_pending_payload_matches_sse_shape_and_skips_closed(self):
         mine = _make_pending(self.env, self.env.uid, title='my write')
@@ -46,7 +46,7 @@ class TestChatbooPendingCards(TransactionCase):
         )
 
         before = self.env['ai.safe.operation'].search_count([])
-        items = self.env['ai.safe.operation'].chatboo_pending_card_payloads()
+        items = self.env['ai.safe.operation'].pending_card_payloads()
         after = self.env['ai.safe.operation'].search_count([])
         self.assertEqual(before, after)
 
@@ -59,11 +59,17 @@ class TestChatbooPendingCards(TransactionCase):
         self.assertEqual(payload['title'], 'my write')
         self.assertEqual(payload['plan'], ['write partner'])
         self.assertEqual(payload['danger_level'], 'medium')
+        self.assertTrue(payload.get('confirm_token'))
+        peek = self.env['ai.safe.operation'].pending_card_payloads(
+            mint_token=False,
+        )
+        self.assertTrue(peek)
+        self.assertNotIn('confirm_token', peek[0])
         self.assertTrue(all(
             row['verification_id'] != closed.verification_id for row in items
         ))
         other_env = api.Environment(self.env.cr, other.id, {})
-        other_items = other_env['ai.safe.operation'].chatboo_pending_card_payloads()
+        other_items = other_env['ai.safe.operation'].pending_card_payloads()
         self.assertEqual(
             [row['title'] for row in other_items],
             ['theirs'],
@@ -73,7 +79,7 @@ class TestChatbooPendingCards(TransactionCase):
         op = _make_pending(self.env, self.env.uid, title='stale')
         past = fields.Datetime.now() - timedelta(hours=1)
         op.sudo().write({'create_date': past, 'expires_at': past})
-        items = self.env['ai.safe.operation'].chatboo_pending_card_payloads()
+        items = self.env['ai.safe.operation'].pending_card_payloads()
         self.assertNotIn(op.verification_id, [
             row['verification_id'] for row in items
         ])

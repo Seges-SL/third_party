@@ -3,9 +3,7 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Unit tests for session download helpers (pure functions)."""
 
-import unittest
-
-from odoo.tests import tagged
+from odoo.tests import tagged, TransactionCase
 
 from odoo.addons.pns_ai_mcp.utils.session_download import (
     build_binary_stored_meta,
@@ -17,8 +15,8 @@ from odoo.addons.pns_ai_mcp.utils.session_download import (
 )
 
 
-@tagged('post_install', '-at_install')
-class TestSessionDownload(unittest.TestCase):
+@tagged('standard', 'post_install', '-at_install')
+class TestSessionDownload(TransactionCase):
     def test_binary_content_type_pdf(self):
         self.assertTrue(is_binary_content_type('application/pdf'))
 

@@ -35,6 +35,30 @@ def unwrap_tool_payload(tool_result):
     return tool_result
 
 
+def rewrap_tool_payload(tool_result, payload):
+    """Write ``payload`` back where ``unwrap_tool_payload`` read it.
+
+    The inner payload of a wrapped result is a copy parsed from text. What
+    the engine adds to that copy (a page url laid out from the rows) is
+    lost unless it goes back into the text the bubble reads.
+    """
+    if not isinstance(tool_result, dict) or not isinstance(payload, dict):
+        return False
+    if payload is tool_result:
+        return True
+    blocks = tool_result.get('content')
+    if not (
+        isinstance(blocks, list) and blocks
+        and isinstance(blocks[0], dict) and blocks[0].get('type') == 'text'
+    ):
+        return False
+    try:
+        blocks[0]['text'] = json.dumps(payload, ensure_ascii=False, default=str)
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
 def summarize_safe_plan_request(result_str, max_len=480):
     """One-line ai.log summary for ``safe_plan_request`` tool results.
 
@@ -107,10 +131,10 @@ def append_local_warm_footer(html_content, footer_text=None):
     if not text:
         return html_content
     # No duplicar si el skill ya cerró con un párrafo similar
-    if 'o_chatboo_local_footer' in html_content:
+    if 'o_ai_local_footer' in html_content:
         return html_content
     return (
-        '%s<p class="text-muted mt-2 mb-0 o_chatboo_local_footer">%s</p>'
+        '%s<p class="text-muted mt-2 mb-0 o_ai_local_footer">%s</p>'
         % (html_content, html.escape(text))
     )
 
@@ -133,14 +157,14 @@ def append_local_warm_footer(html_content, footer_text=None):
 
 REMOTE_FORMAT_SYSTEM_HINT = (
     '[compose-model] You own the ENTIRE response UI for this turn. '
-    'The server will NOT auto-push a Chatboo table or Gráfico toolbar. '
+    'The server will NOT auto-push a chat table or Gráfico toolbar. '
     'Markdown/HTML prose for narrative, greetings, captions and drawings — '
     'never a pipe table. footmode and showmode do not apply. '
-    'A drawing the user asked for: emit the SVG markup; Chatboo files it as a '
+    'A drawing the user asked for: emit the SVG markup; the chat files it as a '
     'session chip — leftover text stays prose. Do not wrap that text in a table. '
     'DATA PLOTS only when THIS turn has real rows/series: then you MAY embed '
-    'data-chatboo-dataset or formatted_text table HTML. SINGLE-FACT CARD: '
-    '{"card": {kind: "fact"|"link", …}} (data-chatboo-card). '
+    'data-ai-dataset or formatted_text table HTML. SINGLE-FACT CARD: '
+    '{"card": {kind: "fact"|"link", …}} (data-ai-card). '
     'Time/date: several places → structured rows; not kind clock. LINK CARD: '
     '{"card": {kind: "link", url, title}}. Do not emit SVG paths for bar/line/pie '
     'plots. Do NOT claim a table is already visible unless you embedded it. '
@@ -317,11 +341,26 @@ def local_tool_result_for_llm(result):
     return stub
 
 
-def local_owns_tabular_paint(remote_flag, payload, *, force_retry=False):
-    """True when compose-agent must paint this table (and stub the LLM)."""
+def local_owns_tabular_paint(
+    remote_flag, payload, *, force_retry=False, inspect_only=False,
+):
+    """True when compose-agent must paint this table (and stub the LLM).
+
+    ``inspect_only``: the model asked ``return_mode=inspect_result``. Its
+    rows are a lookup for the next step, not the answer, so they stay off
+    the bubble. A page it built or changed is still shown.
+    """
     if remote_flag or force_retry:
         return False
     if _payload_is_tool_error(payload):
+        return False
+    try:
+        from .result_page import has_page_url
+    except ImportError:
+        from result_page import has_page_url  # type: ignore
+    if has_page_url(payload):
+        return True
+    if inspect_only:
         return False
     return payload_has_tabular_rows(payload)
 

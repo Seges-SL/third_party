@@ -22,8 +22,9 @@ The system has three layers:
     ┌─────────────────────────────────────┐
     │  LLMDriver  (this interface)        │  ← SPI contract
     │    ├── OpenAIDriver                 │     HTTP POST + Bearer token
+    │    ├── OpenRouterDriver             │     OpenAI-compatible + extras
     │    ├── AnthropicDriver              │     HTTP POST + x-api-key
-    │    └── OllamaDriver(OpenAIDriver)   │     Inherits OpenAI, defaults
+    │    └── SystemOneDriver              │     closed Choice, no chat
     └─────────────────────────────────────┘
 
 Driver lifecycle

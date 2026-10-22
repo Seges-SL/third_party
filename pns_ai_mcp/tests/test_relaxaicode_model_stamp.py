@@ -4,14 +4,16 @@
 """__model stamp: universal formula (display_name + overlap), no domain hardcode."""
 from odoo.tests import tagged, TransactionCase
 
-from odoo.addons.pns_ai_mcp.controllers.tools_relaxaicode import (
-    _coerce_record_id,
-    _iter_all_tabular_row_lists,
+from odoo.addons.pns_ai_mcp.controllers.relaxaicode_models import (
     _models_from_code,
     _pick_best_model_fit,
     _related_models_from_code,
     _score_record_fit,
     _stamp_models,
+)
+from odoo.addons.pns_ai_mcp.controllers.relaxaicode_rows import (
+    _coerce_record_id,
+    _iter_all_tabular_row_lists,
 )
 
 
@@ -136,7 +138,7 @@ class TestRelaxAICodeModelStamp(TransactionCase):
 
     def test_backfill_id_from_namespace_recordset(self):
         """Filas sin id: se rellenan emparejando name con el recordset del sandbox."""
-        from odoo.addons.pns_ai_mcp.controllers.tools_relaxaicode import (
+        from odoo.addons.pns_ai_mcp.controllers.relaxaicode_models import (
             _backfill_missing_record_ids,
             _stamp_models,
         )
@@ -172,7 +174,7 @@ class TestRelaxAICodeModelStamp(TransactionCase):
 
     def test_backfill_id_via_rec_name_search(self):
         """Sin recordset en namespace: search por _rec_name si hay un solo modelo."""
-        from odoo.addons.pns_ai_mcp.controllers.tools_relaxaicode import (
+        from odoo.addons.pns_ai_mcp.controllers.relaxaicode_models import (
             _backfill_missing_record_ids,
         )
         Partner = self.env['res.partner']
@@ -243,7 +245,7 @@ class TestRelaxAICodeModelStamp(TransactionCase):
 
     def test_stamp_from_xmlid_column(self):
         """Celda XML=module.name → __model inequívoco (evita empates de id)."""
-        from odoo.addons.pns_ai_mcp.controllers.tools_relaxaicode import (
+        from odoo.addons.pns_ai_mcp.controllers.relaxaicode_rows import (
             _model_id_from_xmlid_row,
         )
 
@@ -273,7 +275,7 @@ class TestRelaxAICodeModelStamp(TransactionCase):
         Si el campo pedido no existe (logo), la miniatura sale de una imagen
         que el registro sí tiene, no de una URL con ese texto.
         """
-        from odoo.addons.pns_ai_mcp.controllers.tools_relaxaicode import (
+        from odoo.addons.pns_ai_mcp.controllers.relaxaicode_rows import (
             _postprocess_images,
         )
 

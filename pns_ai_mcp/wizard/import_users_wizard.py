@@ -44,6 +44,9 @@ class ImportUsersWizard(models.TransientModel):
         created_count = 0
         updated_count = 0
         skipped_count = 0
+        created_names = []
+        updated_names = []
+        skipped_names = []
         keys_imported_count = 0
         missing_logins = []
         other_errors = []
@@ -102,6 +105,7 @@ class ImportUsersWizard(models.TransientModel):
                                 except Exception as fe:
                                     other_errors.append("%s: field '%s' failed: %s" % (login, k, fe))
                         updated_count += 1
+                        updated_names.append(login)
                         if has_key:
                             keys_imported_count += 1
                     elif has_key and not (existing.mcp_api_key_hash or '').strip():
@@ -114,9 +118,11 @@ class ImportUsersWizard(models.TransientModel):
                         except Exception as we:
                             other_errors.append("%s: API key write failed: %s" % (login, we))
                         updated_count += 1
+                        updated_names.append(login)
                         keys_imported_count += 1
                     else:
                         skipped_count += 1
+                        skipped_names.append(login)
                 else:
                     try:
                         user_model.sudo().create(vals)
@@ -131,6 +137,7 @@ class ImportUsersWizard(models.TransientModel):
                             other_errors.append("%s: create failed: %s" % (login, ce2))
                             continue
                     created_count += 1
+                    created_names.append(login)
                     if has_key:
                         keys_imported_count += 1
 
@@ -146,5 +153,8 @@ class ImportUsersWizard(models.TransientModel):
             skipped=skipped_count,
             linked=keys_imported_count,
             errors=other_errors,
+            created_names=created_names,
+            updated_names=updated_names,
+            skipped_names=skipped_names,
             detail='\n'.join(missing_logins) if missing_logins else None,
         )

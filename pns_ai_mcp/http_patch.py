@@ -3,6 +3,10 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Root.get_request patch (Odoo <= 15): serve MCP type='http' routes that carry
 a Content-Type of application/json (Cursor Streamable HTTP, Antigravity, etc.).
+
+The replacement lives on the Python process (one Odoo can host several
+databases). It only changes POST JSON to ``/mcp`` and ``/mcp/*``. A database
+without this module has no such route, so the extra branch is a no-op there.
 """
 
 import odoo

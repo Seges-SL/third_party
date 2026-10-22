@@ -163,6 +163,16 @@ msgstr "El modelo no devolvió contenido. Revisa el proveedor de IA (endpoint ac
 
 #. module: pns_ai_chatboo
 #: code:addons/pns_ai_chatboo/models/chatboo_async_request.py:0
+msgid "The conversation could not be saved before the reply. Try again."
+msgstr "No se pudo guardar la conversación antes de la respuesta. Vuelve a intentarlo."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_async_request.py:0
+msgid "The reply could not be saved in the conversation because it is busy. Reload the chat and ask again."
+msgstr "La respuesta no se pudo guardar en la conversación porque está ocupada. Recarga el chat y vuelve a preguntar."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_async_request.py:0
 msgid "(incomplete response: interrupted by a server restart)"
 msgstr "(respuesta incompleta: interrumpida por un reinicio del servidor)"
 
@@ -177,9 +187,9 @@ msgid "The request could not be started. Please resend."
 msgstr "No se pudo iniciar la petición. Vuelve a enviarla."
 
 #. module: pns_ai_chatboo
-#: code:addons/pns_ai_chatboo/models/chatboo_async_request.py:0
-msgid "A Chatboo turn can only run in your own session."
-msgstr "Un turno de Chatboo solo puede ejecutarse en tu propia sesión."
+#: code:addons/pns_ai_chatboo/models/chatboo_job.py:0
+msgid "A Chatboo job can only run in your own session."
+msgstr "Un trabajo de Chatboo solo puede ejecutarse en tu propia sesión."
 
 #. module: pns_ai_chatboo
 msgid "No AI provider is configured for the \"%s\" role. Assign at least one AI provider to this role before using the assistant."
@@ -215,12 +225,6 @@ msgstr "Generación cancelada."
 #: model:ir.model.fields.selection,name:pns_ai_chatboo.selection__chatboo_async_request__state__error
 msgid "Error"
 msgstr "Error"
-
-#. module: pns_ai_chatboo
-#. openerp-web
-#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
-msgid "Error while saving"
-msgstr "Error al guardar"
 
 #. module: pns_ai_chatboo
 #. openerp-web
@@ -321,6 +325,8 @@ msgid "messages"
 msgstr "mensajes"
 
 #. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_dashboard.js:0
 msgid "Close"
 msgstr "Cerrar"
 
@@ -569,6 +575,8 @@ msgstr "Común"
 #. module: pns_ai_chatboo
 #. openerp-web
 #: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_canvas_page__owner_id
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.chatboo_canvas_page_view_search
 msgid "Owner"
 msgstr "Propietario"
 
@@ -853,13 +861,13 @@ msgstr "Showmode por defecto"
 
 #. module: pns_ai_chatboo
 #: model:ir.model.fields,field_description:pns_ai_chatboo.field_res_config_settings__chatboo_xlsx_float_decimals
-msgid "Excel float decimals"
-msgstr "Decimales de Excel (coma flotante)"
+msgid "Decimals"
+msgstr "Decimales"
 
 #. module: pns_ai_chatboo
 #: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_xlsx_float_decimals
-msgid "Decimal places for floating-point values and formula cells in Excel exports. Integers stay whole. 0–10."
-msgstr "Cifras decimales de los valores en coma flotante y de las celdas con fórmula en la exportación a Excel. Los enteros se quedan enteros. 0–10."
+msgid "Decimal places of decimal numbers in the chat table, PDF, Word and Excel. Integers stay whole. Equal to the company currency (EUR 2, KWD 3, JPY 0), it follows the currency. 0–10."
+msgstr "Cifras decimales de los números con decimales en la tabla del chat, el PDF, el Word y el Excel. Los enteros se quedan enteros. Si coincide con la moneda de la empresa (EUR 2, KWD 3, JPY 0), sigue a la moneda. 0–10."
 
 #. module: pns_ai_chatboo
 #: model:ir.model.fields,field_description:pns_ai_chatboo.field_res_config_settings__chatboo_xlsx_thousands
@@ -873,8 +881,8 @@ msgstr "Muestra el separador de millares en todas las celdas numéricas de Excel
 
 #. module: pns_ai_chatboo
 #: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
-msgid "Decimals for floats and formula cells in Excel (integers stay whole)."
-msgstr "Decimales de flotantes y fórmulas en Excel (los enteros se quedan enteros)."
+msgid "Decimals in the chat table, PDF, Word and Excel (integers stay whole). By default, those of the company currency."
+msgstr "Decimales en la tabla del chat, el PDF, el Word y el Excel (los enteros se quedan enteros). Por defecto, los de la moneda de la empresa."
 
 #. module: pns_ai_chatboo
 #: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
@@ -1400,6 +1408,31 @@ msgstr "El skill /%s no tiene Code capturable."
 #: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
 msgid "This turn ran /%s. The wizard has that skill's Code and Procedure (not a new query)."
 msgstr "Este turno ejecutó /%s. El asistente trae el Code y el Procedure de ese skill (no una consulta nueva)."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "This turn ran /%s. The wizard captures it as /%s."
+msgstr "Este turno ejecutó /%s. El asistente lo captura como /%s."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_session.py:0
+msgid "This skill opens the page from that turn. Each run fills it with live rows and does not call Design."
+msgstr "Este skill abre la página de ese turno. Cada ejecución la rellena con filas nuevas y no llama a Diseño."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/skill_capture_wizard.py:0
+msgid "This page mixed data into the design. It cannot be saved as a skill."
+msgstr "Esta página mezcló los datos con el diseño. No se puede guardar como skill."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/skill_capture_wizard.py:0
+msgid "This page mixed data into the design (%s). It cannot be saved as a skill."
+msgstr "Esta página mezcló los datos con el diseño (%s). No se puede guardar como skill."
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_session__canvas_turn
+msgid "Canvas turn"
+msgstr "Turno del lienzo"
 
 #. module: pns_ai_chatboo
 #. openerp-web
@@ -2061,7 +2094,301 @@ msgstr "«%(name)s» supera el límite de subida (%(mb)s MB)."
 #, python-format
 msgid "A file is larger than the upload limit (%s MB)."
 msgstr "Un fichero supera el límite de subida (%s MB)."
+
 #. module: pns_ai_chatboo
 #: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
 msgid "Each picture or file sent to the chat. 0 = no limit."
 msgstr "Cada imagen o fichero que se envía al chat. 0 = sin límite."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/models/chatboo_canvas.py:0
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Canvas"
+msgstr "Lienzo"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Data"
+msgstr "Datos"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Lay out the tables of this answer as a page"
+msgstr "Componer las tablas de esta respuesta como una página"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Building the page…"
+msgstr "Creando la página…"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/models/chatboo_canvas_page.py:0
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.chatboo_canvas_page_view_form
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.chatboo_canvas_page_view_tree
+msgid "Open page"
+msgstr "Abrir página"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "No page was built."
+msgstr "No se ha creado la página."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Building the page. Click to cancel."
+msgstr "Creando la página. Pulsa para cancelar."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Cancel the page in progress? It will not be built."
+msgstr "¿Cancelar la página en curso? No se creará."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
+msgid "Session not found"
+msgstr "Sesión no encontrada"
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
+msgid "Page not found"
+msgstr "Página no encontrada"
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_canvas_job.py:0
+msgid "No page was built: the server restarted while it was being laid out."
+msgstr "No se ha creado la página: el servidor se reinició mientras se creaba."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_canvas_job.py:0
+msgid "This answer has no table to lay out."
+msgstr "Esta respuesta no tiene tablas para componer."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_canvas_job.py:0
+msgid "No page was built. The reason is in the AI History."
+msgstr "No se ha creado la página. El motivo está en el Historial IA."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_canvas.py:0
+msgid "Print / PDF"
+msgstr "Imprimir / PDF"
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_canvas.py:0
+msgid "Dark mode"
+msgstr "Modo oscuro"
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_canvas.py:0
+msgid "Light mode"
+msgstr "Modo claro"
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_canvas.py:0
+msgid "Download HTML"
+msgstr "Descargar HTML"
+
+#. module: pns_ai_chatboo
+#: model:ir.model,name:pns_ai_chatboo.model_chatboo_canvas_page
+msgid "Chatboo shared page"
+msgstr "Página compartida de Chatboo"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_canvas_page__name
+msgid "Title"
+msgstr "Título"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_canvas_page__design
+msgid "Page"
+msgstr "Página"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_canvas_page__user_ids
+msgid "Shared with"
+msgstr "Compartida con"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_chatboo_canvas_page__url
+msgid "Link"
+msgstr "Enlace"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_systray.js:0
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.chatboo_canvas_page_view_form
+msgid "Shared page"
+msgstr "Página compartida"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/models/chatboo_canvas_page.py:0
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_systray.js:0
+msgid "%s shared a page with you"
+msgstr "%s ha compartido una página contigo"
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_canvas.py:0
+msgid "Share"
+msgstr "Compartir"
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_canvas.py:0
+msgid "Nobody yet"
+msgstr "Nadie todavía"
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_canvas.py:0
+msgid "Remove"
+msgstr "Quitar"
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_canvas.py:0
+msgid "Shared. They have been told in Odoo."
+msgstr "Compartida. Se les ha avisado en Odoo."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_canvas.py:0
+msgid "Only you can see it now."
+msgstr "Ahora solo la ves tú."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_canvas.py:0
+msgid "Could not share the page."
+msgstr "No se ha podido compartir la página."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_canvas.py:0
+msgid "Link copied"
+msgstr "Enlace copiado"
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_canvas.py:0
+msgid "Search people"
+msgstr "Buscar personas"
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/models/chatboo_canvas.py:0
+msgid "Copy link"
+msgstr "Copiar enlace"
+
+#. module: pns_ai_chatboo
+#: model:ir.actions.act_window,name:pns_ai_chatboo.action_chatboo_canvas_page
+#: model:ir.ui.menu,name:pns_ai_chatboo.menu_chatboo_shared_pages
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.chatboo_canvas_page_view_search
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.chatboo_canvas_page_view_tree
+msgid "Shared pages"
+msgstr "Páginas compartidas"
+
+#. module: pns_ai_chatboo
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.chatboo_canvas_page_view_form
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.chatboo_canvas_page_view_tree
+msgid "Shared on"
+msgstr "Compartida el"
+
+#. module: pns_ai_chatboo
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.chatboo_canvas_page_view_form
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.chatboo_canvas_page_view_tree
+msgid "Stop sharing"
+msgstr "Dejar de compartir"
+
+#. module: pns_ai_chatboo
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.chatboo_canvas_page_view_search
+msgid "Shared by me"
+msgstr "Compartidas por mí"
+
+#. module: pns_ai_chatboo
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.chatboo_canvas_page_view_search
+msgid "Shared with me"
+msgstr "Compartidas conmigo"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Your session has changed. Reload the page (F5)."
+msgstr "Tu sesión ha cambiado. Recarga la página (F5)."
+
+#. module: pns_ai_chatboo
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.view_ai_log_search_chatboo_door
+msgid "From Chatboo"
+msgstr "From Chatboo"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_dashboard.js:0
+msgid "Minimize"
+msgstr "Minimizar"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_dashboard.js:0
+msgid "Maximize"
+msgstr "Maximizar"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_dashboard.js:0
+msgid "Restore"
+msgstr "Restaurar"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_dashboard.js:0
+msgid "Standard size"
+msgstr "Tamaño estándar"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_dashboard.js:0
+msgid "Show again"
+msgstr "Mostrar de nuevo"
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_dashboard.js:0
+msgid "Show all"
+msgstr "Mostrar todas"
+
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
+msgid "Too many files in one message (at most %s)."
+msgstr "Demasiados archivos en un mensaje (como máximo %s)."
+
+#. module: pns_ai_chatboo
+#: code:addons/pns_ai_chatboo/controllers/chatboo.py:0
+msgid "The files together are larger than the upload limit (%s MB)."
+msgstr "Los archivos juntos superan el límite de subida (%s MB)."
+
+#. module: pns_ai_chatboo
+#. openerp-web
+#: code:addons/pns_ai_chatboo/static/src/js/chatboo_component_v2.js:0
+msgid "Prepare and download"
+msgstr "Preparar y descargar"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_ai_agent__chatboo_allow_remote_voices
+#: model:ir.model.fields,field_description:pns_ai_chatboo.field_res_config_settings__chatboo_allow_remote_voices
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
+msgid "Allow remote voices"
+msgstr "Permitir voces remotas"
+
+#. module: pns_ai_chatboo
+#: model:ir.model.fields,help:pns_ai_chatboo.field_ai_agent__chatboo_allow_remote_voices
+#: model:ir.model.fields,help:pns_ai_chatboo.field_res_config_settings__chatboo_allow_remote_voices
+msgid "Unchecked: Chatboo only reads aloud with a voice installed on this computer. Checked: if none is installed, the browser may send the text to its vendor (Google, Microsoft, …)."
+msgstr "Desmarcada: Chatboo solo lee en voz alta con una voz instalada en este equipo. Marcada: si no hay ninguna, el navegador puede enviar el texto a su fabricante (Google, Microsoft, …)."
+
+#. module: pns_ai_chatboo
+#: model_terms:ir.ui.view,arch_db:pns_ai_chatboo.res_config_settings_view_form_chatboo_mcp
+msgid "If no voice is installed on this computer, the browser may send the text to its vendor (Google, Microsoft, …). Off: only a local voice is used."
+msgstr "Si no hay una voz instalada en este equipo, el navegador puede enviar el texto a su fabricante (Google, Microsoft, …). Apagada: solo se usa una voz local."
