@@ -22,8 +22,11 @@
   se contrastaron además en la conversación principal. Correcciones aplicadas: parche 6 (`_on_crash`),
   adaptación de los parches 10 y 12, M10 a **Crítica**, matices de M11, M1/M2, F1, PNS-83, P-37, §9.1,
   §9.2 (U10, U15, U17) y P-9c retirada.
-- **Decisión pendiente:** N12 (seguir con 3.1.782 o cambiar de base) es de Sergio. Este documento no
-  propone cambios de código ni decide nada.
+- **Decisión sobre N12** (seguir con 3.1.782 o cambiar de base): decidida, b′ (Sergio, 22/10/2026; se
+  mantiene el 23/10/2026). Este documento no propone cambios de código ni decide nada.
+- **Fase 3 en laboratorio (22-23/10/2026):** resultados en
+  `docs/pendiente/fase3_lab_pns_ai_3879.md`, resumidos aquí en §3 (PNS-98), §5.6 (PNS-94 y PNS-70),
+  §8.7 (M13, M10 y F4, nuevo) y §9.6 (P-9). N12 se mantiene en b′ (Sergio, 23/10/2026).
 
 ## 1. Resumen
 
@@ -71,10 +74,11 @@ la comprobación definitiva con `odoo-dev 14 paridad` (fase 3).
 - Fichas PARCIAL de §5-§6 con gravedad del resto valorada: PNS-26 (ficha Alta, resto Baja, §5.6) y
   PNS-37 parte (resto Alta propuesta, §6.1).
 
-**Pasada B — superficie nueva y cambios no anunciados (§8, 38 elementos):** 28 VERIFICADO, 4 PARCIAL
-(F1, D1, M5, M16), 6 NO CORREGIDO (M13, M10, M1, M2, M11, M12), 0 REQUIERE PRUEBA como estado principal.
-Por gravedad propuesta: **Crítica 1** (M10, ya en 3.1.782 y en la rama), **Alta 1** (M13, nuevo),
-Media 4 (M1, M2, F1 nuevos; M11 ya en 3.1.782), Baja 4.
+**Pasada B — superficie nueva y cambios no anunciados (§8, 39 elementos):** 28 VERIFICADO, 4 PARCIAL
+(F1, D1, M5, M16), 7 NO CORREGIDO (M13, M10, M1, M2, M11, M12 y F4, este último hallado en la fase 3),
+0 REQUIERE PRUEBA como estado principal. Por gravedad propuesta: **Crítica 1** (M10, ya en 3.1.782 y en
+la rama), **Alta 1** (M13, nuevo), Media 4 (M1, M2, F1 nuevos; M11 ya en 3.1.782), Baja 5. M10 y M13,
+confirmados en la fase 3 (§8.7).
 
 **Pasada B — actualización desde 3.1.782 (§9):** 21 pasos del `-u` revisados (U1 a U21): ningún script
 de migración nuevo (ni se ejecutaría ninguno en Odoo 14); **1 contradicción** con las notas de versión
@@ -118,12 +122,12 @@ agente «Decision» huérfano, U15 tres skills nuevas, U16 historial de Chatboo 
 
 | Id | Gravedad | Qué queda | Dónde |
 |---|---|---|---|
-| M10 | **Crítica** (requiere AI Administrator; ya en 3.1.782 y en la rama) | `create` libre de `ai.safe.operation` más `cleanup_stuck_state` público: un plan se ejecuta con la identidad de otro usuario. En la rama, el AI Administrator se da `base.group_system` (el parche 12 no lo frena); en 3.1.879 la cúspide no cubre `ir.cron`, `ir.actions.server`, `ir.rule` ni `ir.model.access` (REQUIERE PRUEBA) | `models/safe_operation.py:1006-1080` (§8.7) |
+| M10 | **Crítica** (requiere AI Administrator; ya en 3.1.782 y en la rama) | `create` libre de `ai.safe.operation` más `cleanup_stuck_state` público: un plan se ejecuta con la identidad de otro usuario. En la rama, el AI Administrator se da `base.group_system` (el parche 12 no lo frena); en 3.1.879 la cúspide no cubre `ir.cron`, `ir.actions.server`, `ir.rule` ni `ir.model.access` (confirmado en P-8b con `ir.cron`, fase 3) | `models/safe_operation.py:1006-1080` (§8.7) |
 | PNS-37 (parte) | Alta (propuesta; requiere AI Administrator o un plan de escritura) | El cron nuevo de la papelera borra como superusuario lo que digan filas del diario que un AI Administrator puede editar; y el «borrado» de un plan solo exige escritura (archiva) y el cron borra después, saltando las reglas de borrado | `models/ai_change_journal.py:541-575, 612-633`; `data/journal_trash_cron.xml:5-15`; `security/ir.model.access.csv:42-43`; `controllers/safe_plan.py:938-953` (§6.1) |
 | M13 | Alta (nuevo) | `ai.context.unlink_retired_from_module` es público, también para portal: borra los contextos de fábrica (system prompt incluido) con la lista de códigos que pone quien llama | `models/ai_context_disk.py:757-796` (§8.7) |
 | PNS-20 (parte) | Alta (REQUIERE PRUEBA) | «Revisar» ejecuta la importación real dentro de un `SAVEPOINT` de SQL que no cubre las escrituras diferidas del ORM | `pns_base/models/operation_report_wizard.py:290-291, 305-323` (§6.1) |
 | PNS-18 | — | «Sin failover externo» se aplica después de los filtros de rol y de cuota, y no en roles sin cubrir: un turno con imagen o sin cuota puede ir a un externo | `models/ai_execution_engine.py:252-263, 305-316` (§6.1) |
-| PNS-70 | Media | La Chart.js 4.4.8 de Chatboo queda en `window.Chart` y las vistas gráfico de Odoo 14 la usarían | `pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js:24-33` (§5.6) |
+| PNS-70 | **Alta** (23/10/2026; antes Media) | La Chart.js 4.4.8 de Chatboo queda en `window.Chart` y las vistas gráfico de Odoo 14 la usan: **confirmado** en P-70 (fase 3). En 3.1.782 la 4.4.8 ocupa `window.Chart` desde que se carga el backend, sin efecto observado en los gráficos de Odoo (staging, 23/10/2026) | `pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js:24-33` (§5.6) |
 | M11 | Media (ya en 3.1.782) | Envoltorios `log_*` públicos (también portal) que escriben en `ai.log` a nombre de cualquier usuario: es el «Check para Seges» de PNS-30, que §2.1 da por VERIFICADO mirando solo `_create_log_entry` | `models/ai_execution_engine.py:402-756` (§8.7) |
 | M1 / M2 | Media (nuevos) | `paint_canvas` escribe el lienzo de la sesión de otro usuario; `page_html` lee en `sudo` imágenes de cualquier modelo | `pns_ai_chatboo/models/chatboo_session.py:897-943, 974-1017, 1049-1184`; `models/chatboo_canvas.py:639, 677-697` (§8.7) |
 | F1 | Media (nuevo) | El lienzo no tiene CSP: el documento puede enviar los datos a cualquier host; las filas van al `<script>` sin escapar `</` | `pns_ai_chatboo/models/chatboo_canvas.py:500-573, 1097-1109` (§8.4) |
@@ -454,7 +458,7 @@ Columna «Fabricante»: estado y versión de su ficha. «Rama Seges»: parche o 
   salta editando el registro. Para el resto, el AI Administrator decide qué métodos son «acciones de
   confianza»; el impacto depende de qué métodos de modelo trabajen en `sudo` (inventario en P-97).
 
-### PNS-98 (Baja) — NO CORREGIDO (REQUIERE PRUEBA)
+### PNS-98 (Baja) — NO CORREGIDO (confirmado en la fase 3)
 
 - PDF/Word: el adjunto se crea y confirma en un cursor aparte (`utils/session_download.py:365-392`,
   desde `persist_turn_file_detail`, `:395-449`) y la reclamación lo busca con el cursor de la petición
@@ -464,6 +468,10 @@ Columna «Fabricante»: estado y versión de su ficha. «Rama Seges»: parche o 
 - Clip y SVG: la vía de respaldo de `_finalize` (`chatboo_async_request.py:697-715`) actualiza el job
   por SQL y no reclama los adjuntos del turno. El `savepoint` nuevo (`:664-693`) no cubre el fallo de
   serialización al escribir el job (`:660`, fuera del `savepoint`).
+- **Confirmado en la fase 3 (P-6 ampliada, 23/10/2026)** con CSV, SVG y PDF: los adjuntos del clip (dos
+  `text/csv`), del SVG en línea (`image/svg+xml`) y del PDF de `fulfill_client_export`
+  (`application/pdf`) quedan con `res_model` y `res_id` vacíos. Las imágenes del turno sí quedan
+  enlazadas a `chatboo.session`. Detalle: `fase3_lab_pns_ai_3879.md`, parte 2 («Adjuntos nuevos»).
 
 ### Compatibilidad — degradación nueva
 
@@ -598,7 +606,7 @@ Mismas columnas que §2.1. «Rama Seges»: parche o entrega del
 | PNS-43 (resto) | Baja | Resuelto, `pns_base` 1.2.37 | Solo descarta el duplicado si las dos filas son de un módulo `pns*` (`pns_base/models/ir_translation.py:88-111`) | **VERIFICADO** | PB-7 | — | Sí (`--i18n-overwrite` de un módulo ajeno) |
 | PNS-31 (resto) y obs. 4 | Media | Resuelto, 3.1.847 | `_process_ondelete` solo para modelos de módulos `pns*` (`pns_ai_mcp/models/ir_model_fields_selection.py:23-60`); `Root.get_request` sigue igual, solo POST JSON a `/mcp*` (`pns_ai_mcp/http_patch.py:18-39`); la mesa del PIN solo arranca con `session.pns_is_ai_admin` (`pns_ai_mcp/static/src/js/key_pin_desk_v14.js:525-550`; `pns_ai_mcp/models/ir_http.py:13-16`); filtro de origen solo en formularios con la barra (`pns_ai_mcp/static/src/js/ai_agent_origin_filter_v14.js:367-401`); `set_values` solo escribe la política si cambia (`pns_ai_mcp/models/res_config_settings.py:334-342`) | **VERIFICADO** | D9 | — | Sí (interno sin grupos de IA: sin sondeo de la mesa). El filtro de origen pasa a ser un `FormRenderer.include` global, sin efecto fuera de su formulario (§5.7) |
 | PNS-72 (resto) | Baja | Resuelto, `pns_ai_chatboo` 2.1.519 | jsPDF, autotable, html2canvas, Chart.js y ECharts se cargan al abrir el chat (`pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js:12-36`, llamado en `chatboo_systray.js:383`); `assets.xml:6-32` ya no los lleva; icono del systray desde `session_info` (`pns_ai_chatboo/models/ir_http.py:4-29`; `chatboo_systray.js:48`); `check_health` solo desde el componente del chat (`chatboo_component_v2.js:1624`) | **VERIFICADO** | D43 | — | Sí (red del navegador al cargar el backend). Siguen en `web.assets_backend` unos 20 JS propios de Chatboo para todo interno (`assets.xml:12-32`) |
-| PNS-70 | Media | Resuelto, `pns_ai_chatboo` 2.1.519 | El chat usa su copia: `ChartLib` vía `bindEngines` (`pns_ai_chatboo/static/src/js/chatboo_charts.js:36-42, 1636-1640, 2006`; `chatboo_heavy_libs.js:28-33`). **Resto:** al cargarse, `chart.umd.min.js` (Chart.js 4.4.8, `:8`) deja su versión en `window.Chart`, que es la que usan las vistas gráfico de Odoo 14 (detalle) | **PARCIAL** | D43 | — | Su check (otra Chart.js en `window.Chart`) sí. Añadir el caso inverso: REQUIERE PRUEBA (detalle) |
+| PNS-70 | Media (**Alta** desde el 23/10/2026) | Resuelto, `pns_ai_chatboo` 2.1.519 | El chat usa su copia: `ChartLib` vía `bindEngines` (`pns_ai_chatboo/static/src/js/chatboo_charts.js:36-42, 1636-1640, 2006`; `chatboo_heavy_libs.js:28-33`). **Resto:** al cargarse, `chart.umd.min.js` (Chart.js 4.4.8, `:8`) deja su versión en `window.Chart`, que es la que usan las vistas gráfico de Odoo 14 (detalle) | **PARCIAL** | D43 | — | Su check (otra Chart.js en `window.Chart`) sí. Caso inverso confirmado en P-70 (fase 3, §5.6) |
 
 #### §5.5 Conformidad y deuda
 
@@ -669,6 +677,13 @@ Mismas columnas que §2.1. «Rama Seges»: parche o entrega del
   `wait_event_type = 'Lock'` tras cada turno; job en `done` con `session_saved` en `done_meta`; el turno
   en la sesión tras recargar. `SELECT id, res_model, res_id FROM ir_attachment` de los adjuntos nuevos:
   hoy se espera `res_model` vacío en clip, SVG y PDF (PNS-98).
+- **Resultado (fase 3, 23/10/2026):** P-6 ampliada **sin bloqueos**. En los 11 casos ejercitados (23
+  jobs, incluido un 429 real del proveedor): todos los jobs en `done` con `session_saved`, el turno en
+  la sesión, `pg_stat_activity` limpio y ningún «_finalize fresh-cursor failed». El **punto 4** se
+  observó **una vez**: un «could not serialize access» en `update_last_used` al cargar dos veces la
+  sesión 20 ms después de que un turno la confirmara (caso c). Una de las dos cargas devolvió
+  `status: error` y la otra fue bien; no quedó nada colgado. Los puntos 1 y 3 no se dieron. PNS-98,
+  confirmado (§3). Detalle: `fase3_lab_pns_ai_3879.md`, parte 2.
 
 #### PNS-81 (Alta) — PARCIAL: queda una degradación en Chatboo
 
@@ -709,7 +724,30 @@ Mismas columnas que §2.1. «Rama Seges»: parche o entrega del
   excepción, seguida en el mismo turno de una herramienta que confirme: el registro no debe quedar
   modificado.
 
-#### PNS-70 (Media) — PARCIAL: el choque de Chart.js cambia de sentido
+#### PNS-70 (Alta) — CONFIRMADO en 3.1.879: Chart.js 4 en `window.Chart` rompe gráficos de Odoo al abrir el chat
+
+- **Estado (23/10/2026):** de PARCIAL a **CONFIRMADO** en 3.1.879 por P-70 en la fase 3. Severidad
+  **Alta** (antes Media; decisión de Sergio).
+  - **3.1.782 (rama `14.0-pns-ai-correcciones`, LIYBEN y staging):** `pns_ai_chatboo/views/assets.xml:22`
+    (rama) carga `chart.umd.min.js` (Chart.js 4.4.8, hace `window.Chart = …`) dentro de
+    `web.assets_backend`. Comprobado por Sergio en el staging `pns_demo` (parches 1 a 12, 23/10/2026,
+    consola del navegador): con F5 en Contactos y el chat cerrado, `window.Chart` es la 4.4.8; tras
+    abrir Ventas → Análisis y el tablero de Facturación sigue siendo la 4.4.8 (Odoo no recarga su
+    2.x), y aun así la vista gráfico (también al cambiar de tipo) y el tablero se pintan bien, sin
+    errores en la consola. Sin efecto observado en los gráficos de Odoo.
+  - **3.1.879:** solo al abrir el chat (`chatboo_heavy_libs.js:12-33`, en `VENDOR` aunque el motor
+    configurado sea `echarts`). Con F5 vuelve la 2.x hasta que se abre otra vez el chat.
+- **Resultado de P-70:** tras abrir Chatboo, `window.Chart` pasa de 2.x a 4.4.8. En Ventas → Análisis
+  la vista gráfico se dibuja, con errores «Invalid scale configuration for scale: xAxes/yAxes» en cada
+  cambio de tipo; en el tablero de Facturación los gráficos de los diarios no cargan bien. Detalle:
+  `fase3_lab_pns_ai_3879.md`, parte 2 (paso 3).
+- **Sin explicar:** lo observado no casa con el análisis estático de abajo (carga diferida de la 2.x de
+  Odoo con `ajax.loadJS`): según él, la 3.1.782 también debería romper los gráficos de Odoo, y en el
+  staging no lo hace. Tampoco está claro por qué 3.1.879 falla. Se investiga al preparar el parche.
+- **Corrección:** en la rama nueva, sin pisar `window.Chart`. La condición 3 de N12 se cierra al repetir
+  P-70 con ese parche.
+
+Análisis estático original (22/10/2026):
 
 - Odoo 14 carga su Chart.js 2.x solo cuando hace falta, con `ajax.loadJS` (vista gráfico,
   `addons/web/static/src/js/views/graph/graph_view.js:26`; tablero de diarios,
@@ -1011,10 +1049,10 @@ tratados (§8.6).
 | M7 | `ai.change.journal.model_can_archive` (`pns_ai_mcp/models/ai_change_journal.py:200-206`) | Nuevo | Ninguno | Cualquiera | Solo lee `_fields` del modelo pedido (informativo) | **VERIFICADO** | — |
 | M8 | `ai.change.journal.action_empty_trash`, `action_empty_one` (`ai_change_journal.py:577-610`); `res.config.settings.action_empty_journal_trash` (`models/res_config_settings.py:383-388`) | Nuevos | `unlink` real de lo archivado | AI Administrator o Ajustes (`_ensure_journal_manager`, `ai_change_journal.py:38-45`; `ensure_ai_admin`) | Borran con los permisos de quien pulsa (`_empty_rows`, `:551-575`). La vía como superusuario es el cron (§6.1, PNS-37) | **VERIFICADO** | — |
 | M9 | `action_revert`, `snapshot_records`, `record_executed_step` (`ai_change_journal.py:213-372, 443-539`) | Ya en 3.1.782 (`:188, 216, 411`) | `action_revert` crea la fila de deshacer en `sudo` (`:503`) | `action_revert`: gestor del diario; los otros dos crean o leen con la ACL normal (`csv:42-43`) | `action_revert` escribe los valores de `before_json` (editable por AI Administrator) con los permisos de quien pulsa: no da más de lo que ya puede hacer. Por RPC, `snapshot_records`/`record_executed_step` reciben recordsets/entornos que no se pueden pasar | **VERIFICADO** | — |
-| M10 | `ai.safe.operation.create` (sin sobrescribir: Grep de `def create` en `models/safe_operation.py`, vacío) + `cleanup_stuck_state` (`:1006-1039`) → `_retry_confirmed_not_executed` (`:1041-1080`) | **Ya en 3.1.782** (`:938, 974-1012`) y en la rama (`pns_ai_mcp/models/safe_operation.py:938` (rama)) | Ejecuta el plan en cursor propio con `commit` y con el uid de `confirmed_by_uid` o `user_id` de la fila (`:1056-1070`) | AI Administrator (ACL `1,1,1,1`, `security/ir.model.access.csv:46`) | `write` está cerrado para no `sudo` (`:529-536`), pero `create` no: un AI Administrator crea por RPC una operación ya `confirmed`, `executed=False`, con `confirmed_by_uid` = cualquier usuario (p. ej. el administrador) y el plan que quiera, y llama a `cleanup_stuck_state` (público, sin grupo; la auditoría lo mantiene a propósito, `_fabricante/doc/20261022_pns_ai_auditoria.md:855`). El plan corre **con la identidad de ese usuario** (`api.Environment(cr, confirmed_by_uid, {})`; con uid 1, Odoo activa `su`). Mismo patrón que PNS-97 (registro editable tratado como fiable). En la rama, el parche 12 comprueba `self.env.user` (`ai_system_action.py:709` (rama)), que es el suplantado: el AI Administrator se da `base.group_system`. En 3.1.879 la cúspide frena el grupo, pero no cubre `ir.cron`, `ir.actions.server`, `ir.rule` ni `ir.model.access`: REQUIERE PRUEBA | **NO CORREGIDO** (REQUIERE PRUEBA, P-8b) | **Crítica** (requiere AI Administrator) |
+| M10 | `ai.safe.operation.create` (sin sobrescribir: Grep de `def create` en `models/safe_operation.py`, vacío) + `cleanup_stuck_state` (`:1006-1039`) → `_retry_confirmed_not_executed` (`:1041-1080`) | **Ya en 3.1.782** (`:938, 974-1012`) y en la rama (`pns_ai_mcp/models/safe_operation.py:938` (rama)) | Ejecuta el plan en cursor propio con `commit` y con el uid de `confirmed_by_uid` o `user_id` de la fila (`:1056-1070`) | AI Administrator (ACL `1,1,1,1`, `security/ir.model.access.csv:46`) | `write` está cerrado para no `sudo` (`:529-536`), pero `create` no: un AI Administrator crea por RPC una operación ya `confirmed`, `executed=False`, con `confirmed_by_uid` = cualquier usuario (p. ej. el administrador) y el plan que quiera, y llama a `cleanup_stuck_state` (público, sin grupo; la auditoría lo mantiene a propósito, `_fabricante/doc/20261022_pns_ai_auditoria.md:855`). El plan corre **con la identidad de ese usuario** (`api.Environment(cr, confirmed_by_uid, {})`; con uid 1, Odoo activa `su`). Mismo patrón que PNS-97 (registro editable tratado como fiable). En la rama, el parche 12 comprueba `self.env.user` (`ai_system_action.py:709` (rama)), que es el suplantado: el AI Administrator se da `base.group_system`. En 3.1.879 la cúspide frena el grupo, pero no cubre `ir.cron`, `ir.actions.server`, `ir.rule` ni `ir.model.access`: REQUIERE PRUEBA | **NO CORREGIDO** (confirmado en P-8b, fase 3) | **Crítica** (requiere AI Administrator) |
 | M11 | `ai.execution.engine.log_llm_inference`, `log_provider_llm_request`, `log_provider_llm_response`, `log_provider_inference` (`:758`), `log_provider_failover`, `log_role_without_provider` (`models/ai_execution_engine.py:402-758`) | Ya en 3.1.782 (`:338-631`) y en la rama (`:488, 545` (rama)), salvo `log_role_without_provider` (nuevo). En 3.1.782 y en la rama el agujero ya estaba abierto además por `create_log_entry`, público (`ai_log.py:669`) | `_create_log_entry` en cursor propio como superusuario y con `commit` (`models/ai_log.py:685-724, 849`) | Cualquier usuario autenticado, también portal: `ai.execution.engine` es `AbstractModel` (`ai_execution_engine.py:93`), sin ACL que comprobar | Aceptan `user_id` y lo usan tal cual (`:422, 467, 583, 639, 730`). Por RPC, con `provider=False`, `log_llm_inference` crea una fila de `ai.log` a nombre de otro usuario con tokens y coste inventados. Es exactamente el «Check para Seges» de PNS-30 (auditoría `:219-220`): **el resto de PNS-30 sigue abierto por estos envoltorios**, aunque `_create_log_entry` sea privado (§2.1 lo da por VERIFICADO mirando solo ese método). Sin `provider_id` por RPC, no altera el tope de gasto | **NO CORREGIDO** (REQUIERE PRUEBA, P-8f) | Media |
 | M12 | `ai.execution.engine.chat_completion` (`ai_execution_engine.py:849-923`) | Ya en 3.1.782 (`:719`) y en la rama (`:719` (rama)) | Usa la clave del proveedor (`_api_key_for_inference`, `:390`) | Cualquier interno (necesita leer `ai.agent`, `csv:13`) | Inferencia con la clave de la empresa sin pasar por el acceso de Chatboo ni por la clave MCP. Aplica el tope (`:372`) y lo que se envía es lo que el usuario ya puede leer (D10). La auditoría no lo trata; nuestro informe lo citaba solo como «sin llamadas» | **NO CORREGIDO** (REQUIERE PRUEBA, P-8g) | Baja |
-| M13 | `ai.context.unlink_retired_from_module(module_name, found_codes)` (`models/ai_context_disk.py:757-796`) | **Nuevo** (en 3.1.782 no existe en `ai.context`: Grep) | `sudo()` + `skip_hardcoded_restrictions`, que abre el candado de fábrica (`utils/knowledge_ownership.py:38-49`; `unlink`, `models/ai_context.py:747-762`) | Cualquier usuario autenticado, también portal (`@api.model`, sin comprobación) | Borra **todos** los contextos de fábrica del módulo indicado (`owner_id` vacío y con `rel_path`) cuyo código no esté en `found_codes`, **lista que pone quien llama**: también los `core` (system prompt y reglas de ejecución de PNS-38). Su gemelo de skills exige superusuario (`_require_bootstrap`, `models/ai_skill.py:2228`) e `import_system_from_files` exige AI Administrator (`ai_context_disk.py:122`). Solo lo llama `ai_context_disk.py:745`. Deja la IA sin sus instrucciones hasta el siguiente `-u` o «Restaurar desde el módulo» | **NO CORREGIDO** (REQUIERE PRUEBA, P-8a) | Alta |
+| M13 | `ai.context.unlink_retired_from_module(module_name, found_codes)` (`models/ai_context_disk.py:757-796`) | **Nuevo** (en 3.1.782 no existe en `ai.context`: Grep) | `sudo()` + `skip_hardcoded_restrictions`, que abre el candado de fábrica (`utils/knowledge_ownership.py:38-49`; `unlink`, `models/ai_context.py:747-762`) | Cualquier usuario autenticado, también portal (`@api.model`, sin comprobación) | Borra **todos** los contextos de fábrica del módulo indicado (`owner_id` vacío y con `rel_path`) cuyo código no esté en `found_codes`, **lista que pone quien llama**: también los `core` (system prompt y reglas de ejecución de PNS-38). Su gemelo de skills exige superusuario (`_require_bootstrap`, `models/ai_skill.py:2228`) e `import_system_from_files` exige AI Administrator (`ai_context_disk.py:122`). Solo lo llama `ai_context_disk.py:745`. Deja la IA sin sus instrucciones hasta el siguiente `-u` o «Restaurar desde el módulo» | **NO CORREGIDO** (confirmado en P-8a, fase 3) | Alta |
 | M14 | `ai.skill.unlink_retired_from_module`, `unlink_named_factory_skills` (`ai_skill.py:2219-2296`) | Ya en 3.1.782 (`:2136, 2184`) | `sudo` | Solo superusuario (`_require_bootstrap`) | Cerrados | **VERIFICADO** | — |
 | M15 | `ai.provider.spend_cap_reached`, `assert_spend_cap`, `action_open_usage` (`models/ai_provider.py:1049-1076`) | Nuevos | Vía `month_usage` (`sudo` sobre `ai.log`) | Interno | Devuelven un booleano, un error o una acción hacia un asistente solo de AI Administrator (`csv:56`). `month_usage`: §6.1, PNS-29 | **VERIFICADO** | — |
 | M16 | `ai.fx.source.get_usd_fx` (`models/ai_fx_source.py:86-166`) | Ya en 3.1.782 (`:86`) y en la rama | Lee las fuentes en `sudo` (`:108`), descarga con `urllib.request.urlopen` (`:73-84`) y escribe el parámetro de caché en `sudo` (`:95, 151, 163`) | Cualquier interno por RPC (`csv:12`); Chatboo al abrir | La URL la fija un AI Administrator (`csv:54`) y solo se exige `http(s)://` (`:49-56`): sin comprobación de host público, sin tope de tamaño y con las redirecciones por defecto de `urllib`. El texto del error (URL y excepción) vuelve a quien llama (`:116-117, 135-148`). No usa `request_public_http` (`utils/fetch_url_safe.py:113-178`), que sí existe. SSRF limitado para un AI Administrator (la respuesta solo se usa si trae un mapa `rates`) | **PARCIAL** | Baja |
@@ -1048,6 +1086,7 @@ cambios de `pns_ai_chatboo` son los de la tabla.
 | F1 | **Páginas / lienzo (Canvas)** y **proveedor de diseño** (casilla `design`, nueva: `pns_ai_mcp/utils/provider_fit.py:11`; en 3.1.782 la tupla acaba en `decision`) | Un modelo «de diseño» escribe un documento HTML con `const DATA` que el servidor rellena con las filas (`pns_ai_chatboo/models/chatboo_canvas.py:25-60, 884-930, 1476-1507`); se guarda en la sesión (D5) y se sirve en una carcasa con `iframe sandbox="allow-scripts allow-modals"` (`:500-573`); se puede compartir (D1) y descargar | Usuarios con Chatboo (botón Canvas y rutas de §8.1) y el propio modelo desde el sandbox (`page_url`, `page_edit`, `page_html`) | (1) **Sin CSP** en la carcasa ni en la página (Grep de `Content-Security-Policy` en 3.1.879: solo `remote_image.py:38`): el script del documento puede enviar `DATA` a cualquier host (una imagen o `fetch` sin CORS bastan desde un origen opaco). Se salta la lista blanca de PNS-59; la única barrera es la frase «Do not fetch» del prompt (`:44`). (2) Las filas se insertan en el `<script>` con `json.dumps`, que no escapa `</` (`:1097-1109, 1423-1434`); el fabricante sí escapa `</` en otro punto (`:2200`), pero no en `DATA`: un valor de un registro con `</script><script>…` se ejecuta dentro del marco (inyección almacenada desde datos que pueden escribir terceros, p. ej. el nombre de un contacto). (3) Una página compartida enseña a otros, bajo la URL de Odoo, el HTML que quiso su dueño (formularios falsos dentro del marco). (4) El HTML descargado se abre sin `sandbox`. (5) M1 y M2. El `sandbox` sin `allow-same-origin` sí impide tocar la sesión de Odoo, y los manejadores de `postMessage` del marco miran `e.source === window.parent` (`:131-154`) | **PARCIAL** (REQUIERE PRUEBA, P-8e) | Media |
 | F2 | Protocolos `openrouter` y `systemone` | **No son nuevos**: los dos ya están en la selección y en el registro de 3.1.782 (`models/ai_provider.py:169-173` en las dos versiones; `lib/llm/drivers/__init__.py:13-16`). 3.1.879 solo añade un endpoint por defecto a OpenRouter (`openrouter_driver.py:16`) y quita `ollama_driver.py` (PNS-49) | AI Administrator (configura el proveedor) | El de `systemone` sigue llamando con `urlopen` al endpoint del proveedor (`systemone_driver.py:66, 96`), igual que en 3.1.782 | **VERIFICADO** (sin cambio) | — |
 | F3 | **Orígenes MCP permitidos** | Parámetro `pns_ai_mcp.mcp_allowed_origins` en Ajustes (`models/res_config_settings.py:81-83`); sin `Origin` pasa, con `Origin` solo el de `web.base.url` o los listados (`utils/mcp_origin.py:38-49`). `Origin: null` (marcos `sandbox`, `file://`) no pasa salvo que se liste | Administrador de Ajustes | Ninguno nuevo: la página del lienzo no puede llamar a `/mcp` desde su origen opaco. Resto del preflight: §2.1 y §3, PNS-28 | **VERIFICADO** | — |
+| F4 | **Exportación a PDF desde el chat** (no es nueva; hallazgo de la fase 3, P-6 ampliada, caso c) | El exportador del lado del cliente (`pns_ai_chatboo/static/src/js/chatboo_export.js`, «Preparar y descargar» de la ficha de PDF) genera el PDF del turno | Usuarios con Chatboo | Funcional, sin efecto de seguridad: el PDF muestra como texto, antes de la tabla, el HTML del bloque de tabla (§8.7) | **NO CORREGIDO** | Baja |
 
 Las demás funciones de la lista se tratan donde se indica: proveedor de **decisión** (ya existía la
 casilla en 3.1.782, `provider_fit.py:11`; ahora la usa `_choose`, `models/ai_execution_engine.py:334`,
@@ -1103,6 +1142,10 @@ seguridad que se ven al comparar están en las fichas de §2, §5 y §6.
   owner_id IS NULL`; como interno sin grupos de IA (y repetir con un portal), la llamada de arriba
   por `call_kw`; repetir el `SELECT`. Esperado si está bien: `AccessError` y el mismo recuento. Hoy se
   espera que el recuento baje a 0 o 1.
+- **Resultado de P-8a (fase 3, 22/10/2026): M13 confirmado en 3.1.879.** Un usuario interno sin grupos
+  de IA y un usuario de portal borran los 53 contextos de fábrica de `pns_ai_mcp` (53 → 0 en los dos
+  casos; la llamada se acepta en lugar de dar `AccessError`). Se hizo dentro de un `SAVEPOINT`
+  deshecho. Detalle: `fase3_lab_pns_ai_3879.md`, parte 1 (paso 4).
 
 #### M10 (Crítica, requiere AI Administrator) — NO CORREGIDO: ejecutar un plan con la identidad de otro usuario
 
@@ -1139,6 +1182,17 @@ seguridad que se ven al comparar están en las fichas de §2, §5 y §6.
   `write_uid` del contacto. Esperado si está bien: rechazo en el `create` de la operación o en el paso.
   En la rama, además: plan que añada `base.group_system` al propio AI Administrator (hoy se espera que
   lo consiga).
+- **Resultado de P-8b (fase 3, 22/10/2026): M10 confirmado en 3.1.879; sigue siendo Crítica.**
+  - Un AI Administrator sin Ajustes crea una operación ya confirmada a nombre de otro usuario y la hace
+    ejecutar con `cleanup_stuck_state`: el plan corre con la identidad del suplantado (escritura y fila
+    del diario con su uid).
+  - **Condición real:** suplantar a un usuario con Ajustes y AI Writer. Al suplantar al admin de una BD
+    nueva, sin AI Writer, los pasos CRUD se rechazan en la ejecución.
+  - **La cúspide no cubre `ir.cron`:** con la identidad de ese usuario, el plan crea un `ir.cron` cuyo
+    `user_id` es el admin, y su código se ejecuta como el admin. El REQUIERE PRUEBA de arriba queda
+    resuelto en contra.
+  - No se probó el caso de la rama (darse `base.group_system`). Detalle: `fase3_lab_pns_ai_3879.md`,
+    parte 1 (paso 4).
 
 #### M1 (Media) — NO CORREGIDO: `paint_canvas` escribe el lienzo de otra sesión
 
@@ -1202,13 +1256,30 @@ seguridad que se ven al comparar están en las fichas de §2, §5 y §6.
   interno: el `error` devuelto enseña la respuesta del puerto interno (hoy se espera un error de
   JSON o de «no usable rates», que confirma la conexión).
 
-**Recuento §8 (38 elementos evaluados; las remisiones de §8.6 y D4 no se cuentan):**
+#### F4 (Baja) — NO CORREGIDO: el PDF exportado desde el chat muestra el HTML de la tabla como texto
+
+- **Hallazgo de la fase 3** (P-6 ampliada, caso c, 23/10/2026), no de la lectura de código.
+- **Qué se ve:** en el PDF descargado desde la ficha de PDF del chat («Preparar y descargar»), antes de
+  la tabla aparece como texto el HTML del bloque de tabla, con los `_` de las clases `o_ai_*` perdidos
+  (`oaitableblock`, `oaidatatable`). En el chat el mismo turno se ve bien.
+- **Dato guardado:** en `chatboo_session.messages`, el turno empieza por el `div` del bloque de tabla
+  (`o_ai_table_block`) seguido de la prosa.
+- **Origen:** el exportador a PDF del lado del cliente (`pns_ai_chatboo/static/src/js/chatboo_export.js`).
+  No se ha localizado la línea ni comprobado si pasa también en 3.1.782 (el archivo cambia entre las
+  dos versiones).
+- **Efecto:** funcional, sin efecto de seguridad. El PDF de esa prueba traía además datos inventados por
+  el modelo en un turno anterior: es cosa del modelo, no del exportador.
+- **Prueba:** repetir una exportación a PDF de un turno con tabla y comprobar que el PDF no tiene texto
+  antes de la tabla.
+
+**Recuento §8 (39 elementos evaluados; las remisiones de §8.6 y D4 no se cuentan; F4 se añade el
+23/10/2026):**
 
 | Estado | N.º | Elementos |
 |---|---|---|
 | VERIFICADO | 28 | Rutas: las 10 filas de §8.1 · Métodos: M3, M4, M6, M7, M8, M9, M14, M15 · Modelos: D2, D3, D5, D6, D7, D8 · Funciones: F2, F3 · Correcciones no anunciadas: C1, C2 (D4 remite a §2.1) |
 | PARCIAL | 4 | F1 (Media), D1 (Baja), M5 (Baja), M16 (Baja) |
-| NO CORREGIDO | 6 | M13 (Alta), M10 (Crítica, requiere AI Administrator), M1 (Media), M2 (Media), M11 (Media), M12 (Baja) |
+| NO CORREGIDO | 7 | M13 (Alta, confirmado), M10 (Crítica, requiere AI Administrator; confirmado), M1 (Media), M2 (Media), M11 (Media), M12 (Baja), F4 (Baja, fase 3) |
 | REQUIERE PRUEBA (como estado principal) | 0 | Todas las filas NO CORREGIDO y PARCIAL llevan su prueba de confirmación (P-8a a P-8h) |
 
 **Por gravedad propuesta (PARCIAL y NO CORREGIDO):**
@@ -1218,7 +1289,7 @@ seguridad que se ven al comparar están en las fichas de §2, §5 y §6.
 | Crítica | 1 | M10 | — | M10 |
 | Alta | 1 | M13 | M13 | — |
 | Media | 4 | M1, M2, F1, M11 | M1, M2, F1 | M11 (salvo `log_role_without_provider`) |
-| Baja | 4 | M12, D1, M5, M16 | D1 | M12, M5, M16 |
+| Baja | 5 | M12, D1, M5, M16, F4 | D1 | M12, M5, M16 (F4: sin comprobar) |
 
 ## 9. Actualización desde 3.1.782
 
@@ -1311,7 +1382,7 @@ que el módulo ya no declara: registros con XML ID y `noupdate` falso, y campos 
 | U6 | `promote_engine_params` (nuevo) | Renombra los parámetros `pns_ai_chatboo.chart_engine`, `default_show_mode` (y `default_showmode`), `xlsx_float_decimals`, `xlsx_thousands` y `download_max_bytes` a `pns_ai.*` (`ai_schema_fossil.py:39`; `schema_fossils.py:264-295`; claves en `utils/engine_params.py:10-14, 30-37`). Borra su `ir_model_data` (`:279-283`); si la clave nueva ya existe, borra la vieja (`:284-290`) | Los cinco los creó `chatboo_icp_data.xml` al instalar (3.1.782 `data/chatboo_icp_data.xml:4-27`): conservan el valor con otro nombre y dejan de pertenecer a `pns_ai_chatboo`. Chatboo 3.1.879 lee los nombres nuevos (`pns_ai_chatboo/utils/chatboo_product_icp.py:10-26`). Un código 3.1.782 sobre esa BD ya no los encontraría (vuelta atrás: §9.4) | **No figura** (Grep de `promote_engine`, `engine_params` y `pns_ai.chart` en la auditoría: vacío) | No anunciado; sin pérdida |
 | U7 | `ai.agent.init` | `_drop_acl_security_factory_fossil` recorre ahora todos los agentes `origin='module'`, con una marca por agente (`models/ai_agent.py:215-235, 250-273`); en 3.1.782 solo el de `pns_ai_mcp` (3.1.782 `ai_agent.py:251-272`, marca única `:258`) | En el primer `-u` quita la línea `acl_security` de `default_context_codes` del agente de Chatboo (y de cualquier agente de módulo) y crea un parámetro `<código>.fossil_acl_security_agent` por agente. Si alguien la había puesto a mano, se quita una vez | Ficha PNS-76 (`:716-727`) | Coincide con la ficha |
 | U8 | `ai.safe.operation.init` | `_align_executed_status`, igual que en 3.1.782 (`models/safe_operation.py:1888-1900`; 3.1.782 `:1831-1843`) | Sin cambio | — | Sin cambio |
-| U9 | Fin del `-u` (core): campos quitados | `ai.log.agent_id` (3.1.782 `models/ai_log.py:68-75`) no existe en 3.1.879 (Grep de `agent_id` en `ai_log.py`: vacío). Odoo 14 borra al final del `-u` los `ir.model.fields` del módulo cuyo XML ID no se ha cargado (`ir_model.py:2254-2328`, con el aviso «Deleting field … should be explicitly removed by an upgrade script», `:2322-2327`); ese XML ID lo crea el propio módulo al reflejar el campo (`:1079-1101`), y borrar un campo almacenado hace `ALTER TABLE … DROP COLUMN … CASCADE` (`:825-871` → `_drop_column`, `:725-739`) | **Se perdería la columna `ai_log.agent_id`** con el agente de las filas viejas. LIYBEN: filas desde el 19/10, retención de 30 días (`instalacion_liyben_pns_ai.md:155`). Las columnas `key_pin*` caen por la misma vía (ya borradas en U5) | Ficha PNS-87 (`:668`): «La columna se queda con el agente de las filas viejas»; 20/10 (`:1229-1231`): «el `-u` ya no tira … la columna `ai_log.agent_id`»; también `schema_fossils.py:47-48` | **Contradice** a la auditoría: sacarla de `LEFTOVER_COLUMNS` no basta. **REQUIERE PRUEBA** (P-9b) |
+| U9 | Fin del `-u` (core): campos quitados | `ai.log.agent_id` (3.1.782 `models/ai_log.py:68-75`) no existe en 3.1.879 (Grep de `agent_id` en `ai_log.py`: vacío). Odoo 14 borra al final del `-u` los `ir.model.fields` del módulo cuyo XML ID no se ha cargado (`ir_model.py:2254-2328`, con el aviso «Deleting field … should be explicitly removed by an upgrade script», `:2322-2327`); ese XML ID lo crea el propio módulo al reflejar el campo (`:1079-1101`), y borrar un campo almacenado hace `ALTER TABLE … DROP COLUMN … CASCADE` (`:825-871` → `_drop_column`, `:725-739`) | **Se perdería la columna `ai_log.agent_id`** con el agente de las filas viejas. LIYBEN: filas desde el 19/10, retención de 30 días (`instalacion_liyben_pns_ai.md:155`). Las columnas `key_pin*` caen por la misma vía (ya borradas en U5) | Ficha PNS-87 (`:668`): «La columna se queda con el agente de las filas viejas»; 20/10 (`:1229-1231`): «el `-u` ya no tira … la columna `ai_log.agent_id`»; también `schema_fossils.py:47-48` | **Contradice** a la auditoría: sacarla de `LEFTOVER_COLUMNS` no basta. **Confirmado** en P-9b (§9.6) |
 | U10 | Selección `origin = 'chatboo'` (en `ai.log` y en `ai.change.journal`) | Pasa de `pns_ai_mcp` (3.1.782 `ai_log.py:56-61`) a `pns_ai_chatboo` con `selection_add` y un `ondelete` que no hace nada (`pns_ai_chatboo/models/ai_log_door.py:11-33`) | Con los tres módulos en el mismo `-u`, el valor lo declara Chatboo y Odoo solo borra el XML ID viejo (`ir_model.py:2307-2315`); si borrara el valor, el `ondelete` invocable no toca filas (`:1438-1447`). Las filas de `ai_log` y `ai_change_journal` conservan `origin`. Actualizar `pns_ai_mcp` solo no puede darse (arrastra a Chatboo, intro de §9.2). Recuento en P-9a | — | No anunciado; sin pérdida esperada |
 | U11 | Agente «Decision» (`pns_ai_decision`) | 3.1.782 lo sembraba (`data/ai_agent_data.xml:38-51`, `noupdate="1"`) y tomaba de él la cadena de decisión (`models/ai_execution_engine.py:257-261`; `utils/ai_agent_registry.py:18`). 3.1.879 no lo siembra ni lo nombra (Grep: vacío) y usa la cadena del agente que llama con `need='decision'` (`models/ai_execution_engine.py:334`) | Odoo 14 no borra registros `noupdate` al actualizar (`ir_model.py:2269-2272`): el agente queda huérfano y lo configurado en su cadena deja de usarse. En LIYBEN la cadena está en el agente Chatboo (Gemini y OVH, `instalacion_liyben_pns_ai.md:241`): la decisión pasa a esa cadena, filtrada por la casilla Decision. Qué pasa si ningún proveedor la tiene: **REQUIERE PRUEBA** (P-9d) | **No figura** (19.ª, `:1125`, habla del orden por monorol, no del agente) | No anunciado |
 | U12 | `pns_ai_mcp`: crons | Nuevo `data/journal_trash_cron.xml` (`noupdate="1"`, activo, diario, `numbercall` -1, sin `user_id`: `:2-15`). Los otros cinco crons de los tres módulos tienen el mismo XML ID, código e intervalo en las dos versiones (Grep de `data/*.xml`) y son `noupdate="1"`: el `-u` no toca su estado | Un cron nuevo activo, que corre con el usuario por defecto (§6.1, PNS-37). Ninguna fila antigua del diario entra en la papelera: `meta.quarantine` solo lo escribe 3.1.879 (`models/ai_change_journal.py:308-309`; `controllers/safe_plan.py:945-960`; Grep en 3.1.782: vacío) y el cron filtra por él (`ai_change_journal.py:541-549`) | 15.ª (`:1147`): papelera de 30 días | Coincide; no dice que el cron sea nuevo ni con qué usuario corre |
@@ -1328,7 +1399,7 @@ que el módulo ya no declara: registros con XML ID y `noupdate` falso, y campos 
 
 **Resumen de purgas y cambios de datos que pide el encargo:**
 - **`ai.log`:** el `-u` no purga; la purga la hace el cron, ahora solo con retención fijada (U13).
-  Pérdida: la columna `agent_id` (U9, REQUIERE PRUEBA).
+  Pérdida: la columna `agent_id` (U9, confirmado en P-9b, §9.6).
 - **`ai_provider_usage_day`:** sin efecto; la tabla ya no existe en estos entornos (U2).
 - **Skills y contextos de fábrica:** no se borra ninguno; el texto se resiembra desde disco y entran un
   contexto y tres skills nuevas de Chatboo (U15). El agente «Decision» queda huérfano (U11).
@@ -1345,7 +1416,7 @@ que el módulo ya no declara: registros con XML ID y `noupdate` falso, y campos 
 | Nota (auditoría:línea) | Lo que dice | Código | Resultado |
 |---|---|---|---|
 | 19/10, desde 3.1.782 (`:1240-1249`) | Se pierden `ai_log.agent_id`, `canvas_build_*` y los borrados de PNS-87 | `agent_id`: se pierde (U9). `canvas_build_*`: no existen en 3.1.782 (U16). PNS-87: superado por la nota del 20/10 (U2, U13) | Parcialmente vigente |
-| 20/10 (`:1229-1231`) | El `-u` ya no borra historia: ni `ai_provider_usage_day` ni `ai_log.agent_id` | `ai_provider_usage_day`: cierto (U2). `agent_id`: lo borra el core al quitar el campo (U9) | **Falso en `agent_id`** (REQUIERE PRUEBA, P-9b) |
+| 20/10 (`:1229-1231`) | El `-u` ya no borra historia: ni `ai_provider_usage_day` ni `ai_log.agent_id` | `ai_provider_usage_day`: cierto (U2). `agent_id`: lo borra el core al quitar el campo (U9) | **Falso en `agent_id`** (confirmado en P-9b, §9.6) |
 | 20/10 (`:1236-1238`) | Los PIN guardados desaparecen | U5 | Coincide |
 | 2.ª, 12.ª, 15.ª, 17.ª (`:1218, 1162, 1147, 1135-1136`) | Orígenes MCP, topes, papelera, voces | U12, U13, U20 | Coinciden |
 | 8.ª y 20.ª (`:1185, 1119`) | Resiembra desde disco y retirada de filas sin fichero | U15 | Coinciden |
@@ -1397,7 +1468,37 @@ dejaron los parches al usarse.
 | P-9e | `SELECT count(*) FROM chatboo_session WHERE messages LIKE '%o_chatboo_%' OR messages LIKE '%data-chatboo-%'` antes y después; abrir una sesión antigua con 3.1.879 y, en otra copia, con el código 3.1.782 sobre la BD ya actualizada | Tras el `-u`, ningún atributo `data-chatboo-*` de `ENGINE_MARKUP` ni clase de `ENGINE_CLASSES` (pueden quedar clases propias de Chatboo más largas, `markup_rename.py:9-10`); la sesión se ve bien con 3.1.879; con 3.1.782, anotar qué se pierde (tablas, gráficos, botones) |
 | P-9f | `SELECT name, latest_version FROM ir_module_module WHERE name LIKE 'pns_%'` y `odoo-dev 14 paridad pns_base,pns_ai_mcp,pns_ai_chatboo` | `pns_base` 14.0.1.2.47; sin módulos que no se importan |
 
+### 9.6 Resultados de la fase 3 (22-23/10/2026)
+
+Sobre `pns_demo_p9`, copia temporal del staging `pns_demo` (3.1.782 con los parches 1 a 12), con el `-u`
+de los tres módulos a 3.1.879. Excepción puntual a N9; la BD y el volcado se borraron el 23/10/2026.
+P-9d no entraba en el encargo. Detalle y consultas: `docs/pendiente/fase3_lab_pns_ai_3879.md`, parte 3
+(y parte 2, paso 4, para la parte visual de P-9e).
+
+| Id | Resultado | Frente a §9.5 |
+|---|---|---|
+| P-9a | Columnas `key_pin*` fuera; `chatboo_async_request` intacta (25 columnas); los cinco parámetros pasan a `pns_ai.*` sin XML ID y con el mismo valor; ningún `mcp_*`; mismos recuentos por `origin` en `ai_log` y en `ai_change_journal`. Ninguna tabla pierde filas; la única columna con datos que desaparece es `ai_log.agent_id` (P-9b) | Lo esperado |
+| P-9b | **U9 confirmado:** el `-u` borra `ai_log.agent_id` («Deleting field ai.log.agent_id»; después, «column does not exist»). Se pierde el agente de 978 de 987 filas. **La auditoría del fabricante se equivoca**; nuestra comparación (U9) es correcta | Según el core |
+| P-9e | 10 → 0 sesiones con marcas antiguas; las 17 marcas pasan a `o_ai_*` / `data-ai-*` con los mismos recuentos. En las sesiones 5, 16 y 27, deshecho el renombrado, el texto es idéntico byte a byte. **Comprobación visual correcta** con el cliente de 3.1.879 en las sesiones 5, 16 y 27 (tablas con formato, fichas, ordenación y gráfico donde hay columnas numéricas; sin errores en la consola). No se hizo la parte con el cliente de 3.1.782 sobre la BD actualizada | Lo esperado (sin la parte de 3.1.782) |
+| P-9f | `latest_version` 14.0.1.2.47 / 14.0.3.1.879 / 14.0.2.1.538; `odoo-dev 14 paridad`: 23 iguales, 0 sin código, 0 que no se importan | Lo esperado |
+| Cron de la papelera (U12) | El `-u` crea `pns_ai_mcp.ir_cron_ai_journal_trash` **activo**; en la copia lo desactivó la neutralización del kit | Coincide con U12 |
+
+Las pérdidas son las de §9 (U5, U6, U9, U15, U16, U17 bis) y nada más: condición 4 de N12, **CUMPLE**.
+
+#### Para producción (LIYBEN) y el staging
+
+- **Antes del `-u`:** copia completa y, si interesa conservarla, una copia aparte de `ai_log.id` y
+  `agent_id`: el `-u` borra la columna (U9).
+- **Después del `-u`:** el cron nuevo `pns_ai_mcp.ir_cron_ai_journal_trash` queda **activo** (en el
+  laboratorio lo desactivó la neutralización; en producción no hay neutralización).
+- **Vuelta atrás:** el historial de Chatboo queda reescrito (U16) y solo se recupera con la copia.
+
 ## 10. Datos para la decisión sobre N12
+
+> **Decidida después:** b′ (Sergio, 22/10/2026), mantenida el 23/10/2026 como excepción a la
+> condición 3. Ver [n12_decision_3879.md](../pendiente/n12_decision_3879.md) y N12 en
+> [pns_ai_decisiones.md](../pendiente/pns_ai_decisiones.md). El texto de este apartado se conserva
+> como histórico.
 
 N12 (`docs/pendiente/pns_ai_decisiones.md:1725-1759`) está decidida como **b) con vigilancia**
 (mantener 3.1.782 como base propia) y se revisa a la vista de 3.1.879. Este apartado reúne los hechos
@@ -1446,9 +1547,12 @@ informe o propuesta). Los que vienen de fichas ya abiertas en 3.1.782 (PNS-54, 0
 - Alta: PNS-83 (`collect_pin`), PNS-19, PNS-17 y PNS-82, PARCIAL (§3); PNS-26 resto, PARCIAL, con resto
   de gravedad Baja (§5.6); PNS-37 parte, PARCIAL, resto Alta (§6.1); M13, NO CORREGIDO y nuevo (§8.7);
   PNS-20 parte, REQUIERE PRUEBA (§6.1); PNS-94, REQUIERE PRUEBA (§5.6).
-- Media: PNS-61, 36 y 84, PARCIAL (§3); PNS-70, PARCIAL (§5.6); PNS-29 parte y petición de §5, PARCIAL
+- Alta desde el 23/10/2026: PNS-70, CONFIRMADO en 3.1.879 en la fase 3 (§5.6). En 3.1.782 Chart.js
+  4.4.8 también ocupa `window.Chart`, sin efecto observado en los gráficos de Odoo (staging); el
+  origen está en las dos (también con (a)).
+- Media: PNS-61, 36 y 84, PARCIAL (§3); PNS-29 parte y petición de §5, PARCIAL
   (§6.1); M1, M2 y F1, nuevos (§8.7).
-- Baja: PNS-88 y PNS-50/77, PARCIAL (§5.6); D1, nuevo (§8.7).
+- Baja: PNS-88 y PNS-50/77, PARCIAL (§5.6); D1, nuevo (§8.7); F4, hallado en la fase 3 (§8.7).
 - Sin gravedad asignada: PNS-18, PARCIAL (§6.1, §7.1); PNS-81, degradación en Chatboo sin efecto de
   seguridad (§2.4, §5.6).
 - Defensas alegadas de §7: PNS-18, 54 y 26 PARCIAL; PNS-02 NO CORREGIDO (§7).
@@ -1457,7 +1561,7 @@ informe o propuesta). Los que vienen de fichas ya abiertas en 3.1.782 (PNS-54, 0
 
 **Al actualizar (§9), solo con (b):**
 - Datos que no vuelven sin copia: la columna `ai_log.agent_id` (U9, contra lo que dice la auditoría;
-  REQUIERE PRUEBA P-9b), las columnas de PIN (U5), el historial de Chatboo reescrito (U16) y cinco
+  confirmado en P-9b, §9.6), las columnas de PIN (U5), el historial de Chatboo reescrito (U16) y cinco
   parámetros renombrados (U6).
 - Cambios de comportamiento: agente «Decision» huérfano y decisión con la cadena del agente (U11); cron
   nuevo de la papelera con el usuario por defecto (U12); voces remotas desactivadas (U20); tres skills

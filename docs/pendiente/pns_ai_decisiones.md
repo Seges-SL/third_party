@@ -109,7 +109,7 @@ con la tabla 1.1 del informe:
 | N9 | Copias de `pns_demo` | No se guardan (15/10/2026) |
 | N10 | Montaje del staging | Servicio, PostgreSQL y despliegue propios (15/10/2026) |
 | N11 | ¿Quién corrige los PNS? | a) Seges, con parches numerados y tests (19-20/10/2026) |
-| N12 | Versiones futuras del fabricante | b) con vigilancia: se mantiene la 3.1.782 (20/10/2026) |
+| N12 | Versiones futuras del fabricante | b′) cambiar una vez de base a 3.1.879 (22/10/2026; se mantiene el 23/10/2026) |
 
 **Tras la versión 3.1.879 (22/10/2026).** N12 se revisa con la
 [comparación con 3.1.879](../specs/comparacion_pns_ai_3-1-879.md) (verificada por `odoo-reviewer`) y la
@@ -136,6 +136,24 @@ con la tabla 1.1 del informe:
 - Pendiente: comunicárselo al jefe.
 
 Decisión: **b′) cambiar una vez de base a 3.1.879** (Sergio, 22/10/2026) / Fecha: 22/10/2026
+
+**Resultado de la fase 3 (23/10/2026).** Detalle en la [hoja de decisión](n12_decision_3879.md)
+(«Resultado de las condiciones») y en [fase3_lab_pns_ai_3879.md](fase3_lab_pns_ai_3879.md).
+
+- Condiciones 1, 2 y 4: **CUMPLEN**.
+- Condición 3: **NO CUMPLE por P-70**. P-6 cumple: sin bloqueos (el «could not serialize» al cargar dos
+  veces la sesión es el residuo previsto de PNS-94). P-70 falla en 3.1.879: tras abrir el chat, errores
+  xAxes/yAxes y el tablero de Facturación no carga bien (regresión visible). En 3.1.782 (staging
+  `pns_demo`, 23/10/2026) Chart.js 4.4.8 ocupa `window.Chart` en todo el backend, sin efecto observado
+  en los gráficos de Odoo. Sin explicar la diferencia; se investiga al preparar el parche de PNS-70.
+  La condición se cierra al repetir P-70 en el laboratorio con ese parche.
+- **Decisiones de Sergio (reconfirmadas):** b′ sigue adelante **como excepción** a la regla de §5 de la
+  hoja («si alguna falla, volver a b)»), porque el origen de P-70 es único (Chatboo carga Chart.js 4 en
+  `window.Chart`) y la corrección es localizada; PNS-70 pasa a Alta y se corrige en la rama nueva sin
+  pisar `window.Chart`; LIYBEN no se parchea ahora y espera al cambio de base (según el staging, sus
+  gráficos de Odoo no están afectados). Se comunicará al jefe junto con la hoja de N12.
+
+Decisión: **b′ se mantiene** (Sergio, 23/10/2026) / Fecha: 23/10/2026
 
 ### Bloqueantes vigentes
 
@@ -1655,6 +1673,11 @@ borrarla al terminar (plan de staging §1; guía §11.2).
 **Riesgos relacionados:** ninguno.
 
 Decisión: **a)** (Sergio) / Fecha: 15/10/2026
+
+**Excepción puntual (22-23/10/2026):** para P-9 del cambio de base a 3.1.879 se hizo una copia temporal
+del staging `pns_demo` (BD `pns_demo_p9` en el entorno local y su volcado), autorizada por Sergio el
+22/10/2026. La BD y el volcado se borraron el 23/10/2026 ([fase3_lab_pns_ai_3879.md](fase3_lab_pns_ai_3879.md),
+parte 3). La decisión a) sigue vigente.
 
 ### N10 — ¿Cómo se monta el staging en el VPS de `odoo14_server`?
 

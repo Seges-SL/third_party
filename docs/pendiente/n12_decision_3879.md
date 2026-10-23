@@ -99,6 +99,38 @@
 - Chatboo no trae tests.
 - Hay que repetir en laboratorio y staging parte de lo ya validado.
 
+### Resultado de las condiciones (23/10/2026)
+
+Detalle en [fase3_lab_pns_ai_3879.md](fase3_lab_pns_ai_3879.md) («Valoración de las condiciones»).
+
+| Condición | Resultado |
+|---|---|
+| 1. Paridad | **CUMPLE**: 0 módulos que no se importan, 0 librerías que faltan |
+| 2. Tests del fabricante | **CUMPLE**: 202 tests, 17 F y 35 E; los nuevos frente a la línea base son tests desfasados o datos de prueba incompletos |
+| 3. P-6 ampliada y P-70 | **NO CUMPLE** por P-70; aceptada como excepción |
+| 4. P-9a, P-9b y P-9e | **CUMPLE**: las pérdidas son las de §9 de la comparación (U9 confirmado: el `-u` borra `ai_log.agent_id`) |
+
+**Condición 3:**
+- **P-6:** sin bloqueos de sesión. El «could not serialize» al cargar dos veces la sesión es el residuo
+  previsto de PNS-94 (punto 4).
+- **P-70 falla en 3.1.879:** tras abrir el chat, errores xAxes/yAxes en la vista gráfico y el tablero
+  de Facturación no carga bien. Regresión visible.
+- **En 3.1.782 no se observa** (staging `pns_demo`, parches 1 a 12, 23/10/2026): Chart.js 4.4.8 ocupa
+  `window.Chart` en todo el backend desde que se carga (`pns_ai_chatboo/views/assets.xml:22` en
+  `14.0-pns-ai-correcciones`) y Odoo no recarga su 2.x, pero la vista gráfico (también al cambiar de
+  tipo) y el tablero de Facturación se pintan bien, sin errores en la consola.
+- Sin explicar por qué falla en 3.1.879 y no en 3.1.782; tampoco casa con el análisis estático de §5.6
+  de la comparación. Se investiga al preparar el parche de PNS-70.
+- La condición 3 se cierra al repetir P-70 en el laboratorio con el parche de PNS-70.
+
+**Decisiones de Sergio (23/10/2026, reconfirmadas):**
+- **b′ sigue adelante como excepción** a la regla de §5 («si alguna falla, volver a b)»): cambio de base
+  único a 3.1.879 y congelación posterior. P-70 se acepta porque el origen es único (Chatboo carga
+  Chart.js 4 en `window.Chart`) y la corrección es localizada.
+- **PNS-70 pasa a Alta** y se corrige en la rama nueva sin pisar `window.Chart`.
+- **LIYBEN no se parchea ahora:** espera al cambio de base. Según el staging, sus gráficos de Odoo no
+  están afectados. Se comunicará al jefe junto con esta hoja.
+
 ## 6. Comprobación previa en LIYBEN (solo lectura)
 
 AI Administrator activos que no son administradores de Ajustes (los únicos para los que M10 añade
@@ -125,7 +157,7 @@ WHERE u.active
 | Decisión | Pasos |
 |---|---|
 | **b) Mantener** | Parche 13 (M10) en la rama, ampliando el criterio del 12; P-8b, P-8f y P-8g sobre la rama; retomar ET; registrar M10, M11 y M12 con número PNS en el seguimiento; borrar `_fabricante/` |
-| **b′) Cambiar una vez** | 1. Fase 3 en laboratorio (BD nueva, fuera de `pns_demo`): paridad, tests del fabricante, `test_seges_*` adaptados, P-6 ampliada, P-70, P-8a y P-8b. 2. Si pasa: rama `14.0-pns-ai-3879` desde `14.0`, plan nuevo (parches 10-12 adaptados, M10, M13, `collect_pin`, papelera, restos Críticos y Altos) y decidir qué hacer con el lienzo. 3. P-9 sobre copia de `pns_demo`. 4. Staging y, al final, LIYBEN con copia completa previa. 5. Conservar `_fabricante/3.1.879` hasta tener la rama |
+| **b′) Cambiar una vez** | 1. Fase 3 en laboratorio (BD nueva, fuera de `pns_demo`): paridad, tests del fabricante, `test_seges_*` adaptados, P-6 ampliada, P-70, P-8a y P-8b. 2. Si pasa: rama `14.0-pns-ai-3879` desde `14.0`, plan nuevo (parches 10-12 adaptados, M10, M13, `collect_pin`, papelera, PNS-70 sin pisar `window.Chart`, restos Críticos y Altos) y decidir qué hacer con el lienzo. Repetir P-70 en el laboratorio con el parche de PNS-70: cierra la condición 3 (no cumplida por P-70 y aceptada como excepción el 23/10/2026). 3. P-9 sobre copia de `pns_demo`. 4. Staging y, al final, LIYBEN con copia completa previa. 5. Conservar `_fabricante/3.1.879` hasta tener la rama |
 | **a) / c) Reaplicar** | Como b′, más el procedimiento de comparación por versión en `parches_pns_ai.md` |
 
 **En cualquier caso**, actualizar N12 en `pns_ai_decisiones.md` con un bloque «Tras la versión 3.1.879
