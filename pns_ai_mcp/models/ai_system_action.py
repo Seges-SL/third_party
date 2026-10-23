@@ -13,6 +13,9 @@ from odoo import _, api, models
 from odoo.exceptions import UserError
 from odoo.addons.pns_base.utils.compat import user_add_group, user_remove_group
 
+# Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
+from ..utils.privilege_cusp import settings_admin_error
+
 from ..utils.view_policy_arch import (
     MODIFIERS,
     arch_contains_field,
@@ -707,6 +710,17 @@ class AiSystemAction(models.AbstractModel):
             ) % grp.display_name)
         return grp
 
+    # Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    def _check_may_change_user_groups(self):
+        """Native groups are Settings business: AI Administrator alone is not
+        enough. Checked before the sudo() write, after the vendor's cusp check,
+        on the user who runs the plan and, when a supervised operation runs it,
+        on who proposed and confirmed it."""
+        if settings_admin_error(self.env):
+            raise UserError(_(
+                'Only a Settings administrator can add or remove user groups.'
+            ))
+
     def _acl_role_note(self):
         if 'acl.role' in self.env:
             return ' ' + _(
@@ -719,6 +733,8 @@ class AiSystemAction(models.AbstractModel):
     def _preview_user_add_group(self, user_id=None, group=None, **_kw):
         user = self._resolve_user(user_id)
         grp = self._resolve_group_below_cusp(group)
+        # Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self._check_may_change_user_groups()
         return (
             _('Add group %s to user %s') % (grp.display_name, user.display_name)
             + self._acl_role_note()
@@ -728,6 +744,8 @@ class AiSystemAction(models.AbstractModel):
     def _apply_user_add_group(self, user_id=None, group=None, **_kw):
         user = self._resolve_user(user_id)
         grp = self._resolve_group_below_cusp(group)
+        # Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self._check_may_change_user_groups()
         user_add_group(user, grp)
         return {
             'ok': True,
@@ -748,6 +766,8 @@ class AiSystemAction(models.AbstractModel):
     def _preview_user_remove_group(self, user_id=None, group=None, **_kw):
         user = self._resolve_user(user_id)
         grp = self._resolve_group_below_cusp(group)
+        # Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self._check_may_change_user_groups()
         return (
             _('Remove group %s from user %s')
             % (grp.display_name, user.display_name)
@@ -758,6 +778,8 @@ class AiSystemAction(models.AbstractModel):
     def _apply_user_remove_group(self, user_id=None, group=None, **_kw):
         user = self._resolve_user(user_id)
         grp = self._resolve_group_below_cusp(group)
+        # Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self._check_may_change_user_groups()
         user_remove_group(user, grp)
         return {
             'ok': True,

@@ -98,6 +98,29 @@ def _targets(env, model, step):
     return Model.browse()
 
 
+# Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
+SETTINGS_ADMIN_ONLY = 'Only a Settings administrator can add or remove user groups.'
+
+
+# Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
+def settings_admin_error(env):
+    """Seges: a plan changes groups only for Settings administrators.
+
+    Checks the user who runs the plan and, when a supervised operation runs
+    it, who proposed and confirmed it (``execute_plan_now`` puts them in the
+    context). Those keys can only add a refusal, never lift one.
+    """
+    ctx = env.context or {}
+    users = env.user
+    for key in ('ai_journal_user_id', 'ai_journal_confirmed_by_uid'):
+        if ctx.get(key):
+            users |= env['res.users'].sudo().browse(int(ctx[key]))
+    for user in users:
+        if not (user._is_superuser() or user.has_group('base.group_system')):
+            return SETTINGS_ADMIN_ONLY
+    return None
+
+
 def crud_cusp_error(env, model, op, step, records=None):
     """LLM-facing reason a CRUD step touches the cusp, or ``None``."""
     if env is None or model not in ('res.users', 'res.groups'):
@@ -116,7 +139,8 @@ def crud_cusp_error(env, model, op, step, records=None):
         return None
     cusp = cusp_groups(env)
     if not cusp:
-        return None
+        # Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        return settings_admin_error(env)
     if op in ('write', 'unlink', 'copy'):
         targets = records if records is not None else _targets(env, model, step)
         hit = targets & cusp
@@ -136,4 +160,5 @@ def crud_cusp_error(env, model, op, step, records=None):
                 "res.groups.%s would link a maximum-privilege role "
                 "(Settings, Access Rights); a plan cannot do that." % name
             )
-    return None
+    # Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    return settings_admin_error(env)
