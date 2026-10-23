@@ -1,12 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2026 Seges
 # Seges: tests de la entrega E0′ (no regresión de los parches 7 a 10, retirados en 3.1.879). Ver docs/pendiente/parches_pns_ai.md
+# Seges: tests de la entrega E1′ (parches 10, 13 y 14 adaptados o nuevos en 3.1.879). Ver docs/pendiente/parches_pns_ai.md
 """Parches 7 a 10 (PNS-90, PNS-91, PNS-85, PNS-83), cubiertos por el fabricante
 desde 3.1.879: métodos que dejan de ser públicos, flujos internos que siguen
 funcionando y bloqueo de los nombres privados en el sandbox.
 
 Portado de la rama 14.0-pns-ai-correcciones (entrega E1) y adaptado a 3.1.879
-(docs/specs/comparacion_pns_ai_3-1-879.md, §4.1)."""
+(docs/specs/comparacion_pns_ai_3-1-879.md, §4.1).
+
+E1′ añade tres métodos que dejan de ser públicos: ``ai.key.pin.ask.collect_pin``
+(parche 10 adaptado, PNS-83), ``ai.context.unlink_retired_from_module``
+(parche 14, M13) y ``ai.safe.operation.cleanup_stuck_state`` (parche 13, M10)."""
 
 import hashlib
 import inspect
@@ -40,6 +45,7 @@ from odoo.addons.pns_ai_mcp.controllers.validators_base import (
 from odoo.addons.pns_ai_mcp.utils.engine_skills import SkillsMixin
 
 SAFE_PLAN = 'odoo.addons.pns_ai_mcp.controllers.safe_plan'
+KEY_PIN_DESK = 'odoo.addons.pns_ai_mcp.models.key_pin_desk'
 
 # (modelo, nombre antiguo, nombre nuevo)
 RENAMED = (
@@ -54,6 +60,10 @@ RENAMED = (
     ('ai.key.pin.block', 'release_all', '_release_all'),
     ('ai.key.pin.block', 'note_failure', '_note_failure'),
     ('ai.key.pin.block', 'is_blocked', '_is_blocked'),
+    # E1′
+    ('ai.key.pin.ask', 'collect_pin', '_collect_pin'),
+    ('ai.context', 'unlink_retired_from_module', '_unlink_retired_from_module'),
+    ('ai.safe.operation', 'cleanup_stuck_state', '_cleanup_stuck_state'),
 )
 
 NEW_NAMES = tuple(new for _model, _old, new in RENAMED)
@@ -126,6 +136,8 @@ class TestSegesRpcAccess(HttpCase):
 
     def _assert_refused(self, res, private):
         self.assertNotIn('result', res, res)
+        # Odoo 14 omite 'result' cuando vale None: aceptada sin resultado.
+        self.assertIn('error', res, res)
         expected = (
             'odoo.exceptions.AccessError' if private
             else 'builtins.AttributeError'
@@ -140,6 +152,9 @@ class TestSegesRpcAccess(HttpCase):
             'SELECT id, domain, kind, active, notes FROM ai_url_whitelist ORDER BY id',
             'SELECT id, skill_id, key, params_json FROM ai_skill_param_cache ORDER BY id',
             'SELECT id, ip, failures, blocked_until FROM ai_key_pin_block ORDER BY id',
+            'SELECT id FROM ai_key_pin_ask ORDER BY id',
+            'SELECT id FROM ai_context ORDER BY id',
+            'SELECT id, status, executed FROM ai_safe_operation ORDER BY id',
         ):
             self.cr.execute(query)
             snap.append(self.cr.fetchall())
@@ -232,6 +247,36 @@ class TestSegesRpcAccess(HttpCase):
         Block = self.env['ai.key.pin.block'].sudo()
         self.assertTrue(Block._is_blocked(BLOCKED_IP))
         self.assertFalse(Block.search([('ip', '=', '203.0.113.9')]))
+
+    def test_collect_pin_refused(self):
+        # Sin el parche, cada llamada esperaría a una pestaña; se acorta la espera.
+        with patch(KEY_PIN_DESK + '.ASK_WAIT_SECONDS', 1):
+            responses = self._run_calls([
+                ('ai.key.pin.ask', 'collect_pin', ['12345678'], False),
+                ('ai.key.pin.ask', '_collect_pin', ['12345678'], True),
+            ])
+        for text in responses:
+            self.assertNotIn('"result"', text)
+
+    def test_unlink_retired_refused(self):
+        Context = self.env['ai.context'].sudo().with_context(active_test=False)
+        factory = [('source_module', '=', 'pns_ai_mcp'),
+                   ('owner_id', '=', False), ('rel_path', '!=', False)]
+        before = Context.search_count(factory)
+        self.assertTrue(before)
+        self._run_calls([
+            ('ai.context', 'unlink_retired_from_module',
+             ['pns_ai_mcp', ['seges-e1-x']], False),
+            ('ai.context', '_unlink_retired_from_module',
+             ['pns_ai_mcp', ['seges-e1-x']], True),
+        ])
+        self.assertEqual(Context.search_count(factory), before)
+
+    def test_cleanup_stuck_state_refused(self):
+        self._run_calls([
+            ('ai.safe.operation', 'cleanup_stuck_state', [], False),
+            ('ai.safe.operation', '_cleanup_stuck_state', [], True),
+        ])
 
     def test_public_names_gone(self):
         for model, old, new in RENAMED:
@@ -366,6 +411,7 @@ class TestSegesInternalFlows(TransactionCase):
             r"\.(remember_for_skill|lookup_for_skill)\(",
             r"'(lookup|remember)_param_cache'",
             r"\.(redeem_key_pin|release_all|note_failure|is_blocked)\(",
+            r"\.(collect_pin|cleanup_stuck_state)\(",
         )]
         found = []
         for module in ('pns_ai_mcp', 'pns_ai_chatboo', 'pns_base'):
@@ -415,6 +461,23 @@ class TestSegesInternalFlows(TransactionCase):
         block = self.env['ai.key.pin.block'].sudo().search(
             [('ip', '=', '203.0.113.21')])
         self.assertFalse(block)
+
+    def test_redeem_key_pin_counts_through_collect_pin(self):
+        # E1′ (parche 10 adaptado): con una mesa abierta, el canje pasa por el
+        # método privado y un PIN que no es de nadie cuenta como fallo.
+        self.ICP.set_param('pns_ai_mcp.key_pin_attempts', '5')
+        Desk = type(self.env['ai.key.pin.desk'])
+        Ask = type(self.env['ai.key.pin.ask'])
+        with patch.object(Desk, 'any_open', return_value=True), \
+                patch.object(Ask, '_collect_pin', return_value=False) as asked:
+            res = self.env['ai.mcp.user']._redeem_key_pin(
+                '12345678', '203.0.113.22')
+        asked.assert_called_once_with('12345678')
+        self.assertEqual(
+            res, {'ok': False, 'error': 'invalid', 'counted': True})
+        block = self.env['ai.key.pin.block'].sudo().search(
+            [('ip', '=', '203.0.113.22')])
+        self.assertEqual(block.failures, 1)
 
 
 @tagged('post_install', '-at_install', 'pns_ai_mcp', 'seges_e0')
