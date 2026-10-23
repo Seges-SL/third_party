@@ -742,7 +742,8 @@ class AIContextDisk(models.Model):
             and not core_only
             and found_codes
         ):
-            deleted_count = self.unlink_retired_from_module(
+            # Seges: parche 14 (M13, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            deleted_count = self._unlink_retired_from_module(
                 source_mod, found_codes=found_codes,
             )
 
@@ -754,8 +755,9 @@ class AIContextDisk(models.Model):
             'errors': errors,
         }
 
+    # Seges: parche 14 (M13, seguridad). Ver docs/pendiente/parches_pns_ai.md
     @api.model
-    def unlink_retired_from_module(self, module_name, found_codes=None):
+    def _unlink_retired_from_module(self, module_name, found_codes=None):
         """Unlink factory contexts of this addon whose file is gone.
 
         User-owned rows stay. Rows without ``rel_path`` stay (runtime
