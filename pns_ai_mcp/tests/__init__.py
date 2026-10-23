@@ -32,3 +32,5 @@ from . import test_change_journal_menu
 from . import test_session_download
 from . import test_flow_legend
 from . import test_server_identity_detection
+# Seges: tests de la entrega E0′ (no regresión de los parches 7 a 10, retirados en 3.1.879). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_rpc_access
