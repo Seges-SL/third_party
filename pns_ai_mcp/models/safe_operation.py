@@ -526,6 +526,18 @@ class SafeOperation(models.Model):
         return verification
 
 
+    # Seges: parche 13 (M10, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Only the system creates supervised operations (``request_safe_plan``
+        runs as superuser). A row created by RPC could carry its own status,
+        ``confirmed_by_uid`` and plan, and run as that user."""
+        if not self.env.su:
+            raise AccessError(_(
+                'Only the system can create a supervised operation.'
+            ))
+        return super().create(vals_list)
+
     # RPC write() does not honour readonly=True. Every column is written by
     # the system (plan, expiry, danger, state), only inside sudo() after the
     # caller has passed _can_resolve().
@@ -1002,8 +1014,9 @@ class SafeOperation(models.Model):
             ),
         }
 
+    # Seges: parche 13 (M10, seguridad). Ver docs/pendiente/parches_pns_ai.md
     @api.model
-    def cleanup_stuck_state(self, older_than_minutes=10):
+    def _cleanup_stuck_state(self, older_than_minutes=10):
         """Limpiador de estado Safe Plan (el que faltaba).
 
         ``cleanup_expired`` solo toca ``pending`` vencidos. El agujero real es
