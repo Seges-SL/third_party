@@ -19,6 +19,11 @@ class TestPaapCore(TransactionCase):
 
     def setUp(self):
         super().setUp()
+        # Seges: parche de tests E0′ (datos de prueba). Ver docs/pendiente/parches_pns_ai.md
+        # request_safe_plan escribe en un cursor propio: en modo test comparte la
+        # transacción del test y ve al usuario creado aquí (como HttpCase en Odoo 14).
+        self.registry.enter_test_mode(self.cr)
+        self.addCleanup(self.registry.leave_test_mode)
         self.writer = new_test_user(
             self.env, login='pns_paap_core_writer',
             groups='base.group_user,base.group_partner_manager,'

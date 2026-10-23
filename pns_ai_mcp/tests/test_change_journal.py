@@ -9,10 +9,22 @@ from odoo.tests import tagged, TransactionCase
 from odoo.addons.pns_ai_mcp.controllers.safe_plan import execute_safe_plan
 
 
+# Seges: parche de tests E0′ (datos de prueba). Ver docs/pendiente/parches_pns_ai.md
+def _set_superuser_ai_writer(env):
+    """execute_safe_plan exige AI Writer; el usuario 1 no lo tiene en una BD nueva.
+
+    Solo en la transacción del test (se deshace al terminar)."""
+    env.ref('pns_ai_mcp.group_ai_writer').write({
+        'users': [(4, SUPERUSER_ID)],
+    })
+
+
 @tagged('standard', 'post_install', '-at_install', 'pns_ai_mcp')
 class TestChangeJournal(TransactionCase):
 
     def _exec(self, steps, **ctx):
+        # Seges: parche de tests E0′ (datos de prueba). Ver docs/pendiente/parches_pns_ai.md
+        _set_superuser_ai_writer(self.env)
         env = api.Environment(
             self.env.cr, SUPERUSER_ID, dict(self.env.context or {}, **ctx),
         )
