@@ -81,6 +81,13 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 4. Las que se aprueben se traen como parches nuevos de este documento, con el motivo «traída de la
    versión X.Y.Z del fabricante».
 
+## Cambio de base a 3.1.879 (23/10/2026)
+
+- **Rama `14.0-pns-ai-3879`:** los parches 1 a 9 quedan retirados (los cubre el fabricante); el 10, el
+  11 y el 12 se adaptan con el mismo número.
+- **`14.0-pns-ai-correcciones`, staging y LIYBEN:** siguen aplicados hasta el cambio de base.
+- Plan, numeración y seguimiento: [plan de corrección sobre 3.1.879](plan_correccion_pns_ai_3879.md).
+
 ## Parche 1: `pns_ai_mcp/controllers/mcp_decorators.py:171` (antes `:169`)
 
 - **PNS:** PNS-81 (fallo al importar).
