@@ -10,6 +10,8 @@ to external MCP servers.
 
 from odoo import models, fields, api, _
 from odoo.exceptions import AccessError, UserError, ValidationError
+# Seges: parche 16 (PNS-54, seguridad). Ver docs/pendiente/parches_pns_ai.md
+from odoo.addons.base.models.res_users import check_identity
 from datetime import datetime, timedelta
 import hashlib
 import hmac
@@ -1775,6 +1777,8 @@ class SafeOperation(models.Model):
         }
         return action
 
+    # Seges: parche 16 (PNS-54, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    @check_identity
     def action_confirm_and_execute(self):
         """Botón Autorizaciones: un clic = confirmar + escribir + executed.
 
@@ -2040,7 +2044,8 @@ class SafeOperation(models.Model):
             'plan': plan,
             'danger_level': danger,
         }
-        if mint_token:
+        # Seges: parche 16 (PNS-54, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        if mint_token and self.user_id == self.env.user:
             payload['confirm_token'] = self._mint_confirm_token()
         return payload
 
