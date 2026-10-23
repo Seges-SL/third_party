@@ -190,8 +190,9 @@ class KeyPinAsk(models.Model):
             'mcp_user_id': mcp_user.id,
         })
 
+    # Seges: parche 10 (PNS-83, seguridad). Ver docs/pendiente/parches_pns_ai.md
     @api.model
-    def collect_pin(self, pin):
+    def _collect_pin(self, pin):
         """Ask every open tab whose PIN this is. Return the key it stands for.
 
         The server does not know the PIN: the tab minted it next to the key.

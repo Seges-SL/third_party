@@ -763,7 +763,8 @@ class MCPUser(models.Model):
             return {'ok': False, 'error': 'blocked', 'counted': False}
         if not self.env['ai.key.pin.desk'].sudo().any_open():
             return {'ok': False, 'error': 'no_desk', 'counted': False}
-        got = self.env['ai.key.pin.ask'].sudo().collect_pin(raw)
+        # Seges: parche 10 (PNS-83, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        got = self.env['ai.key.pin.ask'].sudo()._collect_pin(raw)
         if got is False:
             paused = Block._note_failure(ip)
             return {
