@@ -88,6 +88,44 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 - **`14.0-pns-ai-correcciones`, staging y LIYBEN:** siguen aplicados hasta el cambio de base.
 - Plan, numeración y seguimiento: [plan de corrección sobre 3.1.879](plan_correccion_pns_ai_3879.md).
 
+## Cambios en tests del fabricante
+
+Datos de prueba de tests del fabricante que en Odoo 14 no podían pasar. No corrigen el código de los
+módulos, así que no llevan número de parche ni entran en el índice. Solo en la rama `14.0-pns-ai-3879`.
+
+- **Marcador:** `# Seges: parche de tests E0′ (datos de prueba). Ver docs/pendiente/parches_pns_ai.md`,
+  junto a cada cambio. Va sin PNS: el más cercano, PNS-50 («Tests no cargados o descartados; sin tests
+  de seguridad negativa», [seguimiento](seguimiento_informe_pns_ai.md)), trata de tests que no se
+  cargan, no de datos de prueba incompletos.
+- **Origen:** [fase 3, parte 1](fase3_lab_pns_ai_3879.md), paso 3 (tabla «Nuevos frente a la línea
+  base»), y la [comparación](../specs/comparacion_pns_ai_3-1-879.md), §5.5 (fila PNS-50 y PNS-77).
+- **Entrega:** E0′ del [plan sobre 3.1.879](plan_correccion_pns_ai_3879.md).
+
+| Archivo | Test | Causa | Cambio |
+|---|---|---|---|
+| `pns_ai_mcp/tests/test_change_journal.py` | `test_create_write_sequence_and_revert`, `test_unlink_archives_then_revert_and_empty_trash` (E) | `_exec` ejecuta el plan como usuario 1, que no está en `AI Writer`; `execute_safe_plan` lo exige (`controllers/controller_helpers.py:102`) | Función `_set_superuser_ai_writer`, llamada al principio de `_exec`: da `pns_ai_mcp.group_ai_writer` al usuario 1 en la transacción del test, que se deshace al terminar |
+| `pns_ai_mcp/tests/test_paap_core.py` | `test_paap_i1_a_proposal_changes_nothing_and_hands_out_no_credential` (E) | `request_safe_plan` crea la operación en un cursor propio con commit (`controllers/safe_plan.py:2197` y siguientes), que no ve al usuario creado en la transacción del test: `IntegrityError` en `ai_safe_operation_user_id_fkey` | En `setUp`, `registry.enter_test_mode(self.cr)` con `leave_test_mode` en `addCleanup`, como hace `HttpCase` en Odoo 14 (`odoo/tests/common.py:1400-1404`): el cursor propio pasa a ser un `TestCursor` sobre la transacción del test (`odoo/modules/registry.py:698-706`) y no se confirma nada |
+
+- **No se toca `test_failed_execute_journals_outside_rollback`** (F; queda como en el fabricante):
+  - Probado en el laboratorio el 23/10/2026: dar `AI Writer` al usuario 1 en el cursor con commit del
+    test no basta.
+  - El plan lo frena otra comprobación del fabricante (`_meta_crud_block_error`, `controllers/safe_plan.py:878-880`:
+    «Do not create, write or delete ir.model.fields via CRUD»), así que el test espera un texto antiguo
+    (`base fields`).
+  - La fila `failed` se escribe en un cursor con commit (`_record_failed_plan`), pero el test la busca
+    con la transacción `REPEATABLE READ` del `TransactionCase`, que empezó antes y no la ve.
+  - Además, el grupo confirmado contaminó otros tests: con él,
+    `TestSafePlanAtomicity.test_normal_execution_marks_executed_and_applies_mutation` dejó de dar
+    error, y volvió a darlo al retirarlo. Se deduce que la revocación en `addCleanup` no surtió
+    efecto; la causa no se ha investigado.
+  - Arreglarlo es rediseñar el test, no completar sus datos: pendiente de decisión de Sergio.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "group_ai_writer\|enter_test_mode\|new_test_user" pns_ai_mcp/tests/test_change_journal.py pns_ai_mcp/tests/test_paap_core.py
+  ```
+  Corregido si sus versiones preparan un usuario con `AI Writer` en `test_change_journal` y evitan el
+  cursor propio (o el usuario sin confirmar) en `test_paap_core`.
+
 ## Parche 1: `pns_ai_mcp/controllers/mcp_decorators.py:171` (antes `:169`)
 
 - **PNS:** PNS-81 (fallo al importar).
@@ -668,3 +706,45 @@ Tras `odoo-dev 14 actualizar pns_base,pns_ai_mcp,pns_ai_chatboo`:
   staging** (16/10/2026, prueba 2: CORREGIDO).
 
 Detalle en `verificacion_seguridad_pns_ai.md`, «Staging (15-16/10/2026)».
+
+## Línea base de E0′ sobre 3.1.879 (23/10/2026)
+
+- **Rama:** `14.0-pns-ai-3879`, código del fabricante 3.1.879 sin cambios en los módulos más los tests
+  de E0′ ([plan](plan_correccion_pns_ai_3879.md)).
+- **Contexto:** `odoo-dev 14` `lab_pns_ai_3879` (imagen `odoo-dev:14-lab_pns_ai_3879`).
+- **Referencia:** fase 3, parte 1 (`odoo-dev 14 tests pns_ai_mcp`, log `tests-20261022-164729.log`).
+- **Cambios en los tests:**
+  - [cambios en tests del fabricante](#cambios-en-tests-del-fabricante);
+  - `pns_ai_mcp/tests/test_seges_rpc_access.py` portado y adaptado (18 tests);
+  - `pns_ai_chatboo/tests/` nuevo: `common.py` (`SegesChatbooCase`), `test_seges_chatboo_smoke.py`
+    (2 tests) y `test_seges_chatboo_access.py` (12 de los 15 tests de E2).
+
+**Comprobaciones:**
+
+1. `py_compile` con Python 3.7.3 en la imagen `odoo-dev:14-lab_pns_ai_3879`, repo montado en solo
+   lectura: los 8 archivos tocados, correctos.
+2. `python3 ~/.claude/hooks/odoo_lint.py --revisar` sobre los archivos tocados: 0 incidencias nuevas
+   (15 preexistentes en los archivos del fabricante, sin tocar).
+3. `odoo-dev 14 tests pns_base,pns_ai_mcp,pns_ai_chatboo` (log `tests-20261023-175029.log`): 234 tests,
+   17 fallos y 32 errores.
+
+| Módulo | Tests | Fallos | Errores | Saltados | Fase 3, parte 1 |
+|---|---|---|---|---|---|
+| `pns_base` | 0 (sin `tests/`) | — | — | — | — |
+| `pns_ai_mcp` | 220 | 17 | 32 | 3 | 202 · 17 F · 35 E · 5 saltados en el log |
+| `pns_ai_chatboo` | 14 | 0 | 0 | 0 | sin tests |
+
+**Diferencias con la fase 3, test a test (`pns_ai_mcp`):**
+
+- **Pasan, antes E (3):** `TestChangeJournal.test_create_write_sequence_and_revert`,
+  `TestChangeJournal.test_unlink_archives_then_revert_and_empty_trash` y
+  `TestPaapCore.test_paap_i1_a_proposal_changes_nothing_and_hands_out_no_credential` (datos de prueba).
+- **Tests nuevos (18):** los de `test_seges_rpc_access.py`, todos en verde.
+- **Ya no se saltan (2):** `TestKnowledgeComposition.test_chatboo_mcp_pack_is_imported` y
+  `test_default_skill_codes_at_module_includes_empty_agent_codes`. Se saltaban porque `pns_ai_chatboo`
+  no estaba instalado (`test_knowledge_composition.py:51` y `:213`); ahora pasan.
+- **El resto de fallos y errores (17 F y 32 E):** los mismos tests que en la fase 3. Uno de ellos es
+  `TestChangeJournal.test_failed_execute_journals_outside_rollback` (F), que no se arregla con datos de
+  prueba (ver el apartado de cambios en tests del fabricante).
+
+La fase 3 anotó 4 saltados; el log de esa ejecución tiene 5 tests distintos con `skipped`.

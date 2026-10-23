@@ -9,7 +9,8 @@
 - **Registro de los cambios en el código:** [parches_pns_ai.md](parches_pns_ai.md).
 - **Plan anterior:** [plan_correccion_pns_ai.md](plan_correccion_pns_ai.md) (base 3.1.782), referencia
   de la rama `14.0-pns-ai-correcciones`.
-- **Estado del plan:** aprobado (23/10/2026); siguiente, E0′.
+- **Estado del plan:** aprobado (23/10/2026); E0′, parte A (tests), validada en laboratorio el
+  23/10/2026; siguiente, el diagnóstico de PNS-70 (E0′).
 
 ## 1. Cómo se trabaja
 
@@ -38,7 +39,7 @@
 
 | Entrega | Contenido | Parches | Estado |
 |---|---|---|---|
-| **E0′** (previa) | `test_seges_*` adaptados; esqueleto de tests de Chatboo; datos de prueba de `test_change_journal` y `test_paap_core`; línea base nueva; diagnóstico de PNS-70 (solo lectura) | — | Pendiente |
+| **E0′** (previa) | `test_seges_*` adaptados; esqueleto de tests de Chatboo; datos de prueba de `test_change_journal` y `test_paap_core`; línea base nueva; diagnóstico de PNS-70 (solo lectura) | — | Parte A (tests): validada en laboratorio (23/10/2026). Diagnóstico de PNS-70: pendiente |
 | **E1′** | Críticos y Altos baratos: M10 con el parche 12 adaptado, PNS-54, PNS-07, M13, `collect_pin` (PNS-83) | 10 y 12 adaptados; nuevos desde el 13 | Pendiente |
 | **E2′** | Resto de Altos: papelera del diario (PNS-37), PNS-19, PNS-17, PNS-82, PNS-70; PNS-20 si P-20 lo confirma | 11 adaptado; nuevos | Pendiente |
 | **E3′** | Lienzo: M1, M2 y F1 | Nuevos | Pendiente |
@@ -48,22 +49,52 @@ Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`;
 
 ### E0′ (previa)
 
-- **Adaptar los `test_seges_*` desde `14.0-pns-ai-correcciones`.**
+- **Adaptar los `test_seges_*` desde `14.0-pns-ai-correcciones`:** solo lo que pasa sin parches.
   - Origen: comparación §4.1 (y §10.1, «Tests de E1 y E2»).
-  - Archivos: `pns_ai_mcp/tests/test_seges_rpc_access.py`, `pns_ai_mcp/tests/test_seges_user_groups.py`
-    y `pns_ai_chatboo/tests/test_seges_chatboo_access.py`.
   - Qué falla: la importación de `RELAXAICODE_SIDE_EFFECT_METHODS` de `controllers/validators` está rota
     (ahora en `controllers/validators_base.py:233`, sin los nombres privados). El detalle por test,
     en §4.1.
+  - `pns_ai_mcp/tests/test_seges_rpc_access.py`, completo (18 tests, parches 7 a 10), con 6 adaptaciones:
+    - la lista negra pasa a `blocked_private_attr` (`validators_base.py:164`);
+    - el AST rechaza el nombre privado (`PRIVATE_ATTR`, `validators.py:303-304, 362-367`);
+    - con la política `open` ya no se da de alta el dominio (`safe_plan.py:775-777`);
+    - el código se lee en `SkillsMixin._normalize_skill_params` (`utils/engine_skills.py:71`);
+    - `_redeem_key_pin` responde `no_desk` sin mesa abierta (`mcp_user.py:764-765`).
+    - Las pruebas del parche 10 son las de su alcance en 3.1.782; el canje por `collect_pin` va en E1′.
+  - `pns_ai_chatboo/tests/test_seges_chatboo_access.py`: 12 de los 15 tests (parche 11).
+    - Los jobs se crean en `sudo`: la ACL es `1,0,0,0`.
+    - `test_claim_filters_in_python` queda sin el adjunto con `res_id = 0`.
+    - Van a E1′: `test_seges_user_groups.py` y `test_fulfill_client_export_claims_own`. Van a E2′: los
+      dos tests de `unlink` y el caso de `res_id = 0`.
 - **Tests propios de Chatboo:** en esta entrega, solo el esqueleto; se amplían en cada entrega.
   - Origen: comparación §5.6, «PNS-50 y PNS-77» (Chatboo sin tests en el paquete).
-  - Archivo y método: a determinar en la entrega.
+  - Archivo y método:
+    - `pns_ai_chatboo/tests/common.py`, clase `SegesChatbooCase(HttpCase)`: usuario con acceso
+      (grupo conversacional y clave MCP, `utils/chatboo_access.py:7-30`) y llamadas JSON-RPC;
+    - `pns_ai_chatboo/tests/test_seges_chatboo_smoke.py`, `TestSegesChatbooSmoke.test_open_session`
+      (`/chatboo/sessions/create` y `/load`, `controllers/chatboo.py:270-320`) y
+      `test_no_access_without_key`.
+  - Ampliación: un archivo `test_seges_chatboo_<tema>.py` por entrega sobre `SegesChatbooCase`
+    (E1′, PNS-07; E2′, parche 11; E3′, lienzo).
 - **Datos de prueba de `test_change_journal` y `test_paap_core`.**
-  - Origen: a determinar en la entrega.
-  - Archivos: `pns_ai_mcp/tests/test_change_journal.py` (comparación §5.5, fila PNS-50 y PNS-77);
-    `test_paap_core`, a determinar en la entrega.
-  - Método: a determinar en la entrega.
+  - Origen: fase 3, parte 1, paso 3 ([fase3_lab_pns_ai_3879.md](fase3_lab_pns_ai_3879.md), tabla
+    «Nuevos frente a la línea base»), y comparación §5.5, fila PNS-50 y PNS-77.
+  - Archivos y método:
+    - `pns_ai_mcp/tests/test_change_journal.py`: `_exec` da `AI Writer` al usuario 1 en la transacción
+      del test;
+    - `pns_ai_mcp/tests/test_paap_core.py`: `setUp` pone el registro en modo test, para que el cursor
+      propio de `request_safe_plan` vea al usuario.
+  - Marcador sin número ni PNS: `Seges: parche de tests E0′ (datos de prueba)`. Registro en
+    [parches_pns_ai.md](parches_pns_ai.md), «Cambios en tests del fabricante».
+  - Queda en F, sin tocar y pendiente de decisión de Sergio,
+    `test_failed_execute_journals_outside_rollback`: no se arregla con datos de prueba (texto de error
+    antiguo y lectura con una transacción anterior al commit).
 - **Línea base nueva** con los tests de Seges. Referencia: 202 tests, 17 F y 35 E (fase 3, parte 1).
+  - **Resultado (23/10/2026):**
+    - `pns_ai_mcp`: 220 tests, 17 F, 32 E y 3 saltados;
+    - `pns_ai_chatboo`: 14 tests, 0 F y 0 E;
+    - `pns_base`: sin tests.
+  - Detalle test a test en [parches_pns_ai.md](parches_pns_ai.md), «Línea base de E0′ sobre 3.1.879».
 - **Diagnóstico de PNS-70**, de solo lectura y sin parche en esta entrega: por qué falla en 3.1.879 y no
   en 3.1.782, con los estáticos reales del contenedor.
   - Origen: comparación §5.6, «PNS-70».
@@ -95,6 +126,13 @@ Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`;
   - Archivo y método: `pns_ai_chatboo/models/chatboo_session.py`, `fulfill_client_export`
     (`:541-564`), que llega a `persist_turn_file` (`utils/session_download.py:365-392`, cursor propio
     con commit); `sandbox_helpers` (`chatboo_session.py:818`).
+  - Tests: se porta aquí `test_fulfill_client_export_claims_own` (de `test_seges_chatboo_access.py`
+    de `14.0-pns-ai-correcciones`), en `pns_ai_chatboo/tests/test_seges_chatboo_export.py`.
+  - **Los tests de PNS-07 no deben usar `enter_test_mode` ni `HttpCase`** (que lo activa): tienen que
+    ejercitar el cursor propio con commit, que es el defecto. Con el registro en modo test, ese cursor
+    comparte la transacción del test y el fallo no se ve.
+- **Tests del parche 12 adaptado:** `pns_ai_mcp/tests/test_seges_user_groups.py` (de
+  `14.0-pns-ai-correcciones`), reescrito con un grupo no cúspide (comparación §4.1 y P-01).
 - **M13.**
   - Origen: comparación §8.7 «M13» (Alta).
   - Archivo y método: `models/ai_context_disk.py:757-796`, `ai.context.unlink_retired_from_module`.
@@ -111,6 +149,10 @@ Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`;
   - Archivo y método: `models/ai_change_journal.py`, `_cron_empty_journal_trash` (`:612-633`) y la
     selección de filas en papelera (`:541-575`); `data/journal_trash_cron.xml:5-15` (sin `user_id`);
     `security/ir.model.access.csv:42-43`; paso `unlink` de un plan en `controllers/safe_plan.py:938-953`.
+  - Tests: si el parche de la papelera afecta a la fila del diario de una ejecución fallida
+    (`_record_failed_plan`), un test de Seges cubrirá que esa fila sobrevive al rollback, con un cursor
+    propio y sin `enter_test_mode`. El test del fabricante `test_failed_execute_journals_outside_rollback`
+    se acepta como desfasado (entre los 17 F de la línea base de E0′) y no se rediseña.
 - **PNS-19.**
   - Origen: comparación §3 «PNS-19» (Alta) y §1.3.
   - Archivo y método: control de modelos de credenciales en `controllers/validators_base.py:187-209,
@@ -124,6 +166,12 @@ Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`;
   - Origen: comparación §3 «PNS-82» (Alta; resto Baja), §1.2 y §10.1.
   - Archivo y método: `pns_ai_chatboo/models/chatboo_session.py`, `unlink` (`:1989-1995`) y
     `_cleanup_old_sessions` (`:2023`).
+  - Tests, de `test_seges_chatboo_access.py` de `14.0-pns-ai-correcciones` (no portados en E0′):
+    - `test_unlink_own_session_keeps_foreign` y `test_cron_unlink_sudo_keeps_foreign`, que fallan con
+      3.1.879 por la diferencia real;
+    - en `test_claim_filters_in_python`, el adjunto con `res_model` y `res_id = 0`, que el fabricante
+      no engancha (exige los dos vacíos, `chatboo_session.py:495`). Hay que decidir si se mantiene el
+      criterio del parche 11.
 - **PNS-70:** parche sin pisar `window.Chart` y repetición de P-70, que cierra la condición 3 de la
   [hoja de N12](n12_decision_3879.md).
   - Origen: comparación §5.6 «PNS-70» (Alta) y §1.3.
@@ -201,3 +249,4 @@ Estados (N11): aplicado → validado en laboratorio → validado en staging → 
 | 10 | PNS-83 (`collect_pin`) | E1′ | Adaptado a 3.1.879; pendiente |
 | 11 | PNS-82 (`unlink` de la sesión) | E2′ | Adaptado a 3.1.879; pendiente |
 | 12 | PNS-01 y PNS-02 (criterio de grupos), con M10 | E1′ | Adaptado a 3.1.879; pendiente |
+| — | Parche de tests E0′ (datos de prueba de `test_change_journal` y `test_paap_core`) | E0′ | Validado en laboratorio (23/10/2026) |
