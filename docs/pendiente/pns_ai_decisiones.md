@@ -104,7 +104,7 @@ con la tabla 1.1 del informe:
 | N4 | ¿Se usa la mesa de entrega de claves por PIN? | a) no se usa |
 | N5 | Proveedor y datos para las 9 pruebas pendientes de staging | a); c) como puente |
 | N6 | Orden de instalación: staging y después LIYBEN | Camino A (15/10/2026) |
-| N7 | Versión que se instala en LIYBEN | 3.1.782 con parches 1-4 y mitigaciones de N3 (15/10/2026); parches 1-6 tras el staging (nota 16/10/2026) |
+| N7 | Versión que se instala en LIYBEN | 3.1.782 con parches 1-4 y mitigaciones de N3 (15/10/2026); parches 1-6 tras el staging (nota 16/10/2026). Pendiente: archivar los 18 usuarios de portal, requisito previo al `-u` del cambio de base (23/10/2026) |
 | N8 | Proveedor externo del staging | Gemini; LIYBEN, en la demostración (15/10/2026) |
 | N9 | Copias de `pns_demo` | No se guardan (15/10/2026) |
 | N10 | Montaje del staging | Servicio, PostgreSQL y despliegue propios (15/10/2026) |
@@ -154,6 +154,24 @@ Decisión: **b′) cambiar una vez de base a 3.1.879** (Sergio, 22/10/2026) / Fe
   gráficos de Odoo no están afectados). Se comunicará al jefe junto con la hoja de N12.
 
 Decisión: **b′ se mantiene** (Sergio, 23/10/2026) / Fecha: 23/10/2026
+
+**Decisiones del 23/10/2026** (Sergio; cierran las que quedaban abiertas, ver
+[hoja de decisión](n12_decision_3879.md) §8):
+
+- **Criterio de grupos: el de Seges.** Solo los administradores de Ajustes (`base.group_system`) dan o
+  quitan grupos mediante un plan, sea cual sea el grupo. Es el parche 12 adaptado, aplicado también a
+  la vía CRUD. Se descarta el criterio del fabricante (cúspide cerrada para todos y el resto libre).
+- **Lienzo (Canvas): se corrige** (M1, M2 y F1); no se desactiva. D1 (ficha de la comparación, no la
+  decisión D1), caso a caso.
+- **Fabricante:** no se le piden el commit de `pns_base` 1.2.47 ni los `unit_tests/`. La base se congela
+  en 3.1.879, salvo que más adelante llegue una versión que mejore lo actual. Los tests los hace Seges
+  (`test_seges_*` adaptados y tests propios de Chatboo).
+- **`ai_log.agent_id`:** no se conserva al actualizar LIYBEN al final del plan (el `-u` borra la
+  columna y no se guarda aparte).
+- **Proveedor en las pruebas:** cuando se agote la cuota gratuita de Gemini, el modelo auxiliar es
+  Qwen3.5-397B-A17B de OVH. Qwen3.5-9B no sirve: inventa datos y no sigue el formato.
+- **Usuarios de portal de LIYBEN (18):** hay que archivarlos (decidido el 20/10/2026; sigue sin hacer).
+  Con 3.1.879 importa más, porque M13 alcanza a los usuarios de portal (ver N7).
 
 ### Bloqueantes vigentes
 
@@ -1632,6 +1650,10 @@ obligatorio si se instala Chatboo (PNS-94); el 5 es inocuo para otros proveedore
 Gemini. El proveedor se estudia con OVH (N8).
 
 **Tras la reunión del 19/10/2026:** **Usuarios de portal: se archivan los 18** (pendiente de ejecutar; [instalación](instalacion_liyben_pns_ai.md) §6). LIYBEN recibe las correcciones **de una vez, al terminar el plan de corrección**, con todo validado en el staging (Sergio, 20/10/2026). (ver [§10](#10-reunión-del-19102026-corrección-por-seges-n11-y-n12))
+
+**Tras las decisiones del 23/10/2026:** los **18 usuarios de portal** de LIYBEN **siguen pendientes de
+archivar**. Es **requisito previo al `-u` del cambio de base** a 3.1.879 (M13 alcanza a los usuarios de
+portal). La fecha se registrará aquí cuando se archiven. (ver N12, «Decisiones del 23/10/2026»)
 
 ### N8 — ¿Qué proveedor externo se usa en el staging (y en LIYBEN)?
 

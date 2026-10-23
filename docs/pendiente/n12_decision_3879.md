@@ -157,20 +157,25 @@ WHERE u.active
 | Decisión | Pasos |
 |---|---|
 | **b) Mantener** | Parche 13 (M10) en la rama, ampliando el criterio del 12; P-8b, P-8f y P-8g sobre la rama; retomar ET; registrar M10, M11 y M12 con número PNS en el seguimiento; borrar `_fabricante/` |
-| **b′) Cambiar una vez** | 1. Fase 3 en laboratorio (BD nueva, fuera de `pns_demo`): paridad, tests del fabricante, `test_seges_*` adaptados, P-6 ampliada, P-70, P-8a y P-8b. 2. Si pasa: rama `14.0-pns-ai-3879` desde `14.0`, plan nuevo (parches 10-12 adaptados, M10, M13, `collect_pin`, papelera, PNS-70 sin pisar `window.Chart`, restos Críticos y Altos) y decidir qué hacer con el lienzo. Repetir P-70 en el laboratorio con el parche de PNS-70: cierra la condición 3 (no cumplida por P-70 y aceptada como excepción el 23/10/2026). 3. P-9 sobre copia de `pns_demo`. 4. Staging y, al final, LIYBEN con copia completa previa. 5. Conservar `_fabricante/3.1.879` hasta tener la rama |
+| **b′) Cambiar una vez** | 1. Fase 3 en laboratorio (BD nueva, fuera de `pns_demo`): paridad, tests del fabricante, `test_seges_*` adaptados, P-6 ampliada, P-70, P-8a y P-8b. 2. Si pasa: rama `14.0-pns-ai-3879` desde `14.0`, plan nuevo (parches 10-12 adaptados, M10, M13, `collect_pin`, papelera, PNS-70 sin pisar `window.Chart`, restos Críticos y Altos) y lienzo: corregir M1, M2 y F1 (§8). Repetir P-70 en el laboratorio con el parche de PNS-70: cierra la condición 3 (no cumplida por P-70 y aceptada como excepción el 23/10/2026). 3. P-9 sobre copia de `pns_demo`. 4. Staging y, al final, LIYBEN con copia completa previa. 5. Conservar `_fabricante/3.1.879` hasta tener la rama |
 | **a) / c) Reaplicar** | Como b′, más el procedimiento de comparación por versión en `parches_pns_ai.md` |
 
 **En cualquier caso**, actualizar N12 en `pns_ai_decisiones.md` con un bloque «Tras la versión 3.1.879
 (22/10/2026)» que remita a este documento, y hacer commit `[DOC]` de la comparación.
 
-## 8. Decisiones que quedan abiertas tras N12
+## 8. Decisiones que quedaban abiertas tras N12 (cerradas el 23/10/2026)
 
-- Criterio de grupos:
-  - el de Seges, parche 12: Ajustes para cualquier grupo;
-  - o el del fabricante: cúspide cerrada para todos y el resto libre.
-- Si se elige b′, el lienzo (Canvas):
-  - corregir M1, M2 y F1;
-  - o dejarlo sin proveedor de diseño. Si esto basta para cerrarlo, REQUIERE PRUEBA: `page_html` no
-    parece necesitarlo.
-- Pedir al fabricante el commit de `pns_base` 1.2.47 y los `unit_tests/`: barato, y aclara numeración y
-  pruebas.
+- Criterio de grupos. **Decidido (Sergio, 23/10/2026): el de Seges.** Solo los administradores de
+  Ajustes (`base.group_system`) dan o quitan grupos mediante un plan, sea cual sea el grupo: parche 12
+  adaptado, aplicado también a la vía CRUD.
+  - el de Seges, parche 12: Ajustes para cualquier grupo; **elegido**.
+  - ~~o el del fabricante: cúspide cerrada para todos y el resto libre.~~ **Descartado.**
+- Si se elige b′, el lienzo (Canvas). **Decidido (Sergio, 23/10/2026): corregir M1, M2 y F1**; no se
+  desactiva. D1, caso a caso.
+  - corregir M1, M2 y F1; **elegido**.
+  - ~~o dejarlo sin proveedor de diseño. Si esto basta para cerrarlo, REQUIERE PRUEBA: `page_html` no
+    parece necesitarlo.~~ **Descartado.**
+- ~~Pedir al fabricante el commit de `pns_base` 1.2.47 y los `unit_tests/`: barato, y aclara numeración y
+  pruebas.~~ **Descartado (Sergio, 23/10/2026): no se pide nada al fabricante.** La base se congela en
+  3.1.879, salvo que más adelante llegue una versión que mejore lo actual. Los tests los hace Seges
+  (`test_seges_*` adaptados y tests propios de Chatboo).
