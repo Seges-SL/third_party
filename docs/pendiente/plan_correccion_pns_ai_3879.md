@@ -9,8 +9,9 @@
 - **Registro de los cambios en el código:** [parches_pns_ai.md](parches_pns_ai.md).
 - **Plan anterior:** [plan_correccion_pns_ai.md](plan_correccion_pns_ai.md) (base 3.1.782), referencia
   de la rama `14.0-pns-ai-correcciones`.
-- **Estado del plan:** aprobado (23/10/2026); E0′, parte A (tests), validada en laboratorio el
-  23/10/2026; siguiente, el diagnóstico de PNS-70 (E0′).
+- **Estado del plan:** aprobado (23/10/2026); E0′ terminada el 23/10/2026: parte A (tests) validada en
+  laboratorio y diagnóstico de PNS-70 hecho ([pns70_diagnostico_3879.md](pns70_diagnostico_3879.md)).
+  Rama `14.0-pns-ai-3879` publicada el 23/10/2026 (desde `dafb316`). Siguiente: E1′.
 
 ## 1. Cómo se trabaja
 
@@ -39,7 +40,7 @@
 
 | Entrega | Contenido | Parches | Estado |
 |---|---|---|---|
-| **E0′** (previa) | `test_seges_*` adaptados; esqueleto de tests de Chatboo; datos de prueba de `test_change_journal` y `test_paap_core`; línea base nueva; diagnóstico de PNS-70 (solo lectura) | — | Parte A (tests): validada en laboratorio (23/10/2026). Diagnóstico de PNS-70: pendiente |
+| **E0′** (previa) | `test_seges_*` adaptados; esqueleto de tests de Chatboo; datos de prueba de `test_change_journal` y `test_paap_core`; línea base nueva; diagnóstico de PNS-70 (solo lectura) | — | Parte A (tests): validada en laboratorio (23/10/2026). Diagnóstico de PNS-70: hecho (23/10/2026) |
 | **E1′** | Críticos y Altos baratos: M10 con el parche 12 adaptado, PNS-54, PNS-07, M13, `collect_pin` (PNS-83) | 10 y 12 adaptados; nuevos desde el 13 | Pendiente |
 | **E2′** | Resto de Altos: papelera del diario (PNS-37), PNS-19, PNS-17, PNS-82, PNS-70; PNS-20 si P-20 lo confirma | 11 adaptado; nuevos | Pendiente |
 | **E3′** | Lienzo: M1, M2 y F1 | Nuevos | Pendiente |
@@ -176,6 +177,19 @@ Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`;
   [hoja de N12](n12_decision_3879.md).
   - Origen: comparación §5.6 «PNS-70» (Alta) y §1.3.
   - Archivo y método: `pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js:24-33`.
+  - Diagnóstico (E0′, parte B): [pns70_diagnostico_3879.md](pns70_diagnostico_3879.md). Mecanismo
+    comprobado en ejecución el 23/10/2026: Chart 4, cargado al abrir el chat, sustituye en `window.Chart`
+    a la 2.x de Odoo.
+  - **Decisión de Sergio (23/10/2026): opción A.** Chart 4 bajo un nombre propio, `PnsChatbooChart`:
+    `pns_ai_chatboo/static/src/js/chart.umd.min.js` (cabecera UMD) y `chatboo_heavy_libs.js:28-33`.
+    Condiciones:
+    1. Antes de aplicarla, comprobar que ningún otro JS de `pns_*` usa `window.Chart` esperando la
+       versión 4; si lo hay, pasa también a `PnsChatbooChart`.
+    2. El cambio en la librería es exactamente un token (`.Chart=e()` → `.PnsChatbooChart=e()`), con
+       marcador, y el `grep` que lo localiza queda en [parches_pns_ai.md](parches_pns_ai.md).
+  - Validación con P-70 (casos en el diagnóstico, §4):
+    - Odoo: `window.Chart` sigue siendo la 2.x (`Chart.helpers` presente, sin `Chart.version`);
+    - chat: `PnsChatbooChart.version` = `4.4.8`.
 - **PNS-20**, solo si P-20 lo confirma.
   - Origen: comparación §6.1 «PNS-20 (parte)» (Alta, REQUIERE PRUEBA) y §1.3.
   - Archivo y método: `pns_base/models/operation_report_wizard.py`, `action_preview` (`:305-323`;
