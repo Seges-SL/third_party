@@ -40,7 +40,7 @@ grep -rn "Seges: parche" pns_base pns_ai_mcp pns_ai_chatboo
 | 4 | `# Seges: parche de compatibilidad con Odoo 14 (API de Odoo 14: Environment sin sudo). Ver docs/pendiente/parches_pns_ai.md` |
 | 5 | `# Seges: parche de compatibilidad (Gemini 3 por el protocolo OpenAI: thought_signature)` |
 | 6 | `# Seges: parche de compatibilidad (bloqueo de chatboo_session)` |
-| 7 en adelante | `# Seges: parche N (PNS-XX, <tipo>). Ver docs/pendiente/parches_pns_ai.md`, con `<tipo>` = `seguridad`, `robustez`, `compatibilidad` o `funcional`; `// …` en JS y `<!-- … -->` en XML |
+| 7 en adelante | `# Seges: parche N (PNS-XX, <tipo>). Ver docs/pendiente/parches_pns_ai.md`, con `PNS-XX` = el PNS o, si no tiene, el id de la [comparación con 3.1.879](../specs/comparacion_pns_ai_3-1-879.md) (`M10`, `M13`…; desde el 23/10/2026), y `<tipo>` = `seguridad`, `robustez`, `compatibilidad` o `funcional`; `// …` en JS y `<!-- … -->` en XML |
 
 Los marcadores de los parches 1 a 6 no se cambian: la ruta de este documento tampoco, porque la citan.
 
@@ -88,6 +88,20 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 - **`14.0-pns-ai-correcciones`, staging y LIYBEN:** siguen aplicados hasta el cambio de base.
 - Plan, numeración y seguimiento: [plan de corrección sobre 3.1.879](plan_correccion_pns_ai_3879.md).
 
+### Índice de la rama `14.0-pns-ai-3879`
+
+| N.º | PNS / id | Tipo | Archivos | Entrega | Estado |
+|---|---|---|---|---|---|
+| 10 (adaptado) | PNS-83 | seguridad | `pns_ai_mcp/models/key_pin_desk.py`, `pns_ai_mcp/models/mcp_user.py` | E1′ | Validado en laboratorio (23/10/2026) |
+| 12 (adaptado) | PNS-01, PNS-02 | seguridad | `pns_ai_mcp/models/ai_system_action.py`, `pns_ai_mcp/utils/privilege_cusp.py` | E1′ | Validado en laboratorio (23/10/2026) |
+| 13 | M10 | seguridad | `pns_ai_mcp/models/safe_operation.py` | E1′ | Validado en laboratorio (23/10/2026) |
+| 14 | M13 | seguridad | `pns_ai_mcp/models/ai_context_disk.py` | E1′ | Validado en laboratorio (23/10/2026) |
+| 15 | PNS-07 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | E1′ | Validado en laboratorio (23/10/2026) |
+| 16 | PNS-54 | seguridad | `pns_ai_mcp/models/safe_operation.py` | E1′ | Validado en laboratorio (23/10/2026) |
+
+Propuesta, comprobaciones previas y decisiones de E1′: [e1_propuesta_3879.md](e1_propuesta_3879.md).
+Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai-3879 (E1′)».
+
 ## Cambios en tests del fabricante
 
 Datos de prueba de tests del fabricante que en Odoo 14 no podían pasar. No corrigen el código de los
@@ -125,6 +139,20 @@ módulos, así que no llevan número de parche ni entran en el índice. Solo en 
   ```
   Corregido si sus versiones preparan un usuario con `AI Writer` en `test_change_journal` y evitan el
   cursor propio (o el usuario sin confirmar) en `test_paap_core`.
+
+### Test del fabricante que falla por diseño con el parche 12 (E1′, 23/10/2026)
+
+- **Test:** `pns_ai_mcp/tests/test_system_action.py`,
+  `TestSystemTrustedActions.test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin` (F).
+- **Decisión de Sergio (23/10/2026):** se acepta como F por diseño y **no se toca**. La línea base
+  pasa a 18 F.
+- **Dónde falla:** solo en la última comprobación (`:510-514`), que espera que un AI Administrator
+  sin Ajustes pueda proponer un grupo que no es cúspide. Con el criterio de Seges (parche 12) se
+  rechaza: «Only a Settings administrator can add or remove user groups.».
+- **Lo anterior del test pasa:** la cúspide, la acción de confianza y los cinco pasos CRUD. La
+  comprobación de Seges va detrás de la del fabricante, que da primero su mensaje
+  («maximum-privilege»).
+- **Comprobado:** con el parche 12 neutralizado, el test vuelve a pasar.
 
 ## Parche 1: `pns_ai_mcp/controllers/mcp_decorators.py:171` (antes `:169`)
 
@@ -748,3 +776,266 @@ Detalle en `verificacion_seguridad_pns_ai.md`, «Staging (15-16/10/2026)».
   prueba (ver el apartado de cambios en tests del fabricante).
 
 La fase 3 anotó 4 saltados; el log de esa ejecución tiene 5 tests distintos con `skipped`.
+
+## Parches de la rama 14.0-pns-ai-3879 (E1′)
+
+- **Fecha:** 23/10/2026. **Entrega:** E1′ del [plan sobre 3.1.879](plan_correccion_pns_ai_3879.md).
+- **Propuesta, comprobaciones previas (a) a (e) y decisiones de Sergio:**
+  [e1_propuesta_3879.md](e1_propuesta_3879.md).
+- **Rutas:** de 3.1.879. Sin tocar `version`, `depends`, `external_dependencies`, `i18n`, `LICENSE` ni
+  `NOTICE`. Mensajes nuevos en inglés, sin traducir (D-6).
+- **Marcadores:** `grep -rn "Seges: parche 1[0-6] (" pns_ai_mcp pns_ai_chatboo --include=*.py`, sin
+  tests: 20 líneas (10: 2; 12: 10; 13: 2; 14: 2; 15: 1; 16: 3).
+
+### Parche 10 adaptado a 3.1.879: `ai.key.pin.ask.collect_pin` pasa a privado (PNS-83)
+
+- **Qué falla sin él:** `collect_pin(pin)` (`models/key_pin_desk.py:193-201`) es público en 3.1.879 y
+  no existía en 3.1.782. Lo puede llamar cualquier usuario autenticado, también portal:
+  - canjea un PIN sin límite por IP ni grupo;
+  - abre un cursor de superusuario y espera 20 s si no hay ninguna pestaña abierta, así que unas
+    pocas llamadas en paralelo dejan sin workers al servidor;
+  - con el PIN correcto, devuelve la clave en claro.
+  Lo que cubría el parche 10 en 3.1.782 ya lo trae el fabricante (§2.2 de la comparación).
+- **Cambio:** renombrado a `_collect_pin`; se actualiza su único llamador,
+  `_redeem_key_pin` (`models/mcp_user.py:766`). El sandbox lo bloquea por empezar por `_`.
+- **Qué se degrada:** nada; no tenía otros llamadores en Python, JS ni XML.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -nE "def _?collect_pin\b" pns_ai_mcp/models/key_pin_desk.py
+  ```
+  Corregido si es privado, o si comprueba grupo y bloqueo por IP antes de `_collect`.
+- **Tests:** en `test_seges_rpc_access.py`, `test_collect_pin_refused` (interno y portal por RPC) y
+  `test_redeem_key_pin_counts_through_collect_pin`; además, entra en `RENAMED` (`test_public_names_gone`)
+  y en `test_no_caller_uses_public_names`.
+
+### Parche 12 adaptado a 3.1.879: solo `base.group_system` da o quita grupos con un plan (PNS-01 y PNS-02)
+
+- **Qué falla sin él:** 3.1.879 prohíbe la cúspide a todos (`_resolve_group_below_cusp`,
+  `models/ai_system_action.py:700-708`) y deja libre cualquier otro grupo. Un AI Administrator sin
+  Ajustes da o quita por un plan cualquier grupo que no sea cúspide, también los de gestión. Por CRUD
+  (`crud_cusp_error`, `utils/privilege_cusp.py`), quien pueda escribir en `res.groups` sin Ajustes
+  (Permisos de acceso) cambia `users` o `implied_ids` de un grupo normal.
+- **Criterio (Sergio, 23/10/2026):** el de Seges, con la cúspide del fabricante dentro.
+- **Cambio:**
+  - `utils/privilege_cusp.py`, función nueva `settings_admin_error(env)`: exige superusuario o
+    `base.group_system` al usuario del entorno. Si el contexto trae `ai_journal_user_id` o
+    `ai_journal_confirmed_by_uid` (los pone `execute_plan_now` desde la fila), lo exige también a
+    quien propuso y a quien confirmó. Esas claves solo añaden rechazos.
+  - `crud_cusp_error` la llama para `res.groups`, después de las comprobaciones de la cúspide del
+    fabricante. Cubre la propuesta y la ejecución, con el mismo `PermissionError`.
+  - `models/ai_system_action.py`: `_check_may_change_user_groups()` (`UserError`) al principio de
+    `_preview_user_add_group`, `_apply_user_add_group`, `_preview_user_remove_group` y
+    `_apply_user_remove_group`. Va después de `_resolve_group_below_cusp`, para que la cúspide dé
+    primero su mensaje, y antes de la escritura en `sudo`.
+- **Qué se degrada:**
+  - un AI Administrator sin Ajustes ya no da ni quita ningún grupo por un plan, tampoco los de IA
+    (sigue teniendo los indicadores de `ai.mcp.user`);
+  - cualquier paso CRUD sobre `res.groups` exige Ajustes, también renombrar un grupo normal.
+  - El test del fabricante `test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin` falla por diseño
+    (ver «Cambios en tests del fabricante»).
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -nE "group_system" pns_ai_mcp/models/ai_system_action.py pns_ai_mcp/utils/privilege_cusp.py
+  ```
+  Corregido si dar o quitar un grupo que no es cúspide, por la acción y por CRUD en `res.groups`,
+  exige `base.group_system` a quien ejecuta el plan. No basta la cúspide.
+- **Tests:** `pns_ai_mcp/tests/test_seges_user_groups.py`, reescrito con
+  `base.group_partner_manager`. 11 tests:
+  - rechazo al proponer y al ejecutar, también tras editar el registro de acciones de confianza o
+    con `sudo`;
+  - quien tiene Ajustes da y quita, pero no la cúspide;
+  - identidades del contexto;
+  - CRUD en `res.groups`, rechazado sin Ajustes y aceptado con él;
+  - acciones de vista sin cambios.
+
+### Parche 13: solo el sistema crea `ai.safe.operation`; `cleanup_stuck_state` pasa a privado (M10)
+
+- **Qué falla sin él (comparación §8.7, M10, Crítica):**
+  - `ai.safe.operation` no sobrescribe `create`, y el AI Administrator tiene permiso de crear.
+  - Por RPC da de alta una operación ya `confirmed`, con `confirmed_by_uid` y plan a su elección (o
+    usa `create_verification`, también público, con otro `user_id`).
+  - Después llama a `cleanup_stuck_state`, que la ejecuta y la confirma con la identidad de ese
+    usuario. Confirmado en P-8b, también creando un `ir.cron` que corre como el administrador.
+- **Comprobaciones previas (23/10/2026):**
+  - `create_verification` crea con `self.create`;
+  - los únicos que crean operaciones corren como superusuario: `request_safe_plan` con `SUPERUSER_ID`
+    y `record_direct_operation` con `request.env(user=SUPERUSER_ID)` (sin llamadores; en Odoo 14,
+    uid 1 activa `su`);
+  - `cleanup_stuck_state` no tiene llamadores en Python, JS ni XML (tampoco cron).
+- **Cambio:** `create` (`@api.model_create_multi`) da `AccessError` si `not self.env.su`, con el mismo
+  criterio que el `write` del fabricante. Cierra `create`, `create_verification` y `copy` por RPC.
+  `cleanup_stuck_state` pasa a `_cleanup_stuck_state` (decisión de Sergio).
+- **Qué se degrada:** nada en los flujos; `cleanup_stuck_state` deja de poder llamarse por RPC.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -nE "def create\b|def _?cleanup_stuck_state\b" pns_ai_mcp/models/safe_operation.py
+  ```
+  Corregido si `create` rechaza a quien no es el sistema (o fuerza `status='pending'` y
+  `confirmed_by_uid` vacío, y `user_id` igual al usuario real) y la reejecución no es pública.
+- **Tests:** `pns_ai_mcp/tests/test_seges_safe_operation.py` (4) y, en `test_seges_rpc_access.py`,
+  `test_cleanup_stuck_state_refused` y la entrada en `RENAMED`.
+
+### Parche 14: `ai.context.unlink_retired_from_module` pasa a privado (M13)
+
+- **Qué falla sin él (comparación §8.7, M13, Alta):** el método es nuevo en 3.1.879, `@api.model`, y
+  trabaja en `sudo` con `skip_hardcoded_restrictions`. Cualquier usuario autenticado, también
+  portal, borra todos los contextos de fábrica de un módulo, `core` incluidos, con la lista de
+  códigos que él mismo pasa (P-8a: 53 → 0).
+- **Cambio:** renombrado a `_unlink_retired_from_module`; se actualiza su único llamador
+  (`models/ai_context_disk.py:745`, dentro de la importación, que exige AI Administrator). El gemelo
+  de `ai.skill` no se toca: ya exige superusuario.
+- **Qué se degrada:** nada.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -nE "def _?unlink_retired_from_module\b" pns_ai_mcp/models/ai_context_disk.py
+  ```
+- **Tests:** en `test_seges_rpc_access.py`, `test_unlink_retired_refused` (interno y portal; el
+  recuento de contextos de fábrica no cambia) y la entrada en `RENAMED`.
+
+### Parche 15: métodos públicos con cursor propio, en la lista del sandbox (PNS-07)
+
+- **Qué falla sin él (comparación §3, PNS-07, Crítica):** la Caja A corre en una transacción
+  `READ ONLY` con `cr.commit()` bloqueado (`controllers/controller_helpers.py:184-250`). Pero un
+  método público que abre un cursor nuevo (`registry.cursor()`, que en Odoo 14 confirma al salir
+  del `with`) escribe fuera de ella. El ejemplo es `chatboo.session.fulfill_client_export` →
+  `persist_turn_file`. Lo aprovecha el modelo con una inyección de prompt, o una skill en su
+  ejecución de prueba.
+- **Inventario (comprobación d, 23/10/2026):** análisis AST de los tres módulos (puntos con
+  `registry.cursor()`, `commit()`, `_run_on_committed_cursor` y `persist_turn_file`) y de los métodos
+  públicos que llegan a ellos, revisado a mano. Entran en la lista los 28 que llegan a un cursor
+  propio:
+  - **Chatboo:** `fulfill_client_export`, `mark_seen` (`UPDATE` en cursor propio).
+  - **Lienzo:** `sandbox_helpers`, `page_url`, `page_html`, `page_edit`, `paint_canvas`
+    (`_store_design`, `log_no_page`). El sandbox los usa como funciones sueltas (`page_html(...)`),
+    no como atributos: las skills siguen funcionando.
+  - **Agentes:** `get_content` y `get_for_agent`, de `ai.agent` (`_persist_cache_isolated`).
+  - **Motor (M11 y M12):** `chat_completion`, `log_role_without_provider`, `log_provider_failover`,
+    `log_provider_llm_request`, `log_provider_llm_response`, `log_llm_inference` y
+    `log_provider_inference` (`_create_log_entry` en cursor propio).
+  - **Proveedores y skills:** `test_connection`, `author_param_schema`, `author_param_help` y
+    `rewrite_code_for_params` (pasan por el motor).
+  - **PIN:** `collect` (`_collect`).
+  - **Servidores externos y asistentes:** `action_suggest_detection`, `action_author_params`,
+    `action_author_help`, `action_adapt_code`, `action_generate_openapi`, `action_generate` y
+    `action_log_generation_usage`.
+- **Fuera de la lista, con motivo:**
+  - **Ya estaban o ya son privados:** `cleanup_stuck_state`, `execute_plan_now`,
+    `action_confirm_and_execute` y `action_execute_plan`; ahora también `collect_pin`.
+  - **Solo confirman el cursor del llamador**, que en la Caja A está bloqueado: `cron_maintenance`,
+    `request_cancel`, `set_values`, `action_rebuild_cache`, `action_reset_contexts_to_default`,
+    `action_restore_contexts_from_module`, `import_agent_zip`, los asistentes de composición e
+    importación, y `action_preview` de `pns_base` (`SAVEPOINT`).
+  - **Solo leen** en cursor propio: `_is_cancel_requested` y `_job_already_finished`.
+  - **Sin cursor propio:** `domain_index_runtime_tail` y `enrich_with_domain_index` llaman al
+    proveedor de decisión sin registrar en un cursor propio; `canvas_public_url` y
+    `ai.api.server.action_test_connection` tampoco abren cursor. Quedan fuera del criterio.
+  - **Sin cadena confirmada:** `action_create_draft` (ejecuta la skill; modelo cerrado en `env[...]`).
+- **Ningún código de skill ni de contexto** (`ai/skills`, `ai/contexts`, `data/`) llama a estos
+  nombres como atributo. Un nombre marcado lleva a `requires_write` y de ahí a
+  `_read_only_response()`: se rechaza y no se ejecuta.
+- **Cambio:** los 28 nombres se añaden a `RELAXAICODE_SIDE_EFFECT_METHODS`
+  (`controllers/validators_base.py`), en un bloque con marcador. La lista la usan el AST
+  (`validators_checks.py:478`) y `guarded_getattr` (`context_builder.py:165`).
+- **Qué se degrada:** el código del sandbox no puede llamar a esos métodos como atributo (antes
+  escribían fuera de la Caja A). Las funciones del lienzo siguen disponibles como funciones.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "fulfill_client_export\|_run_on_committed_cursor\|caja_a" pns_ai_mcp/controllers/validators_base.py pns_ai_mcp/utils/session_download.py
+  ```
+  Corregido si los cursores propios se niegan a escribir desde la Caja A (marca en el cursor, no en
+  el contexto) o si estos nombres están en su lista.
+- **Tests:** `pns_ai_chatboo/tests/test_seges_chatboo_export.py`, `TransactionCase` sin
+  `enter_test_mode` ni `HttpCase`:
+  - `test_names_in_denylist` y `test_ast_flags_literal_call`, sobre los 28 nombres;
+  - `test_control_own_cursor_commits`: control de que `persist_turn_file` confirma en un cursor
+    propio;
+  - `test_box_a_leaves_no_attachment`: código real en la Caja A (`get_readonly_env` y
+    `build_safe_context`) como `base.user_admin`, con el nombre compuesto (`'fulfill_' +
+    'client_export'`). Se cuenta desde un cursor nuevo. Con el parche neutralizado: `1 != 0`;
+  - `test_fulfill_client_export_claims_own`, portado de E2 (sin efecto de seguridad: comprueba que
+    no hay regresión).
+  - Lo que se escapa se borra en un cursor propio al terminar.
+  - El usuario tiene que estar guardado en la BD: uno creado en la transacción del test no existe
+    para el cursor propio, `_run_on_committed_cursor` vuelve al entorno del llamador y el defecto se
+    esconde.
+
+### Parche 16: Autorizaciones pide la contraseña; token de la tarjeta solo para el dueño (PNS-54)
+
+- **Qué falla sin él (comparación §3, PNS-54, Crítica):**
+  - `action_confirm_and_execute` y su alias `action_execute_plan` son públicos: el dueño o un AI
+    Administrator confirman y ejecutan por RPC sin token ni espera.
+  - `card_payload(mint_token=True)` genera y rota el token de operaciones ajenas para quien pueda
+    leerlas.
+- **Cambio:**
+  - `@check_identity` de Odoo 14 (`odoo/addons/base/models/res_users.py:97-132`) en
+    `action_confirm_and_execute`. Por RPC devuelve el asistente `res.users.identitycheck` y no
+    ejecuta; el botón pide la contraseña, que Odoo recuerda 10 minutos.
+  - `action_execute_plan` no se toca: llama a `self.action_confirm_and_execute()`, que pasa por el
+    decorador (comprobación e; cubierto por el test).
+  - `card_payload` solo genera token si `self.user_id == self.env.user`.
+- **Decisión de Sergio (23/10/2026):** (a) y (b). La opción (c), pedir la contraseña en la tarjeta del
+  chat para `high`, no se aplica. Queda como riesgo aceptado ligado a D29, porque requiere antes un
+  XSS en la página del dueño ([decisiones](pns_ai_decisiones.md), D29;
+  [seguimiento](seguimiento_informe_pns_ai.md), PNS-54).
+- **Qué se degrada:**
+  - el botón Confirmar de Autorizaciones pide la contraseña una vez cada 10 minutos;
+  - **comprobar en el staging y en LIYBEN** que nadie entra sin contraseña local (OAuth o LDAP):
+    `check_identity` valida con `_check_credentials`.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -nE "check_identity|def action_confirm_and_execute|mint_token and" pns_ai_mcp/models/safe_operation.py
+  ```
+- **Tests:** `pns_ai_mcp/tests/test_seges_verification.py` (`HttpCase`):
+  - `test_confirm_and_execute_requires_identity`: dueño y AI Administrator, los dos métodos por
+    `call_kw`; la operación sigue `pending` y el contacto sin tocar;
+  - `test_card_payload_mint_only_owner`.
+
+### Línea base de E1′ (23/10/2026)
+
+**Comprobaciones:**
+
+1. `py_compile` con Python 3.7.3 en la imagen `odoo-dev:14-lab_pns_ai_3879`, repo montado en solo
+   lectura: los 7 archivos de los módulos, correctos.
+2. `python3 ~/.claude/hooks/odoo_lint.py --revisar --base 64d2e4c`: 0 incidencias nuevas y 369
+   preexistentes. En los tests, `invalid-commit` y `exec-used` van desactivados en la línea, con su
+   motivo: limpieza fuera de la transacción y ejecución como `tool_relaxaicode`.
+3. `odoo-dev 14 tests pns_base,pns_ai_mcp,pns_ai_chatboo` (log `tests-20261023-193409.log`): 260 tests,
+   18 F y 32 E.
+
+| Módulo | Tests | Fallos | Errores | Saltados | Línea base E0′ |
+|---|---|---|---|---|---|
+| `pns_base` | 0 (sin `tests/`) | — | — | — | — |
+| `pns_ai_mcp` | 241 | 18 | 32 | 3 | 220 · 17 F · 32 E · 3 saltados |
+| `pns_ai_chatboo` | 19 | 0 | 0 | 0 | 14 · 0 · 0 |
+
+**Diferencias con E0′, test a test:**
+
+- **Tests nuevos (26), todos en verde:**
+  - `test_seges_user_groups.py`: 11;
+  - `test_seges_safe_operation.py`: 4;
+  - `test_seges_verification.py`: 2;
+  - `test_seges_rpc_access.py`: 4 (`test_collect_pin_refused`, `test_unlink_retired_refused`,
+    `test_cleanup_stuck_state_refused` y `test_redeem_key_pin_counts_through_collect_pin`);
+  - `test_seges_chatboo_export.py`: 5.
+- **Pasa a F (1), aceptado por diseño:**
+  `TestSystemTrustedActions.test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin`.
+- **Resto:** los 17 F y 32 E de E0′ son los mismos, por nombre. Los 3 saltados también.
+
+**Neutralización (23/10/2026):** los seis parches neutralizados a la vez desde una copia en el
+scratchpad, sin git, y restaurados después.
+- Resultado (log `tests-20261023-192837.log`): 260 tests, 37 F y 33 E.
+- Fallan los 21 tests negativos de E1′, cada uno por su parche:
+  - **10:** `test_collect_pin_refused`, `test_redeem_key_pin_counts_through_collect_pin`,
+    `test_public_names_gone` y `test_no_caller_uses_public_names`;
+  - **12:** 7 de `test_seges_user_groups.py`;
+  - **13:** los 3 negativos de `test_seges_safe_operation.py` y `test_cleanup_stuck_state_refused`;
+  - **14:** `test_unlink_retired_refused`;
+  - **15:** los 3 negativos de `test_seges_chatboo_export.py` (`test_box_a_leaves_no_attachment`:
+    `1 != 0`);
+  - **16:** los 2 de `test_seges_verification.py`.
+- `test_paap_i7` vuelve a pasar.
+- La primera neutralización (log `tests-20261023-192506.log`) mostró que cuatro tests caían por otra
+  causa, antes de llegar a lo que debían comprobar. Se corrigieron antes de la segunda:
+  - dos de M10 no traían `expires_at`, y era la BD, no el parche, la que rechazaba la fila;
+  - `_assert_refused` no detectaba una llamada aceptada que devuelve `None`;
+  - el test de la Caja A no contaba el adjunto si la llamada fallaba después.

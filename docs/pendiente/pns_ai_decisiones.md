@@ -490,6 +490,15 @@ Decisión: ____ / Fecha: ____
   política `open` (NO CONCLUYENTE). Se decide como riesgo aceptado o no, sin bloquear la instalación
   (criterio del plan de staging, §6.2).
 
+**Tras la decisión de E1′ (23/10/2026, base 3.1.879): se le añade un riesgo aceptado (Sergio).**
+- **Qué:** resto 1 de PNS-54 en la tarjeta del chat del propio dueño. Un script en su página puede
+  pedir `/pns_ai_mcp/verification/pending`, esperar los 5 s de `high` y llamar a `confirm` y
+  `execute` con el token. Se descarta la opción (c) de la
+  [propuesta de E1′](e1_propuesta_3879.md): pedir la contraseña en la tarjeta para `high`.
+- **Condición:** exige antes un XSS en la página del dueño, que es lo que gobierna esta decisión.
+- **Lo que sí cierra E1′ (parche 16):** Autorizaciones pide la contraseña (`check_identity`, también
+  por RPC y en `action_execute_plan`), y el token de la tarjeta solo se genera para el dueño.
+
 ### D31 — ¿Se ejecutarán alguna vez los tests del módulo sobre una copia de producción?
 
 **Contexto:** uno de los tests guarda de forma permanente una clave MCP predecible para el

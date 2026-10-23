@@ -12,6 +12,8 @@
 - **Estado del plan:** aprobado (23/10/2026); E0′ terminada el 23/10/2026: parte A (tests) validada en
   laboratorio y diagnóstico de PNS-70 hecho ([pns70_diagnostico_3879.md](pns70_diagnostico_3879.md)).
   Rama `14.0-pns-ai-3879` publicada el 23/10/2026 (desde `dafb316`). Siguiente: E1′.
+  E1′ validada en laboratorio el 23/10/2026 (parches 10 y 12 adaptados y 13 a 16); siguiente: subida al
+  staging `pns_demo` con el cambio de base.
 
 ## 1. Cómo se trabaja
 
@@ -41,7 +43,7 @@
 | Entrega | Contenido | Parches | Estado |
 |---|---|---|---|
 | **E0′** (previa) | `test_seges_*` adaptados; esqueleto de tests de Chatboo; datos de prueba de `test_change_journal` y `test_paap_core`; línea base nueva; diagnóstico de PNS-70 (solo lectura) | — | Parte A (tests): validada en laboratorio (23/10/2026). Diagnóstico de PNS-70: hecho (23/10/2026) |
-| **E1′** | Críticos y Altos baratos: M10 con el parche 12 adaptado, PNS-54, PNS-07, M13, `collect_pin` (PNS-83) | 10 y 12 adaptados; nuevos desde el 13 | Pendiente |
+| **E1′** | Críticos y Altos baratos: M10 con el parche 12 adaptado, PNS-54, PNS-07, M13, `collect_pin` (PNS-83) | 10 y 12 adaptados; 13 (M10), 14 (M13), 15 (PNS-07) y 16 (PNS-54) | Validada en laboratorio (23/10/2026) |
 | **E2′** | Resto de Altos: papelera del diario (PNS-37), PNS-19, PNS-17, PNS-82, PNS-70; PNS-20 si P-20 lo confirma | 11 adaptado; nuevos | Pendiente |
 | **E3′** | Lienzo: M1, M2 y F1 | Nuevos | Pendiente |
 | **E4′** | Hoja de Medios y Bajos (corregir o aceptar); después, lo elegido | Nuevos, si se corrige algo | Pendiente |
@@ -105,6 +107,14 @@ Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`;
 
 ### E1′ (Críticos y Altos baratos)
 
+- **Propuesta y decisiones (23/10/2026):** [e1_propuesta_3879.md](e1_propuesta_3879.md).
+- **Resultado (23/10/2026): validada en laboratorio.**
+  - Parches 10 y 12 adaptados, y 13 (M10), 14 (M13), 15 (PNS-07) y 16 (PNS-54).
+  - Tests: 260, 18 F y 32 E. El F nuevo es `test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin`,
+    aceptado por diseño.
+  - Detalle, inventario de PNS-07 y neutralización en [parches_pns_ai.md](parches_pns_ai.md),
+    «Parches de la rama 14.0-pns-ai-3879 (E1′)».
+  - PNS-54 (c), la tarjeta del chat del propio dueño: riesgo aceptado ligado a D29.
 - **M10, junto con el parche 12 adaptado.**
   - Origen: comparación §8.7 «M10» (Crítica), §1.2 (parche 12), §2.1 (PNS-01, resto) y §10.1.
   - Archivo y método (M10): `models/safe_operation.py`: `create` de `ai.safe.operation` (no
@@ -260,7 +270,11 @@ Estados (N11): aplicado → validado en laboratorio → validado en staging → 
 
 | N.º | Ficha | Entrega | Estado |
 |---|---|---|---|
-| 10 | PNS-83 (`collect_pin`) | E1′ | Adaptado a 3.1.879; pendiente |
+| 10 | PNS-83 (`collect_pin`) | E1′ | Adaptado a 3.1.879; validado en laboratorio (23/10/2026) |
 | 11 | PNS-82 (`unlink` de la sesión) | E2′ | Adaptado a 3.1.879; pendiente |
-| 12 | PNS-01 y PNS-02 (criterio de grupos), con M10 | E1′ | Adaptado a 3.1.879; pendiente |
+| 12 | PNS-01 y PNS-02 (criterio de grupos), con M10 | E1′ | Adaptado a 3.1.879; validado en laboratorio (23/10/2026) |
+| 13 | M10 (`create` de `ai.safe.operation`; `_cleanup_stuck_state`) | E1′ | Validado en laboratorio (23/10/2026) |
+| 14 | M13 (`_unlink_retired_from_module`) | E1′ | Validado en laboratorio (23/10/2026) |
+| 15 | PNS-07 (métodos con cursor propio en la lista del sandbox) | E1′ | Validado en laboratorio (23/10/2026) |
+| 16 | PNS-54 (`check_identity`; token solo para el dueño) | E1′ | Validado en laboratorio (23/10/2026) |
 | — | Parche de tests E0′ (datos de prueba de `test_change_journal` y `test_paap_core`) | E0′ | Validado en laboratorio (23/10/2026) |

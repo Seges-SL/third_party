@@ -372,6 +372,16 @@ Restos que se repiten en varios parciales:
 - **Prueba en el laboratorio:** sí, de comportamiento y sin cargas: con una operación `high`
   pendiente, comprobar si el servidor acepta `confirm` y `execute` en cuanto se crea la operación
   (sin espera) y sin ningún dato que solo produzca el clic en la tarjeta. Hoy se espera que sí.
+- **E1′ sobre 3.1.879 (23/10/2026):**
+  - **Parche 16 de Seges** ([parches](parches_pns_ai.md)):
+    - `action_confirm_and_execute` (y su alias `action_execute_plan`) pide la contraseña
+      (`check_identity` de Odoo 14);
+    - `card_payload` solo genera token para el dueño.
+  - **Riesgo aceptado (Sergio), ligado a D29:** el script en la página del propio dueño puede
+    seguir usando la tarjeta del chat (`pending`, espera de 5 s, `confirm` y `execute`). Antes
+    necesita un XSS en esa página.
+  - Detalle en la [propuesta de E1′](e1_propuesta_3879.md) y en la
+    [comparación](../specs/comparacion_pns_ai_3-1-879.md), §3.
 
 ## Detalle: hallazgos de gravedad alta
 
