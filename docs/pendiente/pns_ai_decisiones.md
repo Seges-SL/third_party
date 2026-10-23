@@ -104,7 +104,7 @@ con la tabla 1.1 del informe:
 | N4 | ¿Se usa la mesa de entrega de claves por PIN? | a) no se usa |
 | N5 | Proveedor y datos para las 9 pruebas pendientes de staging | a); c) como puente |
 | N6 | Orden de instalación: staging y después LIYBEN | Camino A (15/10/2026) |
-| N7 | Versión que se instala en LIYBEN | 3.1.782 con parches 1-4 y mitigaciones de N3 (15/10/2026); parches 1-6 tras el staging (nota 16/10/2026). Pendiente: archivar los 18 usuarios de portal, requisito previo al `-u` del cambio de base (23/10/2026) |
+| N7 | Versión que se instala en LIYBEN | 3.1.782 con parches 1-4 y mitigaciones de N3 (15/10/2026); parches 1-6 tras el staging (nota 16/10/2026). Usuarios de portal: archivados el 23/10/2026 (18: 10 de portal + 8 externos sin grupo de portal; ver [instalación](instalacion_liyben_pns_ai.md) §6), requisito previo al `-u` del cambio de base, ya cumplido |
 | N8 | Proveedor externo del staging | Gemini; LIYBEN, en la demostración (15/10/2026) |
 | N9 | Copias de `pns_demo` | No se guardan (15/10/2026) |
 | N10 | Montaje del staging | Servicio, PostgreSQL y despliegue propios (15/10/2026) |
@@ -170,8 +170,10 @@ Decisión: **b′ se mantiene** (Sergio, 23/10/2026) / Fecha: 23/10/2026
   columna y no se guarda aparte).
 - **Proveedor en las pruebas:** cuando se agote la cuota gratuita de Gemini, el modelo auxiliar es
   Qwen3.5-397B-A17B de OVH. Qwen3.5-9B no sirve: inventa datos y no sigue el formato.
-- **Usuarios de portal de LIYBEN (18):** hay que archivarlos (decidido el 20/10/2026; sigue sin hacer).
+- **Usuarios de portal de LIYBEN (18):** hay que archivarlos (decidido el 20/10/2026). Hecho el 23/10/2026.
   Con 3.1.879 importa más, porque M13 alcanza a los usuarios de portal (ver N7).
+- **Plan de corrección sobre 3.1.879 aprobado** (Sergio, 23/10/2026):
+  [plan_correccion_pns_ai_3879.md](plan_correccion_pns_ai_3879.md).
 
 ### Bloqueantes vigentes
 
@@ -1651,9 +1653,10 @@ Gemini. El proveedor se estudia con OVH (N8).
 
 **Tras la reunión del 19/10/2026:** **Usuarios de portal: se archivan los 18** (pendiente de ejecutar; [instalación](instalacion_liyben_pns_ai.md) §6). LIYBEN recibe las correcciones **de una vez, al terminar el plan de corrección**, con todo validado en el staging (Sergio, 20/10/2026). (ver [§10](#10-reunión-del-19102026-corrección-por-seges-n11-y-n12))
 
-**Tras las decisiones del 23/10/2026:** los **18 usuarios de portal** de LIYBEN **siguen pendientes de
-archivar**. Es **requisito previo al `-u` del cambio de base** a 3.1.879 (M13 alcanza a los usuarios de
-portal). La fecha se registrará aquí cuando se archiven. (ver N12, «Decisiones del 23/10/2026»)
+**Tras las decisiones del 23/10/2026:** los **18 usuarios de portal** de LIYBEN **archivados el
+23/10/2026** (18: 10 de portal + 8 externos sin grupo de portal; ver
+[instalación](instalacion_liyben_pns_ai.md) §6). Era **requisito previo al `-u` del cambio de base** a
+3.1.879 (M13 alcanza a los usuarios de portal); ya está cumplido. (ver N12, «Decisiones del 23/10/2026»)
 
 ### N8 — ¿Qué proveedor externo se usa en el staging (y en LIYBEN)?
 

@@ -242,17 +242,45 @@ Detalle y decisiones en [decisiones](pns_ai_decisiones.md), §10.
 | c) Lista blanca (Open-Meteo) | No se registró |
 | d) Verificación (parches 5 y 6, `pg_stat_activity`) | No se hizo |
 | e) Uso por portal | No se hizo |
-| f) Decisiones | D10 aceptada (proveedores actuales y futuros); D46 y D4: clave MCP y AI Administrator solo para los dos usuarios; portal: se archivan los 18; D12: sin tope por ahora; D2: informe al final, sin código; D15: más adelante; limpieza del staging al terminar el plan de corrección; Seges corrige los PNS (N11) y mantiene la 3.1.782 (N12) |
+| f) Decisiones | D10 aceptada (proveedores actuales y futuros); D46 y D4: clave MCP y AI Administrator solo para los dos usuarios; portal: se archivan los 18 (la cifra del 16/10 suma 10 usuarios de portal y 8 externos sin grupo de portal; se archivaron los 18 el 23/10/2026, ver §6.2); D12: sin tope por ahora; D2: informe al final, sin código; D15: más adelante; limpieza del staging al terminar el plan de corrección; Seges corrige los PNS (N11) y mantiene la 3.1.782 (N12) |
 
 ### 6.2 Pendiente
 
 | Tema | Estado | Dónde |
 |---|---|---|
-| Archivar los 18 usuarios de portal | Pendiente de ejecutar (en la interfaz; anotar la fecha aquí) | N7 |
+| Archivar los 18 usuarios de portal | Hecho el 23/10/2026, 14:17 (interfaz, usuario soporte@liyben.com). Comprobado por SQL: 0 usuarios externos activos. IDs: de portal, 8, 9, 11, 12, 13, 14, 15, 16, 27 y 28; externos sin grupo de portal, 10, 17, 19, 20, 21, 22, 23 y 24 | N7 |
 | Despliegue de las correcciones (parches 7 en adelante) | Al terminar el plan, de una vez y con todo validado en el staging (se registra aquí: commit, fecha y comprobación) | [plan de corrección](plan_correccion_pns_ai.md), §3 |
 | Integrar en `14.0` (merge commit) y volver el clon a `14.0` | Al terminar el plan de corrección | §4; plan de corrección §3 |
 | Limpieza del staging | Al terminar el plan de corrección | plan de staging, §9 |
 | D15 (infraestructura) | Se decide más adelante | decisiones, D15 |
+
+**Archivado de los usuarios externos (23/10/2026).** La cifra «18» del 16/10 (§2.4) suma:
+
+- **10 usuarios de portal** (`base.group_portal`): IDs 8, 9, 11, 12, 13, 14, 15, 16, 27 y 28.
+- **8 usuarios externos (share) sin grupo de portal**, con `base.group_public` y grupos de opciones de
+  presentación, con contraseña y sin conexiones desde 07/2023: IDs 10, 17, 19, 20, 21, 22, 23 y 24.
+
+Ninguno de los 18 se había conectado en los últimos 90 días. `ai_fetch_cache` y `ai_url_whitelist` no
+tenían filas creadas por usuarios externos.
+
+Procedimiento seguido:
+
+1. **Antes:** consulta de solo lectura con los usuarios, su última conexión, sus grupos y sus filas en
+   `ai_fetch_cache` y `ai_url_whitelist`.
+2. **Interfaz:** Ajustes › Usuarios › archivar los 18.
+3. **No borrar nunca:** hay borrados en cascada y `ai_change_journal` tiene `restrict`.
+4. **Después:** comprobar por SQL que no queda ningún usuario externo activo (activos, solo los 3
+   internos).
+
+Lo que **no** hace archivar:
+
+- Las claves `ai.mcp.user` se conservan, pero `/mcp` rechaza a los usuarios inactivos.
+- El contacto sigue activo.
+- Los seguidores siguen recibiendo correo.
+- Los enlaces con `access_token` siguen abriendo.
+
+**Aparcado (decide el jefe):** retirar a esos contactos como seguidores e invalidar los `access_token`
+de sus documentos. Archivar no lo hace y no afecta a `pns_*`.
 
 ---
 
@@ -267,3 +295,5 @@ el VPS.
 3. **Nginx:** restaurar `/etc/nginx/conf.d/odoo.conf.bak-20261016`, comprobar con `nginx -t` y, solo si
    es correcto, recargar.
 4. **Odoo:** reiniciar `odoo14_server`.
+5. **Usuarios externos archivados (§6.2):** se deshace desarchivando esos IDs (Ajustes › Usuarios ›
+   filtro «Archivados» › Desarchivar).

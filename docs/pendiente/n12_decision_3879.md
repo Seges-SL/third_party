@@ -72,7 +72,7 @@
 - **M10** en la rama actual: LIYBEN y `pns_demo` lo tienen. Antes, la comprobación de LIYBEN (§6) dice
   si hoy es explotable allí.
 - **Archivar los 18 usuarios de portal de LIYBEN** (decidido el 20/10): cierra M11 para portal, y M13 si
-  se pasa a 3.1.879.
+  se pasa a 3.1.879. Hecho el 23/10/2026 (10 de portal + 8 externos sin grupo de portal).
 - **Aviso al fabricante:** al final, con todo (decisión de Sergio del 22/10).
 
 ## 5. Recomendación (Claude; la decisión es de Sergio)
