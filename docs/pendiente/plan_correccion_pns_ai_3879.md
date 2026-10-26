@@ -14,6 +14,8 @@
   Rama `14.0-pns-ai-3879` publicada el 23/10/2026 (desde `dafb316`). Siguiente: E1′.
   E1′ validada en laboratorio el 23/10/2026 (parches 10 y 12 adaptados y 13 a 16); siguiente: subida al
   staging `pns_demo` con el cambio de base.
+  E1′ validada en staging el 26/10/2026, con el cambio de base de `pns_demo` a 3.1.879; queda R8 (lienzo),
+  no concluyente, que se repite el 27/10/2026 (decisión 3).
 
 ## 1. Cómo se trabaja
 
@@ -43,7 +45,7 @@
 | Entrega | Contenido | Parches | Estado |
 |---|---|---|---|
 | **E0′** (previa) | `test_seges_*` adaptados; esqueleto de tests de Chatboo; datos de prueba de `test_change_journal` y `test_paap_core`; línea base nueva; diagnóstico de PNS-70 (solo lectura) | — | Parte A (tests): validada en laboratorio (23/10/2026). Diagnóstico de PNS-70: hecho (23/10/2026) |
-| **E1′** | Críticos y Altos baratos: M10 con el parche 12 adaptado, PNS-54, PNS-07, M13, `collect_pin` (PNS-83) | 10 y 12 adaptados; 13 (M10), 14 (M13), 15 (PNS-07) y 16 (PNS-54) | Validada en laboratorio (23/10/2026) |
+| **E1′** | Críticos y Altos baratos: M10 con el parche 12 adaptado, PNS-54, PNS-07, M13, `collect_pin` (PNS-83) | 10 y 12 adaptados; 13 (M10), 14 (M13), 15 (PNS-07) y 16 (PNS-54) | Validada en laboratorio (23/10/2026) y en staging (26/10/2026; R8 pendiente, decisión 3) |
 | **E2′** | Resto de Altos: papelera del diario (PNS-37), PNS-19, PNS-17, PNS-82, PNS-70; PNS-20 si P-20 lo confirma | 11 adaptado; nuevos | Pendiente |
 | **E3′** | Lienzo: M1, M2 y F1 | Nuevos | Pendiente |
 | **E4′** | Hoja de Medios y Bajos (corregir o aceptar); después, lo elegido | Nuevos, si se corrige algo | Pendiente |
@@ -118,6 +120,14 @@ Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`;
 - **Subida al staging `pns_demo` (preparada el 26/10/2026, sin ejecutar):**
   [staging_e1_3879.md](staging_e1_3879.md). Comprobaciones previas, despliegue con `git archive` y `-u`,
   P-9, pruebas de seguridad y de no regresión, y vuelta atrás.
+- **Resultado (26/10/2026): validada en staging `pns_demo`**, con el cambio de base a 3.1.879.
+  - `-u` sin errores; P-9 como se esperaba (se pierde el agente de 978 filas de `ai_log`).
+  - Pruebas de seguridad (D.1) y no regresión R1 a R7 y R9: conformes.
+  - R8 (lienzo), **no concluyente** por el modelo `lite` (PNS-96): se repite el 27/10/2026 con la cuota
+    renovada (decisión 3).
+  - Registro en la [verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E1′
+    (26/10/2026)»; R4 y R6 en [diagnostico_r6_staging_e1p.md](diagnostico_r6_staging_e1p.md). Del
+    fabricante salen PNS-99 y anexos a PNS-26 y PNS-54 ([seguimiento](seguimiento_informe_pns_ai.md)).
 - **M10, junto con el parche 12 adaptado.**
   - Origen: comparación §8.7 «M10» (Crítica), §1.2 (parche 12), §2.1 (PNS-01, resto) y §10.1.
   - Archivo y método (M10): `models/safe_operation.py`: `create` de `ai.safe.operation` (no
@@ -268,6 +278,13 @@ corrige lo elegido.
 - **`lab_pns_ai_3879_14`, tras validar los scripts del staging de E1′ (26/10/2026):** quedan
   `e1p_aiadmin` archivado y 2 filas de `ai_change_journal` de la prueba 2b, que no se pueden borrar
   desde Odoo. Se dejan así (decisión de Sergio del 26/10/2026): reflejan el candado real del diario, que E2′ revisa con PNS-37.
+- **Staging `pns_demo`, tras E1′ (26/10/2026):**
+  - 3.1.879 con E1′ (`pns_base` 1.2.47, `pns_ai_mcp` 3.1.879, `pns_ai_chatboo` 2.1.538), sin
+    neutralizar; cron de la papelera activo; código anterior en `addons_antes_E1p`.
+  - `e1p_aiadmin` (AA, id 19) archivado, como `e2_aiadmin`: la fila del diario de la prueba 2b lo
+    referencia. I, P y T borrados.
+  - De las pruebas quedan 14 operaciones (26 en total, ninguna pendiente) y 5 filas del diario (12 en
+    total).
 - **LIYBEN:** usuarios externos archivados el 23/10/2026.
 
 ## 5. Seguimiento por parche
@@ -276,11 +293,11 @@ Estados (N11): aplicado → validado en laboratorio → validado en staging → 
 
 | N.º | Ficha | Entrega | Estado |
 |---|---|---|---|
-| 10 | PNS-83 (`collect_pin`) | E1′ | Adaptado a 3.1.879; validado en laboratorio (23/10/2026) |
+| 10 | PNS-83 (`collect_pin`) | E1′ | Adaptado a 3.1.879; validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
 | 11 | PNS-82 (`unlink` de la sesión) | E2′ | Adaptado a 3.1.879; pendiente |
-| 12 | PNS-01 y PNS-02 (criterio de grupos), con M10 | E1′ | Adaptado a 3.1.879; validado en laboratorio (23/10/2026) |
-| 13 | M10 (`create` de `ai.safe.operation`; `_cleanup_stuck_state`) | E1′ | Validado en laboratorio (23/10/2026) |
-| 14 | M13 (`_unlink_retired_from_module`) | E1′ | Validado en laboratorio (23/10/2026) |
-| 15 | PNS-07 (métodos con cursor propio en la lista del sandbox) | E1′ | Validado en laboratorio (23/10/2026) |
-| 16 | PNS-54 (`check_identity`; token solo para el dueño) | E1′ | Validado en laboratorio (23/10/2026) |
+| 12 | PNS-01 y PNS-02 (criterio de grupos), con M10 | E1′ | Adaptado a 3.1.879; validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
+| 13 | M10 (`create` de `ai.safe.operation`; `_cleanup_stuck_state`) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
+| 14 | M13 (`_unlink_retired_from_module`) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
+| 15 | PNS-07 (métodos con cursor propio en la lista del sandbox) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
+| 16 | PNS-54 (`check_identity`; token solo para el dueño) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
 | — | Parche de tests E0′ (datos de prueba de `test_change_journal` y `test_paap_core`) | E0′ | Validado en laboratorio (23/10/2026) |

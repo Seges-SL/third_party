@@ -1910,3 +1910,105 @@ E2ADM revocadas. Recuentos finales: `ai_safe_operation` 12 (línea base); adjunt
 sin AI Conversational; ninguna sesión creada desde el despliegue; único usuario `e2_*`, `e2_aiadmin`
 inactivo. Temporales del despliegue en `/tmp`, borrados. `addons_antes_E2` se conserva hasta la
 limpieza final del staging.
+
+## Staging — entrega E1′ (26/10/2026)
+
+Sergio con Claude; horas en UTC. Procedimiento ejecutado: [staging_e1_3879.md](staging_e1_3879.md) (con
+el resultado de cada comprobación en sus casillas «Obtenido»); análisis de R4 y R6 en
+[diagnostico_r6_staging_e1p.md](diagnostico_r6_staging_e1p.md).
+
+- **Qué se valida:** cambio de base de `pns_demo` de 3.1.782 a 3.1.879 con `-u` (sin copia, N9) y los
+  parches 10 y 12 adaptados y 13 a 16 (PNS-83, PNS-01/02, M10, M13, PNS-07 y PNS-54), según el §4 de la
+  [propuesta de E1′](e1_propuesta_3879.md). Laboratorio: 260 tests, 18 F y 32 E (log
+  `tests-20261023-193409.log`; [parches](parches_pns_ai.md), «Línea base de E1′»).
+- **Antes (A):** conforme. Montado el código de `792481c` (634 archivos, huella `5dccc29a…`).
+  `pns_demo` en 3.1.782, sin neutralizar, con los 6 crons `pns_*` activos. Fotografía de P-9: `ai_log`
+  990 (`chatboo` 950, `internal` 28, `mcp_client` 12), diario 7, sesiones 31, jobs 0, contextos 58,
+  skills 10; 978 filas de `ai_log` con agente; 10 sesiones con marcas antiguas. AI Administrators:
+  `admin` (contraseña local y Ajustes) y `e2_aiadmin` (archivado). Proveedor: cadena de Chatboo con
+  Gemini 3.6 flash, 3.5 flash y 3.5 flash lite; «Test Connection» correcto en los tres.
+- **Despliegue en `pns_demo` (B):** conforme. Commit `0366231` de `14.0-pns-ai-3879` (`git archive` de
+  los tres módulos). Huella del archivo `4a0aba60…dd90`, idéntica en el equipo y en el VPS; copia con
+  `scp -P 50050`; comprobaciones del código extraído (B.4) conformes. Copia previa en
+  `/opt/odoo/pns_staging/addons_antes_E1p`; ensayo del `rsync` con las 6 bajas previstas. Tras la
+  sustitución (`rsync --delete`, módulo a módulo, con Odoo parado): 696 archivos, huella `c12168ea…`;
+  `diff -rq` de 268 líneas (195 distintos, 67 nuevos, 6 bajas).
+- **`-u` de los tres módulos:** sin `Traceback`, `ERROR` ni `CRITICAL`; 7 «Deleting field» (entre ellos
+  `ai.log.agent_id`); 11 `DROP leftover`; 7 `WARNING` inocuos (en lugar del de `jinja2`, dos
+  `DeprecationWarning` de `distutils` del core). Arranque sin errores; `/web/login` 200 y `GET /mcp`
+  403.
+- **Después (C):** conforme.
+  - **P-9a:** `key_pin*` fuera; `provider_id` y `client_display` en `ai_log`; cinco `canvas_*` en
+    `chatboo_session`; los cinco parámetros pasan a `pns_ai.*` con los mismos valores; de los XML ID de
+    parámetros solo queda `icp_chatboo_history_retention_days`; `xmlid_mcp` 0. Recuentos iguales salvo
+    `ai_log` `internal` 28 → 31, por los tres «Test Connection» hechos después de la fotografía;
+    contextos 61 y skills 13 (+3).
+  - **P-9b:** se pierde el agente de 978 filas (pérdida aceptada, N9).
+  - **P-9e:** 10 → 0.
+  - **P-9f:** `pns_base` 1.2.47, `pns_ai_mcp` 3.1.879 y `pns_ai_chatboo` 2.1.538, `installed`.
+  - **Cron de la papelera:** activo, diario, `numbercall` -1, `user_id` 1; primera ejecución el
+    27/10/2026 a las 11:50 UTC.
+  - **Recarga de `es_ES`** (antes de D): sin errores.
+- **Usuarios y datos de prueba (D.0):** AA = `e1p_aiadmin` (id 19), I (20), P (21), T (22); UW (11); C,
+  el contacto 9. Línea base: `ai_safe_operation` 12, `ir_attachment` 666, contextos de fábrica 53,
+  mesa de PIN 0/0, diario 7.
+- **Scripts:** `preparar_e1p.py`, `pruebas_e1p_rpc.py` y `pruebas_e1p_mcp.py`, en `~/staging_e1p` del
+  equipo de Sergio, solo con la biblioteca estándar; contraseñas y claves en variables de entorno
+  cargadas con `read -s`, sin guardarlas.
+
+### Pruebas de seguridad
+
+| # | Prueba | Quién | Resultado |
+|---|---|---|---|
+| 1 | P-8b (M10, parche 13): `create`, `create_verification`, `copy`, `cleanup_stuck_state` y `_cleanup_stuck_state` | AA | **CORREGIDO** |
+| 2 | P-01 (parche 12), propuesta por `/mcp`: `user.add_group` para sí y `user.remove_group` a T | AA | **CORREGIDO** |
+| 2b | P-01, plan propuesto por ADM y confirmado por AA en Autorizaciones (pide su contraseña, parche 16) | ADM y AA | **CORREGIDO**: rechazo «Only a Settings administrator…»; `status` final `cancelled`; T conserva el grupo |
+| 3 | CRUD en `res.groups` (parche 12), y control con ADM | AA-ERP | **CORREGIDO** |
+| 4 | P-54b (parche 16): `action_confirm_and_execute` y `action_execute_plan` por `call_kw` | UW y ADM | **CORREGIDO** |
+| 4b | `card_payload(mint_token=True)` sobre la operación de UW (parche 16) | ADM | **CORREGIDO** |
+| 5 | P-07 (parche 15): `fulfill_client_export` desde `relaxaicode`, literal y compuesto | U1 | **CORREGIDO**: 0 adjuntos nuevos. U1 no tenía verificaciones pendientes (`cancelled_operations` 0) |
+| 6 | P-8a (M13, parche 14): `unlink_retired_from_module` y el privado | I y P | **CORREGIDO** |
+| 7 | P-83a (parche 10): `collect_pin` y `_collect_pin`, sin mesa abierta | I y P | **CORREGIDO**: respuestas en menos de 1 s |
+| 8 | P-83b (observación; PNS-84, E4′) | I | Igual que la referencia del laboratorio |
+| — | Control: `res.users.context_get` | I y P | Responde |
+
+### No regresión con Gemini
+
+| # | Caso | Quién | Resultado |
+|---|---|---|---|
+| R1 | Turno de Chatboo con una consulta de datos | U1 | Conforme |
+| R2 | Sesión anterior al `-u` (historial reescrito) | U1 | Conforme |
+| R3 | Exportación a Excel y a PDF | U1 | Conforme |
+| R4 | Tarjeta del chat del propio dueño | UW | Conforme: la tarjeta ejecutó la operación 21 (nota en el chatter). La 22 (modificar el contacto) falló con «configure la dirección de correo electrónico del remitente» porque UW no tiene correo (dato del usuario de prueba) |
+| R5 | Autorizaciones: «Confirmar y ejecutar» | ADM | Conforme |
+| R6 | Plan de grupos con Ajustes sobre T | ADM | Conforme en lo que comprueba E1′: la operación 27 quitó el grupo a T y lo registró (fila 12 del diario). Sergio lo volvió a poner a mano a las 16:48:43 (`write_uid` 2) y T no tiene grupos que lo impliquen ([diagnóstico](diagnostico_r6_staging_e1p.md), §6). Volver a ponerlo por plan no se hizo (cubierto por los tests y por R6 de E2) |
+| R7 | `relaxaicode` normal por `/mcp`: `search_count` de contactos | U1 | Conforme |
+| R8 | Lienzo: una página sencilla desde el chat | U1 | **NO CONCLUYENTE**: `gemini-3.5-flash-lite` dijo haber creado la página y no la creó (0 páginas; PNS-96). Se repite el 27/10/2026 con la cuota renovada (decisión 3) |
+| R9 | Log desde el arranque | — | Conforme: 36 × `429 RESOURCE_EXHAUSTED` y 1 × `503 UNAVAILABLE`, del proveedor; además, los dos errores de serialización de R4 y R6 (observaciones) |
+
+**Resultado:** cambio de base de `pns_demo` a 3.1.879 hecho y parches 10 y 12 a 16 **validados en
+staging**, salvo R8, pendiente de repetir el 27/10/2026. PNS-83, PNS-01/02, M10, M13, PNS-07 y PNS-54
+(lo que cubre el parche 16): CORREGIDO en la rama `14.0-pns-ai-3879`.
+
+### Observaciones (ajenas a E1′; del fabricante)
+
+Detalle, reproducción en el laboratorio con y sin los parches de E1′ y causas en el
+[diagnóstico](diagnostico_r6_staging_e1p.md):
+
+- **`user.remove_group` de un grupo que también llega por implicación** (diagnóstico, 5.1): la operación
+  queda `executed` y el diario `applied` sin que el cambio ocurra. No es lo que pasó en R6. Nuevo PNS-99
+  en el [seguimiento](seguimiento_informe_pns_ai.md) (Media).
+- **Error de serialización en cada `/execute` de la tarjeta** (diagnóstico, 5.2): una línea ERROR y un
+  reintento de Odoo, sin perder ni repetir nada. Visto en R4 y R6. En el seguimiento, en PNS-26 (Baja).
+- **`missing_token` y `bad_token` en la tarjeta del chat** (diagnóstico, 5.3): fallan en cerrado. En el
+  seguimiento, en PNS-54 (Baja).
+- **Escritura en la operación 27 a las 16:47:55 (`write_uid` 2), sin efecto:** sin causa encontrada en
+  el código (diagnóstico, 3.2 y §7).
+
+### Limpieza
+
+`preparar_e1p.py --limpiar` (D.3): conforme. Usuarios `e1p_%`: 1, AA (`e1p_aiadmin`, id 19) archivado,
+con los grupos de la línea base (no se puede borrar: la fila del diario de la prueba 2b lo referencia);
+I, P y T borrados. C sin cambios; mesa de PIN 0/0; contextos de fábrica 53. `ai_safe_operation` 26
+(las 14 de hoy, ninguna pendiente); diario 12; `ir_attachment` 652. Claves MCP temporales revocadas.
+`addons_antes_E1p` se conserva hasta la limpieza final del staging.

@@ -2,7 +2,10 @@
 
 - **Rama:** `14.0-pns-ai-3879` · **Commit a desplegar:** `0366231` (salvo que Sergio indique otro HEAD;
   entonces hay que recalcular las huellas del §B.1 y del §B.4) · **Preparado:** 26/10/2026 ·
-  **Estado:** preparado, sin ejecutar.
+  **Estado:** ejecutado el 26/10/2026 (Sergio con Claude; desplegado `0366231`). Todo conforme salvo R8,
+  no concluyente: se repite el 27/10/2026 con la cuota renovada (decisión 3). Resultado en la
+  [verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E1′ (26/10/2026)», y diagnóstico
+  de R4 y R6 en [diagnostico_r6_staging_e1p.md](diagnostico_r6_staging_e1p.md).
 - **Origen:** ficha de E1′ y §1 (validación, punto 2) del
   [plan de corrección sobre 3.1.879](plan_correccion_pns_ai_3879.md); plan de prueba del §4 de la
   [propuesta de E1′](e1_propuesta_3879.md); pérdidas de P-9 en la
@@ -265,8 +268,8 @@ inactivo (archivado en la limpieza de E2). Si A.4 mostró `auth_oauth` instalado
 existe con ese módulo).
 
 **LIYBEN:** hecho el 26/10/2026 (consulta de solo lectura en `odoo14_db`): `fran.odoo@seges.es` y
-`sguerrero@liyben.com` activos y con contraseña local. Pendiente: que ambos confirmen que la conocen
-([parches](parches_pns_ai.md), parche 16).
+`sguerrero@liyben.com` activos y con contraseña local. Confirmado el 26/10/2026: Sergio confirma que
+los dos la conocen ([parches](parches_pns_ai.md), parche 16).
 
 ### A.7 Proveedor del staging
 
@@ -294,7 +297,8 @@ Después, en la interfaz y **solo Sergio** (AI Engine → Providers):
    del laboratorio (`fase3_lab_pns_ai_3879.md`): protocolo `openai`, endpoint
    `https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions`, Conversation + Vision; se añade a
    la cadena de Chatboo **después** de Gemini. La clave la pega Sergio.
-3. Anotar qué proveedor queda operativo: ______________________
+3. Anotar qué proveedor queda operativo: cadena de Chatboo con Gemini 3.6 flash, 3.5 flash y 3.5 flash
+   lite; «Test Connection» correcto en los tres (26/10/2026).
 
 ---
 
@@ -322,20 +326,24 @@ commit, se sustituye en las tres órdenes y la huella será otra: se anota la qu
 ### B.2 Copia al VPS
 
 Método de E1′: `scp` desde el equipo de Sergio a `/tmp/` del VPS (cómo se copió en E1 y E2 no consta:
-ver F). `<destino_ssh>` es lo mismo que Sergio usa para entrar por `ssh`: el alias de `~/.ssh/config`
-o `ubuntu@<IP>`.
+ver F). `<puerto>`, `<usuario>` y `<host>` son los mismos que Sergio usa para entrar por `ssh`: el
+puerto del `ssh` del VPS, el usuario y la IP o el nombre del VPS (si entra con un alias de
+`~/.ssh/config`, son su `Port`, `User` y `HostName`).
 
 **[LECTURA]** En el equipo de Sergio, para localizar el alias:
 
 ```bash
-grep -iE '^\s*(Host|HostName|User)\s' ~/.ssh/config
+grep -iE '^\s*(Host|HostName|User|Port)\s' ~/.ssh/config
 ```
 
 **[ALTERA solo `/tmp` del VPS]** Copia del archivo:
 
 ```bash
-scp /tmp/pns_addons_0366231.tar.gz <destino_ssh>:/tmp/
+scp -P <puerto> /tmp/pns_addons_0366231.tar.gz <usuario>@<host>:/tmp/
 ```
+
+En `scp` las opciones van antes del archivo. Sin el `-P` delante, falla si el `ssh` del VPS no usa el
+puerto 22.
 
 La comprobación de que llega íntegro es la huella de B.3.
 
@@ -573,9 +581,9 @@ Esperado (comparación §9.6):
 
 | Comprobación | Esperado | Obtenido |
 |---|---|---|
-| P-9a | Como arriba | [ ] ____ |
-| P-9b | `agent_id` fuera; se pierde el agente de ___ filas (A.5) | [ ] ____ |
-| P-9e | ___ (A.5) → 0 | [ ] ____ |
+| P-9a | Como arriba | [x] Conforme: `key_pin*` fuera; `provider_id` y `client_display` en `ai_log`; cinco `canvas_*` en `chatboo_session`; los cinco parámetros a `pns_ai.*` con los mismos valores; solo queda el XML ID `icp_chatboo_history_retention_days`; `xmlid_mcp` 0. Recuentos iguales salvo `ai_log` `internal` 28 → 31 (los tres «Test Connection» de A.7, hechos después de la fotografía); contextos 58 → 61 y skills 10 → 13 (+3) |
+| P-9b | `agent_id` fuera; se pierde el agente de 978 filas (A.5) | [x] Conforme: se pierde el agente de 978 filas |
+| P-9e | 10 (A.5) → 0 | [x] Conforme: 10 → 0 |
 
 ### C.2 P-9f y cron de la papelera (U12)
 
@@ -596,10 +604,10 @@ SQL
 
 | Comprobación | Esperado | Obtenido |
 |---|---|---|
-| P-9f | `pns_base` 14.0.1.2.47, `pns_ai_mcp` 14.0.3.1.879, `pns_ai_chatboo` 14.0.2.1.538, `installed`. (`odoo-dev paridad` no existe en el VPS: lo cubre B.8, sin módulos que no se importen) | [ ] ____ |
-| Cron de la papelera | `pns_ai_mcp.ir_cron_ai_journal_trash` **activo**, diario, `numbercall` -1; anotar `user_id` (sin `user_id` en el XML: corre con el usuario por defecto, PNS-37, E2′) | [ ] ____ |
-| Resto de crons | Los seis de A.4, sin cambios | [ ] ____ |
-| Neutralización | Ninguna fila `odoo_dev.%` (el staging no se neutraliza; el cron nuevo se queda activo, como quedará en LIYBEN) | [ ] ____ |
+| P-9f | `pns_base` 14.0.1.2.47, `pns_ai_mcp` 14.0.3.1.879, `pns_ai_chatboo` 14.0.2.1.538, `installed`. (`odoo-dev paridad` no existe en el VPS: lo cubre B.8, sin módulos que no se importen) | [x] Conforme: 1.2.47, 3.1.879 y 2.1.538, `installed` |
+| Cron de la papelera | `pns_ai_mcp.ir_cron_ai_journal_trash` **activo**, diario, `numbercall` -1; anotar `user_id` (sin `user_id` en el XML: corre con el usuario por defecto, PNS-37, E2′) | [x] Conforme: activo, diario, `numbercall` -1, `user_id` 1; primera ejecución el 27/10/2026 a las 11:50 UTC |
+| Resto de crons | Los seis de A.4, sin cambios | [x] Conforme |
+| Neutralización | Ninguna fila `odoo_dev.%` (el staging no se neutraliza; el cron nuevo se queda activo, como quedará en LIYBEN) | [x] Conforme |
 
 ### C.3 Recargar `es_ES` (obligatorio, antes de D)
 
@@ -626,7 +634,7 @@ cd /opt/odoo/pns_staging && docker compose logs --since 15m web 2>&1 | grep -cE 
 
 | Comprobación | Esperado | Obtenido |
 |---|---|---|
-| Recarga de `es_ES` | El asistente termina («… has been successfully installed»); 0 errores en el log | [ ] ____ |
+| Recarga de `es_ES` | El asistente termina («… has been successfully installed»); 0 errores en el log | [x] Conforme: sin errores |
 
 ---
 
@@ -712,31 +720,31 @@ momento): `count(*)` de `ai_safe_operation`,
 
 | # | Prueba (parche) | Quién | Qué se hace | Esperado | Obtenido |
 |---|---|---|---|---|---|
-| 1 | **P-8b** (M10, parche 13) | AA | Por `call_kw`: `create` de `ai.safe.operation` ya `confirmed` a nombre de ADM con un plan sobre C; `create_verification` con otro `user_id`; `copy` de la operación de UW de la prueba 4 (AA debe poder leerla); `cleanup_stuck_state` y `_cleanup_stuck_state`. La operación de UW la crea el script por /mcp antes de la prueba 1 (tras el control) y es la misma que se usa en la 4 y la 4b; UW la cancela al acabar la 4b | `create`, `create_verification` y `copy`: `AccessError` «Only the system can create a supervised operation.». `cleanup_stuck_state`: `AttributeError` (ya no existe); `_cleanup_stuck_state`: `AccessError` (privado). `ai_safe_operation` y C sin cambios | [ ] ____ |
-| 2 | **P-01** (parche 12) | AA | Por `/mcp`: plan `user.add_group` de `base.group_partner_manager` para sí y `user.remove_group` del mismo grupo a T | Rechazo al proponer: «Only a Settings administrator can add or remove user groups.»; sin operación nueva; grupos de AA y T sin cambios | [ ] ____ |
-| 2b | P-01, plan confirmado (como la prueba 7 de E2) | ADM propone, AA confirma en Autorizaciones | ADM propone quitar el grupo a T; AA confirma (ahora pide su contraseña, parche 16) | Rechazo en la ejecución con el mismo mensaje; T conserva el grupo; anotar `status` final (en E2, `cancelled`) | [ ] ____ |
-| 3 | **CRUD en `res.groups`** (parche 12) | AA-ERP | Plan con un paso CRUD `write` sobre `users` de `base.group_partner_manager` que intenta añadir a I (T ya lo tiene: con T, «sin cambios» no comprobaría nada) | Rechazo al proponer con el mismo mensaje; sin operación; el grupo sin cambios. **Control:** ADM propone lo mismo y pasa (cancelarla después) | [ ] ____ |
-| 4 | **P-54b** (parche 16) | UW (dueño) y ADM | UW, con una operación suya `pending` (plan sobre C, creada por `/mcp` con su clave, sin LLM), llama por `call_kw` con su sesión a `action_confirm_and_execute` y a `action_execute_plan`; ADM, lo mismo sobre la de UW | Devuelven la acción del asistente `res.users.identitycheck` y **no ejecutan**: la operación sigue `pending` y C sin cambios. Cada llamada deja un registro temporal `res.users.identitycheck` (lo limpia el autovacío de Odoo) | [ ] ____ |
-| 4b | `card_payload` (parche 16, b) | ADM | `card_payload(mint_token=True)` sobre la operación de UW | Sin `confirm_token` en la respuesta (solo el dueño lo recibe) | [ ] ____ |
-| 5 | **P-07** (parche 15) | U1 | Por `/mcp`, herramienta `relaxaicode`, sin LLM: código que llama a `fulfill_client_export` sobre su sesión, con el nombre literal y con el nombre compuesto | Literal: rechazado sin ejecutar. Como U1 no tiene AI Writer, el mensaje es «Usuario "…" no tiene permisos de escritura con el servidor MCP. Operación abortada.» y además se cancelan **todas** las verificaciones pendientes de U1 («relaxaicode is READ ONLY» solo sale con AI Writer). Compuesto: rechazado en ejecución con «Method 'fulfill_client_export' writes outside RelaxAICode's rollback and is not allowed here». **Ningún adjunto nuevo** de U1 (`SELECT` de `ir_attachment` por `create_date` y `create_uid`) | [ ] ____ |
-| 6 | **P-8a** (M13, parche 14) | I y P | Por `call_kw`, el nombre antiguo `unlink_retired_from_module` y el privado | Antiguo: `AttributeError`; privado: `AccessError`. Recuento de contextos de fábrica de `pns_ai_mcp` sin cambios | [ ] ____ |
-| 7 | **P-83a** (parche 10) | I y P | Por `call_kw` y por `/jsonrpc`: `collect_pin` y `_collect_pin`, **sin mesa abierta** (N4: el caso con mesa no se hace en el staging) | Antiguo: `AttributeError`; privado: `AccessError`; respuesta inmediata (sin la espera de 20 s) | [ ] ____ |
-| 8 | **P-83b** (observación; no lo corrige E1′: PNS-84 en E4′) | I | Por RPC: `touch`, `supply`, `collect`, `close`, `notify_changed`, `any_open` | Anotar cuáles responden. Ningún cambio en las tablas de la mesa de PIN. Referencia (laboratorio, 26/10/2026): `touch`, `supply` y `collect` fallan con `'int' object has no attribute 'id'`; `close` devuelve `True`; `notify_changed`, `None`; `any_open`, `False`; mesa de PIN 0/0 | [ ] ____ |
-| — | Control | I, P | `res.users.context_get` | Responde | [ ] ____ |
+| 1 | **P-8b** (M10, parche 13) | AA | Por `call_kw`: `create` de `ai.safe.operation` ya `confirmed` a nombre de ADM con un plan sobre C; `create_verification` con otro `user_id`; `copy` de la operación de UW de la prueba 4 (AA debe poder leerla); `cleanup_stuck_state` y `_cleanup_stuck_state`. La operación de UW la crea el script por /mcp antes de la prueba 1 (tras el control) y es la misma que se usa en la 4 y la 4b; UW la cancela al acabar la 4b | `create`, `create_verification` y `copy`: `AccessError` «Only the system can create a supervised operation.». `cleanup_stuck_state`: `AttributeError` (ya no existe); `_cleanup_stuck_state`: `AccessError` (privado). `ai_safe_operation` y C sin cambios | [x] Conforme |
+| 2 | **P-01** (parche 12) | AA | Por `/mcp`: plan `user.add_group` de `base.group_partner_manager` para sí y `user.remove_group` del mismo grupo a T | Rechazo al proponer: «Only a Settings administrator can add or remove user groups.»; sin operación nueva; grupos de AA y T sin cambios | [x] Conforme |
+| 2b | P-01, plan confirmado (como la prueba 7 de E2) | ADM propone, AA confirma en Autorizaciones | ADM propone quitar el grupo a T; AA confirma (ahora pide su contraseña, parche 16) | Rechazo en la ejecución con el mismo mensaje; T conserva el grupo; anotar `status` final (en E2, `cancelled`) | [x] Conforme: `status` final `cancelled`; rechazo «Only a Settings administrator…»; T conserva el grupo |
+| 3 | **CRUD en `res.groups`** (parche 12) | AA-ERP | Plan con un paso CRUD `write` sobre `users` de `base.group_partner_manager` que intenta añadir a I (T ya lo tiene: con T, «sin cambios» no comprobaría nada) | Rechazo al proponer con el mismo mensaje; sin operación; el grupo sin cambios. **Control:** ADM propone lo mismo y pasa (cancelarla después) | [x] Conforme |
+| 4 | **P-54b** (parche 16) | UW (dueño) y ADM | UW, con una operación suya `pending` (plan sobre C, creada por `/mcp` con su clave, sin LLM), llama por `call_kw` con su sesión a `action_confirm_and_execute` y a `action_execute_plan`; ADM, lo mismo sobre la de UW | Devuelven la acción del asistente `res.users.identitycheck` y **no ejecutan**: la operación sigue `pending` y C sin cambios. Cada llamada deja un registro temporal `res.users.identitycheck` (lo limpia el autovacío de Odoo) | [x] Conforme |
+| 4b | `card_payload` (parche 16, b) | ADM | `card_payload(mint_token=True)` sobre la operación de UW | Sin `confirm_token` en la respuesta (solo el dueño lo recibe) | [x] Conforme |
+| 5 | **P-07** (parche 15) | U1 | Por `/mcp`, herramienta `relaxaicode`, sin LLM: código que llama a `fulfill_client_export` sobre su sesión, con el nombre literal y con el nombre compuesto | Literal: rechazado sin ejecutar. Como U1 no tiene AI Writer, el mensaje es «Usuario "…" no tiene permisos de escritura con el servidor MCP. Operación abortada.» y además se cancelan **todas** las verificaciones pendientes de U1 («relaxaicode is READ ONLY» solo sale con AI Writer). Compuesto: rechazado en ejecución con «Method 'fulfill_client_export' writes outside RelaxAICode's rollback and is not allowed here». **Ningún adjunto nuevo** de U1 (`SELECT` de `ir_attachment` por `create_date` y `create_uid`) | [x] Conforme: U1 no tenía verificaciones pendientes (`cancelled_operations` 0); 0 adjuntos nuevos |
+| 6 | **P-8a** (M13, parche 14) | I y P | Por `call_kw`, el nombre antiguo `unlink_retired_from_module` y el privado | Antiguo: `AttributeError`; privado: `AccessError`. Recuento de contextos de fábrica de `pns_ai_mcp` sin cambios | [x] Conforme |
+| 7 | **P-83a** (parche 10) | I y P | Por `call_kw` y por `/jsonrpc`: `collect_pin` y `_collect_pin`, **sin mesa abierta** (N4: el caso con mesa no se hace en el staging) | Antiguo: `AttributeError`; privado: `AccessError`; respuesta inmediata (sin la espera de 20 s) | [x] Conforme: respuestas en menos de 1 s |
+| 8 | **P-83b** (observación; no lo corrige E1′: PNS-84 en E4′) | I | Por RPC: `touch`, `supply`, `collect`, `close`, `notify_changed`, `any_open` | Anotar cuáles responden. Ningún cambio en las tablas de la mesa de PIN. Referencia (laboratorio, 26/10/2026): `touch`, `supply` y `collect` fallan con `'int' object has no attribute 'id'`; `close` devuelve `True`; `notify_changed`, `None`; `any_open`, `False`; mesa de PIN 0/0 | [x] Observación: igual que la referencia del laboratorio |
+| — | Control | I, P | `res.users.context_get` | Responde | [x] Conforme |
 
 ### D.2 No regresión (con el proveedor de A.7)
 
 | # | Caso | Quién | Esperado | Obtenido |
 |---|---|---|---|---|
-| R1 | Turno de Chatboo con una consulta de datos | U1 | Respuesta correcta; tabla con formato | [ ] ____ |
-| R2 | Abrir una sesión anterior al `-u` (historial reescrito, U16; parte visual de P-9e) | U1 | Tablas, fichas, ordenación y gráfico como antes; sin errores en la consola | [ ] ____ |
-| R3 | Exportación a Excel (motor) y a PDF desde el navegador (`fulfill_client_export` por la vía normal) | U1 | Las dos descargan (el parche 15 solo la cierra en el sandbox). El PDF puede quedar huérfano: PNS-98, conocido | [ ] ____ |
-| R4 | Tarjeta del chat del propio dueño: plan de escritura sobre C, confirmar y ejecutar | UW | Se ejecuta (el dueño sigue recibiendo token; parche 16, b) | [ ] ____ |
-| R5 | Autorizaciones: «Confirmar y ejecutar» de una operación pendiente | ADM | Pide la contraseña una vez; ejecuta; una segunda confirmación en menos de 10 minutos no la pide | [ ] ____ |
-| R6 | Plan de grupos con Ajustes: quitar y volver a poner `base.group_partner_manager` a T (R6 de E2) | ADM | Las dos operaciones `executed`; T termina con el grupo | [ ] ____ |
-| R7 | `relaxaicode` normal por `/mcp`: `search_count` de contactos (R7 de E1) | U1 | Responde con el número | [ ] ____ |
-| R8 | Lienzo: una página sencilla desde el chat (el parche 15 deja sus funciones como funciones) | U1 | La página se crea y se ve | [ ] ____ |
-| R9 | Log desde el arranque (B.8) | — | Sin `Traceback` salvo los del proveedor (429/503); los rechazos provocados en D.1, a su hora | [ ] ____ |
+| R1 | Turno de Chatboo con una consulta de datos | U1 | Respuesta correcta; tabla con formato | [x] Conforme |
+| R2 | Abrir una sesión anterior al `-u` (historial reescrito, U16; parte visual de P-9e) | U1 | Tablas, fichas, ordenación y gráfico como antes; sin errores en la consola | [x] Conforme |
+| R3 | Exportación a Excel (motor) y a PDF desde el navegador (`fulfill_client_export` por la vía normal) | U1 | Las dos descargan (el parche 15 solo la cierra en el sandbox). El PDF puede quedar huérfano: PNS-98, conocido | [x] Conforme |
+| R4 | Tarjeta del chat del propio dueño: plan de escritura sobre C, confirmar y ejecutar | UW | Se ejecuta (el dueño sigue recibiendo token; parche 16, b) | [x] Conforme: la tarjeta del dueño ejecutó la operación 21 (nota en el chatter). La 22 (modificar el contacto) falló con «configure la dirección de correo electrónico del remitente» porque UW no tiene correo (dato del usuario de prueba). Error de serialización en el `/execute`: [diagnóstico](diagnostico_r6_staging_e1p.md), 3.1 y 5.2 |
+| R5 | Autorizaciones: «Confirmar y ejecutar» de una operación pendiente | ADM | Pide la contraseña una vez; ejecuta; una segunda confirmación en menos de 10 minutos no la pide | [x] Conforme |
+| R6 | Plan de grupos con Ajustes: quitar y volver a poner `base.group_partner_manager` a T (R6 de E2) | ADM | Las dos operaciones `executed`; T termina con el grupo | [x] Conforme en lo que comprueba E1′: la operación 27 quitó el grupo a T y lo registró (fila 12 del diario). Sergio lo volvió a poner a mano a las 16:48:43 UTC (`write_uid` 2) y T no tiene grupos que lo impliquen ([diagnóstico](diagnostico_r6_staging_e1p.md), §6). Volver a ponerlo por plan no se hizo (cubierto por los tests y por R6 de E2) |
+| R7 | `relaxaicode` normal por `/mcp`: `search_count` de contactos (R7 de E1) | U1 | Responde con el número | [x] Conforme |
+| R8 | Lienzo: una página sencilla desde el chat (el parche 15 deja sus funciones como funciones) | U1 | La página se crea y se ve | [ ] **NO CONCLUYENTE**: `gemini-3.5-flash-lite` dijo haber creado la página del lienzo y no la creó (0 páginas; PNS-96). Se repite el 27/10/2026 con la cuota renovada (decisión 3) |
+| R9 | Log desde el arranque (B.8) | — | Sin `Traceback` salvo los del proveedor (429/503); los rechazos provocados en D.1, a su hora | [x] Conforme: 36 × `429 RESOURCE_EXHAUSTED` y 1 × `503 UNAVAILABLE`, del proveedor; además, los dos errores de serialización de R4 y R6 ([diagnóstico](diagnostico_r6_staging_e1p.md), 5.2) |
 
 ### D.3 Limpieza de las pruebas
 
@@ -777,5 +785,4 @@ Operaciones que cambian el VPS: las decide y hace quien administra el VPS.
 |---|---|
 | Cómo se copió el archivo de `git archive` al VPS en E1 y E2 | No consta. En E1′ se copia con `scp` desde el equipo de Sergio a `/tmp/` del VPS (B.2) |
 | Opciones de `rsync` de E1 y E2 (si llevaban `--delete`) | No consta; aquí hace falta `--delete` (§0) |
-| Cuántas filas de `ai_log` tienen agente hoy en `pns_demo` (la cifra de 978 es de la copia del 22/10) | A.5 |
-| Cuota disponible de Gemini el día de la subida | A.7 (consola de Google AI Studio) |
+| Cuota disponible de Gemini el día de la subida | El 26/10/2026, «Test Connection» correcto en los tres modelos, pero la cuota se agotó durante D (36 × 429) y R8 lo respondió `gemini-3.5-flash-lite`. Para las próximas subidas: comprobar la cuota en la consola de Google AI Studio, no solo con «Test Connection» |

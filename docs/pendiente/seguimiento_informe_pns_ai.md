@@ -19,7 +19,7 @@
   del fabricante) (ver PNS-81, PNS-93, PNS-94 y «Compatibilidad con Odoo 14»).
 - **Alcance:** primer bloque, hallazgos de gravedad crítica y alta (35); segundo bloque, de gravedad
   media y baja (45, con PNS-22, que pasó a Media en la revisión del informe, y PNS-79). Total: los
-  80 hallazgos del informe. Tercer bloque: hallazgos nuevos (PNS-81 a PNS-98) y compatibilidad con
+  80 hallazgos del informe. Tercer bloque: hallazgos nuevos (PNS-81 a PNS-99) y compatibilidad con
   Odoo 14 (Python 3.7 y librerías de la imagen).
 
 > **Fase 3 (laboratorio) hecha**, con el parche 1 aplicado para que los módulos se importen:
@@ -44,6 +44,13 @@
 > informe). La columna «Rama Seges» de la tabla resumen recoge lo corregido o previsto por Seges
 > (parche, entrega y validación). Actualizada el 20/10/2026 con la entrega E1 (PNS-83, 85, 90 y 91) y
 > el 21/10/2026 con la entrega E2 (PNS-82 y restos de PNS-01/02).
+>
+> **Cambio de base a 3.1.879 (23/10/2026; N12, b′):** Seges cambia una vez de base y trabaja en la rama
+> `14.0-pns-ai-3879` ([plan sobre 3.1.879](plan_correccion_pns_ai_3879.md));
+> `14.0-pns-ai-correcciones` queda como referencia. Las columnas «Estado» y «Laboratorio y staging»
+> siguen describiendo 3.1.782. En la columna «Rama Seges», lo de la rama nueva va marcado con
+> `14.0-pns-ai-3879`. Actualizada el 26/10/2026 con el staging de E1′ (parches 10, 12, 15 y 16) y con
+> PNS-99.
 
 Estados: **CORREGIDO** (el cambio cubre el hallazgo y sus puntos de entrada) · **PARCIAL** (cubre
 una parte; queda un resto concreto) · **SIN CAMBIOS** · **YA NO APLICA** (el código desapareció) ·
@@ -60,15 +67,15 @@ prueba que solo comprueba otro rol o el ACL estándar).
 
 | PNS | Gravedad | Estado | Laboratorio y staging | Rama Seges |
 |---|---|---|---|---|
-| PNS-01 | Crítica | PARCIAL | CORREGIDO (parte probada: vía RPC cerrada, 3b-1) | **Parche 12 (E2): CORREGIDO** (laboratorio y staging, 21/10/2026) |
-| PNS-02 | Crítica | PARCIAL | CORREGIDO (parte probada: vía RPC cerrada, 3b-1) | **Parche 12 (E2): CORREGIDO** (laboratorio y staging, 21/10/2026) |
+| PNS-01 | Crítica | PARCIAL | CORREGIDO (parte probada: vía RPC cerrada, 3b-1) | **Parche 12 (E2): CORREGIDO** (laboratorio y staging, 21/10/2026) · **Parche 12 adaptado (E1′, `14.0-pns-ai-3879`): validado en staging (26/10/2026)** |
+| PNS-02 | Crítica | PARCIAL | CORREGIDO (parte probada: vía RPC cerrada, 3b-1) | **Parche 12 (E2): CORREGIDO** (laboratorio y staging, 21/10/2026) · **Parche 12 adaptado (E1′, `14.0-pns-ai-3879`): validado en staging (26/10/2026)** |
 | PNS-03 | Crítica | CORREGIDO | CORREGIDO (3b-1) | — |
 | PNS-04 | Crítica | CORREGIDO | — | — |
 | PNS-05 | Crítica | CORREGIDO | CORREGIDO (staging, prueba 6) | — |
 | PNS-06 | Crítica | CORREGIDO | CORREGIDO (parte probada: rechazo al guardar de una escritura con `sudo`, 3b-1) | — |
-| PNS-07 | Crítica | PARCIAL | — | Parcial (E1): los 11 métodos privatizados, en la lista negra del sandbox; resto (métodos con `_`, alias): E3 |
+| PNS-07 | Crítica | PARCIAL | — | Parcial (E1): los 11 métodos privatizados, en la lista negra del sandbox; resto (métodos con `_`, alias): E3 · **Parche 15 (E1′, `14.0-pns-ai-3879`): validado en staging (26/10/2026)** |
 | PNS-53 | Crítica | CORREGIDO | CORREGIDO (3b-1) | — |
-| PNS-54 | Crítica | PARCIAL | — | — |
+| PNS-54 | Crítica | PARCIAL | — | **Parche 16 (E1′, `14.0-pns-ai-3879`): validado en staging (26/10/2026)**; tarjeta del chat del propio dueño, riesgo aceptado (D29) |
 | PNS-08 | Alta | CORREGIDO | CORREGIDO (3b-1) | — |
 | PNS-09 | Alta | CORREGIDO | CORREGIDO (parte probada: `action_test_connection` de un interno, 3b-1) | — |
 | PNS-10 | Alta | CORREGIDO | CORREGIDO (3b-1) | — |
@@ -142,7 +149,7 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-79 | Baja | CORREGIDO | NO CONCLUYENTE (3b-1) | — |
 | PNS-81 | Alta | NUEVO | importación resuelta con el parche 1 (3a); parche 2 eficaz (3b-2 y staging, prueba 2); parche 3 eficaz (staging, prueba 1); `prompts/*`: parche 4 en la rama, eficaz (prueba del parche 4 y staging, §4.4) | Parches 1-4 (compatibilidad), en LIYBEN |
 | PNS-82 | Alta | NUEVO | VULNERABLE (3b-1) | **Parche 11 (E2): CORREGIDO** (laboratorio y staging, 21/10/2026) |
-| PNS-83 | Alta | NUEVO | VULNERABLE (3b-1) | **Parche 10 (E1): CORREGIDO** (laboratorio y staging, 20/10/2026) |
+| PNS-83 | Alta | NUEVO | VULNERABLE (3b-1) | **Parche 10 (E1): CORREGIDO** (laboratorio y staging, 20/10/2026) · **Parche 10 adaptado (E1′, `14.0-pns-ai-3879`): validado en staging (26/10/2026)** |
 | PNS-84 | Media | NUEVO | — | — |
 | PNS-85 | Media | NUEVO | VULNERABLE (3b-1) | **Parche 9 (E1): CORREGIDO** (laboratorio y staging, 20/10/2026) |
 | PNS-86 | Media | NUEVO | — | — |
@@ -158,17 +165,18 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-96 | Baja | NUEVO | CONFIRMADO (staging, con modelos `lite`) | — |
 | PNS-97 | Media | NUEVO | — (inventario de la spec E2) | Previsto en E4 |
 | PNS-98 | Baja | NUEVO | CONFIRMADO (staging de E2) | Fase posterior (sin entrega asignada) |
+| PNS-99 | Media | NUEVO | CONFIRMADO (laboratorio, con y sin parches; diagnóstico del staging de E1′) | — |
 
 **Recuento:** CORREGIDO 31 · PARCIAL 33 · SIN CAMBIOS 13 · YA NO APLICA 2 · DUDOSO 1 (80 del
-informe) · NUEVO 18 (total 98). Por gravedad:
+informe) · NUEVO 19 (total 99). Por gravedad:
 
 | Gravedad | Corregido | Parcial | Sin cambios | Ya no aplica | Dudoso | Nuevo | Total |
 |---|---|---|---|---|---|---|---|
 | Crítica | 5 | 4 | 0 | 0 | 0 | 0 | 9 |
 | Alta | 13 | 11 | 1 | 1 | 0 | 5 | 31 |
-| Media | 4 | 12 | 9 | 0 | 0 | 7 | 32 |
+| Media | 4 | 12 | 9 | 0 | 0 | 8 | 33 |
 | Baja | 9 | 6 | 3 | 1 | 1 | 6 | 26 |
-| **Total** | **31** | **33** | **13** | **2** | **1** | **18** | **98** |
+| **Total** | **31** | **33** | **13** | **2** | **1** | **19** | **99** |
 
 Restos que se repiten en varios parciales:
 1. **El sandbox (caja A) bloquea por lista de nombres y no impide llamar a métodos privados**
@@ -384,8 +392,18 @@ Restos que se repiten en varios parciales:
     [comparación](../specs/comparacion_pns_ai_3-1-879.md), §3.
 - **Comprobación previa al despliegue en LIYBEN (26/10/2026):** consulta de solo lectura en LIYBEN
   (`odoo14_db`). Los dos AI Administrators (`fran.odoo@seges.es` y `sguerrero@liyben.com`) están activos
-  y tienen contraseña local, así que `check_identity` no les impide confirmar. **Pendiente:** que ambos
-  confirmen que conocen esa contraseña.
+  y tienen contraseña local, así que `check_identity` no les impide confirmar. **Confirmado
+  (26/10/2026):** Sergio confirma que los dos conocen esa contraseña.
+- **Staging de E1′ (26/10/2026):** parche 16 validado (pruebas 4 y 4b, R4 y R5).
+- **`missing_token` y `bad_token` en la tarjeta del chat** (del fabricante; gravedad de esta parte:
+  Baja). Fallan en cerrado: nunca ejecutan sin token.
+  - `missing_token`: el motor acuña el token de la tarjeta en el cursor del job, que no ve la operación
+    recién creada en otro cursor con commit; el evento sale sin token y el primer Confirmar falla hasta
+    que un `/pending` repinta la tarjeta.
+  - `bad_token`: cualquier `/pending`, también el del systray, rota el token sin actualizar la tarjeta.
+  - Efecto: usabilidad (obliga a repetir y confunde), como en R4 y R6 del staging. No es lo que corrige
+    el parche 16, y sin él el resultado es el mismo.
+  - Detalle en el [diagnóstico](diagnostico_r6_staging_e1p.md), 5.3.
 
 ## Detalle: hallazgos de gravedad alta
 
@@ -740,6 +758,14 @@ Restos que se repiten en varios parciales:
       falla una herramienta.
 - **Prueba en el laboratorio:** sí. Una herramienta que escribe y luego falla, llamada por `/mcp` y
   por Chatboo: comprobar en ambos casos que no queda nada escrito.
+- **Staging de E1′ (26/10/2026; 3.1.879): error de serialización en cada `/execute` de la tarjeta del
+  chat** (gravedad de esta parte: Baja). `/execute` lee la operación con el cursor de la petición; el
+  claim y el cursor de la ejecución actualizan esa fila y hacen commit; al volver,
+  `_consume_confirm_token` la escribe con la instantánea antigua y PostgreSQL da 40001. Odoo reintenta
+  la petición, el segundo intento entra por la rama de «ya ejecutada» y responde bien: no se pierde ni
+  se repite nada. Queda una línea ERROR en el log por cada confirmación. Visto en R4 y R6 del staging y
+  reproducido en el laboratorio con y sin los parches de E1′: es del fabricante. No afecta a
+  Autorizaciones. Detalle en el [diagnóstico](diagnostico_r6_staging_e1p.md), 5.2.
 
 ### PNS-27 — jsPDF 2.5.1 y SheetJS 0.18.5 con CVE conocidas en todo el backend
 
@@ -1567,7 +1593,8 @@ PNS-92: código que ya existía en 3.1.486 y que el informe no citaba; salieron 
 independiente del seguimiento y se comprobaron en el laboratorio (fase 3c). PNS-93 a PNS-96: observados
 en el staging (15-16/10/2026, `pns_demo`, proveedor Gemini; `verificacion_seguridad_pns_ai.md`,
 «Staging (15-16/10/2026)»); la gravedad es una propuesta. PNS-97 y PNS-98: de la entrega E2 (inventario
-de la spec, H-5, y staging del 21/10/2026); gravedad propuesta. Mismo criterio de
+de la spec, H-5, y staging del 21/10/2026); gravedad propuesta. PNS-99: del diagnóstico del staging de
+E1′ (26/10/2026, [diagnóstico](diagnostico_r6_staging_e1p.md)); gravedad propuesta. Mismo criterio de
 gravedad que el informe. Antes de numerar cada uno se ha comprobado con Grep que no figuraba en el
 informe ni en este seguimiento; cuando era un resto ya citado, se indica la relación.
 
@@ -2082,6 +2109,32 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
   engancharlo con `res_model`/`res_id` al crearlo, cuando se conoce la sesión) y que la vía de respaldo
   de `_finalize` también reclame los adjuntos del turno.
 - **Rama Seges:** sin entrega asignada (fase posterior).
+
+### PNS-99 — `user.remove_group` queda `executed` y con el diario `applied` sin que el grupo se quite
+
+- **Gravedad propuesta:** Media · **Estado:** NUEVO (diagnóstico del staging de E1′, 26/10/2026;
+  relacionado con PNS-37 y con PNS-01/02, pero distinto).
+- **Descripción:** si el usuario también recibe el grupo por implicación de otro que conserva,
+  `user.remove_group` no tiene efecto y la operación lo da por hecho.
+  - `user_remove_group` (`pns_base/utils/compat.py:119-122`) escribe `(3, gid)`; el `write` de
+    `res.users` de Odoo 14 (`UsersImplied.write`) vuelve a añadir en la misma escritura los grupos
+    implicados por los que quedan.
+  - `_apply_user_remove_group` (`pns_ai_mcp/models/ai_system_action.py:778-798`) devuelve `ok: True`
+    sin comprobar el resultado, y el diario registra siempre `state='applied'`
+    (`pns_ai_mcp/models/ai_change_journal.py:348-367`).
+  - Variante: si el grupo no está en `groups_id`, no se escribe nada y el resultado es el mismo.
+  - Alcance: solo `user.remove_group`, por todas las vías que terminan en `execute_safe_plan` (tarjeta
+    del chat, Autorizaciones, `safe_plan_status` y el reintento del cron).
+- **Impacto:** una retirada de permisos pedida y confirmada no ocurre, y la respuesta y el diario dicen
+  lo contrario: auditoría falsa. No concede privilegios, y la ficha del usuario sigue mostrando el
+  grupo.
+- **Laboratorio (26/10/2026):** reproducido con y sin los parches de E1′ (operación `executed`,
+  `result.ok: true`, diario `applied`; el usuario sigue con el grupo). En R6 del staging no ocurrió:
+  allí el grupo se quitó y volvió por una escritura manual.
+- **Corrección sugerida:** después del `write`, comprobar si el usuario sigue teniendo el grupo y, si es
+  así, devolver error indicando el grupo que lo implica (o rechazarlo al proponer).
+- **Detalle:** [diagnóstico](diagnostico_r6_staging_e1p.md), 5.1.
+- **Rama Seges:** sin entrega asignada.
 
 ### Observaciones sin ficha (para valorar en E4′)
 

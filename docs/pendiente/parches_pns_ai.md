@@ -1,11 +1,17 @@
 # Parches de Seges en los módulos pns_ai
 
 - **Ramas:** `14.0-pns-ai-3` (parches 1 a 6) · `14.0-pns-ai-correcciones` (parches 7 en adelante,
-  [plan de corrección](plan_correccion_pns_ai.md))
-- **Fecha:** 2026-10-13 (parches 1 a 3) · actualizado el 2026-10-20 (N11 y N12) y el 2026-10-21
-  (staging de E2)
+  [plan de corrección](plan_correccion_pns_ai.md)) · desde el 23/10/2026, `14.0-pns-ai-3879` (base
+  3.1.879: parches 10 y 12 adaptados y 13 en adelante,
+  [plan sobre 3.1.879](plan_correccion_pns_ai_3879.md)); `14.0-pns-ai-correcciones` queda como
+  referencia
+- **Fecha:** 2026-10-13 (parches 1 a 3) · actualizado el 2026-10-20 (N11 y N12), el 2026-10-21
+  (staging de E2), el 2026-10-23 (cambio de base a 3.1.879 y E1′) y el 2026-10-26 (staging de E1′)
 - **Versión del fabricante, base propia de Seges desde el 20/10/2026 (N12):** `pns_base` 14.0.1.2.32 ·
   `pns_ai_mcp` 14.0.3.1.782 · `pns_ai_chatboo` 14.0.2.1.453
+- **Desde el 23/10/2026 (N12, b′), en `14.0-pns-ai-3879`:** `pns_base` 14.0.1.2.47 · `pns_ai_mcp`
+  14.0.3.1.879 · `pns_ai_chatboo` 14.0.2.1.538. El staging `pns_demo` está en esta base desde el
+  26/10/2026; LIYBEN sigue con 3.1.782 y los parches 1 a 6 hasta recibirlo todo de una vez
 - **Licencia:** Apache-2.0 (`LICENSE` y `NOTICE` de cada módulo, que se conservan sin cambios).
 - **Entorno objetivo:** imagen oficial de Odoo 14 (Debian Buster): Python 3.7.3 y Pillow 5.4.1
   (`requirements.txt:34` de Odoo 14 fija `Pillow==5.4.1` con Python ≤ 3.7).
@@ -25,6 +31,13 @@
 >   corrección, sin diffs (D2).
 >
 > Sustituye a la regla anterior («cuando su versión los corrija, se revierte el commit del parche»).
+
+> **Cambio de base (N12, b′; 22/10/2026, mantenido el 23/10/2026):** Seges cambia **una sola vez** de
+> base a 3.1.879, en la rama `14.0-pns-ai-3879`. Solo para este cambio, y como excepción a «los parches
+> son permanentes», se retiran los parches 1 a 9 (los cubre el fabricante) y el 10, el 11 y el 12 se
+> adaptan con el mismo número ([decisiones](pns_ai_decisiones.md), N12). A partir de ahí la regla de
+> arriba sigue igual, con 3.1.879 como base propia: vigilancia de versiones, sin incorporar versiones
+> nuevas.
 
 ## Marcadores
 
@@ -92,12 +105,16 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 
 | N.º | PNS / id | Tipo | Archivos | Entrega | Estado |
 |---|---|---|---|---|---|
-| 10 (adaptado) | PNS-83 | seguridad | `pns_ai_mcp/models/key_pin_desk.py`, `pns_ai_mcp/models/mcp_user.py` | E1′ | Validado en laboratorio (23/10/2026) |
-| 12 (adaptado) | PNS-01, PNS-02 | seguridad | `pns_ai_mcp/models/ai_system_action.py`, `pns_ai_mcp/utils/privilege_cusp.py` | E1′ | Validado en laboratorio (23/10/2026) |
-| 13 | M10 | seguridad | `pns_ai_mcp/models/safe_operation.py` | E1′ | Validado en laboratorio (23/10/2026) |
-| 14 | M13 | seguridad | `pns_ai_mcp/models/ai_context_disk.py` | E1′ | Validado en laboratorio (23/10/2026) |
-| 15 | PNS-07 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | E1′ | Validado en laboratorio (23/10/2026) |
-| 16 | PNS-54 | seguridad | `pns_ai_mcp/models/safe_operation.py` | E1′ | Validado en laboratorio (23/10/2026) |
+| 10 (adaptado) | PNS-83 | seguridad | `pns_ai_mcp/models/key_pin_desk.py`, `pns_ai_mcp/models/mcp_user.py` | E1′ | Validado en staging (26/10/2026) |
+| 12 (adaptado) | PNS-01, PNS-02 | seguridad | `pns_ai_mcp/models/ai_system_action.py`, `pns_ai_mcp/utils/privilege_cusp.py` | E1′ | Validado en staging (26/10/2026) |
+| 13 | M10 | seguridad | `pns_ai_mcp/models/safe_operation.py` | E1′ | Validado en staging (26/10/2026) |
+| 14 | M13 | seguridad | `pns_ai_mcp/models/ai_context_disk.py` | E1′ | Validado en staging (26/10/2026) |
+| 15 | PNS-07 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | E1′ | Validado en staging (26/10/2026); R8 (lienzo) se repite el 27/10/2026 |
+| 16 | PNS-54 | seguridad | `pns_ai_mcp/models/safe_operation.py` | E1′ | Validado en staging (26/10/2026) |
+
+Validados en laboratorio el 23/10/2026 y en el staging `pns_demo` el 26/10/2026, con el cambio de base
+(commit `0366231`; [staging_e1_3879.md](staging_e1_3879.md) y
+[verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E1′ (26/10/2026)»).
 
 Propuesta, comprobaciones previas y decisiones de E1′: [e1_propuesta_3879.md](e1_propuesta_3879.md).
 Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai-3879 (E1′)».
@@ -807,6 +824,9 @@ La fase 3 anotó 4 saltados; el log de esa ejecución tiene 5 tests distintos co
 - **Tests:** en `test_seges_rpc_access.py`, `test_collect_pin_refused` (interno y portal por RPC) y
   `test_redeem_key_pin_counts_through_collect_pin`; además, entra en `RENAMED` (`test_public_names_gone`)
   y en `test_no_caller_uses_public_names`.
+- **Staging (26/10/2026):** conforme. Prueba 7 (P-83a): I y P reciben `AttributeError` con
+  `collect_pin` y `AccessError` con `_collect_pin`, sin mesa abierta, en menos de 1 s. Prueba 8 (P-83b,
+  observación): igual que la referencia del laboratorio ([verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E1′»).
 
 ### Parche 12 adaptado a 3.1.879: solo `base.group_system` da o quita grupos con un plan (PNS-01 y PNS-02)
 
@@ -847,6 +867,10 @@ La fase 3 anotó 4 saltados; el log de esa ejecución tiene 5 tests distintos co
   - identidades del contexto;
   - CRUD en `res.groups`, rechazado sin Ajustes y aceptado con él;
   - acciones de vista sin cambios.
+- **Staging (26/10/2026):** conforme. Pruebas 2 (propuesta de AA por `/mcp`), 2b (plan de ADM
+  confirmado por AA: rechazo en la ejecución, `cancelled`, T conserva el grupo) y 3 (CRUD en
+  `res.groups` con AA-ERP; el control de ADM pasa). R6: con Ajustes, la operación 27 quitó el grupo a T
+  y lo registró en el diario ([verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E1′»).
 
 ### Parche 13: solo el sistema crea `ai.safe.operation`; `cleanup_stuck_state` pasa a privado (M10)
 
@@ -874,6 +898,9 @@ La fase 3 anotó 4 saltados; el log de esa ejecución tiene 5 tests distintos co
   `confirmed_by_uid` vacío, y `user_id` igual al usuario real) y la reejecución no es pública.
 - **Tests:** `pns_ai_mcp/tests/test_seges_safe_operation.py` (4) y, en `test_seges_rpc_access.py`,
   `test_cleanup_stuck_state_refused` y la entrada en `RENAMED`.
+- **Staging (26/10/2026):** conforme. Prueba 1 (P-8b): AA no crea operaciones por `create`,
+  `create_verification` ni `copy`, y no llega a `cleanup_stuck_state` ni a `_cleanup_stuck_state`;
+  `ai_safe_operation` y C sin cambios ([verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E1′»).
 
 ### Parche 14: `ai.context.unlink_retired_from_module` pasa a privado (M13)
 
@@ -891,6 +918,8 @@ La fase 3 anotó 4 saltados; el log de esa ejecución tiene 5 tests distintos co
   ```
 - **Tests:** en `test_seges_rpc_access.py`, `test_unlink_retired_refused` (interno y portal; el
   recuento de contextos de fábrica no cambia) y la entrada en `RENAMED`.
+- **Staging (26/10/2026):** conforme. Prueba 6 (P-8a): I y P reciben `AttributeError` y
+  `AccessError`; contextos de fábrica, 53 antes y después ([verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E1′»).
 
 ### Parche 15: métodos públicos con cursor propio, en la lista del sandbox (PNS-07)
 
@@ -980,6 +1009,10 @@ La fase 3 anotó 4 saltados; el log de esa ejecución tiene 5 tests distintos co
   - El usuario tiene que estar guardado en la BD: uno creado en la transacción del test no existe
     para el cursor propio, `_run_on_committed_cursor` vuelve al entorno del llamador y el defecto se
     esconde.
+- **Staging (26/10/2026):** conforme. Prueba 5 (P-07): U1, por `relaxaicode`, rechazado con el nombre
+  literal y con el compuesto; 0 adjuntos nuevos. R3 (Excel y PDF por la vía normal) y R7 (`search_count`)
+  conformes. R8 (lienzo) **no concluyente** por el modelo `lite` (PNS-96): se repite el 27/10/2026
+  (decisión 3) ([verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E1′»).
 
 ### Parche 16: Autorizaciones pide la contraseña; token de la tarjeta solo para el dueño (PNS-54)
 
@@ -1013,9 +1046,16 @@ La fase 3 anotó 4 saltados; el log de esa ejecución tiene 5 tests distintos co
   - `test_card_payload_mint_only_owner`.
 - **Comprobación previa al despliegue en LIYBEN (26/10/2026):** consulta de solo lectura en LIYBEN
   (`odoo14_db`). Los dos AI Administrators (`fran.odoo@seges.es` y `sguerrero@liyben.com`) están activos
-  y tienen contraseña local, así que `check_identity` no les impide confirmar. **Pendiente:** que ambos
-  confirmen que conocen esa contraseña. En `pns_demo`, la misma comprobación está en
+  y tienen contraseña local, así que `check_identity` no les impide confirmar. **Confirmado
+  (26/10/2026):** Sergio confirma que los dos conocen esa contraseña. En `pns_demo`, la misma
+  comprobación está en
   [staging_e1_3879.md](staging_e1_3879.md), A.6.
+- **Staging (26/10/2026):** conforme. En `pns_demo`, el único AI Administrator activo (`admin`) tiene
+  contraseña local (A.6). Pruebas 4 (UW y ADM: `res.users.identitycheck`, la operación sigue `pending`)
+  y 4b (sin `confirm_token` para ADM); la 2b pidió la contraseña de AA. R4: la tarjeta del dueño ejecutó
+  la operación 21. R5: Autorizaciones pide la contraseña una vez. Los `missing_token`, `bad_token` y el
+  error de serialización de la tarjeta son del fabricante, también sin el parche
+  ([diagnóstico](diagnostico_r6_staging_e1p.md), 5.2 y 5.3) ([verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E1′»).
 
 ### Línea base de E1′ (23/10/2026)
 
