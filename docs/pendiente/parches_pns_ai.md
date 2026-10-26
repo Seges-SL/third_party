@@ -938,6 +938,28 @@ La fase 3 anotó 4 saltados; el log de esa ejecución tiene 5 tests distintos co
   (`validators_checks.py:478`) y `guarded_getattr` (`context_builder.py:165`).
 - **Qué se degrada:** el código del sandbox no puede llamar a esos métodos como atributo (antes
   escribían fuera de la Caja A). Las funciones del lienzo siguen disponibles como funciones.
+- **Colisiones de nombre con otros modelos (comprobación, 26/10/2026):** la lista bloquea por
+  nombre, sea cual sea el objeto: en el AST, cualquier llamada `x.<nombre>(...)`
+  (`validators_checks.py:484`); en `guarded_getattr`, cualquier `getattr` (`context_builder.py:165`).
+  Las llamadas internas de Odoo (`self.get_content()` dentro del ORM) no pasan por el sandbox y no
+  se ven afectadas. Búsqueda de `def <nombre>(` para los 28 nombres en `/opt/odoo-src/14.0/odoo`,
+  `/opt/odoo-src/14.0/oca`, los demás módulos de este repo y, además, `vertical-instaladores` (sin
+  coincidencias):
+
+  | Nombre | Dónde | Modelo | ¿Lo usaría una skill? | Decisión |
+  |---|---|---|---|---|
+  | `get_content` | OCA `knowledge/document_page_reference` | `document.page` | Poco: renderiza la página con Mako. Para leer, la skill tiene el campo `content_parsed` (lo calcula con `get_content`) o `content` | Aceptar |
+  | `test_connection` | OCA `server-tools/upgrade_analysis` | `upgrade.comparison.config` | No: conecta por RPC a otro Odoo con credenciales guardadas | Aceptar (mejor bloqueado) |
+  | `test_connection` | `auto_database_backup` (este repo) | `db.backup.configure` | No: abre SFTP/FTP o nube con las credenciales de la copia | Aceptar (mejor bloqueado) |
+  | `test_connection` | OCA `l10n-spain/delivery_seur` | ninguno: clase Python `SeurRequest` | No: no se alcanza desde `env`; envía SOAP a SEUR | Aceptar |
+  | `action_generate` | OCA `account-invoicing/stock_picking_invoicing` | `stock.invoice.onshipping` (asistente) | No: crea facturas; en la Caja A ya fallaría por solo lectura | Aceptar (mejor bloqueado) |
+  | `action_generate` | core `l10n_ph` | `l10n_ph_2307.wizard` (asistente) | No: genera un XLS fiscal de Filipinas | Aceptar |
+  | `collect` | core `base/models/ir_ui_view.py:887` | ninguno: función anidada en `_postprocess_on_change` | No se alcanza como atributo | No es colisión |
+
+  Ningún nombre se saca de la lista: las coincidencias son conexiones externas o asistentes que
+  escriben (que conviene que sigan bloqueados) o lecturas con alternativa por campo. Si un cliente
+  necesitara `document.page.get_content` desde una skill, la salida es leer `content_parsed`, no
+  quitar el nombre.
 - **Cómo comprobar si el fabricante ya lo ha corregido:**
   ```sh
   grep -n "fulfill_client_export\|_run_on_committed_cursor\|caja_a" pns_ai_mcp/controllers/validators_base.py pns_ai_mcp/utils/session_download.py
@@ -989,6 +1011,11 @@ La fase 3 anotó 4 saltados; el log de esa ejecución tiene 5 tests distintos co
   - `test_confirm_and_execute_requires_identity`: dueño y AI Administrator, los dos métodos por
     `call_kw`; la operación sigue `pending` y el contacto sin tocar;
   - `test_card_payload_mint_only_owner`.
+- **Comprobación previa al despliegue en LIYBEN (26/10/2026):** consulta de solo lectura en LIYBEN
+  (`odoo14_db`). Los dos AI Administrators (`fran.odoo@seges.es` y `sguerrero@liyben.com`) están activos
+  y tienen contraseña local, así que `check_identity` no les impide confirmar. **Pendiente:** que ambos
+  confirmen que conocen esa contraseña. En `pns_demo`, la misma comprobación está en
+  [staging_e1_3879.md](staging_e1_3879.md), A.6.
 
 ### Línea base de E1′ (23/10/2026)
 
