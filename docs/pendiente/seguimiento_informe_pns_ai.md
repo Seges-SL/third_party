@@ -382,6 +382,10 @@ Restos que se repiten en varios parciales:
     necesita un XSS en esa página.
   - Detalle en la [propuesta de E1′](e1_propuesta_3879.md) y en la
     [comparación](../specs/comparacion_pns_ai_3-1-879.md), §3.
+- **Comprobación previa al despliegue en LIYBEN (26/10/2026):** consulta de solo lectura en LIYBEN
+  (`odoo14_db`). Los dos AI Administrators (`fran.odoo@seges.es` y `sguerrero@liyben.com`) están activos
+  y tienen contraseña local, así que `check_identity` no les impide confirmar. **Pendiente:** que ambos
+  confirmen que conocen esa contraseña.
 
 ## Detalle: hallazgos de gravedad alta
 

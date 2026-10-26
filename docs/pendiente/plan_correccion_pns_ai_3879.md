@@ -115,6 +115,9 @@ Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`;
   - Detalle, inventario de PNS-07 y neutralización en [parches_pns_ai.md](parches_pns_ai.md),
     «Parches de la rama 14.0-pns-ai-3879 (E1′)».
   - PNS-54 (c), la tarjeta del chat del propio dueño: riesgo aceptado ligado a D29.
+- **Subida al staging `pns_demo` (preparada el 26/10/2026, sin ejecutar):**
+  [staging_e1_3879.md](staging_e1_3879.md). Comprobaciones previas, despliegue con `git archive` y `-u`,
+  P-9, pruebas de seguridad y de no regresión, y vuelta atrás.
 - **M10, junto con el parche 12 adaptado.**
   - Origen: comparación §8.7 «M10» (Crítica), §1.2 (parche 12), §2.1 (PNS-01, resto) y §10.1.
   - Archivo y método (M10): `models/safe_operation.py`: `create` de `ai.safe.operation` (no
