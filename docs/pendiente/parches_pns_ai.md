@@ -1066,3 +1066,25 @@ scratchpad, sin git, y restaurados después.
   - dos de M10 no traían `expires_at`, y era la BD, no el parche, la que rechazaba la fila;
   - `_assert_refused` no detectaba una llamada aceptada que devuelve `None`;
   - el test de la Caja A no contaba el adjunto si la llamada fallaba después.
+
+### Cómo se validó E1′ en el laboratorio (23/10/2026) y reinicio del servidor web (26/10/2026)
+
+**Validación del 23/10/2026: solo con el ejecutor de tests, en proceso propio.** Sale de los logs del
+kit (`~/odoo-dev/14.0/logs`) y de los registros de arriba:
+- Ese día solo hay logs `tests-*` (de `tests-20261023-174554.log` a `tests-20261023-193409.log`); ni
+  `instalar` ni `actualizar`. El último `actualizar` es del 22/10 (`actualizar-20261022-173831.log`,
+  sobre `pns_demo_p9`).
+- Cada `odoo-dev 14 tests` corre en un contenedor nuevo (`odoo-dev-14-web-run-…`), con una BD de tests
+  nueva (`test_lab_pns_ai_3879_14`) y su propio servicio HTTP. Las llamadas RPC de los tests `HttpCase`
+  de E1′ (`TestSegesVerification` y `TestSegesRpcAccess`) van contra ese servicio, con el código del
+  momento.
+- No consta ninguna prueba por RPC contra el servidor web del laboratorio (`odoo-dev-14-web-1`) ese día.
+  Su log no se conserva: el contenedor se recreó el 26/10/2026.
+
+**26/10/2026:** al validar los scripts del staging (`~/staging_e1p`) contra el laboratorio, se detectó
+que el servidor web llevaba en marcha desde el 22/10 con código anterior a E1′. Se reinició y las
+pruebas de D.1 ([staging_e1_3879.md](staging_e1_3879.md)) por RPC dieron lo esperado.
+
+**Regla para las entregas siguientes:** tras aplicar un parche, reiniciar el contexto del laboratorio
+antes de cualquier prueba por RPC contra el servidor web. Los tests de `odoo-dev tests` no lo
+necesitan (contenedor nuevo cada vez).

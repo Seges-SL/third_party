@@ -2083,6 +2083,16 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
   de `_finalize` también reclame los adjuntos del turno.
 - **Rama Seges:** sin entrega asignada (fase posterior).
 
+### Observaciones sin ficha (para valorar en E4′)
+
+- **Un intento de escritura por `relaxaicode` de un usuario sin AI Writer cancela todas sus
+  verificaciones pendientes** (vista el 26/10/2026, en la validación de los scripts de E1′ en el
+  laboratorio; prueba 5 de [staging_e1_3879.md](staging_e1_3879.md), D.1):
+  - el rechazo («Usuario "…" no tiene permisos de escritura con el servidor MCP. Operación
+    abortada.») cancela todas las verificaciones pendientes del usuario, no solo la del intento;
+  - solo afecta a las del propio usuario: no cruza permisos ni toca operaciones de otros;
+  - sin ficha PNS; para valorar en E4′.
+
 ### Candidatos evaluados y descartados
 
 - **Candidatos de la revisión independiente sin número propio:**

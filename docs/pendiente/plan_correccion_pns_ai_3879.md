@@ -265,6 +265,9 @@ corrige lo elegido.
 
 - **`lab_pns_ai_3879_14`:** conserva las claves de los 4 proveedores y la clave MCP de admin, para las
   pruebas (decisión de Sergio del 23/10/2026).
+- **`lab_pns_ai_3879_14`, tras validar los scripts del staging de E1′ (26/10/2026):** quedan
+  `e1p_aiadmin` archivado y 2 filas de `ai_change_journal` de la prueba 2b, que no se pueden borrar
+  desde Odoo. Se dejan así (decisión de Sergio del 26/10/2026): reflejan el candado real del diario, que E2′ revisa con PNS-37.
 - **LIYBEN:** usuarios externos archivados el 23/10/2026.
 
 ## 5. Seguimiento por parche

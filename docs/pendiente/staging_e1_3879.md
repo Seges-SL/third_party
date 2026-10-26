@@ -658,17 +658,37 @@ el 26/10/2026 en el equipo de Sergio):
   Las claves MCP las generaba Sergio en la interfaz. Lo que necesitaba SQL lo hacía Sergio con `psql`
   en el VPS: `prueba4_bis_e2.py` se para y espera a que Sergio enganche el adjunto X por SQL.
 
-**Propuesta para E1′ (los scripts se escriben aparte, cuando Sergio lo pida):** lo mismo que en E2.
+**Scripts de E1′ (preparados y validados contra el laboratorio el 26/10/2026):** lo mismo que en E2.
 - Carpeta `~/staging_e1p` en el equipo de Sergio, fuera del repo; nada se copia al VPS.
 - `preparar_e1p.py` (crea AA o desarchiva `e2_aiadmin`, I, P y T; `--limpiar` según D.3) y
   `e1p_estado.json` con los ids; `pruebas_e1p_rpc.py` (D.1: 1, 4, 4b, 6, 7, 8 y control);
   `pruebas_e1p_mcp.py` (D.1: 2, 2b, 3 y 5, y R7). Se parte de los de E1 y E2 con las adaptaciones de
   la comparación (§4.2, «Scripts de staging»).
-- Variables `E1P_URL` (por defecto `https://pns.liyben.com`), `E1P_DB`, `E1P_ADM_LOGIN`,
-  `E1P_ADM_PASS`, `E1P_PASS` y `E1P_KEY_*`, con `read -s`; biblioteca estándar.
+- Variables (sin valores en este documento; biblioteca estándar):
+  - `E1P_URL` (por defecto `https://pns.liyben.com`), `E1P_DB`, `E1P_ADM_LOGIN`, `E1P_ADM_PASS` y
+    `E1P_PASS` (contraseña común de AA, I, P y T);
+  - `E1P_UW_LOGIN` y `E1P_UW_PASS`: UW llama por `call_kw` con su sesión en la prueba 4;
+  - cuatro claves MCP: `E1P_KEY_ADM`, `E1P_KEY_AA`, `E1P_KEY_U1` y `E1P_KEY_UW`. La de UW crea su
+    operación pendiente por `/mcp`, sin LLM (no desde el chat);
+  - opcionales: `E1P_AA_LOGIN` (por defecto `e1p_aiadmin`), `E1P_C_ID` (contacto C; si no, el script
+    elige uno) y `E1P_PG_CONTAINER` (por defecto `odoo14_pns_db`; solo para el texto de las consultas
+    SQL que muestran los scripts).
 - Los ejecuta Sergio desde su equipo. La línea base y las comprobaciones de tablas, con `psql` en el VPS
-  y en solo lectura. La confirmación de 2b pide ahora la contraseña de AA (parche 16): se hace en
-  Autorizaciones o el script la pide con `getpass`; se decide al escribirlo.
+  y en solo lectura. La confirmación de 2b pide ahora la contraseña de AA (parche 16). **Decidido por
+  Sergio el 26/10/2026:** se hace en Autorizaciones, desde la interfaz.
+
+**Procedimiento de uso.** Los scripts están en `~/staging_e1p`, en el equipo de Sergio, fuera del
+repo; no se suben al VPS.
+
+1. Desde `~/staging_e1p`, cargar con `read -s` `E1P_ADM_PASS`, `E1P_PASS`, `E1P_UW_PASS` y las
+   `E1P_KEY_*` (la de AA, cuando exista: paso 4), y exportar los logins y `E1P_URL`.
+2. `python3 preparar_e1p.py`: crea los usuarios y escribe `e1p_estado.json`.
+3. Tomar y anotar la línea base (la pide `preparar_e1p.py` en ese momento; ver abajo).
+4. Generar en la interfaz la clave MCP de AA y cargarla en `E1P_KEY_AA`.
+5. `python3 pruebas_e1p_rpc.py` y después `python3 pruebas_e1p_mcp.py` (D.1).
+6. D.2, en la interfaz.
+7. `python3 preparar_e1p.py --limpiar` (D.3).
+8. Revocar a mano, en la interfaz, las claves MCP temporales de ADM, U1 y UW.
 
 | Etiqueta | Usuario | Grupos | Para |
 |---|---|---|---|
@@ -681,7 +701,9 @@ el 26/10/2026 en el equipo de Sergio):
 | T | `e1p_objetivo` (nuevo) | Interno + `base.group_partner_manager` | P-01 (quitar) |
 | C | contacto de demostración | — | P-8b, P-54b |
 
-Línea base con `SELECT` (solo lectura) antes de las pruebas: `count(*)` de `ai_safe_operation`,
+Línea base con `SELECT` (solo lectura) **después de crear los usuarios** y antes de las pruebas (cada
+usuario interno nuevo añade 5 adjuntos de avatar a `ir_attachment`; `preparar_e1p.py` ya la pide en ese
+momento): `count(*)` de `ai_safe_operation`,
 `ir_attachment` y `ai_context WHERE source_module = 'pns_ai_mcp' AND owner_id IS NULL`;
 `res_groups_users_rel` de AA y T; `write_uid` y `write_date` de C; recuentos de `ai_key_pin_ask` y
 `ai_key_pin_desk`. **Sin mesa de PIN** (N4): no se abre ninguna.
@@ -690,16 +712,16 @@ Línea base con `SELECT` (solo lectura) antes de las pruebas: `count(*)` de `ai_
 
 | # | Prueba (parche) | Quién | Qué se hace | Esperado | Obtenido |
 |---|---|---|---|---|---|
-| 1 | **P-8b** (M10, parche 13) | AA | Por `call_kw`: `create` de `ai.safe.operation` ya `confirmed` a nombre de ADM con un plan sobre C; `create_verification` con otro `user_id`; `copy` de una operación existente; `cleanup_stuck_state` y `_cleanup_stuck_state` | `create`, `create_verification` y `copy`: `AccessError` «Only the system can create a supervised operation.». `cleanup_stuck_state`: `AttributeError` (ya no existe); `_cleanup_stuck_state`: `AccessError` (privado). `ai_safe_operation` y C sin cambios | [ ] ____ |
+| 1 | **P-8b** (M10, parche 13) | AA | Por `call_kw`: `create` de `ai.safe.operation` ya `confirmed` a nombre de ADM con un plan sobre C; `create_verification` con otro `user_id`; `copy` de la operación de UW de la prueba 4 (AA debe poder leerla); `cleanup_stuck_state` y `_cleanup_stuck_state`. La operación de UW la crea el script por /mcp antes de la prueba 1 (tras el control) y es la misma que se usa en la 4 y la 4b; UW la cancela al acabar la 4b | `create`, `create_verification` y `copy`: `AccessError` «Only the system can create a supervised operation.». `cleanup_stuck_state`: `AttributeError` (ya no existe); `_cleanup_stuck_state`: `AccessError` (privado). `ai_safe_operation` y C sin cambios | [ ] ____ |
 | 2 | **P-01** (parche 12) | AA | Por `/mcp`: plan `user.add_group` de `base.group_partner_manager` para sí y `user.remove_group` del mismo grupo a T | Rechazo al proponer: «Only a Settings administrator can add or remove user groups.»; sin operación nueva; grupos de AA y T sin cambios | [ ] ____ |
 | 2b | P-01, plan confirmado (como la prueba 7 de E2) | ADM propone, AA confirma en Autorizaciones | ADM propone quitar el grupo a T; AA confirma (ahora pide su contraseña, parche 16) | Rechazo en la ejecución con el mismo mensaje; T conserva el grupo; anotar `status` final (en E2, `cancelled`) | [ ] ____ |
-| 3 | **CRUD en `res.groups`** (parche 12) | AA-ERP | Plan con un paso CRUD `write` sobre `users` de `base.group_partner_manager` | Rechazo al proponer con el mismo mensaje; sin operación; el grupo sin cambios. **Control:** ADM propone lo mismo y pasa (cancelarla después) | [ ] ____ |
-| 4 | **P-54b** (parche 16) | UW (dueño) y ADM | UW, con una operación suya `pending` (plan sobre C desde el chat), llama por `call_kw` a `action_confirm_and_execute` y a `action_execute_plan`; ADM, lo mismo sobre la de UW | Devuelven la acción del asistente `res.users.identitycheck` y **no ejecutan**: la operación sigue `pending` y C sin cambios | [ ] ____ |
+| 3 | **CRUD en `res.groups`** (parche 12) | AA-ERP | Plan con un paso CRUD `write` sobre `users` de `base.group_partner_manager` que intenta añadir a I (T ya lo tiene: con T, «sin cambios» no comprobaría nada) | Rechazo al proponer con el mismo mensaje; sin operación; el grupo sin cambios. **Control:** ADM propone lo mismo y pasa (cancelarla después) | [ ] ____ |
+| 4 | **P-54b** (parche 16) | UW (dueño) y ADM | UW, con una operación suya `pending` (plan sobre C, creada por `/mcp` con su clave, sin LLM), llama por `call_kw` con su sesión a `action_confirm_and_execute` y a `action_execute_plan`; ADM, lo mismo sobre la de UW | Devuelven la acción del asistente `res.users.identitycheck` y **no ejecutan**: la operación sigue `pending` y C sin cambios. Cada llamada deja un registro temporal `res.users.identitycheck` (lo limpia el autovacío de Odoo) | [ ] ____ |
 | 4b | `card_payload` (parche 16, b) | ADM | `card_payload(mint_token=True)` sobre la operación de UW | Sin `confirm_token` en la respuesta (solo el dueño lo recibe) | [ ] ____ |
-| 5 | **P-07** (parche 15) | U1 | Por `/mcp`, herramienta `relaxaicode`, sin LLM: código que llama a `fulfill_client_export` sobre su sesión, con el nombre literal y con el nombre compuesto | Literal: rechazado sin ejecutar («relaxaicode es SOLO LECTURA»). Compuesto: rechazado en ejecución. **Ningún adjunto nuevo** de U1 (`SELECT` de `ir_attachment` por `create_date` y `create_uid`) | [ ] ____ |
+| 5 | **P-07** (parche 15) | U1 | Por `/mcp`, herramienta `relaxaicode`, sin LLM: código que llama a `fulfill_client_export` sobre su sesión, con el nombre literal y con el nombre compuesto | Literal: rechazado sin ejecutar. Como U1 no tiene AI Writer, el mensaje es «Usuario "…" no tiene permisos de escritura con el servidor MCP. Operación abortada.» y además se cancelan **todas** las verificaciones pendientes de U1 («relaxaicode is READ ONLY» solo sale con AI Writer). Compuesto: rechazado en ejecución con «Method 'fulfill_client_export' writes outside RelaxAICode's rollback and is not allowed here». **Ningún adjunto nuevo** de U1 (`SELECT` de `ir_attachment` por `create_date` y `create_uid`) | [ ] ____ |
 | 6 | **P-8a** (M13, parche 14) | I y P | Por `call_kw`, el nombre antiguo `unlink_retired_from_module` y el privado | Antiguo: `AttributeError`; privado: `AccessError`. Recuento de contextos de fábrica de `pns_ai_mcp` sin cambios | [ ] ____ |
 | 7 | **P-83a** (parche 10) | I y P | Por `call_kw` y por `/jsonrpc`: `collect_pin` y `_collect_pin`, **sin mesa abierta** (N4: el caso con mesa no se hace en el staging) | Antiguo: `AttributeError`; privado: `AccessError`; respuesta inmediata (sin la espera de 20 s) | [ ] ____ |
-| 8 | **P-83b** (observación; no lo corrige E1′: PNS-84 en E4′) | I | Por RPC: `touch`, `supply`, `collect`, `close`, `notify_changed`, `any_open` | Anotar cuáles responden. Ningún cambio en las tablas de la mesa de PIN | [ ] ____ |
+| 8 | **P-83b** (observación; no lo corrige E1′: PNS-84 en E4′) | I | Por RPC: `touch`, `supply`, `collect`, `close`, `notify_changed`, `any_open` | Anotar cuáles responden. Ningún cambio en las tablas de la mesa de PIN. Referencia (laboratorio, 26/10/2026): `touch`, `supply` y `collect` fallan con `'int' object has no attribute 'id'`; `close` devuelve `True`; `notify_changed`, `None`; `any_open`, `False`; mesa de PIN 0/0 | [ ] ____ |
 | — | Control | I, P | `res.users.context_get` | Responde | [ ] ____ |
 
 ### D.2 No regresión (con el proveedor de A.7)
@@ -719,7 +741,8 @@ Línea base con `SELECT` (solo lectura) antes de las pruebas: `count(*)` de `ai_
 ### D.3 Limpieza de las pruebas
 
 **[ALTERA]** Como en E2: cada usuario de prueba borra sus sesiones; se borran I, P, T y sus contactos;
-AA se archiva si `ai_change_journal.confirmed_by_uid` lo referencia; se retiran «Permisos de acceso» de
+AA se archiva **siempre** (cada confirmación de la 2b escribe en `ai_change_journal` una fila `FAILED`
+con `confirmed_by_uid` = AA, y esas filas no se pueden borrar desde Odoo); se retiran «Permisos de acceso» de
 AA y las claves MCP temporales; operaciones de prueba borradas o canceladas. Recuentos finales frente a
 la línea base de D.0. Resultado en la [verificación](verificacion_seguridad_pns_ai.md), en un bloque
 nuevo «Staging — entrega E1′».
