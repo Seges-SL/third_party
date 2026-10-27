@@ -6,7 +6,7 @@
   [plan sobre 3.1.879](plan_correccion_pns_ai_3879.md)); `14.0-pns-ai-correcciones` queda como
   referencia
 - **Fecha:** 2026-10-13 (parches 1 a 3) · actualizado el 2026-10-20 (N11 y N12), el 2026-10-21
-  (staging de E2), el 2026-10-23 (cambio de base a 3.1.879 y E1′) y el 2026-10-26 (staging de E1′)
+  (staging de E2), el 2026-10-23 (cambio de base a 3.1.879 y E1′) el 2026-10-26 (staging de E1′) y el 2026-10-27 (repetición de R8)
 - **Versión del fabricante, base propia de Seges desde el 20/10/2026 (N12):** `pns_base` 14.0.1.2.32 ·
   `pns_ai_mcp` 14.0.3.1.782 · `pns_ai_chatboo` 14.0.2.1.453
 - **Desde el 23/10/2026 (N12, b′), en `14.0-pns-ai-3879`:** `pns_base` 14.0.1.2.47 · `pns_ai_mcp`
@@ -109,7 +109,7 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 | 12 (adaptado) | PNS-01, PNS-02 | seguridad | `pns_ai_mcp/models/ai_system_action.py`, `pns_ai_mcp/utils/privilege_cusp.py` | E1′ | Validado en staging (26/10/2026) |
 | 13 | M10 | seguridad | `pns_ai_mcp/models/safe_operation.py` | E1′ | Validado en staging (26/10/2026) |
 | 14 | M13 | seguridad | `pns_ai_mcp/models/ai_context_disk.py` | E1′ | Validado en staging (26/10/2026) |
-| 15 | PNS-07 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | E1′ | Validado en staging (26/10/2026); R8 (lienzo) se repite el 27/10/2026 |
+| 15 | PNS-07 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | E1′ | Validado en staging (26/10/2026); R8 (lienzo) no concluyente por el proveedor (27/10/2026): se valida en E3′ |
 | 16 | PNS-54 | seguridad | `pns_ai_mcp/models/safe_operation.py` | E1′ | Validado en staging (26/10/2026) |
 
 Validados en laboratorio el 23/10/2026 y en el staging `pns_demo` el 26/10/2026, con el cambio de base
@@ -1013,6 +1013,11 @@ La fase 3 anotó 4 saltados; el log de esa ejecución tiene 5 tests distintos co
   literal y con el compuesto; 0 adjuntos nuevos. R3 (Excel y PDF por la vía normal) y R7 (`search_count`)
   conformes. R8 (lienzo) **no concluyente** por el modelo `lite` (PNS-96): se repite el 27/10/2026
   (decisión 3) ([verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E1′»).
+- **Staging, repetición de R8 (27/10/2026):** no concluyente por el proveedor. Gemini 3.6 flash dio 503 y
+  3.5 flash, fallo de conexión; tras el failover, `gemini-3.5-flash-lite` afirmó haber creado la página
+  y no la creó (sesiones 46 y 47 de U1 con `canvas_rev` = 0; 0 filas nuevas en `chatboo_canvas_page`;
+  PNS-96). Sin indicios de un error de Seges. R8 se valida en E3′ (decisión de Sergio del 27/10/2026)
+  ([verificación](verificacion_seguridad_pns_ai.md), «Repetición de R8 (27/10/2026)»).
 
 ### Parche 16: Autorizaciones pide la contraseña; token de la tarjeta solo para el dueño (PNS-54)
 

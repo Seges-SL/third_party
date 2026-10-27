@@ -5,7 +5,9 @@
   **Estado:** ejecutado el 26/10/2026 (Sergio con Claude; desplegado `0366231`). Todo conforme salvo R8,
   no concluyente: se repite el 27/10/2026 con la cuota renovada (decisión 3). Resultado en la
   [verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E1′ (26/10/2026)», y diagnóstico
-  de R4 y R6 en [diagnostico_r6_staging_e1p.md](diagnostico_r6_staging_e1p.md).
+  de R4 y R6 en [diagnostico_r6_staging_e1p.md](diagnostico_r6_staging_e1p.md). R8, repetida el 27/10/2026,
+  sigue no concluyente por el proveedor: se valida en E3′ y E1′ queda cerrada en el staging con esa salvedad
+  (decisión de Sergio del 27/10/2026).
 - **Origen:** ficha de E1′ y §1 (validación, punto 2) del
   [plan de corrección sobre 3.1.879](plan_correccion_pns_ai_3879.md); plan de prueba del §4 de la
   [propuesta de E1′](e1_propuesta_3879.md); pérdidas de P-9 en la
@@ -743,7 +745,7 @@ momento): `count(*)` de `ai_safe_operation`,
 | R5 | Autorizaciones: «Confirmar y ejecutar» de una operación pendiente | ADM | Pide la contraseña una vez; ejecuta; una segunda confirmación en menos de 10 minutos no la pide | [x] Conforme |
 | R6 | Plan de grupos con Ajustes: quitar y volver a poner `base.group_partner_manager` a T (R6 de E2) | ADM | Las dos operaciones `executed`; T termina con el grupo | [x] Conforme en lo que comprueba E1′: la operación 27 quitó el grupo a T y lo registró (fila 12 del diario). Sergio lo volvió a poner a mano a las 16:48:43 UTC (`write_uid` 2) y T no tiene grupos que lo impliquen ([diagnóstico](diagnostico_r6_staging_e1p.md), §6). Volver a ponerlo por plan no se hizo (cubierto por los tests y por R6 de E2) |
 | R7 | `relaxaicode` normal por `/mcp`: `search_count` de contactos (R7 de E1) | U1 | Responde con el número | [x] Conforme |
-| R8 | Lienzo: una página sencilla desde el chat (el parche 15 deja sus funciones como funciones) | U1 | La página se crea y se ve | [ ] **NO CONCLUYENTE**: `gemini-3.5-flash-lite` dijo haber creado la página del lienzo y no la creó (0 páginas; PNS-96). Se repite el 27/10/2026 con la cuota renovada (decisión 3) |
+| R8 | Lienzo: una página sencilla desde el chat (el parche 15 deja sus funciones como funciones) | U1 | La página se crea y se ve | [ ] **NO CONCLUYENTE**: `gemini-3.5-flash-lite` dijo haber creado la página del lienzo y no la creó (0 páginas; PNS-96). Se repite el 27/10/2026 con la cuota renovada (decisión 3). Repetida el 27/10/2026 (08:08:43 UTC): Gemini 3.6 flash dio 503 `UNAVAILABLE` y 3.5 flash, fallo de conexión; tras el failover contestó `gemini-3.5-flash-lite` (93 s), que volvió a afirmar que había creado la página sin crearla (PNS-96). **No concluyente por el proveedor**; se valida en E3′ (decisión de Sergio del 27/10/2026) |
 | R9 | Log desde el arranque (B.8) | — | Sin `Traceback` salvo los del proveedor (429/503); los rechazos provocados en D.1, a su hora | [x] Conforme: 36 × `429 RESOURCE_EXHAUSTED` y 1 × `503 UNAVAILABLE`, del proveedor; además, los dos errores de serialización de R4 y R6 ([diagnóstico](diagnostico_r6_staging_e1p.md), 5.2) |
 
 ### D.3 Limpieza de las pruebas

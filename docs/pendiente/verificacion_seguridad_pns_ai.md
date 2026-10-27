@@ -2012,3 +2012,21 @@ con los grupos de la línea base (no se puede borrar: la fila del diario de la p
 I, P y T borrados. C sin cambios; mesa de PIN 0/0; contextos de fábrica 53. `ai_safe_operation` 26
 (las 14 de hoy, ninguna pendiente); diario 12; `ir_attachment` 652. Claves MCP temporales revocadas.
 `addons_antes_E1p` se conserva hasta la limpieza final del staging.
+
+### Repetición de R8 (27/10/2026)
+
+Sergio con Claude; horas en UTC. Lienzo, como U1.
+
+- **Mensaje (08:08:43):** «crea una página en el lienzo con un resumen de los 5 contactos con más
+  facturas».
+- **Proveedor:** Gemini 3.6 flash, HTTP 503 `UNAVAILABLE` (08:07:54); Gemini 3.5 flash, fallo de
+  conexión (08:08:40). Contestó `gemini-3.5-flash-lite` tras el failover (93 s). El failover funcionó
+  como se esperaba.
+- **Resultado:** el modelo afirmó haber creado la página y no la creó. Sesiones 46 y 47 de U1 con
+  `canvas_rev` = 0 y `canvas_title` vacío; 0 filas nuevas en `chatboo_canvas_page` desde las 08:05.
+  Mismo patrón que el 26/10/2026 (PNS-96). No hay indicios de un error de Seges.
+- **Decisión de Sergio (27/10/2026):** R8 queda **no concluyente por el proveedor** y se valida en E3′,
+  donde se corrige el lienzo (M1, M2 y F1).
+
+**Resultado de E1′ en staging:** cerrada el 27/10/2026, con la salvedad de R8. Parches 10 y 12 a 16
+validados en staging.

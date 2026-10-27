@@ -16,6 +16,8 @@
   staging `pns_demo` con el cambio de base.
   E1′ validada en staging el 26/10/2026, con el cambio de base de `pns_demo` a 3.1.879; queda R8 (lienzo),
   no concluyente, que se repite el 27/10/2026 (decisión 3).
+  E1′ cerrada en staging el 27/10/2026: R8, repetida, no concluyente por el proveedor; se valida en E3′
+  (decisión de Sergio del 27/10/2026).
 
 ## 1. Cómo se trabaja
 
@@ -45,7 +47,7 @@
 | Entrega | Contenido | Parches | Estado |
 |---|---|---|---|
 | **E0′** (previa) | `test_seges_*` adaptados; esqueleto de tests de Chatboo; datos de prueba de `test_change_journal` y `test_paap_core`; línea base nueva; diagnóstico de PNS-70 (solo lectura) | — | Parte A (tests): validada en laboratorio (23/10/2026). Diagnóstico de PNS-70: hecho (23/10/2026) |
-| **E1′** | Críticos y Altos baratos: M10 con el parche 12 adaptado, PNS-54, PNS-07, M13, `collect_pin` (PNS-83) | 10 y 12 adaptados; 13 (M10), 14 (M13), 15 (PNS-07) y 16 (PNS-54) | Validada en laboratorio (23/10/2026) y en staging (26/10/2026; R8 pendiente, decisión 3) |
+| **E1′** | Críticos y Altos baratos: M10 con el parche 12 adaptado, PNS-54, PNS-07, M13, `collect_pin` (PNS-83) | 10 y 12 adaptados; 13 (M10), 14 (M13), 15 (PNS-07) y 16 (PNS-54) | Validada en laboratorio (23/10/2026) y en staging (26/10/2026); cerrada el 27/10/2026, con R8 no concluyente por el proveedor (se valida en E3′) |
 | **E2′** | Resto de Altos: papelera del diario (PNS-37), PNS-19, PNS-17, PNS-82, PNS-70; PNS-20 si P-20 lo confirma | 11 adaptado; nuevos | Pendiente |
 | **E3′** | Lienzo: M1, M2 y F1 | Nuevos | Pendiente |
 | **E4′** | Hoja de Medios y Bajos (corregir o aceptar); después, lo elegido | Nuevos, si se corrige algo | Pendiente |
@@ -128,6 +130,14 @@ Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`;
   - Registro en la [verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E1′
     (26/10/2026)»; R4 y R6 en [diagnostico_r6_staging_e1p.md](diagnostico_r6_staging_e1p.md). Del
     fabricante salen PNS-99 y anexos a PNS-26 y PNS-54 ([seguimiento](seguimiento_informe_pns_ai.md)).
+- **Repetición de R8 (27/10/2026): no concluyente por el proveedor; E1′ cerrada en staging con esa
+  salvedad** (decisión de Sergio).
+  - Gemini 3.6 flash dio 503 y 3.5 flash, fallo de conexión; contestó `gemini-3.5-flash-lite` tras el
+    failover, que funcionó como se esperaba.
+  - El modelo afirmó haber creado la página y no la creó (0 páginas; PNS-96), como el 26/10/2026. Sin
+    indicios de un error de Seges.
+  - R8 pasa a las validaciones de E3′. Registro en la [verificación](verificacion_seguridad_pns_ai.md),
+    «Repetición de R8 (27/10/2026)».
 - **M10, junto con el parche 12 adaptado.**
   - Origen: comparación §8.7 «M10» (Crítica), §1.2 (parche 12), §2.1 (PNS-01, resto) y §10.1.
   - Archivo y método (M10): `models/safe_operation.py`: `create` de `ai.safe.operation` (no
@@ -234,6 +244,9 @@ Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`;
   - Archivo: `pns_ai_chatboo/models/chatboo_canvas.py` (carcasa `:500-573`; filas en el `<script>`
     `:1097-1109, 1423-1434`).
   - Método: a determinar en la entrega.
+- **Validaciones en staging que se añaden:**
+  - R8 de E1′ (lienzo: una página sencilla desde el chat, como U1; la página se crea y se ve). Quedó
+    no concluyente en E1′ por el proveedor (26 y 27/10/2026; PNS-96) (decisión de Sergio del 27/10/2026).
 
 ### E4′ (hoja de Medios y Bajos)
 
@@ -298,6 +311,6 @@ Estados (N11): aplicado → validado en laboratorio → validado en staging → 
 | 12 | PNS-01 y PNS-02 (criterio de grupos), con M10 | E1′ | Adaptado a 3.1.879; validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
 | 13 | M10 (`create` de `ai.safe.operation`; `_cleanup_stuck_state`) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
 | 14 | M13 (`_unlink_retired_from_module`) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
-| 15 | PNS-07 (métodos con cursor propio en la lista del sandbox) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
+| 15 | PNS-07 (métodos con cursor propio en la lista del sandbox) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026); R8 (lienzo) se valida en E3′ |
 | 16 | PNS-54 (`check_identity`; token solo para el dueño) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
 | — | Parche de tests E0′ (datos de prueba de `test_change_journal` y `test_paap_core`) | E0′ | Validado en laboratorio (23/10/2026) |
