@@ -20,6 +20,18 @@
 4.4.8, UMD. Sin cargador AMD ni CommonJS, el UMD hace `globalThis.Chart = …`: la asignación es única en
 el archivo.
 
+> **Corrección (27/10/2026, propuesta de E2′):** la asignación **no es única**. `chart.umd.min.js` (md5
+> `45f5b4f17f83d6d21847ec6e14f91674`, 206 553 caracteres) escribe la global dos veces (`grep -ob`):
+> - en la cabecera UMD (desplazamiento 584): `(t="undefined"!=typeof globalThis?globalThis:t||self).Chart=e()`;
+> - dentro de la fábrica, al final (desplazamiento 206 491): `"undefined"!=typeof window&&(window.Chart=An)`.
+>   Se ejecuta antes que la de la cabecera.
+> - `An.Chart=An` (desplazamiento 206 450) es una propiedad de la clase y no toca la global.
+>
+> Con solo el token de la cabecera, `window.Chart` seguiría siendo la 4. La opción A necesita los dos
+> tokens (decisión de Sergio del 27/10/2026; [propuesta de E2′](e2_propuesta_3879.md), PNS-70). El
+> criterio de P-70 sigue valiendo: la 4 también tiene `Chart.helpers` (desplazamiento 206 177), pero solo
+> ella tiene `Chart.version` (`static version="4.4.8"`, desplazamiento 98 778).
+
 | | 3.1.782 (`14.0-pns-ai-correcciones`) | 3.1.879 (esta rama) |
 |---|---|---|
 | Dónde | Dentro de `web.assets_backend` (`pns_ai_chatboo/views/assets.xml:22`), junto con jsPDF, autotable, html2canvas, ECharts y showdown (`:17-23`) | Fuera del bundle. `chatboo_heavy_libs.js:12-33` lo carga con `ajax.loadJS` al abrir el chat (`chatboo_systray.js:383`, `_showOverlay`), en `VENDOR` aunque el motor sea ECharts |
@@ -134,6 +146,20 @@ PNS-70.
    `chart.umd.min.js`), con su marcador en un comentario aparte. En
    [parches_pns_ai.md](parches_pns_ai.md) queda el `grep` que lo localiza.
 
+### Tras las decisiones del 27/10/2026 (propuesta de E2′)
+
+- **Condición 1:** se cumple. Repetido el `grep` al preparar E2′: solo `chatboo_heavy_libs.js:29` lee
+  `window.Chart`, y `chatboo_charts.js` usa su copia `ChartLib`.
+- **Condición 2, sustituida:** la librería asigna la global dos veces (corrección de §1). Sergio aprueba
+  **dos tokens**, cada uno con su marcador y el `grep` de comprobación:
+  - `.Chart=e()` → `.PnsChatbooChart=e()`;
+  - `window.Chart=An` → `window.PnsChatbooChart=An`.
+- **Carga por URL fija:** `chart.umd.min.js` no va en ningún bundle (`pns_ai_chatboo/views/assets.xml:4-33`
+  solo incluye `chatboo_heavy_libs.js`, `:20`).
+  - Se pide con `ajax.loadJS` desde la lista `VENDOR` (`chatboo_heavy_libs.js:12-18`), con URL fija.
+  - Odoo 14 sirve `/static` con una semana de caché (`STATIC_CACHE`, `odoo/http.py:69, 1367`).
+  - Por eso se añade `?seges=20` a esa URL y el caso 5 de P-70.
+
 ### Validación con P-70
 
 En el laboratorio `lab_pns_ai_3879`, con recarga sin caché.
@@ -149,6 +175,9 @@ En el laboratorio `lab_pns_ai_3879`, con recarga sin caché.
 2. Lo mismo con el tablero de Facturación.
 3. Orden inverso: F5 → abrir el chat → vista gráfico y tablero; y abrir el chat otra vez.
 4. Sesión antigua con gráfico (como P-9e, sesión 5): el gráfico del chat se pinta.
+5. (Añadido el 27/10/2026) **Con la caché normal**, sin recarga forzada, en un navegador que haya abierto
+   el chat antes del parche: F5, abrir el chat y repetir el caso 1. Se espera `PnsChatbooChart.version` =
+   `4.4.8` y `window.Chart` sin `version`.
 
 ## 5. Pendiente
 
