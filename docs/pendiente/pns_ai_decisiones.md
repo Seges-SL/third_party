@@ -1937,3 +1937,30 @@ y de F29-F51 en el §6.1 del [consolidado de Chatboo](../specs/analisis_pns_ai_c
 | F49 | Rendimiento de las skills financieras con datos reales | 68 | Copia de producción (cargarla lo decide el usuario) |
 | F50 | ¿Es la comprobación de estado de Chatboo la que espera a las fuentes de tipos de cambio? ¿Cuánto tarda cada carga sin Internet? | 48, 73 | Laboratorio |
 | F51 | Voces que ofrece cada navegador (locales o remotas) y cuál usa la lectura en voz alta | 65 | Laboratorio (navegadores del cliente, D40) |
+
+## 11. Segundo rechazo de E2′ (28/10/2026): formateador del sandbox y su (N13, N14)
+
+### N13 — ¿Cómo se cierra `str.format` del sandbox (C1/V1/V2)?
+
+**Contexto:** el revisor confirmó que, con la plantilla en una variable, `str.format` resuelve la cadena
+de atributos sobre el objeto real sin pasar por `guarded_getattr` (C1: hasta `odoo.tools.config`), y que
+`string.Formatter` (V1) y `type(attrgetter(...))` (V2) devuelven objetos reales. Un `str` guardado en los
+builtins no sirve: los literales son `str` nativo y `str.format` es un método en C.
+
+**Decisión (Sergio):** formateador propio del sandbox. Se reescribe en el AST el acceso a
+`.format`/`.format_map` (lo ve siempre, sea cual sea el receptor) a `_sandbox_str_attr`, que resuelve cada
+campo por `guarded_getattr` (predicado único `sandbox_forbidden_name`). Se rechazó la fusión «literal →
+filtro / no literal → rechazo». Detalle en [parches_pns_ai.md](parches_pns_ai.md) (parche 23 ampliado).
+Fecha: 27–28/10/2026.
+
+### N14 — `Markup` como receptor de `.format` en el sandbox
+
+**Contexto:** `Markup` (markupsafe) es subclase de `str`. Hoy no es alcanzable como receptor en el sandbox
+(no es módulo permitido; los campos `Html` de Odoo 14 dan `str`; ningún helper devuelve `Markup`). Si
+llegara, `SandboxFormatter` (un `string.Formatter` normal) lo formatearía **perdiendo el autoescape**.
+
+**Decisión (Sergio):** **rechazar** `.format`/`.format_map` sobre `Markup` (defensa en profundidad);
+`isinstance(Markup)` se comprueba **antes** que la rama `str`, con la misma excepción/estilo que los
+nombres prohibidos. **El formateador con escape (resolver los campos por `guarded_getattr` conservando el
+autoescape de `Markup.format`) se reabre solo si aparece un uso legítimo de `Markup` como receptor.**
+Fecha: 28/10/2026.

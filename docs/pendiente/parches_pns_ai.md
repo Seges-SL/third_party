@@ -6,7 +6,7 @@
   [plan sobre 3.1.879](plan_correccion_pns_ai_3879.md)); `14.0-pns-ai-correcciones` queda como
   referencia
 - **Fecha:** 2026-10-13 (parches 1 a 3) · actualizado el 2026-10-20 (N11 y N12), el 2026-10-21
-  (staging de E2), el 2026-10-23 (cambio de base a 3.1.879 y E1′) el 2026-10-26 (staging de E1′) y el 2026-10-27 (repetición de R8)
+  (staging de E2), el 2026-10-23 (cambio de base a 3.1.879 y E1′) el 2026-10-26 (staging de E1′) y el 2026-10-27 (repetición de R8; E2′: parches 11 adaptado y 17 a 22)
 - **Versión del fabricante, base propia de Seges desde el 20/10/2026 (N12):** `pns_base` 14.0.1.2.32 ·
   `pns_ai_mcp` 14.0.3.1.782 · `pns_ai_chatboo` 14.0.2.1.453
 - **Desde el 23/10/2026 (N12, b′), en `14.0-pns-ai-3879`:** `pns_base` 14.0.1.2.47 · `pns_ai_mcp`
@@ -111,8 +111,22 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 | 14 | M13 | seguridad | `pns_ai_mcp/models/ai_context_disk.py` | E1′ | Validado en staging (26/10/2026) |
 | 15 | PNS-07 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | E1′ | Validado en staging (26/10/2026); R8 (lienzo) no concluyente por el proveedor (27/10/2026): se valida en E3′ |
 | 16 | PNS-54 | seguridad | `pns_ai_mcp/models/safe_operation.py` | E1′ | Validado en staging (26/10/2026) |
+| 11 (adaptado) | PNS-82 | seguridad | `pns_ai_chatboo/models/chatboo_session.py` | E2′ | Aplicado; tests en verde (27/10/2026) |
+| 17 | PNS-37 | seguridad | `pns_ai_mcp/models/ai_change_journal.py`, `pns_ai_mcp/controllers/safe_plan.py` | E2′ | Aplicado; tests en verde (27/10/2026); P-37 y P-37b pendientes |
+| 18 | PNS-19 | seguridad | `pns_ai_mcp/models/box_a_guard.py` (nuevo), `pns_ai_mcp/models/__init__.py`, `pns_ai_mcp/controllers/tools_relaxaicode.py`, `pns_ai_chatboo/models/chatboo_session.py` (ventana del lienzo) | E2′ | Aplicado; rechazado en la revisión y corregido (27/10/2026: alias, ids, caché); tests en verde; P-19 pendiente |
+| 19 | PNS-17 | seguridad | `pns_ai_mcp/utils/fetch_url_safe.py`, `pns_ai_mcp/utils/mcp_client.py` | E2′ | Aplicado; tests en verde (27/10/2026); P-17 manual pendiente |
+| 20 | PNS-70 | compatibilidad | `pns_ai_chatboo/static/src/js/chart.umd.min.js`, `pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js` | E2′ | Aplicado (27/10/2026); sin test Python; P-70 pendiente |
+| 21 | PNS-20 | seguridad | `pns_base/models/operation_report_wizard.py` | E2′ | Aplicado; `clear_caches()` tras la revisión; tests en verde (27/10/2026); P-20 repetida pendiente |
+| 22 | PNS-100 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | E2′ | Aplicado; tests en verde (27/10/2026) |
+| 23 | PNS-101 | seguridad | `pns_ai_mcp/controllers/validators_base.py`, `pns_ai_mcp/controllers/validators.py`, `pns_ai_mcp/controllers/context_builder.py` | E2′ | Aplicado; tests en verde (27/10/2026); P-101 pendiente |
 
-Validados en laboratorio el 23/10/2026 y en el staging `pns_demo` el 26/10/2026, con el cambio de base
+Parches 11 adaptado y 17 a 22 (E2′, 27/10/2026): aplicados, con tests y neutralización hechos; pruebas
+manuales del laboratorio pendientes ([lab_e2_3879.md](lab_e2_3879.md)). Tras la revisión del mismo día:
+parche 18 corregido, cambio en el 21 y parche 23 nuevo (PNS-101), con tests y neutralización
+(«Revisión de E2′ (27/10/2026)», al final de la sección). Entradas más abajo, en «Parches
+de la rama 14.0-pns-ai-3879 (E2′)».
+
+Parches 10, 12 y 13 a 16 (E1′): validados en laboratorio el 23/10/2026 y en el staging `pns_demo` el 26/10/2026, con el cambio de base
 (commit `0366231`; [staging_e1_3879.md](staging_e1_3879.md) y
 [verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E1′ (26/10/2026)»).
 
@@ -1133,3 +1147,866 @@ pruebas de D.1 ([staging_e1_3879.md](staging_e1_3879.md)) por RPC dieron lo espe
 **Regla para las entregas siguientes:** tras aplicar un parche, reiniciar el contexto del laboratorio
 antes de cualquier prueba por RPC contra el servidor web. Los tests de `odoo-dev tests` no lo
 necesitan (contenedor nuevo cada vez).
+
+## Parches de la rama 14.0-pns-ai-3879 (E2′)
+
+- **Fecha:** 27/10/2026. **Entrega:** E2′ del [plan sobre 3.1.879](plan_correccion_pns_ai_3879.md).
+- **Propuesta, comprobaciones y decisiones de Sergio:** [e2_propuesta_3879.md](e2_propuesta_3879.md),
+  «Propuesta final». HEAD de partida del código: `c639fa8`.
+- **Rutas:** de 3.1.879 con E1′ y E2′. Sin tocar `version`, `depends`, `external_dependencies`, `i18n`,
+  `LICENSE` ni `NOTICE`. Mensajes nuevos en inglés, sin traducir (D-6).
+- **Marcadores:**
+  `grep -rn "Seges: parche \(11\|1[7-9]\|2[0-3]\) (" pns_base pns_ai_mcp pns_ai_chatboo --include=*.py --include=*.js`,
+  sin tests: 36 líneas (11: 2; 17: 5; 18: 7; 19: 3; 20: 4; 21: 6; 22: 1; 23: 8), tras la revisión del
+  27/10/2026 (antes, 26). En la librería minificada de
+  Chart.js el marcador va como `/* … */` en la cabecera.
+- **Pruebas manuales del laboratorio** (preparadas, las ejecuta Sergio): [lab_e2_3879.md](lab_e2_3879.md).
+
+### Comprobaciones previas a implementar (27/10/2026)
+
+Solo lectura (código, core de Odoo 14 de referencia, OCA, `vertical-instaladores` y `SELECT` en
+`lab_pns_ai_3879_14`).
+
+1. **(f) Qué lee la caja A.** `build_safe_context` y la serialización (`_link_and_picture_rows`,
+   `_present_result`, `_success_response`) solo leen `web.base.url`, que el parche 18 deja legible.
+   **Cambió el diseño:** los helpers que `pns_ai_chatboo` publica en el sandbox (`page_url`, `page_edit`) se
+   construyen sobre el entorno de la caja A y llaman a `paint_canvas` → `_ask_design` →
+   `llm_completion_for_agent(self.env)`, que lee `ai.provider` (cadena del agente y clave del driver); al
+   salir, `inference_audit` lo vuelve a leer para registrar el consumo. Con el control independiente de
+   `su`, el lienzo pedido desde `relaxaicode` habría fallado en silencio (`paint_canvas` captura el error y
+   devuelve `''`). Sergio eligió la **ventana en `_ask_design`** (ver el parche 18). La página «en espera» se
+   completa fuera de la caja A (`utils/engine_tool_run.py:393`) y no le afecta.
+2. **`auto_join` hacia los modelos cerrados:** ninguno en el core 14, OCA, `vertical-instaladores` ni en
+   los tres módulos.
+3. **Colisiones de los 28 nombres del parche 22** (`def <nombre>(` en core, OCA, este repo y
+   `vertical-instaladores`, sin tests ni migraciones): todas las coincidencias envían, conectan o
+   ejecutan. Por ejemplo `send_email` en 5 módulos OCA de `social` (sobrescrituras de `ir.mail_server`),
+   `connect` en `fetchmail.server` y en el cliente MCP (clase Python, no alcanzable desde `env`), `send` en
+   `mail.mail`, `sms.sms` y TicketBAI/FACe de `l10n-spain`, `run` en 53 sitios (acciones de servidor,
+   aprovisionamiento, asistentes contables y de cobro, hilos y CLI fuera del ORM), `send_mail` en
+   asistentes del compositor, `method_direct_trigger` en `queue_job_cron`. Ninguna es una lectura sin
+   alternativa: no se saca ningún nombre. Ninguno aparece como atributo en `ai/` ni `data/` de los tres
+   módulos.
+4. **Inventario de PNS-07 reafirmado:** el código de los módulos no cambia desde `ee74c08` (tests de
+   E1′). `cursor_scan.py` de E1′, repetido: los mismos 54 métodos públicos; solo desaparecen
+   `collect_pin` y `cleanup_stuck_state`, ya privados en E1′.
+5. **Parche 21: `precommit` antes del `SAVEPOINT`.** En la petición de «Review» no hay trabajo pendiente
+   en `cr.precommit` al entrar en `action_preview`: en Odoo 14 el formulario guarda el asistente en una
+   petición aparte (`saveRecord`, `web/static/src/js/views/form/form_controller.js:454-480`) y
+   `/web/dataset/call_button` → `_call_kw_multi` (`odoo/api.py:386-392`) solo hace `browse` y llama al
+   método. Los asistentes son transitorios sin `mail.thread`. Por eso `precommit.clear()` tras el
+   `ROLLBACK` solo descarta lo de la vista previa (`cr.savepoint()` de Odoo, en cambio, hace
+   `precommit.run()` antes del `SAVEPOINT`, `odoo/sql_db.py:113-120`).
+6. **Parche 18: firmas.** Las de Odoo 14 (`odoo/models.py`): `_fetch_field(field)` (`:3063`),
+   `read(fields=None, load='_classic_read')` (`:3006`), `_read(fields)` (`:3087`),
+   `_read_group_raw(domain, fields, groupby, offset=0, limit=None, orderby=False, lazy=True)` (`:2286`),
+   `_search(args, offset=0, limit=None, order=None, count=False, access_rights_uid=None)` (`:4527`) y
+   `ir.config_parameter.get_param(key, default=False)`. Las sobrescrituras del parche pasan
+   `*args/**kwargs` a `super()` (`read` usa la firma exacta, como pide pylint-odoo). Las que ya había por
+   encima son compatibles: `ai.mcp.user._search(domain, *args, **kwargs)`, tres `read(fields=None,
+   load=…)` (`ai.context`, `ai.safe.operation`, `ai.agent`), `res.users._read`, `ir.attachment._read` y
+   `mail.message._read_group_raw`, todas con la firma estándar.
+
+### Parche 11 adaptado a 3.1.879: el `unlink` de la sesión no borra adjuntos de otros creadores (PNS-82)
+
+- **Qué falla sin él:** `chatboo.session.unlink` borra en `sudo` todos los adjuntos con
+  `res_model='chatboo.session'` de esas sesiones, sean de quien sean, antes de que `super().unlink()`
+  compruebe el acceso. Sobre una sesión propia, se lleva adjuntos de otros creadores que cuelguen de
+  ella. El cron `_cleanup_old_sessions` pasa por el mismo `unlink`.
+- **Cambio** (`pns_ai_chatboo/models/chatboo_session.py`, `unlink`, `:1959`): `check_access_rights` y
+  `check_access_rule('unlink')` al principio (el superusuario y el cron pasan); de los adjuntos colgados
+  solo se borran los del dueño de cada sesión o sin `create_uid`; el resto se desengancha (`res_model` y
+  `res_id` a `False`). Es el cambio del parche 11 original (`14.0-pns-ai-correcciones`), sin el resto del
+  parche: el enganche ya lo corrige 3.1.879.
+- **Criterio de enganche (decisión 7):** el del fabricante, sin cambios en `_claim_turn_file_chips`: solo
+  se enganchan los huérfanos con `res_model` y `res_id` vacíos. Confirmado por el recuento del laboratorio
+  y del staging (los únicos con `res_id = 0` son bundles de estáticos del sistema).
+- **Qué se degrada:** al borrar una sesión, un adjunto ajeno que colgara de ella queda huérfano de su
+  creador en vez de borrarse.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "check_access_rule\|create_uid" pns_ai_chatboo/models/chatboo_session.py
+  ```
+  Corregido si `unlink` comprueba el acceso antes del borrado en `sudo` y no borra adjuntos de otros
+  creadores.
+- **Tests:** `pns_ai_chatboo/tests/test_seges_chatboo_access.py`: `test_unlink_own_session_keeps_foreign`
+  y `test_cron_unlink_sudo_keeps_foreign` (portados de E2), y el caso (d) de
+  `test_claim_filters_in_python` (el adjunto propio con `res_model` y `res_id = 0` no se engancha).
+
+### Parche 17: el diario solo lo escribe el sistema; borrar con un plan exige permiso de borrado (PNS-37)
+
+- **Qué falla sin él (comparación §6.1, PNS-37, Alta propuesta):**
+  - (a) `ai.change.journal` solo sobrescribía `unlink`: AI Administrator y Ajustes crean y escriben filas
+    por RPC (ACL `1,1,1,0`). Una fila reescrita como borrado en papelera la vacía el cron
+    `_cron_empty_journal_trash`, que corre como superusuario.
+  - (b) El paso `unlink` de un plan, en un modelo con `active`, archiva con solo permiso de escritura, y
+    el cron lo borra pasados los días de retención.
+- **Cambio:**
+  - `models/ai_change_journal.py`: `create` (`@api.model_create_multi`, `:639`) y `write` (`:647`) dan
+    `AccessError` («Only the system can write the AI change journal.») si no es `self.env.su`, como el
+    parche 13 en `ai.safe.operation`. Las dos escrituras que corrían como quien pulsa pasan a `sudo()`:
+    `action_revert` (`:498`) y `_empty_rows` (`:571`); antes ya se comprueba `_ensure_journal_manager`, y
+    el borrado de `_empty_rows` sigue con los permisos de quien pulsa.
+  - `controllers/safe_plan.py`, paso `unlink` (`:950`): `check_access_rights('unlink')` y
+    `check_access_rule('unlink')` antes de archivar.
+  - El cron no se toca; el ACL tampoco (`ir.model.access.csv` no admite el marcador).
+- **Inventario de escrituras del diario** (decisión 1; [propuesta](e2_propuesta_3879.md), «PNS-37
+  (decisiones 1 y 2)»): solo cambian las vías 6 y 7 (dos `sudo()`); las demás ya escribían como
+  superusuario. Un test de no regresión por vía.
+- **Qué se degrada:** nadie corrige a mano una fila del diario (no hay botón que lo haga). Un plan de
+  borrado sobre un registro que el usuario no puede borrar falla, en vez de archivarlo.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "def create\|def write\|env.su" pns_ai_mcp/models/ai_change_journal.py
+  grep -n "check_access_rights('unlink')" pns_ai_mcp/controllers/safe_plan.py
+  ```
+- **Tests:** `pns_ai_mcp/tests/test_seges_change_journal.py` (11):
+  - negativos: `test_ai_admin_write_refused`, `test_ai_admin_create_refused`,
+    `test_plan_unlink_requires_unlink_right`;
+  - no regresión, por vía del inventario: 1 `test_applied_row_as_ai_writer`, 2 `test_heal_shape_creates_row`,
+    6 `test_revert_still_works_for_ai_admin`, 7 `test_empty_one_and_settings_still_work_for_ai_admin`,
+    8 `test_cron_empties_old_row`, 9 `test_related_verification_id_recompute`;
+  - `TestSegesFailedPlanRow` (cursor propio, sin `enter_test_mode` ni `HttpCase`, `base.user_admin`,
+    limpieza en un cursor propio): 3 `test_failed_plan_row_survives_rollback` (decisión 2) y 4
+    `test_rejected_plan_journals_failed_row`, que necesita el rechazo de (b) y por eso falla al
+    neutralizar.
+  - `test_failed_execute_journals_outside_rollback` (fabricante) sigue aceptado como desfasado.
+
+### Parche 18: en la caja A, los modelos de credenciales solo dan sus campos de identificación (PNS-19)
+
+- **Qué falla sin él (comparación §3, PNS-19, Alta):** el sandbox solo cierra la puerta `env[...]`. Los
+  recordsets del ORM son los reales: `ai.log.provider_id.api_key`, `env.ref(<agente>)` y su cadena de
+  proveedores, `new()` con un many2one, los campos `Reference` del core
+  (`mail.template.preview.resource_ref`), `read`, `read_group` y los dominios con camino (oráculo)
+  llegan a los secretos, también los de `ir.mail_server` o `ir.config_parameter` si el usuario los
+  puede leer.
+- **Cambio** (opción B, rediseño por campos; decisiones de la segunda y tercera ronda):
+  - `pns_ai_mcp/models/box_a_guard.py` (nuevo; `_inherit = 'base'`, y `_inherit = 'ir.config_parameter'`
+    para `get_param`). En `_fetch_field`, `read`, `_read`, `_read_group_raw` y `_search`, primero la marca
+    del cursor (fuera de la caja A, `super()` de inmediato) y después el modelo. No mira `su` ni `sudo`.
+  - 11 modelos con sus campos permitidos: `ai.provider`, `ai.api.server`, `ir.mail_server` y
+    `fetchmail.server` (`id`, `display_name`, `name`); `ai.api.server.key` y `ai.mcp.user` (`…`,
+    `user_id`); `ai.key.pin.ask` y `ai.api.key.wizard` (`id`, `display_name`); `ai.key.pin.desk` (solo
+    `id`: su `_rec_name` es el token); `iap.account` (`…`, `service_name`); `ir.config_parameter` (`…`,
+    `key`, y `value` en lectura solo si todos los ids del recordset son enteros (`int`, no `bool`; de un
+    `NewId`, su `origin`) y ninguna de esas filas tiene una clave bloqueada; nunca en un dominio ni en
+    `read_group`, ni como campo ni como agregado).
+  - Clave bloqueada de `ir.config_parameter`: contiene `secret`, `password`, `passwd`, `token`,
+    `api_key`, `apikey` o `private` (incluye `database.secret`). `get_param` la rechaza antes del
+    `ormcache` de `_get_param`.
+  - `read()` sin campos devuelve solo los permitidos; con campos no permitidos, `AccessError`. La
+    precarga de `_fetch_field` va sin `prefetch_fields`: lo que lee la caja A no trae la clave a la
+    caché. Eso no basta, porque en Odoo 14 la caché es una por hilo, no por cursor: lo que el motor lee
+    con su cursor (`_api_key_for_inference`, la llamada de diseño) la caja A lo recibe sin pasar por
+    `_fetch_field`. Por eso se vacía (tercer cierre, abajo).
+  - `controllers/tools_relaxaicode.py`: `ro_cr._seges_box_a = True` justo después de abrir la caja A
+    (`:187`), seguido de `_box_a_clear_cache(ro_env)`, y `False` en el `finally`, antes del `rollback`
+    (`:291`).
+  - `models/__init__.py`: importa `box_a_guard`.
+  - **Tres cierres tras el rechazo de la revisión (27/10/2026)**, con los scripts del revisor:
+    1. **`read_group` con alias.** `'display_name:max(value)'` leía `value` con el nombre de un campo
+       permitido. `_read_group_raw` analiza cada campo de `fields` con `models.regex_field_agg`, como el
+       core, y comprueba el alias y el campo entre paréntesis (`_agg_field_names`). `value` de
+       `ir.config_parameter` se rechaza también como agregado. `groupby` no admite alias en el 14
+       (`_read_group_process_groupby` toma la parte anterior a `:` y exige un campo guardado; lo de
+       después es la granularidad de fecha): se mantiene `_field_names`. `orderby` solo acepta campos
+       agrupados o agregados (`_read_group_prepare`), ya comprobados.
+    2. **Ids que no son enteros.** `browse(7.0)`, `browse('7')` y `new(origin=browse(7.0))` llegan a la
+       misma fila en SQL, y el filtro anterior (`isinstance(i, int)`) los dejaba fuera de la comprobación
+       de claves. `_box_a_blocked_icp_rows` toma el `origin` de cada `NewId` (sin `origin`, no hay fila) y
+       trata el recordset como bloqueado si algún id no es exactamente `int`.
+    3. **Caché.** `_box_a_clear_cache(env)` invalida en `env.cache` los campos no permitidos de los 11
+       modelos y `value` de `ir.config_parameter` (`env.cache.invalidate([(campo, None), …])`; vale para
+       todos los entornos del hilo). Se llama al poner la marca (`tools_relaxaicode.py`) y en el `finally`
+       de `_box_a_trusted`, al volver a ponerla.
+- **Excepción documentada: la ventana del lienzo** (comprobación (f), decisión de Sergio del 27/10/2026).
+  - **Motivo:** `page_url` y `page_edit` (helpers de `pns_ai_chatboo` en el sandbox) llaman a la cadena
+    de diseño con el entorno de la caja A, que lee `ai.provider`. Sin la ventana, el lienzo desde
+    `relaxaicode` dejaría de funcionar (R8, que se valida en E3′).
+  - **Cambio:** `pns_ai_chatboo/models/chatboo_session.py`. `_ask_design` (`:1189`) pasa a ser la
+    envoltura y el cuerpo original queda sin cambios en `_ask_design_raw` (`:1202`). La envoltura:
+    1. convierte a `str` `system`, `prompt` y `what` antes de abrir la ventana (lo demás que usa el cuerpo,
+       `mcp_turn` y el agente, sale del contexto del motor, no del sandbox);
+    2. abre `_box_a_trusted(self.env)` (`box_a_guard.py`, función privada a nivel de módulo: quita la
+       marca y la restaura en `finally`, también si la llamada falla, y vacía de la caché lo que la llamada
+       dejó; recibe el entorno, y no el cursor, desde el tercer cierre);
+    3. devuelve solo `{'content': str, 'error': str}`: ni el recordset del proveedor ni `usage` salen de la
+       ventana. `paint_canvas`, el único llamador, solo usa esas dos claves.
+  - `_box_a_trusted` no es alcanzable desde el sandbox: nombre con `_`, fuera de `build_safe_context` y
+    de los helpers; `import`, `cr` y los atributos con `_` están bloqueados
+    (`test_box_a_cannot_lift_mark`).
+  - **Nota para E3′:** al corregir el lienzo (M1, M2 y F1), revisar si la ventana sigue haciendo falta o
+    si la llamada de diseño puede salir de la caja A (por ejemplo, como la página «en espera», que se
+    completa fuera, en `utils/engine_tool_run.py:393`).
+- **Qué se degrada:** en la caja A no se lee ningún campo de esos modelos salvo los de identificación,
+  ni por relación ni en `sudo`. `read()` de otros modelos sigue dando sus many2one como `(id, nombre)`.
+  El código interno de Odoo que corra con la marca y necesite otro campo de esos modelos dará
+  `AccessError` (la batería completa no ha encontrado ninguno, aparte del lienzo).
+- **Observaciones:**
+  - `search_by_affinity(model, …, fields=[…])` (helper del sandbox) usa el `env` sin la puerta de catálogos:
+    sin el parche, `search_by_affinity('ai.provider', [...], fields=['api_key'])` servía de oráculo de la
+    clave. El parche lo cierra (`_search`).
+  - El orden (`order='api_key'`) no se filtra: ordenar por la clave entre filas existentes es un oráculo
+    muy débil. Para la hoja de E4′.
+  - `read_group` sin `fields` usa los campos guardados con `group_operator` (numéricos): en los 11
+    modelos, ninguno es una credencial (puertos, temperatura, costes). No se filtra.
+  - Desde la caja A se llegaba a `env.cache` y a `env.all` (los entornos reales del hilo): lo cierra el
+    parche 23 (PNS-101), no este.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -rn "_seges_box_a\|box_a" pns_ai_mcp/controllers/tools_relaxaicode.py pns_ai_mcp/models/
+  ```
+  Corregido si la caja A deja leer solo campos de identificación de los modelos de credenciales por
+  cualquier vía (relación, `new()`, `Reference`, `read_group`, dominios), sin depender de `sudo`.
+- **Tests:**
+  - `pns_ai_mcp/tests/test_seges_sandbox_credentials.py` (31): la marca se pone en el cursor del test y
+    `addCleanup` la quita. Desde el 27/10/2026, `_mark()` hace lo mismo que `tool_relaxaicode`
+    (`_box_a_clear_cache`) y el `setUp` ya no vacía la caché: llega llena (`create` deja la clave en
+    ella). Se lee con `rec.campo` y los negativos comprueban el mensaje («cannot be read from the
+    RelaxAICode sandbox»);
+    - negativos por vía: `test_env_ref_agent_provider_key`, `test_new_many2one`, `test_reference_field`,
+      `test_sudo_does_not_lift`, `test_read_group`, `test_related_field`, `test_search_oracle`,
+      `test_prefetch_no_secret`, `test_mail_server_secret`, `test_icp_blocked_key`,
+      `test_icp_cached_get_param`, `test_icp_value_search_refused` y `test_provider_read_no_fields`;
+    - cierres nuevos: `test_read_group_alias_provider` y `test_read_group_alias_icp` (alias y campo
+      agregado), `test_icp_float_id`, `test_icp_str_id` y `test_icp_new_origin` (`origin` entero y
+      decimal); controles `test_read_group_alias_allowed` y `test_icp_int_id_allowed_key`;
+    - no regresión: `test_gate_env_getitem`, `test_display_name`, `test_log_read_no_fields`,
+      `test_log_search_read_no_fields`, `test_message_search_read_no_fields`, `test_icp_allowed_key` y,
+      sin marca, `test_outside_box_a_chatboo_reads_provider` (usuario de chat: el motor lee la clave);
+    - `TestSegesBoxAReal`, con la herramienta real y la caja A real como `base.user_admin` (Ajustes, sin
+      AI Administrator: el secreto es `database.secret`, sin conceder ni confirmar grupos):
+      `test_box_a_reference_secret_refused`, `test_box_a_cursor_is_marked`,
+      `test_marker_cleared_after_box_a` (código correcto y código que falla),
+      `test_box_a_cannot_lift_mark` (importar `_box_a_trusted`, `import odoo`, `env.cr._seges_box_a` y
+      `getattr(getattr(env, 'c' + 'r'), '_seges' + '_box_a')`, que cae por el `getattr` compuesto y no
+      por un `env.cr` literal; con control positivo) y `test_box_a_engine_cache_before_run` (el motor lee
+      la clave con `_api_key_for_inference` en el mismo hilo y después la caja A real la pide por
+      `ai.log.new({'provider_id': …})`).
+  - `pns_ai_chatboo/tests/test_seges_canvas_box_a.py` (6), la ventana con el driver simulado (lee la
+    clave como el real): `test_design_call_reads_provider_in_box_a`, `test_only_design_leaves_the_window`,
+    `test_window_takes_plain_strings`, `test_mark_restored_when_design_fails` (el driver falla),
+    `test_guard_still_closed_after_window` (desde el 27/10/2026, sin vaciar la caché y con `rec.api_key`
+    además de `read`) y `test_cache_closed_after_window_prefetch` (el driver lee otros campos del
+    proveedor y la precarga deja la clave en la caché; después de la ventana, `rec.api_key` se rechaza).
+    El `setUp` pone la marca como `tool_relaxaicode`, sin vaciar la caché a mano.
+
+### Parche 19: al cambiar de host solo siguen las cabeceras permitidas; el cliente MCP no sigue redirecciones (PNS-17)
+
+- **Qué falla sin él (comparación §3, PNS-17, Alta):** `request_public_http` solo quitaba las cabeceras de
+  `_AUTH_HEADER_NAMES` al cambiar de host; la cabecera personalizada del servidor (`auth_header_name`, p.
+  ej. `apikey` u `Ocp-Apim-Subscription-Key`) viajaba al host nuevo. El cliente MCP por HTTP
+  (`utils/mcp_client.py`) seguía las redirecciones de `requests`, que solo quita `Authorization`.
+- **Cambio:**
+  - `utils/fetch_url_safe.py` (`:104-119`): `_strip_auth_headers` conserva solo `accept`,
+    `accept-language`, `content-type` y `user-agent` (`_CROSS_HOST_HEADER_NAMES`). `_AUTH_HEADER_NAMES`
+    queda definida y sin uso.
+  - `utils/mcp_client.py`, `_http_post` (`:103-117`): `allow_redirects=False` y, si la respuesta es una
+    redirección, `MCPClientError` («MCP server '…' answered with a redirect to …. Set the final URL in
+    the server.») (decisión 5).
+- **Qué se degrada:** una API que redirige a otro host y espera allí una cabecera propia no la recibe. Un
+  servidor MCP con URL que redirige deja de conectar, con ese error. **Antes de LIYBEN:** comprobar que
+  sus URLs MCP son las finales ([plan](plan_correccion_pns_ai_3879.md), §3).
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "_AUTH_HEADER_NAMES\|_CROSS_HOST_HEADER_NAMES" pns_ai_mcp/utils/fetch_url_safe.py
+  grep -n "allow_redirects" pns_ai_mcp/utils/mcp_client.py
+  ```
+- **Tests:** `pns_ai_mcp/tests/test_seges_fetch_redirect.py` (3, sin red: `requests` y
+  `non_public_host_error` sustituidos): `test_custom_auth_header_dropped_on_other_host`,
+  `test_same_host_keeps_header` (control) y `test_mcp_client_redirect_refused`.
+
+### Parche 20: Chart.js 4 del chat como `PnsChatbooChart`, sin tocar `window.Chart` (PNS-70)
+
+- **Qué falla sin él:** al abrir el chat, `chart.umd.min.js` (Chart.js 4.4.8) sustituye en `window.Chart`
+  a la 2.9.3 de Odoo, que pinta después con la API 4 y opciones de la 2
+  ([diagnóstico](pns70_diagnostico_3879.md)).
+- **Cambio (decisión 8):**
+  - `pns_ai_chatboo/static/src/js/chart.umd.min.js`: **dos** tokens, `.Chart=e()` → `.PnsChatbooChart=e()`
+    (cabecera UMD; desplazamiento 584 en 3.1.879) y `window.Chart=An` → `window.PnsChatbooChart=An`
+    (fábrica; desplazamiento 206491). Un marcador por token en comentarios `/* … */` aparte, en las dos
+    primeras líneas (sin el texto literal de los tokens, para que el `grep` no los cuente). `An.Chart=An`
+    no se toca. Original: md5 `45f5b4f17f83d6d21847ec6e14f91674`, 206 553 caracteres.
+  - `pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js`: la URL pasa a
+    `chart.umd.min.js?seges=20` (`:18`; carga por URL fija con `ajax.loadJS` y una semana de caché de
+    `/static`) y `bindEngines` recibe `window.PnsChatbooChart` (`:32`).
+- **`grep` de comprobación** (27/10/2026, con el resultado esperado):
+  ```sh
+  grep -o 'PnsChatbooChart=e()\|window\.PnsChatbooChart=An\|\.Chart=e()\|window\.Chart=An' \
+    pns_ai_chatboo/static/src/js/chart.umd.min.js | sort | uniq -c
+  #       1 PnsChatbooChart=e()
+  #       1 window.PnsChatbooChart=An        (ninguno de los antiguos)
+  grep -rn "window\.Chart\b\|chart\.umd\.min\.js" pns_base pns_ai_mcp pns_ai_chatboo --include=*.js --include=*.xml | grep -v "chart.umd.min.js:"
+  # pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js:18: …/chart.umd.min.js?seges=20
+  ```
+- **Qué se degrada:** nada. Una versión nueva de la librería deshace el cambio: se vigila con el `grep`.
+- **Cómo comprobar si el fabricante ya lo ha corregido:** el primer `grep` sin `.Chart=e()` ni
+  `window.Chart=An` en la librería que traiga, o `chatboo_heavy_libs.js` sin leer `window.Chart`.
+- **Tests:** sin test Python (JS de carga diferida). Validación con P-70, casos 1 a 5
+  ([lab_e2_3879.md](lab_e2_3879.md), §5).
+
+### Parche 21: «Review» no deja nada escrito (PNS-20)
+
+- **Qué falla sin él (P-20, 27/10/2026, CONFIRMADO):** `action_preview` hace `SAVEPOINT`, importa,
+  `ROLLBACK TO SAVEPOINT` e `invalidate_cache()`, que no vacía `towrite`. Lo que la importación deja
+  pendiente se vuelca al final de la petición: en usuarios MCP, la etiqueta importada; en proveedores, un
+  `UPDATE` de `model_id` con `write_date` nuevo ([propuesta](e2_propuesta_3879.md), «Parche 21: por qué
+  los dos asistentes se comportan distinto»).
+- **Cambio** (`pns_base/models/operation_report_wizard.py`):
+  - `action_preview` (`:314`): `self.env['base'].flush()` antes del `SAVEPOINT` y antes de cada
+    `ROLLBACK TO SAVEPOINT`. En el camino normal, el `flush` va dentro del `try`, justo después de la
+    importación y antes de `_preview_snapshot()` (cambio del 27/10/2026, tras la revisión): si falla, lo
+    recoge el camino de excepción. En ese camino, con `contextlib.suppress` (puede fallar por lo mismo que
+    la importación, y el `ROLLBACK` lo deshace; se relanza la excepción original);
+  - `_invalidate_after_preview_rollback` (`:292`, se mantiene por si alguien lo hereda; se llama en los dos
+    caminos): `cr.precommit.clear()` y `env.clear()`, como `cr.savepoint()`, y desde el 27/10/2026
+    `self.env.registry.clear_caches()`: el `ROLLBACK` no deshace el `ormcache`, y `has_group` (y las
+    reglas y permisos que dependen de él) seguía dando los grupos que la vista previa había escrito.
+  - Comprobación previa: en la petición de «Review» no hay `precommit` pendiente antes del `SAVEPOINT`
+    (ver «Comprobaciones previas», 5).
+- **Qué no cubre:** lo que la importación confirme en cursores propios o envíe fuera. De los 15 asistentes,
+  `bundle_import_wizard` guarda la caché del agente con `_persist_cache_isolated` (cursor propio): hoja de
+  E4′.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "flush()\|env.clear()\|precommit" pns_base/models/operation_report_wizard.py
+  ```
+- **Tests:** `pns_ai_mcp/tests/test_seges_import_preview.py` (4; `pns_base` no tiene `tests/`). El final de
+  la petición se simula con un `flush`; un `UPDATE` se detecta por el `ctid` de la fila:
+  `test_users_preview_keeps_value`, `test_providers_preview_no_update`, `test_users_preview_keeps_groups`
+  (el many2many va directo a la tabla de relación y el `ROLLBACK` ya lo deshacía; desde el 27/10/2026
+  comprueba además `self.user.has_group(...)` después de la vista previa, que falla sin
+  `clear_caches()`) y `test_import_still_applies` (control).
+
+### Parche 22: métodos con efectos fuera de la BD, en la lista del sandbox (PNS-100)
+
+- **Qué falla sin él (PNS-100, Alta, nuevo):** la caja A frena las escrituras con `READ ONLY`, pero no lo
+  que sale a la red o ejecuta otro código sin escribir antes. Cualquier usuario de chat, con una inyección
+  de prompt, puede enviar correo a cualquier host (`ir.mail_server.send_email` con `smtp_server`), abrir
+  SMTP a cualquier host y puerto (`connect`) o pedir cualquier URL (`ir.qweb.field.image.load_remote_url`);
+  con más permisos, ejecutar acciones de servidor y crons (`run`, `method_direct_trigger`).
+- **Cambio:** 28 nombres en un bloque nuevo de `RELAXAICODE_SIDE_EFFECT_METHODS`
+  (`controllers/validators_base.py:286-316`), que usan el AST y `guarded_getattr`, como el parche 15:
+  `send_email`, `connect`, `test_smtp_connection`, `load_remote_url`, `send`, `process_email_queue`,
+  `fetch_mail`, `button_confirm_login`, `get_credits`, `autocomplete`, `enrich_company`, `read_by_vat`,
+  `start_sync`, `send_letter`, `snailmail_print`, `update_notification`, `install_from_urls`,
+  `action_process_edi_web_services`, `get_usd_fx`, `run`, `method_direct_trigger`, `execute_callback`,
+  `upgrade_module`, `action_start_automatic_process`, `parent_migration_process_cb`, `send_mail`,
+  `message_process` y `message_route`. Origen: barrido de los 47 módulos instalados
+  ([propuesta](e2_propuesta_3879.md), «PNS-100: barrido…»). Fuera, con motivo: `update` (bloquearía
+  `dict.update`) y `onchange_email` (Gravatar, hoja de E4′).
+- **Colisiones de nombre:** ver «Comprobaciones previas», 3. Bloquea también `x.send(...)` de un
+  generador, que el sandbox no necesita.
+- **Qué se degrada:** el código del sandbox no llama a esos métodos como atributo (antes enviaban o
+  ejecutaban fuera de la caja A).
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "send_email\|load_remote_url\|method_direct_trigger" pns_ai_mcp/controllers/validators_base.py
+  ```
+- **Tests:** `pns_ai_mcp/tests/test_seges_sandbox_side_effects.py` (10): `test_names_in_denylist` y
+  `test_ast_flags_literal_call` (los 28), y la herramienta real como `base.user_admin` (sin AI
+  Administrator en una BD nueva), con el método de cada vía sustituido en la clase del registro para ver
+  si se llega a llamar, y `smtplib.SMTP` y `requests.get` sustituidos: `test_box_a_send_email_refused`,
+  `test_box_a_connect_refused`, `test_box_a_load_remote_url_refused`,
+  `test_box_a_server_action_run_refused`, `test_box_a_cron_trigger_refused`,
+  `test_box_a_mail_queue_refused` (`process_email_queue` y `send`), `test_box_a_iap_refused`
+  (`get_credits` y `read_by_vat`) y `test_box_a_module_from_urls_refused`.
+
+### Parche 23: el `env` de la caja A no lleva a los entornos reales del hilo (PNS-101)
+
+- **Qué falla sin él (PNS-101, nuevo; gravedad propuesta Crítica, la decide Sergio):** en Odoo 14 la caché
+  y el conjunto de entornos son uno por hilo (`api.Environments`: `env.cache`, `env.all`, `envs`), y la
+  caja A abre su cursor en el mismo hilo que la petición. `GuardedSandboxEnv.__getattr__` daba cualquier
+  atributo público del entorno, y ni el AST ni `guarded_getattr` bloqueaban `cache` ni `all`. Desde el
+  sandbox, `env.all` da los `Environment` reales: el del cursor de la petición (sin la marca del parche 18,
+  sin `READ ONLY`, con commit al final) y otros con `su=True`; `env.cache.get(...)` da lo que cualquiera de
+  ellos leyó; `env.all.towrite` es el diccionario de escrituras pendientes del hilo. Reproducción de solo
+  lectura con la caja A real como `base.user_admin` (27/10/2026, en `lab_pns_ai_3879_14`, con rollback):
+  desde el entorno del cursor principal se lee `database.secret`; `env.cache.get` lo devuelve si el motor
+  lo leyó antes; `towrite` es alcanzable (no se escribió en él) ([propuesta](e2_propuesta_3879.md),
+  «Revisión del parche 18 y PNS-101»).
+- **Cambio** (opción A, decisión de Sergio del 27/10/2026):
+  - `controllers/validators_base.py`: `RELAXAICODE_ENV_STATE_ATTRS` (`cache`, `all`, `envs`, `towrite`,
+    `tocompute`, `protected`) y su mensaje (`:338-345`).
+  - `controllers/validators.py` (`:307`): el AST los rechaza como **atributo** (`ast.Attribute`), nunca
+    como nombre: `all([...])` y una variable `cache` siguen funcionando.
+  - `controllers/context_builder.py`: `guarded_getattr` (`:178`) los rechaza al correr, y con él
+    `attrgetter` y `methodcaller`, que pasan por la misma función. `GuardedSandboxEnv` (`:90` y `:129`) da
+    solo una lista de atributos y rechaza el resto: `uid`, `su`, `user`, `company`, `companies`, `context`,
+    `lang`, `ref`, `is_superuser`, `is_admin`, `is_system`, `with_context` y `with_company` para el código
+    del sandbox; `cr` y `registry` para el motor, que recibe este mismo envoltorio después de la ejecución
+    (`relaxaicode_render._t` usa `rcx['env'].cr`; `relaxaicode_replies._keyerror_missing_model_response`,
+    `getattr(env, 'registry', None)`), y que el código del sandbox no puede nombrar (el AST y
+    `guarded_getattr` rechazan `cr` y `registry`). `__getitem__`, `get`, `__contains__` y `__call__`
+    siguen como estaban.
+- **Inventario de atributos del `env` usados por el código legítimo** (antes de fijar la lista):
+  - `ai/` y `data/` de `pns_base`, `pns_ai_mcp` y `pns_ai_chatboo`: `env.company` (10) y `env.user` (3), en
+    las skills de `pns_ai_chatboo/ai/skills/system/`; `env.registry` y `env.pool` solo en el texto de la regla
+    que los prohíbe (`system_prompt.xml:86`).
+  - Código del motor que inyecta o recibe el `env` del sandbox: `build_safe_context` y sus helpers usan el
+    entorno real, no el envoltorio. Reciben el envoltorio `render_context_from_env` y `_t`
+    (`user`, `lang`, `context`, `cr`), `presentation_mode` (`context`), `engine_params.xlsx_float_decimals`
+    (`company`), `_largest_image_url` y `_related_models_from_code` (`in` y `[...]`),
+    `_keyerror_missing_model_response` (`registry`), y `relaxaicode_models` (`_name` e `ids` como sondas con
+    `hasattr`, que ya daban `AttributeError`).
+  - Helpers de módulos (`sandbox_helpers`, solo `chatboo.session`): entorno real, sin el envoltorio.
+  - Tests de fábrica del sandbox (`test_relaxaicode_*`): `env.cr` y `env.sudo` como negativos, `env.user`.
+  - Inventario dinámico: los tests de los tres módulos con un registro temporal en `__getattr__` (retirado):
+    `user`, `context`, `_name` e `ids`.
+  - Fuera de la lista, sin uso legítimo encontrado: `values` e `items` (darían todos los modelos sin la
+    puerta de catálogos), `clear`, `protecting`, `add_to_compute`, `args`, `uid_origin`…
+- **Qué se degrada:** `x.cache`, `x.all`, `x.envs`, `x.towrite`, `x.tocompute` y `x.protected` no se pueden
+  usar como atributo de ningún objeto en el sandbox; único campo afectado en el core, `pos.cache.cache`
+  (binario del TPV). `env.<otro>` fuera de la lista da `AttributeError` con un mensaje propio.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "cache\|'all'" pns_ai_mcp/controllers/validators_base.py pns_ai_mcp/controllers/context_builder.py
+  ```
+  Corregido si desde `relaxaicode` no se llega a `env.cache`, `env.all` ni `Environment.envs`.
+- **Tests:**
+  - `pns_ai_mcp/tests/test_seges_sandbox_env.py` (13), con la herramienta real como `base.user_admin`:
+    negativos `test_env_cache`, `test_env_cache_get_warm` (con la caché caliente por el motor),
+    `test_env_all`, `test_alias_all` (`x = env; x.all`), `test_state_attrs`, `test_composite_getattr`,
+    `test_attrgetter`, `test_walk_to_other_environment` y `test_wrapper_allowlist`; positivos
+    `test_builtin_all_and_cache_name` (`all([...])` y una variable `cache`), `test_allowed_attrs` y
+    `test_engine_attrs_on_wrapper` (`cr` y `registry` para el motor).
+  - `pns_ai_chatboo/tests/test_seges_skill_env.py` (1): la skill de fábrica `customer_360.py` (`env.user`,
+    `env.company`, `env['res.partner']`, `'modelo' in env`) corre en la caja A real sin error. Sin cliente:
+    con uno, falla en esta BD por un error propio de la skill (`_iso` recibe una fecha como `str`), ajeno
+    al parche.
+
+### Línea base de E2′ (27/10/2026)
+
+**Comprobaciones:**
+
+1. `py_compile` con Python 3.7.3 en la imagen `odoo-dev:14-lab_pns_ai_3879`, repo montado en solo lectura:
+   los 19 `.py` tocados o nuevos, correctos.
+2. `python3 ~/.claude/hooks/odoo_lint.py --revisar --base c639fa8 pns_base/ pns_ai_mcp/ pns_ai_chatboo/`:
+   0 incidencias nuevas y 530 preexistentes. En los tests, `invalid-commit` va desactivado en la línea
+   (limpieza fuera de la transacción).
+3. `odoo-dev 14 tests pns_base,pns_ai_mcp,pns_ai_chatboo` (log `tests-20261027-124454.log`): 319 tests,
+   18 F y 32 E.
+
+| Módulo | Tests | Fallos | Errores | Saltados | Línea base E1′ |
+|---|---|---|---|---|---|
+| `pns_base` | 0 (sin `tests/`) | — | — | — | — |
+| `pns_ai_mcp` | 293 | 18 | 32 | 3 | 241 · 18 F · 32 E · 3 saltados |
+| `pns_ai_chatboo` | 26 | 0 | 0 | 0 | 19 · 0 · 0 |
+
+**Diferencias con E1′, test a test:**
+- **Tests nuevos (59), todos en verde:** `test_seges_change_journal.py` 11, `test_seges_sandbox_credentials.py`
+  24, `test_seges_fetch_redirect.py` 3, `test_seges_import_preview.py` 4,
+  `test_seges_sandbox_side_effects.py` 10, `test_seges_canvas_box_a.py` 5 y, en
+  `test_seges_chatboo_access.py`, los 2 de `unlink`. El caso (d) de `test_claim_filters_in_python` se
+  amplía (no es un test nuevo).
+- **Resto:** los 18 F y 32 E de E1′ son los mismos, por nombre. Los 3 saltados también.
+- Una primera ejecución (log `tests-20261027-124149.log`) dio 9 F más, todos de tests nuevos de caja A
+  real: el test buscaba `"requires_write": true` en el JSON escapado y `ERROR (` en errores de ejecución,
+  que llegan como `"isError": true`. Corregida la comprobación del test, no el código.
+
+**Neutralización (27/10/2026):** cada parche retirado desde una copia en el scratchpad, sin git, y
+restaurado después; el `git diff` final es idéntico al de antes (mismo md5).
+
+| Ejecución | Parches retirados | Log | Resultado | Fallan (nuevos) |
+|---|---|---|---|---|
+| N1 | 11, 17, 18 (guardián: `_in_box_a` siempre falso), 19, 21 y 22 | `tests-20261027-124735.log` | 319 · 55 F · 32 E | 37, ver abajo; los 50 aceptados, iguales |
+| N2 | 18, ventana (`_box_a_trusted` no quita la marca) | `tests-20261027-125017.log` (solo Chatboo) | 26 · 0 F · 4 E | `test_design_call_reads_provider_in_box_a`, `test_only_design_leaves_the_window`, `test_window_takes_plain_strings`, `test_guard_still_closed_after_window`: la llamada de diseño da `AccessError` |
+| N3 | 18, conversión a `str` y filtrado de la salida | `tests-20261027-125158.log` (solo Chatboo) | 26 · 2 F | `test_window_takes_plain_strings`, `test_only_design_leaves_the_window` |
+| N4 | 18, `finally` de la ventana | `tests-20261027-125349.log` (solo Chatboo) | 26 · 1 F | `test_mark_restored_when_design_fails` |
+| — | 20 | — | Manual | Caso 1 de P-70 con la librería original ([lab_e2_3879.md](lab_e2_3879.md), §5) |
+
+En N1 fallan, por parche:
+- **11:** `test_unlink_own_session_keeps_foreign`, `test_cron_unlink_sudo_keeps_foreign`.
+- **17:** `test_ai_admin_write_refused`, `test_ai_admin_create_refused`,
+  `test_plan_unlink_requires_unlink_right` y `test_rejected_plan_journals_failed_row` (depende del rechazo
+  de (b)).
+- **18:** 13 de `TestSegesSandboxCredentials` (los negativos y `test_provider_read_no_fields`: sin el
+  parche, `read()` devuelve todos los campos), `test_box_a_reference_secret_refused`,
+  `test_box_a_cursor_is_marked`, y en Chatboo `test_guard_still_closed_after_window` y
+  `test_design_call_reads_provider_in_box_a` (con el guardián apagado, la ventana no ve marca que quitar:
+  efecto de la neutralización; la ventana se neutraliza aparte en N2 a N4).
+- **19:** `test_custom_auth_header_dropped_on_other_host`, `test_mcp_client_redirect_refused`.
+- **21:** `test_users_preview_keeps_value`, `test_providers_preview_no_update` (por `ctid`, como en P-20).
+- **22:** los 10 de `test_seges_sandbox_side_effects.py`.
+
+Pasan con y sin parche (no regresión): los 7 de no regresión de `test_seges_change_journal.py`, los 7 de
+`TestSegesSandboxCredentials` y `TestSegesOutsideBoxA` citados arriba, `test_marker_cleared_after_box_a`,
+`test_box_a_cannot_lift_mark` (comprueba el sandbox, no el guardián), `test_same_host_keeps_header`,
+`test_users_preview_keeps_groups`, `test_import_still_applies` y, en Chatboo,
+`test_mark_restored_when_design_fails` (salvo en N4) y los de `test_seges_chatboo_access.py` anteriores.
+
+**Pendiente en el laboratorio** (lo ejecuta Sergio, tras reiniciar el contexto): P-19, P-37, P-37b, P-17
+manual, P-70 casos 1 a 5 y P-20 repetida ([lab_e2_3879.md](lab_e2_3879.md)).
+
+### Revisión de E2′ (27/10/2026): rechazo del parche 18, parche 23 y nueva línea base
+
+- **Revisión (`odoo-reviewer`):** rechaza el parche 18 y aprueba el resto con observaciones menores.
+  Scripts de reproducción del revisor (sin secretos), en el scratchpad de su sesión:
+  `/tmp/claude-1000/-home-soporte-GitHub-third-party/8a8812e6-9f03-4729-b6f8-d3064fb95b17/scratchpad/`
+  (`p18_check.py`, `p18_b.py`, `p18_c.py`, `p18_real.py`).
+- **Cambios** (detalle en las entradas de los parches 18, 21 y 23):
+  - parche 18: alias en `read_group`, ids que no son enteros y caché del hilo;
+  - parche 21: `flush` del camino normal dentro del `try` y `registry.clear_caches()`;
+  - parche 23 (PNS-101, nuevo): al comprobar si el sandbox llega a la caché resultó que llega a `env.cache`
+    y a `env.all`. Sergio eligió la opción A, como parche propio;
+  - tests (punto 6 de la revisión): `assertRaisesRegex` con el mensaje en los negativos del 18 y en
+    `test_plan_unlink_requires_unlink_right` (17); control positivo en `test_box_a_cannot_lift_mark`.
+
+**Comprobaciones:**
+
+1. `py_compile` con Python 3.7.3 en la imagen `odoo-dev:14-lab_pns_ai_3879`, repo montado en solo lectura:
+   los 23 `.py` tocados o nuevos, correctos.
+2. `python3 ~/.claude/hooks/odoo_lint.py --revisar --base c639fa8 pns_base/ pns_ai_mcp/ pns_ai_chatboo/`:
+   0 incidencias nuevas y 706 preexistentes.
+3. `odoo-dev 14 tests pns_base,pns_ai_mcp,pns_ai_chatboo` (log `tests-20261027-162742.log`): 341 tests,
+   18 F y 32 E; los mismos, por nombre, que antes de la revisión (log `tests-20261027-151148.log`).
+
+| Módulo | Tests | Fallos | Errores | Línea base E2′ anterior |
+|---|---|---|---|---|
+| `pns_ai_mcp` | 313 | 18 | 32 | 293 · 18 F · 32 E |
+| `pns_ai_chatboo` | 28 | 0 | 0 | 26 · 0 · 0 |
+
+Tests nuevos (22), todos en verde: `test_seges_sandbox_credentials.py` 7, `test_seges_sandbox_env.py` 13,
+`test_seges_canvas_box_a.py` 1 y `test_seges_skill_env.py` 1. Una primera ejecución dio 4 F de tests nuevos
+(el JSON de la respuesta va escapado dos veces; el proveedor creado en el test no existe para el cursor de
+la caja A; la skill con cliente falla por su `_iso`): corregidos los tests, no el código.
+
+**Neutralización (27/10/2026):** script `neutralizar.py` en el scratchpad de esta sesión
+(`/tmp/claude-1000/-home-soporte-GitHub-third-party/5b6a0dd0-041a-4357-ae79-6549a6ce09ac/scratchpad/`):
+copia, cambio, batería completa, restauración y comprobación del SHA-256 de cada archivo (iguales).
+
+| Ejecución | Qué se retira | Resultado | Fallan (de E2′) |
+|---|---|---|---|
+| N0 | nada | 341 · 18 F · 32 E | — |
+| N1 | 18, guardián (`_box_a_allowed` siempre `None`) | 40 F · 35 E | los negativos del 18, también los nuevos (alias, `float`, `str`, `new(origin=…)`), `test_box_a_engine_cache_before_run` y los de Chatboo que dependen del guardián |
+| N2 | 18, ventana (`_box_a_trusted` no quita la marca) | 18 F · 37 E | 5 de `test_seges_canvas_box_a.py` (la llamada de diseño da `AccessError`) |
+| N3 | 18, alias (vuelve `_field_names` en `fields`) | 20 F · 34 E | `test_read_group_alias_provider` (2 subtests) y `test_read_group_alias_icp` (`display_name:max(value)` y `key:max(value)`) |
+| N4 | 18, ids (vuelve `isinstance(i, int)`) | 21 F · 32 E | `test_icp_float_id`, `test_icp_str_id` y `test_icp_new_origin` con `origin` decimal |
+| N5a | 18, caché al poner la marca (`tools_relaxaicode.py`) | 19 F · 32 E | `test_box_a_engine_cache_before_run` |
+| N5b | 18, caché al cerrar la ventana | 19 F · 32 E | `test_guard_still_closed_after_window` |
+| N6 | 21, `registry.clear_caches()` | 19 F · 32 E | `test_users_preview_keeps_groups` |
+| N7a | 23 entero (lista de `GuardedSandboxEnv`, AST y `guarded_getattr`) | 43 F · 32 E | todos los negativos de `test_seges_sandbox_env.py` (con subtests) |
+| N7b | 23, solo la lista de `GuardedSandboxEnv` | 29 F · 32 E | `test_wrapper_allowlist` (11 subtests); el AST y `guarded_getattr` siguen cerrando el resto |
+| N7c | 23, solo el AST y `guarded_getattr` | 32 F · 32 E | los negativos con el mensaje de estado del ORM: la lista de `GuardedSandboxEnv` sigue rechazando, con otro mensaje |
+
+- N3: `value:max(key)` sigue rechazado sin el cierre (el alias `value` ya lo cogía `_field_names`).
+- N4: con `origin` entero el caso ya estaba cubierto antes (se lee por el `origin`).
+- N6: la importación de usuarios escribe el grupo con `write`, que vacía el `ormcache`; el valor viejo
+  aparece si algo pregunta `has_group` durante la vista previa (como `ai.mcp.user._export_user_dict`). El
+  test lo simula envolviendo `_preview_snapshot`; sin esa llamada, el test pasaba con y sin el cambio.
+- Pasan con y sin cada cierre (no regresión): `test_read_group_alias_allowed`, `test_icp_int_id_allowed_key`,
+  `test_builtin_all_and_cache_name`, `test_allowed_attrs`, `test_engine_attrs_on_wrapper` y
+  `test_customer_360_runs`.
+
+**Scripts del revisor** (`odoo-dev 14 shell`, solo lectura, con rollback):
+- `p18_check.py`: A (`browse` decimal, también con `read`) y B (alias), rechazo. **C sigue dando
+  `True`**: el script pone la marca con `setattr` sobre un cursor ya usado y no pasa por `tool_relaxaicode`,
+  que es donde se vacía la caché. Por la herramienta real, el mismo caso (`p18_real_c.py`, en el scratchpad
+  de esta sesión) da rechazo, y lo cubre `test_box_a_engine_cache_before_run`.
+- `p18_b.py` (alias en `ir.config_parameter`) y `p18_c.py` (alias en `ai.provider`, con un proveedor con
+  clave): rechazo.
+- `p18_real.py` (caja A real): `control`, `A_float` y `B_alias`, rechazo del guardián (se comprobó el
+  mensaje).
+- Reproducción de PNS-101 repetida con el parche 23: `env.cache`, `env.all`, alias, `getattr` compuesto y
+  `towrite`, rechazados; ningún entorno visible desde el sandbox.
+
+**Pendiente en el laboratorio** (lo ejecuta Sergio, tras reiniciar el contexto): lo anterior, más P-19 h,
+i y j y P-101 ([lab_e2_3879.md](lab_e2_3879.md)).
+
+### Segundo rechazo de E2′ (28/10/2026): C1/V1/V2 y C2 — cierre por la raíz
+
+`odoo-reviewer` **rechaza** la propuesta E2′ por fugas del sandbox de relaxaicode
+que **no introduce** E2′ (están en 3.1.782 y en LIYBEN). Confirmadas por la
+herramienta real: **C1** (`.format` con la plantilla en una variable llega a
+`odoo.tools.config` y saca `admin_passwd` / `db_password`), **C2** (`user` /
+`company` con `su=True` saltan ACL y record rules); y por lectura de código
+**V1** (`string.Formatter` por import) y **V2** (`type()` de un `attrgetter`),
+que devuelven el objeto Python real y, por `__globals__` → `__builtins__` →
+`__import__`, permiten probablemente ejecutar código.
+
+**Decisión de diseño (Sergio, 27–28/10/2026):** cortar la raíz, no tapar
+ejemplos. C1, V1, V2 y variantes comparten causa: el sandbox resuelve un nombre
+que lleva a un dunder (o al objeto que lo porta) por una vía que el AST no ve
+(nombre partido, método en variable, `format` / `Formatter` / `attrgetter`).
+Se impide resolver esos nombres **por ninguna vía**, en el punto donde se
+resuelve el acceso, no en el AST que mira literales. Gravedad **Crítica** las dos
+(C1/V1/V2 y C2).
+
+**Inventario (fase 1) de puntos de resolución de nombres en runtime** y si pasan
+por un filtro común:
+
+| Punto | Dónde | ¿Filtro común antes? |
+|---|---|---|
+| `guarded_getattr` (builtin `getattr`) | `context_builder.py` | Sí (privado/PRIVILEGE/ENV_STATE/ORM/DANGEROUS/dunder) |
+| `attrgetter` / `methodcaller` → `_check_attr_path` | `context_builder.py` | Sí (vía `guarded_getattr`) |
+| `SafeModuleFacade._module_facade_rejects` | `context_builder.py` | Parcial — **faltaba** `DANGEROUS_FORMAT_NAMES` (hueco V1) |
+| `str.format` / `format_map` con plantilla no literal | **no había formateador propio** | **No** (hueco C1 y variantes) |
+| `type(x)` (1 arg), clases crudas (`date`…) | builtins/globales | Devuelven objeto real; su único canal dunder es `format`/literal |
+
+**Enfoque de raíz:** predicado único `sandbox_forbidden_name` (dunder + privado +
+PRIVILEGE + ENV_STATE + FORBIDDEN_ORM + ORM_WRITE + SIDE_EFFECT + DANGEROUS_ATTR
++ DANGEROUS_FORMAT + `format`/`format_map`), aplicado en `guarded_getattr`,
+`_check_attr_path`, `_module_facade_rejects` y el formateador propio. El AST con
+el filtro ampliado es defensa adicional, no la única capa.
+
+#### Parche 23 ampliado (PNS-101): formateador propio de `str.format` / `format_map`
+
+- **Causa de C1/V1/V2:** `str.format` es un método en C: resuelve la cadena de
+  atributos de la plantilla sobre el objeto real sin pasar por `guarded_getattr`,
+  y con la plantilla en variable el AST no la ve. Un `str` guardado en los
+  builtins no sirve (los literales son `str` nativo). El punto de enganche es el
+  **acceso a `.format` / `.format_map`**, que el AST ve siempre, sea cual sea el
+  receptor.
+- **Cambio:**
+  - `controllers/relaxaicode_format_guard.py` (**nuevo**): `_FormatAttrRewriter`
+    (`ast.NodeTransformer`) reescribe todo `ast.Attribute` con
+    `attr in {'format','format_map'}` y `ctx=Load` como
+    `_sandbox_str_attr(<receptor>, '<attr>')` — sobre el `Attribute`, para cubrir
+    `f = t.format`. `compile_sandbox_code` parsea, reescribe y compila el AST
+    **directamente** (sin `ast.unparse`, que es 3.9+; el objetivo es 3.7.3).
+    `SandboxFormatter(string.Formatter)` parte el campo con
+    `_string.formatter_field_name_split` y resuelve cada `.atributo` por
+    `guarded_getattr` y cada `[clave]` por `getitem` (los atributos son el vector,
+    ya cubiertos); las especificaciones anidadas (`'{0:{1.x}}'`) pasan por el
+    mismo `get_field`. `_sandbox_str_attr`: `isinstance(Markup)` **antes** que la
+    rama `str` (si no, perdería el autoescape) → `AttributeError` con el mismo
+    estilo que los nombres prohibidos; `str` → `format`/`format_map` del
+    `SandboxFormatter`; el tipo `str` → re-despacho sobre la plantilla; cualquier
+    otro receptor → `guarded_getattr` (y como `format`/`format_map` están en
+    `sandbox_forbidden_name`, rechaza).
+  - `controllers/tools_relaxaicode.py`: compila con `compile_sandbox_code` e
+    inyecta `_sandbox_str_attr` en `safe_context`.
+  - `controllers/validators_base.py`: `sandbox_forbidden_name`,
+    `RELAXAICODE_STR_FORMAT_NAMES`, `_is_dunder`.
+  - `controllers/context_builder.py`: `guarded_getattr` y `_module_facade_rejects`
+    usan `sandbox_forbidden_name` (cierra V1: `from string import Formatter`).
+  - `controllers/validators.py`: filtro de campos de la plantilla **literal**
+    ampliado a `sandbox_forbidden_name` (defensa adicional).
+- **Markup:** hoy no es alcanzable como receptor en el sandbox (no es módulo
+  permitido; los campos `Html` de Odoo 14 dan `str`; ningún helper devuelve
+  `Markup`). Se **rechaza** por defensa en profundidad. El formateador con escape
+  se reabre solo si aparece un uso legítimo (ver
+  [pns_ai_decisiones.md](pns_ai_decisiones.md) / nota de pendiente).
+- **Qué se degrada:** `.format` / `.format_map` dinámicos (`getattr(t,'format')`,
+  `attrgetter('format')`, `methodcaller('format',…)`) y sobre objetos no-`str` se
+  rechazan. Inventario de fábrica (`ai/`, `data/`): 0 usos de `str.format` Python
+  (las 28 coincidencias son `Intl.NumberFormat` de JS embebido). Plantilla literal
+  y en variable con campos públicos siguen funcionando.
+- **Tests:** `pns_ai_mcp/tests/test_seges_format_guard.py` (negativos: payload
+  exacto de C1, plantilla en variable / concatenada / de llamada, `f=t.format`,
+  `str.format(t,user)`, `getattr`/`attrgetter`/`methodcaller`, spec anidada,
+  `format_map` con dunder, V1, V2, Markup; positivos: `{0.login}`, `{:,.2f}`,
+  `format_map` con dict, plantilla traducida en variable, `{0[k]}`, control del
+  sandbox).
+
+#### Parche 24 (PNS-102): `user` / `company` / `companies` del sandbox SIN su
+
+- **Qué falla sin él (C2):** `env.user` / `env.company` / `env.companies` del ORM
+  fuerzan `su=True` (`api.py`: `return self(su=True)[...]`). El sandbox corre como
+  el usuario, pero por el registro `user` inyectado (y los globales) se leían
+  campos `NO_ACCESS` (`res.users.totp_secret`) y datos de terceros saltándose ACL
+  y record rules.
+- **Cambio** (`controllers/context_builder.py`): helper `_identity_no_su` que
+  reconstruye `user` = `env['res.users'].browse(env.uid)`, `company` =
+  `env['res.company'].browse(env.company.id)`, `companies` =
+  `env['res.company'].browse(env.companies.ids)`, **sin** su. Se usa en
+  `GuardedSandboxEnv.__getattr__` (`user`/`company`/`companies`) y en los globales
+  `user`/`company` de `build_safe_context`.
+- **Comprobado:** las skills de fábrica que usan `env.company` (10) y `env.user`
+  (3) leen `.id`/`.name`/`.lang` del propio usuario/compañía, válido sin su.
+- **Tests:** `pns_ai_mcp/tests/test_seges_identity_su.py` (identidad sin su en el
+  wrapper, el helper y los globales; positivo de lectura propia; C2: `totp_secret`
+  por `user` y por `env[...]` da `AccessError`, con `skipTest` si `auth_totp` no
+  está).
+
+#### A1/S1 (dentro del parche 23 ampliado)
+
+- `GuardedSandboxEnv`: se retiran `with_context` / `with_company` de `_ATTRS` y
+  `_WRAP_METHODS` (`_WRAP_METHODS = ()`) y del docstring; el código del modelo usa
+  `recordset.with_context(...)`, que no pasa por el wrapper (comprobado:
+  `users_all.py`, `sys_info.py`). Comentario de `cr`/`registry` corregido.
+
+#### Blindaje de los nombres internos del motor (dentro del parche 23 ampliado, 28/10/2026)
+
+Sugerencia de la revisión acotada de E2′ (28/10/2026), **aprobada por Sergio** el mismo día.
+
+- **Qué cubre:** el motor inyecta `_sandbox_str_attr` en el contexto del sandbox, y el código reescrito
+  lo llama. Un script podía sombrearlo (`_sandbox_str_attr = …`). Hoy no es explotable: lo que el script
+  ponga en su lugar sigue sin alcanzar el `str.format` nativo (`format`/`format_map` están en
+  `sandbox_forbidden_name` por todas las vías). Se cierra para que la reescritura llame siempre al
+  formateador del motor.
+- **Nombres internos:** `RELAXAICODE_ENGINE_NAMES = {'_sandbox_str_attr'}`, el único que inyecta
+  `relaxaicode_format_guard` (`tools_relaxaicode.py`: `safe_context['_sandbox_str_attr']`). Se leen, no
+  se ligan.
+- **Cambio:**
+  - `controllers/validators_base.py`: `RELAXAICODE_ENGINE_NAMES`, `RELAXAICODE_ENGINE_NAME_HINT` y
+    `engine_name_binding(node)`, que devuelve el nombre interno que liga un nodo: `Name` con `Store` o
+    `Del` (asignación, asignación aumentada, desempaquetado y destinos de `for`, comprensión y `with … as`),
+    `global`/`nonlocal`, argumento (`ast.arg`: posicional, `*args`, solo nombre, `**kwargs` y lambda),
+    nombre de `def`/`class`, destino de `import`/`from … import` (`asname` o el primer componente) y
+    `except … as`.
+  - `controllers/validators.py`: primer chequeo del recorrido del AST, con el mismo estilo que los
+    nombres prohibidos: `(False, format_ast_error('ENGINE_NAME', …), False)` →
+    `[PROHIBITED:ENGINE_NAME] RelaxAICode cannot bind '_sandbox_str_attr': …`.
+- **Tests** (`test_seges_format_guard.py`, clase nueva `TestSegesEngineNames`, separada para no superar
+  20 métodos públicos por clase): un test negativo por forma, `test_engine_name_store`, `_del`,
+  `_global`, `_nonlocal`, `_argument`, `_def_class`, `_import`, `_for`, `_with` y `_except`, y
+  `test_engine_name_shadow_tool` por la herramienta real (rechazo sin ejecutar nada). Los positivos de
+  `TestSegesFormatGuard` confirman que leer el nombre (la reescritura) sigue funcionando.
+- **Comprobaciones (28/10/2026):**
+  1. `python3 ~/.claude/hooks/odoo_lint.py --revisar --base c639fa8 pns_ai_mcp/ pns_ai_chatboo/ pns_base/`:
+     **0 incidencias nuevas** y 705 preexistentes.
+  2. `odoo-dev 14 tests pns_ai_mcp` (BD de test nueva, Python 3.7 del contenedor): **348 tests, 18 F y
+     32 E**. Los 50 que fallan son, por nombre, los mismos que en la línea base de E2′ (ninguno es
+     `TestSeges*`). Los **11 tests nuevos** de `TestSegesEngineNames` están en verde, y también los 146
+     `TestSeges*` de `pns_ai_mcp`.
+
+#### LIYBEN
+
+Claves MCP **revocadas el 27/10/2026** hasta el despliegue final de E2′. Paso
+pendiente: **volver a generarlas tras el despliegue** (ver plan §3 y §4, y el
+seguimiento PNS-101/PNS-102).
+
+**Comprobaciones (28/10/2026):**
+
+1. `compile()` con Python 3.7.3 en la imagen `odoo-dev:14-lab_pns_ai_3879` (repo montado en solo
+   lectura): los 7 `.py` tocados o nuevos, correctos (en especial `relaxaicode_format_guard.py`, que
+   compila el AST directamente, sin `ast.unparse`).
+2. `python3 ~/.claude/hooks/odoo_lint.py --revisar --base c639fa8 pns_ai_mcp/ pns_ai_chatboo/ pns_base/`:
+   **0 incidencias nuevas** y 705 preexistentes.
+3. `odoo-dev 14 tests pns_ai_mcp` (BD de test nueva): **337 tests, 18 F y 32 E**; el conjunto de los 50
+   que fallan es idéntico, por nombre, al de la línea base de E2′ (sin regresión). Los **24 tests nuevos**
+   (`test_seges_format_guard.py` 19, `test_seges_identity_su.py` 5) en verde. (`auth_totp` instalado en la
+   BD, así que el test C2 de `totp_secret` corre, no se salta.)
+
+**Neutralización (28/10/2026):** script `neutralizar_e2amp.sh` en el scratchpad de esta sesión
+(copia → parcheo → batería completa → restauración y SHA-256). Cada cierre, por separado, es
+load-bearing; los tres archivos quedan idénticos (SHA-256 IGUAL):
+
+| Ejecución | Qué se retira | Resultado | Fallan (de E2′ ampliado) |
+|---|---|---|---|
+| N0 | nada | 337 · 18 F · 32 E | — |
+| NEU-A | formateador (compila sin reescribir `.format`) | 23 F · 32 E | `test_c1_exact_payload`, `test_template_in_variable`, `test_template_concatenated`, `test_str_format_unbound`, `test_format_map_dunder` (plantillas no literales que el AST no ve) |
+| NEU-B | predicado sin `DANGEROUS_FORMAT_NAMES`/`format`/`format_map` | 21 F · 32 E | `test_getattr_format` (subtests), `test_attrgetter_methodcaller_format` (obtienen el método nativo) |
+| NEU-C | parche 24 (`user`/`company`/`companies` con su) | 24 F · 32 E | `test_wrapper_user_not_su`, `test_wrapper_company_not_su`, `test_identity_helper_not_su`, `test_c2_no_access_field_via_user` |
+
+**NEU-D (28/10/2026, tras el blindaje de nombres internos):** script `neutralizar_neu_d.sh` en el
+scratchpad de la sesión, con el mismo procedimiento. Cambia `engine_name = engine_name_binding(node)` por
+`engine_name = None` en `validators.py`, ejecuta la batería (log `tests-20261028-120613.log`), restaura y
+calcula el SHA-256. `validators.py` y `validators_base.py` quedan IGUAL que antes.
+
+| Ejecución | Qué se retira | Resultado | Fallan (de E2′ ampliado) |
+|---|---|---|---|
+| N0 | nada | 348 · 18 F · 32 E | — |
+| NEU-D | chequeo `engine_name_binding` del recorrido del AST | 33 F · 32 E | Los **11** de `TestSegesEngineNames` (`test_engine_name_store`, `_del`, `_global`, `_nonlocal`, `_argument` con sus 4 subtests, `_def_class`, `_import`, `_for`, `_with`, `_except` y `_shadow_tool`). Los 15 F de más son esos 11 tests más los 4 subtests de `_argument` |
+
+**Scripts del revisor** (`odoo-dev 14 shell`, solo lectura, con rollback), todos pasan a **rechazo**:
+- `c1_config.py`: `reach_config_object` y `reach_config_options` → `AttributeError '__func__'` (isError);
+  `leak_admin_passwd` y `leak_db_password` → `error/rechazo`, `hash_matches_server: None` (no filtran),
+  `server_key_set: True` (el servidor sí tiene esas claves).
+- `v1_formatter.py`: `from string import Formatter` e `import string; string.Formatter` → rechazo.
+- `v2_type_attrgetter.py`: `type(attrgetter(...))` + `.format` con `__init__.__globals__` → rechazo.
+- `c2_noaccess.py`: `control_demo_directo` y `exploit_via_su` → `AccessError (NO entrega)`.
+
+### Segunda vuelta de E2′ (28/10/2026): clase nativa de las fachadas y vía de skills
+
+`odoo-reviewer`, al revisar la propuesta anterior, confirma dos evasiones que las
+tablas de la primera vuelta no cubrían (siguen dentro del parche 23 ampliado,
+PNS-101; no son parches nuevos):
+
+- **CRÍTICO 1 — clase nativa de las fachadas.** `guarded_attrgetter` /
+  `guarded_methodcaller` validaban la ruta pero devolvían una instancia real de
+  `operator.attrgetter` / `operator.methodcaller`. Con `type()` permitido se
+  obtenía la **clase nativa** (`type(attrgetter('id'))`) y con ella se construía
+  un getter nuevo que ya no pasaba por `_check_attr_path`, llegando a los dunders
+  del objeto. Esto **corrige el diagnóstico de la primera vuelta**: la fila
+  «`v2_type_attrgetter.py` → rechazo» de los *Scripts del revisor* se refería a
+  `type(attrgetter('id')(user))` (la clase del **resultado**, un recordset), no a
+  `type(attrgetter('id'))` (la clase del **getter**), que era la vía abierta.
+- **CRÍTICO 2 — vía de skills.** `bootstrap_skill_code_body` (las skills con `/`)
+  compilaba con `compile()` normal, sin la reescritura de `.format`; una plantilla
+  C1 en variable se resolvía con `str.format` nativo.
+
+**Decisión (Sergio, 28/10/2026):** cerrar la raíz en los dos puntos y, por
+consistencia, cerrar también `itemgetter`, que la fachada devolvía nativo.
+
+#### Cierre de las fachadas de `operator` (CRÍTICO 1)
+
+- `controllers/context_builder.py`: `guarded_attrgetter`, `guarded_methodcaller`
+  y el nuevo `guarded_itemgetter` devuelven una **función** (no el objeto de
+  `operator`). `type()` sobre el resultado da `function`; su «constructor» no
+  sirve para recorrer atributos. Helper `_resolve_attr_path` (un `guarded_getattr`
+  por tramo). `SafeModuleFacade.__getattr__` intercepta los tres nombres.
+  - `attrgetter`: valida cada ruta con `_check_attr_path` y resuelve por
+    `guarded_getattr`; una ruta → valor, varias → tupla; conserva las rutas con
+    punto y el uso como `key=`.
+  - `methodcaller`: resuelve el método por `guarded_getattr` y lo llama con los
+    argumentos ligados.
+  - `itemgetter`: resuelve **subíndice** (`obj[k]`), no atributos (no es vía a
+    dunders); se cierra solo para que `type()` no dé la clase nativa. Conserva el
+    subíndice y el `key=`.
+
+#### Helper único `run_sandbox_code` (CRÍTICO 2)
+
+- `controllers/relaxaicode_format_guard.py`: `compile_sandbox_code` devuelve un
+  `SandboxCode`; `run_sandbox_code(ctx, code, filename)` es la **única** entrada
+  para ejecutar código del sandbox. Compila con la reescritura de `.format` (o
+  acepta un `SandboxCode` ya compilado), inyecta `_sandbox_str_attr` **después**
+  de los valores del llamante (ningún parámetro lo sombrea) y hace el `exec`.
+  Rechaza un objeto de código hecho con `compile()` normal.
+- `controllers/tools_relaxaicode.py` y `utils/skill_runtime.py`: las dos vías
+  ejecutan con `run_sandbox_code`. Solo se unifica la compilación y la inyección;
+  cada vía conserva sus globals y su gestión de errores (relaxaicode compila antes
+  para responder `-32602` ante `SyntaxError`; las skills compilan dentro de su
+  `try` y devuelven un error amigable).
+
+#### Inventario del punto 6 (rehecho, 28/10/2026)
+
+Construido el `safe_context` real (81 entradas, 50 builtins): para cada
+builtin/fachada, si `type()` sobre el objeto da una clase nativa con constructor
+o ruta dunder peligrosa.
+
+| Categoría | `type()` da | ¿Vector? |
+|---|---|---|
+| fachada `attrgetter` / `methodcaller` | `function` | Cerrado (antes: clase nativa que resolvía atributos en C) |
+| fachada `itemgetter` | `function` | Cerrado (residual: solo subíndice, no dunders; cerrado por consistencia) |
+| builtins tipo (`int/str/list/dict/tuple/set/type/bytes`…) | clases nativas construibles | No: su único canal a atributos es `getattr` (guardado) o `.format` (reescrito) |
+| `date/timedelta/timezone/ZoneInfo`, excepciones | clases construibles | No: sin ruta a dunder fuera de `guarded_getattr` |
+
+Tras el cierre, ninguna entrada del `safe_context` resuelve atributos en C.
+
+#### Tests (segunda vuelta)
+
+- `pns_ai_mcp/tests/test_seges_facade_class.py` (**nuevo**): negativos
+  `test_type_attrgetter_class`, `test_type_methodcaller_class`,
+  `test_type_itemgetter_class` (la clase nativa de la fachada ya no abre la vía) y
+  `test_skill_format_blocked` (plantilla C1 en variable por
+  `bootstrap_skill_code_body`); positivos de no regresión
+  `test_attrgetter_sorted_key`, `test_attrgetter_multiple_paths`,
+  `test_attrgetter_dotted_path`, `test_methodcaller_legit`,
+  `test_itemgetter_legit`, `test_skill_format_ok`.
+- Las comprobaciones de no filtración leen `database.secret` en tiempo de test y
+  usan `assertFalse(secreto in texto, 'filtra')`: ni el secreto ni la respuesta
+  entera entran en el mensaje del assert. Se corrige el mismo patrón en los tests
+  previos `test_seges_format_guard.py` (`_refused`) y
+  `test_seges_sandbox_credentials.py` (`test_box_a_reference_secret_refused`).
+
+#### Neutralización NEU-E / NEU-F / NEU-G (28/10/2026)
+
+Scripts `neutralizar_neu_ef.sh` y `neutralizar_neu_g.sh` en el scratchpad de la
+sesión (backup → quitar el cierre → batería → restaurar → SHA-256). N0 = 358 ·
+18 F · 32 E (356 anteriores + 2 de itemgetter). Cada cierre es load-bearing; los
+archivos quedan IGUAL (SHA-256).
+
+| Ejecución | Qué se retira | Resultado | Fallan (de los nuevos) | Archivo |
+|---|---|---|---|---|
+| NEU-E | fachadas vuelven a devolver `attrgetter`/`methodcaller` nativo | 20 F · 32 E | `test_type_attrgetter_class`, `test_type_methodcaller_class` | `context_builder.py` IGUAL |
+| NEU-F | la vía de skills vuelve a `compile()` + `exec` sin reescritura | 19 F · 32 E | `test_skill_format_blocked` | `skill_runtime.py` IGUAL |
+| NEU-G | la fachada deja de interceptar `itemgetter` | 19 F · 32 E | `test_type_itemgetter_class` | `context_builder.py` IGUAL |
+
+**Aclaración de NEU-D (recuento 11 + 4 = 15):** en el log de NEU-D
+(`tests-20261028-120613.log`) hay 33 F, es decir 15 más que los 18 de la línea
+base. Son los **11** tests de `TestSegesEngineNames` más los **4** subtests de
+`test_engine_name_argument` (que el runner cuenta aparte). El total es 15, no 14:
+`test_engine_name_argument` falla además por su cuenta (la forma `lambda`, fuera
+de los subtests), de modo que aparece como test y como 4 subtests.

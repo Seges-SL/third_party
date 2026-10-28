@@ -8,10 +8,11 @@
 - **Registro de parches:** [parches_pns_ai.md](parches_pns_ai.md). Línea base de E1′: 260 tests, 18 F y 32 E.
 - **HEAD de partida de E2′:** `c639fa8` («[DOC] Staging E1′: repetición de R8 (27/10/2026), no
   concluyente por el proveedor; E1′ cerrada y R8 pasa a E3′»).
-- **Estado:** **propuesta final, todas las decisiones cerradas (27/10/2026, tercera ronda).** P-20
-  ejecutada: PNS-20 confirmado. La lista definitiva de parches y commits está en «Propuesta final» (al
-  final del documento); sustituye a la §3. Pendiente: implementar.
-  - Registro anterior de este campo: decisiones de Sergio del 27/10/2026 tomadas; quedaban las nuevas
+- **Estado:** **implementada (27/10/2026)**: parches, tests, neutralización y documentación; pruebas
+  manuales del laboratorio pendientes ([lab_e2_3879.md](lab_e2_3879.md)). Ver «Implementación» al final.
+  - Registro anterior de este campo: propuesta final, todas las decisiones cerradas (27/10/2026, tercera
+    ronda); P-20 ejecutada, PNS-20 confirmado; pendiente: implementar.
+  - Registro anterior: decisiones de Sergio del 27/10/2026 tomadas; quedaban las nuevas
     decisiones y P-20 iba antes que cualquier parche.
 
 Rutas de `pns_ai_mcp` salvo indicación; líneas de la copia de trabajo (3.1.879 con E1′). Las comprobaciones
@@ -1395,3 +1396,168 @@ HEAD de partida: `c639fa8`. Un commit por parche, uno de tests y uno de document
   (cambios);
 - con un usuario de chat, pedir algo normal (lectura de datos) para comprobar que la Caja A sigue
   respondiendo.
+
+## Implementación (27/10/2026)
+
+- **Comprobaciones previas** (punto 1 de «Orden de trabajo», más dos pedidas por Sergio: `precommit` en
+  «Review» y firmas de las sobrescrituras en `base`): resultado en [parches_pns_ai.md](parches_pns_ai.md),
+  «Parches de la rama 14.0-pns-ai-3879 (E2′)», «Comprobaciones previas a implementar».
+- **Cambio de diseño por la (f):** `page_url` y `page_edit` (helpers del lienzo en el sandbox) piden el
+  diseño con el entorno de la caja A y leen `ai.provider`. **Decisión de Sergio (27/10/2026): ventana en
+  `_ask_design`**, con cinco condiciones:
+  1. el gestor de contexto (`_box_a_trusted`) es privado, está fuera de `build_safe_context` y de los
+     helpers, y un test comprueba que el código de la caja A no lo alcanza;
+  2. dentro de la ventana solo entran datos simples (`str`);
+  3. la marca se restaura en `finally`, con un test en el que el driver falla;
+  4. de la ventana solo sale el diseño (`content` y `error`), sin datos del proveedor;
+  5. se registra como excepción del parche 18, con la nota para E3′ (al corregir M1, M2 y F1, revisar si la
+     ventana sigue haciendo falta o si la llamada puede salir de la caja A).
+- **Resultado:** parches 11 adaptado y 17 a 22 aplicados, 59 tests nuevos en verde, la línea base de E1′
+  sin cambios (319 · 18 F · 32 E), y neutralización conforme. Detalle en el registro.
+- **Pendiente:** reiniciar el contexto y las pruebas manuales ([lab_e2_3879.md](lab_e2_3879.md)); después,
+  el staging (§5 de este documento y «Orden de trabajo», punto 4).
+
+## Revisión del parche 18 y PNS-101 (27/10/2026)
+
+- **Rechazo:** la revisión de `odoo-reviewer` rechaza el parche 18 y aprueba el resto con observaciones
+  menores. Tres vías siguen llegando al secreto, todas reproducidas con sus scripts:
+  1. `read_group` con alias: `['display_name:max(value)']` lee `value` con el nombre de un campo permitido;
+  2. ids que no son enteros: `browse(7.0)` llega a la fila de `database.secret` y el filtro de claves la
+     ignoraba;
+  3. caché: en Odoo 14 es una por hilo; lo que el motor lee con su cursor, la caja A lo recibe sin pasar por
+     `_fetch_field`.
+- **Comprobación pedida por Sergio** (solo lectura de código): ¿llega el sandbox a `env.cache` o a
+  `env.all`? Sí: `GuardedSandboxEnv.__getattr__` da cualquier atributo público y ni el AST ni
+  `guarded_getattr` bloquean esos nombres. Se paró y se consultó.
+- **Reproducción** (decisión 1 de Sergio; caja A real como `base.user_admin`, shell de
+  `lab_pns_ai_3879_14`, con rollback, sin imprimir secretos; scripts `p101_repro.py` y
+  `p101_repro_c2.py` en `/tmp/claude-1000/-home-soporte-GitHub-third-party/5b6a0dd0-041a-4357-ae79-6549a6ce09ac/scratchpad/`):
+  - a) `env.cache` y `env.all` alcanzables, también con `x = env; x.all` y `getattr(env, 'al' + 'l')`;
+  - b) `env.cache.get(p, p._fields['value'])` devuelve `database.secret` si el motor lo leyó antes;
+  - c) `env.all`: dos entornos de la caja A (uid 2, uno con `su=True`, `READ ONLY` activo) y el del cursor
+    principal (uid 2, `su=False`, `READ ONLY` desactivado), desde el que se lee `database.secret`;
+  - d) `env.all.towrite`, `tocompute`, `protected` y `envs`, alcanzables (no se escribió en ellos).
+  - Gravedad propuesta: **Crítica** (la decide Sergio). Pasa a PNS-101 en el
+    [seguimiento](seguimiento_informe_pns_ai.md).
+- **Decisiones de Sergio (27/10/2026):**
+  1. reproducción de solo lectura antes de seguir (hecha, arriba);
+  2. opción A como parche nuevo 23 (PNS-101), con commit y tests propios: inventario de atributos antes de
+     fijar la lista de `GuardedSandboxEnv`; `cache`, `all`, `envs`, `towrite`, `tocompute` y `protected`
+     bloqueados como atributo (nunca como nombre) en el AST y en `guarded_getattr`;
+  3. revisar si alguna función que el sandbox puede llamar lee credenciales con el entorno principal
+     mientras dura la caja A;
+  4. `registry.clear_caches()` en `_invalidate_after_preview_rollback` (los dos caminos);
+  5. después, los cierres del parche 18 y el resto de la revisión.
+- **Decisión 3, resultado** (solo lectura de código): los helpers de `build_safe_context`
+  (`field_selection`, `search_by_affinity`…) y los de módulos (`collect_sandbox_helpers`, solo
+  `chatboo.session`) usan el entorno de la caja A, no el principal. La única que lee credenciales es la
+  llamada de diseño del lienzo (`page_url`, `page_edit` → `_ask_design` → `llm_completion_for_agent`), ya
+  dentro de la ventana, que ahora vacía la caché al cerrarse. Los cursores propios que abren
+  `_store_design`, `_store_title` y `ai.log._create_log_entry` escriben `chatboo.session` y `ai.log`, sin
+  leer credenciales. No hay ninguna otra que tratar.
+- **Inventario de atributos del `env`** (decisión 2): en la entrada del parche 23 del
+  [registro](parches_pns_ai.md). Resultado: el código del sandbox usa `user`, `company`, `companies`,
+  `context`, `lang`, `uid` y `ref`; el motor recibe el mismo envoltorio después de la ejecución y usa
+  además `cr` y `registry`, que el código del sandbox no puede nombrar.
+- **Resultado:** parche 18 corregido (tres cierres), cambio en el 21, parche 23 nuevo; 341 tests, 18 F y
+  32 E (los mismos por nombre), 22 tests nuevos en verde; neutralización conforme, cada cierre por separado.
+  Scripts del revisor: rechazo en todos los casos salvo el C de `p18_check.py`, que pone la marca con
+  `setattr` sin pasar por `tool_relaxaicode` (por la herramienta real, rechazo). Detalle en el
+  [registro](parches_pns_ai.md), «Revisión de E2′ (27/10/2026)».
+
+### Parches y commits de E2′ (actualizado tras la revisión)
+
+Sustituye a la tabla de «Parches y commits de E2′ (definitivo)». El 23 va antes del commit de tests.
+
+| Commit | Parche | PNS / tipo | Archivos |
+|---|---|---|---|
+| 1 | **11** (adaptado) | PNS-82, seguridad | `pns_ai_chatboo/models/chatboo_session.py` (`unlink`; solo esas líneas) |
+| 2 | **17** | PNS-37, seguridad | `pns_ai_mcp/models/ai_change_journal.py`; `pns_ai_mcp/controllers/safe_plan.py` |
+| 3 | **18** | PNS-19, seguridad | `pns_ai_mcp/models/box_a_guard.py` (nuevo), `pns_ai_mcp/models/__init__.py`, `pns_ai_mcp/controllers/tools_relaxaicode.py` (marca e import de `_box_a_clear_cache`), `pns_ai_chatboo/models/chatboo_session.py` (ventana: import, `_ask_design` y `_ask_design_raw`; solo esas líneas) |
+| 4 | **19** | PNS-17, seguridad | `pns_ai_mcp/utils/fetch_url_safe.py`; `pns_ai_mcp/utils/mcp_client.py` |
+| 5 | **20** | PNS-70, compatibilidad | `pns_ai_chatboo/static/src/js/chart.umd.min.js`; `pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js` |
+| 6 | **21** | PNS-20, seguridad | `pns_base/models/operation_report_wizard.py` |
+| 7 | **22** | PNS-100, seguridad | `pns_ai_mcp/controllers/validators_base.py` (bloque de 28 nombres; solo esas líneas) |
+| 8 | **23** | PNS-101, seguridad | `pns_ai_mcp/controllers/validators_base.py` (`RELAXAICODE_ENV_STATE_*`; solo esas líneas), `pns_ai_mcp/controllers/validators.py`, `pns_ai_mcp/controllers/context_builder.py` |
+| 9 | — | Tests de E2′ | `pns_ai_mcp/tests/__init__.py`, `test_seges_change_journal.py`, `test_seges_sandbox_credentials.py`, `test_seges_fetch_redirect.py`, `test_seges_import_preview.py`, `test_seges_sandbox_side_effects.py`, `test_seges_sandbox_env.py` (nuevo, 23); `pns_ai_chatboo/tests/__init__.py`, `test_seges_chatboo_access.py`, `test_seges_canvas_box_a.py`, `test_seges_skill_env.py` (nuevo, 23) |
+| 10 | — | [DOC] | `parches_pns_ai.md`, `plan_correccion_pns_ai_3879.md`, `verificacion_seguridad_pns_ai.md`, `seguimiento_informe_pns_ai.md` (PNS-100 y PNS-101 nuevos), `e2_propuesta_3879.md`, `lab_e2_3879.md` (`pns70_diagnostico_3879.md` ya va en `88ba581`) |
+
+`chatboo_session.py` lleva los parches 11 y 18, y `validators_base.py` los parches 22 y 23: en GitHub
+Desktop se separan seleccionando las líneas de cada marcador.
+
+
+## Segundo rechazo de E2′ (28/10/2026): C1/V1/V2 y C2
+
+`odoo-reviewer` **rechaza** E2′ por fugas del sandbox que **no introduce** E2′ (están en 3.1.782 y en
+LIYBEN). Confirmadas por la herramienta real: **C1** (`.format` con la plantilla en variable llega a
+`odoo.tools.config` → `admin_passwd`/`db_password`), **C2** (`user`/`company` con `su=True` saltan ACL y
+record rules); por lectura, **V1** (`string.Formatter` por import) y **V2** (`type()` de un `attrgetter`),
+que devuelven el objeto Python real (→ `__globals__` → `__builtins__` → `__import__`).
+
+### Fase 1 — inventario de puntos de resolución de nombres en runtime
+
+| Punto | Dónde | ¿Filtro común antes? | Caso que colaba |
+|---|---|---|---|
+| `guarded_getattr` (builtin `getattr`) | `context_builder.py` | Sí | — |
+| `attrgetter`/`methodcaller` → `_check_attr_path` | `context_builder.py` | Sí (vía `guarded_getattr`) | — |
+| `SafeModuleFacade._module_facade_rejects` | `context_builder.py` | Parcial (sin `DANGEROUS_FORMAT_NAMES`) | V1 (`from string import Formatter`) |
+| `str.format`/`format_map`, plantilla no literal | no había formateador propio | No | C1 y variantes (`f=t.format`, `getattr(t,'format')`, `methodcaller`) |
+| `type(x)` 1 arg, clases crudas | builtins/globales | — (objeto real) | V2 (solo por un canal dunder: `format`/literal) |
+| `env.user`/`env.company` | `api.py` fuerza `su=True` | — | C2 |
+
+### Enfoque de raíz (decisión de Sergio, Crítica)
+
+Impedir resolver los nombres peligrosos **por ninguna vía**, en el punto de resolución: predicado único
+`sandbox_forbidden_name` (dunder + privado + PRIVILEGE + ENV_STATE + ORM + SIDE_EFFECT + DANGEROUS_ATTR +
+DANGEROUS_FORMAT + `format`/`format_map`) en `guarded_getattr`, `_check_attr_path` y
+`_module_facade_rejects`; **formateador propio** (`relaxaicode_format_guard.py`) que reescribe en el AST el
+acceso a `.format`/`.format_map` a `_sandbox_str_attr` y resuelve los campos por `guarded_getattr` (cubre
+plantilla literal y en variable); `Markup` rechazado. C2: `user`/`company`/`companies` sin su
+(`_identity_no_su`). El AST con el filtro ampliado es defensa adicional.
+
+### Parches y commits de E2′ (tras el segundo rechazo)
+
+> **Superada (28/10/2026)** por «Commits de E2′: regla de tres commits (28/10/2026)», al final de este
+> documento.
+
+Todo C1/V1/V2 amplía el **parche 23** (PNS-101 ampliado); C2 es el **parche 24** (PNS-102 nuevo). Tres
+commits:
+
+| Commit | Contenido | Archivos |
+|---|---|---|
+| A — parche 23 ampliado (código) | formateador y predicado único, A1/S1 | `controllers/relaxaicode_format_guard.py` (nuevo), `controllers/validators_base.py` (`sandbox_forbidden_name`, `RELAXAICODE_STR_FORMAT_NAMES`, `_is_dunder`), `controllers/context_builder.py` (predicado en `guarded_getattr`/`_module_facade_rejects`; A1/S1; `_identity_no_su` lo comparte C2), `controllers/validators.py` (filtro de campos literal), `controllers/tools_relaxaicode.py` (compila con `compile_sandbox_code`, inyecta `_sandbox_str_attr`) |
+| B — parche 24 (código) | `user`/`company`/`companies` sin su | `controllers/context_builder.py` (`_identity_no_su` y su uso en `GuardedSandboxEnv` y `build_safe_context`) |
+| C — tests y docs | tests nuevos y documentación | `tests/__init__.py`, `tests/test_seges_format_guard.py`, `tests/test_seges_identity_su.py`; `parches_pns_ai.md`, `seguimiento_informe_pns_ai.md`, `plan_correccion_pns_ai_3879.md`, `pns_ai_decisiones.md`, `e2_propuesta_3879.md`, `lab_e2_3879.md` |
+
+`context_builder.py` recibe cambios en A y B; en GitHub Desktop se separan por líneas (el helper
+`_identity_no_su` y su uso van en B). **LIYBEN: claves MCP revocadas el 27/10/2026; regenerarlas tras el
+despliegue.**
+
+## Commits de E2′: regla de tres commits (28/10/2026)
+
+Regla decidida por Sergio el 27/10/2026: **commit 1 = código, commit 2 = tests, commit 3 = documentación**,
+por carpetas completas. Sustituye a todas las tablas de commits anteriores de este documento («definitivo»,
+«actualizado tras la revisión» y «tras el segundo rechazo»). HEAD de partida: `c639fa8` (más `88ba581`,
+[DOC], ya subido). Ningún archivo mezcla código y tests, así que **no hay que separar líneas** en GitHub
+Desktop: cada archivo va entero a un único commit (también `context_builder.py`, `validators_base.py` y
+`chatboo_session.py`, que llevan varios parches). Los marcadores `# Seges: parche N (PNS-XX, <tipo>)` del
+código se mantienen y son los que relacionan cada línea con su parche.
+
+| Commit | Contenido | Carpetas (completas) | Archivos |
+|---|---|---|---|
+| 1 — código | Parches 11 (adaptado), 17, 18, 19, 20, 21, 22, 23 (ampliado, con A1/S1, el blindaje de nombres internos y la segunda vuelta de 28/10: fachadas de `operator` como funciones y helper único `run_sandbox_code`, que toca `skill_runtime.py`) y 24 | `pns_ai_mcp/controllers/`, `pns_ai_mcp/models/`, `pns_ai_mcp/utils/`, `pns_ai_chatboo/models/`, `pns_ai_chatboo/static/src/js/`, `pns_base/models/` | `context_builder.py`, `relaxaicode_format_guard.py` (nuevo), `safe_plan.py`, `tools_relaxaicode.py`, `validators.py`, `validators_base.py`; `models/__init__.py`, `ai_change_journal.py`, `box_a_guard.py` (nuevo); `fetch_url_safe.py`, `mcp_client.py`, `skill_runtime.py`; `chatboo_session.py`; `chart.umd.min.js`, `chatboo_heavy_libs.js`; `operation_report_wizard.py` |
+| 2 — tests | Tests de Seges de E2′ | `pns_ai_mcp/tests/`, `pns_ai_chatboo/tests/` | `pns_ai_mcp/tests/`: `__init__.py`, `test_seges_change_journal.py`, `test_seges_facade_class.py` (nuevo), `test_seges_fetch_redirect.py`, `test_seges_format_guard.py`, `test_seges_identity_su.py`, `test_seges_import_preview.py`, `test_seges_sandbox_credentials.py`, `test_seges_sandbox_env.py`, `test_seges_sandbox_side_effects.py` (todos nuevos salvo `__init__.py`); `pns_ai_chatboo/tests/`: `__init__.py`, `test_seges_chatboo_access.py`, `test_seges_canvas_box_a.py` (nuevo), `test_seges_skill_env.py` (nuevo) |
+| 3 — [DOC] | Documentación de E2′ | `docs/pendiente/` | `e2_propuesta_3879.md`, `lab_e2_3879.md` (nuevo), `parches_pns_ai.md`, `plan_correccion_pns_ai_3879.md`, `pns_ai_decisiones.md`, `seguimiento_informe_pns_ai.md`, `verificacion_seguridad_pns_ai.md` |
+
+Títulos propuestos, en el estilo de E1′:
+
+1. `[FIX] pns_ai_mcp, pns_ai_chatboo, pns_base: E2′, parches 11 y 17 a 24 (PNS-82, 37, 19, 17, 70, 20, 100, 101, 102)`
+2. `[ADD] pns_ai_mcp, pns_ai_chatboo: tests de Seges de E2′`
+3. `[DOC] E2′: parches 11 y 17 a 24, revisiones y validación en laboratorio`
+
+Antes de cada commit, comprobar en GitHub Desktop que la lista de archivos marcados coincide con esta
+tabla (37 archivos en total: 16 de código, 14 de tests y 7 de documentación). Respecto a la versión de
+35 (primera vuelta del parche 23 ampliado), la segunda vuelta (28/10/2026) añade `pns_ai_mcp/utils/skill_runtime.py`
+al commit de código y `pns_ai_mcp/tests/test_seges_facade_class.py` al de tests.
+
+**LIYBEN:** claves MCP revocadas el 27/10/2026; regenerarlas tras el despliegue.

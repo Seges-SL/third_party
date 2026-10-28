@@ -2030,3 +2030,48 @@ Sergio con Claude; horas en UTC. Lienzo, como U1.
 
 **Resultado de E1′ en staging:** cerrada el 27/10/2026, con la salvedad de R8. Parches 10 y 12 a 16
 validados en staging.
+
+## Laboratorio — entrega E2′ (27/10/2026)
+
+Laboratorio `lab_pns_ai_3879` (BD `lab_pns_ai_3879_14`), rama `14.0-pns-ai-3879`; horas en UTC. Propuesta:
+[e2_propuesta_3879.md](e2_propuesta_3879.md); parches y tests: [parches_pns_ai.md](parches_pns_ai.md),
+«Parches de la rama 14.0-pns-ai-3879 (E2′)».
+
+### P-20 (PNS-20), antes del parche (Sergio, 27/10/2026)
+
+Pasos y consultas en la [propuesta de E2′](e2_propuesta_3879.md), «P-20: pasos y consultas». «Review» de
+una importación, sin pulsar Confirmar:
+
+| Caso | `temperature` / etiqueta | `write_date` |
+|---|---|---|
+| A. Proveedores (`ai_provider` 3, OVH; exportación 459) | 0.7, sin cambios | 2026-10-23 09:38:41 → **2026-10-27 10:45:29** |
+| B. Usuarios MCP (`ai_mcp_user` 1, `demo`; exportación 461) | vacío → **`P-20 preview`** | 2026-10-23 07:28:35 → **2026-10-27 10:50:09** |
+
+- **PNS-20 CONFIRMADO:** «Review» persiste la importación (B) o deja un `UPDATE` del registro después del
+  `ROLLBACK TO SAVEPOINT` (A; el `model_id`, con el mismo valor). Causa: `invalidate_cache()` no vacía
+  `towrite`. Se aplica el parche 21.
+- `res.users` de `demo` sin cambios. Restos aceptados: la etiqueta de `demo`, el `write_date` de OVH y
+  los adjuntos 459 y 461. `~/p20_lab` borrado.
+
+### Validaciones de E2′ hechas (Claude)
+
+- **Comprobaciones previas** (solo lectura): (f) qué lee la caja A, `auto_join`, colisiones de los 28
+  nombres del parche 22, inventario de PNS-07, `precommit` en «Review» y firmas de Odoo 14. La (f)
+  cambió el diseño del parche 18: el lienzo lee `ai.provider` desde la caja A; Sergio aprobó una ventana
+  en `_ask_design` como excepción documentada.
+- **`py_compile`** con Python 3.7.3 (imagen `odoo-dev:14-lab_pns_ai_3879`): 19 archivos, correctos.
+- **Lint** `--base c639fa8`: 0 incidencias nuevas.
+- **Tests** (`odoo-dev 14 tests pns_base,pns_ai_mcp,pns_ai_chatboo`, BD de tests nueva; log
+  `tests-20261027-124454.log`): 319 tests, 18 F y 32 E, los mismos que la línea base de E1′; 59 nuevos,
+  todos en verde.
+- **Neutralización** de cada parche (N1 a N4): fallan los tests negativos de cada uno y los de no
+  regresión siguen pasando; restauración comprobada con el md5 del `git diff`. El parche 20 se neutraliza
+  a mano en P-70.
+- No se ha escrito en `lab_pns_ai_3879_14` (solo `SELECT` dentro de `BEGIN TRANSACTION READ ONLY`), ni se
+  ha reiniciado el contexto: el servidor web sigue con el código anterior a E2′.
+
+### Pendiente en el laboratorio (Sergio)
+
+Tras reiniciar el contexto (`odoo-dev 14 parar` y `arrancar` desde `~/GitHub/lab_pns_ai_3879`): P-19,
+P-37, P-37b, P-17 manual, P-70 (casos 1 a 5) y P-20 repetida, con los pasos y las consultas de
+[lab_e2_3879.md](lab_e2_3879.md). El resultado se anota en un bloque fechado debajo de este.

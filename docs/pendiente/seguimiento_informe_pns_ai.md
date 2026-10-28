@@ -19,7 +19,7 @@
   del fabricante) (ver PNS-81, PNS-93, PNS-94 y «Compatibilidad con Odoo 14»).
 - **Alcance:** primer bloque, hallazgos de gravedad crítica y alta (35); segundo bloque, de gravedad
   media y baja (45, con PNS-22, que pasó a Media en la revisión del informe, y PNS-79). Total: los
-  80 hallazgos del informe. Tercer bloque: hallazgos nuevos (PNS-81 a PNS-99) y compatibilidad con
+  80 hallazgos del informe. Tercer bloque: hallazgos nuevos (PNS-81 a PNS-100) y compatibilidad con
   Odoo 14 (Python 3.7 y librerías de la imagen).
 
 > **Fase 3 (laboratorio) hecha**, con el parche 1 aplicado para que los módulos se importen:
@@ -50,7 +50,9 @@
 > `14.0-pns-ai-correcciones` queda como referencia. Las columnas «Estado» y «Laboratorio y staging»
 > siguen describiendo 3.1.782. En la columna «Rama Seges», lo de la rama nueva va marcado con
 > `14.0-pns-ai-3879`. Actualizada el 26/10/2026 con el staging de E1′ (parches 10, 12, 15 y 16) y con
-> PNS-99.
+> PNS-99. Actualizada el 27/10/2026 con E2′ (parches 11 adaptado y 17 a 22) y PNS-100.
+> Actualizada el 28/10/2026: gravedad de PNS-101 y PNS-102 fijada en Crítica (decisión de Sergio del
+> 27/10/2026; PNS-100 sigue en Alta) y PNS-102 añadido a la tabla y al recuento.
 
 Estados: **CORREGIDO** (el cambio cubre el hallazgo y sus puntos de entrada) · **PARCIAL** (cubre
 una parte; queda un resto concreto) · **SIN CAMBIOS** · **YA NO APLICA** (el código desapareció) ·
@@ -85,10 +87,10 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-14 | Alta | PARCIAL | VULNERABLE en `ai.fetch.cache` (3c, PNS-90); el resto, CORREGIDO (3b-1) | Resto de `ai.fetch.cache`: parche 7 (E1), CORREGIDO |
 | PNS-15 | Alta | CORREGIDO | — | — |
 | PNS-16 | Alta | PARCIAL | CORREGIDO (parte probada: tarjeta sin auto-confirmación ni salida, con las dos políticas; staging, prueba 3); resto (reinyección como `system`), NO CONCLUYENTE | — |
-| PNS-17 | Alta | PARCIAL | — | — |
+| PNS-17 | Alta | PARCIAL | — | — · **Parche 19 (E2′, `14.0-pns-ai-3879`): aplicado; tests en verde y neutralización hechos (27/10/2026)** |
 | PNS-18 | Alta | PARCIAL | CORREGIDO (parte probada: `no_external_failover`, 3b-2) | — |
-| PNS-19 | Alta | PARCIAL | — | Previsto en E3 |
-| PNS-20 | Alta | PARCIAL | — | — |
+| PNS-19 | Alta | PARCIAL | — | Previsto en E3 · **Parche 18 (E2′, `14.0-pns-ai-3879`): aplicado; tests en verde y neutralización hechos (27/10/2026)**; ventana del lienzo en `_ask_design`, a revisar en E3′ · rechazado en la revisión y corregido el 27/10/2026 (alias en `read_group`, ids que no son enteros, caché del hilo); el acceso a `env.all`/`env.cache` es PNS-101 (parche 23) |
+| PNS-20 | Alta | PARCIAL | VULNERABLE en «Review» (P-20 en `lab_pns_ai_3879_14`, 27/10/2026, sobre 3.1.879) | — · **Parche 21 (E2′, `14.0-pns-ai-3879`): aplicado; tests en verde y neutralización hechos (27/10/2026)** |
 | PNS-21 | Alta | CORREGIDO | CORREGIDO (3c) | — |
 | PNS-23 | Alta | SIN CAMBIOS | — | — |
 | PNS-24 | Alta | PARCIAL | — | — |
@@ -112,7 +114,7 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-34 | Media | CORREGIDO | — | — |
 | PNS-35 | Media | SIN CAMBIOS | — | — |
 | PNS-36 | Media | PARCIAL | SIN CAMBIOS (resto reproducido: nombre de la BD y campos sin valores, staging, prueba 7) | — |
-| PNS-37 | Media | SIN CAMBIOS | — | Resto (`record_failed_plan`): previsto en E4 |
+| PNS-37 | Media | SIN CAMBIOS | — | Resto (`record_failed_plan`): previsto en E4 · **Parche 17 (E2′, `14.0-pns-ai-3879`): aplicado; tests en verde y neutralización hechos (27/10/2026)**: papelera del diario (Alta, propuesta) |
 | PNS-38 | Media | SIN CAMBIOS | — | — |
 | PNS-39 | Media | PARCIAL | — | — |
 | PNS-40 | Media | PARCIAL | SIN CAMBIOS (resto reproducido, 3b-2) | — |
@@ -126,7 +128,7 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-66 | Media | SIN CAMBIOS | SIN CAMBIOS (3b-2) | — |
 | PNS-67 | Media | CORREGIDO | — | — |
 | PNS-68 | Media | SIN CAMBIOS | — | — |
-| PNS-70 | Media | SIN CAMBIOS | — | — |
+| PNS-70 | Media | SIN CAMBIOS | — | — · **Parche 20 (E2′, `14.0-pns-ai-3879`): aplicado (27/10/2026); P-70 pendiente** |
 | PNS-43 | Baja | PARCIAL | — | — |
 | PNS-44 | Baja | YA NO APLICA | — | — |
 | PNS-45 | Baja | CORREGIDO | — | — |
@@ -148,7 +150,7 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-78 | Baja | CORREGIDO | — | — |
 | PNS-79 | Baja | CORREGIDO | NO CONCLUYENTE (3b-1) | — |
 | PNS-81 | Alta | NUEVO | importación resuelta con el parche 1 (3a); parche 2 eficaz (3b-2 y staging, prueba 2); parche 3 eficaz (staging, prueba 1); `prompts/*`: parche 4 en la rama, eficaz (prueba del parche 4 y staging, §4.4) | Parches 1-4 (compatibilidad), en LIYBEN |
-| PNS-82 | Alta | NUEVO | VULNERABLE (3b-1) | **Parche 11 (E2): CORREGIDO** (laboratorio y staging, 21/10/2026) |
+| PNS-82 | Alta | NUEVO | VULNERABLE (3b-1) | **Parche 11 (E2): CORREGIDO** (laboratorio y staging, 21/10/2026) · **Parche 11 adaptado (E2′, `14.0-pns-ai-3879`): aplicado; tests en verde y neutralización hechos (27/10/2026)** |
 | PNS-83 | Alta | NUEVO | VULNERABLE (3b-1) | **Parche 10 (E1): CORREGIDO** (laboratorio y staging, 20/10/2026) · **Parche 10 adaptado (E1′, `14.0-pns-ai-3879`): validado en staging (26/10/2026)** |
 | PNS-84 | Media | NUEVO | — | — |
 | PNS-85 | Media | NUEVO | VULNERABLE (3b-1) | **Parche 9 (E1): CORREGIDO** (laboratorio y staging, 20/10/2026) |
@@ -166,17 +168,20 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-97 | Media | NUEVO | — (inventario de la spec E2) | Previsto en E4 |
 | PNS-98 | Baja | NUEVO | CONFIRMADO (staging de E2) | Fase posterior (sin entrega asignada) |
 | PNS-99 | Media | NUEVO | CONFIRMADO (laboratorio, con y sin parches; diagnóstico del staging de E1′) | — |
+| PNS-100 | Alta | NUEVO | VULNERABLE (tests de E2′ con el parche 22 neutralizado, 27/10/2026, sobre 3.1.879) | · **Parche 22 (E2′, `14.0-pns-ai-3879`): aplicado; tests en verde y neutralización hechos (27/10/2026)** |
+| PNS-101 | Crítica | NUEVO | VULNERABLE (caja A real en el shell de `lab_pns_ai_3879_14`, solo lectura, 27/10/2026, sobre 3.1.879) | · **Parche 23 (E2′, `14.0-pns-ai-3879`): aplicado; tests en verde y neutralización hechos (27/10/2026)** · **ampliado (28/10/2026)**: formateador propio de `str.format`/`format_map`, predicado único y blindaje de nombres internos (NEU-A/B/D); segunda vuelta tras revisión: fachadas de `operator` (attrgetter/methodcaller/itemgetter) como funciones y helper único `run_sandbox_code` en las dos vías de `exec`, cerrando `type()` sobre la clase nativa (CRÍTICO 1) y la vía de skills (CRÍTICO 2); tests `test_seges_format_guard.py`, `test_seges_facade_class.py` y NEU-E/F/G en verde |
+| PNS-102 | Crítica | NUEVO | VULNERABLE (herramienta real, segundo rechazo de E2′, 27/10/2026, sobre 3.1.782 y en LIYBEN) | · **Parche 24 (E2′, `14.0-pns-ai-3879`): validación local y neutralización hechas (28/10/2026)**; tests `test_seges_identity_su.py` · LIYBEN: claves MCP revocadas el 27/10/2026; regenerarlas tras el despliegue final |
 
 **Recuento:** CORREGIDO 31 · PARCIAL 33 · SIN CAMBIOS 13 · YA NO APLICA 2 · DUDOSO 1 (80 del
-informe) · NUEVO 19 (total 99). Por gravedad:
+informe) · NUEVO 22 (total 102). Por gravedad:
 
 | Gravedad | Corregido | Parcial | Sin cambios | Ya no aplica | Dudoso | Nuevo | Total |
 |---|---|---|---|---|---|---|---|
-| Crítica | 5 | 4 | 0 | 0 | 0 | 0 | 9 |
-| Alta | 13 | 11 | 1 | 1 | 0 | 5 | 31 |
+| Crítica | 5 | 4 | 0 | 0 | 0 | 2 | 11 |
+| Alta | 13 | 11 | 1 | 1 | 0 | 6 | 32 |
 | Media | 4 | 12 | 9 | 0 | 0 | 8 | 33 |
 | Baja | 9 | 6 | 3 | 1 | 1 | 6 | 26 |
-| **Total** | **31** | **33** | **13** | **2** | **1** | **19** | **99** |
+| **Total** | **31** | **33** | **13** | **2** | **1** | **22** | **102** |
 
 Restos que se repiten en varios parciales:
 1. **El sandbox (caja A) bloquea por lista de nombres y no impide llamar a métodos privados**
@@ -1594,7 +1599,11 @@ independiente del seguimiento y se comprobaron en el laboratorio (fase 3c). PNS-
 en el staging (15-16/10/2026, `pns_demo`, proveedor Gemini; `verificacion_seguridad_pns_ai.md`,
 «Staging (15-16/10/2026)»); la gravedad es una propuesta. PNS-97 y PNS-98: de la entrega E2 (inventario
 de la spec, H-5, y staging del 21/10/2026); gravedad propuesta. PNS-99: del diagnóstico del staging de
-E1′ (26/10/2026, [diagnóstico](diagnostico_r6_staging_e1p.md)); gravedad propuesta. Mismo criterio de
+E1′ (26/10/2026, [diagnóstico](diagnostico_r6_staging_e1p.md)); gravedad propuesta. PNS-100: de la propuesta de E2′
+(27/10/2026, [e2_propuesta_3879.md](e2_propuesta_3879.md), «Correo desde la Caja A» y «PNS-100: barrido…»), sobre 3.1.879;
+gravedad decidida por Sergio. PNS-101: de la revisión del parche 18 (27/10/2026, [e2_propuesta_3879.md](e2_propuesta_3879.md),
+«Revisión del parche 18 y PNS-101»), sobre 3.1.879. PNS-102: del segundo rechazo de E2′ (27/10/2026,
+[e2_propuesta_3879.md](e2_propuesta_3879.md)). PNS-101 y PNS-102: Críticas, decisión de Sergio del 27/10/2026. Mismo criterio de
 gravedad que el informe. Antes de numerar cada uno se ha comprobado con Grep que no figuraba en el
 informe ni en este seguimiento; cuando era un resto ya citado, se indica la relación.
 
@@ -2135,6 +2144,102 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
   así, devolver error indicando el grupo que lo implica (o rechazarlo al proponer).
 - **Detalle:** [diagnóstico](diagnostico_r6_staging_e1p.md), 5.1.
 - **Rama Seges:** sin entrega asignada.
+
+### PNS-100 — La caja A permite enviar correo, abrir conexiones y ejecutar acciones sin escribir en la BD
+
+- **Gravedad:** Alta (decisión de Sergio, 27/10/2026) · **Estado:** NUEVO (propuesta de E2′, sobre 3.1.879;
+  del mismo tipo que PNS-07).
+- **Descripción:** la caja A frena las escrituras con una transacción `READ ONLY`, pero no lo que sale a la
+  red o ejecuta otro código sin escribir antes. Ni `send_email` ni `connect` estaban en
+  `RELAXAICODE_SIDE_EFFECT_METHODS`, y `env['ir.mail_server']` no está en la puerta del sandbox.
+  - `ir.mail_server.send_email(message, smtp_server=…, smtp_port=…)` (`odoo/addons/base/models/ir_mail_server.py:426-514`):
+    `@api.model`, sin ACL; con `smtp_server`, `connect` no lee ningún servidor guardado y abre SMTP al host
+    y puerto que diga quien llama. El mensaje se arma con `build_email`, también sin escrituras.
+  - `ir.mail_server.connect(host, port, …)`: TCP/SMTP a cualquier host y puerto, también internos, fuera de
+    la política de URL de `fetch_url`.
+  - `ir.qweb.field.image.load_remote_url(url)` (`addons/web_editor/models/ir_qweb.py:461-470`):
+    `requests.get` a cualquier URL, con redirecciones; modelo abstracto, sin ACL.
+  - Con más permisos: acciones de servidor (`ir.actions.server.run`, cuyo código no pasa por el AST),
+    crons (`ir.cron.method_direct_trigger`, como su `user_id`), la cola de correo, IAP, instalación de
+    módulos desde URL y otros. Lista completa (28 nombres) y barrido de los 47 módulos instalados en la
+    [propuesta de E2′](e2_propuesta_3879.md), «PNS-100: barrido de métodos con efectos fuera de la BD».
+- **Quién:** cualquier usuario de chat (el motor ejecuta `relaxaicode` para lecturas sin exigir ningún
+  grupo), mediante una inyección de prompt que dicte el código. No hace falta AI Administrator ni Ajustes.
+- **Impacto:** exfiltración de cualquier dato que el usuario pueda leer hacia un servidor del atacante
+  (SMTP o HTTP) y conexión a hosts internos, sin escrituras ni confirmación; con un administrador, ejecución
+  de crons y acciones de servidor.
+- **Laboratorio (27/10/2026):** en los tests de E2′, con el parche 22 neutralizado, el código de la caja A
+  real llega a llamar a `send_email`, `connect`, `load_remote_url`, `run`, `method_direct_trigger`,
+  `process_email_queue`, `send`, `get_credits`, `read_by_vat` e `install_from_urls` (métodos sustituidos en
+  el test, sin envío real). En modo test, Odoo no envía ni conecta (`ir_mail_server.py:189-191, 491-494`).
+- **Corrección sugerida:** que el sandbox no alcance métodos con efectos fuera de la BD; mejor aún, una
+  marca en el cursor de la caja A que esos métodos respeten, en lugar de una lista de nombres.
+- **Rama Seges:** parche 22 (E2′, `14.0-pns-ai-3879`): los 28 nombres en
+  `RELAXAICODE_SIDE_EFFECT_METHODS` ([parches](parches_pns_ai.md)); aplicado, tests en verde y neutralización
+  hechos (27/10/2026).
+
+### PNS-101 — La caja A permite llegar a los entornos reales del hilo
+
+- **Gravedad:** Crítica (decisión de Sergio, 27/10/2026) · **Estado:** NUEVO (revisión del parche 18, sobre
+  3.1.879; relacionado con PNS-19).
+- **Descripción:** en Odoo 14 la caché y el conjunto de entornos son uno por hilo
+  (`odoo/api.py:458-462`: `self.cache = envs.cache`, `self.all = envs`), y la caja A
+  (`controllers/controller_helpers.py:184`, `get_readonly_env`) abre su cursor en el hilo de la petición.
+  `GuardedSandboxEnv.__getattr__` (`controllers/context_builder.py:104-117`) daba cualquier atributo público
+  del entorno salvo los de identidad, y ni el AST (`controllers/validators.py:298-308`) ni `guarded_getattr`
+  bloqueaban `cache`, `all` ni `envs`.
+  - `env.all` (también `x = env; x.all` y `getattr(env, 'al' + 'l')`): los `Environment` reales del hilo, sin
+    envoltorio. Entre ellos, el del cursor de la petición: sin la marca de la caja A (parche 18), sin
+    `READ ONLY` y con commit al final; y entornos con `su=True`.
+  - `env.cache.get(registro, campo)`: lo que cualquier entorno del hilo haya leído, sin pasar por
+    `_fetch_field`; `env.cache.set` permite envenenarla.
+  - `env.all.towrite`: las escrituras pendientes del hilo, que el `flush` del cursor principal lleva a la BD
+    (no se ha probado a escribir).
+- **Quién:** cualquier usuario de chat (como PNS-100), mediante una inyección de prompt que dicte el código.
+- **Impacto:** lectura de cualquier credencial o dato desde la caja A, saltándose la barrera de catálogos,
+  la marca del parche 18 y `READ ONLY`; probablemente, escritura persistente fuera de la caja A.
+- **Laboratorio (27/10/2026, solo lectura):** caja A real como `base.user_admin`, en el shell de
+  `lab_pns_ai_3879_14`, con rollback y sin imprimir secretos: `env.cache` y `env.all` alcanzables (también
+  por alias y `getattr` compuesto); `env.cache.get` devuelve `database.secret` cuando el motor lo leyó antes;
+  `env.all` tiene dos entornos de la caja A (uno con `su=True`) y el del cursor principal (`READ ONLY`
+  desactivado), desde el que se lee `database.secret`; `towrite`, `tocompute`, `protected` y `envs`,
+  alcanzables.
+- **Corrección sugerida:** que el `env` del sandbox sea una lista cerrada de atributos y que el estado
+  compartido del ORM no se pueda nombrar; mejor aún, ejecutar la caja A en un hilo o proceso propio.
+- **Rama Seges:** parche 23 (E2′, `14.0-pns-ai-3879`): `cache`, `all`, `envs`, `towrite`, `tocompute` y
+  `protected` bloqueados como atributo en el AST y en `guarded_getattr`, y lista de atributos en
+  `GuardedSandboxEnv` ([parches](parches_pns_ai.md)); aplicado, tests en verde y neutralización hechos
+  (27/10/2026); P-101 pendiente en el laboratorio.
+- **Actualización (28/10/2026), segundo rechazo de E2′ — parche 23 ampliado:** el revisor encontró que el
+  sandbox también resuelve nombres peligrosos por `str.format` con la plantilla en variable (C1:
+  `odoo.tools.config` → `admin_passwd`/`db_password`), por `string.Formatter` importado (V1) y por
+  `type(attrgetter(...))` (V2). Cierre por la raíz (decisión de Sergio, Crítica): predicado único
+  `sandbox_forbidden_name` (incluye `DANGEROUS_FORMAT_NAMES` y `format`/`format_map`) en `guarded_getattr`,
+  `_check_attr_path` y `_module_facade_rejects`, y **formateador propio** del sandbox
+  (`controllers/relaxaicode_format_guard.py`): el acceso a `.format`/`.format_map` se reescribe (AST) a
+  `_sandbox_str_attr`, que resuelve los campos por `guarded_getattr` (cubre plantilla literal y en variable);
+  `Markup` se rechaza. A1/S1: `with_context`/`with_company` fuera del wrapper. Tests nuevos
+  `test_seges_format_guard.py`. **LIYBEN: claves MCP revocadas el 27/10/2026 hasta el despliegue; regenerarlas
+  después.**
+
+### PNS-102 — `user` / `company` del sandbox con `su=True` saltan ACL y record rules
+
+- **Gravedad:** Crítica (decisión de Sergio, 27/10/2026) · **Estado:** NUEVO (segundo rechazo de E2′, sobre
+  3.1.782 y en LIYBEN; relacionado con PNS-101).
+- **Descripción:** `env.user` / `env.company` / `env.companies` del ORM fuerzan `su=True`
+  (`odoo/api.py`: `return self(su=True)[...]`). El sandbox corre como el usuario que pregunta, pero por el
+  registro `user` inyectado y por los globales `user`/`company` (y `env.user`/`env.company` del wrapper) se
+  leían campos `NO_ACCESS` (`res.users.totp_secret`) y datos de terceros (facturas de otro partner)
+  saltándose ACL y record rules.
+- **Quién:** cualquier usuario de chat, mediante inyección de prompt (como PNS-100/PNS-101).
+- **Impacto:** lectura de datos y campos que el usuario no debería ver, con su propia identidad aparente.
+- **Confirmado (herramienta real, revisor):** `c2_su.py` (facturas de un partner ajeno vía
+  `user.partner_id.browse(...).invoice_ids`) y `c2_noaccess.py` (`res.users.totp_secret`, `NO_ACCESS`):
+  entregaban el dato con `su`.
+- **Rama Seges:** parche 24 (E2′, `14.0-pns-ai-3879`): helper `_identity_no_su` reconstruye
+  `user`/`company`/`companies` sin su en `GuardedSandboxEnv` y en `build_safe_context`
+  ([parches](parches_pns_ai.md)). Tests `test_seges_identity_su.py`. **LIYBEN: claves MCP revocadas el
+  27/10/2026 hasta el despliegue; regenerarlas después.** Validación local y neutralización, 28/10/2026.
 
 ### Observaciones sin ficha (para valorar en E4′)
 

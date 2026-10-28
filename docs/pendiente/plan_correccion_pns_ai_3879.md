@@ -18,6 +18,14 @@
   no concluyente, que se repite el 27/10/2026 (decisión 3).
   E1′ cerrada en staging el 27/10/2026: R8, repetida, no concluyente por el proveedor; se valida en E3′
   (decisión de Sergio del 27/10/2026).
+  E2′ aplicada el 27/10/2026 (parches 11 adaptado y 17 a 22, con PNS-100 nuevo): tests y neutralización
+  en el laboratorio hechos; siguiente: pruebas manuales del laboratorio ([lab_e2_3879.md](lab_e2_3879.md)),
+  tras reiniciar el contexto, y después la subida al staging.
+  E2′ revisada el 27/10/2026: el revisor rechaza el parche 18 (alias en `read_group`, ids que no son
+  enteros, caché del hilo) y se corrige; de la comprobación sale PNS-101 (nuevo), que cierra el parche 23.
+  Siguiente, igual: pruebas manuales del laboratorio, ahora con P-101.
+  E2′ aprobada en revisión el 28/10/2026 con la herramienta real (vías A y B), con las dos evasiones
+  críticas cerradas; siguiente: los commits y el push, y después las pruebas manuales del laboratorio.
 
 ## 1. Cómo se trabaja
 
@@ -48,7 +56,7 @@
 |---|---|---|---|
 | **E0′** (previa) | `test_seges_*` adaptados; esqueleto de tests de Chatboo; datos de prueba de `test_change_journal` y `test_paap_core`; línea base nueva; diagnóstico de PNS-70 (solo lectura) | — | Parte A (tests): validada en laboratorio (23/10/2026). Diagnóstico de PNS-70: hecho (23/10/2026) |
 | **E1′** | Críticos y Altos baratos: M10 con el parche 12 adaptado, PNS-54, PNS-07, M13, `collect_pin` (PNS-83) | 10 y 12 adaptados; 13 (M10), 14 (M13), 15 (PNS-07) y 16 (PNS-54) | Validada en laboratorio (23/10/2026) y en staging (26/10/2026); cerrada el 27/10/2026, con R8 no concluyente por el proveedor (se valida en E3′) |
-| **E2′** | Resto de Altos: papelera del diario (PNS-37), PNS-19, PNS-17, PNS-82, PNS-70; PNS-20 si P-20 lo confirma | 11 adaptado; nuevos | Pendiente |
+| **E2′** | Resto de Altos: papelera del diario (PNS-37), PNS-19, PNS-17, PNS-82, PNS-70; PNS-20 (confirmado por P-20); PNS-100 y PNS-101 (nuevos) | 11 adaptado; 17 (PNS-37), 18 (PNS-19), 19 (PNS-17), 20 (PNS-70), 21 (PNS-20), 22 (PNS-100), 23 (PNS-101, ampliado) y 24 (PNS-102) | Aplicada (27/10/2026): tests en verde y neutralización hecha; parche 18 corregido tras la revisión y parche 23 nuevo (27/10/2026). **Aprobada en revisión (28/10/2026)** con la herramienta real (vía A, shell; vía B, `/mcp`): las dos evasiones críticas, cerradas. Pendiente: los tres commits (código, tests, documentación) y el push; después, las pruebas manuales del laboratorio |
 | **E3′** | Lienzo: M1, M2 y F1 | Nuevos | Pendiente |
 | **E4′** | Hoja de Medios y Bajos (corregir o aceptar); después, lo elegido | Nuevos, si se corrige algo | Pendiente |
 
@@ -177,6 +185,47 @@ Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`;
 
 ### E2′ (resto de Altos)
 
+- **Propuesta y decisiones (27/10/2026):** [e2_propuesta_3879.md](e2_propuesta_3879.md), «Propuesta final».
+  Lo que sigue en esta ficha es el plan de partida; donde no coincide, manda la propuesta (dos tokens en
+  PNS-70, control en el modelo en PNS-19, `mcp_client.py` en PNS-17, criterio del fabricante en PNS-82).
+- **Resultado (27/10/2026): aplicada en la copia de trabajo.**
+  - Parches 11 adaptado (PNS-82), 17 (PNS-37), 18 (PNS-19), 19 (PNS-17), 20 (PNS-70), 21 (PNS-20,
+    confirmado por P-20) y 22 (PNS-100, nuevo, Alta).
+  - Comprobación previa (f): el lienzo pide el diseño desde la caja A y lee `ai.provider`. Sergio aprobó
+    una ventana en `_ask_design` como excepción del parche 18; se revisa en E3′.
+  - Tests: 319, 18 F y 32 E (los mismos que E1′); 59 nuevos en verde. Neutralización: fallan los tests
+    negativos de cada parche.
+  - Detalle en [parches_pns_ai.md](parches_pns_ai.md), «Parches de la rama 14.0-pns-ai-3879 (E2′)».
+  - **Pendiente:** reiniciar el contexto y las pruebas manuales P-19, P-37, P-37b, P-17, P-70 (casos 1 a 5)
+    y P-20 repetida ([lab_e2_3879.md](lab_e2_3879.md)); después, la subida al staging.
+- **Revisión (27/10/2026):** el revisor rechaza el parche 18 y aprueba el resto con observaciones menores.
+  - Parche 18 corregido: alias en `read_group`, ids que no son enteros en `ir.config_parameter` y caché del
+    hilo (se vacía al poner la marca y al cerrar la ventana del lienzo).
+  - Parche 21: `flush` del camino normal dentro del `try` y `registry.clear_caches()` tras el `ROLLBACK`.
+  - **Parche 23 (PNS-101, nuevo):** desde la caja A se llegaba a `env.cache` y a `env.all`, los entornos
+    reales del hilo (el de la petición, sin marca ni `READ ONLY`). Se cierra con una lista de atributos en
+    `GuardedSandboxEnv` y el bloqueo como atributo en el AST y en `guarded_getattr`.
+  - Commits de E2′ (detalle en la [propuesta](e2_propuesta_3879.md), «Revisión del parche 18 y PNS-101»):
+    11 adaptado, 17, 18, 19, 20, 21, 22, **23**, tests de E2′ y documentación; el 23 va antes del commit de
+    tests.
+  - **Pendiente:** además de lo anterior, P-101 y los casos nuevos de P-19 (h, i y j).
+- **Revisión con la herramienta real (28/10/2026): APROBADA.**
+  - Tras el segundo rechazo de E2′ (parche 23 ampliado y parche 24, PNS-102), el revisor repite los casos
+    con la herramienta real en `lab_pns_ai_3879_14`: vía A (caja A en el shell, con rollback) y vía B
+    (`POST /mcp/pns_ai_admin`, `relaxaicode`, con el servidor reiniciado después de la última edición
+    de los parches).
+  - Las dos evasiones críticas, cerradas:
+    - `type()` sobre las fachadas de `operator` (`attrgetter`, `methodcaller`, `itemgetter`): da
+      `function`, no la clase nativa, y `__subclasses__` se rechaza (`PRIVATE_ATTR`);
+    - reasignar `_sandbox_str_attr` (asignación, `def`, parámetro, `lambda`, `for`): rechazo `ENGINE_NAME`.
+  - La skill con `/` (`bootstrap_skill_code_body`) no tiene endpoint MCP: cuentan como evidencia la vía A
+    y los tests `test_skill_format_blocked` y `test_seges_skill_env`.
+  - Es la aprobación de la **revisión**, no de las pruebas manuales: P-101 sigue pendiente.
+  - **Pendiente, en este orden:**
+    1. los tres commits (código, tests y documentación) y el push;
+    2. con el laboratorio reiniciado, las pruebas manuales de [lab_e2_3879.md](lab_e2_3879.md): P-19,
+       P-37 y P-37b, P-17, P-70 (casos 1 a 5), P-20 repetida, y P-101′ y P-102; después, la subida al
+       staging.
 - **Papelera del diario, PNS-37:** cron como superusuario sobre filas editables; borrado que solo exige
   escritura.
   - Origen: comparación §6.1 «PNS-37 (parte)» (Alta, propuesta) y §1.3.
@@ -270,6 +319,16 @@ corrige lo elegido.
 | D1 (ficha de la comparación) en el lienzo | §8.7 «D1», §8.3 | `pns_ai_chatboo/models/chatboo_canvas_page.py:25-176` (`write` de `owner_id`); regla del AI Administrator en `pns_ai_chatboo/security/security.xml:43-76` |
 | M5 | §8.7 «M5 y M16», §8.2 | `pns_ai_chatboo/models/chatboo_async_request.py:1559-1586`, `cron_maintenance` |
 | M16 | §8.7 «M5 y M16», §8.2 | `models/ai_fx_source.py:86-166`, `get_usd_fx` |
+| Tokens de portal (E2′) | [Propuesta de E2′](e2_propuesta_3879.md), «PNS-19 (decisión 4)» | `access_token` de `account.move`, `sale.order` e `ir.attachment`; `signup_token` de `res.partner`: dan acceso a lo que el usuario ya ve |
+| Reenvío de `params` y `data` en las redirecciones (E2′) | Propuesta de E2′, PNS-17 | `utils/fetch_url_safe.py`, `request_public_http`: la consulta y el cuerpo se reenvían al host nuevo salvo en 303 |
+| Caché del agente en la vista previa (E2′) | Propuesta de E2′, «Parche 21: los otros 13 asistentes» | `bundle_import_wizard`: `import_agent_zip` → `ai.agent.get_content` → `_persist_cache_isolated` (`models/ai_agent.py:1389-1403`), cursor propio con `commit` durante «Review»; posible espera por bloqueo de la fila |
+| `onchange_email` y Gravatar (E2′) | Propuesta de E2′, «PNS-100: barrido» | core `res.partner.onchange_email` (`odoo/addons/base/models/res_partner.py:372, 870`): petición a Gravatar con el MD5 del correo desde la caja A |
+| `bus.presence.update` en cursor propio (E2′) | Propuesta de E2′, «PNS-100: barrido» | core `bus/models/bus_presence.py:36`; fuera de la lista del parche 22 porque bloquearía `dict.update` |
+| Orden por un campo secreto en la caja A (E2′) | [Registro](parches_pns_ai.md), parche 18, observaciones | `search(order='api_key')` no se filtra: oráculo débil entre filas existentes |
+| `customer_360._iso` (E2′, 28/10/2026) | [Registro](parches_pns_ai.md), parche 23, tests (`test_seges_skill_env.py`) | `pns_ai_chatboo/ai/skills/system/customer_360.py:70-75`, `_iso`: llama a `isoformat()` y falla cuando la fecha llega como `str`; la skill de fábrica falla con un cliente en `lab_pns_ai_3879_14`. Funcional, no de seguridad y ajeno a los parches; código de fábrica (decidir si se parchea o solo se comunica) |
+
+`iap.account.account_token` legible por cualquier usuario interno: observación del core de Odoo (ACL
+estándar), sin parche; en la caja A lo cubre el parche 18 (decisión de Sergio del 27/10/2026).
 
 ## 3. Al terminar
 
@@ -279,9 +338,25 @@ corrige lo elegido.
    - `ai_log.agent_id` se pierde (decidido);
    - después: cron de la papelera activo, retención de 30 días, recargar idiomas y abrir sesiones
      antiguas de Chatboo.
-2. **Informe al fabricante:** M10, M13, `collect_pin`, PNS-54, PNS-07, PNS-97, PNS-98, PNS-70, F4, la
+   - **Antes del despliegue (E2′, 27/10/2026):**
+     - **URLs MCP finales (PNS-17, parche 19):** el cliente MCP por HTTP ya no sigue redirecciones.
+       Comprobar que las URLs de los servidores MCP de LIYBEN (`ai_api_server` con transporte HTTP) son
+       las finales: `SELECT` de las URLs y `curl -sI` de cada una (o «Probar conexión» desde la ficha).
+       Si alguna redirige, poner la URL final antes de actualizar.
+     - **Auditoría de adjuntos (PNS-82, decisión 7):** repetir en LIYBEN (contenedor `odoo14_db`) la
+       consulta de §5.2 de la [propuesta de E2′](e2_propuesta_3879.md): si salen adjuntos con
+       `res_model` informado y `res_id = 0` citados en sesiones del chat, revisar el criterio antes de
+       desplegar.
+     - **Diario (PNS-37, parche 17):** la consulta de §5.1 de la misma propuesta (filas en papelera y
+       quién las escribió).
+     - **Claves MCP de LIYBEN (segundo rechazo de E2′, PNS-101/PNS-102, 27/10/2026):** las claves MCP de
+       LIYBEN se **revocaron el 27/10/2026** hasta el despliegue final de E2′ (C1/V1/V2 y C2 permitían leer
+       credenciales y datos ajenos desde el sandbox). **Tras desplegar E2′, volver a generar las claves MCP**
+       (ficha de `ai.api.server` / `ai.mcp.user`) y comprobar que los clientes vuelven a conectar.
+2. **Informe al fabricante:** M10, M13, `collect_pin`, PNS-54, PNS-07, PNS-97, PNS-98, PNS-70, PNS-100, F4, la
    nota falsa sobre `agent_id` (comparación §9.3) y, como observación, la numeración de `pns_base`
-   1.2.47 (§9.1). Sin rutas locales, kit, laboratorio, clientes ni personas.
+   1.2.47 (§9.1). Pendiente de comunicar al final (28/10/2026): PNS-101 y PNS-102 (Críticas) y
+   `customer_360._iso` (fallo funcional de la skill de fábrica; hoja de E4′). Sin rutas locales, kit, laboratorio, clientes ni personas.
 3. **Limpieza:** staging `pns_demo`, `lab_pns_ai` / `lab_pns_ai_14` y `_fabricante/`.
 
 ## 4. Estado del entorno
@@ -291,6 +366,9 @@ corrige lo elegido.
 - **`lab_pns_ai_3879_14`, tras validar los scripts del staging de E1′ (26/10/2026):** quedan
   `e1p_aiadmin` archivado y 2 filas de `ai_change_journal` de la prueba 2b, que no se pueden borrar
   desde Odoo. Se dejan así (decisión de Sergio del 26/10/2026): reflejan el candado real del diario, que E2′ revisa con PNS-37.
+- **`lab_pns_ai_3879_14`, tras P-20 (27/10/2026):** restos aceptados (decisión de Sergio): la etiqueta
+  `P-20 preview` de `demo` (`ai_mcp_user` 1), el `write_date` de OVH (`ai_provider` 3) y los adjuntos de
+  exportación 459 y 461.
 - **Staging `pns_demo`, tras E1′ (26/10/2026):**
   - 3.1.879 con E1′ (`pns_base` 1.2.47, `pns_ai_mcp` 3.1.879, `pns_ai_chatboo` 2.1.538), sin
     neutralizar; cron de la papelera activo; código anterior en `addons_antes_E1p`.
@@ -299,6 +377,8 @@ corrige lo elegido.
   - De las pruebas quedan 14 operaciones (26 en total, ninguna pendiente) y 5 filas del diario (12 en
     total).
 - **LIYBEN:** usuarios externos archivados el 23/10/2026.
+- **LIYBEN, segundo rechazo de E2′ (27/10/2026):** claves MCP **revocadas** hasta el despliegue final de E2′
+  (PNS-101 ampliado y PNS-102). Paso pendiente al terminar: **regenerarlas** (ver §3.1).
 
 ## 5. Seguimiento por parche
 
@@ -307,10 +387,18 @@ Estados (N11): aplicado → validado en laboratorio → validado en staging → 
 | N.º | Ficha | Entrega | Estado |
 |---|---|---|---|
 | 10 | PNS-83 (`collect_pin`) | E1′ | Adaptado a 3.1.879; validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
-| 11 | PNS-82 (`unlink` de la sesión) | E2′ | Adaptado a 3.1.879; pendiente |
+| 11 | PNS-82 (`unlink` de la sesión) | E2′ | Adaptado a 3.1.879; aplicado, tests en verde (27/10/2026) |
 | 12 | PNS-01 y PNS-02 (criterio de grupos), con M10 | E1′ | Adaptado a 3.1.879; validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
 | 13 | M10 (`create` de `ai.safe.operation`; `_cleanup_stuck_state`) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
 | 14 | M13 (`_unlink_retired_from_module`) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
 | 15 | PNS-07 (métodos con cursor propio en la lista del sandbox) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026); R8 (lienzo) se valida en E3′ |
 | 16 | PNS-54 (`check_identity`; token solo para el dueño) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
+| 17 | PNS-37 (diario solo para el sistema; borrar con permiso de borrado) | E2′ | Aplicado, tests en verde (27/10/2026); P-37 y P-37b pendientes |
+| 18 | PNS-19 (credenciales en la caja A; ventana del lienzo) | E2′ | Aplicado, tests en verde (27/10/2026); rechazado en la revisión y corregido el mismo día (alias, ids, caché); P-19 pendiente; ventana a revisar en E3′ |
+| 19 | PNS-17 (cabeceras al cambiar de host; cliente MCP sin redirecciones) | E2′ | Aplicado, tests en verde (27/10/2026); P-17 manual pendiente |
+| 20 | PNS-70 (Chart.js 4 como `PnsChatbooChart`) | E2′ | Aplicado (27/10/2026); P-70, casos 1 a 5, pendiente |
+| 21 | PNS-20 («Review» no escribe) | E2′ | Aplicado, tests en verde (27/10/2026); `clear_caches()` añadido tras la revisión; P-20 repetida pendiente |
+| 22 | PNS-100 (envíos y conexiones desde la caja A) | E2′ | Aplicado, tests en verde (27/10/2026) |
+| 23 | PNS-101 (el `env` de la caja A no lleva a los entornos reales del hilo) | E2′ | Aplicado, tests en verde (27/10/2026); P-101 pendiente |
+| 24 | PNS-102 (`user`/`company` del sandbox sin `su`) | E2′ | Aplicado; validación local y neutralización (28/10/2026); P-102 pendiente |
 | — | Parche de tests E0′ (datos de prueba de `test_change_journal` y `test_paap_core`) | E0′ | Validado en laboratorio (23/10/2026) |
