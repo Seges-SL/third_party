@@ -101,12 +101,21 @@ _AUTH_HEADER_NAMES = frozenset({
 })
 
 
+# Seges: parche 19 (PNS-17, seguridad). Ver docs/pendiente/parches_pns_ai.md
+# On another host only these go on: a custom auth header (apikey,
+# Ocp-Apim-Subscription-Key…) has no fixed name to strip.
+_CROSS_HOST_HEADER_NAMES = frozenset({
+    'accept', 'accept-language', 'content-type', 'user-agent',
+})
+
+
 def _strip_auth_headers(headers):
     if not headers:
         return {}
+    # Seges: parche 19 (PNS-17, seguridad). Ver docs/pendiente/parches_pns_ai.md
     return {
         key: value for key, value in headers.items()
-        if str(key).lower() not in _AUTH_HEADER_NAMES
+        if str(key).lower() in _CROSS_HOST_HEADER_NAMES
     }
 
 

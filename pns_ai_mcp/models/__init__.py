@@ -41,3 +41,5 @@ from . import ir_http
 from . import ir_model_fields_selection
 from . import ai_schema_fossil
 from . import secret_native_export
+# Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
+from . import box_a_guard

@@ -16,6 +16,9 @@ try:  # pragma: no cover - camino de runtime Odoo
     from odoo.addons.pns_ai_mcp.controllers.validators_base import (
         DANGEROUS_ATTR_NAMES,
         RELAXAICODE_DANGEROUS_MODULES,
+        # Seges: parche 23 (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        RELAXAICODE_ENV_STATE_ATTRS,
+        RELAXAICODE_ENV_STATE_HINT,
         RELAXAICODE_FORBIDDEN_ORM_ATTRS,
         RELAXAICODE_ORM_WRITE_ATTRS,
         RELAXAICODE_PRIVILEGE_ATTRS,
@@ -26,6 +29,8 @@ try:  # pragma: no cover - camino de runtime Odoo
         _unsafe_import_error,
         blocked_private_attr,
         catalogue_inspect_error,
+        # Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        sandbox_forbidden_name,
     )
 except Exception:  # pragma: no cover - camino unit test / standalone
     import importlib.util as _ilu
@@ -35,6 +40,9 @@ except Exception:  # pragma: no cover - camino unit test / standalone
     _vm = _ilu.module_from_spec(_sp)
     _sp.loader.exec_module(_vm)
     DANGEROUS_ATTR_NAMES = _vm.DANGEROUS_ATTR_NAMES
+    # Seges: parche 23 (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    RELAXAICODE_ENV_STATE_ATTRS = _vm.RELAXAICODE_ENV_STATE_ATTRS
+    RELAXAICODE_ENV_STATE_HINT = _vm.RELAXAICODE_ENV_STATE_HINT
     RELAXAICODE_FORBIDDEN_ORM_ATTRS = _vm.RELAXAICODE_FORBIDDEN_ORM_ATTRS
     RELAXAICODE_ORM_WRITE_ATTRS = _vm.RELAXAICODE_ORM_WRITE_ATTRS
     RELAXAICODE_PRIVILEGE_ATTRS = _vm.RELAXAICODE_PRIVILEGE_ATTRS
@@ -46,6 +54,8 @@ except Exception:  # pragma: no cover - camino unit test / standalone
     _unsafe_import_error = _vm._unsafe_import_error
     blocked_private_attr = _vm.blocked_private_attr
     catalogue_inspect_error = _vm.catalogue_inspect_error
+    # Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    sandbox_forbidden_name = _vm.sandbox_forbidden_name
 
 try:  # pragma: no cover - Odoo runtime
     from odoo.addons.pns_ai_mcp.utils.sandbox_helpers import (
@@ -63,19 +73,52 @@ except Exception:  # pragma: no cover - host unit test / standalone
     collect_sandbox_helpers = _shm.collect_sandbox_helpers
 
 
+# Seges: parche 24 (PNS-102, seguridad). Ver docs/pendiente/parches_pns_ai.md
+def _identity_no_su(env, name):
+    """``user`` / ``company`` / ``companies`` reconstruidos SIN su.
+
+    ``env.user`` / ``env.company`` / ``env.companies`` del ORM fuerzan su=True
+    (``api.py``: ``self(su=True)``). El sandbox corre como el usuario que pregunta,
+    así que se reconstruyen desde su ``uid`` sobre el mismo ``env`` (sin su) para
+    que ACL y record rules se apliquen al leer sus campos y relaciones.
+    """
+    if name == 'user':
+        return env['res.users'].browse(env.uid)
+    if name == 'company':
+        return env['res.company'].browse(env.company.id)
+    return env['res.company'].browse(env.companies.ids)
+
+
 class GuardedSandboxEnv(object):
     """Sandbox ``env``: catalogue models stay off ORM (AST + runtime).
 
     ``ai.api.server`` / ``ai.context`` / ``ai.skill`` /
     ``ai.trusted.action`` are catalogues.
     List/load knowledge via ``get_context``; skills via ``/`` in Chatboo;
-    external calls via ``api_call``. ``with_context`` / ``with_company``
-    return another wrapper so the gate holds down the chain. Nothing here
-    changes the identity: ``sudo``, ``with_user``, ``with_env`` and
-    ``env(user=…, su=…)`` raise.
+    external calls via ``api_call``. Nothing here changes the identity:
+    ``sudo``, ``with_user``, ``with_env`` and ``env(user=…, su=…)`` raise.
     """
 
-    _WRAP_METHODS = ('with_context', 'with_company')
+    # Seges: parche 23 ampliado / A1 (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    # with_context / with_company se retiran del wrapper: eran una vía de estado
+    # (y cambio de contexto) innecesaria para el sandbox; el código del modelo usa
+    # recordset.with_context(...), que no pasa por aquí.
+    _WRAP_METHODS = ()
+    # Seges: parche 23 (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    # What the wrapper hands out; anything else raises. uid/su/user/.../ref are for
+    # sandbox code. cr and registry are for the ENGINE, which gets this wrapper
+    # back after the run (render, error replies); sandbox code cannot name them
+    # (the AST and guarded_getattr refuse both).
+    _ATTRS = frozenset({
+        'uid', 'su', 'user', 'company', 'companies', 'context', 'lang', 'ref',
+        'is_superuser', 'is_admin', 'is_system',
+        'cr', 'registry',
+    })
+    # Seges: parche 24 (PNS-102, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    # user/company/companies del ORM fuerzan su=True (api.py: self(su=True)). El
+    # sandbox corre como el usuario: se reconstruyen SIN su para que ACL y record
+    # rules se apliquen (p. ej. account.move ajeno, res.users.totp_secret).
+    _IDENTITY_NO_SU = ('user', 'company', 'companies')
 
     def __init__(self, env):
         object.__setattr__(self, '_env', env)
@@ -109,6 +152,15 @@ class GuardedSandboxEnv(object):
             )
         if name in RELAXAICODE_PRIVILEGE_ATTRS:
             raise AttributeError(RELAXAICODE_PRIVILEGE_HINT % (name,))
+        # Seges: parche 23 (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        if name not in self._ATTRS:
+            raise AttributeError(
+                f"env.{name} is not available in RelaxAICode (sandbox): env gives "
+                "models (env['model']), user, company, context, lang and ref.")
+        # Seges: parche 24 (PNS-102, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        # user/company/companies sin su (ver _IDENTITY_NO_SU).
+        if name in self._IDENTITY_NO_SU:
+            return _identity_no_su(self._env, name)
         attr = getattr(self._env, name)
         if name in self._WRAP_METHODS and callable(attr):
             def _wrapped(*args, **kwargs):
@@ -152,6 +204,9 @@ def guarded_getattr(obj, name, *default):
             )
         if name in RELAXAICODE_PRIVILEGE_ATTRS:
             raise AttributeError(RELAXAICODE_PRIVILEGE_HINT % (name,))
+        # Seges: parche 23 (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        if name in RELAXAICODE_ENV_STATE_ATTRS:
+            raise AttributeError(RELAXAICODE_ENV_STATE_HINT % (name,))
         if name in RELAXAICODE_FORBIDDEN_ORM_ATTRS:
             raise AttributeError(
                 "Access to attribute %r is not allowed in RelaxAICode "
@@ -174,6 +229,14 @@ def guarded_getattr(obj, name, *default):
         if len(name) >= 5 and name.startswith('__') and name.endswith('__'):
             raise AttributeError(
                 "Access to dunder attribute %r is not allowed in RelaxAICode (sandbox)." % (name,)
+            )
+        # Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        # Catch-all por el predicado ÚNICO: cierra lo que no tiene mensaje propio
+        # arriba (Formatter/get_field/vformat… y format/format_map), de modo que
+        # ningún nombre que sandbox_forbidden_name rechace se resuelva por getattr.
+        if sandbox_forbidden_name(name):
+            raise AttributeError(
+                f"Access to attribute {name!r} is not allowed in RelaxAICode (sandbox)."
             )
     value = getattr(obj, name, *default)
     if isinstance(value, _types.ModuleType):
@@ -235,13 +298,13 @@ _MODULE_FACADE_FORBIDDEN_CALLABLES = frozenset({
 
 def _module_facade_rejects(name, value):
     """Shared policy: True when a module attribute must not be exposed."""
-    if blocked_private_attr(name):
-        return True
-    if name in DANGEROUS_ATTR_NAMES:
+    # Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    # Predicado ÚNICO: cierra `from string import Formatter` (V1) y, en general,
+    # cualquier nombre de DANGEROUS_FORMAT_NAMES / dunder / privado expuesto por un
+    # módulo stdlib seguro. Mismo criterio que guarded_getattr y el formateador.
+    if sandbox_forbidden_name(name):
         return True
     if name in _MODULE_FACADE_FORBIDDEN_CALLABLES:
-        return True
-    if len(name) >= 5 and name.startswith('__') and name.endswith('__'):
         return True
     return isinstance(value, _types.ModuleType)
 
@@ -272,6 +335,8 @@ class SafeModuleFacade(object):
             return guarded_attrgetter
         if value is _operator.methodcaller:
             return guarded_methodcaller
+        if value is _operator.itemgetter:
+            return guarded_itemgetter
         return value
 
     def __setattr__(self, name, value):
@@ -305,17 +370,63 @@ class _AttrProbe(object):
 _ATTR_PROBE = _AttrProbe()
 
 
+def _resolve_attr_path(obj, names):
+    """Follow ``names`` from ``obj``, one ``guarded_getattr`` per part."""
+    for name in names:
+        obj = guarded_getattr(obj, name)
+    return obj
+
+
+# Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+# Las fachadas devuelven una función, no un operator.attrgetter/methodcaller:
+# con type() permitido, la clase nativa construiría un getter nuevo sin pasar
+# por _check_attr_path. type() sobre la función solo da 'function'.
 def guarded_attrgetter(*paths):
     """``operator.attrgetter`` whose names pass the same policy as getattr."""
+    if not paths:
+        raise TypeError('attrgetter expected 1 argument, got 0')
     for path in paths:
         _check_attr_path(path)
-    return _operator.attrgetter(*paths)
+    parts = [path.split('.') for path in paths]
+    if len(parts) == 1:
+        names = parts[0]
+
+        def attrgetter(obj):
+            return _resolve_attr_path(obj, names)
+    else:
+        def attrgetter(obj):
+            return tuple(_resolve_attr_path(obj, names) for names in parts)
+    return attrgetter
 
 
 def guarded_methodcaller(name, *args, **kwargs):
     """``operator.methodcaller`` whose name passes the same policy as getattr."""
     _check_attr_path(name)
-    return _operator.methodcaller(name, *args, **kwargs)
+
+    def methodcaller(obj):
+        return guarded_getattr(obj, name)(*args, **kwargs)
+    return methodcaller
+
+
+def guarded_itemgetter(*items):
+    """``operator.itemgetter`` como función: ``type()`` sobre ella da 'function'.
+
+    itemgetter resuelve SUBÍNDICE (``obj[k]``), no atributos, así que no es una
+    vía hacia los dunders; se cierra por consistencia con attrgetter/methodcaller,
+    para que su clase nativa no se obtenga por ``type()``. Conserva el subíndice y
+    el uso como ``key=`` (varios índices → tupla, como el nativo).
+    """
+    if not items:
+        raise TypeError('itemgetter expected 1 argument, got 0')
+    if len(items) == 1:
+        item = items[0]
+
+        def itemgetter(obj):
+            return obj[item]
+    else:
+        def itemgetter(obj):
+            return tuple(obj[i] for i in items)
+    return itemgetter
 
 
 def safe_module(module):
@@ -437,9 +548,12 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
     env = env_override if env_override is not None else controller._get_env_for_operation(operation_type)
     
     # Extraer variables de infraestructura (Protocolo Técnico)
-    user = env.user
-    company = env.company
-    
+    # Seges: parche 24 (PNS-102, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    # Globales user/company SIN su (env.user/env.company fuerzan su=True): el
+    # sandbox lee como el usuario. Mismo criterio que GuardedSandboxEnv.
+    user = _identity_no_su(env, 'user')
+    company = _identity_no_su(env, 'company')
+
     # Información de versión de Odoo
     try:
         import odoo

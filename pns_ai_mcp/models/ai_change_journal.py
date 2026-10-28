@@ -495,7 +495,8 @@ class AiChangeJournal(models.Model):
         else:
             raise UserError(_('This operation type cannot be reverted from the journal.'))
 
-        self.write({
+        # Seges: parche 17 (PNS-37, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self.sudo().write({
             'state': 'reverted',
             'reversible': False,
             'reversible_reason': _('Already reverted'),
@@ -567,7 +568,8 @@ class AiChangeJournal(models.Model):
                         model, ids,
                     )
                     continue
-            row.write({
+            # Seges: parche 17 (PNS-37, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            row.sudo().write({
                 'reversible': False,
                 'reversible_reason': _('Emptied from the trash'),
             })
@@ -631,6 +633,21 @@ class AiChangeJournal(models.Model):
                 count, days,
             )
         return count
+
+    # Seges: parche 17 (PNS-37, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Only the system writes the journal. A row written by RPC could
+        send records to the trash, which the cron empties as superuser."""
+        if not self.env.su:
+            raise AccessError(_('Only the system can write the AI change journal.'))
+        return super().create(vals_list)
+
+    # Seges: parche 17 (PNS-37, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    def write(self, vals):
+        if not self.env.su and vals:
+            raise AccessError(_('Only the system can write the AI change journal.'))
+        return super().write(vals)
 
     def unlink(self):
         if self.env.user._is_superuser():

@@ -283,6 +283,37 @@ RELAXAICODE_SIDE_EFFECT_METHODS = frozenset({
     'action_generate_openapi',
     'action_generate',
     'action_log_generation_usage',
+    # Seges: parche 22 (PNS-100, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    # Public methods that send mail, open a connection or run other code
+    # without writing first, so box A's READ ONLY does not stop them.
+    'send_email',
+    'connect',
+    'test_smtp_connection',
+    'load_remote_url',
+    'send',
+    'process_email_queue',
+    'fetch_mail',
+    'button_confirm_login',
+    'get_credits',
+    'autocomplete',
+    'enrich_company',
+    'read_by_vat',
+    'start_sync',
+    'send_letter',
+    'snailmail_print',
+    'update_notification',
+    'install_from_urls',
+    'action_process_edi_web_services',
+    'get_usd_fx',
+    'run',
+    'method_direct_trigger',
+    'execute_callback',
+    'upgrade_module',
+    'action_start_automatic_process',
+    'parent_migration_process_cb',
+    'send_mail',
+    'message_process',
+    'message_route',
 })
 
 # RelaxAICode always runs as the asking user. These names hand out another
@@ -299,6 +330,19 @@ RELAXAICODE_PRIVILEGE_HINT = (
     "what the user cannot read stays out of the answer."
 )
 
+# Seges: parche 23 (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+# The ORM state the thread shares with the engine: ``env.all`` hands out
+# every real environment (the request's cursor, ``su``) and ``env.cache``
+# what any of them read. Blocked as attributes only: ``all([...])`` and a
+# variable called ``cache`` still work.
+RELAXAICODE_ENV_STATE_ATTRS = frozenset({
+    'cache', 'all', 'envs', 'towrite', 'tocompute', 'protected',
+})
+RELAXAICODE_ENV_STATE_HINT = (
+    "RelaxAICode cannot use %r: it is the ORM's own state, shared with the "
+    "engine. Read records with env['model'] and their fields."
+)
+
 RELAXAICODE_EXTERNAL_API_METHODS = frozenset({
     '_get_driver',
     '_resolve_auth_token',
@@ -311,6 +355,91 @@ RELAXAICODE_DRIVER_METHODS = frozenset({
     'call',
     'discover',
 })
+
+# Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+# str.format / str.format_map resueltos por el formateador propio del sandbox
+# (relaxaicode_format_guard). Prohibidos COMO NOMBRE para que no se obtenga el
+# método nativo por getattr / attrgetter / methodcaller y se esquive la reescritura
+# del AST: '{...}'.format(x) pasa por _sandbox_str_attr, pero getattr(t, 'format')
+# o methodcaller('format', …) no deben devolver el método en C.
+RELAXAICODE_STR_FORMAT_NAMES = frozenset({'format', 'format_map'})
+
+
+def _is_dunder(name):
+    """``__x__`` (doble guion a ambos lados, ``len >= 5``): introspección."""
+    return (
+        isinstance(name, str)
+        and len(name) >= 5
+        and name.startswith('__')
+        and name.endswith('__')
+    )
+
+
+def sandbox_forbidden_name(name):
+    """Predicado ÚNICO de nombres que el sandbox no puede resolver POR NINGUNA VÍA.
+
+    Un solo criterio para todos los puntos donde un nombre se resuelve en
+    runtime: ``guarded_getattr`` (acceso dinámico), ``_check_attr_path``
+    (attrgetter / methodcaller), ``_module_facade_rejects`` (atributo de módulo
+    stdlib) y el formateador propio de str.format. Cierra por la raíz la familia
+    C1 / V1 / V2: el nombre que lleva a introspección (dunder, privado, estado del
+    motor, mutadores, Formatter) se rechaza aunque el nombre llegue partido, en
+    variable o resuelto solo al correr; el AST (que solo ve literales) es defensa
+    adicional, no la única capa.
+    """
+    if not isinstance(name, str):
+        return False
+    if _is_dunder(name):
+        return True
+    if blocked_private_attr(name):
+        return True
+    return name in (
+        RELAXAICODE_PRIVILEGE_ATTRS
+        | RELAXAICODE_ENV_STATE_ATTRS
+        | RELAXAICODE_FORBIDDEN_ORM_ATTRS
+        | RELAXAICODE_ORM_WRITE_ATTRS
+        | RELAXAICODE_SIDE_EFFECT_METHODS
+        | DANGEROUS_ATTR_NAMES
+        | DANGEROUS_FORMAT_NAMES
+        | RELAXAICODE_STR_FORMAT_NAMES
+    )
+
+
+# Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+# Nombres globales que el motor inyecta en el contexto del sandbox y a los que
+# llama el código ya reescrito (relaxaicode_format_guard). El script puede leerlos,
+# pero no ligarlos: si los sombrea, la reescritura del AST llamaría a lo que él
+# haya puesto en su lugar.
+RELAXAICODE_ENGINE_NAMES = frozenset({'_sandbox_str_attr'})
+RELAXAICODE_ENGINE_NAME_HINT = (
+    "RelaxAICode cannot bind %r: it is an internal name of the sandbox engine. "
+    "Use another name for your variable."
+)
+
+
+def engine_name_binding(node):
+    """Nombre interno del motor que *node* liga (Store/Del, global/nonlocal,
+    argumento, def/class, import, ``except … as``), o ``None``."""
+    if isinstance(node, ast.Name):
+        names = () if isinstance(node.ctx, ast.Load) else (node.id,)
+    elif isinstance(node, (ast.Global, ast.Nonlocal)):
+        names = node.names
+    elif isinstance(node, ast.arg):
+        names = (node.arg,)
+    elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        names = (node.name,)
+    elif isinstance(node, (ast.Import, ast.ImportFrom)):
+        names = tuple(
+            alias.asname or alias.name.split('.')[0] for alias in node.names
+        )
+    elif isinstance(node, ast.ExceptHandler):
+        names = (node.name,) if node.name else ()
+    else:
+        names = ()
+    for name in names:
+        if name in RELAXAICODE_ENGINE_NAMES:
+            return name
+    return None
 
 
 # Python 3.7 (Odoo 14) parses literals as Str / Num / NameConstant / Bytes;

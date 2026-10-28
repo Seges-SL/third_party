@@ -5,7 +5,11 @@
 
 import logging
 
+# Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
+from ..models.box_a_guard import _box_a_clear_cache
 from .context_builder import build_safe_context
+# Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+from .relaxaicode_format_guard import compile_sandbox_code, run_sandbox_code
 from .mcp_decorators import mcp_tool
 from .relaxaicode_replies import (
     _format_error_response,
@@ -181,6 +185,9 @@ def tool_relaxaicode(
 
         # CAJA A: cursor aislado; rollback al cerrar (escrituras colaterales no persisten).
         ro_env, ro_cr = controller._get_readonly_env()
+        # Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        ro_cr._seges_box_a = True
+        _box_a_clear_cache(ro_env)
         safe_context = build_safe_context(
             controller,
             operation_type,
@@ -192,8 +199,8 @@ def tool_relaxaicode(
             return error_response
 
         try:
-            # Compilar código (Python estándar, sin transformaciones)
-            byte_code = compile(code, '<relaxaicode>', 'exec')
+            # Compilar reescribiendo .format/.format_map (relaxaicode_format_guard).
+            byte_code = compile_sandbox_code(code)
         except SyntaxError as e:
             return _format_error_response(
                 -32602,
@@ -231,7 +238,10 @@ def tool_relaxaicode(
             if test_env is None:
                 _logger.error(f"[{_log_where()}] CRÍTICO: env es None en safe_context antes de exec")
 
-            exec(byte_code, safe_context, safe_context)
+            # Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            # run_sandbox_code inyecta el formateador propio (_sandbox_str_attr) y
+            # solo ejecuta código compilado con la reescritura de .format.
+            run_sandbox_code(safe_context, byte_code)
         except Exception as exec_error:
             return _exec_error_response(
                 controller, exec_error, code, safe_context, agent_llm,
@@ -282,6 +292,8 @@ def tool_relaxaicode(
     finally:
         # Cerrar el cursor aislado de la caja A (rollback descarta cualquier escritura colateral).
         if ro_cr is not None:
+            # Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            ro_cr._seges_box_a = False
             try:
                 ro_cr.rollback()
             except Exception:

@@ -15,6 +15,13 @@ from .validators_base import (
     RELAXAICODE_NETWORK_IMPORT_MODULES,
     RELAXAICODE_PRIVILEGE_ATTRS,
     RELAXAICODE_SAFE_MODULES,
+    # Seges: parche 23 (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    RELAXAICODE_ENV_STATE_ATTRS,
+    RELAXAICODE_ENV_STATE_HINT,
+    # Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    sandbox_forbidden_name,
+    RELAXAICODE_ENGINE_NAME_HINT,
+    engine_name_binding,
     _ast_parent_map,
     _is_inside_function,
     _private_attr_error,
@@ -130,6 +137,12 @@ def validate_relaxaicode_source_ast(code):
     
     # Analizar AST completo
     for node in ast.walk(tree):
+        # Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        # Nombres internos del motor (_sandbox_str_attr): se leen, no se ligan.
+        engine_name = engine_name_binding(node)
+        if engine_name:
+            return False, format_ast_error(
+                'ENGINE_NAME', RELAXAICODE_ENGINE_NAME_HINT % (engine_name,)), False
         # ============================================================
         # VALIDAR IMPORTS DIRECTOS
         # ============================================================
@@ -300,6 +313,10 @@ def validate_relaxaicode_source_ast(code):
                 return False, _external_api_bypass_error(node.attr), False
             if node.attr in RELAXAICODE_PRIVILEGE_ATTRS:
                 return False, _privilege_error(node.attr), False
+            # Seges: parche 23 (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            if node.attr in RELAXAICODE_ENV_STATE_ATTRS:
+                return False, format_ast_error(
+                    'ENV_STATE', RELAXAICODE_ENV_STATE_HINT % (node.attr,)), False
             if blocked_private_attr(node.attr):
                 return False, _private_attr_error(node.attr), False
             if node.attr in dangerous_attrs:
@@ -394,6 +411,18 @@ def validate_relaxaicode_source_ast(code):
                     (p for p in _fmt_parts if blocked_private_attr(p)), None)
                 if _fmt_private:
                     return False, _private_attr_error(_fmt_private), False
+                # Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+                # Defensa adicional en plantilla LITERAL: filtro completo de campos.
+                # El cierre real de la familia es el formateador propio en runtime
+                # (relaxaicode_format_guard), que cubre también plantillas en variable.
+                _fmt_forbidden = next(
+                    (p for p in _fmt_parts if sandbox_forbidden_name(p)), None)
+                if _fmt_forbidden:
+                    return False, format_ast_error(
+                        'FORMAT',
+                        f"Relaxaicode cannot use .format() with {_fmt_forbidden!r} "
+                        "in the template (blocked name).",
+                    ), False
                 if fmt_str and re.search(r'\{[^{}]*__[A-Za-z0-9_]*__', fmt_str):
                     return False, format_ast_error(
                         'FORMAT',

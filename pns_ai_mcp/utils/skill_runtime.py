@@ -2985,6 +2985,9 @@ def bootstrap_skill_code_body(env, code, arguments='', skill_code='skill',
         code = drop_schema_literal_assigns(code, live)
     try:
         from ..controllers.context_builder import build_safe_context
+        from ..controllers.relaxaicode_format_guard import (  # pylint: disable=import-outside-toplevel
+            run_sandbox_code,
+        )
 
         class _Ctrl(object):
             def __init__(self, _env):
@@ -3020,10 +3023,11 @@ def bootstrap_skill_code_body(env, code, arguments='', skill_code='skill',
         ctx.setdefault('previous_result', None)
         for key, val in params.items():
             ctx[key] = val
-        exec(
-            compile(code, '<skill:%s>' % (skill_code or 'x'), 'exec'),
-            ctx, ctx,
-        )
+        # Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        # Misma compilación que relaxaicode (reescritura de .format) y el
+        # formateador propio inyectado tras los parámetros: un parámetro no lo
+        # sombrea.
+        run_sandbox_code(ctx, code, f"<skill:{skill_code or 'x'}>")
         result = ctx.get('result')
         if isinstance(result, dict):
             # Skill-authored help/ask cards: stamp trust so report mode can

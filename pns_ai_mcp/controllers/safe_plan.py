@@ -947,6 +947,9 @@ def execute_safe_plan(env, steps):
                 'ai.change.journal' in env
                 and env['ai.change.journal'].model_can_archive(model)
             ):
+                # Seges: parche 17 (PNS-37, seguridad). Ver docs/pendiente/parches_pns_ai.md
+                recs.check_access_rights('unlink')
+                recs.check_access_rule('unlink')
                 recs.write({'active': False})
                 quarantine = True
             else:

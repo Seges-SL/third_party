@@ -13,6 +13,8 @@ from odoo import models, fields, api, _
 from odoo.exceptions import RedirectWarning, UserError
 
 from odoo.addons.pns_ai_mcp.utils import record_marks
+# Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
+from odoo.addons.pns_ai_mcp.models.box_a_guard import _box_a_trusted
 from odoo.addons.pns_ai_mcp.utils.markup_rename import rename_stored_markup
 
 from ..utils import turn_documents
@@ -1183,7 +1185,21 @@ class ChatbooSession(models.Model):
             )
         return self.canvas_public_url(rev=rev)
 
+    # Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
     def _ask_design(self, system, prompt, what):
+        """The design call, inside box A too: it reads the provider there.
+
+        Plain strings go in; only the design (content and error) comes out.
+        """
+        system, prompt, what = str(system or ''), str(prompt or ''), str(what or '')
+        with _box_a_trusted(self.env):
+            result = self._ask_design_raw(system, prompt, what) or {}
+            return {
+                'content': str(result.get('content') or ''),
+                'error': str(result.get('error') or ''),
+            }
+
+    def _ask_design_raw(self, system, prompt, what):
         """One call to the Design chain, metered and logged on the turn."""
         from odoo.addons.pns_ai_mcp.utils.agent_engine import (
             llm_completion_for_agent,
@@ -1954,6 +1970,9 @@ class ChatbooSession(models.Model):
         tiene un job zombie bloqueado, fallamos YA con mensaje claro en vez de
         dejar el History colgado (el spinner va en shadow y parece que «no borra»).
         """
+        # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self.check_access_rights('unlink')
+        self.check_access_rule('unlink')
         if self.ids:
             # 1) Jobs async primero (FK ON DELETE CASCADE también esperaría el
             #    mismo lock; así controlamos timeout y mensaje).
@@ -1992,7 +2011,12 @@ class ChatbooSession(models.Model):
                     ('res_id', 'in', self.ids),
                 ])
                 if atts:
-                    atts.unlink()
+                    # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
+                    owner = {s.id: s.user_id.id for s in self.sudo()}
+                    own = atts.filtered(
+                        lambda a: a.create_uid.id in (False, owner.get(a.res_id)))
+                    (atts - own).write({'res_model': False, 'res_id': False})
+                    own.unlink()
             except Exception:
                 _logger.warning(
                     "Chatboo: no se pudieron borrar los adjuntos de las sesiones %s",
