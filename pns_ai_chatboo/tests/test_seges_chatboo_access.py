@@ -6,11 +6,13 @@ métodos del flujo de chips dejan de ser públicos y un adjunto solo se engancha
 a la sesión de su creador.
 
 Portado de la rama 14.0-pns-ai-correcciones (entrega E2) y adaptado a 3.1.879
-(docs/specs/comparacion_pns_ai_3-1-879.md, §4.1). Quedan fuera:
-- E1′ (PNS-07): ``test_fulfill_client_export_claims_own``;
-- E2′ (parche 11 adaptado): ``test_unlink_own_session_keeps_foreign``,
-  ``test_cron_unlink_sudo_keeps_foreign`` y, en ``test_claim_filters_in_python``,
-  el adjunto con ``res_model`` y ``res_id = 0``.
+(docs/specs/comparacion_pns_ai_3-1-879.md, §4.1). ``test_fulfill_client_export_claims_own``
+está en ``test_seges_chatboo_export.py`` (E1′, PNS-07).
+
+E2′ (parche 11 adaptado a 3.1.879): ``test_unlink_own_session_keeps_foreign``,
+``test_cron_unlink_sudo_keeps_foreign`` y, en ``test_claim_filters_in_python``, el
+adjunto con ``res_model`` y ``res_id = 0``, que no se engancha (criterio del
+fabricante, decisión 7 de docs/pendiente/e2_propuesta_3879.md).
 """
 
 import base64
@@ -199,6 +201,35 @@ class TestSegesChatbooRpc(_SegesChatbooData):
                 'seges_e2_b', f'/pns_ai_mcp/session_file/{att.id}')
             self.assertEqual(resp.status_code, 404)
 
+    def test_unlink_own_session_keeps_foreign(self):
+        """Parche 11 adaptado (E2′). Falla sin el parche (borraría el adjunto de A)."""
+        # Enganche anterior a la corrección, simulado en sudo.
+        self.att_a.sudo().write({
+            'res_model': 'chatboo.session', 'res_id': self.cs_b.id})
+        own = self.env['ir.attachment'].with_user(self.user_b).create({
+            'name': 'seges-e2-own.png',
+            'datas': base64.b64encode(b'seges-e2-own'),
+            'mimetype': 'image/png',
+            'res_model': 'chatboo.session',
+            'res_id': self.cs_b.id,
+        })
+        own_id = own.id
+        res = self._rpc(
+            'seges_e2_b', 'chatboo.session', 'unlink', [[self.cs_b.id]])
+        self.assertIn('result', res, res)
+        self.assertIsNone(self._att_row(own_id))
+        row = self._att_row(self.att_a.id)
+        self.assertIsNotNone(row)
+        self.assertFalse(row[0])
+        self.assertFalse(row[1])
+        self.assertEqual(row[2], self.user_a.id)
+        resp = self._get(
+            'seges_e2_a', f'/pns_ai_mcp/session_file/{self.att_a.id}')
+        self.assertEqual(resp.status_code, 200)
+        resp = self._get(
+            'seges_e2_b', f'/pns_ai_mcp/session_file/{self.att_a.id}')
+        self.assertEqual(resp.status_code, 404)
+
     def test_unlink_foreign_session_refused(self):
         img = self.env['ir.attachment'].with_user(self.user_a).create({
             'name': 'seges-e2-img.png',
@@ -251,13 +282,15 @@ class TestSegesChatbooFlows(_SegesChatbooData):
         cs_a_as_b._claim_turn_file_chips([{'attachment_id': self.att_b.id}])
         self.assertEqual(self._hung(self.att_a.id), (None, None))
         self.assertEqual(self._hung(self.att_b.id), (None, None))
-        # (d) control: A engancha el suyo. El de res_id=0 (con res_model) no lo
-        # engancha 3.1.879: ese caso se decide con el parche 11 adaptado (E2′).
+        # (d) control: A engancha el suyo. El suyo con res_model y res_id=0 no
+        # se engancha: criterio del fabricante (decisión 7 de E2′).
         self.cs_a.with_user(self.user_a)._claim_turn_file_chips([
             {'attachment_id': self.att_a.id},
+            {'attachment_id': self.att_a_rm0.id},
         ])
         self.assertEqual(
             self._hung(self.att_a.id), ('chatboo.session', self.cs_a.id))
+        self.assertEqual(self._hung(self.att_a_rm0.id), ('res.partner', 0))
 
     def test_save_to_session_claims_only_own(self):
         env_a = self.env(user=self.user_a)
@@ -290,6 +323,29 @@ class TestSegesChatbooFlows(_SegesChatbooData):
         self.assertIn(
             chip_own['attachment_id'],
             [f.get('attachment_id') for f in last.get('files') or []])
+
+    def test_cron_unlink_sudo_keeps_foreign(self):
+        """Parche 11 adaptado (E2′): varias sesiones en sudo, como `_cleanup_old_sessions`."""
+        Attachment = self.env['ir.attachment']
+        vals = {'mimetype': 'image/png'}
+        own_a = Attachment.with_user(self.user_a).create(dict(
+            vals, name='seges-e2-cron-a.png', datas=base64.b64encode(b'cron-a'),
+            res_model='chatboo.session', res_id=self.cs_a.id))
+        own_b = Attachment.with_user(self.user_b).create(dict(
+            vals, name='seges-e2-cron-b.png', datas=base64.b64encode(b'cron-b'),
+            res_model='chatboo.session', res_id=self.cs_b.id))
+        # Adjunto de otro creador (admin) enganchado a la sesión de B, en sudo.
+        self.att_cfg.sudo().write({
+            'res_model': 'chatboo.session', 'res_id': self.cs_b.id})
+        own_ids = (own_a.id, own_b.id)
+        (self.cs_a + self.cs_b).sudo().unlink()
+        for att_id in own_ids:
+            self.assertIsNone(self._att_row(att_id))
+        row = self._att_row(self.att_cfg.id)
+        self.assertIsNotNone(row)
+        self.assertFalse(row[0])
+        self.assertFalse(row[1])
+        self.assertEqual(row[2], self.user_admin.id)
 
     def test_public_names_gone(self):
         model = type(self.env['chatboo.session'])

@@ -38,3 +38,15 @@ from . import test_seges_rpc_access
 from . import test_seges_user_groups
 from . import test_seges_safe_operation
 from . import test_seges_verification
+# Seges: tests de la entrega E2′ (parches 17, 18, 19, 21 y 22). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_change_journal
+from . import test_seges_sandbox_credentials
+from . import test_seges_fetch_redirect
+from . import test_seges_import_preview
+from . import test_seges_sandbox_side_effects
+# Seges: tests de la entrega E2′ (parche 23). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_sandbox_env
+# Seges: tests de la entrega E2′ (parche 23 ampliado y 24). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_format_guard
+from . import test_seges_facade_class
+from . import test_seges_identity_su
