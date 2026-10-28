@@ -2075,3 +2075,28 @@ una importación, sin pulsar Confirmar:
 Tras reiniciar el contexto (`odoo-dev 14 parar` y `arrancar` desde `~/GitHub/lab_pns_ai_3879`): P-19,
 P-37, P-37b, P-17 manual, P-70 (casos 1 a 5) y P-20 repetida, con los pasos y las consultas de
 [lab_e2_3879.md](lab_e2_3879.md). El resultado se anota en un bloque fechado debajo de este.
+
+## Laboratorio — E2′, resultado (28/10/2026)
+
+Pruebas manuales de [lab_e2_3879.md](lab_e2_3879.md) tras reiniciar el contexto (`parar` + `arrancar`,
+Sergio). Detalle por caso en ese documento, «Resultado (28/10/2026)».
+
+| Prueba | Parche (PNS) | Quién / cómo | Resultado |
+|---|---|---|---|
+| P-19 | 18 (PNS-19) | Claude, shell | **OK** |
+| P-101 | 23 (PNS-101) | Claude, shell | **OK** |
+| P-101′ | 23 ampliado (PNS-101) | Claude, shell | **OK** |
+| P-102 | 24 (PNS-102) | Claude, shell | **OK** |
+| P-37w/c | 17 (PNS-37) | Claude, shell | **OK** |
+| P-37b | 17 (PNS-37) | Test `test_plan_unlink_requires_unlink_right` (verde en `tests-20261027-124454.log`) | **Cubierta por el test**; **pendiente de confirmación manual en staging** |
+| P-17 manual | 19 (PNS-17) | Sergio, navegador | **OK** |
+| P-70, casos 1 a 5 | 20 (PNS-70) | Sergio, navegador | **OK** |
+| P-20 A y B | 21 (PNS-20) | Sergio, navegador | **OK** |
+
+- Shell: `odoo-dev 14 shell` con `tool_relaxaicode` + `_StubController`, sin `/mcp` ni claves MCP;
+  rollback al final. Ninguna respuesta contenía `database.secret`, las `api_key` de los proveedores,
+  `admin_passwd`/`db_password` ni `totp_secret` (comprobado contra los valores leídos fuera del sandbox,
+  sin imprimirlos).
+- Salvedades (P-19b sin datos en esta BD; `c2_su.py` no discrimina porque `demo` tiene Facturación) y la
+  escritura no prevista en `ai_log` (filas 318 y 319, de P-19j): en [lab_e2_3879.md](lab_e2_3879.md).
+- Queda para staging: P-37b manual.
