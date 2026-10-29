@@ -472,19 +472,38 @@ figuran quién, qué se hace y qué se espera; los pasos detallados se remiten a
 **Requisitos bloqueantes: dos pasos previos de código.** **No se empieza A ni se toca el staging** hasta
 que los dos estén hechos y validados contra el laboratorio (`lab_pns_ai_3879`). Precedente: los scripts de
 E1′ se prepararon y validaron contra el laboratorio el 26/10/2026, antes de la subida ([subida de
-E1′](staging_e1_3879.md), D.0). Son scripts del equipo de Sergio, fuera del repo, y no código de los
-módulos.
+E1′](staging_e1_3879.md), D.0). Son scripts del equipo de Sergio y no código de los módulos: el de P-19
+está en el repo ([scripts_e2/pruebas_e2p_lab.py](scripts_e2/pruebas_e2p_lab.py)); los de la 4 bis,
+fuera.
 
 | # | Paso previo | Por qué bloquea | Validación en el laboratorio | Hecho |
 |---|---|---|---|---|
-| 1 | **Adaptar `pruebas_e2p_lab.py`** para que, si un caso de P-19 **no** se rechaza, no imprima la respuesta: solo un marcador de «no rechazado» y el tipo del resultado, **nunca el contenido ni la clave**. Los casos rechazados siguen mostrando el mensaje de rechazo, y los controles (r1, r2, P-101r) su respuesta | Tal como está, un caso no rechazado imprime los 200 primeros caracteres de la respuesta. En el staging podría ser la clave real de Gemini | Ejecutarlo contra `lab_pns_ai_3879_14` y comprobar dos cosas: que P-19, P-101 y P-37 dan lo mismo que el 28/10 ([lab](lab_e2_3879.md), «Resultado (28/10/2026)»), y que un caso forzado a no rechazarse (por ejemplo, el control r1 tratado como si fuera de secreto) sale solo con el marcador y el tipo | [ ] |
+| 1 | **Adaptar `pruebas_e2p_lab.py`** para que, si un caso de P-19 **no** se rechaza, no imprima la respuesta: solo un marcador de «no rechazado» y el tipo del resultado, **nunca el contenido ni la clave**. Los casos rechazados siguen mostrando el mensaje de rechazo, y los controles (r1, r2, P-101r) su respuesta | Tal como está, un caso no rechazado imprime los 200 primeros caracteres de la respuesta. En el staging podría ser la clave real de Gemini | Ejecutarlo contra `lab_pns_ai_3879_14` y comprobar dos cosas: que P-19, P-101 y P-37 dan lo mismo que el 28/10 ([lab](lab_e2_3879.md), «Resultado (28/10/2026)»), y que un caso forzado a no rechazarse (por ejemplo, el control r1 tratado como si fuera de secreto) sale solo con el marcador y el tipo | [x] 29/10/2026: validado en `lab_pns_ai_3879_14`, sin diferencias con el 28/10 y con el forzado solo en r1; guardado en [scripts_e2/pruebas_e2p_lab.py](scripts_e2/pruebas_e2p_lab.py) ([lab](lab_e2_3879.md), «Validación del script, paso 1 de D.0 (29/10/2026)») |
 | 2 | **Adaptar los scripts de la 4 bis (P-82)**, `preparar_e2.py` y `prueba4_bis_e2.py` (`~/staging_e2`), para que no choquen con `e2_aiadmin` (id 17, archivado en `pns_demo`): que creen solo A2, B y el adjunto X (sin `e2_aiadmin`), o que usen logins nuevos. También tienen que funcionar sobre 3.1.879 | `preparar_e2.py` vuelve a crear `e2_aiadmin` y el login único chocaría. Además, la comparación anota cambios de 3.1.879 en esas vías (§4.2, «Scripts de staging») | Prueba 4 bis completa en `lab_pns_ai_3879_14`: Z2 borrado; X desenganchado y de A2; A2 descarga X (200) y B no (404). Después, limpieza de los usuarios y del adjunto de prueba en el laboratorio | [ ] |
 
-**Scripts** (equipo de Sergio, fuera del repo, carpeta `~/staging_e2p`; nada se copia al VPS), una vez
-cumplidos los dos pasos:
-- **`pruebas_e2p_lab.py` adaptado** (paso 1): P-19, P-101, P-37w/c y la propuesta de P-37b. Variables:
-  `E2P_URL=https://pns.liyben.com`, `E2P_DB=pns_demo`, `E2P_ADM_PASS`, `E2P_KEY_ADM` y `E2P_SECRET_ID`
-  (A.8). Para P-37b, además, `E2P_KEY_DEMO` (la clave de UW) y `E2P_P37B_CAT`. Todas con `read -s`.
+**Scripts** (equipo de Sergio, se ejecutan desde la carpeta `~/staging_e2p`; nada se copia al VPS), una
+vez cumplidos los dos pasos:
+- **`pruebas_e2p_lab.py` adaptado** (paso 1), en
+  [scripts_e2/pruebas_e2p_lab.py](scripts_e2/pruebas_e2p_lab.py); se copia a `~/staging_e2p`: P-19,
+  P-101, P-37w/c y la propuesta de P-37b. Variables: `E2P_URL=https://pns.liyben.com`, `E2P_DB=pns_demo`,
+  `E2P_ADM_PASS`, `E2P_KEY_ADM` y `E2P_SECRET_ID` (A.8). Para P-37b, además, `E2P_KEY_DEMO` (la clave de
+  UW) y `E2P_P37B_CAT`. Las claves, con `read -rsp` (ni en el historial ni en pantalla), y todas se borran
+  al acabar:
+  ```sh
+  cp ~/GitHub/third_party/docs/pendiente/scripts_e2/pruebas_e2p_lab.py ~/staging_e2p/
+  cd ~/staging_e2p
+  read -rsp 'Contraseña de admin: ' E2P_ADM_PASS; echo
+  read -rsp 'Clave MCP de ADM: ' E2P_KEY_ADM; echo
+  read -rp 'Id de database.secret (A.8): ' E2P_SECRET_ID
+  export E2P_URL=https://pns.liyben.com E2P_DB=pns_demo E2P_ADM_PASS E2P_KEY_ADM E2P_SECRET_ID
+  # Para P-37b, antes de ejecutar:
+  #   read -rsp 'Clave MCP de UW: ' E2P_KEY_DEMO; echo
+  #   read -rp 'Id de la etiqueta Seges P-37b: ' E2P_P37B_CAT
+  #   export E2P_KEY_DEMO E2P_P37B_CAT
+  python3 pruebas_e2p_lab.py
+  unset E2P_URL E2P_DB E2P_ADM_PASS E2P_KEY_ADM E2P_SECRET_ID E2P_KEY_DEMO E2P_P37B_CAT
+  ```
+  Sin `E2P_FORZAR_NO_RECHAZO` (solo sirve para validar el script en el laboratorio).
   - **P-37w** escribe sobre la fila `[1]` del diario. Con el parche da `AccessError` y no cambia nada. Sin
     el parche la alteraría; el «antes» de A.5 permite verlo.
 - **Scripts de la 4 bis adaptados** (paso 2): P-82.
@@ -496,9 +515,9 @@ cumplidos los dos pasos:
 
 | # | Prueba (parche) | Quién | Qué se hace | Esperado | Obtenido |
 |---|---|---|---|---|---|
-| 1 | **P-37w/c** (parche 17) | ADM, `pruebas_e2p_lab.py` | `write` y `create` en `ai.change.journal` por `call_kw` ([lab](lab_e2_3879.md), §2) | `AccessError` «Only the system can write the AI change journal.» en los dos; el diario igual que en A.5 | [ ] |
-| 2 | **P-37b** (parche 17), **primera vez de forma manual** (en el laboratorio solo la cubrió `test_plan_unlink_requires_unlink_right`) | ADM prepara; UW propone y confirma | Preparación de [lab](lab_e2_3879.md) §3, con UW en lugar de `demo`: etiqueta «Seges P-37b»; grupo «Seges P-37b» con leer y escribir sobre `res.partner.category`, sin crear ni eliminar; UW en el grupo. Propuesta con el script (`E2P_KEY_DEMO` = clave de UW) o, sin script, UW en Chatboo: «borra la etiqueta de contacto Seges P-37b». Después, UW en AI Engine → Security → My Authorizations → la operación → confirmar (pide la contraseña) | Error en la ejecución por falta de permiso de borrado; la etiqueta sigue `active`; en el diario, ninguna fila `unlink` `applied` y una `failed` del intento. Consultas de [lab](lab_e2_3879.md) §3 en `odoo14_pns_db` / `pns_demo` | [ ] |
-| 3 | **P-19** (parche 18) | ADM, `pruebas_e2p_lab.py` | Casos a a j, r1 y r2 ([lab](lab_e2_3879.md), §1) | a a j: rechazo «Field api_key of ai.provider…» o «Field value of ir.config_parameter… cannot be read from the RelaxAICode sandbox.»; r1 y r2 responden. Si A.8 da 0 proveedores en el agente admin, la b devuelve `[]` y no prueba nada (como en el laboratorio) | [ ] |
+| 1 | **P-37w/c** (parche 17) | ADM, [`pruebas_e2p_lab.py`](scripts_e2/pruebas_e2p_lab.py) (ejecución de D.0) | `write` y `create` en `ai.change.journal` por `call_kw` ([lab](lab_e2_3879.md), §2) | `AccessError` «Only the system can write the AI change journal.» en los dos; el diario igual que en A.5 | [ ] |
+| 2 | **P-37b** (parche 17), **primera vez de forma manual** (en el laboratorio solo la cubrió `test_plan_unlink_requires_unlink_right`) | ADM prepara; UW propone y confirma | Preparación de [lab](lab_e2_3879.md) §3, con UW en lugar de `demo`: etiqueta «Seges P-37b»; grupo «Seges P-37b» con leer y escribir sobre `res.partner.category`, sin crear ni eliminar; UW en el grupo. Propuesta con el [script](scripts_e2/pruebas_e2p_lab.py) (`E2P_KEY_DEMO` = clave de UW, con `read -rsp` como en D.0) o, sin script, UW en Chatboo: «borra la etiqueta de contacto Seges P-37b». Después, UW en AI Engine → Security → My Authorizations → la operación → confirmar (pide la contraseña) | Error en la ejecución por falta de permiso de borrado; la etiqueta sigue `active`; en el diario, ninguna fila `unlink` `applied` y una `failed` del intento. Consultas de [lab](lab_e2_3879.md) §3 en `odoo14_pns_db` / `pns_demo` | [ ] |
+| 3 | **P-19** (parche 18) | ADM, [`pruebas_e2p_lab.py`](scripts_e2/pruebas_e2p_lab.py) (ejecución de D.0) | Casos a a j, r1 y r2 ([lab](lab_e2_3879.md), §1) | a a j: rechazo «Field api_key of ai.provider…» o «Field value of ir.config_parameter… cannot be read from the RelaxAICode sandbox.»; r1 y r2 responden. Si A.8 da 0 proveedores en el agente admin, la b devuelve `[]` y no prueba nada (como en el laboratorio). **Cómo leer el marcador:** «NO RECHAZADO (… vacío)» en la b = no prueba nada (sin proveedores en el agente admin), igual que en el laboratorio; cualquier «NO RECHAZADO (… no vacío)» = **parar la prueba y escalarlo**, sin abrir el contenido ni repetirla | [ ] |
 | 3b | **P-101** (parche 23), en el mismo script | ADM | Casos a a e y r ([lab](lab_e2_3879.md), §1b) | a a e: rechazo «it is the ORM's own state»; r responde | [ ] |
 | 4 | **P-82** (parche 11 adaptado), prueba 4 bis de E2 | B; Sergio por SQL | Como la 4 bis de E2 ([verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E2»): B crea una sesión; **[ALTERA]** Sergio engancha a ella por SQL el adjunto X de A2 (`UPDATE 1`); B cuelga un adjunto propio Z2 y borra la sesión desde History | Z2 borrado; X existe con `res_model` vacío, `res_id` 0 y `create_uid` de A2; A2 descarga X (200) y B no (404) | [ ] |
 | 5 | **P-70** (parche 20), casos 1 a 5 | ADM, navegador de Sergio | Pasos de [lab](lab_e2_3879.md) §5 y la comprobación de consola de cada paso; el tablero de Facturación por URL con el id de A.8 (`/web#action=<id>`). Casos 1 a 4 con recarga sin caché; caso 5 con caché normal en un navegador que abrió el chat antes de E2′ | `[undefined, true, "4.4.8"]` (antes de abrir el chat, el tercero `undefined`); sin errores `xAxes`/`yAxes`; el gráfico del chat se pinta; en el caso 5, `chart.umd.min.js?seges=20` en la pestaña Red | [ ] |
@@ -556,7 +575,7 @@ Operaciones que cambian el VPS: las decide y hace quien administra el VPS.
 | Dato | Dónde se comprueba |
 |---|---|
 | `WARNING` del `-u` de E2′ | Sin referencia: el laboratorio no hizo `-u` con E2′. Se anotan los de B.8 |
-| Scripts de E2′ para el staging | Requisito bloqueante de D.0 (pasos previos 1 y 2): adaptar `pruebas_e2p_lab.py` para que no imprima la respuesta de un caso de P-19 no rechazado, y los scripts de la 4 bis por el choque con `e2_aiadmin`. Los dos, validados contra el laboratorio antes de tocar el staging |
+| Scripts de E2′ para el staging | Requisito bloqueante de D.0 (pasos previos 1 y 2). Paso 1 hecho el 29/10/2026: [scripts_e2/pruebas_e2p_lab.py](scripts_e2/pruebas_e2p_lab.py), validado contra el laboratorio ([lab](lab_e2_3879.md), «Validación del script, paso 1 de D.0 (29/10/2026)»). Pendiente el paso 2: los scripts de la 4 bis, por el choque con `e2_aiadmin`, validados contra el laboratorio antes de tocar el staging; hasta entonces sigue bloqueada la subida |
 | Usuario para P-37b sin permiso de borrado de etiquetas por otro grupo | A.8 (consulta de permisos con el login elegido) |
 | Proveedores del agente admin en `pns_demo` (P-19b) | A.8 |
 | Id de la acción del tablero de Facturación en `pns_demo` (P-70) | A.8 (en el laboratorio era 335) |
