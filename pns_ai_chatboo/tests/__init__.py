@@ -8,3 +8,5 @@ from . import test_seges_chatboo_export
 from . import test_seges_canvas_box_a
 # Seges: tests de la entrega E2′ (parche 23, skill de fábrica). Ver docs/pendiente/parches_pns_ai.md
 from . import test_seges_skill_env
+# Seges: tests de la entrega E3′ (parches 25 a 28, lienzo). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_chatboo_canvas
