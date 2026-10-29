@@ -16,6 +16,8 @@ import logging
 from markupsafe import Markup
 
 from odoo import api, fields, models, _
+# Seges: parche 28 (D1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+from odoo.exceptions import AccessError, ValidationError
 
 from odoo.addons.pns_ai_mcp.utils.markup_rename import rename_stored_markup
 
@@ -64,6 +66,14 @@ class ChatbooCanvasPage(models.Model):
         for page in self:
             page.url = '%s/chatboo/page/%s' % (base, page.id) if page.id else ''
 
+    # Seges: parche 28 (D1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    @api.constrains('user_ids')
+    def _check_user_ids_internal(self):
+        if self.mapped('user_ids').filtered('share'):
+            raise ValidationError(
+                _('A page can only be shared with internal users.'),
+            )
+
     @api.model_create_multi
     def create(self, vals_list):
         pages = super(ChatbooCanvasPage, self.with_context(
@@ -74,6 +84,13 @@ class ChatbooCanvasPage(models.Model):
         return pages
 
     def write(self, vals):
+        # Seges: parche 28 (D1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        if 'owner_id' in vals and not self.env.su and any(
+            page.owner_id.id != (vals['owner_id'] or False) for page in self
+        ):
+            raise AccessError(
+                _('Only the system can change the owner of a shared page.'),
+            )
         before = {
             page.id: page.user_ids for page in self
         } if 'user_ids' in vals else {}

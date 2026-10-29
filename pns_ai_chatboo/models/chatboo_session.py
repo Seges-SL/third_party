@@ -11,6 +11,8 @@ from datetime import timedelta
 
 from odoo import models, fields, api, _
 from odoo.exceptions import RedirectWarning, UserError
+# Seges: parche 25 (M1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+from odoo.exceptions import AccessError
 
 from odoo.addons.pns_ai_mcp.utils import record_marks
 # Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
@@ -919,7 +921,8 @@ class ChatbooSession(models.Model):
             if not session:
                 return ''
             blocks = _blocks_for_page(rows)
-            blocks, images = pictures_as_tokens(session.env, blocks)
+            # Seges: parche 26 (M2, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            blocks, images = pictures_as_tokens(session.env(su=False), blocks)
             content = swap_pictures(
                 place_rows_on_page(
                     html, blocks, captured=True, title=title,
@@ -1048,8 +1051,9 @@ class ChatbooSession(models.Model):
             except Exception:
                 pass
 
-    def paint_canvas(self, instruction, new_page=False, rows=None, title='',
-                     images=None):
+    # Seges: parche 25 (M1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    def _paint_canvas(self, instruction, new_page=False, rows=None, title='',
+                      images=None):
         """One design call. Returns the page url, or '' when there is none.
 
         Lives on this model on purpose: ``page_url`` is already here, and a
@@ -1066,6 +1070,9 @@ class ChatbooSession(models.Model):
         fit the page exactly get the whole document laid out again.
         """
         self.ensure_one()
+        # Seges: parche 25 (M1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        if self.sudo().user_id.id != self.env.uid:
+            raise AccessError(_('This canvas belongs to another user.'))
         from .chatboo_canvas import (
             DESIGN_SYSTEM, EDIT_SYSTEM, apply_edits, design_figure_leaks,
             design_figures_centralized, is_document, log_no_page, page_edits,

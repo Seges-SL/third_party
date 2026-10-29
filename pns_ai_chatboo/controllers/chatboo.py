@@ -1150,8 +1150,12 @@ class ChatbooController(http.Controller):
             csrf_token=request.csrf_token(),
             people_url='/chatboo/share/people',
         )
+        # Seges: parche 27 (F1, seguridad). Ver docs/pendiente/parches_pns_ai.md
         return request.make_response(
-            page, headers=[('Content-Type', 'text/html; charset=utf-8')],
+            page, headers=[
+                ('Content-Type', 'text/html; charset=utf-8'),
+                ('X-Frame-Options', 'SAMEORIGIN'),
+            ],
         )
 
     def _shared_answer(self, shared):
@@ -1239,8 +1243,12 @@ class ChatbooController(http.Controller):
             download_url='/chatboo/page/%s/download' % shared.id,
             **sharing
         )
+        # Seges: parche 27 (F1, seguridad). Ver docs/pendiente/parches_pns_ai.md
         return request.make_response(
-            page, headers=[('Content-Type', 'text/html; charset=utf-8')],
+            page, headers=[
+                ('Content-Type', 'text/html; charset=utf-8'),
+                ('X-Frame-Options', 'SAMEORIGIN'),
+            ],
         )
 
     @http.route(

@@ -22,6 +22,28 @@ from odoo import _
 
 _logger = logging.getLogger(__name__)
 
+# Seges: parche 27 (F1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+# Inside a <script> the HTML parser ends the block at </script> and reads
+# <!-- as a comment: a row must not do either. Line separators break old JS.
+_SCRIPT_UNSAFE = (
+    ('<', '\\u003c'), ('>', '\\u003e'), ('&', '\\u0026'),
+    ('\u2028', '\\u2028'), ('\u2029', '\\u2029'),
+)
+
+
+def _script_safe(text):
+    """JSON text that can sit inside a <script>. Exact: JSON keeps those
+    characters only inside strings, where the escape means the same."""
+    for char, escaped in _SCRIPT_UNSAFE:
+        text = text.replace(char, escaped)
+    return text
+
+
+def _script_json(value):
+    """``value`` as JSON for a <script>: the one way figures go in."""
+    return _script_safe(json.dumps(value, ensure_ascii=False, default=str))
+
+
 _PAGE_RULES = (
     'You return a reusable HTML template, not a finished report. '
     'The server always replaces const DATA (and const TITLE when you write it) '
@@ -42,6 +64,9 @@ _PAGE_RULES = (
     'not set a locale. '
     'When the figures change, replace DATA; do not patch the markup. '
     'Do not fetch and do not call APIs. '
+    # Seges: parche 27 (F1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    'Do not load external libraries, fonts, stylesheets or images: the page '
+    'cannot reach the network. Draw charts with inline SVG or <canvas>. '
     'Every tab, chip or card you open must already contain its figures. '
     'Do not leave an empty slot. Do not write an em-dash where a figure belongs. '
     'Finish the document: close every tag, include a body, close every script. '
@@ -427,6 +452,28 @@ def _share_panel(share_url, people_url, csrf_token, people, link):
     )
 
 
+# Seges: parche 27 (F1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+# Added when the page is served, never stored: pages saved before get it too.
+_CSP_META = (
+    '<meta http-equiv="Content-Security-Policy" content="'
+    "default-src 'none'; script-src 'unsafe-inline'; "
+    "style-src 'unsafe-inline'; img-src data: blob:; font-src data:; "
+    "connect-src 'none'; form-action 'none'; base-uri 'none'; "
+    "frame-src 'none'; object-src 'none'; worker-src 'none'"
+    '">'
+)
+# Our own doctype comes first, so the page is in standards mode; the two
+# metas right after it open an implied <html> and <head> and are its first
+# children. The design follows untouched: its doctype is ignored, and its
+# <html> and <head> merge into ours. Nothing of it runs before the policy.
+_CSP_PREFIX = '<!DOCTYPE html><meta charset="utf-8">' + _CSP_META
+
+
+def _with_csp(design):
+    """The design served behind our doctype and CSP, from byte 0."""
+    return _CSP_PREFIX + (design or '')
+
+
 def _before_body_end(design, snippet):
     idx = design.lower().rfind('</body>')
     if idx >= 0:
@@ -460,7 +507,10 @@ def downloadable_page(design):
         + _tool_caption(_PDF, _('Print / PDF'))
         + '</button></div>'
     )
-    return _before_body_end(_with_theme(design), _HIDDEN_HIDES + buttons)
+    # Seges: parche 27 (F1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    return _with_csp(
+        _before_body_end(_with_theme(design), _HIDDEN_HIDES + buttons),
+    )
 
 
 _KEBAB_NOISE = re.compile(r'[^a-z0-9]+')
@@ -509,8 +559,11 @@ def canvas_page(design, title='', download_url='', share_url='', csrf_token='',
     Close leaves either step. It posts with the CSRF token.
     ``people`` and ``link`` say who already has a shared page and where.
     """
+    # Seges: parche 27 (F1, seguridad). Ver docs/pendiente/parches_pns_ai.md
     srcdoc = html.escape(
-        _before_body_end(_with_theme(design), _HIDDEN_HIDES + _PRINT_BRIDGE)
+        _with_csp(_before_body_end(
+            _with_theme(design), _HIDDEN_HIDES + _PRINT_BRIDGE,
+        ))
         if (design or '').strip() else '',
         quote=True,
     )
@@ -704,7 +757,8 @@ def _picture_of(env, value):
     if not isinstance(value, str):
         return ''
     if value.startswith('data:image/'):
-        return value
+        # Seges: parche 27 (F1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        return value if _DATA_URI_RE.fullmatch(value) else ''
     if value.startswith('/web/image/'):
         return _web_image_picture(env, value)
     return _base64_picture(value)
@@ -907,7 +961,8 @@ def open_page(sessions, rows, instruction='', new=False, title=''):
         _logger.info('Chatboo canvas: page waits for rows')
         return ''
     name = page_title(rows, material, title)
-    material, images = pictures_as_tokens(sessions.env, material)
+    # Seges: parche 26 (M2, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    material, images = pictures_as_tokens(sessions.env(su=False), material)
     text = (instruction or '').strip()
     if name:
         text += '\nPage title: ' + name
@@ -921,7 +976,8 @@ def open_page(sessions, rows, instruction='', new=False, title=''):
         + '\nSample figures (shape only; the server replaces const DATA):\n'
         + dumped
     ).strip()
-    url = session.paint_canvas(
+    # Seges: parche 25 (M1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    url = session._paint_canvas(
         text, new_page=bool(new) or not session.canvas_open, rows=material,
         title=name, images=images,
     )
@@ -945,7 +1001,8 @@ def edit_page(sessions, instruction, rows=None):
     if _blocks_for_page(rows):
         url = open_page(sessions, rows, instruction, new=False)
     else:
-        url = session.paint_canvas(instruction, new_page=False)
+        # Seges: parche 25 (M1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        url = session._paint_canvas(instruction, new_page=False)
     if url:
         try:
             from odoo.addons.pns_ai_mcp.utils.result_page import note_page_wanted
@@ -1094,7 +1151,8 @@ def _page_for_rows(blocks):
         if title:
             break
     title = html.escape(title or _('Page'))
-    data_js = json.dumps(_flat_rows(blocks), ensure_ascii=False, default=str)
+    # Seges: parche 27 (F1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    data_js = _script_json(_flat_rows(blocks))
     return (
         '<!DOCTYPE html><html><head><meta charset="utf-8"><title>%s</title>'
         '<style>'
@@ -1430,8 +1488,9 @@ def _payload_for_const_data(old_val, blocks):
         )
     ):
         dumped, _note = figures_for_design(blocks)
-        return dumped
-    return json.dumps(_flat_rows(blocks), ensure_ascii=False, default=str)
+        # Seges: parche 27 (F1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        return _script_safe(dumped)
+    return _script_json(_flat_rows(blocks))
 
 
 _CONST_TITLE_RE = re.compile(r'\bconst\s+TITLE\s*=\s*')
@@ -1444,7 +1503,8 @@ def bind_const_title(html, title):
         return html or '', 0
     dec = json.JSONDecoder()
     replaced = [0]
-    dumped = json.dumps(title, ensure_ascii=False)
+    # Seges: parche 27 (F1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    dumped = _script_json(title)
 
     def _in_script(inner):
         matches = list(_CONST_TITLE_RE.finditer(inner))
@@ -1738,7 +1798,8 @@ def bind_script_row_json(html, blocks):
             if best is None or best_n < need:
                 continue
             chunks.append(inner[last:start])
-            chunks.append(json.dumps(best, ensure_ascii=False, default=str))
+            # Seges: parche 27 (F1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            chunks.append(_script_json(best))
             last = end
             count[0] += 1
         if not chunks:
@@ -2197,7 +2258,8 @@ def _spare_rows_watch(marks):
     (scripts, styles and the hidden copy left out), hidden tabs included.
     """
     rows = [[' '.join(mark.split()) for mark in own] for own in marks]
-    data = json.dumps(rows, ensure_ascii=False).replace('</', '<\\/')
+    # Seges: parche 27 (F1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    data = _script_json(rows)
     return (
         '<script id="pns-page-rows-watch">(function(){'
         'var ROWS=%s,broken=false;'
