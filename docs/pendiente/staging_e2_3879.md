@@ -3,9 +3,9 @@
 - **Rama:** `14.0-pns-ai-3879` · **Base:** `c639fa8` (código de los módulos igual al de `0366231`, lo montado
   en E1′) · **Commit a desplegar:** `9a2970d`, el último que toca los módulos. Cualquier commit posterior
   que solo sea [DOC] (como `4a6b432`) da el mismo árbol y la misma huella del árbol, pero otra huella del
-  `.tar.gz` (B.1) · **Preparado:** 28/10/2026 · **Estado:** preparado, sin ejecutar. **Bloqueado** hasta
-  cumplir los dos pasos previos de código de D.0 (scripts de P-19 y de la 4 bis, validados contra el
-  laboratorio).
+  `.tar.gz` (B.1) · **Preparado:** 28/10/2026 · **Estado:** preparado, sin ejecutar. Ya no está
+  bloqueado: los dos pasos previos de código de D.0 (scripts de P-19 y de la 4 bis) se cumplieron y
+  validaron contra el laboratorio el 29/10/2026.
 - **Qué se sube:** parches 11 (adaptado) y 17 a 24: PNS-82, PNS-37, PNS-19, PNS-17, PNS-70, PNS-20,
   PNS-100, PNS-101 (ampliado) y PNS-102. Lista de archivos en la [propuesta de E2′](e2_propuesta_3879.md),
   «Commits de E2′: regla de tres commits (28/10/2026)»; registro en [parches](parches_pns_ai.md),
@@ -467,22 +467,23 @@ figuran quién, qué se hace y qué se espera; los pasos detallados se remiten a
 | ADM | `admin` (id 2), Ajustes + AI Administrator, con **clave MCP temporal** | P-19, P-101, P-37 y no regresión |
 | U1 | el del staging (chat) | No regresión del chat y P-82 (B) |
 | UW | el del staging (chat + AI Writer), con contraseña local | P-37b (si A.8 lo permite), Autorizaciones |
-| A2 y B | dos usuarios internos de prueba (los de la prueba 4 bis de E2; borrados en su limpieza) | P-82 |
+| A2 y B | `e2p_interno_a` y `e2p_interno_b`: internos sin más grupos, creados y borrados por [`prueba4_bis_e2p.py`](scripts_e2/prueba4_bis_e2p.py) (`--preparar` y `--limpiar`) | P-82 |
 
-**Requisitos bloqueantes: dos pasos previos de código.** **No se empieza A ni se toca el staging** hasta
-que los dos estén hechos y validados contra el laboratorio (`lab_pns_ai_3879`). Precedente: los scripts de
-E1′ se prepararon y validaron contra el laboratorio el 26/10/2026, antes de la subida ([subida de
-E1′](staging_e1_3879.md), D.0). Son scripts del equipo de Sergio y no código de los módulos: el de P-19
-está en el repo ([scripts_e2/pruebas_e2p_lab.py](scripts_e2/pruebas_e2p_lab.py)); los de la 4 bis,
-fuera.
+**Requisitos previos: dos pasos de código (cumplidos el 29/10/2026).** No se empezaba A ni se tocaba el
+staging hasta que los dos estuvieran hechos y validados contra el laboratorio (`lab_pns_ai_3879`); los
+dos lo están y D.0 ya no bloquea la subida. Precedente: los scripts de E1′ se prepararon y validaron
+contra el laboratorio el 26/10/2026, antes de la subida ([subida de E1′](staging_e1_3879.md), D.0). Son
+scripts del equipo de Sergio y no código de los módulos, y los dos están en el repo:
+[scripts_e2/pruebas_e2p_lab.py](scripts_e2/pruebas_e2p_lab.py) (P-19, P-101 y P-37) y
+[scripts_e2/prueba4_bis_e2p.py](scripts_e2/prueba4_bis_e2p.py) (P-82).
 
 | # | Paso previo | Por qué bloquea | Validación en el laboratorio | Hecho |
 |---|---|---|---|---|
 | 1 | **Adaptar `pruebas_e2p_lab.py`** para que, si un caso de P-19 **no** se rechaza, no imprima la respuesta: solo un marcador de «no rechazado» y el tipo del resultado, **nunca el contenido ni la clave**. Los casos rechazados siguen mostrando el mensaje de rechazo, y los controles (r1, r2, P-101r) su respuesta | Tal como está, un caso no rechazado imprime los 200 primeros caracteres de la respuesta. En el staging podría ser la clave real de Gemini | Ejecutarlo contra `lab_pns_ai_3879_14` y comprobar dos cosas: que P-19, P-101 y P-37 dan lo mismo que el 28/10 ([lab](lab_e2_3879.md), «Resultado (28/10/2026)»), y que un caso forzado a no rechazarse (por ejemplo, el control r1 tratado como si fuera de secreto) sale solo con el marcador y el tipo | [x] 29/10/2026: validado en `lab_pns_ai_3879_14`, sin diferencias con el 28/10 y con el forzado solo en r1; guardado en [scripts_e2/pruebas_e2p_lab.py](scripts_e2/pruebas_e2p_lab.py) ([lab](lab_e2_3879.md), «Validación del script, paso 1 de D.0 (29/10/2026)») |
-| 2 | **Adaptar los scripts de la 4 bis (P-82)**, `preparar_e2.py` y `prueba4_bis_e2.py` (`~/staging_e2`), para que no choquen con `e2_aiadmin` (id 17, archivado en `pns_demo`): que creen solo A2, B y el adjunto X (sin `e2_aiadmin`), o que usen logins nuevos. También tienen que funcionar sobre 3.1.879 | `preparar_e2.py` vuelve a crear `e2_aiadmin` y el login único chocaría. Además, la comparación anota cambios de 3.1.879 en esas vías (§4.2, «Scripts de staging») | Prueba 4 bis completa en `lab_pns_ai_3879_14`: Z2 borrado; X desenganchado y de A2; A2 descarga X (200) y B no (404). Después, limpieza de los usuarios y del adjunto de prueba en el laboratorio | [ ] |
+| 2 | **Adaptar los scripts de la 4 bis (P-82)**, `preparar_e2.py` y `prueba4_bis_e2.py` (`~/staging_e2`), para que no choquen con `e2_aiadmin` (id 17, archivado en `pns_demo`): que creen solo A2, B y el adjunto X (sin `e2_aiadmin`), o que usen logins nuevos. También tienen que funcionar sobre 3.1.879 | `preparar_e2.py` vuelve a crear `e2_aiadmin` y el login único chocaría. Además, la comparación anota cambios de 3.1.879 en esas vías (§4.2, «Scripts de staging») | Prueba 4 bis completa en `lab_pns_ai_3879_14`: Z2 borrado; X desenganchado y de A2; A2 descarga X (200) y B no (404). Después, limpieza de los usuarios y del adjunto de prueba en el laboratorio | [x] 29/10/2026: script nuevo [scripts_e2/prueba4_bis_e2p.py](scripts_e2/prueba4_bis_e2p.py), con logins `e2p_interno_a` y `e2p_interno_b` y sin tocar `e2_aiadmin`; prueba completa en `lab_pns_ai_3879_14` TODO OK y limpieza sin restos ([lab](lab_e2_3879.md), «Validación del script de la 4 bis, paso 2 de D.0 (29/10/2026)»). Sustituye a `preparar_e2.py` y `prueba4_bis_e2.py`; los de `~/staging_e2` quedan como registro de E2, sin cambios |
 
-**Scripts** (equipo de Sergio, se ejecutan desde la carpeta `~/staging_e2p`; nada se copia al VPS), una
-vez cumplidos los dos pasos:
+**Scripts** (equipo de Sergio, se ejecutan desde la carpeta `~/staging_e2p`; nada se copia al VPS). Los
+dos tienen por defecto el laboratorio: en el staging, siempre con `E2P_URL` y `E2P_DB` del staging:
 - **`pruebas_e2p_lab.py` adaptado** (paso 1), en
   [scripts_e2/pruebas_e2p_lab.py](scripts_e2/pruebas_e2p_lab.py); se copia a `~/staging_e2p`: P-19,
   P-101, P-37w/c y la propuesta de P-37b. Variables: `E2P_URL=https://pns.liyben.com`, `E2P_DB=pns_demo`,
@@ -506,7 +507,26 @@ vez cumplidos los dos pasos:
   Sin `E2P_FORZAR_NO_RECHAZO` (solo sirve para validar el script en el laboratorio).
   - **P-37w** escribe sobre la fila `[1]` del diario. Con el parche da `AccessError` y no cambia nada. Sin
     el parche la alteraría; el «antes» de A.5 permite verlo.
-- **Scripts de la 4 bis adaptados** (paso 2): P-82.
+- **`prueba4_bis_e2p.py`** (paso 2), en [scripts_e2/prueba4_bis_e2p.py](scripts_e2/prueba4_bis_e2p.py):
+  P-82 (D.1, fila 4). Escribe `e2p_estado.json` (solo ids, sin secretos) en la carpeta actual, así que
+  se ejecuta desde `~/staging_e2p` y no desde el repo. `E2P_PSQL` se deja sin definir: el script usa por
+  defecto `docker exec -i odoo14_pns_db sh -c 'psql -U "$POSTGRES_USER" -d pns_demo'`, el del VPS, y lo
+  imprime en la pausa con el `UPDATE` que hay que lanzar allí. Las contraseñas, con `read -rsp`:
+  ```sh
+  mkdir -p ~/staging_e2p
+  cp ~/GitHub/third_party/docs/pendiente/scripts_e2/prueba4_bis_e2p.py ~/staging_e2p/
+  cd ~/staging_e2p
+  read -rsp 'Contraseña de admin: ' E2P_ADM_PASS; echo
+  read -rsp 'Contraseña común de A2 y B (nueva, solo para la prueba): ' E2P_TEST_PASS; echo
+  export E2P_URL=https://pns.liyben.com E2P_DB=pns_demo E2P_ADM_PASS E2P_TEST_PASS
+  python3 prueba4_bis_e2p.py --preparar   # [ALTERA] crea A2, B y el adjunto X de A2
+  python3 prueba4_bis_e2p.py              # la prueba; en la pausa, el UPDATE que imprime, en el VPS
+  python3 prueba4_bis_e2p.py --limpiar    # [ALTERA] D.3
+  unset E2P_URL E2P_DB E2P_ADM_PASS E2P_TEST_PASS
+  ```
+  `--preparar` aborta sin tocar nada si `e2p_interno_a` o `e2p_interno_b` ya existen como portal o con
+  Ajustes, administración, AI Administrator o AI Conversational. Si la prueba se corta (por ejemplo, en la
+  pausa o por un fallo), `--limpiar` recoge lo que haya quedado: sesiones, X, Z2 y los dos usuarios.
 
 **Línea base** (después de crear los datos y antes de las pruebas), con `SELECT` de solo lectura:
 `count(*)` de `ai_safe_operation`, `ai_change_journal` e `ir_attachment`, y el diario entero (A.5).
@@ -519,7 +539,7 @@ vez cumplidos los dos pasos:
 | 2 | **P-37b** (parche 17), **primera vez de forma manual** (en el laboratorio solo la cubrió `test_plan_unlink_requires_unlink_right`) | ADM prepara; UW propone y confirma | Preparación de [lab](lab_e2_3879.md) §3, con UW en lugar de `demo`: etiqueta «Seges P-37b»; grupo «Seges P-37b» con leer y escribir sobre `res.partner.category`, sin crear ni eliminar; UW en el grupo. Propuesta con el [script](scripts_e2/pruebas_e2p_lab.py) (`E2P_KEY_DEMO` = clave de UW, con `read -rsp` como en D.0) o, sin script, UW en Chatboo: «borra la etiqueta de contacto Seges P-37b». Después, UW en AI Engine → Security → My Authorizations → la operación → confirmar (pide la contraseña) | Error en la ejecución por falta de permiso de borrado; la etiqueta sigue `active`; en el diario, ninguna fila `unlink` `applied` y una `failed` del intento. Consultas de [lab](lab_e2_3879.md) §3 en `odoo14_pns_db` / `pns_demo` | [ ] |
 | 3 | **P-19** (parche 18) | ADM, [`pruebas_e2p_lab.py`](scripts_e2/pruebas_e2p_lab.py) (ejecución de D.0) | Casos a a j, r1 y r2 ([lab](lab_e2_3879.md), §1) | a a j: rechazo «Field api_key of ai.provider…» o «Field value of ir.config_parameter… cannot be read from the RelaxAICode sandbox.»; r1 y r2 responden. Si A.8 da 0 proveedores en el agente admin, la b devuelve `[]` y no prueba nada (como en el laboratorio). **Cómo leer el marcador:** «NO RECHAZADO (… vacío)» en la b = no prueba nada (sin proveedores en el agente admin), igual que en el laboratorio; cualquier «NO RECHAZADO (… no vacío)» = **parar la prueba y escalarlo**, sin abrir el contenido ni repetirla | [ ] |
 | 3b | **P-101** (parche 23), en el mismo script | ADM | Casos a a e y r ([lab](lab_e2_3879.md), §1b) | a a e: rechazo «it is the ORM's own state»; r responde | [ ] |
-| 4 | **P-82** (parche 11 adaptado), prueba 4 bis de E2 | B; Sergio por SQL | Como la 4 bis de E2 ([verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E2»): B crea una sesión; **[ALTERA]** Sergio engancha a ella por SQL el adjunto X de A2 (`UPDATE 1`); B cuelga un adjunto propio Z2 y borra la sesión desde History | Z2 borrado; X existe con `res_model` vacío, `res_id` 0 y `create_uid` de A2; A2 descarga X (200) y B no (404) | [ ] |
+| 4 | **P-82** (parche 11 adaptado), prueba 4 bis de E2 | A2 y B (`e2p_interno_a`, `e2p_interno_b`); Sergio por SQL | Con [`scripts_e2/prueba4_bis_e2p.py`](scripts_e2/prueba4_bis_e2p.py) (`--preparar`, la prueba, `--limpiar`; ejecución en D.0, desde `~/staging_e2p`, con `E2P_URL` y `E2P_DB` del staging). Como la 4 bis de E2 ([verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E2»): B crea su sesión CS_B2; **[ALTERA]** Sergio engancha a ella por SQL el adjunto X de A2 (`UPDATE 1`); B cuelga un adjunto propio Z2 y borra la sesión con `unlink`, el método al que llama el borrado de History (`/chatboo/sessions/delete` → `session.unlink()`). **Por qué no desde History:** esa ruta exige acceso a Chatboo (grupo AI Conversational + clave MCP propia) y no se quiere crear ni revocar una clave para B en `pns_demo`; la lógica del parche 11 está en `unlink()` y es la misma; el controlador de History se ejercita en la no regresión del chat con U1 (D.2, R4) | X con `res_model` vacío, `res_id` 0 y `create_uid` de A2; Z2 borrado; CS_B2 borrada; A2 descarga X (200) y B recibe 404 exacto. El script termina con «RESULTADO: TODO OK» | [ ] |
 | 5 | **P-70** (parche 20), casos 1 a 5 | ADM, navegador de Sergio | Pasos de [lab](lab_e2_3879.md) §5 y la comprobación de consola de cada paso; el tablero de Facturación por URL con el id de A.8 (`/web#action=<id>`). Casos 1 a 4 con recarga sin caché; caso 5 con caché normal en un navegador que abrió el chat antes de E2′ | `[undefined, true, "4.4.8"]` (antes de abrir el chat, el tercero `undefined`); sin errores `xAxes`/`yAxes`; el gráfico del chat se pinta; en el caso 5, `chart.umd.min.js?seges=20` en la pestaña Red | [ ] |
 | 6 | **P-20** (parche 21), casos A y B | ADM, navegador de Sergio | Pasos de la [propuesta](e2_propuesta_3879.md), «P-20: pasos y consultas», con los registros del staging (A.8). Caso A: un proveedor que no sea el primero de la cadena de Chatboo, `temperature` → un valor nuevo que se distinga (por ejemplo, 0.43). Caso B: el usuario MCP de U1, `last_mcp_client_label` → `P-20b staging`. «Review» sin Confirmar y cerrar; consulta antes, después de «Review» y después de cerrar (la de [lab](lab_e2_3879.md) §6, con los ids del staging). JSON en una carpeta temporal fuera del repo, que se borra al acabar | Valor y `write_date` iguales a los de «antes» en los dos casos | [ ] |
 | — | No se repiten aquí | — | **P-17:** sin servidor de pruebas en el staging (propuesta final); la cubren la prueba manual del laboratorio y `test_seges_fetch_redirect.py`. **P-101′ y P-102:** validadas con la herramienta real en el laboratorio y cubiertas por `test_seges_format_guard.py` y `test_seges_identity_su.py` | — | — |
@@ -547,10 +567,29 @@ En el laboratorio, el 28/10, se vio `seges-e2p-viab 1`. U1 no debe conectar por 
 
 **[ALTERA]** Mínima, porque la limpieza general es al final de todos los cambios. Se revocan las claves MCP
 temporales: la de ADM y, si se generó, la de UW. Se quitan a UW el grupo «Seges P-37b» y se archivan el
-grupo y la etiqueta. Se borran o archivan los usuarios de P-82 (A2 y B) y sus sesiones, cada una por su
-dueño, como en E2. Si P-20 hubiera cambiado algo, se devuelve el valor original. La fila `failed` de
-P-37b y las de R6 y R7 se quedan en el diario, porque no se pueden borrar desde Odoo. Resultado en la
-[verificación](verificacion_seguridad_pns_ai.md), en un bloque nuevo «Staging — entrega E2′».
+grupo y la etiqueta. Los usuarios de P-82 se quitan con `prueba4_bis_e2p.py --limpiar` (ejecución de
+D.0): cada usuario borra sus sesiones; se borran X y Z2 y los dos usuarios con su contacto; si la FK del
+diario impide borrar un usuario, queda archivado (se anota). Si P-20 hubiera cambiado algo, se devuelve
+el valor original. La fila `failed` de P-37b y las de R6 y R7 se quedan en el diario, porque no se pueden
+borrar desde Odoo.
+
+**[LECTURA]** Comprobación final de P-82, en el VPS:
+
+```sh
+docker exec -i odoo14_pns_db psql -U odoo -d pns_demo -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN TRANSACTION READ ONLY;
+SELECT count(*) AS usuarios_e2p FROM res_users WHERE login LIKE 'e2p\_%';
+SELECT count(*) AS adjuntos_e2p FROM ir_attachment WHERE name LIKE 'e2p-%';
+SELECT count(*) AS sesiones_e2p
+  FROM chatboo_session s JOIN res_users u ON u.id = s.user_id
+ WHERE u.login LIKE 'e2p\_%';
+ROLLBACK;
+SQL
+```
+
+Esperado: 0, 0 y 0 (si `--limpiar` archivó algún usuario, sale en el primer recuento y se anota).
+Resultado en la [verificación](verificacion_seguridad_pns_ai.md), en un bloque nuevo «Staging — entrega
+E2′».
 
 ---
 
@@ -575,7 +614,7 @@ Operaciones que cambian el VPS: las decide y hace quien administra el VPS.
 | Dato | Dónde se comprueba |
 |---|---|
 | `WARNING` del `-u` de E2′ | Sin referencia: el laboratorio no hizo `-u` con E2′. Se anotan los de B.8 |
-| Scripts de E2′ para el staging | Requisito bloqueante de D.0 (pasos previos 1 y 2). Paso 1 hecho el 29/10/2026: [scripts_e2/pruebas_e2p_lab.py](scripts_e2/pruebas_e2p_lab.py), validado contra el laboratorio ([lab](lab_e2_3879.md), «Validación del script, paso 1 de D.0 (29/10/2026)»). Pendiente el paso 2: los scripts de la 4 bis, por el choque con `e2_aiadmin`, validados contra el laboratorio antes de tocar el staging; hasta entonces sigue bloqueada la subida |
+| Scripts de E2′ para el staging | Pasos previos 1 y 2 de D.0, hechos el 29/10/2026; D.0 ya no bloquea la subida. Paso 1: [scripts_e2/pruebas_e2p_lab.py](scripts_e2/pruebas_e2p_lab.py) ([lab](lab_e2_3879.md), «Validación del script, paso 1 de D.0 (29/10/2026)»). Paso 2: [scripts_e2/prueba4_bis_e2p.py](scripts_e2/prueba4_bis_e2p.py), sin `e2_aiadmin` ([lab](lab_e2_3879.md), «Validación del script de la 4 bis, paso 2 de D.0 (29/10/2026)»). Los dos, validados contra el laboratorio |
 | Usuario para P-37b sin permiso de borrado de etiquetas por otro grupo | A.8 (consulta de permisos con el login elegido) |
 | Proveedores del agente admin en `pns_demo` (P-19b) | A.8 |
 | Id de la acción del tablero de Facturación en `pns_demo` (P-70) | A.8 (en el laboratorio era 335) |
