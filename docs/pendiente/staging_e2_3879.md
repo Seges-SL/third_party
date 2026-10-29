@@ -3,9 +3,9 @@
 - **Rama:** `14.0-pns-ai-3879` · **Base:** `c639fa8` (código de los módulos igual al de `0366231`, lo montado
   en E1′) · **Commit a desplegar:** `9a2970d`, el último que toca los módulos. Cualquier commit posterior
   que solo sea [DOC] (como `4a6b432`) da el mismo árbol y la misma huella del árbol, pero otra huella del
-  `.tar.gz` (B.1) · **Preparado:** 28/10/2026 · **Estado:** preparado, sin ejecutar. Ya no está
-  bloqueado: los dos pasos previos de código de D.0 (scripts de P-19 y de la 4 bis) se cumplieron y
-  validaron contra el laboratorio el 29/10/2026.
+  `.tar.gz` (B.1) · **Preparado:** 28/10/2026 · **Estado:** ejecutado el 29/10/2026 con `9a2970d`;
+  resultado en «Resultado de la subida (29/10/2026)», al final. Los pasos marcados «(corregido el
+  29/10/2026)» recogen lo que hubo que cambiar durante la subida.
 - **Qué se sube:** parches 11 (adaptado) y 17 a 24: PNS-82, PNS-37, PNS-19, PNS-17, PNS-70, PNS-20,
   PNS-100, PNS-101 (ampliado) y PNS-102. Lista de archivos en la [propuesta de E2′](e2_propuesta_3879.md),
   «Commits de E2′: regla de tres commits (28/10/2026)»; registro en [parches](parches_pns_ai.md),
@@ -41,6 +41,7 @@ C. Comprobaciones posteriores
 D. Pruebas de seguridad y de no regresión
 E. Vuelta atrás (descrita)
 F. Lo que no está documentado
+G. Resultado de la subida (29/10/2026)
 
 ---
 
@@ -246,22 +247,29 @@ SELECT res_id AS accion_tablero FROM ir_model_data
 SELECT id, name, active, temperature, write_uid, write_date FROM ai_provider ORDER BY id;
 SELECT m.id, u.login, m.last_mcp_client_label, m.write_uid, m.write_date
   FROM ai_mcp_user m JOIN res_users u ON u.id = m.user_id ORDER BY m.id;
--- P-37b: permisos actuales del usuario de prueba sobre res.partner.category (sustituir <login>)
-SELECT g.name AS grupo, a.perm_read, a.perm_write, a.perm_create, a.perm_unlink
-  FROM ir_model_access a
-  JOIN ir_model m ON m.id = a.model_id AND m.model = 'res.partner.category'
-  LEFT JOIN res_groups g ON g.id = a.group_id
- WHERE a.active AND (a.group_id IS NULL OR a.group_id IN (
-         SELECT r.gid FROM res_groups_users_rel r JOIN res_users u ON u.id = r.uid
-          WHERE u.login = '<login>'))
- ORDER BY 1;
+-- P-37b: usuarios con AI Writer y si ya pueden borrar etiquetas de contacto (res.partner.category)
+SELECT u.id, u.login, u.active, u.share,
+       EXISTS (SELECT 1 FROM ir_model_access a
+                 JOIN ir_model m ON m.id = a.model_id AND m.model = 'res.partner.category'
+                WHERE a.active AND a.perm_unlink
+                  AND (a.group_id IS NULL OR a.group_id IN (
+                         SELECT r.gid FROM res_groups_users_rel r WHERE r.uid = u.id))
+       ) AS puede_borrar_etiquetas
+  FROM res_users u
+  JOIN res_groups_users_rel w ON w.uid = u.id
+  JOIN ir_model_data d ON d.model = 'res.groups' AND d.res_id = w.gid
+ WHERE d.module = 'pns_ai_mcp' AND d.name = 'group_ai_writer'
+ ORDER BY u.id;
 ROLLBACK;
 SQL
 ```
 
 Para P-37b, el usuario de prueba **no puede tener ya `perm_unlink`** sobre `res.partner.category` por otro
-grupo: con `base.group_partner_manager`, por ejemplo, la prueba no discriminaría. Si lo tiene, se usa otro
-usuario con AI Writer o se crea uno temporal (D.0).
+grupo: con `base.group_partner_manager`, por ejemplo, la prueba no discriminaría. Se elige uno interno
+(`share` falso) y activo con `puede_borrar_etiquetas` falso; si no hay ninguno, se crea uno temporal (D.0).
+**(corregido el 29/10/2026:** la consulta anterior pedía sustituir un `'<login>'` a mano; esta lista
+directamente los candidatos. En `pns_demo`, `admin` y UW ya podían borrar etiquetas y se usó un usuario
+temporal.**)**
 
 ---
 
@@ -291,8 +299,12 @@ Esperado: `commit` y `0dd550a384fbe4d2fd8708f753da4d200b94e0d2d74544d01fa39f3b0a
 **[ALTERA solo `/tmp` del VPS]** Como en E1′ (B.2):
 
 ```bash
-scp -P <puerto> /tmp/pns_addons_9a2970d.tar.gz <usuario>@<host>:/tmp/
+read -rp 'Puerto SSH del VPS: ' VPS_PORT; read -rp 'Usuario@host del VPS: ' VPS_DEST
+scp -P "$VPS_PORT" /tmp/pns_addons_9a2970d.tar.gz "$VPS_DEST":/tmp/
 ```
+
+**(corregido el 29/10/2026:** los marcadores `<puerto>` y `<usuario>@<host>` se sustituyen por dos
+variables que se piden al pegar, para no editar la orden.**)**
 
 ### B.3 En el VPS: huella y extracción
 
@@ -441,10 +453,10 @@ base).
 
 | Comprobación | Esperado | Obtenido |
 |---|---|---|
-| Versiones | Las de A.4, `installed` | [ ] |
-| Cron de la papelera | `pns_ai_mcp.ir_cron_ai_journal_trash` activo, diario, `numbercall` -1, `user_id` 1. Con el parche 17 el diario solo lo escribe el sistema, y el cron corre como superusuario | [ ] |
-| Resto de crons | Los seis de A.4, sin cambios | [ ] |
-| Neutralización | Ninguna fila `odoo_dev.%` | [ ] |
+| Versiones | Las de A.4, `installed` | [x] Igual que A.4 |
+| Cron de la papelera | `pns_ai_mcp.ir_cron_ai_journal_trash` activo, diario, `numbercall` -1, `user_id` 1. Con el parche 17 el diario solo lo escribe el sistema, y el cron corre como superusuario | [x] Igual que A.4 |
+| Resto de crons | Los seis de A.4, sin cambios | [x] Igual que A.4; los de 5 minutos se ejecutaron a las 11:08 UTC con el código nuevo |
+| Neutralización | Ninguna fila `odoo_dev.%` | [x] Ninguna |
 
 ### C.3 Recargar `es_ES`
 
@@ -466,8 +478,19 @@ figuran quién, qué se hace y qué se espera; los pasos detallados se remiten a
 |---|---|---|
 | ADM | `admin` (id 2), Ajustes + AI Administrator, con **clave MCP temporal** | P-19, P-101, P-37 y no regresión |
 | U1 | el del staging (chat) | No regresión del chat y P-82 (B) |
-| UW | el del staging (chat + AI Writer), con contraseña local | P-37b (si A.8 lo permite), Autorizaciones |
+| W | usuario **temporal** interno (en la subida, `e2p_writer`), con AI Writer y AI Conversational, contraseña local y clave MCP propia, sin permiso de borrado de etiquetas | P-37b |
 | A2 y B | `e2p_interno_a` y `e2p_interno_b`: internos sin más grupos, creados y borrados por [`prueba4_bis_e2p.py`](scripts_e2/prueba4_bis_e2p.py) (`--preparar` y `--limpiar`) | P-82 |
+
+**(corregido el 29/10/2026:** UW ya no es necesario: P-37b la hace W y R5 (Autorizaciones), ADM. Donde
+D.1 (fila 2) dice UW, léase W.**)** Preparación de W:
+- Usuario interno con **AI Writer y AI Conversational**: `/mcp` exige AI Conversational porque el agente
+  del usuario es conversacional; sin ese grupo, el script responde «Esta clave no ve la herramienta
+  safe_plan_request». Contraseña local y clave MCP propia (Usuarios MCP).
+- Los grupos se añaden **desde la ficha del usuario o desde la del grupo**. En la subida, marcar la casilla
+  AI Conversational en Usuarios MCP y guardar no dejó el grupo puesto: fallo de la casilla (observación
+  para E4′ en el plan de corrección).
+- Después, la consulta de P-37b de A.8: W debe salir con `puede_borrar_etiquetas` falso. Los grupos que la
+  plantilla de usuario añade por defecto pueden cambiar de una BD a otra.
 
 **Requisitos previos: dos pasos de código (cumplidos el 29/10/2026).** No se empezaba A ni se tocaba el
 staging hasta que los dos estuvieran hechos y validados contra el laboratorio (`lab_pns_ai_3879`); los
@@ -488,9 +511,11 @@ dos tienen por defecto el laboratorio: en el staging, siempre con `E2P_URL` y `E
   [scripts_e2/pruebas_e2p_lab.py](scripts_e2/pruebas_e2p_lab.py); se copia a `~/staging_e2p`: P-19,
   P-101, P-37w/c y la propuesta de P-37b. Variables: `E2P_URL=https://pns.liyben.com`, `E2P_DB=pns_demo`,
   `E2P_ADM_PASS`, `E2P_KEY_ADM` y `E2P_SECRET_ID` (A.8). Para P-37b, además, `E2P_KEY_DEMO` (la clave de
-  UW) y `E2P_P37B_CAT`. Las claves, con `read -rsp` (ni en el historial ni en pantalla), y todas se borran
-  al acabar:
+  W) y `E2P_P37B_CAT`. Las claves, con `read -rsp` (ni en el historial ni en pantalla), y todas se borran
+  al acabar. **(corregido el 29/10/2026:** el `mkdir -p` va antes del primer `cp`; antes solo estaba en el
+  bloque de `prueba4_bis_e2p.py`.**)**
   ```sh
+  mkdir -p ~/staging_e2p
   cp ~/GitHub/third_party/docs/pendiente/scripts_e2/pruebas_e2p_lab.py ~/staging_e2p/
   cd ~/staging_e2p
   read -rsp 'Contraseña de admin: ' E2P_ADM_PASS; echo
@@ -498,7 +523,7 @@ dos tienen por defecto el laboratorio: en el staging, siempre con `E2P_URL` y `E
   read -rp 'Id de database.secret (A.8): ' E2P_SECRET_ID
   export E2P_URL=https://pns.liyben.com E2P_DB=pns_demo E2P_ADM_PASS E2P_KEY_ADM E2P_SECRET_ID
   # Para P-37b, antes de ejecutar:
-  #   read -rsp 'Clave MCP de UW: ' E2P_KEY_DEMO; echo
+  #   read -rsp 'Clave MCP de W: ' E2P_KEY_DEMO; echo
   #   read -rp 'Id de la etiqueta Seges P-37b: ' E2P_P37B_CAT
   #   export E2P_KEY_DEMO E2P_P37B_CAT
   python3 pruebas_e2p_lab.py
@@ -513,7 +538,6 @@ dos tienen por defecto el laboratorio: en el staging, siempre con `E2P_URL` y `E
   defecto `docker exec -i odoo14_pns_db sh -c 'psql -U "$POSTGRES_USER" -d pns_demo'`, el del VPS, y lo
   imprime en la pausa con el `UPDATE` que hay que lanzar allí. Las contraseñas, con `read -rsp`:
   ```sh
-  mkdir -p ~/staging_e2p
   cp ~/GitHub/third_party/docs/pendiente/scripts_e2/prueba4_bis_e2p.py ~/staging_e2p/
   cd ~/staging_e2p
   read -rsp 'Contraseña de admin: ' E2P_ADM_PASS; echo
@@ -535,13 +559,13 @@ dos tienen por defecto el laboratorio: en el staging, siempre con `E2P_URL` y `E
 
 | # | Prueba (parche) | Quién | Qué se hace | Esperado | Obtenido |
 |---|---|---|---|---|---|
-| 1 | **P-37w/c** (parche 17) | ADM, [`pruebas_e2p_lab.py`](scripts_e2/pruebas_e2p_lab.py) (ejecución de D.0) | `write` y `create` en `ai.change.journal` por `call_kw` ([lab](lab_e2_3879.md), §2) | `AccessError` «Only the system can write the AI change journal.» en los dos; el diario igual que en A.5 | [ ] |
-| 2 | **P-37b** (parche 17), **primera vez de forma manual** (en el laboratorio solo la cubrió `test_plan_unlink_requires_unlink_right`) | ADM prepara; UW propone y confirma | Preparación de [lab](lab_e2_3879.md) §3, con UW en lugar de `demo`: etiqueta «Seges P-37b»; grupo «Seges P-37b» con leer y escribir sobre `res.partner.category`, sin crear ni eliminar; UW en el grupo. Propuesta con el [script](scripts_e2/pruebas_e2p_lab.py) (`E2P_KEY_DEMO` = clave de UW, con `read -rsp` como en D.0) o, sin script, UW en Chatboo: «borra la etiqueta de contacto Seges P-37b». Después, UW en AI Engine → Security → My Authorizations → la operación → confirmar (pide la contraseña) | Error en la ejecución por falta de permiso de borrado; la etiqueta sigue `active`; en el diario, ninguna fila `unlink` `applied` y una `failed` del intento. Consultas de [lab](lab_e2_3879.md) §3 en `odoo14_pns_db` / `pns_demo` | [ ] |
-| 3 | **P-19** (parche 18) | ADM, [`pruebas_e2p_lab.py`](scripts_e2/pruebas_e2p_lab.py) (ejecución de D.0) | Casos a a j, r1 y r2 ([lab](lab_e2_3879.md), §1) | a a j: rechazo «Field api_key of ai.provider…» o «Field value of ir.config_parameter… cannot be read from the RelaxAICode sandbox.»; r1 y r2 responden. Si A.8 da 0 proveedores en el agente admin, la b devuelve `[]` y no prueba nada (como en el laboratorio). **Cómo leer el marcador:** «NO RECHAZADO (… vacío)» en la b = no prueba nada (sin proveedores en el agente admin), igual que en el laboratorio; cualquier «NO RECHAZADO (… no vacío)» = **parar la prueba y escalarlo**, sin abrir el contenido ni repetirla | [ ] |
-| 3b | **P-101** (parche 23), en el mismo script | ADM | Casos a a e y r ([lab](lab_e2_3879.md), §1b) | a a e: rechazo «it is the ORM's own state»; r responde | [ ] |
-| 4 | **P-82** (parche 11 adaptado), prueba 4 bis de E2 | A2 y B (`e2p_interno_a`, `e2p_interno_b`); Sergio por SQL | Con [`scripts_e2/prueba4_bis_e2p.py`](scripts_e2/prueba4_bis_e2p.py) (`--preparar`, la prueba, `--limpiar`; ejecución en D.0, desde `~/staging_e2p`, con `E2P_URL` y `E2P_DB` del staging). Como la 4 bis de E2 ([verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E2»): B crea su sesión CS_B2; **[ALTERA]** Sergio engancha a ella por SQL el adjunto X de A2 (`UPDATE 1`); B cuelga un adjunto propio Z2 y borra la sesión con `unlink`, el método al que llama el borrado de History (`/chatboo/sessions/delete` → `session.unlink()`). **Por qué no desde History:** esa ruta exige acceso a Chatboo (grupo AI Conversational + clave MCP propia) y no se quiere crear ni revocar una clave para B en `pns_demo`; la lógica del parche 11 está en `unlink()` y es la misma; el controlador de History se ejercita en la no regresión del chat con U1 (D.2, R4) | X con `res_model` vacío, `res_id` 0 y `create_uid` de A2; Z2 borrado; CS_B2 borrada; A2 descarga X (200) y B recibe 404 exacto. El script termina con «RESULTADO: TODO OK» | [ ] |
-| 5 | **P-70** (parche 20), casos 1 a 5 | ADM, navegador de Sergio | Pasos de [lab](lab_e2_3879.md) §5 y la comprobación de consola de cada paso; el tablero de Facturación por URL con el id de A.8 (`/web#action=<id>`). Casos 1 a 4 con recarga sin caché; caso 5 con caché normal en un navegador que abrió el chat antes de E2′ | `[undefined, true, "4.4.8"]` (antes de abrir el chat, el tercero `undefined`); sin errores `xAxes`/`yAxes`; el gráfico del chat se pinta; en el caso 5, `chart.umd.min.js?seges=20` en la pestaña Red | [ ] |
-| 6 | **P-20** (parche 21), casos A y B | ADM, navegador de Sergio | Pasos de la [propuesta](e2_propuesta_3879.md), «P-20: pasos y consultas», con los registros del staging (A.8). Caso A: un proveedor que no sea el primero de la cadena de Chatboo, `temperature` → un valor nuevo que se distinga (por ejemplo, 0.43). Caso B: el usuario MCP de U1, `last_mcp_client_label` → `P-20b staging`. «Review» sin Confirmar y cerrar; consulta antes, después de «Review» y después de cerrar (la de [lab](lab_e2_3879.md) §6, con los ids del staging). JSON en una carpeta temporal fuera del repo, que se borra al acabar | Valor y `write_date` iguales a los de «antes» en los dos casos | [ ] |
+| 1 | **P-37w/c** (parche 17) | ADM, [`pruebas_e2p_lab.py`](scripts_e2/pruebas_e2p_lab.py) (ejecución de D.0) | `write` y `create` en `ai.change.journal` por `call_kw` ([lab](lab_e2_3879.md), §2) | `AccessError` «Only the system can write the AI change journal.» en los dos; el diario igual que en A.5 | [x] OK: diario intacto (la fila 1 conserva su `write_date` del 16/10) |
+| 2 | **P-37b** (parche 17), **primera vez de forma manual** (en el laboratorio solo la cubrió `test_plan_unlink_requires_unlink_right`) | ADM prepara; UW propone y confirma | Preparación de [lab](lab_e2_3879.md) §3, con UW en lugar de `demo`: etiqueta «Seges P-37b»; grupo «Seges P-37b» con leer y escribir sobre `res.partner.category`, sin crear ni eliminar; UW en el grupo. Propuesta con el [script](scripts_e2/pruebas_e2p_lab.py) (`E2P_KEY_DEMO` = clave de UW, con `read -rsp` como en D.0) o, sin script, UW en Chatboo: «borra la etiqueta de contacto Seges P-37b». Después, UW en AI Engine → Security → My Authorizations → la operación → confirmar (pide la contraseña) | Error en la ejecución por falta de permiso de borrado; la etiqueta sigue `active`; en el diario, ninguna fila `unlink` `applied` y una `failed` del intento. Consultas de [lab](lab_e2_3879.md) §3 en `odoo14_pns_db` / `pns_demo` | [x] OK, con W = `e2p_writer` (id 23): propuesta `UNLK00000001`; al confirmar, error «No puedes borrar… res.partner.category» (solo Contact Creation); la etiqueta 8 sigue activa; diario: fila 13 `unlink` `failed` (`create_uid` 1); `ai_safe_operation` 32 `cancelled`. Las dos primeras ejecuciones del script fallaron porque W no tenía AI Conversational (D.0) |
+| 3 | **P-19** (parche 18) | ADM, [`pruebas_e2p_lab.py`](scripts_e2/pruebas_e2p_lab.py) (ejecución de D.0) | Casos a a j, r1 y r2 ([lab](lab_e2_3879.md), §1) | a a j: rechazo «Field api_key of ai.provider…» o «Field value of ir.config_parameter… cannot be read from the RelaxAICode sandbox.»; r1 y r2 responden. Si A.8 da 0 proveedores en el agente admin, la b devuelve `[]` y no prueba nada (como en el laboratorio). **Cómo leer el marcador:** «NO RECHAZADO (… vacío)» en la b = no prueba nada (sin proveedores en el agente admin), igual que en el laboratorio; cualquier «NO RECHAZADO (… no vacío)» = **parar la prueba y escalarlo**, sin abrir el contenido ni repetirla | [x] OK; la b, «NO RECHAZADO (… vacío)» (0 proveedores en el agente admin, ya conocido) |
+| 3b | **P-101** (parche 23), en el mismo script | ADM | Casos a a e y r ([lab](lab_e2_3879.md), §1b) | a a e: rechazo «it is the ORM's own state»; r responde | [x] OK |
+| 4 | **P-82** (parche 11 adaptado), prueba 4 bis de E2 | A2 y B (`e2p_interno_a`, `e2p_interno_b`); Sergio por SQL | Con [`scripts_e2/prueba4_bis_e2p.py`](scripts_e2/prueba4_bis_e2p.py) (`--preparar`, la prueba, `--limpiar`; ejecución en D.0, desde `~/staging_e2p`, con `E2P_URL` y `E2P_DB` del staging). Como la 4 bis de E2 ([verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E2»): B crea su sesión CS_B2; **[ALTERA]** Sergio engancha a ella por SQL el adjunto X de A2 (`UPDATE 1`); B cuelga un adjunto propio Z2 y borra la sesión con `unlink`, el método al que llama el borrado de History (`/chatboo/sessions/delete` → `session.unlink()`). **Por qué no desde History:** esa ruta exige acceso a Chatboo (grupo AI Conversational + clave MCP propia) y no se quiere crear ni revocar una clave para B en `pns_demo`; la lógica del parche 11 está en `unlink()` y es la misma; el controlador de History se ejercita en la no regresión del chat con U1 (D.2, R4) | X con `res_model` vacío, `res_id` 0 y `create_uid` de A2; Z2 borrado; CS_B2 borrada; A2 descarga X (200) y B recibe 404 exacto. El script termina con «RESULTADO: TODO OK» | [x] TODO OK: A2 24, B 25, X 915, CS_B2 48, Z2 916; X (False, 0, 24); A2 200, B 404; `--limpiar` borró los dos usuarios (no hizo falta archivarlos) |
+| 5 | **P-70** (parche 20), casos 1 a 5 | ADM, navegador de Sergio | Pasos de [lab](lab_e2_3879.md) §5 y la comprobación de consola de cada paso; el tablero de Facturación por URL con el id de A.8 (`/web#action=<id>`). **El caso 5, primero**, con caché normal en el navegador habitual (el que abrió el chat antes de E2′); **después los casos 1 a 4, en una ventana privada**. **(corregido el 29/10/2026:** antes decía casos 1 a 4 con recarga sin caché y caso 5 después; hechos en ese orden en el mismo navegador, los casos 1 a 4 renuevan la caché y el caso 5 ya no prueba nada.**)** | `[undefined, true, "4.4.8"]` (antes de abrir el chat, el tercero `undefined`); sin errores `xAxes`/`yAxes`; el gráfico del chat se pinta; en el caso 5, `chart.umd.min.js?seges=20` en la pestaña Red | [x] OK casos 1 a 5: el 5 primero, en el navegador habitual con caché, con `?seges=20`; los 1 a 4 en ventana privada; sesión antigua 39 |
+| 6 | **P-20** (parche 21), casos A y B | ADM, navegador de Sergio | Pasos de la [propuesta](e2_propuesta_3879.md), «P-20: pasos y consultas», con los registros del staging (A.8). Caso A: un proveedor que no sea el primero de la cadena de Chatboo, `temperature` → un valor nuevo que se distinga (por ejemplo, 0.43). Caso B: el usuario MCP de U1, `last_mcp_client_label` → `P-20b staging`. «Review» sin Confirmar y cerrar; consulta antes, después de «Review» y después de cerrar (la de [lab](lab_e2_3879.md) §6, con los ids del staging). JSON en una carpeta temporal fuera del repo, que se borra al acabar | Valor y `write_date` iguales a los de «antes» en los dos casos | [x] OK A (proveedor 3, `temperature` 0.7 → 0.43) y B (usuario MCP 2, de U1, etiqueta → «P-20b staging»), con «Will replace» en «Review»: valor y `write_date` sin cambios después de «Review» y después de cerrar; el `res.users` de U1 sin cambios |
 | — | No se repiten aquí | — | **P-17:** sin servidor de pruebas en el staging (propuesta final); la cubren la prueba manual del laboratorio y `test_seges_fetch_redirect.py`. **P-101′ y P-102:** validadas con la herramienta real en el laboratorio y cubiertas por `test_seges_format_guard.py` y `test_seges_identity_su.py` | — | — |
 
 **P-20 B:** cualquier conexión por `/mcp` reescribe `last_mcp_client_label` con el `clientInfo` del cliente.
@@ -552,42 +576,56 @@ En el laboratorio, el 28/10, se vio `seges-e2p-viab 1`. U1 no debe conectar por 
 
 | # | Caso | Quién | Esperado | Obtenido |
 |---|---|---|---|---|
-| R1 | Turno de Chatboo con una consulta de datos (la caja A sigue respondiendo con el control por campos del parche 18 y el formateador del 23) | U1 | Respuesta correcta; tabla con formato | [ ] |
-| R2 | **Descargas:** Excel del motor y PDF montado en el navegador | U1 | Las dos descargan. El PDF puede quedar huérfano (PNS-98, conocido) | [ ] |
-| R3 | **Gráficos:** gráfico en el chat y cambio a gráfico de una tabla del historial | U1 | Se pintan; sin errores en la consola (complementa P-70) | [ ] |
-| R4 | **Borrar una sesión con adjuntos** desde History (R5 de E2) | U1 | Sin error; desaparecen la sesión y sus adjuntos enganchados; los huérfanos siguen | [ ] |
-| R5 | **Autorizaciones:** «Confirmar y ejecutar» de una operación pendiente (R5 de E1′) | ADM | Pide la contraseña una vez y ejecuta | [ ] |
-| R6 | **Diario, Revertir:** ADM borra por plan confirmado un registro de prueba (por ejemplo, una etiqueta «Seges E2p diario»); en AI Engine → Security → Applied changes, la fila `unlink` → «Revert» | ADM | La fila se crea con el borrado en papelera (la escribe el sistema: parche 17, sin `AccessError`); «Revert» devuelve el registro; la fila pasa a `reverted` y aparece otra `applied` con `origin` `revert` y `reverts_id` = la original (`ai_change_journal.py`, `action_revert`) | [ ] |
-| R7 | **Diario, Vaciar papelera:** otro borrado igual y «Empty trash» (o «Delete permanently» en la fila) | ADM | El registro se borra definitivamente, sin `AccessError`; anotar el estado final de la fila | [ ] |
-| R8 | **Importaciones con «Review» y con Confirmar** | ADM | «Review» y cerrar: sin cambios (es P-20). Después, con Confirmar: el cambio se aplica. Devolver el valor original (otra importación o la ficha) | [ ] |
-| R9 | `relaxaicode` normal por `/mcp`: `search_count` de contactos (R7 de E1′) | ADM | Responde con el número | [ ] |
-| R10 | Log desde el arranque (B.8) | — | Sin `Traceback` salvo los del proveedor (429/503); los rechazos provocados en D.1, a su hora | [ ] |
+| R1 | Turno de Chatboo con una consulta de datos (la caja A sigue respondiendo con el control por campos del parche 18 y el formateador del 23) | U1 | Respuesta correcta; tabla con formato | [x] Validada por Sergio, sin consultas de comprobación |
+| R2 | **Descargas:** Excel del motor y PDF montado en el navegador | U1 | Las dos descargan. El PDF puede quedar huérfano (PNS-98, conocido) | [x] Validada por Sergio, sin consultas de comprobación |
+| R3 | **Gráficos:** gráfico en el chat y cambio a gráfico de una tabla del historial | U1 | Se pintan; sin errores en la consola (complementa P-70) | [x] Validada por Sergio, sin consultas de comprobación |
+| R4 | **Borrar una sesión con adjuntos** desde History (R5 de E2) | U1 | Sin error; desaparecen la sesión y sus adjuntos enganchados; los huérfanos siguen | [x] Validada por Sergio, sin consultas de comprobación |
+| R5 | **Autorizaciones:** «Confirmar y ejecutar» de una operación pendiente (R5 de E1′) | ADM | Pide la contraseña una vez y ejecuta | [x] OK |
+| R6 | **Diario, Revertir:** ADM borra por plan confirmado un registro de prueba (por ejemplo, una etiqueta «Seges E2p diario»); en AI Engine → Security → Applied changes, la fila `unlink` → «Revert» | ADM | La fila se crea con el borrado en papelera (la escribe el sistema: parche 17, sin `AccessError`); «Revert» devuelve el registro; la fila pasa a `reverted` y aparece otra `applied` con `origin` `revert` y `reverts_id` = la original (`ai_change_journal.py`, `action_revert`) | [x] OK: fila 14 `unlink` → `reverted`; fila 15 con `origin` `revert` y `reverts_id` 14; la etiqueta 9 vuelve. `create_uid` 2 (el `sudo` conserva el uid) |
+| R7 | **Diario, Vaciar papelera:** otro borrado igual y «Empty trash» (o «Delete permanently» en la fila) | ADM | El registro se borra definitivamente, sin `AccessError`; anotar el estado final de la fila | [x] OK: la fila 16 queda en `applied` (`create_uid` 2) y la etiqueta 10 se borró definitivamente |
+| R8 | **Importaciones con «Review» y con Confirmar** | ADM | «Review» y cerrar: sin cambios (es P-20). Después, con Confirmar: el cambio se aplica. Devolver el valor original (otra importación o la ficha) | [x] OK: 0.43 confirmado y devuelto a 0.7 (12:37 UTC) |
+| R9 | `relaxaicode` normal por `/mcp`: `search_count` de contactos (R7 de E1′) | ADM | Responde con el número | [x] Cubierta por los controles P-19 r1/r2 y P-101 r del script (`relaxaicode` normal por `/mcp` como ADM) |
+| R10 | Log desde el arranque (B.8) | — | Sin `Traceback` salvo los del proveedor (429/503); los rechazos provocados en D.1, a su hora | [x] 8 líneas, todas esperadas: un 503 de Gemini (12:13 UTC) y los dos `ERROR` de P-37b, cada uno con dos `Traceback` encadenados |
 
 ### D.3 Limpieza de las pruebas
 
-**[ALTERA]** Mínima, porque la limpieza general es al final de todos los cambios. Se revocan las claves MCP
-temporales: la de ADM y, si se generó, la de UW. Se quitan a UW el grupo «Seges P-37b» y se archivan el
-grupo y la etiqueta. Los usuarios de P-82 se quitan con `prueba4_bis_e2p.py --limpiar` (ejecución de
-D.0): cada usuario borra sus sesiones; se borran X y Z2 y los dos usuarios con su contacto; si la FK del
-diario impide borrar un usuario, queda archivado (se anota). Si P-20 hubiera cambiado algo, se devuelve
-el valor original. La fila `failed` de P-37b y las de R6 y R7 se quedan en el diario, porque no se pueden
-borrar desde Odoo.
+**[ALTERA]** Mínima, porque la limpieza general es al final de todos los cambios:
+- Se revocan las claves MCP temporales: la de ADM y la de W (el usuario de P-37b).
+- Se archiva W: la fila `failed` de P-37b lo referencia y no se borra.
+- Se archivan las etiquetas «Seges P-37b» y la de R6 (la que «Revert» devolvió).
+- Se borra el grupo «Seges P-37b»: en Odoo 14 los grupos no se pueden archivar.
+- Los usuarios de P-82 se quitan con `prueba4_bis_e2p.py --limpiar` (ejecución de D.0): cada usuario
+  borra sus sesiones; se borran X y Z2 y los dos usuarios con su contacto; si la FK del diario impide
+  borrar un usuario, queda archivado (se anota).
+- Si P-20 hubiera cambiado algo, se devuelve el valor original.
+- La fila `failed` de P-37b y las de R6 y R7 se quedan en el diario, porque no se pueden borrar desde Odoo.
 
-**[LECTURA]** Comprobación final de P-82, en el VPS:
+**(corregido el 29/10/2026:** se añaden la clave y el archivado de W, la etiqueta de R6 y el borrado del
+grupo, que antes decía «archivar»; la consulta final lista los logins `e2p_` en vez de contarlos y
+comprueba las claves revocadas.**)**
+
+**[LECTURA]** Comprobación final, en el VPS. La última consulta dice si hay hash, **sin leerlo**:
 
 ```sh
 docker exec -i odoo14_pns_db psql -U odoo -d pns_demo -v ON_ERROR_STOP=1 <<'SQL'
 BEGIN TRANSACTION READ ONLY;
-SELECT count(*) AS usuarios_e2p FROM res_users WHERE login LIKE 'e2p\_%';
+SELECT id, login, active FROM res_users WHERE login LIKE 'e2p\_%' ORDER BY id;
 SELECT count(*) AS adjuntos_e2p FROM ir_attachment WHERE name LIKE 'e2p-%';
 SELECT count(*) AS sesiones_e2p
   FROM chatboo_session s JOIN res_users u ON u.id = s.user_id
  WHERE u.login LIKE 'e2p\_%';
+SELECT m.id, u.login, m.mcp_api_key_state,
+       coalesce(m.mcp_api_key_hash, '') <> '' AS tiene_hash
+  FROM ai_mcp_user m JOIN res_users u ON u.id = m.user_id
+ WHERE u.login = 'admin' OR u.login LIKE 'e2p\_%'
+ ORDER BY m.id;
 ROLLBACK;
 SQL
 ```
 
-Esperado: 0, 0 y 0 (si `--limpiar` archivó algún usuario, sale en el primer recuento y se anota).
+Esperado: solo W, archivado (`active` falso); 0 adjuntos y 0 sesiones; las claves de `admin` y W en
+`not_generated` y `tiene_hash` falso. Si `--limpiar` archivó algún usuario de P-82, sale en la primera
+consulta y se anota.
 Resultado en la [verificación](verificacion_seguridad_pns_ai.md), en un bloque nuevo «Staging — entrega
 E2′».
 
@@ -620,3 +658,116 @@ Operaciones que cambian el VPS: las decide y hace quien administra el VPS.
 | Id de la acción del tablero de Facturación en `pns_demo` (P-70) | A.8 (en el laboratorio era 335) |
 | Cuota de Gemini el día de la subida | Consola de Google AI Studio, no solo «Test Connection» (F de E1′) |
 | E3′ y E4′ | **No entran en esta subida.** E3′ (lienzo: M1, M2 y F1; R8 y la revisión de la ventana de `_ask_design` del parche 18) y E4′ (hoja de Medios y Bajos) se suben con su propio documento cuando estén validadas en el laboratorio. Por eso no hay prueba del lienzo en D |
+
+---
+
+## G. Resultado de la subida (29/10/2026)
+
+Sergio con Claude; horas en UTC. Commit `9a2970d` de `14.0-pns-ai-3879`. Resultado por prueba en las
+columnas «Obtenido» de C.2, D.1 y D.2; resumen en la [verificación](verificacion_seguridad_pns_ai.md),
+«Staging — entrega E2′ (29/10/2026)».
+
+### A. Comprobaciones previas
+
+- **A.1 a A.4:** como se esperaba. Montaje de `addons` de solo lectura; 0 `__pycache__` y 0 archivos de
+  otro usuario; 696 archivos, huella `c12168ea…6160`; 7 crons `pns_*`.
+- **A.5:** 0 filas en papelera; `pns_ai_mcp.journal_trash_days` sin definir; diario de 12 filas
+  (guardado en `/tmp/pns_e2p_diario_antes.txt` del VPS).
+- **A.6:** a) 200; b) 14 (9 JS y 5 CSS de `ir.ui.view`, de `__system__`, el último del 26/10); d) 13.
+  Consulta 3 vacía: se mantiene la decisión 7.
+- **A.7:** cadena de Chatboo con Gemini 3.6 flash, 3.5 flash y 3.5 flash lite; «Test Connection» correcto
+  y cuota disponible. El primer «Test Connection» de 3.6 flash dio HTTP 503 (10:50:35); al repetirlo salió
+  bien.
+- **A.8:** `database.secret` id 1; 206 logs con proveedor; 0 proveedores en el agente admin (P-19b no
+  prueba nada, como en el laboratorio); acción del tablero de Facturación 334. Para P-37b, `admin` y UW
+  ya podían borrar etiquetas, así que se usó un usuario temporal (D.0).
+
+### Antes de B
+
+Se comprobó que el repo no tiene commits en los módulos después de `9a2970d`, y que el laboratorio carga
+los módulos desde la raíz de `third_party` (las carpetas `_fabricante` van después en `addons_path`).
+
+### B. Despliegue
+
+- **B.4:** todo coincide: 75 marcadores; por parche 2, 5, 7, 3, 4, 6, 1, 23, 4; `seges=20` 1; 709
+  archivos, huella `7a6c7144…bb9f`.
+- **B.5:** copia en `addons_antes_E2p` con 696 archivos, huella `c12168ea…`.
+- **B.6:** el ensayo no listó bajas. Tras la sustitución, 709 archivos, huella `7a6c7144…`; `diff -rq`
+  de 30 líneas = 17 distintos + 13 nuevos + 0 bajas.
+- **B.7 y B.8 (`-u`):** 0 `Traceback`, `ERROR` y `CRITICAL`; 0 «Deleting field». `WARNING`: etiquetas
+  repetidas (`ai.log` «Client» ×2, `ai.trusted.action` «Model»), `skip retired unlink for pns_ai_mcp` y
+  dos `DeprecationWarning` de `distutils` del núcleo (`ir_actions_report.py`). El aviso de `jinja2` de
+  E1′ no apareció.
+- **Arranque:** `web` arrancó a las 10:57:35. Los 3 errores de la primera revisión del log eran el 503
+  de A.7, anterior a la parada. `/web/login` 200 y `/mcp` 403.
+
+### C. Comprobaciones posteriores
+
+C.2 igual que A.4; los crons de 5 minutos se ejecutaron a las 11:08 con el código nuevo.
+
+### D. Pruebas
+
+- **D.0:** scripts copiados a `~/staging_e2p`, con sha256 `4a247c5c…` y `47b63259…`. Etiqueta «Seges
+  P-37b» id 8; grupo «Seges P-37b» id 43 (leer y escribir en `res.partner.category`); W = usuario
+  temporal `e2p_writer`, id 23, con AI Writer. La plantilla por defecto le añadió Manage Product
+  Variants, Quotation Templates, Tax display B2B y Technical Features, que no dan borrado de etiquetas.
+  Usuario MCP 14. Línea base: 26 `ai_safe_operation`, 12 filas de diario, 657 adjuntos.
+- **D.1 (seguridad):** todas OK.
+  1. **P-37w/c:** OK; diario intacto (la fila 1 conserva su `write_date` del 16/10).
+  2. **P-37b:** OK. Propuesta `UNLK00000001`; al confirmar como `e2p_writer`, error «No puedes borrar…
+     res.partner.category» (solo Contact Creation); la etiqueta 8 sigue activa; diario: fila 13 `unlink`
+     `failed` (`create_uid` 1); `ai_safe_operation` 32 `cancelled`. Las dos primeras ejecuciones del
+     script dieron «Esta clave no ve la herramienta safe_plan_request»: `e2p_writer` no tenía AI
+     Conversational (id 15), que `/mcp` exige porque su agente es conversacional. Se añadió desde la
+     ficha del usuario (11:43); marcar la casilla en Usuarios MCP y guardar no lo dejó puesto (fallo de
+     la casilla, observación para E4′).
+  3. **P-19:** OK; la b salió «NO RECHAZADO (… vacío)», ya conocido. **P-101 (3b):** OK.
+  4. **P-82:** TODO OK. A2 24, B 25, X 915, CS_B2 48, Z2 916; X (False, 0, 24); A2 200, B 404;
+     `--limpiar` borró los dos usuarios (no hizo falta archivarlos).
+  5. **P-70, casos 1 a 5:** OK. El caso 5 primero, en el navegador habitual con caché, con
+     `?seges=20`; los casos 1 a 4 en ventana privada; sesión antigua 39.
+  6. **P-20 A y B:** OK. A: proveedor 3, `temperature` 0.7 → 0.43. B: usuario MCP 2, de U1, etiqueta →
+     «P-20b staging». «Will replace» en la pantalla de «Review»; valor y `write_date` sin cambios después
+     de «Review» y después de cerrar; el `res.users` de U1 sin cambios.
+- **D.2 (no regresión):** conforme.
+  - R1 a R4: validadas por Sergio, sin consultas de comprobación. R5: OK.
+  - R6: fila 14 `unlink` → `reverted`; fila 15 con `origin` `revert` y `reverts_id` 14; la etiqueta 9
+    vuelve.
+  - R7: la fila 16 queda en `applied` y la etiqueta 10 se borró definitivamente.
+  - Las filas 14 a 16 tienen `create_uid` 2: el `sudo` conserva el uid.
+  - R8: 0.43 confirmado y devuelto a 0.7 (12:37).
+  - R9: cubierta por los controles P-19 r1/r2 y P-101 r del script (`relaxaicode` normal por `/mcp` como
+    ADM).
+  - R10: 8 líneas, todas esperadas: un 503 de Gemini (12:13) y los dos `ERROR` de P-37b, cada uno con dos
+    `Traceback` encadenados.
+- **D.3 (limpieza):** claves MCP de `admin` (usuario MCP 1) y de `e2p_writer` (14) revocadas
+  (`not_generated`, sin hash); `e2p_writer` archivado; etiquetas 8 y 9 archivadas; grupo «Seges P-37b»
+  borrado (en Odoo 14 los grupos no se pueden archivar); P-82: 0 adjuntos y 0 sesiones.
+
+**Resultado:** E2′ desplegada en `pns_demo` y parches 11 (adaptado) y 17 a 24 **validados en staging**.
+P-37b, que en el laboratorio solo cubría el test, queda confirmada a mano.
+
+### Correcciones del procedimiento
+
+Hechas en su sitio, con la nota «(corregido el 29/10/2026)»: B.2 (puerto y destino con `read -rp`), A.8
+(consulta de P-37b sin `'<login>'`), D.0 (`mkdir -p` antes del primer `cp`; UW sustituido por el usuario
+temporal W, con AI Writer y AI Conversational), D.1 fila 5 (orden de los casos de P-70) y D.3 (W, etiqueta
+de R6, grupo y consulta final).
+
+### Observaciones para E4′
+
+Anotadas en el [plan de corrección](plan_correccion_pns_ai_3879.md), «E4′ (hoja de Medios y Bajos)»:
+«Test Connection» escribe en `ai_provider`; `pruebas_e2p_lab.py` se identifica como `seges-e2p-lab` también
+en el staging; la autenticación MCP no consulta `mcp_api_key_state`; y el fallo de la casilla AI
+Conversational de Usuarios MCP (`is_ai_conversational`): Sergio confirma que la marcó y guardó la ficha y
+el grupo no cambió; se puso desde la ficha del usuario. Candidata al informe al fabricante.
+
+### Restos para la limpieza final (no se borran ahora)
+
+- **`/tmp` del VPS, de E2′:** `pns_u_E2p.log`, `pns_diff_E2p.txt`, `pns_e2p_diario_antes.txt` y
+  `pns_e2p_linea_base.txt`.
+- **`/tmp` del VPS, de E1/E1′:** tres `.tar.gz`, `pns_diff_E1p.txt`, `pns_p9_*`, `pns_r4_r6_E1p.log`,
+  `pns_u_E1p.log`, `pns_demo_init.log` y `pns_liyben.snip`. **Revisar antes de borrar.**
+- **`/opt/odoo/pns_staging/addons_antes_E2p`:** vuelta atrás de E2′ (E, punto 3).
+- **`~/staging_e2p` del equipo de Sergio:** las tres salidas del script y `e2p_estado.json`.
+- **`~/Descargas`:** los dos JSON exportados de P-20, si siguen ahí.

@@ -26,6 +26,8 @@
   Siguiente, igual: pruebas manuales del laboratorio, ahora con P-101.
   E2′ aprobada en revisión el 28/10/2026 con la herramienta real (vías A y B), con las dos evasiones
   críticas cerradas; siguiente: los commits y el push, y después las pruebas manuales del laboratorio.
+  E2′ validada en staging el 29/10/2026 (`9a2970d` en `pns_demo`; P-37b confirmada a mano);
+  [staging_e2_3879.md](staging_e2_3879.md), apartado G. Siguiente: E3′.
 
 ## 1. Cómo se trabaja
 
@@ -56,7 +58,7 @@
 |---|---|---|---|
 | **E0′** (previa) | `test_seges_*` adaptados; esqueleto de tests de Chatboo; datos de prueba de `test_change_journal` y `test_paap_core`; línea base nueva; diagnóstico de PNS-70 (solo lectura) | — | Parte A (tests): validada en laboratorio (23/10/2026). Diagnóstico de PNS-70: hecho (23/10/2026) |
 | **E1′** | Críticos y Altos baratos: M10 con el parche 12 adaptado, PNS-54, PNS-07, M13, `collect_pin` (PNS-83) | 10 y 12 adaptados; 13 (M10), 14 (M13), 15 (PNS-07) y 16 (PNS-54) | Validada en laboratorio (23/10/2026) y en staging (26/10/2026); cerrada el 27/10/2026, con R8 no concluyente por el proveedor (se valida en E3′) |
-| **E2′** | Resto de Altos: papelera del diario (PNS-37), PNS-19, PNS-17, PNS-82, PNS-70; PNS-20 (confirmado por P-20); PNS-100 y PNS-101 (nuevos) | 11 adaptado; 17 (PNS-37), 18 (PNS-19), 19 (PNS-17), 20 (PNS-70), 21 (PNS-20), 22 (PNS-100), 23 (PNS-101, ampliado) y 24 (PNS-102) | Aplicada (27/10/2026): tests en verde y neutralización hecha; parche 18 corregido tras la revisión y parche 23 nuevo (27/10/2026). **Aprobada en revisión (28/10/2026)** con la herramienta real (vía A, shell; vía B, `/mcp`): las dos evasiones críticas, cerradas. Pendiente: los tres commits (código, tests, documentación) y el push; después, las pruebas manuales del laboratorio |
+| **E2′** | Resto de Altos: papelera del diario (PNS-37), PNS-19, PNS-17, PNS-82, PNS-70; PNS-20 (confirmado por P-20); PNS-100 y PNS-101 (nuevos) | 11 adaptado; 17 (PNS-37), 18 (PNS-19), 19 (PNS-17), 20 (PNS-70), 21 (PNS-20), 22 (PNS-100), 23 (PNS-101, ampliado) y 24 (PNS-102) | Aplicada (27/10/2026): tests en verde y neutralización hecha; parche 18 corregido tras la revisión y parche 23 nuevo (27/10/2026). **Aprobada en revisión (28/10/2026)** con la herramienta real (vía A, shell; vía B, `/mcp`): las dos evasiones críticas, cerradas. Validada en laboratorio (28/10/2026). **Validada en staging (29/10/2026)**: commit `9a2970d` ([staging_e2_3879.md](staging_e2_3879.md), apartado G) |
 | **E3′** | Lienzo: M1, M2 y F1 | Nuevos | Pendiente |
 | **E4′** | Hoja de Medios y Bajos (corregir o aceptar); después, lo elegido | Nuevos, si se corrige algo | Pendiente |
 
@@ -226,6 +228,15 @@ Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`;
     2. con el laboratorio reiniciado, las pruebas manuales de [lab_e2_3879.md](lab_e2_3879.md): P-19,
        P-37 y P-37b, P-17, P-70 (casos 1 a 5), P-20 repetida, y P-101′ y P-102; después, la subida al
        staging.
+- **Validación en staging (29/10/2026): VALIDADA.** Commit `9a2970d` en `pns_demo`, con `-u` de
+  `pns_ai_mcp` y `pns_ai_chatboo`, sin errores en el log.
+  - D.1: P-37w/c, P-37b (primera vez a mano, con un usuario temporal), P-19, P-101, P-82 (4 bis), P-70
+    (casos 1 a 5) y P-20 (A y B), todas OK. P-17, P-101′ y P-102 no se repiten en staging (laboratorio y
+    tests).
+  - D.2: no regresión R1 a R10 conforme.
+  - Detalle en [staging_e2_3879.md](staging_e2_3879.md), apartado G, y en la
+    [verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E2′ (29/10/2026)». Observaciones
+    nuevas para E4′, en su tabla.
 - **Papelera del diario, PNS-37:** cron como superusuario sobre filas editables; borrado que solo exige
   escritura.
   - Origen: comparación §6.1 «PNS-37 (parte)» (Alta, propuesta) y §1.3.
@@ -326,6 +337,10 @@ corrige lo elegido.
 | `bus.presence.update` en cursor propio (E2′) | Propuesta de E2′, «PNS-100: barrido» | core `bus/models/bus_presence.py:36`; fuera de la lista del parche 22 porque bloquearía `dict.update` |
 | Orden por un campo secreto en la caja A (E2′) | [Registro](parches_pns_ai.md), parche 18, observaciones | `search(order='api_key')` no se filtra: oráculo débil entre filas existentes |
 | `customer_360._iso` (E2′, 28/10/2026) | [Registro](parches_pns_ai.md), parche 23, tests (`test_seges_skill_env.py`) | `pns_ai_chatboo/ai/skills/system/customer_360.py:70-75`, `_iso`: llama a `isoformat()` y falla cuando la fecha llega como `str`; la skill de fábrica falla con un cliente en `lab_pns_ai_3879_14`. Funcional, no de seguridad y ajeno a los parches; código de fábrica (decidir si se parchea o solo se comunica) |
+| «Test Connection» escribe en el proveedor (staging E2′, 29/10/2026) | [Staging E2′](staging_e2_3879.md), «Resultado de la subida (29/10/2026)», A.7 | `models/ai_provider.py:1078` (`test_connection`): asigna `temperature_support`, `stt_support` y `usage_support` (`:1140-1154`), y el registro `ai_provider` cambia de `write_date`. Afecta a la lectura de P-20 A: el «antes» se toma después de cualquier «Test Connection» |
+| Etiqueta del cliente MCP del script de pruebas (staging E2′, 29/10/2026) | [Staging E2′](staging_e2_3879.md), D.1 | [`scripts_e2/pruebas_e2p_lab.py`](scripts_e2/pruebas_e2p_lab.py) se identifica como `seges-e2p-lab` también en el staging y queda en `last_mcp_client_label` del usuario que conecta. Script de Seges, no código de fábrica: decidir si toma la etiqueta del entorno |
+| La autenticación MCP no consulta el estado de la clave (staging E2′, 29/10/2026) | [Staging E2′](staging_e2_3879.md), D.3 | `controllers/main.py:473, 689, 837`: buscan `ai.mcp.user` solo por `mcp_api_key_hash` y no miran `mcp_api_key_state`. Revocar (`models/mcp_api_key_wizard.py:85-90`) borra el hash, así que hoy funciona; queda anotado por si alguna vía deja `not_generated` con el hash puesto |
+| Casilla AI Conversational en Usuarios MCP (staging E2′, 29/10/2026) | [Staging E2′](staging_e2_3879.md), D.0 y D.1 (P-37b) | `models/mcp_user.py:152-181` (casillas de grupos AI; `is_ai_conversational` en `:174-181`, con `_inverse_is_ai_conversational` en `:310-312`). **Fallo de la casilla `is_ai_conversational`:** Sergio confirma que la marcó y guardó la ficha de `e2p_writer` y el grupo no cambió; el grupo se puso desde la ficha del usuario. Código de fábrica. **Candidata al informe al fabricante** |
 
 `iap.account.account_token` legible por cualquier usuario interno: observación del core de Odoo (ACL
 estándar), sin parche; en la caja A lo cubre el parche 18 (decisión de Sergio del 27/10/2026).
@@ -356,7 +371,10 @@ estándar), sin parche; en la caja A lo cubre el parche 18 (decisión de Sergio 
 2. **Informe al fabricante:** M10, M13, `collect_pin`, PNS-54, PNS-07, PNS-97, PNS-98, PNS-70, PNS-100, F4, la
    nota falsa sobre `agent_id` (comparación §9.3) y, como observación, la numeración de `pns_base`
    1.2.47 (§9.1). Pendiente de comunicar al final (28/10/2026): PNS-101 y PNS-102 (Críticas) y
-   `customer_360._iso` (fallo funcional de la skill de fábrica; hoja de E4′). Sin rutas locales, kit, laboratorio, clientes ni personas.
+   `customer_360._iso` (fallo funcional de la skill de fábrica; hoja de E4′). Pendiente de comunicar al
+   final (29/10/2026): la casilla AI Conversational de Usuarios MCP (`is_ai_conversational`,
+   `models/mcp_user.py:174-181` y `:310-312`), que al marcarla y guardar no pone el grupo (hoja de E4′,
+   fila «Casilla AI Conversational en Usuarios MCP»). Sin rutas locales, kit, laboratorio, clientes ni personas.
 3. **Limpieza:** staging `pns_demo`, `lab_pns_ai` / `lab_pns_ai_14` y `_fabricante/`.
 
 ## 4. Estado del entorno
@@ -376,6 +394,14 @@ estándar), sin parche; en la caja A lo cubre el parche 18 (decisión de Sergio 
     referencia. I, P y T borrados.
   - De las pruebas quedan 14 operaciones (26 en total, ninguna pendiente) y 5 filas del diario (12 en
     total).
+- **Staging `pns_demo`, tras E2′ (29/10/2026):**
+  - Código de `9a2970d` montado (709 archivos, huella `7a6c7144…bb9f`); versiones sin cambios. Vuelta
+    atrás: código de `0366231` en `addons_antes_E2p` ([staging_e2_3879.md](staging_e2_3879.md), E).
+  - De las pruebas: `e2p_writer` (id 23) archivado; `e2p_interno_a` y `e2p_interno_b` borrados; etiquetas
+    «Seges P-37b» (8) y la de R6 (9) archivadas; grupo «Seges P-37b» borrado; claves MCP temporales de
+    `admin` y `e2p_writer` revocadas. En el diario quedan las filas 13 a 16 de P-37b, R6 y R7.
+  - Restos para la limpieza final (archivos en `/tmp` del VPS y en el equipo de Sergio): lista en el
+    apartado G del documento de staging.
 - **LIYBEN:** usuarios externos archivados el 23/10/2026.
 - **LIYBEN, segundo rechazo de E2′ (27/10/2026):** claves MCP **revocadas** hasta el despliegue final de E2′
   (PNS-101 ampliado y PNS-102). Paso pendiente al terminar: **regenerarlas** (ver §3.1).
@@ -387,18 +413,18 @@ Estados (N11): aplicado → validado en laboratorio → validado en staging → 
 | N.º | Ficha | Entrega | Estado |
 |---|---|---|---|
 | 10 | PNS-83 (`collect_pin`) | E1′ | Adaptado a 3.1.879; validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
-| 11 | PNS-82 (`unlink` de la sesión) | E2′ | Adaptado a 3.1.879; aplicado, tests en verde (27/10/2026) |
+| 11 | PNS-82 (`unlink` de la sesión) | E2′ | Adaptado a 3.1.879; aplicado, tests en verde (27/10/2026); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): P-82 (4 bis) |
 | 12 | PNS-01 y PNS-02 (criterio de grupos), con M10 | E1′ | Adaptado a 3.1.879; validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
 | 13 | M10 (`create` de `ai.safe.operation`; `_cleanup_stuck_state`) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
 | 14 | M13 (`_unlink_retired_from_module`) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
 | 15 | PNS-07 (métodos con cursor propio en la lista del sandbox) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026); R8 (lienzo) se valida en E3′ |
 | 16 | PNS-54 (`check_identity`; token solo para el dueño) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
-| 17 | PNS-37 (diario solo para el sistema; borrar con permiso de borrado) | E2′ | Aplicado, tests en verde (27/10/2026); P-37 y P-37b pendientes |
-| 18 | PNS-19 (credenciales en la caja A; ventana del lienzo) | E2′ | Aplicado, tests en verde (27/10/2026); rechazado en la revisión y corregido el mismo día (alias, ids, caché); P-19 pendiente; ventana a revisar en E3′ |
-| 19 | PNS-17 (cabeceras al cambiar de host; cliente MCP sin redirecciones) | E2′ | Aplicado, tests en verde (27/10/2026); P-17 manual pendiente |
-| 20 | PNS-70 (Chart.js 4 como `PnsChatbooChart`) | E2′ | Aplicado (27/10/2026); P-70, casos 1 a 5, pendiente |
-| 21 | PNS-20 («Review» no escribe) | E2′ | Aplicado, tests en verde (27/10/2026); `clear_caches()` añadido tras la revisión; P-20 repetida pendiente |
-| 22 | PNS-100 (envíos y conexiones desde la caja A) | E2′ | Aplicado, tests en verde (27/10/2026) |
-| 23 | PNS-101 (el `env` de la caja A no lleva a los entornos reales del hilo) | E2′ | Aplicado, tests en verde (27/10/2026); P-101 pendiente |
-| 24 | PNS-102 (`user`/`company` del sandbox sin `su`) | E2′ | Aplicado; validación local y neutralización (28/10/2026); P-102 pendiente |
+| 17 | PNS-37 (diario solo para el sistema; borrar con permiso de borrado) | E2′ | Aplicado, tests en verde (27/10/2026); validado en laboratorio (28/10/2026; P-37b por test); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): P-37w/c y P-37b a mano |
+| 18 | PNS-19 (credenciales en la caja A; ventana del lienzo) | E2′ | Aplicado, tests en verde (27/10/2026); rechazado en la revisión y corregido el mismo día (alias, ids, caché); validado en laboratorio (28/10/2026); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): P-19; ventana a revisar en E3′ |
+| 19 | PNS-17 (cabeceras al cambiar de host; cliente MCP sin redirecciones) | E2′ | Aplicado, tests en verde (27/10/2026); validado en laboratorio (28/10/2026, P-17 manual); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): sin prueba propia allí (sin servidor de pruebas) |
+| 20 | PNS-70 (Chart.js 4 como `PnsChatbooChart`) | E2′ | Aplicado (27/10/2026); validado en laboratorio (28/10/2026); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): P-70, casos 1 a 5 |
+| 21 | PNS-20 («Review» no escribe) | E2′ | Aplicado, tests en verde (27/10/2026); `clear_caches()` añadido tras la revisión; validado en laboratorio (28/10/2026); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): P-20 A y B |
+| 22 | PNS-100 (envíos y conexiones desde la caja A) | E2′ | Aplicado, tests en verde (27/10/2026); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): sin prueba propia, cubierto por los tests y la no regresión |
+| 23 | PNS-101 (el `env` de la caja A no lleva a los entornos reales del hilo) | E2′ | Aplicado, tests en verde (27/10/2026); validado en laboratorio (28/10/2026, P-101 y P-101′); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): P-101 |
+| 24 | PNS-102 (`user`/`company` del sandbox sin `su`) | E2′ | Aplicado; validación local y neutralización (28/10/2026); validado en laboratorio (28/10/2026, P-102); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): sin prueba propia allí |
 | — | Parche de tests E0′ (datos de prueba de `test_change_journal` y `test_paap_core`) | E0′ | Validado en laboratorio (23/10/2026) |

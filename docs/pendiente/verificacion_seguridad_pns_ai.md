@@ -2100,3 +2100,29 @@ Sergio). Detalle por caso en ese documento, «Resultado (28/10/2026)».
 - Salvedades (P-19b sin datos en esta BD; `c2_su.py` no discrimina porque `demo` tiene Facturación) y la
   escritura no prevista en `ai_log` (filas 318 y 319, de P-19j): en [lab_e2_3879.md](lab_e2_3879.md).
 - Queda para staging: P-37b manual.
+
+## Staging — entrega E2′ (29/10/2026)
+
+Sergio con Claude; horas en UTC. Commit `9a2970d` de `14.0-pns-ai-3879` desplegado en `pns_demo` con `-u`
+de `pns_ai_mcp` y `pns_ai_chatboo`. Procedimiento, comprobaciones previas, despliegue, no regresión (D.2) y
+limpieza: [staging_e2_3879.md](staging_e2_3879.md), columnas «Obtenido» y «Resultado de la subida
+(29/10/2026)».
+
+| # | Prueba | Parche (PNS) | Quién / cómo | Resultado |
+|---|---|---|---|---|
+| 1 | P-37w/c: `write` y `create` en `ai.change.journal` por `call_kw` | 17 (PNS-37) | ADM, `pruebas_e2p_lab.py` | **OK**: diario intacto (la fila 1 conserva su `write_date` del 16/10) |
+| 2 | P-37b: borrado por plan de un usuario sin permiso de borrado, **primera vez de forma manual** | 17 (PNS-37) | Usuario temporal `e2p_writer` (id 23; AI Writer y AI Conversational), propuesta con el script y confirmación en Autorizaciones | **OK**: «No puedes borrar… res.partner.category»; la etiqueta 8 sigue activa; fila 13 del diario `unlink` `failed`; operación 32 `cancelled` |
+| 3 | P-19: casos a a j, r1 y r2 | 18 (PNS-19) | ADM, `pruebas_e2p_lab.py` por `/mcp` | **OK**; la b, «NO RECHAZADO (… vacío)» (0 proveedores en el agente admin, como en el laboratorio) |
+| 3b | P-101: casos a a e y r | 23 (PNS-101) | ADM, mismo script | **OK** |
+| 4 | P-82: prueba 4 bis | 11 adaptado (PNS-82) | `e2p_interno_a` y `e2p_interno_b`, `prueba4_bis_e2p.py`; Sergio por SQL | **TODO OK**: X desenganchado y de A2; Z2 y CS_B2 borrados; A2 200, B 404; usuarios borrados por `--limpiar` |
+| 5 | P-70, casos 1 a 5 | 20 (PNS-70) | ADM, navegador de Sergio (caso 5 primero, con caché; 1 a 4 en ventana privada) | **OK**; en el caso 5, `?seges=20` |
+| 6 | P-20, casos A y B | 21 (PNS-20) | ADM, navegador de Sergio | **OK**: «Review» y cerrar no cambian valor ni `write_date` (proveedor 3 y usuario MCP 2) |
+| — | No repetidas en staging: P-17, P-101′ y P-102 | 19, 23 y 24 | Laboratorio y tests | Validadas en el laboratorio (28/10/2026) |
+
+- **No regresión (D.2):** R1 a R10 conformes (R1 a R4, validadas por Sergio sin consultas; R9, cubierta
+  por los controles del script). Log: solo un 503 de Gemini y los dos `ERROR` provocados por P-37b.
+- **Limpieza:** claves MCP temporales revocadas (sin hash), `e2p_writer` archivado, etiquetas archivadas
+  y grupo de P-37b borrado; restos para la limpieza final, en el documento de staging.
+
+**Resultado de E2′ en staging:** parches 11 (adaptado) y 17 a 24 validados en staging el 29/10/2026.
+P-37b, que en el laboratorio solo cubría el test, queda confirmada a mano.
