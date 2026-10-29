@@ -1060,6 +1060,13 @@ tratados (§8.6).
 Nota sobre `chatboo.session.sandbox_helpers` (`chatboo_session.py:817-840`): por RPC devuelve funciones
 (no serializables) y no hace nada útil; lo que importa es lo que publica al sandbox (M2 y M3).
 
+Nota sobre M3 (29/10/2026, inventario de E3′, [e3_propuesta_3879.md](../pendiente/e3_propuesta_3879.md), I2):
+lo de «incrustan imágenes con el entorno del usuario» solo es cierto por RPC. Desde el sandbox, que es el uso
+normal, `page_url` y `page_edit` con filas también leen las imágenes en `sudo`: los helpers se publican con
+`rec.sudo()` (`pns_ai_mcp/utils/sandbox_helpers.py:68-70`) y `open_page` pasa `sessions.env` a
+`pictures_as_tokens`. M2 alcanza también a estos dos. Lo corrige el parche 26 de Seges
+([registro de parches](../pendiente/parches_pns_ai.md)).
+
 ### 8.3 Modelos nuevos, ACL y reglas de registro
 
 Comparación de `_name`/`_inherit` y de `security/` de los dos árboles. **Sin cambios** entre versiones:

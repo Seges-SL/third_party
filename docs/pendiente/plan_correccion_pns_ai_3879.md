@@ -28,6 +28,15 @@
   críticas cerradas; siguiente: los commits y el push, y después las pruebas manuales del laboratorio.
   E2′ validada en staging el 29/10/2026 (`9a2970d` en `pns_demo`; P-37b confirmada a mano);
   [staging_e2_3879.md](staging_e2_3879.md), apartado G. Siguiente: E3′.
+  E3′ aplicada el 29/10/2026 (parches 25 a 28; la ventana del parche 18 se mantiene): tests y
+  neutralización en el laboratorio hechos ([e3_propuesta_3879.md](e3_propuesta_3879.md), «Propuesta
+  final»); siguiente: pruebas manuales del laboratorio ([lab_e3_3879.md](lab_e3_3879.md)), con R8, tras
+  reiniciar el contexto.
+  E3′ revisada el 29/10/2026: el revisor rechaza el parche 27 b (B1, la CSP no siempre quedaba la primera);
+  se sustituye por un prefijo fijo (decisión de Sergio) y se corrigen los tests (m1, m2). Siguiente: nueva
+  revisión del 27 b y de los tests cambiados.
+  E3′ aprobada en revisión el 29/10/2026 (segunda revisión, acotada a B1, m1 y m2; m-a y m-b aceptadas);
+  siguiente: los commits y las pruebas manuales del laboratorio ([lab_e3_3879.md](lab_e3_3879.md)).
 
 ## 1. Cómo se trabaja
 
@@ -59,7 +68,7 @@
 | **E0′** (previa) | `test_seges_*` adaptados; esqueleto de tests de Chatboo; datos de prueba de `test_change_journal` y `test_paap_core`; línea base nueva; diagnóstico de PNS-70 (solo lectura) | — | Parte A (tests): validada en laboratorio (23/10/2026). Diagnóstico de PNS-70: hecho (23/10/2026) |
 | **E1′** | Críticos y Altos baratos: M10 con el parche 12 adaptado, PNS-54, PNS-07, M13, `collect_pin` (PNS-83) | 10 y 12 adaptados; 13 (M10), 14 (M13), 15 (PNS-07) y 16 (PNS-54) | Validada en laboratorio (23/10/2026) y en staging (26/10/2026); cerrada el 27/10/2026, con R8 no concluyente por el proveedor (se valida en E3′) |
 | **E2′** | Resto de Altos: papelera del diario (PNS-37), PNS-19, PNS-17, PNS-82, PNS-70; PNS-20 (confirmado por P-20); PNS-100 y PNS-101 (nuevos) | 11 adaptado; 17 (PNS-37), 18 (PNS-19), 19 (PNS-17), 20 (PNS-70), 21 (PNS-20), 22 (PNS-100), 23 (PNS-101, ampliado) y 24 (PNS-102) | Aplicada (27/10/2026): tests en verde y neutralización hecha; parche 18 corregido tras la revisión y parche 23 nuevo (27/10/2026). **Aprobada en revisión (28/10/2026)** con la herramienta real (vía A, shell; vía B, `/mcp`): las dos evasiones críticas, cerradas. Validada en laboratorio (28/10/2026). **Validada en staging (29/10/2026)**: commit `9a2970d` ([staging_e2_3879.md](staging_e2_3879.md), apartado G) |
-| **E3′** | Lienzo: M1, M2 y F1 | Nuevos | Pendiente |
+| **E3′** | Lienzo: M1, M2, F1 y D1 (D1 pasa de E4′ a E3′: decisión de Sergio del 29/10/2026) | 25 (M1), 26 (M2), 27 (F1) y 28 (D1); la ventana del parche 18 se mantiene | **Aplicada (29/10/2026)**: tests en verde y neutralización hecha; rechazada en la primera revisión (B1, parche 27 b) y corregida; **aprobada en revisión (29/10/2026)**; pruebas manuales del laboratorio pendientes ([lab_e3_3879.md](lab_e3_3879.md)) |
 | **E4′** | Hoja de Medios y Bajos (corregir o aceptar); después, lo elegido | Nuevos, si se corrige algo | Pendiente |
 
 Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`; línea de 3.1.879).
@@ -304,9 +313,18 @@ Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`;
   - Archivo: `pns_ai_chatboo/models/chatboo_canvas.py` (carcasa `:500-573`; filas en el `<script>`
     `:1097-1109, 1423-1434`).
   - Método: a determinar en la entrega.
+- **D1:** páginas compartidas (pasa de E4′ a E3′: decisión de Sergio del 29/10/2026).
+  - Origen: comparación §8.7 «D1» (Baja) y §8.3.
+  - Archivo y método: `pns_ai_chatboo/models/chatboo_canvas_page.py:25-176` (`write` de `owner_id`);
+    regla del AI Administrator en `pns_ai_chatboo/security/security.xml:43-76`.
 - **Validaciones en staging que se añaden:**
   - R8 de E1′ (lienzo: una página sencilla desde el chat, como U1; la página se crea y se ve). Quedó
     no concluyente en E1′ por el proveedor (26 y 27/10/2026; PNS-96) (decisión de Sergio del 27/10/2026).
+  - R8 se hace con un modelo de diseño que no sea `lite`, en el laboratorio y en el staging (decisión de
+    Sergio del 29/10/2026).
+  - Lectores de portal ya guardados en páginas compartidas (observación m3 de la revisión de E3′, parche
+    28), solo `SELECT`, en el staging y en LIYBEN:
+    `SELECT count(*) FROM chatboo_canvas_page_user_rel r JOIN res_users u ON u.id = r.user_id WHERE u.share;`
 
 ### E4′ (hoja de Medios y Bajos)
 
@@ -327,7 +345,7 @@ corrige lo elegido.
 | PNS-26 (resto) | §5.6 «PNS-26 (resto)» | `utils/engine_tool_run.py:323-357` (`SAVEPOINT` por herramienta) y `:256-260, 306-321` |
 | PNS-88 | §5.6 «PNS-88» | `utils/schema_fossils.py:69-97` (`XMLID_RENAMES`) |
 | F4 | §8.7 «F4», §8.4 | `pns_ai_chatboo/static/src/js/chatboo_export.js`; método: a determinar en la entrega |
-| D1 (ficha de la comparación) en el lienzo | §8.7 «D1», §8.3 | `pns_ai_chatboo/models/chatboo_canvas_page.py:25-176` (`write` de `owner_id`); regla del AI Administrator en `pns_ai_chatboo/security/security.xml:43-76` |
+| D1 (ficha de la comparación) en el lienzo — **pasa a E3′ (29/10/2026)** | §8.7 «D1», §8.3 | `pns_ai_chatboo/models/chatboo_canvas_page.py:25-176` (`write` de `owner_id`); regla del AI Administrator en `pns_ai_chatboo/security/security.xml:43-76` |
 | M5 | §8.7 «M5 y M16», §8.2 | `pns_ai_chatboo/models/chatboo_async_request.py:1559-1586`, `cron_maintenance` |
 | M16 | §8.7 «M5 y M16», §8.2 | `models/ai_fx_source.py:86-166`, `get_usd_fx` |
 | Tokens de portal (E2′) | [Propuesta de E2′](e2_propuesta_3879.md), «PNS-19 (decisión 4)» | `access_token` de `account.move`, `sale.order` e `ir.attachment`; `signup_token` de `res.partner`: dan acceso a lo que el usuario ya ve |
@@ -420,11 +438,15 @@ Estados (N11): aplicado → validado en laboratorio → validado en staging → 
 | 15 | PNS-07 (métodos con cursor propio en la lista del sandbox) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026); R8 (lienzo) se valida en E3′ |
 | 16 | PNS-54 (`check_identity`; token solo para el dueño) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
 | 17 | PNS-37 (diario solo para el sistema; borrar con permiso de borrado) | E2′ | Aplicado, tests en verde (27/10/2026); validado en laboratorio (28/10/2026; P-37b por test); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): P-37w/c y P-37b a mano |
-| 18 | PNS-19 (credenciales en la caja A; ventana del lienzo) | E2′ | Aplicado, tests en verde (27/10/2026); rechazado en la revisión y corregido el mismo día (alias, ids, caché); validado en laboratorio (28/10/2026); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): P-19; ventana a revisar en E3′ |
+| 18 | PNS-19 (credenciales en la caja A; ventana del lienzo) | E2′ | Aplicado, tests en verde (27/10/2026); rechazado en la revisión y corregido el mismo día (alias, ids, caché); validado en laboratorio (28/10/2026); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): P-19; ventana a revisar en E3′; revisada en E3′ (29/10/2026): se mantiene |
 | 19 | PNS-17 (cabeceras al cambiar de host; cliente MCP sin redirecciones) | E2′ | Aplicado, tests en verde (27/10/2026); validado en laboratorio (28/10/2026, P-17 manual); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): sin prueba propia allí (sin servidor de pruebas) |
 | 20 | PNS-70 (Chart.js 4 como `PnsChatbooChart`) | E2′ | Aplicado (27/10/2026); validado en laboratorio (28/10/2026); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): P-70, casos 1 a 5 |
 | 21 | PNS-20 («Review» no escribe) | E2′ | Aplicado, tests en verde (27/10/2026); `clear_caches()` añadido tras la revisión; validado en laboratorio (28/10/2026); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): P-20 A y B |
 | 22 | PNS-100 (envíos y conexiones desde la caja A) | E2′ | Aplicado, tests en verde (27/10/2026); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): sin prueba propia, cubierto por los tests y la no regresión |
 | 23 | PNS-101 (el `env` de la caja A no lleva a los entornos reales del hilo) | E2′ | Aplicado, tests en verde (27/10/2026); validado en laboratorio (28/10/2026, P-101 y P-101′); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): P-101 |
 | 24 | PNS-102 (`user`/`company` del sandbox sin `su`) | E2′ | Aplicado; validación local y neutralización (28/10/2026); validado en laboratorio (28/10/2026, P-102); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): sin prueba propia allí |
+| 25 | M1 (`paint_canvas` privado y con dueño) | E3′ | Aplicado; aprobado en revisión (29/10/2026); P-8c pendiente |
+| 26 | M2 (imágenes del lienzo sin `su`) | E3′ | Aplicado; aprobado en revisión (29/10/2026); P-8d pendiente |
+| 27 | F1 (JSON seguro en `<script>`, CSP al servir, regla de diseño, `X-Frame-Options`) | E3′ | Aplicado; aprobado en revisión (29/10/2026); P-8e (a y b) pendiente |
+| 28 | D1 (dueño fijo, solo internos, AI Administrator solo lee y borra) | E3′ | Aplicado; aprobado en revisión (29/10/2026); P-8h pendiente |
 | — | Parche de tests E0′ (datos de prueba de `test_change_journal` y `test_paap_core`) | E0′ | Validado en laboratorio (23/10/2026) |

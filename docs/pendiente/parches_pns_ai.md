@@ -6,7 +6,7 @@
   [plan sobre 3.1.879](plan_correccion_pns_ai_3879.md)); `14.0-pns-ai-correcciones` queda como
   referencia
 - **Fecha:** 2026-10-13 (parches 1 a 3) · actualizado el 2026-10-20 (N11 y N12), el 2026-10-21
-  (staging de E2), el 2026-10-23 (cambio de base a 3.1.879 y E1′) el 2026-10-26 (staging de E1′) y el 2026-10-27 (repetición de R8; E2′: parches 11 adaptado y 17 a 22)
+  (staging de E2), el 2026-10-23 (cambio de base a 3.1.879 y E1′) el 2026-10-26 (staging de E1′) y el 2026-10-27 (repetición de R8; E2′: parches 11 adaptado y 17 a 22) y el 2026-10-29 (E3′: parches 25 a 28)
 - **Versión del fabricante, base propia de Seges desde el 20/10/2026 (N12):** `pns_base` 14.0.1.2.32 ·
   `pns_ai_mcp` 14.0.3.1.782 · `pns_ai_chatboo` 14.0.2.1.453
 - **Desde el 23/10/2026 (N12, b′), en `14.0-pns-ai-3879`:** `pns_base` 14.0.1.2.47 · `pns_ai_mcp`
@@ -119,6 +119,10 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 | 21 | PNS-20 | seguridad | `pns_base/models/operation_report_wizard.py` | E2′ | Aplicado; `clear_caches()` tras la revisión; tests en verde (27/10/2026); P-20 repetida pendiente |
 | 22 | PNS-100 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | E2′ | Aplicado; tests en verde (27/10/2026) |
 | 23 | PNS-101 | seguridad | `pns_ai_mcp/controllers/validators_base.py`, `pns_ai_mcp/controllers/validators.py`, `pns_ai_mcp/controllers/context_builder.py` | E2′ | Aplicado; tests en verde (27/10/2026); P-101 pendiente |
+| 25 | M1 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | E3′ | Aplicado; aprobado en revisión (29/10/2026); P-8c pendiente |
+| 26 | M2 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | E3′ | Aplicado; aprobado en revisión (29/10/2026); P-8d pendiente |
+| 27 | F1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/controllers/chatboo.py` | E3′ | Aplicado; aprobado en revisión (29/10/2026; el 27 b, rehecho tras B1); P-8e pendiente |
+| 28 | D1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas_page.py`, `pns_ai_chatboo/security/security.xml` | E3′ | Aplicado; aprobado en revisión (29/10/2026); P-8h pendiente |
 
 Parches 11 adaptado y 17 a 22 (E2′, 27/10/2026): aplicados, con tests y neutralización hechos; pruebas
 manuales del laboratorio pendientes ([lab_e2_3879.md](lab_e2_3879.md)). Tras la revisión del mismo día:
@@ -1338,6 +1342,17 @@ Solo lectura (código, core de Odoo 14 de referencia, OCA, `vertical-instaladore
   - **Nota para E3′:** al corregir el lienzo (M1, M2 y F1), revisar si la ventana sigue haciendo falta o
     si la llamada de diseño puede salir de la caja A (por ejemplo, como la página «en espera», que se
     completa fuera, en `utils/engine_tool_run.py:393`).
+  - **Ventana revisada en E3′ (29/10/2026): se mantiene** (decisión 5 de Sergio;
+    [e3_propuesta_3879.md](e3_propuesta_3879.md), I5 y «Propuesta final»). Motivos:
+    1. sacar solo `page_url` (con filas) de la caja A no la elimina, porque `page_edit` sin filas la sigue
+       necesitando, y cambia el comportamiento (la URL llega al resultado después, las filas serían las del
+       resultado y no las que pasó el código);
+    2. quitarla del todo exige cambiar el contrato de `fulfill_waiting_page` en `pns_ai_mcp` (ejecutar el
+       `fulfill` sin filas) y sustituir los 6 tests de `test_seges_canvas_box_a.py`;
+    3. está acotada (texto plano de entrada; solo `content` y `error` de salida; marca restaurada y caché
+       vaciada al cerrar) y validada en staging (29/10/2026);
+    4. con el parche 26 no da más acceso: las imágenes se leen sin `su` antes de la ventana, que solo
+       envuelve la llamada al proveedor.
 - **Qué se degrada:** en la caja A no se lee ningún campo de esos modelos salvo los de identificación,
   ni por relación ni en `sudo`. `read()` de otros modelos sigue dando sus many2one como `(id, nombre)`.
   El código interno de Odoo que corra con la marca y necesite otro campo de esos modelos dará
@@ -2010,3 +2025,374 @@ base. Son los **11** tests de `TestSegesEngineNames` más los **4** subtests de
 `test_engine_name_argument` (que el runner cuenta aparte). El total es 15, no 14:
 `test_engine_name_argument` falla además por su cuenta (la forma `lambda`, fuera
 de los subtests), de modo que aparece como test y como 4 subtests.
+
+## Parches de la rama 14.0-pns-ai-3879 (E3′)
+
+- **Fecha:** 29/10/2026. **Entrega:** E3′ (lienzo: M1, M2, F1 y D1) del
+  [plan sobre 3.1.879](plan_correccion_pns_ai_3879.md).
+- **Propuesta, comprobaciones previas y decisiones de Sergio:** [e3_propuesta_3879.md](e3_propuesta_3879.md),
+  «Propuesta final (29/10/2026)». HEAD de partida: `59f8980`.
+- **Rutas:** de 3.1.879 con E1′, E2′ y E3′ (copia de trabajo del 29/10/2026). Sin tocar `version`,
+  `depends`, `external_dependencies`, `i18n`, `LICENSE` ni `NOTICE`. Mensajes nuevos en inglés, sin
+  traducir. Solo cambia `pns_ai_chatboo`.
+- **Marcadores:**
+  `grep -rn "Seges: parche 2[5-8] (" pns_ai_chatboo --include=*.py --include=*.xml | grep -v /tests/`:
+  24 líneas (25: 5; 26: 2; 27: 13; 28: 4, una de ellas en XML).
+- **Pruebas manuales del laboratorio** (preparadas, las ejecuta Sergio): [lab_e3_3879.md](lab_e3_3879.md).
+
+### Parche 25: `paint_canvas` pasa a privado y comprueba el dueño (M1)
+
+- **Qué falla sin él (comparación §8.2 y §8.7, M1, Media):** `chatboo.session.paint_canvas` es público.
+  Por `/web/dataset/call_kw`, `_call_kw_multi` hace `browse(ids)` sin comprobar el acceso, así que
+  cualquier interno pide un diseño sobre **cualquier** sesión, y `_store_design` la sobrescribe como
+  `SUPERUSER_ID` en un cursor propio con `commit` (P-8c). El dueño, además, gasta inferencia de diseño sin
+  pasar por el acceso de Chatboo ni por la clave MCP.
+- **Cambio** (`pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py`):
+  - `paint_canvas` pasa a `_paint_canvas` (`chatboo_session.py:1055`). Odoo 14 rechaza por RPC los nombres
+    con `_` (`check_method_name`). Llamadores: `open_page` (`chatboo_canvas.py:990`) y `edit_page`
+    (`:1015`), los únicos (paso 0).
+  - Al empezar, después de `ensure_one`, `_paint_canvas` lee la sesión en `sudo` y, si su `user_id` no es
+    `self.env.uid`, da `AccessError` antes de leer el diseño o de llamar al proveedor (`:1073-1074`).
+    **Sin** la excepción de uid 1 de `_session_of_this_turn`.
+  - Import de `AccessError` (`chatboo_session.py:14-15`).
+  - La lista del parche 15 (`validators_base.py:264`, `'paint_canvas'`) y su test
+    (`test_seges_chatboo_export.py:40`) **no se tocan** (decisión 1): siguen como defensa por nombre.
+- **Qué se degrada:**
+  - nadie pide diseños por RPC, ni siquiera el dueño: el lienzo sigue por el chat (botón Canvas, página
+    en espera) y por los helpers del sandbox;
+  - un turno o un job que corra como `__system__` (uid 1) sobre la sesión de otro deja de pintar: da
+    `AccessError`, que `page_url`/`page_edit` convierten en `log_no_page`. Chatboo usa el uid del usuario,
+    así que no se espera ninguno.
+- **Lint:** las tres incidencias de la línea del `def` (C901 19 > 16, R0912 21/12, R0915 61/50) son las
+  del `paint_canvas` del fabricante (18 > 16, 20/12 y 59/50 en `59f8980`, `:1051`). Salen como nuevas
+  porque el cambio de nombre toca esa línea; la comprobación del parche suma una rama y dos sentencias.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "def paint_canvas\|def _paint_canvas\|user_id.id != self.env.uid" pns_ai_chatboo/models/chatboo_session.py
+  ```
+  Corregido si su versión no publica `paint_canvas` o si comprueba el dueño dentro del método.
+- **Tests** (`pns_ai_chatboo/tests/test_seges_chatboo_canvas.py`, `TestSegesPaintCanvas`, 4):
+  `test_rpc_public_name_gone` (`call_kw` de `paint_canvas` → `AttributeError`, método inexistente),
+  `test_rpc_private_name_refused` (`call_kw` de `_paint_canvas` → `AccessError`, privado),
+  `test_foreign_session_refused` (`_paint_canvas` sobre la sesión de otro usuario → `AccessError`;
+  `canvas_design` y `canvas_rev` sin cambios; el driver no se llama) y `test_own_session_paints` (la
+  propia se pinta: revisión 1 y la URL de la carcasa).
+
+### Parche 26: `page_html` y `open_page` leen las imágenes sin `su` (M2)
+
+- **Qué falla sin él (comparación §8.2 y §8.7, M2, Media; nota del 29/10/2026 en M3):** los helpers del
+  sandbox se publican en `sudo` (`pns_ai_mcp/utils/sandbox_helpers.py:68-70`). `page_html` pasa a
+  `pictures_as_tokens` `session.env` (sesión leída en `sudo` por `_session_of_this_turn`), y `open_page`,
+  que usan `page_url` y `page_edit` con filas, `sessions.env` (el `self` del helper, en `sudo`). Para cada
+  `/web/image/<modelo>/<id>/<campo>` de las filas, `_web_image_picture` hace `search` y lee el campo **sin
+  ACL, reglas ni grupos de campo**, y la imagen queda incrustada en la página (P-8d).
+- **Cambio:** `pictures_as_tokens(session.env(su=False), …)` en `page_html` (`chatboo_session.py:924-925`)
+  y `pictures_as_tokens(sessions.env(su=False), …)` en `open_page` (`chatboo_canvas.py:974-975`). Mismo
+  cursor, uid y contexto; solo cae `su`. `_session_of_this_turn` no se toca: la comprobación del dueño
+  sigue leyendo la sesión en `sudo`.
+- **Qué se degrada:** desaparecen de la página las imágenes de registros que el usuario no puede leer (la
+  celda se queda con la ruta `/web/image/…` como texto); las de los registros que ve, igual. Las skills de
+  fábrica que usan `page_html` (`cash_forecast`, `customer_360`, `pipeline`) apuntan a registros del
+  usuario. En la caja A sigue mandando además el guardián del parche 18.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "pictures_as_tokens(" pns_ai_chatboo/models/chatboo_session.py pns_ai_chatboo/models/chatboo_canvas.py
+  ```
+  Corregido si `pictures_as_tokens` recibe un entorno sin `su` (o con el usuario real) en las dos
+  llamadas.
+- **Tests** (`TestSegesCanvasPictures`, 5): un contacto de otra compañía, sin usuario (la regla
+  multicompañía de `res.partner` lo oculta), y otro sin compañía; ambos con imagen. Llamada **a través de
+  los helpers publicados** (`collect_sandbox_helpers`, en `sudo`) con `ai_session_ref`:
+  `test_user_cannot_read_hidden` (control de la premisa), `test_page_html_hidden_picture` y
+  `test_page_url_hidden_picture` (sin `data:image` en `canvas_design`), y los controles
+  `test_page_html_visible_picture` y `test_page_url_visible_picture` (sí aparece
+  `data:image/png;base64,`). `page_url` con el driver de diseño simulado.
+
+### Parche 27: el lienzo no deja salir datos (F1)
+
+- **Qué falla sin él (comparación §8.4 y §8.7, F1, Media; inventario I3 de la propuesta):**
+  - las filas y el título se escriben dentro de `<script>` con `json.dumps(…, ensure_ascii=False)`, que no
+    escapa `<`: un valor `</script><script>…` cierra el bloque y ejecuta lo que sigue dentro del marco
+    (P-8e, a). El vigilante del fabricante (`</` → `<\/`) no cubre `<!--<script`;
+  - el marco no tiene CSP: el diseño puede cargar librerías, fuentes, hojas e imágenes de cualquier host
+    y sacar datos con `fetch`, `sendBeacon`, `WebSocket` o una imagen (P-8e, b). El prompt solo dice «Do not
+    fetch»;
+  - la carcasa no lleva `X-Frame-Options`: otra web puede enmarcarla;
+  - `_picture_of` aceptaba cualquier valor que empezara por `data:image/`, y `swap_pictures` lo vuelve a
+    meter sin escapar en `DATA` y en `<img src="…">` (punto nuevo del paso 0).
+- **Cambio** (`pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/controllers/chatboo.py`):
+  - **a) Función única** `_script_json(valor)` (`:42`): `json.dumps(valor, ensure_ascii=False,
+    default=str)` y después `_script_safe` (`:34`), que cambia `<`, `>`, `&`, U+2028 y U+2029 por `<`,
+    `>`, `&`, ` ` y ` `. Es exacto: en JSON esos caracteres solo aparecen dentro de
+    cadenas, donde el escape significa lo mismo, y `json.loads` devuelve el valor original. Se usa en los
+    cinco puntos de I3 (b): página de rescate (`_page_for_rows`, `:1164-1165`), `const DATA`
+    (`_payload_for_const_data`, `:1501-1503`), otras matrices (`bind_script_row_json`, `:1811-1812`),
+    `const TITLE` (`bind_const_title`, `:1516-1517`) y el vigilante (`_spare_rows_watch`, `:2271-2272`).
+    En la rama de bloques de `const DATA`, `figures_for_design` no se toca y su texto pasa por
+    `_script_safe` (decisión del paso 0: si `json.dumps` falla devuelve `str(blocks)`, que no es JSON, igual
+    que hoy, pero ya no puede cerrar el `<script>`).
+  - **a′) Imágenes** (decisión del paso 0): en `_picture_of` (`:770-771`), un valor `data:image/` solo
+    cuenta como imagen si es exactamente `data:image/<tipo>;base64,<base64>` (`_DATA_URI_RE.fullmatch`);
+    si no, se queda como texto y lo serializa `_script_json`.
+  - **b) CSP en `<meta>` al servir** (versión rechazada en la revisión, B1; sustituida el 29/10/2026 por
+    el prefijo fijo: ver «Revisión de E3′ (29/10/2026)» al final): `_CSP_META` (`:457`) y `_with_csp` (`:472-474`), que la pone la primera
+    dentro del `<head>` del diseño. Si el documento no empieza (tras BOM, comentarios, `<!doctype>` y
+    `<html>`) por `<head>`, se crea un `<head>` con la `<meta>` delante: así ningún script del diseño corre
+    antes que ella, y el analizador mete en ese `<head>` los elementos de cabecera del diseño. La aplican
+    `canvas_page` al `srcdoc` (`:572`; `/chatboo/canvas/<id>` y `/chatboo/page/<id>`) y
+    `downloadable_page` (`:520`; las dos descargas), **al servir**: no se guarda, así que vale también para
+    los diseños guardados antes. Política: `default-src 'none'; script-src 'unsafe-inline'; style-src
+    'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; form-action 'none'; base-uri
+    'none'; frame-src 'none'; object-src 'none'; worker-src 'none'`.
+  - **c) Regla nueva en `_PAGE_RULES`** (`:67-69`), en inglés: «Do not load external libraries, fonts,
+    stylesheets or images: the page cannot reach the network. Draw charts with inline SVG or <canvas>.»
+    Llega a `DESIGN_SYSTEM` y a `EDIT_SYSTEM`.
+  - **d) `X-Frame-Options: SAMEORIGIN`** en `GET /chatboo/canvas/<session_id>` (`chatboo.py:1153-1159`) y
+    `GET /chatboo/page/<page_id>` (`:1246-1252`). Nada enmarca la carcasa (paso 0).
+- **e) Riesgo aceptado** (decisión 3 e, I3 d):
+  - **autonavegación del marco** (`location = …`, `<meta http-equiv="refresh">`, un enlace sin `target`):
+    ninguna directiva CSP implantada la limita y el documento nuevo ya no tiene la `<meta>`;
+  - **WebRTC** (`RTCPeerConnection` con STUN/TURN propio) y **DNS** (`dns-prefetch`, `preconnect`): sin
+    directiva CSP que los cierre en todos los navegadores;
+  - **imágenes `http(s)` externas de las filas**: dejan de verse en el lienzo (`img-src data: blob:`). Las
+    de `/web/image` siguen, porque se incrustan en `data:`;
+  - **respuestas 404 de la carcasa sin `X-Frame-Options`** (observación m4 de la revisión, aceptada el
+    29/10/2026): `request.not_found()` devuelve el 404 genérico de werkzeug, sin la cabecera y sin nada del
+    diseño. Sin sesión, Odoo redirige al login.
+- **Qué se degrada:**
+  - un diseño que use una librería, una fuente o una hoja de un CDN deja de cargarla: los gráficos tienen
+    que ser SVG o `<canvas>` (lo dice ya la regla c). Los diseños guardados con CDN se ven sin ese recurso;
+  - `fetch`, formularios, marcos y workers dentro del diseño, bloqueados;
+  - una imagen `data:image/` que no sea base64 (SVG en texto, por ejemplo) ya no se trata como imagen
+    (hoy ya rompía el JSON por las comillas);
+  - la descarga se abre en local con la misma CSP.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "Content-Security-Policy\|u003c\|X-Frame-Options\|external librar" pns_ai_chatboo/models/chatboo_canvas.py pns_ai_chatboo/controllers/chatboo.py
+  ```
+  Corregido si los datos van escapados dentro de `<script>` (`<` incluido), el marco y la descarga llevan
+  una CSP sin red y la carcasa no se puede enmarcar desde otro origen.
+- **Tests** (`TestSegesCanvasScriptJson`, 8, y `TestSegesCanvasShell`, 8), con valores
+  `</script><script>alert(…)</script>`, `<!--<script>`, `R&D`, `>` y U+2028:
+  - a: `test_const_data`, `test_const_data_blocks_shape` (rama de `figures_for_design`),
+    `test_const_title`, `test_other_arrays`, `test_rescue_page`, `test_rows_watch` y `test_whole_page`
+    (`place_rows_on_page` completo, con título): sin `</script><script>alert` ni `<!--<script` en el HTML, y
+    `json.loads` del texto serializado devuelve el valor original;
+    `test_picture_only_base64_data_uri` (a′);
+  - b: `test_canvas_shell` y `test_page_shell` (`srcdoc` de la carcasa desescapado) y `test_canvas_download`
+    y `test_page_download`: la `<meta>` CSP es lo primero de `<head>` y no hay ningún script antes, con un
+    diseño guardado sin `<meta>` (`test_stored_design_has_no_csp` lo comprueba); `test_csp_without_head`
+    (sin `<head>`, con un script antes de `<head>` y solo `<body>`) y `test_csp_policy`;
+  - c: `test_design_rule` (en `_PAGE_RULES`, `DESIGN_SYSTEM` y `EDIT_SYSTEM`);
+  - d: `X-Frame-Options: SAMEORIGIN` en `test_canvas_shell` y `test_page_shell`.
+
+### Parche 28: páginas compartidas — dueño fijo, solo internos y el AI Administrator solo lee y borra (D1)
+
+- **Qué falla sin él (comparación §8.3 y §8.7, D1, Baja; inventario I4):**
+  - `write` no limita campos y Odoo 14 comprueba la regla **antes** de escribir: el dueño puede pasar la
+    página a otro usuario cambiando `owner_id` (P-8h); con `user_ids` en el mismo `write`, el aviso sale
+    como «<nuevo dueño> shared a page with you»;
+  - el `domain` de `user_ids` (`share = False`) solo se aplica en la interfaz: por ORM entra un usuario de
+    portal, que recibe la notificación (por correo, si es su preferencia) aunque no pueda leer la página;
+  - la regla del AI Administrator (`[(1, '=', 1)]` con los cuatro permisos) le deja cambiar `design` o
+    `name` de páginas ajenas (los lectores ven el HTML nuevo en la URL de Odoo), cambiar `owner_id`, avisar
+    a quien quiera y crear páginas a nombre de cualquiera.
+- **Cambio** (`pns_ai_chatboo/models/chatboo_canvas_page.py`, `pns_ai_chatboo/security/security.xml`):
+  - `write` (`:86-93`): si `owner_id` está en los valores, no es `sudo` y cambia en alguna página,
+    `AccessError` («Only the system can change the owner of a shared page.»). Escribir el mismo dueño no es
+    un cambio. Nadie lo cambia fuera de `sudo`, tampoco el AI Administrator.
+  - Constraint `_check_user_ids_internal` (`:69-75`): `user_ids` solo admite usuarios internos, también en
+    `sudo` y en `create`, `ValidationError` («A page can only be shared with internal users.»). Odoo valida
+    dentro de `create` y `write`, antes de `_tell_new_readers`: no sale ningún aviso.
+  - Regla `chatboo_canvas_page_admin_rule` (`security.xml:67-78`): `perm_write` y `perm_create` pasan a
+    `False`; quedan lectura y borrado. Está en `<data noupdate="0">` y `ir_model_data.noupdate` es falso
+    (paso 0): el `-u` la cambia en las BD existentes. El dueño sigue escribiendo y creando las suyas por la
+    regla del dueño.
+  - Import de `AccessError` y `ValidationError` (`:19-20`).
+- **Qué se degrada:**
+  - el AI Administrator ya no corrige ni retira lectores de páginas ajenas: «Stop sharing» y guardar el
+    formulario de una ajena dan `AccessError` (las vistas no cambian, decisión 4; en pantalla parece
+    editable). Puede abrirlas, descargarlas y borrarlas;
+  - pasar una página a otro dueño solo se puede con `sudo` (código del sistema), no desde la interfaz ni
+    por RPC;
+  - el docstring del modelo («The AI administrator sees, changes and deletes every page», `:9`) es del
+    fabricante y ya no es exacto; no se toca.
+- **Observación m3 de la revisión (29/10/2026):** en Odoo 14 el `domain=[('share', '=', False)]` de
+  `user_ids` se aplica también al leer: un lector de portal ya guardado no se ve, ni en `sudo`. El
+  constraint funciona porque lee la caché que deja el propio `create` o `write`; en datos existentes no
+  rompe nada (añadir un interno a una página que tiene un portal da OK), pero tampoco lo detecta ni lo
+  limpia. No se cambia el código. Se mide con `SELECT` en el laboratorio
+  ([lab_e3_3879.md](lab_e3_3879.md), 8b), en el staging y en LIYBEN:
+  `SELECT count(*) FROM chatboo_canvas_page_user_rel r JOIN res_users u ON u.id = r.user_id WHERE u.share;`
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "owner_id' in vals\|constrains('user_ids')" pns_ai_chatboo/models/chatboo_canvas_page.py; grep -n -A9 'chatboo_canvas_page_admin_rule' pns_ai_chatboo/security/security.xml
+  ```
+  Corregido si `owner_id` no se puede cambiar por ORM, `user_ids` rechaza usuarios de portal en el servidor
+  y la regla del AI Administrator no da escritura ni alta.
+- **Tests** (`TestSegesSharedPage`, 9): `test_owner_cannot_change_owner`, `test_ai_admin_cannot_change_owner`
+  (en su página y en una ajena), `test_sudo_changes_owner` (control), `test_same_owner_is_not_a_change`,
+  `test_portal_reader_refused` (por `write`, por `create` y en `sudo`), `test_internal_reader_allowed`
+  (control), `test_ai_admin_reads_and_deletes`, `test_ai_admin_cannot_write_foreign` (`write` y
+  `action_unshare`) y `test_ai_admin_cannot_create_for_other`.
+
+### Comprobaciones de E3′ (29/10/2026)
+
+1. `py_compile` con Python 3.7.3 en la imagen `odoo-dev:14-lab_pns_ai_3879`, repo montado en solo lectura:
+   los 6 `.py` tocados o nuevos, correctos.
+2. `python3 ~/.claude/hooks/odoo_lint.py --revisar --base 59f8980 pns_base/ pns_ai_mcp/ pns_ai_chatboo/`:
+   3 incidencias en líneas cambiadas, las tres en la línea del `def` de `_paint_canvas` y heredadas del
+   fabricante (parche 25, «Lint»); 358 preexistentes. Ninguna en el código nuevo.
+3. Línea base antes de cambiar nada (log `tests-20261029-160733.log`): **386 tests, 18 F y 32 E**
+   (`pns_ai_mcp` 358, `pns_ai_chatboo` 28). Con E3′ (log `tests-20261029-163136.log`): **420 tests, 18 F
+   y 32 E**; los 50 que fallan son, por nombre, los mismos; los **34 nuevos**, en verde. Una primera
+   ejecución dio 4 E en `TestSegesCanvasShell`: el test usaba `self.session`, que en `HttpCase` es la
+   sesión HTTP; se corrigió el test, no el código.
+
+| Módulo | Tests | Fallos | Errores | Línea base (29/10/2026) |
+|---|---|---|---|---|
+| `pns_ai_mcp` | 358 | 18 | 32 | 358 · 18 F · 32 E |
+| `pns_ai_chatboo` | 62 | 0 | 0 | 28 · 0 · 0 |
+
+**Neutralización (29/10/2026):** script `neutralizar_e3.py` en el scratchpad de la sesión
+(`/tmp/claude-1000/-home-soporte-GitHub-third-party/35a25973-48f1-42e9-b83a-108e4c834740/scratchpad/`),
+con el método de E2′: copia, cambio, batería completa, restauración y SHA-256 de cada archivo (**IGUAL** en
+los 10). Referencia N0: 420 · 18 F · 32 E (log `tests-20261029-163136.log`). En ningún caso desaparece un
+F o E de la línea base.
+
+| Ejecución | Qué se retira | Resultado | Fallan (de E3′) |
+|---|---|---|---|
+| N25a | 25, comprobación del dueño en `_paint_canvas` | 19 F · 32 E | `test_foreign_session_refused` |
+| N25b | 25, vuelve el nombre público `paint_canvas` (y sus dos llamadores) | 19 F · 34 E | `test_rpc_public_name_gone` (F); `test_foreign_session_refused` y `test_own_session_paints` (E: `_paint_canvas` no existe) |
+| N26 | 26, `pictures_as_tokens` con `session.env` / `sessions.env` (en `sudo`) | 20 F · 32 E | `test_page_html_hidden_picture`, `test_page_url_hidden_picture` |
+| N27a | 27 a, `_script_safe` sin escape | 25 F · 32 E | `test_const_data`, `test_const_data_blocks_shape`, `test_const_title`, `test_other_arrays`, `test_rescue_page`, `test_rows_watch`, `test_whole_page` |
+| N27img | 27 a′, `data:image/` sin exigir base64 | 19 F · 32 E | `test_picture_only_base64_data_uri` |
+| N27b | 27 b, `_with_csp` devuelve el diseño sin `<meta>` | 23 F · 32 E | `test_canvas_shell`, `test_page_shell`, `test_canvas_download`, `test_page_download`, `test_csp_without_head` |
+| N27d | 27 d, sin `X-Frame-Options` | 20 F · 32 E | `test_canvas_shell`, `test_page_shell` |
+| N28o | 28, `owner_id` modificable | 20 F · 32 E | `test_owner_cannot_change_owner`, `test_ai_admin_cannot_change_owner` (en su propia página; en la ajena sigue frenando la regla) |
+| N28u | 28, sin el constraint de `user_ids` | 19 F · 32 E | `test_portal_reader_refused` |
+| N28r | 28, regla del AI Administrator con escritura y alta | 20 F · 32 E | `test_ai_admin_cannot_write_foreign`, `test_ai_admin_cannot_create_for_other` |
+
+- La regla de diseño (27 c) no se neutraliza: es un texto del prompt y lo comprueba `test_design_rule`.
+- Pasan con y sin cada cierre (controles): `test_rpc_private_name_refused`, `test_own_session_paints` (salvo
+  N25b), `test_user_cannot_read_hidden`, `test_page_html_visible_picture`, `test_page_url_visible_picture`,
+  `test_stored_design_has_no_csp`, `test_csp_policy`, `test_sudo_changes_owner`,
+  `test_same_owner_is_not_a_change`, `test_internal_reader_allowed` y `test_ai_admin_reads_and_deletes`.
+
+### Revisión de E3′ (29/10/2026): B1 del parche 27 b y nueva versión
+
+- **Revisión (`odoo-reviewer`):** RECHAZADO por un bloqueante, **B1**; el resto, conforme o con
+  observaciones menores (m1 a m4). Los scripts de html5lib de las dos revisiones están en el repo:
+  [scripts_e3/csp_prefijo.py](scripts_e3/csp_prefijo.py) (incluye los 23 casos de esta primera revisión)
+  y [scripts_e3/csp_adversario.py](scripts_e3/csp_adversario.py).
+- **B1:** la primera versión de `_with_csp` buscaba el principio del documento y su `<head>` con
+  expresiones regulares (`_DOC_START_RE`, `_HEAD_OPEN_RE`) que no siguen el tokenizador de HTML5.
+  Comprobado con html5lib 1.1 en el equipo (la imagen no lo tiene) en 23 casos: con `<!-->`, `<!--->` o
+  `--!>` un script del diseño corría antes que la CSP; con BOM (en el `srcdoc`), NBSP o VT iniciales,
+  `<html-x>`/`<head-x>` o un atributo con `>`, la `<meta>` acababa en `<body>` (sin efecto) o dentro de un
+  atributo; con `<?xml …?>` delante del doctype, la descarga pasaba a modo quirks.
+- **Decisión de Sergio (29/10/2026):** no se aplica la corrección del revisor (otro analizador del
+  principio del documento). `_with_csp` deja de analizar el diseño.
+- **Cambio** (`pns_ai_chatboo/models/chatboo_canvas.py:465-474`, mismo marcador del parche 27):
+  `_CSP_PREFIX = '<!DOCTYPE html><meta charset="utf-8">' + _CSP_META`, y `_with_csp(design)` devuelve
+  `_CSP_PREFIX + design`, sin quitarle al diseño su doctype, su BOM ni nada. Se aplica como **último paso**
+  al servir: en `canvas_page`, después de `_with_theme`, `_HIDDEN_HIDES` y `_PRINT_BRIDGE` y antes del
+  escape de atributo del `srcdoc`; en `downloadable_page`, después de los botones de la descarga. Vale para
+  la carcasa (`/chatboo/canvas/<id>`, `/chatboo/page/<id>`), las dos descargas y los diseños guardados
+  antes. Se eliminan `_DOC_START_RE`, `_HEAD_OPEN_RE` y la búsqueda del `<head>`.
+- **Por qué funciona (reglas de HTML5):**
+  1. el primer token es nuestro doctype: el documento queda en **modo estándar** («no quirks»), sea cual sea
+     lo que traiga el diseño;
+  2. la `<meta charset>` que sigue, en el modo «before html», abre `<html>` y `<head>` implícitos; las dos
+     `<meta>` son sus **dos primeros hijos**: la CSP es el segundo, justo detrás de la de `charset`, y antes
+     que cualquier cosa del diseño;
+  3. lo que viene del diseño se lee con la CSP ya en vigor: su doctype se ignora (error de análisis), los
+     atributos de su `<html>` se fusionan con el nuestro, su `<head>` se ignora y sus elementos de cabecera
+     siguen dentro de nuestro `<head>`; un BOM o cualquier texto cierra el `<head>` y abre `<body>`, con
+     la CSP ya dentro de `<head>`.
+- **Coste aceptado:** un diseño **sin doctype** pasa de modo quirks a estándar y puede verse algo distinto
+  (cajas, alturas de tablas o de imágenes en línea). Los diseños con `<!DOCTYPE html>`, que es lo que pide
+  el prompt, no cambian de modo. Se revisa en la comprobación visual del laboratorio
+  ([lab_e3_3879.md](lab_e3_3879.md), apartado 2).
+- **Discrepancia con el texto de la decisión:** se pidió comprobar que la `<meta>` CSP es «el primer hijo de
+  `<head>`». Con el prefijo aprobado es el **segundo**: la `<meta charset>` va delante. No cambia nada para
+  la seguridad (la de `charset` no carga ni ejecuta nada) y es lo que comprueban el script y los tests.
+- **Comprobación con html5lib (en el equipo, fuera de los tests):** script
+  [scripts_e3/csp_prefijo.py](scripts_e3/csp_prefijo.py), sobre los 23 casos de la primera revisión y los 14 de
+  `B1_DESIGNS` del test: **37 casos, 0 MAL**. En la descarga y en el `srcdoc` (desescapado), los dos
+  primeros hijos de `<head>` son la `<meta charset>` y la CSP, ningún script va antes de la CSP, lo servido
+  empieza exactamente por el prefijo y el modo es «no quirks» en todos (también con BOM, `<?xml …?>`,
+  comentarios raros y sin doctype). Control: con `_with_csp` sin prefijo (`c._with_csp = lambda d: d`
+  tras `load()`), 37 de 37 MAL.
+- **Tests cambiados** (`test_seges_chatboo_canvas.py`):
+  - m1: `_assert_csp_first` (buscaba `<head` con una expresión) se sustituye por `_assert_csp_served`:
+    lo servido **empieza** exactamente por `_CSP_PREFIX` y lo que sigue es el documento sin cambios (hasta
+    el `</body>` del diseño, donde el servidor añade lo suyo). Se usa en `test_canvas_shell`,
+    `test_page_shell`, `test_canvas_download` y `test_page_download` (diseño guardado antes del parche,
+    sin `<meta>`). `test_csp_without_head` pasa a `test_csp_prefix_cases`, con 14 subtests
+    (`B1_DESIGNS`): `<!-->`, `<!--->`, `--!>`, BOM, NBSP, VT, `<html-x>`/`<head-x>`, atributos con `>`,
+    `<?xml …?>` y doctype, `<script>` antes del `<head>`, mayúsculas con una `<meta http-equiv>` propia,
+    sin doctype, solo `<body>` y sin `<body>`. `test_csp_policy` comprueba además el prefijo exacto;
+  - m2: `test_foreign_session_refused` usa `assertRaisesRegex(AccessError, 'belongs to another user')`.
+- **m3** (lectores de portal guardados): observación en la entrada del parche 28 y `SELECT` en
+  [lab_e3_3879.md](lab_e3_3879.md), 8b, en el staging y en LIYBEN. **m4** (404 sin `X-Frame-Options`):
+  aceptada, en la entrada del parche 27 (riesgo aceptado).
+- **Script del laboratorio:** `scripts_e3/pruebas_e3p_lab.py` comprueba ahora que lo servido empieza por el
+  prefijo (antes buscaba la `<meta>` detrás del `<head>` del diseño).
+
+**Comprobaciones (29/10/2026):**
+
+1. `py_compile` con Python 3.7.3 en la imagen (repo en solo lectura): `chatboo_canvas.py`, el test y el
+   script del laboratorio, correctos.
+2. `odoo_lint.py --revisar` de `chatboo_canvas.py` y del test: 0 incidencias nuevas.
+3. Batería completa (log `tests-20261029-172402.log`): **420 tests, 18 F y 32 E**; los 50 que fallan, los
+   mismos por nombre que en la línea base; los 34 de E3′, en verde.
+4. Neutralización del 27 b, con el mismo método (copia, cambio, batería, restauración y SHA-256):
+
+| Ejecución | Qué se retira | Resultado | Fallan (de E3′) | SHA-256 |
+|---|---|---|---|---|
+| N27b′ | `_with_csp` devuelve el diseño sin el prefijo (log `tests-20261029-172642.log`) | 36 F · 32 E | `test_canvas_shell`, `test_page_shell`, `test_canvas_download`, `test_page_download` y los **14 subtests** de `test_csp_prefix_cases` (4 + 14 = 18 F de más) | IGUAL |
+
+La fila N27b de la tabla anterior es de la primera versión (rechazada).
+
+#### Segunda revisión de E3′ (29/10/2026): APROBADA
+
+- **Revisión acotada (`odoo-reviewer`)** de lo cambiado tras el rechazo (B1, m1 y m2): **APROBADO**, sin
+  bloqueantes. Batería del revisor (log `tests-20261029-173855.log`): 420 tests, 18 F y 32 E, los mismos 50
+  por nombre que la línea base; los 34 de E3′, en verde. Lint: 0 incidencias nuevas en lo revisado (las 3
+  de `_paint_canvas` son las del fabricante, parche 25).
+- **Lo que comprobó:**
+  - el prefijo es el **último** paso en las cuatro salidas (`downloadable_page`, `:511-513`; `canvas_page`,
+    `:563-569`, antes del escape de atributo); tema, ocultos, puente de impresión y botones quedan detrás;
+    ningún otro camino sirve `design` ni `canvas_design` (rutas, vistas y JS); no quedan `_DOC_START_RE` ni
+    `_HEAD_OPEN_RE` en los tres módulos;
+  - **html5lib 1.1, 37 + 41 casos, 0 MAL**, en la descarga y en el `srcdoc` desescapado:
+    [scripts_e3/csp_prefijo.py](scripts_e3/csp_prefijo.py) (37) y
+    [scripts_e3/csp_adversario.py](scripts_e3/csp_adversario.py) (41: el diseño empieza por `</head>`,
+    `</html>`, `<body>`, `<frameset>`, `<template>`, `<noscript>`, `<base>`, `<plaintext>`, `<xmp>`,
+    `<textarea>`, `<title>`/`<style>`/`<script>` sin cerrar, texto suelto, NUL, comentario sin cerrar, CDATA,
+    SVG, MathML, tablas, `<select>`, `<iframe>`, `<object>`, comillas, CR/LF, FF, `<` suelto, otra
+    `<meta charset>`, una CSP más laxa, doctype de modo quirks o basura, BOM, `<?xml?>`, `<html manifest>` y
+    tema de noche). En todos, los primeros nodos son `html`, `head`, la `<meta charset>` y la CSP: la CSP es
+    el **segundo hijo de `<head>`**, detrás solo de la de `charset`, y el modo es **no-quirks**. En la
+    descarga, html5lib elige utf-8 aunque el diseño traiga otro `charset`;
+  - el diseño no puede anular la CSP: otra CSP se suma y solo endurece; `<base>` lo bloquea `base-uri
+    'none'`; quitar la `<meta>` con un script no revoca la política. Lo que la CSP no cubre (autonavegación,
+    WebRTC, DNS) sigue como riesgo aceptado del parche 27;
+  - **m1 y m2:** la neutralización del 27 b falla en `assertTrue(served.startswith(prefix))`, con el
+    documento sin prefijo en el mensaje. Variantes rotas a propósito de `_with_csp` contra
+    `_assert_csp_served` y `B1_DESIGNS` (original 0/30; sin prefijo 30/30; quitando el doctype del diseño
+    16/30; quitando BOM y espacios 2/30; CSP tras el doctype del diseño 30/30; prefijo sin `<meta charset>`
+    30/30): los tests las detectan. El texto de m2 («belongs to another user») solo lo da
+    `chatboo_session.py:1075`.
+- **Observaciones aceptadas** (decisión de Sergio del 29/10/2026):
+  - **m-a** (`chatboo_canvas.py:486-487`): `downloadable_page('   ')` devuelve el texto en blanco sin
+    prefijo. No se llega: las cuatro rutas dan 404 si el diseño está vacío y `canvas_page` deja vacío el
+    `srcdoc`;
+  - **m-b** (`test_seges_chatboo_canvas.py:83-89`): el test comprueba el prefijo literal, no el árbol HTML5
+    (la imagen no tiene html5lib; lo cubren los dos scripts). Si algún caso de `B1_DESIGNS` llevara tema de
+    noche, la comprobación de «documento sin cambios» dejaría de coincidir, porque `_THEME_START` se
+    inserta antes de cada script.
+  - **m-c** (errata de la línea de `_with_csp` en la entrada del parche 27): corregida.
+- **Estado de los parches 25 a 28:** aplicados; aprobados en revisión (29/10/2026). Siguiente: los commits y
+  las pruebas manuales del laboratorio ([lab_e3_3879.md](lab_e3_3879.md)).
