@@ -196,7 +196,7 @@ también a `page_url` y `page_edit` (con filas).
   el bloque en el analizador HTML y ejecuta lo que sigue dentro del marco (P-8e, a).
 - El escape del fabricante (`</` → `<\/`) cierra `</script>`. No cubre la secuencia `<!--` seguida de
   `<script` dentro de un script (estado «doble escapado» del analizador), que puede romper el bloque de
-  otra forma. Escapar `<` como `<` cubre los dos casos y sigue siendo JSON válido. Es una opción, sin
+  otra forma. Escapar `<` como `\u003c` cubre los dos casos y sigue siendo JSON válido. Es una opción, sin
   elegir.
 
 ### (c) Recursos externos
@@ -269,7 +269,7 @@ estilos y fuentes externas (`script-src`, `style-src`, `font-src`), marcos y `ob
 - **Grado de cierre de red:** cerrar todo (rompe CDN, fuentes e imágenes externas) o una lista de hosts
   (por ejemplo la de PNS-59). Hay que decidir qué hacer con las librerías de CDN; cambiar el prompt para
   prohibirlas es otra opción.
-- **Escape en `DATA` y `TITLE`:** `</` → `<\/` (el del fabricante) o `<` → `<`, en los cuatro puntos de
+- **Escape en `DATA` y `TITLE`:** `</` → `<\/` (el del fabricante) o `<` → `\u003c`, en los cuatro puntos de
   la tabla (b).
 - **Autonavegación del marco** (vía 1): solo se puede detectar desde la carcasa (por ejemplo, contar los
   `load` del marco y vaciarlo); no se puede impedir. Queda como riesgo aceptado u opción aparte.
@@ -447,7 +447,7 @@ Decisiones de Sergio del 29/10/2026, aprobadas. Regla N11 en todos los parches: 
    `_session_of_this_turn` no se toca. Alcance: el de I2, opción 2.
 3. **F1 → parche 27.**
    - a) Una función única que serializa valores para meterlos dentro de `<script>`: JSON con `<`, `>`, `&`,
-     U+2028 y U+2029 escapados como `<`, `>`, `&`, ` ` y ` `. Se usa en los cinco
+     U+2028 y U+2029 escapados como `\u003c`, `\u003e`, `\u0026`, `\u2028` y `\u2029`. Se usa en los cinco
      puntos de la tabla I3 (b): página de rescate, `const DATA`, otras matrices, `const TITLE` y el vigilante
      (`:2200`).
    - b) CSP en `<meta http-equiv="Content-Security-Policy">`, insertada por el servidor **al servir** (no al
@@ -526,3 +526,5 @@ Decisiones de Sergio del 29/10/2026, aprobadas. Regla N11 en todos los parches: 
   sin `X-Frame-Options`, aceptada).
 - Detalle, comprobación con html5lib y neutralización: [registro](parches_pns_ai.md), «Revisión de E3′
   (29/10/2026)».
+
+- **Errata (30/10/2026):** restituidas las secuencias de escape perdidas al escribir (puntos sobre `_script_safe` y el escape de `<`).

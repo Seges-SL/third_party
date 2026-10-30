@@ -2122,8 +2122,8 @@ de los subtests), de modo que aparece como test y como 4 subtests.
     meter sin escapar en `DATA` y en `<img src="…">` (punto nuevo del paso 0).
 - **Cambio** (`pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/controllers/chatboo.py`):
   - **a) Función única** `_script_json(valor)` (`:42`): `json.dumps(valor, ensure_ascii=False,
-    default=str)` y después `_script_safe` (`:34`), que cambia `<`, `>`, `&`, U+2028 y U+2029 por `<`,
-    `>`, `&`, ` ` y ` `. Es exacto: en JSON esos caracteres solo aparecen dentro de
+    default=str)` y después `_script_safe` (`:34`), que cambia `<`, `>`, `&`, U+2028 y U+2029 por `\u003c`,
+    `\u003e`, `\u0026`, `\u2028` y `\u2029`. Es exacto: en JSON esos caracteres solo aparecen dentro de
     cadenas, donde el escape significa lo mismo, y `json.loads` devuelve el valor original. Se usa en los
     cinco puntos de I3 (b): página de rescate (`_page_for_rows`, `:1164-1165`), `const DATA`
     (`_payload_for_const_data`, `:1501-1503`), otras matrices (`bind_script_row_json`, `:1811-1812`),
@@ -2185,6 +2185,7 @@ de los subtests), de modo que aparece como test y como 4 subtests.
     (sin `<head>`, con un script antes de `<head>` y solo `<body>`) y `test_csp_policy`;
   - c: `test_design_rule` (en `_PAGE_RULES`, `DESIGN_SYSTEM` y `EDIT_SYSTEM`);
   - d: `X-Frame-Options: SAMEORIGIN` en `test_canvas_shell` y `test_page_shell`.
+- **Errata (30/10/2026):** restituidas las secuencias de escape perdidas al escribir.
 
 ### Parche 28: páginas compartidas — dueño fijo, solo internos y el AI Administrator solo lee y borra (D1)
 
@@ -2396,3 +2397,362 @@ La fila N27b de la tabla anterior es de la primera versión (rechazada).
   - **m-c** (errata de la línea de `_with_csp` en la entrada del parche 27): corregida.
 - **Estado de los parches 25 a 28:** aplicados; aprobados en revisión (29/10/2026). Siguiente: los commits y
   las pruebas manuales del laboratorio ([lab_e3_3879.md](lab_e3_3879.md)).
+
+### Parche 29: el lienzo no guarda un DATA que no escribió el servidor (P-8e a)
+
+- **Fecha:** 30/10/2026. **Origen:** prueba P-8e a del laboratorio, sobre el parche 27 a. Análisis,
+  opciones y decisiones de Sergio: [e3_hallazgo_p8ea_3879.md](e3_hallazgo_p8ea_3879.md), apartados 5 y 7.
+  HEAD de partida: `58885ce`.
+- **Qué falla sin él (P-8e a, gravedad alta):**
+  - Design recibe la muestra de las filas sin escapar (`sample_figures_for_design`) y puede copiarla en
+    `const DATA`. Si un valor lleva `</script`, `_SCRIPT_INNER_RE` corta el script ahí, `raw_decode`
+    falla y el servidor **no sustituye** DATA: se guarda el texto del modelo, con el valor en crudo.
+  - Pasa lo mismo cuando DATA no es JSON, cuando se asigna con `let`, `var` o `window.DATA`, o cuando la
+    repetición de Design falla y se queda el primer documento (`chatboo_session.py:1161-1166`).
+  - En la edición sin filas no se volvían a meter las filas: el modelo podía desescapar las de la página
+    abierta.
+  - Impacto: quien puede poner nombre a un registro puede ejecutar un script en el marco de la página de
+    otro usuario y navegarlo a una web externa (apartado 3.2 del hallazgo).
+- **Cambio** (`pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_session.py`):
+  - **A y B, en un único punto:** una envoltura nueva, `place_rows_on_page` (`chatboo_canvas.py:2324`). La
+    función del fabricante pasa a llamarse `_place_rows_on_page` (`:2347`), con su cuerpo sin cambios. Por la
+    envoltura pasan `_paint_canvas` (y con él la repetición fallida) y `page_html` (skill capturada, caso h).
+    Si hay bloques, la envoltura cambia el resultado por la página de rescate (`_finish_rescue(_page_for_rows(blocks))`,
+    ya escapada) en dos casos, y deja una línea `_logger.info` sin los valores:
+    - **A:** `_model_data_left` (`:1626`) recorre las asignaciones `const`/`let`/`var DATA =` y `window.DATA =`
+      (`_DATA_ASSIGN_RE`, `:1601`) dentro de cada `<script>`, tal como lo corta el servidor. Va al rescate si
+      alguna no es JSON legible, si su valor no es uno de los que escribe el servidor
+      (`_server_data_values`, `:1611`: las filas planas, las de cada bloque o los bloques) o si hay
+      asignaciones fuera de los scripts. No cuenta una asignación que solo pasa un nombre
+      (`window.DATA = DATA;`, `_DATA_NAME_RE`, `:1606`): el nombre debe ir seguido de `;`, `,`, `)` o del
+      final del script (`\Z`, sin `re.M`; aviso m1 de la revisión: con `$` y `re.M` bastaba un salto de
+      línea para seguir con `.concat([…])` en la línea siguiente). Es la única coincidencia de una expresión
+      regular que lleva a conservar el diseño, y solo excluye lo que no puede llevar cifras.
+    - **B:** `_raw_value_left` (`:1682`) busca en crudo en el documento los valores (`_markup_values`, `:1651`)
+      que, tras `strip`, tienen 3 caracteres o más y llevan `<`, `>` o `"` (`_MARKUP_UNSAFE`). Son las
+      cadenas de las filas, recorridas en profundidad (también las que cuelgan de claves `_…`, que van en la
+      muestra y en DATA: observación m3 de la revisión); sus claves públicas; el título de cada bloque, y el
+      título de la página (`title` o `page_title`, el mismo que liga `const TITLE`). Sin repetidos, con un
+      conjunto auxiliar (m8).
+      Para los que llevan `<` o `>` busca también su forma de cadena JSON
+      (`json.dumps(valor, ensure_ascii=…)[1:-1]`, con `False` y con `True`): copiado en una cadena JS, `"`
+      pasa a `\"` y `ñ` puede pasar a `\u00f1`. Las dos formas conservan `<` o `>` en crudo, que el servidor
+      nunca escribe: no dan falsos positivos (decisión de Sergio del 30/10/2026, tras la neutralización N29a).
+    - **Sin falsos positivos con lo que escribe el servidor:** en los scripts, `_script_safe` escapa `<`, `>` y
+      `&`, y `json.dumps`, `"`. En las tablas, `html.escape` escapa `<` y `>`, y ahora también `"`.
+  - **Comilla en las tablas de rescate:** `_cell_html` (`:1117`) y `_rows_as_table` (`:1142`) pasan de
+    `quote=False` a `quote=True`, para que B no salte con la tabla del propio servidor. `_page_shows_rows`
+    (`:1315`) acepta también la forma `&quot;`. En pantalla no cambia nada. La premisa de la decisión
+    («`&quot;` en el rescate») solo se cumplía en las cabeceras.
+  - **C1:** `sample_figures_for_design` (`:916`) pasa la muestra por `_script_safe`. Si Design la copia tal
+    cual, va escapada. `json.loads` devuelve los mismos valores.
+  - **D:** en `_paint_canvas` (`chatboo_session.py:1095-1098`), si hay página abierta y no llegan filas, se
+    leen las del `const DATA` de la página (`_rows_from_const_data(_const_data_value(page))`, después de
+    `pictures_out`, así que las imágenes vuelven como `pns-img:N`). El título es `title` o
+    `canvas_title`. Los dos se pasan a `place_rows_on_page` (`:1197`). La comprobación de centralización y
+    la repetición siguen con las filas y el título del turno, como antes. Importaciones en `:1082-1083`.
+  - **D, página abierta sin DATA legible de filas** (bloqueante B1 de la revisión; decisión de Sergio del
+    30/10/2026, opción a con cierre; `chatboo_session.py:1096-1113` y `:1201-1210`):
+    1. con DATA legible de filas, D como arriba;
+    2. sin él, pero con la tabla del servidor en `#pns-page-rows` (diseño que no escribió DATA, o filas que
+       no son diccionarios): `page_rows_texts` (`chatboo_canvas.py:1734`, con `_PageRowsText`, `:1709`, un
+       `html.parser.HTMLParser` de la biblioteca estándar) extrae los textos de esa tabla, con las entidades
+       decodificadas. Después de pintar, B se aplica con esos valores; si alguno queda en crudo, la
+       edición se rechaza (`log_no_page`, «the change left a value of the page as markup») y la página
+       anterior se queda;
+    3. sin DATA legible ni tabla, o si la extracción falla o sale vacía: la edición sin filas se rechaza
+       **antes** de llamar a Design («the open page has no figures to keep; change it with its rows»).
+    - **Valores movidos fuera de la tabla** (observación n1 de la segunda revisión; decisión de Sergio del
+      30/10/2026, opción b): en el caso 2 se añade a los valores que se comparan todo el texto visible de la
+      página abierta, fuera de scripts y estilos, que ya decodificado lleva `<` o `>`
+      (`page_markup_texts`, `chatboo_canvas.py:1766`, con `_PageMarkupText`, `:1750`; llamada en
+      `chatboo_session.py:1113`). Pasa por el mismo `_markup_values` que B: 3 caracteres o más tras
+      `strip`. Así, si una edición anterior sacó un valor de `#pns-page-rows` (escapado en su propio HTML),
+      la siguiente no lo puede desescapar. El rechazo previo del caso 3 sigue dependiendo solo de la tabla.
+    - `html.parser` solo sirve para saber qué valores buscar: una lista vacía no concluye que la página
+      sea segura, sino que no hay con qué comprobar, y entonces se rechaza. Los elementos vacíos (`<img>`
+      de las celdas con imagen, `<br>`…) no cuentan para la profundidad. Las excepciones del analizador
+      con entradas raras (`AssertionError`, `NotImplementedError`, `ValueError`; por ejemplo `<![bogus`,
+      comprobado con Python 3.7.3) dan lista vacía.
+  - **Regla nueva en `_PAGE_RULES`** (`chatboo_canvas.py:73-75`), en inglés: «Put every value from DATA and
+    TITLE on the page with textContent (or createTextNode): they are plain text. Never insert them with
+    innerHTML, outerHTML, insertAdjacentHTML or document.write.» Llega a `DESIGN_SYSTEM` y a `EDIT_SYSTEM`.
+- **Qué se degrada:**
+  - un diseño cuyo DATA no se puede sustituir (no es JSON, `let`/`var`/`window.DATA` con otras columnas,
+    filas que no son diccionarios) se cambia por la página de rescate, en lugar de guardarse con DATA
+    vacío o con los datos del modelo;
+  - un diseño que copia en crudo un valor de las filas o el título con `<`, `>` o `"` (3 caracteres o
+    más) también va al rescate, aunque el valor sea inofensivo (`x > 5` en un rótulo). El mínimo de 3
+    caracteres evita que `>` o `<5` coincidan con el propio HTML. Con 1 o 2 caracteres no se puede
+    cerrar un `<script>` ni abrir `<!--`;
+  - en una edición sin filas, el modelo ya no cambia los datos: DATA vuelve a ser el de la página abierta
+    (lo que ya decía `edit_page`: «the figures already on it stay»). TITLE vuelve a ser el título de la
+    pestaña, y la copia oculta y su vigilante se regeneran. Si la página abierta no tiene un DATA legible
+    de filas, la edición sin filas solo se guarda si no deja en crudo ningún valor de la tabla del
+    servidor; si tampoco hay tabla, se rechaza y hay que pedir el cambio con las filas (`page_url` o
+    `page_edit` con `rows`). Una página guardada **antes** del parche cuya tabla tenga un valor con `"`
+    (entonces se escribía con `quote=False`) rechazará también una edición inocente que la conserve;
+  - **integridad de las cifras sin DATA** (observación n1): en una página sin DATA legible de filas, si el
+    modelo vacía o cambia la tabla de `#pns-page-rows` en una edición, una edición sin filas posterior
+    puede cambiar las cifras de esa tabla: el servidor no tiene las filas para volver a escribirlas. Es
+    integridad de los datos, no seguridad. El cierre de n1 protege los valores con `<` o `>` que siguen en
+    el texto visible de la página; **no cubre** los que una edición anterior dejó en un atributo, un
+    comentario, un `<script>`, un `<style>` o codificados (observación o1 de la revisión acotada; residual
+    de m6, en «Riesgos residuales»);
+  - **texto con `<` o `>` en crudo en la página abierta** (por el cierre de n1): en una página sin DATA
+    legible de filas, un texto visible de 3 caracteres o más con `<` o `>` escrito en crudo (`a > b`) se
+    compara también; si la edición lo conserva tal cual, se rechaza (observación o2 de la revisión
+    acotada: «Ver más ->» o «Total > 100» en un botón o un rótulo; con `&gt;` se guarda). Solo afecta al
+    caso 2 de B1, la edición sin filas sobre una página sin DATA legible de filas: las guardadas antes del
+    parche y las que, ya con él, salen sin DATA de filas (un diseño que no escribe DATA y se conserva tras
+    la repetición, o filas que no son diccionarios). Las páginas cuyo DATA sustituye el servidor, que son
+    el caso normal, van por el caso 1 y no se ven afectadas;
+  - la página de rescate escribe `&quot;` en las celdas, sin cambio visible;
+  - **falsos positivos de B** (observación m5 de la revisión): la búsqueda es por subcadena en todo el
+    documento, también en el CSS y el JavaScript del diseño. Un valor `x > 5` coincide con un
+    `if (x > 5)` del script, y un valor `<br>` con cualquier `<br>` del diseño: esos diseños van al rescate
+    aunque el modelo no haya copiado el valor;
+  - **valores que empiezan por `"` y no llevan otra comilla** (observación m4), por ejemplo `"Pepe`: van
+    siempre al rescate, porque el DATA del servidor y el `ROWS` del vigilante los escriben como `\"Pepe`,
+    que contiene `"Pepe`. No se corrige ignorando las apariciones precedidas de `\`: en un atributo HTML,
+    `\"` **sí** cierra el valor (la barra no escapa nada en HTML), así que `data-x="\"Pepe…"` sería
+    un falso negativo. Se prefiere el falso positivo.
+- **Observación n2 de la segunda revisión (sin consecuencias):** `html.parser` no se comporta igual en
+  Python 3.7.3 (el de la imagen) y en 3.12. Con 3.7.3, `<![bogus` o `<a b="` sin cerrar hacen que
+  `page_rows_texts` devuelva `[]`, y la edición se rechaza antes de Design; un `<!--` sin cerrar sigue
+  extrayendo la tabla (más valores de los que muestra el navegador: más estricto). Con 3.12, `<![bogus`
+  extrae los valores y el rechazo llega después de Design. En ningún caso se acepta una edición hostil.
+- **Riesgos residuales (aceptados, decisiones de Sergio del 30/10/2026):**
+  - **`innerHTML` en el código del diseño:** `_script_json` solo protege al analizador HTML. Si el
+    JavaScript del diseño pinta un valor con `innerHTML`, `insertAdjacentHTML`, `outerHTML` o
+    `document.write`, un nombre como `<img src=x onerror=…>` se ejecuta en el marco. El servidor no puede
+    garantizarlo leyendo el JavaScript. Lo reducen la regla nueva y la contención actual (sandbox y CSP
+    del parche 27); el impacto es el del apartado 3.2 del hallazgo;
+  - **comilla simple en atributos:** B no revisa `'`. Un valor con `'` copiado en crudo en un atributo
+    entre comillas simples puede añadir un manejador en línea. Mismo impacto y misma contención;
+  - **páginas ya guardadas antes del parche:** el parche actúa al pintar y al guardar, no al servir. Un
+    `canvas_design` o un `design` de página compartida guardado antes, con DATA del modelo, se sigue
+    sirviendo igual (con la CSP del parche 27) hasta que se vuelva a pintar. Se miden con el fragmento
+    del final de esta entrada;
+  - un valor inventado por el modelo (que no está en las filas), fuera de cualquier asignación de DATA y
+    escrito en el HTML o en otro script: no lo detecta ni A ni B;
+  - **copias modificadas de un valor real** (observación m6): el modelo lo cambia de mayúsculas o de
+    espacios, lo recorta, lo parte en trozos que el JavaScript concatena o pasa sus entidades a crudo
+    (`&lt;` → `<`). B solo reconoce el valor exacto y sus dos formas JSON. En DATA lo cubre A; fuera de
+    DATA, no. Tampoco lo cubre el cierre de n1 cuando una edición anterior sacó el valor de la tabla y lo
+    dejó en un atributo, un comentario, un `<script>`, un `<style>` o codificado (por ejemplo, en base64),
+    y una edición posterior lo desescapa (observación o1; comprobado en 5 casos de html5lib). Mismo
+    impacto y misma contención que `innerHTML`;
+  - **HTML del código del orquestador en `page_html`** (observación m7, preexistente y fuera del alcance de
+    P-8e a): el helper `page_html(html, rows)` (`chatboo_session.py:901`) guarda el HTML que escribe el
+    código del turno. A y B solo comprueban las filas y el título: el HTML que el propio código trae
+    (sin pasar por Design) se guarda tal cual, con la CSP del parche 27;
+  - las etiquetas reales del prompt de repetición y del log (`chatboo_session.py:1140-1152`) y las líneas
+    `Page title:` y `Company:` del prompt siguen en crudo. No es HTML.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "def sample_figures_for_design" -A30 pns_ai_chatboo/models/chatboo_canvas.py | grep -n "u003c\|_script_safe"; grep -n "def place_rows_on_page" -A25 pns_ai_chatboo/models/chatboo_canvas.py | grep -n "rescue\|_page_for_rows"
+  ```
+  Corregido si la muestra a Design va escapada y si un diseño cuyo DATA no se puede sustituir no se guarda
+  tal cual.
+- **Tests** (`TestSegesCanvasModelData`, 15, `test_seges_chatboo_canvas.py:488`). El simulador de Design
+  devuelve una lista de respuestas, en orden:
+  - `test_sample_copied_evil_first` y `test_sample_copied_comment_first`: Design copia la muestra en
+    `const DATA`, sin escapar, con `EVIL` y `EVIL_COMMENT` en los dos órdenes y una fila inventada; la
+    repetición devuelve lo mismo (cubre `:1161-1166`). Resultado: 2 llamadas, rescate sin ruptura, DATA
+    con las filas reales;
+  - `test_sample_copied_retry_error`: la repetición da `HTTP 503`, como en el laboratorio. Resultado:
+    rescate;
+  - `test_data_not_written_by_server` (5 subtests, filas inocentes): DATA sin comillas en las claves,
+    fila inventada con `</script>`, `let DATA` y `window.DATA` con otras columnas, y `var DATA = JSON.parse(…)`.
+    Resultado: rescate (solo A);
+  - `test_data_forms_bound_kept` (control, 2 subtests): `window.DATA = DATA;` y un `let DATA` que el
+    servidor sí sustituye. Resultado: se conserva el diseño;
+  - `test_raw_value_in_markup` (7 subtests): DATA sustituible con `EVIL`, `EVIL_COMMENT`, una `"` copiada
+    en un atributo, o el título en `<title>`, en crudo en el HTML; o, fuera de DATA, un `const SAMPLE = […]`
+    con `EVIL` (`ensure_ascii=False`) o con `Señor <b>"P29"</b>` (`ensure_ascii=True`). Resultado: rescate.
+    Con `R&D Ltd` en crudo, se conserva el diseño;
+  - `test_page_html_hostile_template`: skill capturada (`page_html`) con la muestra copiada. Resultado:
+    rescate;
+  - `test_edit_rebinds_rows` (D): edición sin filas cuyo DATA lleva `EVIL_COMMENT` en crudo. Resultado: se
+    conserva el diseño y DATA vuelve a tener las filas de la página;
+  - `test_edit_unescaped_data` y `test_edit_raw_value_in_markup` (D con A y B): `EVIL` en crudo en DATA o
+    en el HTML. Resultado: rescate con las filas de la página;
+  - `test_edit_page_without_data` (B1 y n1, 6 subtests, `:643`): página abierta sin DATA legible de filas,
+    generada con `place_rows_on_page` (premisa comprobada: sin filas en DATA y con `EVIL` en la tabla). (2)
+    inocente: una edición que cambia el fondo y conserva la tabla escapada se guarda (revisión 2). (2)
+    hostil, sobre un diseño sin DATA y sobre un rescate de filas escalares: `EVIL` en crudo en el HTML. Se
+    rechaza: sin URL, revisión 1 y la página sin cambios. (3) sin DATA ni tabla: se rechaza sin llamar a
+    Design. n1, en dos pasos: la edición 1 vacía la tabla y lleva `EVIL`, escapado, a su propio `<p>` (se
+    guarda, revisión 2); la 2 lo desescapa y se rechaza (revisión 2, página del paso 1). Control inocente:
+    la 2 cambia el fondo y conserva el valor escapado, y se guarda (revisión 3);
+  - `test_design_prompt_escaped` (C1): el prompt no lleva `</script` ni `<!--<script`, y la muestra se
+    decodifica con los valores originales;
+  - `test_normal_design_kept` (control): filas inocentes. Resultado: una sola llamada, diseño conservado,
+    DATA = filas;
+  - `test_hostile_rows_design_kept` (control de falsos positivos): filas con `EVIL`, `EVIL_COMMENT`, `R&D`,
+    `&amp; Co`, `O'Brien`, `Seges "P29"` y `x > y`, título con `EVIL` y comillas. Resultado: se conserva el
+    diseño. Además, A y B no saltan con la página de rescate;
+  - `test_design_rule_text_content`: la regla está en `_PAGE_RULES`, `DESIGN_SYSTEM` y `EDIT_SYSTEM`.
+
+**Comprobaciones (30/10/2026):**
+
+1. `py_compile` con Python 3.7.3 en la imagen `odoo-dev:14-lab_pns_ai_3879` (repo en solo lectura):
+   `chatboo_canvas.py`, `chatboo_session.py` y el test, correctos.
+2. `python3 ~/.claude/hooks/odoo_lint.py --revisar` de los tres archivos: **0 incidencias nuevas** (101 y 150
+   preexistentes en los modelos). Para no añadir ninguna, la línea de `_rows_as_table` pasa a f-string y la
+   de `_page_shows_rows` usa una tupla.
+3. Batería completa (`odoo-dev 14 tests pns_ai_mcp,pns_ai_chatboo`, log `tests-20261030-160902.log`):
+   **434 tests, 18 F y 32 E**. Los 50 que fallan son, por nombre, los mismos que en la línea base de E3′
+   (`tests-20261029-172402.log`: 420 · 18 F · 32 E); los **14 nuevos**, en verde. El `ERROR` de `ir_attachment`
+   (`create_uid` 186) también está en la línea base.
+4. Marcadores: `grep -rn "Seges: parche 29 (" pns_ai_chatboo --include=*.py | grep -v /tests/` da **11 líneas**
+   (8 en `chatboo_canvas.py` y 3 en `chatboo_session.py`).
+5. Neutralización por partes: script `neutralizar_p29.py` en el scratchpad de la sesión
+   (`/tmp/claude-1000/-home-soporte-GitHub-third-party/abe8eb70-5464-4d0f-8f3d-4311258d195a/scratchpad/`), con el
+   método de E3′ (copia, cambio, batería completa, restauración y SHA-256). **Tabla sustituida el 30/10/2026**
+   tras la revisión (aviso m2: la primera tabla era anterior a la ampliación de B). Todas las ejecuciones
+   sobre el código final, con B1, m1, m3 y m8. Referencia: **435 · 18 F · 32 E** (log
+   `tests-20261030-170201.log`). En ninguna desaparece un F o un E de la línea base, y el SHA-256 de cada
+   archivo restaurado es **IGUAL** en las siete.
+
+| Ejecución | Qué se retira | Log | Resultado | Fallan (del parche 29) |
+|---|---|---|---|---|
+| N29a | A (`_model_data_left` no se consulta) | `tests-20261030-170443.log` | 23 F · 32 E | los 5 subtests de `test_data_not_written_by_server`. `test_edit_unescaped_data` ya no falla: lo detecta la forma JSON de B |
+| N29b | B (`_raw_value_left` no se consulta en la envoltura) | `-170727` | 25 F · 32 E | 6 subtests de `test_raw_value_in_markup` (el de `R&D Ltd` pasa, es control); `test_edit_raw_value_in_markup` |
+| N29ab | A y B | `-171020` | 35 F · 32 E | los 11 subtests anteriores; `test_sample_copied_evil_first`, `test_sample_copied_comment_first`, `test_sample_copied_retry_error`, `test_page_html_hostile_template`, `test_edit_unescaped_data`, `test_edit_raw_value_in_markup` |
+| N29c1 | C1 (muestra sin `_script_safe`) | `-171306` | 19 F · 32 E | `test_design_prompt_escaped` |
+| N29d | D entero (edición sin filas sin volver a meter las filas; arrastra B1) | `-171546` | 24 F · 32 E | `test_edit_rebinds_rows`, `test_edit_unescaped_data`, `test_edit_raw_value_in_markup`; 3 subtests de `test_edit_page_without_data`: (2) hostil, (2) hostil con filas escalares y (3) |
+| N29e | B1 (`if not _blocks_for_page(bind_rows):` pasa a `if False:`) | `-171833` | 21 F · 32 E | los 3 subtests de `test_edit_page_without_data`: (2) hostil, (2) hostil con filas escalares y (3); el (2) inocente pasa |
+| N29f | cierre de n1 (`kept_texts += page_markup_texts(page)` pasa a `kept_texts += []`) | `tests-20261030-174048.log` | 19 F · 32 E | el subtest «dos pasos, hostil» de `test_edit_page_without_data`; «dos pasos, inocente» pasa |
+| N29q | `_cell_html` vuelve a `quote=False` | `-172129` | 20 F · 32 E | `test_hostile_rows_design_kept` y el subtest de control `R&D Ltd` de `test_raw_value_in_markup` (las filas de ese test llevan otros valores con `"`, que la tabla deja en crudo: falso positivo de B con su propia tabla) |
+
+- La regla de `textContent` no se neutraliza: es un texto, y la comprueba `test_design_rule_text_content`.
+- Pasan con y sin cada cierre (controles): `test_data_forms_bound_kept`, `test_normal_design_kept`,
+  `test_hostile_rows_design_kept` (salvo N29q), `test_design_rule_text_content`, el subtest de `R&D Ltd`
+  (salvo N29q) y el subtest (2) inocente de `test_edit_page_without_data`.
+
+**Observación de la neutralización N29a (decidida el 30/10/2026: opción 2, aplicada; ver el bloque del final):**
+
+- **Problema:** B busca cada valor tal cual. Cuando el modelo copia un valor con `"` dentro de una cadena
+  JavaScript o JSON, ese valor aparece con `\"`, no literal. Por eso, con A retirado, B no detecta el `EVIL`
+  copiado en el DATA de la edición (`test_edit_unescaped_data`).
+- **Con A activo, el caso queda cerrado:** el script cortado deja un DATA ilegible y la página va al rescate.
+  Es un hueco de B **como defensa en profundidad**: queda sin cubrir, por ejemplo, un `const SAMPLE = […]`
+  (caso f) con un valor de las filas que lleva `</script` y comillas.
+- **Reproducción:** retirar A (`if False:` en lugar de `if _model_data_left(page, blocks):`) y ejecutar
+  `test_edit_unescaped_data`.
+- **Opciones:**
+  1. aceptarlo como está (A lo cubre en DATA);
+  2. que B, para los valores con `<` o `>`, busque también su forma de cadena JSON
+     (`json.dumps(valor, ensure_ascii=False)[1:-1]`). No da falsos positivos con lo que escribe el
+     servidor, que escapa `<` y `>` como `\u003c` y `\u003e`. Coste: una línea en `_raw_value_left` y un
+     subtest.
+     - Para los valores que solo tienen `"`, la forma JSON (`\"`) coincide con el DATA del servidor y daría
+       siempre rescate. Por eso quedan fuera.
+- **Recomendación:** la opción 2.
+
+**Fragmento de solo lectura para medir las páginas ya guardadas** (`odoo-dev 14 shell` en el laboratorio;
+en el staging y en LIYBEN, en su `odoo shell`). Lleva sus propios patrones, así que funciona también donde no
+está el parche 29. Cuenta, con sus ids, los diseños con alguna asignación de DATA (`const`/`let`/`var`/`window`)
+que no es JSON legible dentro de su `<script>`. No escribe nada y termina con `rollback`.
+
+```python
+import json, re
+SCRIPT = re.compile(r'(<script\b[^>]*>)(.*?)(</script>)', re.I | re.S)
+ASSIGN = re.compile(r'(?:\b(?:const|let|var)\s+|\bwindow\s*\.\s*)DATA\s*=(?!=)\s*')
+NAME = re.compile(r'[A-Za-z_$][\w$.]*\s*(?:[;,)]|\Z)')
+dec = json.JSONDecoder()
+
+def data_ilegible(page):
+    text, seen = page or '', 0
+    for match in SCRIPT.finditer(text):
+        inner = match.group(2)
+        for hit in ASSIGN.finditer(inner):
+            seen += 1
+            if NAME.match(inner, hit.end()):
+                continue
+            try:
+                dec.raw_decode(inner, hit.end())
+            except ValueError:
+                return True
+    return len(ASSIGN.findall(text)) > seen
+
+for model, field in (('chatboo.session', 'canvas_design'), ('chatboo.canvas.page', 'design')):
+    recs = env[model].sudo().with_context(active_test=False).search([(field, '!=', False)])
+    ids = [rec.id for rec in recs if data_ilegible(rec[field])]
+    print(model, field, len(recs), 'con diseño;', len(ids), 'con DATA ilegible:', ids)
+env.cr.rollback()
+```
+
+Mide lo que mide A sin las filas. Un DATA del modelo que sí es JSON (la muestra copiada sin `</script`) no
+se puede distinguir del del servidor sin las filas de ese turno, así que no se cuenta.
+
+**Ampliación de B tras la observación de N29a (decisión de Sergio del 30/10/2026, opción 2):**
+
+- **Cambio:** `_raw_value_left` (`chatboo_canvas.py:1682-1700`) busca, para los valores con `<` o `>`, también
+  `json.dumps(valor, ensure_ascii=False)[1:-1]` y `json.dumps(valor, ensure_ascii=True)[1:-1]`.
+- **Tests:** dos subtests nuevos en `test_raw_value_in_markup` (`const SAMPLE` fuera de DATA, con `EVIL` y con
+  un valor no ASCII escrito con `ensure_ascii=True`). Resultado: rescate. Siguen siendo 14 tests.
+- **Comprobaciones:** `py_compile` con 3.7.3 y lint `--revisar` (0 nuevas). Batería completa (log
+  `tests-20261030-163625.log`): **434 tests, 18 F y 32 E**, los mismos 50 por nombre que la línea base; los 14
+  del parche 29, en verde.
+- **Neutralización N29b repetida** (log `tests-20261030-163859.log`, SHA-256 IGUAL): **25 F · 32 E**. Fallan los
+  **6** subtests de rescate de `test_raw_value_in_markup` (los 4 anteriores y los 2 de `const SAMPLE`; el de
+  `R&D Ltd` pasa, es control) y `test_edit_raw_value_in_markup`. Superada por la neutralización completa
+  tras la revisión (tabla del punto 5).
+
+#### Revisión del parche 29 (30/10/2026): B1 y avisos m1 a m8
+
+- **Revisión (`odoo-reviewer`): RECHAZADO** por un bloqueante, **B1**: edición sin filas sobre una página sin
+  `const DATA` legible de filas, sin A ni B (detalle y corrección en «Cambio», D). Arnés html5lib del revisor:
+  56 casos y 3 de datos reales; con el parche, 44 BIEN y 12 MAL (2 de B1, 7 residuales y 3 falsos
+  positivos); con `58885ce`, 45 MAL de 56. La copia real de la sesión 11 (`~/lab_e3p/p8ea_sesion11.html`)
+  da BIEN en sus tres modos.
+- **Decisiones de Sergio (30/10/2026):** B1, opción a con cierre; m1, m3 y m8, aplicados; m4, m5, m6 y m7,
+  documentados en «Qué se degrada» y «Riesgos residuales»; m2, neutralización completa repetida (tabla del
+  punto 5, sustituida).
+- **Comprobaciones:**
+  1. `py_compile` con Python 3.7.3 en la imagen: los tres archivos, correctos.
+  2. Lint `--revisar` de los tres archivos: **0 incidencias nuevas**. El `except` de `page_rows_texts` se
+     limita a `AssertionError`, `NotImplementedError` y `ValueError`.
+  3. Batería completa (log `tests-20261030-170201.log`): **435 tests, 18 F y 32 E**, los mismos 50 por nombre
+     que la línea base (`tests-20261029-172402.log`); los **15** del parche 29, en verde.
+  4. Marcadores: `grep -rn "Seges: parche 29 (" pns_ai_chatboo --include=*.py | grep -v /tests/` da **13
+     líneas** (9 en `chatboo_canvas.py`, con la importación de `HTMLParser`, y 4 en `chatboo_session.py`).
+  5. Neutralización completa: tabla del punto 5.
+
+#### Segunda revisión del parche 29 (30/10/2026): APROBADO CON OBSERVACIONES; cierre de n1
+
+- **Segunda revisión (`odoo-reviewer`):** APROBADO CON OBSERVACIONES, sin bloqueantes. B1, en 41 casos de
+  html5lib (`b1_p29.py`): 40 BIEN y 1 MAL, que es n1. Arnés completo: 47 BIEN y 9 MAL, todos residuales o
+  falsos positivos documentados (m4, m5 y m6), salvo uno que es del propio arnés. Batería del revisor (log
+  `tests-20261030-172540.log`): 435 · 18 F · 32 E, los mismos 50.
+- **Decisiones de Sergio (30/10/2026):** n1, opción b (cierre en «Cambio», D); n2, observación sin
+  consecuencias; integridad de las cifras sin DATA, en «Qué se degrada».
+- **Comprobaciones del cierre de n1:**
+  1. `py_compile` con Python 3.7.3: los tres archivos, correctos. Lint `--revisar`: 0 incidencias nuevas.
+  2. Batería completa (log `tests-20261030-173803.log`): **435 tests, 18 F y 32 E**, los mismos 50 por nombre
+     que la línea base; los 15 del parche 29, en verde.
+  3. Marcadores: **14 líneas** (9 en `chatboo_canvas.py` y 5 en `chatboo_session.py`).
+  4. Neutralización N29f: fila nueva de la tabla del punto 5. Las demás filas se ejecutaron antes de este
+     cierre y no se han repetido. El código nuevo está dentro de la rama que retiran N29d y N29e, y
+     ninguna otra ejecución lo toca.
+
+#### Revisión acotada del cierre de n1 (30/10/2026): APROBADO CON OBSERVACIONES
+
+- **Revisión (`odoo-reviewer`):** solo el cierre de n1, su test y N29f. Sin bloqueantes.
+  - Arnés de B1 (`b1_p29.py`): 41 BIEN y 0 MAL. Sin el cierre, «dos pasos, paso 2» vuelve a MAL.
+  - Casos del cierre (`n1_cierre.py`): 17 casos, 12 BIEN y 5 MAL. Los 5 son o1. Página grande (212 KB):
+    0,17 s de extracción y 1,9 s de edición. Entradas raras con Python 3.7.3: ninguna excepción sin capturar.
+  - Confirma que las demás filas de neutralización no hacía falta repetirlas (simulado en una copia aislada).
+  - Batería del revisor (log `tests-20261030-174458.log`): 435 · 18 F · 32 E, los mismos 50; los 15 del
+    parche 29, en verde. Lint: 0 incidencias nuevas. Marcadores: 14.
+- **Observaciones:**
+  - **o1:** el registro describía el cierre como más amplio de lo que es. Corregido en «Qué se degrada» y
+    añadido a m6 en «Riesgos residuales».
+  - **o2:** falso positivo con `->` o `>` en crudo en el texto. Precisado en «Qué se degrada».
+- **Decisión de Sergio (30/10/2026):** opción a, solo documentación; sin cambios de código.
+
+- **Estado:** parche 29 **aprobado** el 30/10/2026. Pendiente del commit y de las pruebas del laboratorio
+  ([lab_p29_3879.md](lab_p29_3879.md); [e3_hallazgo_p8ea_3879.md](e3_hallazgo_p8ea_3879.md), apartado 6).
