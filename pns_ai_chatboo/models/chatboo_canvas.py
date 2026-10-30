@@ -17,6 +17,8 @@ import json
 import logging
 import re
 import unicodedata
+# Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
+from html.parser import HTMLParser
 
 from odoo import _
 
@@ -67,6 +69,10 @@ _PAGE_RULES = (
     # Seges: parche 27 (F1, seguridad). Ver docs/pendiente/parches_pns_ai.md
     'Do not load external libraries, fonts, stylesheets or images: the page '
     'cannot reach the network. Draw charts with inline SVG or <canvas>. '
+    # Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    'Put every value from DATA and TITLE on the page with textContent (or '
+    'createTextNode): they are plain text. Never insert them with innerHTML, '
+    'outerHTML, insertAdjacentHTML or document.write. '
     'Every tab, chip or card you open must already contain its figures. '
     'Do not leave an empty slot. Do not write an em-dash where a figure belongs. '
     'Finish the document: close every tag, include a body, close every script. '
@@ -905,6 +911,9 @@ def sample_figures_for_design(blocks):
         dumped = json.dumps(sample, ensure_ascii=False, default=str)
     except (TypeError, ValueError):
         dumped = str(sample)
+    # Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    # Design may copy the sample into const DATA: it must not close the script.
+    dumped = _script_safe(dumped)
     note = (
         'Show all %d rows: they replace const DATA after you return. '
         'This JSON is a short sample of the shape. '
@@ -1102,8 +1111,10 @@ def _is_picture_token(value):
 def _cell_html(value):
     if _is_picture_token(value):
         return '<td><img src="%s" alt="" style="max-height:64px"></td>' % value
+    # Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    # Quotes escaped too: a raw " on the page is a value Design copied.
     return '<td>%s</td>' % html.escape(
-        '' if value is None else str(value), quote=False,
+        '' if value is None else str(value), quote=True,
     )
 
 
@@ -1126,8 +1137,9 @@ def _rows_as_table(rows):
             '<table><thead><tr>%s</tr></thead><tbody>%s</tbody></table>'
             % (head, ''.join(body))
         )
+    # Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
     cells = ''.join(
-        '<tr><td>%s</td></tr>' % html.escape(str(row), quote=False)
+        f'<tr><td>{html.escape(str(row), quote=True)}</td></tr>'
         for row in rows
     )
     return '<table><tbody>%s</tbody></table>' % cells
@@ -1296,10 +1308,11 @@ def _page_shows_rows(design, blocks, in_scripts=False):
         return _visible_snippet(design, form) >= 0
 
     for own in _own_marks(blocks):
+        # Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
         if not any(
             found(form)
             for mark in own
-            for form in {html.escape(mark, quote=False), mark}
+            for form in (html.escape(mark, quote=False), html.escape(mark), mark)
         ):
             return False
     return any(_row_marks(row) for block in blocks for row in block.get('data') or [])
@@ -1581,6 +1594,187 @@ def _const_data_value(html):
             return None
         return val
     return None
+
+
+# Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
+# Every way a design hands DATA to its script. Only the server writes it.
+_DATA_ASSIGN_RE = re.compile(
+    r'(?:\b(?:const|let|var)\s+|\bwindow\s*\.\s*)DATA\s*=(?!=)\s*',
+)
+# ``window.DATA = DATA;`` passes a name on, not figures. Only when nothing
+# follows the name: a line break before ``.concat([...])`` is not the end.
+_DATA_NAME_RE = re.compile(r'[A-Za-z_$][\w$.]*\s*(?:[;,)]|\Z)')
+# A row value with one of these, raw on the page, is markup Design copied.
+_MARKUP_UNSAFE = ('<', '>', '"')
+
+
+def _server_data_values(blocks):
+    """What the server writes as DATA for ``blocks``, as plain JSON values."""
+    values = [_flat_rows(blocks)]
+    values.extend(data for _keys, data in _row_payloads(blocks))
+    dumped, _note = figures_for_design(blocks)
+    try:
+        values.append(json.loads(dumped))
+    except ValueError:
+        _logger.debug('Chatboo canvas: figures are not JSON', exc_info=True)
+    return [
+        json.loads(json.dumps(value, ensure_ascii=False, default=str))
+        for value in values
+    ]
+
+
+def _model_data_left(page, blocks):
+    """True when the page assigns DATA figures the server did not write.
+
+    Read inside each <script> as the server cuts it: a value that closes
+    the script leaves JSON that does not parse.
+    """
+    text = page or ''
+    server = _server_data_values(blocks)
+    dec = json.JSONDecoder()
+    seen = 0
+    for match in _SCRIPT_INNER_RE.finditer(text):
+        inner = match.group(2)
+        for hit in _DATA_ASSIGN_RE.finditer(inner):
+            seen += 1
+            if _DATA_NAME_RE.match(inner, hit.end()):
+                continue
+            try:
+                val, _end = dec.raw_decode(inner, hit.end())
+            except ValueError:
+                return True
+            if val not in server:
+                return True
+    return len(_DATA_ASSIGN_RE.findall(text)) > seen
+
+
+def _markup_values(blocks, title=''):
+    """Row values, keys and titles that would be markup if left raw."""
+    found = []
+    seen = set()
+
+    def walk(value):
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if not str(key).startswith('_'):
+                    walk(str(key))
+                # Private fields still go to Design's sample and to DATA.
+                walk(item)
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                walk(item)
+        elif isinstance(value, str):
+            text = value.strip()
+            if (
+                len(text) >= 3 and text not in seen
+                and any(char in text for char in _MARKUP_UNSAFE)
+            ):
+                seen.add(text)
+                found.append(text)
+
+    walk(title or '')
+    for block in blocks or []:
+        walk(block.get('title') or '')
+        walk(block.get('data') or [])
+    return found
+
+
+def _raw_value_left(page, blocks, title=''):
+    """The first such value that sits raw in ``page``, or None.
+
+    The server never writes one raw: scripts get ``\\u003c`` and ``\\"``,
+    tables get ``&lt;`` and ``&quot;``.
+    """
+    text = page or ''
+    for value in _markup_values(blocks, title):
+        forms = [value]
+        # Copied into a JS string, " becomes \": look for that form too. It
+        # keeps < or > raw, which the server never writes, so no false hit.
+        if '<' in value or '>' in value:
+            forms.extend(
+                json.dumps(value, ensure_ascii=ascii_only)[1:-1]
+                for ascii_only in (False, True)
+            )
+        if any(form in text for form in forms):
+            return value
+    return None
+
+
+_VOID_TAGS = frozenset((
+    'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link',
+    'meta', 'source', 'track', 'wbr',
+))
+
+
+class _PageRowsText(HTMLParser):
+    """Text inside the server's ``#pns-page-rows`` tables, entities decoded."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.depth = 0
+        self.texts = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag in _VOID_TAGS:
+            return
+        if self.depth:
+            self.depth += 1
+        elif dict(attrs).get('id') == 'pns-page-rows':
+            self.depth = 1
+
+    def handle_endtag(self, tag):
+        if self.depth and tag not in _VOID_TAGS:
+            self.depth -= 1
+
+    def handle_data(self, data):
+        if self.depth and data.strip():
+            self.texts.append(data)
+
+
+def page_rows_texts(page):
+    """The values of the tables the server wrote in ``#pns-page-rows``.
+
+    Only to know what to look for: an empty list means there is nothing to
+    check against, never that the page is safe.
+    """
+    try:
+        parser = _PageRowsText()
+        parser.feed(page or '')
+        parser.close()
+    except (AssertionError, NotImplementedError, ValueError):
+        _logger.debug('Chatboo canvas: could not read the page rows', exc_info=True)
+        return []
+    return parser.texts
+
+
+class _PageMarkupText(_PageRowsText):
+    """Text of the whole page, outside scripts and styles, that holds < or >."""
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ('script', 'style'):
+            self.depth += 1
+
+    def handle_endtag(self, tag):
+        if tag in ('script', 'style') and self.depth:
+            self.depth -= 1
+
+    def handle_data(self, data):
+        if not self.depth and ('<' in data or '>' in data):
+            self.texts.append(data)
+
+
+def page_markup_texts(page):
+    """Visible text of ``page`` with < or > once decoded: what an edit must
+    not unescape. A change may have moved a value out of ``#pns-page-rows``.
+    """
+    try:
+        parser = _PageMarkupText()
+        parser.feed(page or '')
+        parser.close()
+    except (AssertionError, NotImplementedError, ValueError):
+        _logger.debug('Chatboo canvas: could not read the page text', exc_info=True)
+        return []
+    return parser.texts
 
 
 def _visible_page_text(html):
@@ -2126,7 +2320,31 @@ def wrap_captured_page(code, html, title=''):
     return code + suffix
 
 
+# Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
 def place_rows_on_page(design, rows, captured=False, title=''):
+    """``_place_rows_on_page``, or the rescue page when that is not safe.
+
+    The rescue page (escaped tables) replaces a design that still assigns
+    DATA figures the server did not write, or that has a row value or the
+    title with ``<``, ``>`` or ``"`` as raw text.
+    """
+    page = _place_rows_on_page(design, rows, captured=captured, title=title)
+    blocks = _blocks_for_page(rows)
+    if not blocks:
+        return page
+    name = (title or '').strip() or page_title(rows, blocks)
+    if _model_data_left(page, blocks):
+        reason = 'DATA the server did not write'
+    elif _raw_value_left(page, blocks, name) is not None:
+        reason = 'a raw row value'
+    else:
+        return page
+    _logger.info('Chatboo canvas: the page kept %s; rescue page', reason)
+    return _finish_rescue(_page_for_rows(blocks))
+
+
+# Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
+def _place_rows_on_page(design, rows, captured=False, title=''):
     """Keep Design's template when DATA can take this run's figures.
 
     The first turn and a later slash do the same: replace ``const DATA``

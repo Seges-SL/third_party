@@ -1078,6 +1078,9 @@ class ChatbooSession(models.Model):
             design_figures_centralized, is_document, log_no_page, page_edits,
             pictures_out, place_rows_on_page, strip_fence, swap_pictures,
             sync_canvas_title_phrases,
+            # Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            _blocks_for_page, _const_data_value, _raw_value_left,
+            _rows_from_const_data, page_markup_texts, page_rows_texts,
         )
 
         instruction = (instruction or '').strip()
@@ -1087,6 +1090,27 @@ class ChatbooSession(models.Model):
         page = ''
         if not new_page and (self.canvas_design or '').strip():
             page = pictures_out(self.canvas_design, images)
+        # Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        # A change without rows keeps the open page's figures: the server
+        # writes them again, so Design cannot change or unescape them.
+        bind_rows, bind_title, kept_texts = rows, title, []
+        if page and not _blocks_for_page(rows):
+            bind_rows = _rows_from_const_data(_const_data_value(page))
+            bind_title = title or self.canvas_title or ''
+            if not _blocks_for_page(bind_rows):
+                # No DATA to write again: check the change against the
+                # values of the server's own tables, or do not change it.
+                kept_texts = page_rows_texts(page)
+                if not kept_texts:
+                    return log_no_page(
+                        self.env,
+                        'the open page has no figures to keep; '
+                        'change it with its rows',
+                        session_id=self.id,
+                    )
+                # Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
+                # An earlier change may have moved a value out of the table.
+                kept_texts += page_markup_texts(page)
         prompt = instruction or 'Open a canvas.'
         if page:
             prompt += '\n\nCurrent page:\n' + page
@@ -1167,12 +1191,22 @@ class ChatbooSession(models.Model):
                 )
         content = ''
         if raw:
+            # Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
             content = swap_pictures(place_rows_on_page(
                 sync_canvas_title_phrases(raw, title),
-                rows,
+                bind_rows,
                 captured=True,
-                title=title,
+                title=bind_title,
             ), images)
+            # Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            if kept_texts and _raw_value_left(
+                content, [{'title': '', 'data': kept_texts}],
+            ) is not None:
+                return log_no_page(
+                    self.env,
+                    'the change left a value of the page as markup',
+                    session_id=self.id,
+                )
         if err or not content:
             return log_no_page(
                 self.env, err or 'the design model returned nothing',
