@@ -4,8 +4,8 @@
   `522ce6e`, el último que toca los módulos (`git log --oneline 9a2970d..HEAD -- pns_base pns_ai_mcp
   pns_ai_chatboo`: `60271e6`, `c64a556`, `a3762ec` y `522ce6e`). Los commits posteriores, `bdb9dda` y
   `047ff89`, solo son [DOC]: dan el mismo árbol y la misma huella del árbol, pero otra huella del
-  `.tar.gz` (B.1) · **Preparado:** 03/11/2026 · **Estado:** preparado, **sin ejecutar**. Bloqueado por los
-  pasos previos de D.0.
+  `.tar.gz` (B.1) · **Preparado:** 03/11/2026 · **Estado:** preparado, **sin ejecutar**. Pasos previos de D.0
+  hechos el 03/11/2026.
 - **Qué se sube:** parches 25 (M1), 26 (M2), 27 (F1), 28 (D1) y 29 (P-8e a), todos en `pns_ai_chatboo`.
   Registro en [parches](parches_pns_ai.md), «Parches de la rama 14.0-pns-ai-3879 (E3′)» y «Parche 29».
 - **Origen:** «Propuesta final (29/10/2026)» de la [propuesta de E3′](e3_propuesta_3879.md) y
@@ -612,11 +612,11 @@ toca el staging hasta tenerlos hechos:
 
 | # | Paso previo | Por qué bloquea | Validación | Hecho |
 |---|---|---|---|---|
-| 1 | **[ALTERA la BD del laboratorio `lab_pns_ai_3879_14`]** Ejecutar en el laboratorio el **nuevo orden de `preparar` y después `limpiar`** con el script del repo. Nunca se ha ejecutado entero: el 30/10/2026 `preparar` falló (quitaba la compañía a `admin` antes de crear el contacto oculto) y se completó a mano. **Ojo:** `~/lab_e3p/pruebas_e3p_lab.py` todavía es la versión anterior (SHA-256 `3c807309…cadaca`, con el orden antiguo en `preparar`; `limpiar` igual): hay que copiar el del repo (`e9a40981…78ec`). Antes, apartar el estado del 30/10 (paso 2), para que `limpiar` no intente borrar las páginas 9, 12 y 14 que ya no existen | Es la versión de `preparar` que se va a usar en el staging y no se ha probado nunca | Con el contexto del laboratorio arrancado (lo hace Sergio): `cp ~/GitHub/third_party/docs/pendiente/scripts_e3/pruebas_e3p_lab.py ~/lab_e3p/ && cd ~/lab_e3p && sha256sum pruebas_e3p_lab.py && python3 pruebas_e3p_lab.py preparar`. Esperado: `compañía ok <id>`, `admin sin la compañía ok`, `contactos ok ok ok`, las dos rutas de imagen, `P-8e a: contactos [<a>, <b>]` y `Comprobación: admin no ve el oculto -> ('ok', 0)`. Después, `python3 pruebas_e3p_lab.py limpiar`. Esperado: sin línea `páginas` (no hay páginas en el estado nuevo), `admin con la compañía ok`, `contactos ('ok', True)`, `admin sin la compañía ok`, `compañía ('ok', True)` y `Queda el archivo de estado: …`. Por último, la consulta de [lab_p29_3879.md](lab_p29_3879.md), apartado 8 (con `e3sql` del laboratorio). **Esperado: 0 / 2 / 0**, o **0 / 1 / 0** si Sergio ya archivó el 68: `res.company.create` crea un contacto «Seges E3 otra» con la compañía y Odoo no lo borra con ella, así que este `preparar` deja otro igual que el 68, que también se archiva a mano | [ ] |
-| 2 | **Archivo de estado del script.** `pruebas_e3p_lab.py` guarda y lee los ids en una ruta fija, `~/lab_e3p/estado_e3p.json`, **aunque se ejecute desde otra carpeta**. Hoy tiene los ids del laboratorio (compañía 3; contactos 70 a 73; páginas 9, 12 y 14). Sin cambiar el script: antes del paso 1, `mv ~/lab_e3p/estado_e3p.json ~/lab_e3p/estado_e3p_lab_3010.json`; tras el paso 1, `mv ~/lab_e3p/estado_e3p.json ~/lab_e3p/estado_e3p_lab_paso1.json`; y en el staging, al terminar D.3, `mv ~/lab_e3p/estado_e3p.json ~/staging_e3p/estado_e3p_staging.json` | Con un estado viejo, `limpiar` borraría en `pns_demo` las páginas y contactos con los ids del laboratorio (el AI Administrator puede borrar cualquier página) y `preparar` solo sobrescribe parte de las claves | `test ! -e ~/lab_e3p/estado_e3p.json && echo libre` antes del `preparar` del staging. La alternativa con cambio de código (una variable `E3P_STATE`) la decide Sergio; no se propone para esta subida | [ ] |
+| 1 | **[ALTERA la BD del laboratorio `lab_pns_ai_3879_14`]** Ejecutar en el laboratorio el **nuevo orden de `preparar` y después `limpiar`** con el script del repo. Nunca se ha ejecutado entero: el 30/10/2026 `preparar` falló (quitaba la compañía a `admin` antes de crear el contacto oculto) y se completó a mano. **Ojo:** `~/lab_e3p/pruebas_e3p_lab.py` todavía es la versión anterior (SHA-256 `3c807309…cadaca`, con el orden antiguo en `preparar`; `limpiar` igual): hay que copiar el del repo (`c433305c…32e2`, con `limpiar` corregido el 03/11/2026). Antes, apartar el estado del 30/10 (paso 2), para que `limpiar` no intente borrar las páginas 9, 12 y 14 que ya no existen | Es la versión de `preparar` que se va a usar en el staging y no se ha probado nunca | Con el contexto del laboratorio arrancado (lo hace Sergio): `cp ~/GitHub/third_party/docs/pendiente/scripts_e3/pruebas_e3p_lab.py ~/lab_e3p/ && cd ~/lab_e3p && sha256sum pruebas_e3p_lab.py && python3 pruebas_e3p_lab.py preparar`. Esperado: `compañía ok <id>`, `admin sin la compañía ok`, `contactos ok ok ok`, las dos rutas de imagen, `P-8e a: contactos [<a>, <b>]` y `Comprobación: admin no ve el oculto -> ('ok', 0)`. Después, `python3 pruebas_e3p_lab.py limpiar`. Esperado: sin línea `páginas` (no hay páginas en el estado nuevo), `admin con la compañía ok`, `contactos ('ok', True)` (al repetirlo sobre el estado del 03/11, con los contactos 76 a 79 ya borrados: `contactos ya borrados`), `propiedades ok N` (N ≥ 1; en el laboratorio, al menos la 82), `acción temporal ('ok', True)`, `admin sin la compañía ok`, `compañía ('ok', True)` y `Queda el archivo de estado: …`. Las propiedades se borran antes que la compañía porque `res.company.create` le crea una `property_product_pricelist` sin `res_id`, que al borrar la compañía queda con `company_id` NULL y choca con `ir_property_unique_index` si ya hay otra igual (o queda huérfana); como `admin` no tiene `perm_unlink` en `ir.property`, lo hace una acción de servidor temporal ([lab_e3_3879.md](lab_e3_3879.md), apartado 9). La huérfana 81 del laboratorio (del borrado de la compañía 3) no la toca: es un resto que decide Sergio. Por último, la consulta de [lab_p29_3879.md](lab_p29_3879.md), apartado 8 (con `e3sql` del laboratorio). **Esperado: 0 / 2 / 0**, o **0 / 1 / 0** si Sergio ya archivó el 68: `res.company.create` crea un contacto «Seges E3 otra» con la compañía y Odoo no lo borra con ella, así que este `preparar` deja otro igual que el 68, que también se archiva a mano | [x] 03/11/2026. `preparar` OK (compañía 4, contactos 76 a 79). El primer `limpiar` falló en la compañía por `ir_property_unique_index` (chocaba con la propiedad huérfana 81 que dejó el borrado de la compañía 3) y se corrigió el script (`c433305c…32e2`). Repetido: `contactos ya borrados`, `propiedades ok 1` (la 82), `acción temporal ('ok', True)` y compañía borrada. Sergio borró la huérfana 81 con `odoo-dev 14 shell` (comprobando antes campo, compañía y `res_id`). Ciclo completo sin huérfana previa: compañía 5, contactos 81 a 84, `admin no ve el oculto -> ('ok', 0)`; `limpiar` sin errores, `propiedades ok 1` (la 83). Después: 0 páginas, 0 compañías, 0 acciones «Seges E3%», `admin` con 1 compañía y ninguna propiedad de tarifa sin `res_id`. Los «Seges E3 otra» 68, 75 y 80, archivados a mano por Sergio: 0 contactos «Seges E3%» activos |
+| 2 | **Archivo de estado del script.** `pruebas_e3p_lab.py` guarda y lee los ids en una ruta fija, `~/lab_e3p/estado_e3p.json`, **aunque se ejecute desde otra carpeta**. Hoy tiene los ids del laboratorio (compañía 3; contactos 70 a 73; páginas 9, 12 y 14). Sin cambiar el script: antes del paso 1, `mv ~/lab_e3p/estado_e3p.json ~/lab_e3p/estado_e3p_lab_3010.json`; tras el paso 1, `mv ~/lab_e3p/estado_e3p.json ~/lab_e3p/estado_e3p_lab_paso1.json`; y en el staging, al terminar D.3, `mv ~/lab_e3p/estado_e3p.json ~/staging_e3p/estado_e3p_staging.json` | Con un estado viejo, `limpiar` borraría en `pns_demo` las páginas y contactos con los ids del laboratorio (el AI Administrator puede borrar cualquier página) y `preparar` solo sobrescribe parte de las claves | `test ! -e ~/lab_e3p/estado_e3p.json && echo libre` antes del `preparar` del staging. La alternativa con cambio de código (una variable `E3P_STATE`) la decide Sergio; no se propone para esta subida | [x] 03/11/2026: el estado del 30/10, en `~/lab_e3p/estado_e3p_lab_3010.json`; el del paso 1, en `~/lab_e3p/estado_e3p_lab_paso1.json`; ruta libre |
 
 **Script de pruebas** ([`scripts_e3/pruebas_e3p_lab.py`](scripts_e3/pruebas_e3p_lab.py), leído el
-03/11/2026; no se cambia):
+03/11/2026; `limpiar` corregido el mismo día: borra las propiedades de la compañía de prueba y se puede repetir):
 - **Variables:** `E3P_URL` (por defecto `http://localhost:8169`), `E3P_DB` (por defecto
   `lab_pns_ai_3879_14`) y `E3P_SESSION` (sesión de `admin` para P-8c y la carcasa). **Apunta por defecto al
   laboratorio:** en el staging, siempre `E3P_URL=https://pns.liyben.com` y `E3P_DB=pns_demo`. Las admite sin
@@ -630,7 +630,8 @@ toca el staging hasta tenerlos hechos:
 - **Logins fijos:** `admin`, `demo` y `portal` (A.8). **Archivo de estado fijo** (paso previo 2).
 - **Escribe en `pns_demo`:** `preparar` crea la compañía «Seges E3 otra», cuatro contactos «Seges E3 …» y
   cambia las compañías de `admin` (se la añade y se la quita); `rpc` crea páginas «Seges E3 P-8h …» y una
-  de `demo` compartida con `admin`; `http` crea la página «Seges E3 P-8e b»; `limpiar` lo borra. Si
+  de `demo` compartida con `admin`; `http` crea la página «Seges E3 P-8e b»; `limpiar` lo borra (y, para borrar las `ir.property` de la
+  compañía, crea, ejecuta y borra una acción de servidor «Seges E3 limpiar propiedades»). Si
   `preparar` se corta, `admin` puede quedarse con la compañía: lo comprueba D.3.
 
 **Carpeta de trabajo en el equipo de Sergio:** `~/staging_e3p`, fuera del repo. Nada se copia al VPS salvo,
@@ -640,7 +641,7 @@ con la opción A de A.6, `medir_data_ilegible.py` a `/tmp`.
 mkdir -p ~/staging_e3p
 cp ~/GitHub/third_party/docs/pendiente/scripts_e3/pruebas_e3p_lab.py ~/GitHub/third_party/docs/pendiente/scripts_e3/medir_data_ilegible.py ~/staging_e3p/
 cd ~/staging_e3p && sha256sum pruebas_e3p_lab.py medir_data_ilegible.py
-# esperado: e9a40981…78ec y 05af0d60…f16e
+# esperado: c433305c…32e2 y 05af0d60…f16e
 test ! -e ~/lab_e3p/estado_e3p.json && echo libre
 export E3P_URL=https://pns.liyben.com E3P_DB=pns_demo
 # E3P_SESSION, después de R-vis (D.2): export E3P_SESSION=<id de la sesión de ADM de la primera página>
@@ -883,10 +884,16 @@ SQL
 **[ALTERA]** Mínima, porque la limpieza general es al final de todos los cambios. Lo que se deshace es lo que
 falsearía las pruebas siguientes (sobre todo los valores hostiles):
 - **Datos de `preparar`:** `cd ~/staging_e3p && python3 pruebas_e3p_lab.py limpiar`. Esperado: `páginas
-  ('ok', True)`, `admin con la compañía ok`, `contactos ('ok', True)`, `admin sin la compañía ok` y
-  `compañía ('ok', True)` (o el error que diga qué la usa). Después, archivar a mano el contacto «Seges E3
-  otra» que Odoo crea con la compañía y no borra con ella. Y el archivo de estado, a `~/staging_e3p` (D.0,
-  paso previo 2).
+  ('ok', True)`, `admin con la compañía ok`, `contactos ('ok', True)`, `propiedades ok N` (N ≥ 1),
+  `acción temporal ('ok', True)`, `admin sin la compañía ok` y `compañía ('ok', True)` (o el error que
+  diga qué la usa). Las `ir.property` de la compañía se borran antes que ella: si no, el borrado deja
+  huérfana la propiedad de la tarifa que Odoo le creó (o choca con `ir_property_unique_index` si ya hay
+  una huérfana igual; [lab_e3_3879.md](lab_e3_3879.md), apartado 9). Si se repite, `ya borradas` o
+  `ya borrados` en lo que no quede, y `compañía ya borrada` si ya no existe.
+  **Después de `limpiar`, archivar a mano** (como ADM, en Contactos) el contacto «Seges E3 otra» que
+  `res.company.create` crea con la compañía: `limpiar` no lo borra ni Odoo lo borra con ella (en el
+  laboratorio, el 03/11/2026, quedaron así el 68, el 75 y el 80). Sin archivarlo, la comprobación final da
+  1 contacto en vez de 0. Y el archivo de estado, a `~/staging_e3p` (D.0, paso previo 2).
 - **PT:** como ADM, en Contactos, **vaciar la ciudad** de su contacto (es un valor hostil), archivar el
   usuario `e3p_portal` y archivar su contacto.
 - **6e:** archivar el contacto `Seges E3 "P29"`.
@@ -959,7 +966,7 @@ Operaciones que cambian el VPS: las decide y hace quien administra el VPS.
 | Cuota de Gemini el día de la subida | Consola de Google AI Studio, no solo «Test Connection» (F de E1′) |
 | Rechazos de RPC que Odoo deja como `ERROR` en el log | D.2, R-log |
 | Envío de invitación al crear PT | D.0, paso 3 (comprobado en el código de 14.0, no en el staging) |
-| Pasos previos 1 y 2 de D.0 | Sin hacer el 03/11/2026: bloquean la subida |
+| Pasos previos 1 y 2 de D.0 | Hechos el 03/11/2026 (D.0, columna «Hecho») |
 | E4′ | **No entra en esta subida.** Observaciones del laboratorio de E3′ para E4′ o el informe: el chat afirma cambios que no hizo, la muestra de Design con `keys`, tres llamadas a Design por edición, la casilla «Design» en `lite` |
 
 ---
@@ -979,7 +986,8 @@ columnas «Obtenido» de A.6, C.1, C.2, D.1, D.2 y D.2b; resumen en la
 
 ### Antes de B
 
-(pendiente: pasos previos 1 y 2 de D.0, y que el repo no tenga commits en los módulos después de `522ce6e`)
+- **Pasos previos 1 y 2 de D.0:** hechos el 03/11/2026 en el laboratorio (D.0, columna «Hecho»).
+- (pendiente: que el repo no tenga commits en los módulos después de `522ce6e`)
 
 ### B. Despliegue
 

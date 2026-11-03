@@ -255,13 +255,80 @@ def http_check():
           % (URL, page_net))
 
 
+def _existing(admin, model, ids, context=None):
+    """Ids de la lista que siguen existiendo: limpiar se puede repetir a medias."""
+    status, found = admin.call(model, 'search', [[('id', 'in', ids)]],
+                               {'context': context} if context else None)
+    # Si la búsqueda falla, se intenta con todos y el unlink dice el error.
+    return found if status == 'ok' else ids
+
+
+def _unlink_properties(admin, company_id, name):
+    """Borra las ir.property de la compañía de prueba con una acción de servidor temporal.
+
+    admin no puede hacerlo por XML-RPC: la ACL de ir.property no da perm_unlink a
+    base.group_system (ir.model.access.csv:24 del core 14.0). Tampoco basta un write a
+    company_id False: res.company.create crea una propiedad de la tarifa sin res_id y el
+    índice ir_property_unique_index, (fields_id, COALESCE(company_id, 0), COALESCE(res_id, '')),
+    choca con la que dejó sin compañía un borrado anterior (y si no la hay, la deja huérfana).
+    El sudo se limita a las propiedades de esa compañía, que la acción vuelve a comprobar
+    por id y nombre.
+    """
+    code = (
+        "c = env['res.company'].sudo().search([('id', '=', %r), ('name', '=', %r)])\n"
+        "if c:\n"
+        "    props = env['ir.property'].sudo().search([('company_id', '=', c.id)])\n"
+        "    count = len(props)\n"
+        "    props.unlink()\n"
+        "    action = {'propiedades': count}\n"
+        "else:\n"
+        "    action = {'propiedades': 0, 'aviso': 'la compañía no existe o no es de prueba'}\n"
+    ) % (company_id, name)
+    status, model = admin.call('ir.model', 'search', [[('model', '=', 'res.company')]])
+    if status != 'ok' or not model:
+        print('propiedades', status, model)
+        return
+    status, action_id = admin.call('ir.actions.server', 'create', [{
+        'name': TAG + ' limpiar propiedades', 'model_id': model[0], 'state': 'code', 'code': code,
+    }])
+    if status != 'ok':
+        print('propiedades', status, action_id)
+        return
+    try:
+        status, result = admin.call('ir.actions.server', 'run', [[action_id]])
+        if status == 'ok' and isinstance(result, dict):
+            print('propiedades', status, result.get('propiedades'), result.get('aviso', ''))
+        else:
+            print('propiedades', status, result)
+    finally:
+        print('acción temporal', admin.call('ir.actions.server', 'unlink', [[action_id]]))
+
+
 def limpiar():
     admin = Rpc('admin')
     state = _load()
     pages = [state.get(k) for k in ('page_admin', 'page_demo_ui', 'page_net') if state.get(k)]
     if pages:
-        print('páginas', admin.call('chatboo.canvas.page', 'unlink', [pages]))
+        pages = _existing(admin, 'chatboo.canvas.page', pages)
+        if pages:
+            print('páginas', admin.call('chatboo.canvas.page', 'unlink', [pages]))
+        else:
+            print('páginas ya borradas')
     company_id = state.get('company_id')
+    company_name = TAG + ' otra'
+    if company_id:
+        # Solo se toca si sigue siendo la de preparar (admin la ve: regla erp manager).
+        status, found = admin.call('res.company', 'search_read', [[('id', '=', company_id)]],
+                                   {'fields': ['name']})
+        if status != 'ok':
+            print('compañía', (status, found))
+            company_id = None
+        elif not found:
+            print('compañía ya borrada')
+            company_id = None
+        elif found[0]['name'] != company_name:
+            print('compañía %s no es de prueba: no se toca' % company_id)
+            company_id = None
     if company_id:
         # El contacto oculto es de esa compañía: sin ella, la regla multicompañía
         # impide a admin borrarlo (y la llamada no borraría ninguno de los cuatro).
@@ -270,8 +337,14 @@ def limpiar():
     partners = [state.get('hidden'), state.get('visible')] + list(state.get('evil') or [])
     partners = [p for p in partners if isinstance(p, int)]
     if partners:
-        print('contactos', admin.call('res.partner', 'unlink', [partners]))
+        partners = _existing(admin, 'res.partner', partners, {'active_test': False})
+        if partners:
+            print('contactos', admin.call('res.partner', 'unlink', [partners]))
+        else:
+            print('contactos ya borrados')
     if company_id:
+        # Con sudo da igual que admin tenga o no la compañía: se hace antes de quitársela.
+        _unlink_properties(admin, company_id, company_name)
         print('admin sin la compañía', admin.call('res.users', 'write', [[admin.uid], {
             'company_ids': [(3, company_id)]}])[0])
         # En Odoo 14 res.company no se archiva: se borra (si algo la usa, lo dice el error).
