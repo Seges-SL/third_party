@@ -113,13 +113,15 @@ def preparar():
     main_id = admin.call('res.users', 'read', [[admin.uid], ['company_id']])[1][0]['company_id'][0]
     status, company_id = admin.call('res.company', 'create', [{'name': TAG + ' otra'}])
     print('compañía', status, company_id)
+    # El contacto oculto se crea antes de quitarle la compañía a admin: la regla
+    # multicompañía también aplica al crear.
+    status, hidden = admin.call('res.partner', 'create', [{
+        'name': TAG + ' foto oculta', 'company_id': company_id, 'image_1920': png,
+    }])
     # res.company.create la añade a admin: se le quita para que el contacto quede oculto.
     print('admin sin la compañía', admin.call('res.users', 'write', [[admin.uid], {
         'company_ids': [(3, company_id)], 'company_id': main_id,
     }])[0])
-    status, hidden = admin.call('res.partner', 'create', [{
-        'name': TAG + ' foto oculta', 'company_id': company_id, 'image_1920': png,
-    }])
     status2, visible = admin.call('res.partner', 'create', [{
         'name': TAG + ' foto visible', 'company_id': False, 'image_1920': png,
     }])
@@ -259,13 +261,21 @@ def limpiar():
     pages = [state.get(k) for k in ('page_admin', 'page_demo_ui', 'page_net') if state.get(k)]
     if pages:
         print('páginas', admin.call('chatboo.canvas.page', 'unlink', [pages]))
+    company_id = state.get('company_id')
+    if company_id:
+        # El contacto oculto es de esa compañía: sin ella, la regla multicompañía
+        # impide a admin borrarlo (y la llamada no borraría ninguno de los cuatro).
+        print('admin con la compañía', admin.call('res.users', 'write', [[admin.uid], {
+            'company_ids': [(4, company_id)]}])[0])
     partners = [state.get('hidden'), state.get('visible')] + list(state.get('evil') or [])
-    partners = [p for p in partners if p]
+    partners = [p for p in partners if isinstance(p, int)]
     if partners:
         print('contactos', admin.call('res.partner', 'unlink', [partners]))
-    if state.get('company_id'):
+    if company_id:
+        print('admin sin la compañía', admin.call('res.users', 'write', [[admin.uid], {
+            'company_ids': [(3, company_id)]}])[0])
         # En Odoo 14 res.company no se archiva: se borra (si algo la usa, lo dice el error).
-        print('compañía', admin.call('res.company', 'unlink', [[state['company_id']]]))
+        print('compañía', admin.call('res.company', 'unlink', [[company_id]]))
     print('Queda el archivo de estado:', STATE)
 
 

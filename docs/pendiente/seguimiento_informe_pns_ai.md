@@ -89,7 +89,7 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-16 | Alta | PARCIAL | CORREGIDO (parte probada: tarjeta sin auto-confirmación ni salida, con las dos políticas; staging, prueba 3); resto (reinyección como `system`), NO CONCLUYENTE | — |
 | PNS-17 | Alta | PARCIAL | — | — · **Parche 19 (E2′, `14.0-pns-ai-3879`): aplicado; tests en verde y neutralización hechos (27/10/2026)** |
 | PNS-18 | Alta | PARCIAL | CORREGIDO (parte probada: `no_external_failover`, 3b-2) | — |
-| PNS-19 | Alta | PARCIAL | — | Previsto en E3 · **Parche 18 (E2′, `14.0-pns-ai-3879`): aplicado; tests en verde y neutralización hechos (27/10/2026)**; ventana del lienzo en `_ask_design`, a revisar en E3′ · rechazado en la revisión y corregido el 27/10/2026 (alias en `read_group`, ids que no son enteros, caché del hilo); el acceso a `env.all`/`env.cache` es PNS-101 (parche 23) |
+| PNS-19 | Alta | PARCIAL | — | Previsto en E3 · **Parche 18 (E2′, `14.0-pns-ai-3879`): aplicado; tests en verde y neutralización hechos (27/10/2026)**; ventana del lienzo en `_ask_design`, a revisar en E3′ · rechazado en la revisión y corregido el 27/10/2026 (alias en `read_group`, ids que no son enteros, caché del hilo); el acceso a `env.all`/`env.cache` es PNS-101 (parche 23) · ventana revisada en E3′ (29/10/2026): se mantiene (decisión 5 de la [propuesta de E3′](e3_propuesta_3879.md), I5 y «Propuesta final»; [parches](parches_pns_ai.md), parche 18) |
 | PNS-20 | Alta | PARCIAL | VULNERABLE en «Review» (P-20 en `lab_pns_ai_3879_14`, 27/10/2026, sobre 3.1.879) | — · **Parche 21 (E2′, `14.0-pns-ai-3879`): aplicado; tests en verde y neutralización hechos (27/10/2026)** |
 | PNS-21 | Alta | CORREGIDO | CORREGIDO (3c) | — |
 | PNS-23 | Alta | SIN CAMBIOS | — | — |
@@ -2076,6 +2076,10 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
 - **Impacto:** enlaces que llevan a otro registro o a ninguno, y mensajes de error técnicos en el
   chat. Sin efecto de seguridad observado: los accesos se siguen comprobando en Odoo.
 - **Staging (16/10/2026):** observado en varias pruebas con modelos `lite`.
+- **Laboratorio (03/11/2026):** el chat afirma cambios que no hizo. En la prueba 6d′ del
+  [laboratorio del parche 29](lab_p29_3879.md) respondió «He actualizado el color de fondo…» tras un rechazo
+  del servidor; en P-8d del [laboratorio de E3′](lab_e3_3879.md), «Se ha generado la página» sin construirla.
+  El usuario no se entera del rechazo (hoja de E4′ del [plan](plan_correccion_pns_ai_3879.md)).
 - **Corrección sugerida:** construir los enlaces a partir de los ids devueltos por la herramienta (no
   del texto del modelo), traducir los errores de acceso a un mensaje para el usuario y documentar los
   modelos mínimos recomendados.

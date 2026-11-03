@@ -6,7 +6,9 @@
   [plan sobre 3.1.879](plan_correccion_pns_ai_3879.md)); `14.0-pns-ai-correcciones` queda como
   referencia
 - **Fecha:** 2026-10-13 (parches 1 a 3) · actualizado el 2026-10-20 (N11 y N12), el 2026-10-21
-  (staging de E2), el 2026-10-23 (cambio de base a 3.1.879 y E1′) el 2026-10-26 (staging de E1′) y el 2026-10-27 (repetición de R8; E2′: parches 11 adaptado y 17 a 22) y el 2026-10-29 (E3′: parches 25 a 28)
+  (staging de E2), el 2026-10-23 (cambio de base a 3.1.879 y E1′), el 2026-10-26 (staging de E1′), el
+  2026-10-27 (repetición de R8; E2′: parches 11 adaptado y 17 a 22), el 2026-10-29 (E3′: parches 25 a 28),
+  el 2026-10-30 (parche 29) y el 2026-11-03 (laboratorio del parche 29)
 - **Versión del fabricante, base propia de Seges desde el 20/10/2026 (N12):** `pns_base` 14.0.1.2.32 ·
   `pns_ai_mcp` 14.0.3.1.782 · `pns_ai_chatboo` 14.0.2.1.453
 - **Desde el 23/10/2026 (N12, b′), en `14.0-pns-ai-3879`:** `pns_base` 14.0.1.2.47 · `pns_ai_mcp`
@@ -109,7 +111,7 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 | 12 (adaptado) | PNS-01, PNS-02 | seguridad | `pns_ai_mcp/models/ai_system_action.py`, `pns_ai_mcp/utils/privilege_cusp.py` | E1′ | Validado en staging (26/10/2026) |
 | 13 | M10 | seguridad | `pns_ai_mcp/models/safe_operation.py` | E1′ | Validado en staging (26/10/2026) |
 | 14 | M13 | seguridad | `pns_ai_mcp/models/ai_context_disk.py` | E1′ | Validado en staging (26/10/2026) |
-| 15 | PNS-07 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | E1′ | Validado en staging (26/10/2026); R8 (lienzo) no concluyente por el proveedor (27/10/2026): se valida en E3′ |
+| 15 | PNS-07 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | E1′ | Validado en staging (26/10/2026); R8 (lienzo) no concluyente por el proveedor (27/10/2026); R8 OK en el laboratorio de E3′ (30/10/2026), con un defecto previo del fabricante: la muestra para Design lleva `keys` y el DATA real (`_flat_rows`) no; los diseños que dependen de `keys` salen vacíos y los salva la tabla de rescate (para E4′) |
 | 16 | PNS-54 | seguridad | `pns_ai_mcp/models/safe_operation.py` | E1′ | Validado en staging (26/10/2026) |
 | 11 (adaptado) | PNS-82 | seguridad | `pns_ai_chatboo/models/chatboo_session.py` | E2′ | Aplicado; tests en verde (27/10/2026) |
 | 17 | PNS-37 | seguridad | `pns_ai_mcp/models/ai_change_journal.py`, `pns_ai_mcp/controllers/safe_plan.py` | E2′ | Aplicado; tests en verde (27/10/2026); P-37 y P-37b pendientes |
@@ -119,16 +121,22 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 | 21 | PNS-20 | seguridad | `pns_base/models/operation_report_wizard.py` | E2′ | Aplicado; `clear_caches()` tras la revisión; tests en verde (27/10/2026); P-20 repetida pendiente |
 | 22 | PNS-100 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | E2′ | Aplicado; tests en verde (27/10/2026) |
 | 23 | PNS-101 | seguridad | `pns_ai_mcp/controllers/validators_base.py`, `pns_ai_mcp/controllers/validators.py`, `pns_ai_mcp/controllers/context_builder.py` | E2′ | Aplicado; tests en verde (27/10/2026); P-101 pendiente |
-| 25 | M1 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | E3′ | Aplicado; aprobado en revisión (29/10/2026); P-8c pendiente |
-| 26 | M2 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | E3′ | Aplicado; aprobado en revisión (29/10/2026); P-8d pendiente |
-| 27 | F1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/controllers/chatboo.py` | E3′ | Aplicado; aprobado en revisión (29/10/2026; el 27 b, rehecho tras B1); P-8e pendiente |
-| 28 | D1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas_page.py`, `pns_ai_chatboo/security/security.xml` | E3′ | Aplicado; aprobado en revisión (29/10/2026); P-8h pendiente |
+| 25 | M1 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | E3′ | Aplicado; aprobado en revisión (29/10/2026); validado en laboratorio (30/10/2026): P-8c OK |
+| 26 | M2 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | E3′ | Aplicado; aprobado en revisión (29/10/2026); validado en laboratorio (30/10/2026): P-8d OK |
+| 27 | F1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/controllers/chatboo.py` | E3′ | Aplicado; aprobado en revisión (29/10/2026; el 27 b, rehecho tras B1); P-8e b y X-Frame-Options OK en laboratorio (30/10/2026); P-8e a falló → parche 29 |
+| 28 | D1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas_page.py`, `pns_ai_chatboo/security/security.xml` | E3′ | Aplicado; aprobado en revisión (29/10/2026); validado en laboratorio (30/10/2026): P-8h OK |
+| 29 | F1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_session.py` | E3′ | Aplicado; aprobado en revisión (30/10/2026); validado en laboratorio (03/11/2026) |
 
 Parches 11 adaptado y 17 a 22 (E2′, 27/10/2026): aplicados, con tests y neutralización hechos; pruebas
 manuales del laboratorio pendientes ([lab_e2_3879.md](lab_e2_3879.md)). Tras la revisión del mismo día:
 parche 18 corregido, cambio en el 21 y parche 23 nuevo (PNS-101), con tests y neutralización
 («Revisión de E2′ (27/10/2026)», al final de la sección). Entradas más abajo, en «Parches
 de la rama 14.0-pns-ai-3879 (E2′)».
+
+Parches 25 a 28 (E3′): validados en el laboratorio el 30/10/2026 ([lab_e3_3879.md](lab_e3_3879.md)); P-8c,
+P-8d, P-8h, P-8e b y X-Frame-Options OK. P-8e a falló y dio lugar al parche 29
+([e3_hallazgo_p8ea_3879.md](e3_hallazgo_p8ea_3879.md)), validado en el laboratorio el 03/11/2026
+([lab_p29_3879.md](lab_p29_3879.md)). Entradas más abajo, en «Parches de la rama 14.0-pns-ai-3879 (E3′)».
 
 Parches 10, 12 y 13 a 16 (E1′): validados en laboratorio el 23/10/2026 y en el staging `pns_demo` el 26/10/2026, con el cambio de base
 (commit `0366231`; [staging_e1_3879.md](staging_e1_3879.md) y
@@ -1036,6 +1044,9 @@ La fase 3 anotó 4 saltados; el log de esa ejecución tiene 5 tests distintos co
   y no la creó (sesiones 46 y 47 de U1 con `canvas_rev` = 0; 0 filas nuevas en `chatboo_canvas_page`;
   PNS-96). Sin indicios de un error de Seges. R8 se valida en E3′ (decisión de Sergio del 27/10/2026)
   ([verificación](verificacion_seguridad_pns_ai.md), «Repetición de R8 (27/10/2026)»).
+- **Laboratorio de E3′, R8 (30/10/2026):** OK ([lab_e3_3879.md](lab_e3_3879.md)); diseñó Gemini 3.6 flash
+  tras un 503. Defecto previo del fabricante: la muestra para Design lleva `keys` y el DATA real
+  (`_flat_rows`) no; los diseños que dependen de `keys` salen vacíos y los salva la tabla de rescate (para E4′).
 
 ### Parche 16: Autorizaciones pide la contraseña; token de la tarjeta solo para el dueño (PNS-54)
 
@@ -1327,6 +1338,9 @@ Solo lectura (código, core de Odoo 14 de referencia, OCA, `vertical-instaladore
   - **Motivo:** `page_url` y `page_edit` (helpers de `pns_ai_chatboo` en el sandbox) llaman a la cadena
     de diseño con el entorno de la caja A, que lee `ai.provider`. Sin la ventana, el lienzo desde
     `relaxaicode` dejaría de funcionar (R8, que se valida en E3′).
+  - **R8 en el laboratorio de E3′ (30/10/2026):** OK ([lab_e3_3879.md](lab_e3_3879.md)), con el defecto previo
+    del fabricante de `keys` descrito en el parche 15 (la muestra para Design lleva `keys` y el DATA real,
+    `_flat_rows`, no; los diseños que dependen de `keys` salen vacíos y los salva la tabla de rescate; para E4′).
   - **Cambio:** `pns_ai_chatboo/models/chatboo_session.py`. `_ask_design` (`:1189`) pasa a ser la
     envoltura y el cuerpo original queda sin cambios en `_ask_design_raw` (`:1202`). La envoltura:
     1. convierte a `str` `system`, `prompt` y `what` antes de abrir la ventana (lo demás que usa el cuerpo,
@@ -2413,6 +2427,11 @@ La fila N27b de la tabla anterior es de la primera versión (rechazada).
     abierta.
   - Impacto: quien puede poner nombre a un registro puede ejecutar un script en el marco de la página de
     otro usuario y navegarlo a una web externa (apartado 3.2 del hallazgo).
+  - Matiz del laboratorio (03/11/2026): con el 71 solo, el valor corta el script, pero `alert("P-8e")` no se
+    ejecuta: en el JSON la comilla doble queda escapada y da `SyntaxError`. Con comilla simple sí se ejecuta.
+    El disparador externo quedó demostrado: un usuario de portal puso el valor en la **ciudad** de su ficha
+    («Mi cuenta»; el nombre lo bloquea la regla de `account` si hay facturas) y saltó la alerta «P-portal» en
+    el lienzo de `admin` (sesión 14). Vale cualquier campo de texto que acabe en una página.
 - **Cambio** (`pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_session.py`):
   - **A y B, en un único punto:** una envoltura nueva, `place_rows_on_page` (`chatboo_canvas.py:2324`). La
     función del fabricante pasa a llamarse `_place_rows_on_page` (`:2347`), con su cuerpo sin cambios. Por la
@@ -2754,5 +2773,24 @@ se puede distinguir del del servidor sin las filas de ese turno, así que no se 
   - **o2:** falso positivo con `->` o `>` en crudo en el texto. Precisado en «Qué se degrada».
 - **Decisión de Sergio (30/10/2026):** opción a, solo documentación; sin cambios de código.
 
-- **Estado:** parche 29 **aprobado** el 30/10/2026. Pendiente del commit y de las pruebas del laboratorio
-  ([lab_p29_3879.md](lab_p29_3879.md); [e3_hallazgo_p8ea_3879.md](e3_hallazgo_p8ea_3879.md), apartado 6).
+#### Laboratorio (03/11/2026)
+
+[lab_p29_3879.md](lab_p29_3879.md), ejecutado por Sergio; web reiniciado con el parche a las 11:14:22 UTC.
+
+- **5a a 5c** (71 solo, P-8e a original y ciudad del portal; sesiones 15, 16 y 17): `cierra_script = f`,
+  `comentario = f`, valores escapados en DATA; el servidor sustituyó DATA y conservó el diseño. Sin alertas.
+- **6c, camino de P-8e a reproducido y frenado:** en la sesión 16, por el camino del fulfill, Design copió el
+  valor en crudo (`ai_log` 666 y 669) y el parche dio la página de rescate (`pagina_rescate = t`,
+  `cierra_script = f`).
+- **6d′, caso 2 de B1 rechazado:** edición sin filas del lienzo de la sesión 12 (guardado antes del parche):
+  «No page was built: the change left a value of the page as markup» (`ai_log` 719 y 739), `canvas_rev` sin
+  cambios. Las filas 718 y 738 de `ai_log` («laid out the page again», justo antes de cada rechazo) salen con
+  `crudo = t`: Design devolvió el valor en crudo y el servidor lo rechazó. El chat respondió que había cambiado
+  el fondo (observación para E4′).
+- **6e:** `Seges E3 "P29"` se ve con sus comillas; DATA con la comilla escapada y la tabla con `&quot;`.
+- **Medición después:** DATA ilegible en las sesiones `[12, 14]`, de antes del parche (apartados 2 y 3); ninguna
+  de las creadas con el parche. Es el riesgo residual de páginas guardadas antes del parche, ya documentado.
+
+- **Estado:** parche 29 **aprobado** el 30/10/2026; commits `a3762ec`, `522ce6e` y `bdb9dda` (30/10/2026).
+  **Validado en laboratorio el 03/11/2026** ([lab_p29_3879.md](lab_p29_3879.md);
+  [e3_hallazgo_p8ea_3879.md](e3_hallazgo_p8ea_3879.md), apartado 6). Siguiente: el staging.

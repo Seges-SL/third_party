@@ -4,9 +4,10 @@
 - **Fecha:** 30/10/2026.
 - **Origen:** prueba P-8e a del laboratorio ([lab_e3_3879.md](lab_e3_3879.md), apartado 7), sobre el
   parche 27 a (F1) del [registro de parches](parches_pns_ai.md).
-- **Estado:** parche 29 **aprobado** el 30/10/2026 (tres revisiones de `odoo-reviewer`; ajustes en el
-  apartado 7). Registro, tests y neutralización: [parches_pns_ai.md](parches_pns_ai.md), «Parche 29».
-  Pendiente del commit y del laboratorio ([lab_p29_3879.md](lab_p29_3879.md)); después, reanudar P-8e a.
+- **Estado:** parche 29 implementado, **aprobado** y publicado el 30/10/2026 (tres revisiones de
+  `odoo-reviewer`, ajustes en el apartado 7; commits `a3762ec` [FIX], `522ce6e` [TEST] y `bdb9dda` [DOC]).
+  **Validado en el laboratorio el 03/11/2026** ([lab_p29_3879.md](lab_p29_3879.md); resultados en el
+  apartado 6). Registro, tests y neutralización: [parches_pns_ai.md](parches_pns_ai.md), «Parche 29».
 
 ## 1. Qué falló y cómo reproducirlo
 
@@ -180,6 +181,12 @@ Para confirmar cómo lo interpreta un navegador, sin analizar el HTML hostil con
   texto, primero con 71 y 72 juntos y después con 71 solo;
 - o `chromium --headless --dump-dom` sobre la descarga.
 
+**Matiz (03/11/2026, laboratorio del parche 29):** la conclusión de `html5lib` (con el 71 solo salta la
+alerta) vale para el **corte del script**, no para la carga útil. En contexto JSON la comilla doble queda
+escapada con barra invertida y `alert("P-8e")` da `SyntaxError`: en la sesión 12 (71 solo, antes del parche)
+`cierra_script = t` y no hubo alerta. La gravedad no cambia: con comilla simple el script se ejecuta (sesión
+14, alerta «P-portal», 3.2).
+
 ### 3.2 Impacto: navegación del marco con disparador externo (gravedad alta)
 
 El script inyectado se ejecuta en el iframe `sandbox="allow-scripts allow-modals"`, con origen opaco y la
@@ -193,6 +200,13 @@ Ese era un riesgo aceptado del parche 27 (e, «autonavegación del marco»), con
 registro** que acabe en una página (contactos, productos…) puede navegar el marco de otro usuario, dentro
 de la carcasa de Odoo. Alcanza a las páginas compartidas y a la descarga (`downloadable_page`).
 **Gravedad: alta.**
+
+**Disparador externo demostrado (03/11/2026, laboratorio del parche 29):** un usuario de portal pone el
+valor en su propia ficha desde «Mi cuenta» y se ejecuta en el lienzo de `admin` (sesión 14, alerta
+«P-portal», `write_uid` = el usuario portal). Se usó la **ciudad**: el nombre solo lo bloquea la regla de
+`account` («No está permitido cambiar tu nombre una vez que se hayan emitido facturas»), y solo si el contacto
+tiene facturas; esa regla tampoco cubre la calle, la ciudad, etc. Vale cualquier campo de texto que acabe en
+una página, no solo el nombre.
 
 ## 4. Opciones de corrección
 
@@ -251,6 +265,19 @@ cubierto por A y B, porque `page_html` usa el mismo `place_rows_on_page`.
     - comprobar si el usuario portal puede poner un nombre hostil a su propio contacto desde «Mi cuenta»;
     - si puede, comprobar si ese nombre llega a una página del lienzo de `admin`.
 
+### Estado (03/11/2026)
+
+- **Parche 29:** implementado, aprobado y publicado el 30/10/2026 (commits `a3762ec` [FIX], `522ce6e` [TEST]
+  y `bdb9dda` [DOC]). **Validado en el laboratorio el 03/11/2026** ([lab_p29_3879.md](lab_p29_3879.md)).
+- **Pruebas previstas:**
+  - **a) 71 solo:** antes del parche, sesión 12 con `cierra_script = t` (sin alerta: la comilla doble queda
+    escapada en el JSON, 3.1); después, sesión 15 con `cierra_script = f` y `escapado = t`.
+  - **b) Portal:** no puede cambiar el nombre (contacto con facturas); se usó la ciudad con comilla simple.
+    Antes del parche, sesión 14 con `cierra_script = t` y la alerta «P-portal» (3.2); después, sesión 17 con
+    `cierra_script = f` y `escapado = t`, sin alerta.
+- **Laboratorio de E3′:** P-8e a queda corregido por el parche 29; la limpieza se hizo en el apartado 8 del
+  laboratorio del parche 29 (el contacto 68 queda para archivar a mano).
+
 ## 7. Ajustes al plan del parche 29 e implementación (30/10/2026)
 
 Plan de la fase 1 aprobado por Sergio el 30/10/2026, con estos ajustes:
@@ -292,6 +319,13 @@ edición sin filas vuelve a meter las de la página abierta. La regla de `textCo
 | f (otra copia, además de DATA) | Rescate si es otra asignación de DATA (A) o si lleva un valor de las filas en crudo o como cadena JSON (B) |
 | g (edición sin filas) | Con DATA legible de filas en la página abierta: se vuelven a meter (D), y después A y B. Sin él, pero con la tabla del servidor: B con los valores de esa tabla; si alguno queda en crudo, la edición se rechaza y la página anterior se queda. Sin DATA ni tabla: la edición sin filas se rechaza (B1 de la revisión). Sin DATA, B compara también el texto visible de la página abierta con `<` o `>`, por si una edición anterior sacó un valor de la tabla (n1 de la segunda revisión) |
 | h (skill capturada) | `page_html` pasa por A y B |
+
+**En el laboratorio (03/11/2026, [lab_p29_3879.md](lab_p29_3879.md)):** la prueba 6c reprodujo con el modelo
+real el camino de P-8e a (fulfill; Design copió el valor en crudo, `ai_log` 666 y 669) y el parche lo frenó
+con la página de rescate. La prueba 6d′ comprobó el caso 2 de B1 (fila g): una edición sin filas de un lienzo
+guardado antes del parche (sesión 12) se rechazó con «No page was built: the change left a value of the page
+as markup» y `canvas_rev` no cambió. Las filas 718 y 738 de `ai_log` («laid out the page again», justo antes
+de cada rechazo) salen con `crudo = t`: Design devolvió el valor en crudo y el servidor lo rechazó.
 
 **Tras la revisión del parche 29 (30/10/2026):** `odoo-reviewer` lo rechazó por un bloqueante, **B1**. Una
 página abierta sin `const DATA` legible de filas dejaba la edición sin filas sin protección. Esa página
