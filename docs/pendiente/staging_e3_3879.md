@@ -4,8 +4,9 @@
   `522ce6e`, el último que toca los módulos (`git log --oneline 9a2970d..HEAD -- pns_base pns_ai_mcp
   pns_ai_chatboo`: `60271e6`, `c64a556`, `a3762ec` y `522ce6e`). Los commits posteriores, `bdb9dda` y
   `047ff89`, solo son [DOC]: dan el mismo árbol y la misma huella del árbol, pero otra huella del
-  `.tar.gz` (B.1) · **Preparado:** 03/11/2026 · **Estado:** preparado, **sin ejecutar**. Pasos previos de D.0
-  hechos el 03/11/2026.
+  `.tar.gz` (B.1) · **Preparado:** 03/11/2026 · **Estado:** ejecutado el 03 y 04/11/2026 con `522ce6e`;
+  resultado en «Resultado de la subida (03 y 04/11/2026)», al final. Pasos previos de D.0 hechos el
+  03/11/2026.
 - **Qué se sube:** parches 25 (M1), 26 (M2), 27 (F1), 28 (D1) y 29 (P-8e a), todos en `pns_ai_chatboo`.
   Registro en [parches](parches_pns_ai.md), «Parches de la rama 14.0-pns-ai-3879 (E3′)» y «Parche 29».
 - **Origen:** «Propuesta final (29/10/2026)» de la [propuesta de E3′](e3_propuesta_3879.md) y
@@ -272,11 +273,11 @@ SQL
 
 | Medición (antes) | Obtenido |
 |---|---|
-| `python3` en el host / opción usada | [ ] |
-| `chatboo.session`: con diseño / ilegibles (ids) | [ ] |
-| `chatboo.canvas.page`: con diseño / ilegibles (ids) | [ ] |
-| Dueños de los ilegibles (login, `write_date`) | [ ] |
-| Lectores de portal guardados (m3) | [ ] |
+| `python3` en el host / opción usada | [x] `python3` 3.12.3 en el host; opción A, script `05af0d60…f16e` en `/tmp` |
+| `chatboo.session`: con diseño / ilegibles (ids) | [x] 0 / 0 (`/tmp/pns_e3p_medir_antes.txt`) |
+| `chatboo.canvas.page`: con diseño / ilegibles (ids) | [x] 0 / 0 |
+| Dueños de los ilegibles (login, `write_date`) | [x] No aplica: 0 ilegibles, sin riesgo residual; 6d′ no aplica |
+| Lectores de portal guardados (m3) | [x] 0 |
 
 **Si sale una sesión ilegible cuyo dueño Sergio pueda usar** (por ejemplo, de `admin` o de U1), se anota:
 es la candidata de 6d′ (D.1).
@@ -544,7 +545,7 @@ Esperado: 0; `200`; `403`.
 
 | Comprobación | Esperado | Obtenido |
 |---|---|---|
-| `chatboo_canvas_page_admin_rule` (`perm_read`, `perm_write`, `perm_create`, `perm_unlink`) | `t f f t`, como en 0.1 de [lab_e3_3879.md](lab_e3_3879.md) | [ ] |
+| `chatboo_canvas_page_admin_rule` (`perm_read`, `perm_write`, `perm_create`, `perm_unlink`) | `t f f t`, como en 0.1 de [lab_e3_3879.md](lab_e3_3879.md) | [x] OK: `t f f t` |
 
 ### C.2 Módulos y crons
 
@@ -552,10 +553,10 @@ Esperado: 0; `200`; `403`.
 
 | Comprobación | Esperado | Obtenido |
 |---|---|---|
-| Versiones | Las de A.4, `installed` (sin cambio de versión) | [ ] |
-| Cron de la papelera | `pns_ai_mcp.ir_cron_ai_journal_trash` activo, diario, `numbercall` -1, `user_id` 1 | [ ] |
-| Resto de crons | Los seis de A.4, sin cambios | [ ] |
-| Neutralización | Ninguna fila `odoo_dev.%` | [ ] |
+| Versiones | Las de A.4, `installed` (sin cambio de versión) | [x] Igual que A.4: `1.2.47`, `3.1.879` y `2.1.538` |
+| Cron de la papelera | `pns_ai_mcp.ir_cron_ai_journal_trash` activo, diario, `numbercall` -1, `user_id` 1 | [x] Igual que A.4 |
+| Resto de crons | Los seis de A.4, sin cambios | [x] Igual que A.4 (7 crons `pns_*` en total) |
+| Neutralización | Ninguna fila `odoo_dev.%` | [x] Igual que A.4: ninguna |
 
 ### C.3 Recargar `es_ES`
 
@@ -771,16 +772,16 @@ SQL
 
 | # | Prueba (parche) | Quién | Qué se hace | Esperado | Obtenido |
 |---|---|---|---|---|---|
-| 1 | **P-8c** (parche 25) | ADM y DEMO, script, paso `rpc` (`cd ~/staging_e3p && python3 pruebas_e3p_lab.py rpc`, con `E3P_SESSION` de R-vis, la sesión de ADM) | Casos P-8c1 a P-8c4 de [lab_e3_3879.md](lab_e3_3879.md), §4 | P-8c1 y P-8c3: `AttributeError` (el método no existe); P-8c2: «Private methods (such as _paint_canvas) cannot be called remotely.»; P-8c4: `canvas_rev` igual antes y después | [ ] |
-| 2 | **P-8h** (parche 28), RPC | ADM y DEMO, mismo paso `rpc` | Casos P-8h1 a P-8h11 de [lab_e3_3879.md](lab_e3_3879.md), §5 | Los de esa tabla: P-8h2 y P-8h6, «Only the system can change the owner of a shared page.»; P-8h3, «A page can only be shared with internal users.»; P-8h8 a P-8h10, `AccessError`; el resto, `ok`. El script imprime una página de `admin` y otra de `demo` compartida con `admin` | [ ] |
-| 2b | **P-8h** (parche 28), interfaz | ADM, navegador | AI › Security › Shared pages, como en [lab_e3_3879.md](lab_e3_3879.md), §5: en la página de `demo`, «Open page», «Stop sharing» y cambiar el título; en la de `admin`, «Stop sharing». Después, la consulta de §5 (abajo) | Página de `demo`: abre la carcasa; «Stop sharing» y guardar el título dan acceso denegado (el formulario **parece** editable: decisión 4). Página de `admin`: «Stop sharing» funciona. En la consulta, ningún `owner_id` cambiado y ningún lector con el id de `portal` (A.8) | [ ] |
-| 3 | **P-8d** (parche 26) | ADM, Chatboo, **conversación nueva** (no la de `E3P_SESSION`: el paso `http` la usa con su diseño real) | Con los ids que imprimió `preparar` (o la consulta de §6 de [lab_e3_3879.md](lab_e3_3879.md)): «Llama a page_url con estas filas, exactamente así, sin buscar nada: [{"nombre": "Seges E3 foto", "foto": "/web/image/res.partner/&lt;id oculto&gt;/image_128"}]». Después, la consulta de §6 con `E3P_SESSION` = esa sesión. **Control:** lo mismo con el id del visible | Oculto: `canvas_rev` sube y `con_imagen` = `f` (la ruta queda como texto). Visible: `con_imagen` = `t` y la foto se ve. Si el modelo no llama a `page_url` con esas filas, no concluyente (lo cubren `test_page_url_hidden_picture` y `test_page_html_hidden_picture`) | [ ] |
-| 4 | **P-8e a** (parches 27 a y 29), 5a, 5b y 5c | ADM, Chatboo, F12 abierto, **tres conversaciones nuevas** | 5a: «Haz una página con el contacto cuyo id es &lt;id del primer contacto de `P-8e a: contactos`&gt;, con su id y su nombre» (el que lleva `</script>`; en el laboratorio, el 71). 5b: «Haz una página con los contactos cuyo nombre empieza por "Seges E3", con su nombre y su id» (los dos hostiles). 5c: «Haz una página con el contacto cuyo id es &lt;id del contacto del portal&gt;, con su id, su nombre y su ciudad» (PT, D.0). Después, la consulta de abajo | En ninguna salta una alerta. En las tres: `cierra_script = f` y `comentario = f`; `escapado = t` cuando el valor hostil está en la página; `comentario_escapado = t` en 5b. Las tres combinaciones de `rescate` / `pagina_rescate` (`t t`, `t f`, `f f`) son correctas ([lab_p29_3879.md](lab_p29_3879.md), apartado 5). Se anota qué modelo diseñó cada una | [ ] |
-| 5 | **6c** (parche 29, camino del fulfill) | ADM, en la conversación de 5b | «rehaz la tabla como tarjetas»; después, consulta C (`E3P_SESSION` = la de 5b) y la de `ai_log` (columna `crudo`) | `canvas_rev` sube y `cierra_script = f`; `pagina_rescate` puede ser `t` si Design copió los valores. `crudo = t` en una fila de Design con la página guardada con `cierra_script = f`: Design copió el valor y el parche 29 lo frenó | [ ] |
-| 6 | **6d′** (parche 29, caso 2 de B1) | ADM, solo si A.6 dio una sesión candidata **y su dueño puede usarla** | Mensaje acotado sobre esa sesión (como dueño); antes, `e3medir` (solo lectura) para confirmar que sigue ilegible. Después, consulta C y `ai_log` | **Se rechaza:** `canvas_rev` no cambia y `ai_log` dice `No page was built: the change left a value of the page as markup`. Otros desenlaces correctos, los de [lab_p29_3879.md](lab_p29_3879.md), 6d. **Si A.6 no dio candidata: «no aplica»** (cubierto por el laboratorio, 6d′, y por `test_edit_page_without_data`) | [ ] |
-| 7 | **6e** (parche 27 a) | ADM | Crear en Contactos `Seges E3 "P29"` (con comillas dobles) y pedir en una conversación nueva una página con ese contacto por id; consulta C | El nombre se ve igual, con sus comillas, en el diseño o en el rescate; `cierra_script = f` | [ ] |
-| 8 | **P-8e b y `X-Frame-Options`** (parches 27 b y d) | ADM, script, paso `http` (`python3 pruebas_e3p_lab.py http`, con `E3P_SESSION` de R-vis), y navegador | Rutas y pasos de [lab_e3_3879.md](lab_e3_3879.md), §8, con `https://pns.liyben.com`. Cabeceras a mano (opcional): el `curl` de §8 con la URL del staging y la cookie con `read -rsp` y `unset` | `/chatboo/canvas/<E3P_SESSION>` y `/chatboo/page/<id>`: HTTP 200, `X-Frame-Options: SAMEORIGIN`, prefijo CSP `True`. Las dos descargas: HTTP 200, `X-Frame-Options: None`, prefijo CSP `True`. En el navegador: «script en linea: ok», imagen externa rota, avisos «Refused to load…» y «Refused to connect…», peticiones a `example.com` bloqueadas por CSP; la página de `E3P_SESSION` (R-vis), sin esos avisos | [ ] |
-| 9 | **6b** (parche 29, caso 1 de B1) | ADM, en la sesión `E3P_SESSION` (R-vis), **al final** (después del paso `http`) | Mensaje acotado; consulta C y `ai_log` | `canvas_rev` sube; las cifras no cambian; `pagina_rescate = f` (`rescate` puede ser `t`) | [ ] |
+| 1 | **P-8c** (parche 25) | ADM y DEMO, script, paso `rpc` (`cd ~/staging_e3p && python3 pruebas_e3p_lab.py rpc`, con `E3P_SESSION` de R-vis, la sesión de ADM) | Casos P-8c1 a P-8c4 de [lab_e3_3879.md](lab_e3_3879.md), §4 | P-8c1 y P-8c3: `AttributeError` (el método no existe); P-8c2: «Private methods (such as _paint_canvas) cannot be called remotely.»; P-8c4: `canvas_rev` igual antes y después | [x] OK (por el túnel, G): P-8c1 y P-8c3, «method 'paint_canvas' does not exist»; P-8c2, «Private methods…»; P-8c4, `canvas_rev` 1 antes y después (sesión 50) |
+| 2 | **P-8h** (parche 28), RPC | ADM y DEMO, mismo paso `rpc` | Casos P-8h1 a P-8h11 de [lab_e3_3879.md](lab_e3_3879.md), §5 | Los de esa tabla: P-8h2 y P-8h6, «Only the system can change the owner of a shared page.»; P-8h3, «A page can only be shared with internal users.»; P-8h8 a P-8h10, `AccessError`; el resto, `ok`. El script imprime una página de `admin` y otra de `demo` compartida con `admin` | [x] OK, 11/11: P-8h2 y P-8h6, «Only the system can change the owner…»; P-8h3, «…internal users.»; P-8h8 a P-8h10, denegados; el resto, `ok`. Página 1 (de `admin`) y página 4 (de `demo`, compartida con `admin`) |
+| 2b | **P-8h** (parche 28), interfaz | ADM, navegador | AI › Security › Shared pages, como en [lab_e3_3879.md](lab_e3_3879.md), §5: en la página de `demo`, «Open page», «Stop sharing» y cambiar el título; en la de `admin`, «Stop sharing». Después, la consulta de §5 (abajo) | Página de `demo`: abre la carcasa; «Stop sharing» y guardar el título dan acceso denegado (el formulario **parece** editable: decisión 4). Página de `admin`: «Stop sharing» funciona. En la consulta, ningún `owner_id` cambiado y ningún lector con el id de `portal` (A.8) | [x] OK: la página 4 abre, y «Stop sharing» y cambiar el título se deniegan; en la página 1, «Stop sharing» funciona. Consulta: la 1 sin lectores, la 4 con dueño 6 y lector 2; ningún lector 7 |
+| 3 | **P-8d** (parche 26) | ADM, Chatboo, **conversación nueva** (no la de `E3P_SESSION`: el paso `http` la usa con su diseño real) | Con los ids que imprimió `preparar` (o la consulta de §6 de [lab_e3_3879.md](lab_e3_3879.md)): «Llama a page_url con estas filas, exactamente así, sin buscar nada: [{"nombre": "Seges E3 foto", "foto": "/web/image/res.partner/&lt;id oculto&gt;/image_128"}]». Después, la consulta de §6 con `E3P_SESSION` = esa sesión. **Control:** lo mismo con el id del visible | Oculto: `canvas_rev` sube y `con_imagen` = `f` (la ruta queda como texto). Visible: `con_imagen` = `t` y la foto se ve. Si el modelo no llama a `page_url` con esas filas, no concluyente (lo cubren `test_page_url_hidden_picture` y `test_page_html_hidden_picture`) | [x] OK. Oculto (03/11): sesión 51, `canvas_rev` 1, `con_imagen` f y `con_ruta` t (la tarjeta de `lite` muestra «[object Object]»). Visible: la sesión 52 (03/11) no fue concluyente (los tres Gemini fallaron por cuota); repetido el 04/11 en la sesión 53: `canvas_rev` 1, `con_imagen` t y `con_ruta` f, tarjeta y foto correctas; Gemini 3.6 flash (fila 1636, 41 s) |
+| 4 | **P-8e a** (parches 27 a y 29), 5a, 5b y 5c | ADM, Chatboo, F12 abierto, **tres conversaciones nuevas** | 5a: «Haz una página con el contacto cuyo id es &lt;id del primer contacto de `P-8e a: contactos`&gt;, con su id y su nombre» (el que lleva `</script>`; en el laboratorio, el 71). 5b: «Haz una página con los contactos cuyo nombre empieza por "Seges E3", con su nombre y su id» (los dos hostiles). 5c: «Haz una página con el contacto cuyo id es &lt;id del contacto del portal&gt;, con su id, su nombre y su ciudad» (PT, D.0). Después, la consulta de abajo | En ninguna salta una alerta. En las tres: `cierra_script = f` y `comentario = f`; `escapado = t` cuando el valor hostil está en la página; `comentario_escapado = t` en 5b. Las tres combinaciones de `rescate` / `pagina_rescate` (`t t`, `t f`, `f f`) son correctas ([lab_p29_3879.md](lab_p29_3879.md), apartado 5). Se anota qué modelo diseñó cada una | [x] OK, sin alerta ni avisos en ninguna (04/11). Columnas: `cierra_script`, `comentario`, `escapado`, `comentario_escapado`; `rescate`, `pagina_rescate`. **5a** (contacto 63, sesión 54): f f t f; f f; 3.6 flash (fila 1642, 25 s). **5b** (sesión 55): f f t t; f f; 3.6 flash (fila 1648, 48 s); se ven 59, 60, 62, 63 y 64, no el 61 (oculto). **5c** (contacto 59 de PT, sesión 56): f f t f; f f; diseñó 3.5 flash (fila 1655, 84 s) tras un failover de 3.6 flash (fila 1654; HTTP 503 según el log de Odoo a las 11:12:23, `ai_log` no guarda el detalle). El `crudo` = t de las filas «Execution successful» (1643, 1649 y 1656) es el resultado de la herramienta de datos, no lo guardado; en las filas de Design, `crudo` f |
+| 5 | **6c** (parche 29, camino del fulfill) | ADM, en la conversación de 5b | «rehaz la tabla como tarjetas»; después, consulta C (`E3P_SESSION` = la de 5b) y la de `ai_log` (columna `crudo`) | `canvas_rev` sube y `cierra_script = f`; `pagina_rescate` puede ser `t` si Design copió los valores. `crudo = t` en una fila de Design con la página guardada con `cierra_script = f`: Design copió el valor y el parche 29 lo frenó | [x] Conforme: sesión 55, `canvas_rev` 2; f f t t; f f. Design 1661 («changed the page», 30 s) y 1662 («laid out the page again», 35 s), las dos con `crudo` f: Design no copió los valores en crudo, así que el freno del parche 29 no se vio actuar en este camino (cubierto en [lab_p29_3879.md](lab_p29_3879.md), 6c). 3.6 flash; la página, como tarjetas, sin avisos |
+| 6 | **6d′** (parche 29, caso 2 de B1) | ADM, solo si A.6 dio una sesión candidata **y su dueño puede usarla** | Mensaje acotado sobre esa sesión (como dueño); antes, `e3medir` (solo lectura) para confirmar que sigue ilegible. Después, consulta C y `ai_log` | **Se rechaza:** `canvas_rev` no cambia y `ai_log` dice `No page was built: the change left a value of the page as markup`. Otros desenlaces correctos, los de [lab_p29_3879.md](lab_p29_3879.md), 6d. **Si A.6 no dio candidata: «no aplica»** (cubierto por el laboratorio, 6d′, y por `test_edit_page_without_data`) | [x] No aplica: A.6 sin ilegibles |
+| 7 | **6e** (parche 27 a) | ADM | Crear en Contactos `Seges E3 "P29"` (con comillas dobles) y pedir en una conversación nueva una página con ese contacto por id; consulta C | El nombre se ve igual, con sus comillas, en el diseño o en el rescate; `cierra_script = f` | [x] OK: contacto 65, sesión 57, `canvas_rev` 1, `cierra_script` f, `rescate` / `pagina_rescate` f f; el nombre se ve con sus comillas. 3.6 flash (fila 1671, 110 s). En la fila 1668, «AST Validation Error: [PROHIBITED:DIR]»: el código del modelo usó `dir()`, el validador lo rechazó y se corrigió en la segunda ronda |
+| 8 | **P-8e b y `X-Frame-Options`** (parches 27 b y d) | ADM, script, paso `http` (`python3 pruebas_e3p_lab.py http`, con `E3P_SESSION` de R-vis), y navegador | Rutas y pasos de [lab_e3_3879.md](lab_e3_3879.md), §8, con `https://pns.liyben.com`. Cabeceras a mano (opcional): el `curl` de §8 con la URL del staging y la cookie con `read -rsp` y `unset` | `/chatboo/canvas/<E3P_SESSION>` y `/chatboo/page/<id>`: HTTP 200, `X-Frame-Options: SAMEORIGIN`, prefijo CSP `True`. Las dos descargas: HTTP 200, `X-Frame-Options: None`, prefijo CSP `True`. En el navegador: «script en linea: ok», imagen externa rota, avisos «Refused to load…» y «Refused to connect…», peticiones a `example.com` bloqueadas por CSP; la página de `E3P_SESSION` (R-vis), sin esos avisos | [x] OK (P-8e b conforme), con una desviación sin efecto en la seguridad. Página 5 (`page_net` 5 en el estado). `/chatboo/canvas/50`, `/chatboo/page/5`, `/chatboo/page/5/download` y `/chatboo/canvas/50/download`: HTTP 200, prefijo CSP `True` y `X-Frame-Options: SAMEORIGIN` en las cuatro. **Desviación:** en las descargas, `X-Frame-Options: SAMEORIGIN` lo pone Nginx por la URL pública (`pns_liyben_com.conf` l. 11). Que Odoo no la pone en las descargas se comprueba en el código de `522ce6e` (solo en `chatboo_canvas`, `chatboo.py` l. 1157, y `chatboo_shared_page`, l. 1250); por el túnel, solo que Odoo no la pone en `/mcp` (405 sin `X-Frame-Options`, frente a 403 con ella por la URL pública). Navegador (Firefox): «script en linea: ok», imagen externa rota; en la consola, «La configuración de la página bloqueó…» en `style-src-elem` ×2 (`example.com/seges-e3.css` y `seges-e3-font.css`), `img-src` (`seges-e3.png`) y `connect-src` ×2, y «Uncaught (in promise) TypeError: NetworkError» (consecuencia del bloqueo); además, 2 avisos de mapeo de fuente de `about:srcdoc` de las herramientas de Firefox (irrelevantes). La página de la sesión 50, sin esos avisos |
+| 9 | **6b** (parche 29, caso 1 de B1) | ADM, en la sesión `E3P_SESSION` (R-vis), **al final** (después del paso `http`) | Mensaje acotado; consulta C y `ai_log` | `canvas_rev` sube; las cifras no cambian; `pagina_rescate = f` (`rescate` puede ser `t`) | [x] OK: sesión 50, `canvas_rev` 1 → 2; `pagina_rescate` f y el resto f; mismas cifras (2 registros, total 907500; Deco Addict 590000 y Azure Interior 317500); fondo azul. 3.6 flash: Design 1677 («changed the page in 10 s»; respuesta de Design de 104 caracteres, según `ai_log`) y 1678 («laid out the page again», 40 s). `relaxaicode` (fila 1676) llamado aunque el mensaje pedía no consultar datos; ninguna «No page was built» |
 
 **Consulta de P-8e a** (de [lab_p29_3879.md](lab_p29_3879.md), apartado 5, tal cual; `<reinicio>` con la
 forma `2026-11-04 10:57:35`). Saca las sesiones de `admin` con lienzo creadas después del reinicio:
@@ -840,10 +841,10 @@ tabla ni `DATA`), que no se puede provocar desde el chat (`test_edit_page_withou
 
 | # | Caso | Quién | Esperado | Obtenido |
 |---|---|---|---|---|
-| R8 | **Lienzo desde el chat** (cierra la R8 que E1′ dejó para E3′). Conversación nueva: «Hazme una página con las ventas por mes de este año, con un gráfico de barras y una tabla». Consultas de [lab_e3_3879.md](lab_e3_3879.md), §1 (abajo, con el id de U1), y «Qué modelo diseñó». **Hace también de 6a**, para ahorrar cuota: consulta C sobre esa sesión, con `E3P_SESSION=<id de la sesión de R8> e3sql` solo para esa orden (la sesión de R8 **no** es `E3P_SESSION`) | U1 | La burbuja trae la tarjeta de la página y al abrirla se ven el gráfico y la tabla; la sesión con `canvas_open = t` y `canvas_rev >= 1`; en `ai_log`, «Design laid out the page in … s» y ninguna «No page was built: the design call broke: AccessError». Como 6a: `pagina_rescate = f` (`rescate` puede ser `t`). **Se anota el modelo.** Si la diseña `lite` y no se crea: no concluyente por el proveedor (PNS-96) | [ ] |
-| R-vis | **Comprobación visual con la CSP** ([lab_e3_3879.md](lab_e3_3879.md), §2): una o dos páginas, cada una en una conversación nueva («página con los clientes y su facturación», «página con las facturas pendientes por cliente»), al menos una con gráfico. **La sesión de la primera es `E3P_SESSION`** (se saca con la consulta de R8 con `user_id = 2`), en el VPS y en `~/staging_e3p`. La página de R8 la revisa U1 con los mismos puntos | ADM, navegador | Se ven completas; tema e «Imprimir / PDF» funcionan; consola sin avisos de CSP de la propia página (si sale alguno, anotar el host); «Descargar HTML» se ve igual, empieza por el prefijo CSP y `document.compatMode` da `"CSS1Compat"`. Si una página se ve distinta (de quirks a estándar), anotarlo: coste aceptado del parche 27 b | [ ] |
-| R-desc | **Descargas del lienzo:** «Descargar HTML» del lienzo (`/chatboo/canvas/<id>/download`) y de una página compartida (`/chatboo/page/<id>/download`) | ADM | Las dos descargan y abren en local con la CSP (complementa la fila 8 de D.1). La del lienzo se nombra con la sesión, no con la página (observación del laboratorio, ya conocida) | [ ] |
-| R-log | **Log desde el arranque** (B.8), con la orden de abajo | — | Solo errores del proveedor (429/503) y los rechazos provocados en D.1 (`rpc`: P-8c y P-8h), a su hora. Qué rechazos de RPC deja Odoo en el log como `ERROR` es **«Sin confirmar»**: se anotan con su hora y se cotejan con las pruebas | [ ] |
+| R8 | **Lienzo desde el chat** (cierra la R8 que E1′ dejó para E3′). Conversación nueva: «Hazme una página con las ventas por mes de este año, con un gráfico de barras y una tabla». Consultas de [lab_e3_3879.md](lab_e3_3879.md), §1 (abajo, con el id de U1), y «Qué modelo diseñó». **Hace también de 6a**, para ahorrar cuota: consulta C sobre esa sesión, con `E3P_SESSION=<id de la sesión de R8> e3sql` solo para esa orden (la sesión de R8 **no** es `E3P_SESSION`) | U1 | La burbuja trae la tarjeta de la página y al abrirla se ven el gráfico y la tabla; la sesión con `canvas_open = t` y `canvas_rev >= 1`; en `ai_log`, «Design laid out the page in … s» y ninguna «No page was built: the design call broke: AccessError». Como 6a: `pagina_rescate = f` (`rescate` puede ser `t`). **Se anota el modelo.** Si la diseña `lite` y no se crea: no concluyente por el proveedor (PNS-96) | [x] OK (03/11): sesión 49 de U1, `canvas_open` t (consulta del 04/11) y `canvas_rev` 1; `ai_log` 1591, «Design laid out the page in 9 s»; diseñó `lite` y la página se creó (correcta en R-vis). Como 6a: todo f (`rescate` y `pagina_rescate` incluidos). Cierra la R8 de E1′ |
+| R-vis | **Comprobación visual con la CSP** ([lab_e3_3879.md](lab_e3_3879.md), §2): una o dos páginas, cada una en una conversación nueva («página con los clientes y su facturación», «página con las facturas pendientes por cliente»), al menos una con gráfico. **La sesión de la primera es `E3P_SESSION`** (se saca con la consulta de R8 con `user_id = 2`), en el VPS y en `~/staging_e3p`. La página de R8 la revisa U1 con los mismos puntos | ADM, navegador | Se ven completas; tema e «Imprimir / PDF» funcionan; consola sin avisos de CSP de la propia página (si sale alguno, anotar el host); «Descargar HTML» se ve igual, empieza por el prefijo CSP y `document.compatMode` da `"CSS1Compat"`. Si una página se ve distinta (de quirks a estándar), anotarlo: coste aceptado del parche 27 b | [x] OK: una página, la de ADM en la sesión 50 (`E3P_SESSION`), diseñada por `lite` (fila 1605). Páginas de las sesiones 49 (U1) y 50 correctas: tema, «Imprimir / PDF», consola sin avisos de CSP y descarga en `CSS1Compat` |
+| R-desc | **Descargas del lienzo:** «Descargar HTML» del lienzo (`/chatboo/canvas/<id>/download`) y de una página compartida (`/chatboo/page/<id>/download`) | ADM | Las dos descargan y abren en local con la CSP (complementa la fila 8 de D.1). La del lienzo se nombra con la sesión, no con la página (observación del laboratorio, ya conocida) | [x] OK: descargas del lienzo 50 y de la página 1, abiertas en local, correctas |
+| R-log | **Log desde el arranque** (B.8), con la orden de abajo | — | Solo errores del proveedor (429/503) y los rechazos provocados en D.1 (`rpc`: P-8c y P-8h), a su hora. Qué rechazos de RPC deja Odoo en el log como `ERROR` es **«Sin confirmar»**: se anotan con su hora y se cotejan con las pruebas | [x] OK, desde 2026-11-03T16:27:50Z: 26 líneas `ERROR` y 16 `Traceback`, de tres tipos: 429 de Gemini (03/11, 16:34 a 17:16), 503 de Gemini (03/11 17:16 y 04/11 11:12:23) y «The method 'paint_canvas' does not exist» ×2 (03/11 17:07:40, P-8c1 y P-8c3). Ninguno inesperado. **Resuelve el «Sin confirmar»:** Odoo solo registra como `ERROR` el método inexistente; P-8c2 y los rechazos de P-8h no salen como `ERROR`. Las URLs del log no llevan la clave |
 
 **Orden de R-log** **[LECTURA]**, con la hora de `docker inspect` de B.8 tal como sale (formato RFC 3339):
 
@@ -875,9 +876,9 @@ SQL
 
 | Medición (después) | Esperado | Obtenido |
 |---|---|---|
-| `chatboo.session`: ilegibles | Los de A.6 (salvo si 6d′ sustituyó alguno por otra página) y **ninguna** de las sesiones creadas después del reinicio | [ ] |
-| `chatboo.canvas.page`: ilegibles | Los de A.6 | [ ] |
-| Lectores de portal guardados (m3) | El número de A.6 (el parche no limpia los guardados; impide guardar nuevos) | [ ] |
+| `chatboo.session`: ilegibles | Los de A.6 (salvo si 6d′ sustituyó alguno por otra página) y **ninguna** de las sesiones creadas después del reinicio | [x] OK: 8 con diseño, 0 ilegibles (`/tmp/pns_e3p_medir_despues.txt`). Los 8 lienzos los crearon las pruebas (sesiones 49, 50, 51 y 53 a 57) |
+| `chatboo.canvas.page`: ilegibles | Los de A.6 | [x] OK: 3 con diseño (páginas 1, 4 y 5, de las pruebas), 0 ilegibles |
+| Lectores de portal guardados (m3) | El número de A.6 (el parche no limpia los guardados; impide guardar nuevos) | [x] OK: 0, como en A.6 |
 
 ### D.3 Limpieza de las pruebas
 
@@ -971,54 +972,153 @@ Operaciones que cambian el VPS: las decide y hace quien administra el VPS.
 
 ---
 
-## G. Resultado de la subida
+## G. Resultado de la subida (03 y 04/11/2026)
 
-Sergio con Claude; horas en UTC. Commit `522ce6e` de `14.0-pns-ai-3879`. Resultado por prueba en las
-columnas «Obtenido» de A.6, C.1, C.2, D.1, D.2 y D.2b; resumen en la
-[verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E3′».
+Sergio con Claude; horas en UTC. Commit `522ce6e` de `14.0-pns-ai-3879`. A a C y la mayor parte de D, el
+03/11/2026; el resto de D y la limpieza, el 04/11/2026. Resultado por prueba en las columnas «Obtenido» de
+A.6, C.1, C.2, D.1, D.2 y D.2b; resumen en la [verificación](verificacion_seguridad_pns_ai.md), «Staging —
+entrega E3′ (03 y 04/11/2026)».
 
 ### A. Comprobaciones previas
 
-- **A.0 a A.5:** (pendiente)
-- **A.6 (medición antes):** (pendiente)
-- **A.7:** (pendiente)
-- **A.8:** (pendiente)
+- **A.0 a A.5:** como se esperaba, sin cambios respecto al traspaso.
+  - A.0: `on` y `UTC`.
+  - A.1: `odoo14_pns` y `odoo14_pns_db` en marcha; `POSTGRES_USER` `odoo`.
+  - A.2: montajes como en E2′, más el volumen anónimo `/mnt/extra-addons` (`rw=true`) de la imagen oficial,
+    que no es un cambio. Copias `addons_antes_E1`, `addons_antes_E2`, `addons_antes_E1p` y
+    `addons_antes_E2p`, sin `addons_antes_E3p`. Restos `addons_27cadbb`, `addons_27cadbb_b` y
+    `addons_95d6b1a`. Disco al 87 % (9,6 GB libres).
+  - A.3: 709 archivos, huella `7a6c7144…bb9f`.
+  - A.4: `1.2.47`, `3.1.879` y `2.1.538`; sin `odoo_dev.%`; 7 crons; ninguna transacción en curso.
+  - A.5: `t t t t`.
+- **A.6 (medición antes):** `python3` 3.12.3 en el host (opción A), script `05af0d60…f16e` en `/tmp`.
+  `chatboo.session` 0 con diseño y 0 ilegibles; `chatboo.canvas.page` 0 con diseño y 0 ilegibles
+  (`/tmp/pns_e3p_medir_antes.txt`): sin riesgo residual, 6d′ no aplica. m3: 0.
+- **A.7:** cadena de Chatboo con Gemini 3.6 flash (1), 3.5 flash (3) y 3.5 flash lite (4). «Design» ya
+  estaba en `t` en los tres: el paso 1 de D.0 no hizo falta. Proveedor 2, «Proveedor fuera de cadena»,
+  inactivo. «Test Connection» de 3.5 flash: 429.
+- **A.8:** U1 = `u1` (id 8, clave `generated`); `admin` con los cinco grupos de IA y clave `not_generated`.
+  `demo` (6) y `portal` (7) existían, pero **archivados**: caso no previsto. Decisión de Sergio: desarchivarlos,
+  poner a `demo` una contraseña nueva y volver a archivarlos al terminar. Restos «Seges E3»: 0 / 0 / 0.
+  Decisión de Sergio: seguir sin comprobar la cuota en la consola de Google AI Studio.
 
 ### Antes de B
 
 - **Pasos previos 1 y 2 de D.0:** hechos el 03/11/2026 en el laboratorio (D.0, columna «Hecho»).
-- (pendiente: que el repo no tenga commits en los módulos después de `522ce6e`)
+- **Commits en los módulos después de `522ce6e`:** 0 (comprobado el 04/11/2026, paso 0).
 
 ### B. Despliegue
 
-- **B.4:** (pendiente)
-- **B.5:** (pendiente)
-- **B.6:** (pendiente)
-- **B.7 y B.8 (`-u`):** (pendiente)
-- **Arranque (reinicio):** (pendiente)
+- **B.1:** huella del archivo `34b1b023…f3d0`.
+- **B.2 a B.4:** huella igual en el VPS. 113 marcadores (por parche, 5, 2, 13, 4 y 14); las comprobaciones de
+  los cinco parches, conformes; 710 archivos, huella `6ac645fc…44e5`.
+- **B.5:** copia en `addons_antes_E3p`, con huella `7a6c7144…`.
+- **B.6:** el ensayo no listó bajas. Tras la sustitución, 710 archivos y huella `6ac645fc…`; `diff -rq` de 7
+  líneas (6 distintos + 1 nuevo + 0 bajas), todo de `pns_ai_chatboo`.
+- **B.7 y B.8 (`-u` de `pns_ai_chatboo`):** 0 errores y 0 «Deleting field». 3 `WARNING` conocidos: la
+  etiqueta «Client» de `ai.log` y los dos de `distutils`.
+- **Arranque (reinicio):** 2026-11-03 16:27:50 (`StartedAt` 2026-11-03T16:27:50.349009205Z). Log con 0
+  errores; `/web/login` 200 y `/mcp` 403.
 
 ### C. Comprobaciones posteriores
 
-(pendiente)
+C.1: `t f f t`. C.2: igual que A.4. C.3: no aplica.
 
 ### D. Pruebas
 
-- **D.0:** (pendiente)
-- **D.1 (seguridad):** (pendiente)
-- **D.2 (no regresión):** (pendiente)
-- **D.2b (medición después):** (pendiente)
-- **D.3 (limpieza):** (pendiente)
+- **D.0 (03/11):** `demo` y `portal` desarchivados; `demo` con contraseña nueva; clave MCP temporal de
+  `admin`. PT: usuario `e3p_portal` 26, contacto 59, ciudad hostil con comilla simple guardada, `write_uid`
+  26. Línea base: 39 sesiones, 0 páginas, 1576 filas de `ai_log` y `admin` con 1 compañía.
+- **`preparar`:** compañía 2, oculto 61, «admin sin la compañía ok», visible 62. Al crear los contactos
+  hostiles, Nginx devolvió **503** (`limit_req zone=odoo_login`, 5 r/min con ráfaga 5, en `/xmlrpc` y
+  `/web/login`). El script no captura `ProtocolError` y no guardó el estado. Los hostiles 63
+  (`</script>…`) y 64 (`<!--<script>`) se crearon a mano en la interfaz y el estado se escribió a mano;
+  «admin no ve el oculto», comprobado en la interfaz; el contacto de la compañía es el 60. **Desde entonces,
+  `preparar`, `rpc` y `limpiar` se hicieron por un túnel SSH al puerto 8169 del VPS (18169 en local)**, sin
+  tocar Nginx ni el script.
+- **D.2, R8 (+6a) y R-vis (03/11):** R8, sesión 49 de U1, diseñó `lite` (fila 1591), conforme; 6a todo f.
+  R-vis: sesión 50 de `admin` = `E3P_SESSION`, diseñó `lite` (fila 1605); páginas 49 y 50 correctas.
+- **D.1 (03/11):** P-8c y P-8h por el túnel, OK (P-8h, 11/11 por RPC y conforme en la interfaz). P-8d
+  oculto (sesión 51), OK. P-8d visible (sesión 52), no concluyente: fallaron los tres Gemini por cuota (3.6
+  flash con el límite diario gratuito de 20, «retry in 15h» a las 17:01; 3.5 flash, 429; `lite` falló hacia
+  las 17:16).
+- **Noche del 03/11:** Sergio volvió a archivar `demo` y `portal`.
+- **Paso 0 (04/11):** `StartedAt` sin cambios (sin reinicio). Datos íntegros: contactos 59 a 64, compañía 2,
+  páginas 1 y 4, sesiones 49 a 52, claves de `admin` y `u1` en `generated`, `admin` con 1 compañía. Último
+  `ai_log`, 1632. 0 commits en los módulos después de `522ce6e`. Script del repo y del equipo con
+  `c433305c…32e2`; estado con `page_admin` 1 y `page_demo_ui` 4; túnel, 200. **Cuota:** comprobada por el
+  uso: 3.6 flash respondió desde la primera prueba (fila 1634); un 503 momentáneo a las 11:12:23 (failover a
+  3.5 flash, fila 1654); la consola de AI Studio no se anotó.
+- **D.1 (04/11):** todas conformes.
+  - P-8d visible: sesión 53, `con_imagen` t; 3.6 flash (fila 1636).
+  - P-8e a: 5a (sesión 54), 5b (sesión 55) y 5c (sesión 56), sin alerta ni avisos y con `cierra_script` y
+    `comentario` f en las tres; 5c lo diseñó 3.5 flash tras el failover.
+  - 6c: sesión 55, `canvas_rev` 2; conforme. Design no copió los valores en crudo, así que el freno del
+    parche 29 no se vio actuar en este camino (cubierto en [lab_p29_3879.md](lab_p29_3879.md), 6c).
+  - 6d′: no aplica (A.6 sin ilegibles).
+  - 6e: contacto 65, sesión 57; conforme.
+  - Paso `http`: página 5. HTTP 200, prefijo CSP y `X-Frame-Options: SAMEORIGIN` en las cuatro rutas; en
+    las descargas la pone Nginx por la URL pública (D.1, fila 8). P-8e b, conforme en Firefox.
+  - 6b: sesión 50, `canvas_rev` 2, mismas cifras y fondo azul; conforme.
+- **D.2 (04/11):** R-desc y R-log conformes. R-log resuelve el «Sin confirmar»: solo el método inexistente
+  (P-8c1 y P-8c3) sale como `ERROR`.
+- **D.2b:** script `05af0d60…f16e`; `chatboo.session` 8 con diseño y 0 ilegibles; `chatboo.canvas.page` 3
+  con diseño y 0 ilegibles; lectores de portal 0 (`/tmp/pns_e3p_medir_despues.txt`).
+- **D.3 (limpieza, 04/11):**
+  - `limpiar` por el túnel: páginas `('ok', True)`, `admin con la compañía ok`, contactos `('ok', True)`,
+    `propiedades ok 1`, acción temporal `('ok', True)`, `admin sin la compañía ok` y compañía `('ok', True)`.
+  - A mano: archivados el contacto 60, el usuario 26, el contacto 59 y el contacto 65. La ciudad de 59: en
+    el primer guardado se sustituyó por «Madrid» (ya sin el valor hostil) y después se vació. Clave MCP de
+    `admin` revocada. `demo` y `portal`, archivados desde la noche del 03/11. Estado movido a
+    `~/staging_e3p/estado_e3p_staging.json`.
+  - Comprobación final: 0 / 0 / 0; `demo` y `portal` inactivos con el contacto activo (como en A.8);
+    `e3p_portal` inactivo, con el contacto inactivo y la ciudad vacía; `admin` con 1 compañía; clave de
+    `admin` en `not_generated` y sin hash; se conservan las 9 sesiones de prueba (49 a 57).
 
-**Resultado:** (pendiente)
+**Resultado:** E3′ y el parche 29 **validados en el staging `pns_demo`** (parches 25 a 29). R8 de E1′,
+cerrada. Desviaciones sin efecto en la seguridad: el `X-Frame-Options` que Nginx añade a las descargas por
+la URL pública, y la ciudad de PT corregida en D.3.
 
 ### Correcciones del procedimiento
 
-(pendiente)
+Anotadas aquí; los pasos de A a D no se han cambiado.
+
+- **Límite de Nginx en `/xmlrpc`** (5 r/min, ráfaga 5): `preparar`, `rpc` y `limpiar`, por el túnel SSH
+  (18169 en local).
+- **`demo` y `portal` archivados:** el documento solo preveía «existen» o «no existen».
+- **«Design» ya activa en los tres Gemini** (el paso 1 de D.0 no hizo falta).
+- **`E3P_SESSION` también en el VPS:** lo dice D.0, pero no estaba en el paso 0 del traspaso.
+- **Confusión de terminales:** las consultas, en el VPS; el script y el `scp`, en el equipo.
+- **Cuota:** con el nivel gratuito, unos 13 turnos de diseño no caben en un día si antes se ha usado el
+  laboratorio.
+- **`X-Frame-Options` en las descargas:** lo añade Nginx en la URL pública; lo que pone Odoo se ve por el
+  túnel o en el código.
+- **Textos de Firefox:** muestra la CSP como «La configuración de la página bloqueó…» (el documento usa los
+  textos de Chrome).
+- **D.3, PT:** comprobar `ciudad_vacia`; los contactos archivados se editan con el filtro «Archivado».
+- **No repetir el paso `http` para comparar:** crea otra página y sobrescribe `page_net` en el estado.
 
 ### Observaciones para E4′
 
-(pendiente)
+Anotadas también en el [plan de corrección](plan_correccion_pns_ai_3879.md), «E4′ (hoja de Medios y
+Bajos)»:
+
+- Toda la tarde del 03/11 diseñó `lite`; el 04/11, 3.6 flash (y 3.5 flash en 5c).
+- La tarjeta de `lite` pinta la ruta de P-8d como «[object Object]».
+- `pruebas_e3p_lab.py` no resiste un 503: termina sin guardar el estado (valorar capturar
+  `xmlrpc.client.ProtocolError` y guardar tras cada creación).
+- Dos llamadas a Design por edición (6c y 6b: «changed» y después «laid out again»).
+- El chat llama a `relaxaicode` aunque se le pida no consultar datos (6b).
+- `ai_log` no guarda el detalle del error del proveedor en el failover (fila 1654); solo está en el log de
+  Odoo.
+- El validador AST rechaza `dir()` (fila 1668): funciona como debe; se anota por el tiempo extra.
+- La casilla «Design» en `lite` (excepción de esta subida).
 
 ### Restos para la limpieza final (no se borran ahora)
 
-(pendiente)
+- **`pns_demo`:** sesiones 49 a 57; contactos archivados 59, 60 y 65; usuario `e3p_portal` (26) archivado;
+  casillas «Design» de los tres Gemini.
+- **`/opt/odoo/pns_staging`:** `addons_antes_E1`, `addons_antes_E2`, `addons_antes_E1p`, `addons_antes_E2p`
+  y `addons_antes_E3p`, y `addons_27cadbb`, `addons_27cadbb_b` y `addons_95d6b1a`. Disco al 87 %.
+- **`/tmp` del VPS:** `pns_u_E3p.log`, `pns_diff_E3p.txt`, `pns_e3p_medir_antes.txt`,
+  `pns_e3p_medir_despues.txt` y `medir_data_ilegible.py` (se borran después de este [DOC]).

@@ -111,7 +111,7 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 | 12 (adaptado) | PNS-01, PNS-02 | seguridad | `pns_ai_mcp/models/ai_system_action.py`, `pns_ai_mcp/utils/privilege_cusp.py` | E1′ | Validado en staging (26/10/2026) |
 | 13 | M10 | seguridad | `pns_ai_mcp/models/safe_operation.py` | E1′ | Validado en staging (26/10/2026) |
 | 14 | M13 | seguridad | `pns_ai_mcp/models/ai_context_disk.py` | E1′ | Validado en staging (26/10/2026) |
-| 15 | PNS-07 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | E1′ | Validado en staging (26/10/2026); R8 (lienzo) no concluyente por el proveedor (27/10/2026); R8 OK en el laboratorio de E3′ (30/10/2026), con un defecto previo del fabricante: la muestra para Design lleva `keys` y el DATA real (`_flat_rows`) no; los diseños que dependen de `keys` salen vacíos y los salva la tabla de rescate (para E4′) |
+| 15 | PNS-07 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | E1′ | Validado en staging (26/10/2026); R8 (lienzo) no concluyente por el proveedor (27/10/2026); R8 OK en el laboratorio de E3′ (30/10/2026), con un defecto previo del fabricante: la muestra para Design lleva `keys` y el DATA real (`_flat_rows`) no; los diseños que dependen de `keys` salen vacíos y los salva la tabla de rescate (para E4′); R8 validada en el staging de E3′ (03/11/2026) |
 | 16 | PNS-54 | seguridad | `pns_ai_mcp/models/safe_operation.py` | E1′ | Validado en staging (26/10/2026) |
 | 11 (adaptado) | PNS-82 | seguridad | `pns_ai_chatboo/models/chatboo_session.py` | E2′ | Aplicado; tests en verde (27/10/2026) |
 | 17 | PNS-37 | seguridad | `pns_ai_mcp/models/ai_change_journal.py`, `pns_ai_mcp/controllers/safe_plan.py` | E2′ | Aplicado; tests en verde (27/10/2026); P-37 y P-37b pendientes |
@@ -121,11 +121,11 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 | 21 | PNS-20 | seguridad | `pns_base/models/operation_report_wizard.py` | E2′ | Aplicado; `clear_caches()` tras la revisión; tests en verde (27/10/2026); P-20 repetida pendiente |
 | 22 | PNS-100 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | E2′ | Aplicado; tests en verde (27/10/2026) |
 | 23 | PNS-101 | seguridad | `pns_ai_mcp/controllers/validators_base.py`, `pns_ai_mcp/controllers/validators.py`, `pns_ai_mcp/controllers/context_builder.py` | E2′ | Aplicado; tests en verde (27/10/2026); P-101 pendiente |
-| 25 | M1 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | E3′ | Aplicado; aprobado en revisión (29/10/2026); validado en laboratorio (30/10/2026): P-8c OK |
-| 26 | M2 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | E3′ | Aplicado; aprobado en revisión (29/10/2026); validado en laboratorio (30/10/2026): P-8d OK |
-| 27 | F1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/controllers/chatboo.py` | E3′ | Aplicado; aprobado en revisión (29/10/2026; el 27 b, rehecho tras B1); P-8e b y X-Frame-Options OK en laboratorio (30/10/2026); P-8e a falló → parche 29 |
-| 28 | D1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas_page.py`, `pns_ai_chatboo/security/security.xml` | E3′ | Aplicado; aprobado en revisión (29/10/2026); validado en laboratorio (30/10/2026): P-8h OK |
-| 29 | F1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_session.py` | E3′ | Aplicado; aprobado en revisión (30/10/2026); validado en laboratorio (03/11/2026) |
+| 25 | M1 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | E3′ | Validado en staging (04/11/2026) |
+| 26 | M2 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | E3′ | Validado en staging (04/11/2026) |
+| 27 | F1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/controllers/chatboo.py` | E3′ | Validado en staging (04/11/2026) |
+| 28 | D1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas_page.py`, `pns_ai_chatboo/security/security.xml` | E3′ | Validado en staging (04/11/2026) |
+| 29 | F1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_session.py` | E3′ | Validado en staging (04/11/2026) |
 
 Parches 11 adaptado y 17 a 22 (E2′, 27/10/2026): aplicados, con tests y neutralización hechos; pruebas
 manuales del laboratorio pendientes ([lab_e2_3879.md](lab_e2_3879.md)). Tras la revisión del mismo día:
@@ -136,7 +136,9 @@ de la rama 14.0-pns-ai-3879 (E2′)».
 Parches 25 a 28 (E3′): validados en el laboratorio el 30/10/2026 ([lab_e3_3879.md](lab_e3_3879.md)); P-8c,
 P-8d, P-8h, P-8e b y X-Frame-Options OK. P-8e a falló y dio lugar al parche 29
 ([e3_hallazgo_p8ea_3879.md](e3_hallazgo_p8ea_3879.md)), validado en el laboratorio el 03/11/2026
-([lab_p29_3879.md](lab_p29_3879.md)). Entradas más abajo, en «Parches de la rama 14.0-pns-ai-3879 (E3′)».
+([lab_p29_3879.md](lab_p29_3879.md)). Parches 25 a 29, validados en el staging `pns_demo` el 04/11/2026
+(commit `522ce6e`; [staging_e3_3879.md](staging_e3_3879.md) y [verificación](verificacion_seguridad_pns_ai.md),
+«Staging — entrega E3′ (03 y 04/11/2026)»). Entradas más abajo, en «Parches de la rama 14.0-pns-ai-3879 (E3′)».
 
 Parches 10, 12 y 13 a 16 (E1′): validados en laboratorio el 23/10/2026 y en el staging `pns_demo` el 26/10/2026, con el cambio de base
 (commit `0366231`; [staging_e1_3879.md](staging_e1_3879.md) y
@@ -2794,3 +2796,5 @@ se puede distinguir del del servidor sin las filas de ese turno, así que no se 
 - **Estado:** parche 29 **aprobado** el 30/10/2026; commits `a3762ec`, `522ce6e` y `bdb9dda` (30/10/2026).
   **Validado en laboratorio el 03/11/2026** ([lab_p29_3879.md](lab_p29_3879.md);
   [e3_hallazgo_p8ea_3879.md](e3_hallazgo_p8ea_3879.md), apartado 6). Siguiente: el staging.
+  **Validado en staging el 04/11/2026**, con los parches 25 a 28 (commit `522ce6e` en `pns_demo`;
+  [staging_e3_3879.md](staging_e3_3879.md), apartado G).

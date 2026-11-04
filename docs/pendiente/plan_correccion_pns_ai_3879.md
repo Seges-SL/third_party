@@ -9,8 +9,7 @@
 - **Registro de los cambios en el código:** [parches_pns_ai.md](parches_pns_ai.md).
 - **Plan anterior:** [plan_correccion_pns_ai.md](plan_correccion_pns_ai.md) (base 3.1.782), referencia
   de la rama `14.0-pns-ai-correcciones`.
-- **Estado del plan:** E3′ validada en laboratorio (30/10/2026; P-8e a, con el parche 29, el 03/11/2026);
-  siguiente, el staging de E3′. Registro: aprobado (23/10/2026); E0′ terminada el 23/10/2026: parte A (tests) validada en
+- **Estado del plan:** E3′ validada en staging (04/11/2026; `522ce6e` en `pns_demo`); siguiente, E4′. Registro: aprobado (23/10/2026); E0′ terminada el 23/10/2026: parte A (tests) validada en
   laboratorio y diagnóstico de PNS-70 hecho ([pns70_diagnostico_3879.md](pns70_diagnostico_3879.md)).
   Rama `14.0-pns-ai-3879` publicada el 23/10/2026 (desde `dafb316`). Siguiente: E1′.
   E1′ validada en laboratorio el 23/10/2026 (parches 10 y 12 adaptados y 13 a 16); siguiente: subida al
@@ -42,6 +41,8 @@
   P-8e b y `X-Frame-Options` OK; P-8e a falla ([e3_hallazgo_p8ea_3879.md](e3_hallazgo_p8ea_3879.md)).
   Parche 29 implementado, aprobado y publicado el 30/10/2026 (`a3762ec`, `522ce6e` y `bdb9dda`); laboratorio
   del parche 29 el 03/11/2026 ([lab_p29_3879.md](lab_p29_3879.md)): validado. Siguiente: el staging de E3′.
+  E3′ validada en staging el 03 y 04/11/2026 (`522ce6e` en `pns_demo`; R8 de E1′ cerrada);
+  [staging_e3_3879.md](staging_e3_3879.md), apartado G. Siguiente: E4′.
 
 ## 1. Cómo se trabaja
 
@@ -71,9 +72,9 @@
 | Entrega | Contenido | Parches | Estado |
 |---|---|---|---|
 | **E0′** (previa) | `test_seges_*` adaptados; esqueleto de tests de Chatboo; datos de prueba de `test_change_journal` y `test_paap_core`; línea base nueva; diagnóstico de PNS-70 (solo lectura) | — | Parte A (tests): validada en laboratorio (23/10/2026). Diagnóstico de PNS-70: hecho (23/10/2026) |
-| **E1′** | Críticos y Altos baratos: M10 con el parche 12 adaptado, PNS-54, PNS-07, M13, `collect_pin` (PNS-83) | 10 y 12 adaptados; 13 (M10), 14 (M13), 15 (PNS-07) y 16 (PNS-54) | Validada en laboratorio (23/10/2026) y en staging (26/10/2026); cerrada el 27/10/2026, con R8 no concluyente por el proveedor (se valida en E3′); R8 OK en el laboratorio de E3′ (30/10/2026), con el defecto de `keys` del fabricante (hoja de E4′) |
+| **E1′** | Críticos y Altos baratos: M10 con el parche 12 adaptado, PNS-54, PNS-07, M13, `collect_pin` (PNS-83) | 10 y 12 adaptados; 13 (M10), 14 (M13), 15 (PNS-07) y 16 (PNS-54) | Validada en laboratorio (23/10/2026) y en staging (26/10/2026); cerrada el 27/10/2026, con R8 no concluyente por el proveedor (se valida en E3′); R8 OK en el laboratorio de E3′ (30/10/2026), con el defecto de `keys` del fabricante (hoja de E4′); R8 validada en el staging de E3′ (03/11/2026) |
 | **E2′** | Resto de Altos: papelera del diario (PNS-37), PNS-19, PNS-17, PNS-82, PNS-70; PNS-20 (confirmado por P-20); PNS-100 y PNS-101 (nuevos) | 11 adaptado; 17 (PNS-37), 18 (PNS-19), 19 (PNS-17), 20 (PNS-70), 21 (PNS-20), 22 (PNS-100), 23 (PNS-101, ampliado) y 24 (PNS-102) | Aplicada (27/10/2026): tests en verde y neutralización hecha; parche 18 corregido tras la revisión y parche 23 nuevo (27/10/2026). **Aprobada en revisión (28/10/2026)** con la herramienta real (vía A, shell; vía B, `/mcp`): las dos evasiones críticas, cerradas. Validada en laboratorio (28/10/2026). **Validada en staging (29/10/2026)**: commit `9a2970d` ([staging_e2_3879.md](staging_e2_3879.md), apartado G) |
-| **E3′** | Lienzo: M1, M2, F1 y D1 (D1 pasa de E4′ a E3′: decisión de Sergio del 29/10/2026) | 25 (M1), 26 (M2), 27 (F1) y 28 (D1); la ventana del parche 18 se mantiene; 29 (F1, P-8e a, 30/10/2026) | **Aplicada (29/10/2026)**: tests en verde y neutralización hecha; rechazada en la primera revisión (B1, parche 27 b) y corregida; **aprobada en revisión (29/10/2026)**; pruebas manuales del laboratorio hechas el 30/10/2026 ([lab_e3_3879.md](lab_e3_3879.md)); P-8e a falló y se corrigió con el parche 29, validado en laboratorio el 03/11/2026 ([lab_p29_3879.md](lab_p29_3879.md)); staging pendiente |
+| **E3′** | Lienzo: M1, M2, F1 y D1 (D1 pasa de E4′ a E3′: decisión de Sergio del 29/10/2026) | 25 (M1), 26 (M2), 27 (F1) y 28 (D1); la ventana del parche 18 se mantiene; 29 (F1, P-8e a, 30/10/2026) | **Aplicada (29/10/2026)**: tests en verde y neutralización hecha; rechazada en la primera revisión (B1, parche 27 b) y corregida; **aprobada en revisión (29/10/2026)**; pruebas manuales del laboratorio hechas el 30/10/2026 ([lab_e3_3879.md](lab_e3_3879.md)); P-8e a falló y se corrigió con el parche 29, validado en laboratorio el 03/11/2026 ([lab_p29_3879.md](lab_p29_3879.md)). **Validada en staging (04/11/2026)**: commit `522ce6e` ([staging_e3_3879.md](staging_e3_3879.md), apartado G) |
 | **E4′** | Hoja de Medios y Bajos (corregir o aceptar); después, lo elegido | Nuevos, si se corrige algo | Pendiente |
 
 Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`; línea de 3.1.879).
@@ -332,6 +333,16 @@ Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`;
   - Lectores de portal ya guardados en páginas compartidas (observación m3 de la revisión de E3′, parche
     28), solo `SELECT`, en el staging y en LIYBEN:
     `SELECT count(*) FROM chatboo_canvas_page_user_rel r JOIN res_users u ON u.id = r.user_id WHERE u.share;`
+- **Validación en staging (03 y 04/11/2026): VALIDADA.** Commit `522ce6e` en `pns_demo`, con `-u` de
+  `pns_ai_chatboo`, sin errores en el log.
+  - D.1: P-8c, P-8h (RPC e interfaz), P-8d, P-8e a (5a, 5b y 5c), 6c, 6e, P-8e b y `X-Frame-Options`, y 6b,
+    todas OK; 6d′ no aplica (ningún `DATA` ilegible guardado). En las descargas, `X-Frame-Options` lo añade
+    Nginx por la URL pública (sin efecto en la seguridad).
+  - D.2: R8 (cierra la de E1′), R-vis, R-desc y R-log conformes. Mediciones antes y después: 0 ilegibles y 0
+    lectores de portal.
+  - Detalle en [staging_e3_3879.md](staging_e3_3879.md), apartado G, y en la
+    [verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E3′ (03 y 04/11/2026)». Observaciones
+    nuevas para E4′, en su tabla.
 
 ### E4′ (hoja de Medios y Bajos)
 
@@ -368,10 +379,15 @@ corrige lo elegido.
 | Casilla AI Conversational en Usuarios MCP (staging E2′, 29/10/2026) | [Staging E2′](staging_e2_3879.md), D.0 y D.1 (P-37b) | `models/mcp_user.py:152-181` (casillas de grupos AI; `is_ai_conversational` en `:174-181`, con `_inverse_is_ai_conversational` en `:310-312`). **Fallo de la casilla `is_ai_conversational`:** Sergio confirma que la marcó y guardó la ficha de `e2p_writer` y el grupo no cambió; el grupo se puso desde la ficha del usuario. Código de fábrica. **Candidata al informe al fabricante** |
 | Defecto de `keys` en la muestra para Design (laboratorio de E3′, 30/10/2026) | [Laboratorio de E3′](lab_e3_3879.md), R8; [registro](parches_pns_ai.md), parche 15 | `pns_ai_chatboo/models/chatboo_canvas.py:889` (`sample_figures_for_design`) da a Design las filas con `keys`, y el DATA que escribe el servidor (`_flat_rows`, `:1487`) no las lleva: los diseños que dependen de `keys` salen vacíos y los salva la tabla de rescate. Código de fábrica, previo a los parches. **Candidata al informe al fabricante** |
 | Nombre de la descarga del lienzo (laboratorio de E3′, 30/10/2026) | [Laboratorio de E3′](lab_e3_3879.md), comprobación visual (2) | `pns_ai_chatboo/controllers/chatboo.py:1292-1299`: la descarga del lienzo usa `download_filename(session.canvas_title, …)` y sale con el nombre de la sesión, no con el de la página. Funcional |
-| Casilla «Design» en Gemini 3.5 flash lite (laboratorio del parche 29, 03/11/2026) | [Laboratorio del parche 29](lab_p29_3879.md), «Estado del laboratorio al terminar» | Datos de `lab_pns_ai_3879_14`: el proveedor 4 (lite) no tenía «Design» el 30/10/2026 ([laboratorio de E3′](lab_e3_3879.md), 0.2) y sí el 03/11/2026. R8 se hace con un modelo de diseño que no sea `lite` (decisión 6 de la [propuesta de E3′](e3_propuesta_3879.md), «Propuesta final (29/10/2026)»; apartado E3′ de este plan). Se deja para E4′ por decisión de Sergio: decidir si se quita aquí y cómo queda en el staging y en LIYBEN |
+| Casilla «Design» en Gemini 3.5 flash lite (laboratorio del parche 29, 03/11/2026) | [Laboratorio del parche 29](lab_p29_3879.md), «Estado del laboratorio al terminar»; [staging de E3′](staging_e3_3879.md), G (toda la tarde del 03/11/2026 diseñó `lite`; el 04/11, 3.6 flash, y 3.5 flash en 5c) | Datos de `lab_pns_ai_3879_14`: el proveedor 4 (lite) no tenía «Design» el 30/10/2026 ([laboratorio de E3′](lab_e3_3879.md), 0.2) y sí el 03/11/2026. R8 se hace con un modelo de diseño que no sea `lite` (decisión 6 de la [propuesta de E3′](e3_propuesta_3879.md), «Propuesta final (29/10/2026)»; apartado E3′ de este plan). Se deja para E4′ por decisión de Sergio: decidir si se quita aquí y cómo queda en el staging y en LIYBEN |
 | El chat afirma cambios que no hizo (laboratorios de E3′ y del parche 29) | [Laboratorio del parche 29](lab_p29_3879.md), 6d′; [laboratorio de E3′](lab_e3_3879.md), P-8d; relacionado con PNS-96 | Tras un rechazo o un fallo del lienzo, `log_no_page` (`pns_ai_chatboo/models/chatboo_canvas.py:646`) devuelve `''` y el turno sigue: el chat respondió «He actualizado el color de fondo…» o «Se ha generado la página» sin página nueva. El usuario no se entera del rechazo; método: a determinar |
-| Tres llamadas a Design por edición (laboratorio del parche 29, 03/11/2026) | [Laboratorio del parche 29](lab_p29_3879.md), 6b, 6d y 6d′ | `pns_ai_chatboo/models/chatboo_session.py:1055` (`_paint_canvas`): `changed the page` (`:1119`) y dos `laid out the page again` (`:1141` y `:1179`) para un solo guardado. Coste y tiempo; con la cuota de Gemini agotada, todo lo hizo lite |
+| Tres llamadas a Design por edición (laboratorio del parche 29, 03/11/2026) | [Laboratorio del parche 29](lab_p29_3879.md), 6b, 6d y 6d′; en el [staging de E3′](staging_e3_3879.md), D.1 (6c y 6b), dos: «changed» y después «laid out again» | `pns_ai_chatboo/models/chatboo_session.py:1055` (`_paint_canvas`): `changed the page` (`:1119`) y dos `laid out the page again` (`:1141` y `:1179`) para un solo guardado. Coste y tiempo; con la cuota de Gemini agotada, todo lo hizo lite |
 | El orquestador reinterpreta peticiones cortas de edición (laboratorio del parche 29, 03/11/2026) | [Laboratorio del parche 29](lab_p29_3879.md), 6d | «pon el fondo azul» sobre un lienzo abierto se convirtió en una página nueva (otra consulta y otra página) en lugar de una edición. Orquestador del chat; método: a determinar |
+| La tarjeta de `lite` pinta la ruta de una imagen como «[object Object]» (staging de E3′, 03/11/2026) | [Staging de E3′](staging_e3_3879.md), D.1 (P-8d, oculto) | Sesión 51: con la imagen del contacto oculto rechazada (parche 26), la ruta queda como texto y la tarjeta que diseñó `lite` la muestra como «[object Object]». Funcional; método: a determinar |
+| `pruebas_e3p_lab.py` no resiste un 503 (staging de E3′, 03/11/2026) | [Staging de E3′](staging_e3_3879.md), D.0 (`preparar`) | [`scripts_e3/pruebas_e3p_lab.py`](scripts_e3/pruebas_e3p_lab.py): con el 503 del límite de Nginx en `/xmlrpc`, termina sin guardar el estado. Script de Seges, no código de fábrica: valorar capturar `xmlrpc.client.ProtocolError` y guardar el estado tras cada creación |
+| El chat llama a `relaxaicode` aunque se le pida no consultar datos (staging de E3′, 04/11/2026) | [Staging de E3′](staging_e3_3879.md), D.1 (6b) | Fila 1676 de `ai_log`, con el mensaje acotado «sin volver a consultar datos». Orquestador del chat; método: a determinar |
+| `ai_log` no guarda el detalle del error del proveedor en el failover (staging de E3′, 04/11/2026) | [Staging de E3′](staging_e3_3879.md), D.1 (5c) | Fila 1654: el HTTP 503 de Gemini 3.6 flash solo está en el log de Odoo (11:12:23). Diagnóstico; método: a determinar |
+| El validador AST rechaza `dir()` (staging de E3′, 04/11/2026) | [Staging de E3′](staging_e3_3879.md), D.1 (6e) | Fila 1668, «AST Validation Error: [PROHIBITED:DIR]»: el validador funciona como debe y el modelo lo corrigió en la segunda ronda. Se anota por el tiempo extra del turno |
 
 `iap.account.account_token` legible por cualquier usuario interno: observación del core de Odoo (ACL
 estándar), sin parche; en la caja A lo cubre el parche 18 (decisión de Sergio del 27/10/2026).

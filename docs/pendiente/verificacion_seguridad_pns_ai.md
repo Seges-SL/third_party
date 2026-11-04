@@ -2031,6 +2031,13 @@ Sergio con Claude; horas en UTC. Lienzo, como U1.
 **Resultado de E1′ en staging:** cerrada el 27/10/2026, con la salvedad de R8. Parches 10 y 12 a 16
 validados en staging.
 
+### R8, validada en el staging de E3′ (03/11/2026)
+
+R8 de E1′, **cerrada: conforme.** U1, sesión 49: página creada y vista (`canvas_open` t, `canvas_rev` 1;
+`ai_log` 1591, «Design laid out the page in 9 s»). La diseñó `gemini-3.5-flash-lite`, con la casilla
+«Design» activa en los tres Gemini (excepción de esa subida). Detalle en «Staging — entrega E3′ (03 y
+04/11/2026)» y en [staging_e3_3879.md](staging_e3_3879.md), D.2.
+
 ## Laboratorio — entrega E2′ (27/10/2026)
 
 Laboratorio `lab_pns_ai_3879` (BD `lab_pns_ai_3879_14`), rama `14.0-pns-ai-3879`; horas en UTC. Propuesta:
@@ -2126,3 +2133,39 @@ limpieza: [staging_e2_3879.md](staging_e2_3879.md), columnas «Obtenido» y «Re
 
 **Resultado de E2′ en staging:** parches 11 (adaptado) y 17 a 24 validados en staging el 29/10/2026.
 P-37b, que en el laboratorio solo cubría el test, queda confirmada a mano.
+
+## Staging — entrega E3′ (03 y 04/11/2026)
+
+Sergio con Claude; horas en UTC. Commit `522ce6e` de `14.0-pns-ai-3879` desplegado en `pns_demo` con `-u`
+de `pns_ai_chatboo` (reinicio 2026-11-03 16:27:50). Procedimiento, comprobaciones previas, despliegue,
+mediciones, no regresión (D.2) y limpieza: [staging_e3_3879.md](staging_e3_3879.md), columnas «Obtenido» y
+«Resultado de la subida (03 y 04/11/2026)».
+
+| # | Prueba | Parche (PNS) | Quién / cómo | Resultado |
+|---|---|---|---|---|
+| 1 | P-8c: `paint_canvas` y `_paint_canvas` por RPC | 25 (M1) | ADM y DEMO, `pruebas_e3p_lab.py rpc`, por el túnel SSH | **OK**: P-8c1 y P-8c3, «method 'paint_canvas' does not exist»; P-8c2, «Private methods…»; P-8c4, `canvas_rev` 1 antes y después (sesión 50) |
+| 2 | P-8h: páginas compartidas por RPC, casos 1 a 11 | 28 (D1) | ADM y DEMO, mismo paso | **OK**, 11/11: P-8h2 y P-8h6, «Only the system can change the owner…»; P-8h3, «…internal users.»; P-8h8 a P-8h10, denegados |
+| 2b | P-8h en la interfaz (AI › Security › Shared pages) | 28 (D1) | ADM, navegador | **OK**: en la página 4 (de `demo`), «Stop sharing» y el título se deniegan; en la 1 (de `admin`), «Stop sharing» funciona. Ningún dueño cambiado ni lector de portal |
+| 3 | P-8d: imagen de un contacto oculto y control con el visible | 26 (M2) | ADM, Chatboo | **OK**: oculto, sesión 51, `con_imagen` f (03/11); visible, sesión 53, `con_imagen` t y foto visible (04/11; la 52, del 03/11, no concluyente por cuota) |
+| 4 | P-8e a: 5a, 5b y 5c (5c con la ciudad hostil que guardó un usuario de portal) | 27 a y 29 (F1) | ADM, Chatboo, F12 | **OK**: sin alerta; `cierra_script` y `comentario` f en las tres; `escapado` t en las tres y `comentario_escapado` t en 5b (sesiones 54 a 56) |
+| 5 | 6c: rehacer como tarjetas (camino del fulfill) | 29 (F1) | ADM, sesión de 5b | **Conforme**: `canvas_rev` 2, `cierra_script` f. Design no copió los valores en crudo: el freno del parche 29 no se vio actuar en este camino (cubierto en [lab_p29_3879.md](lab_p29_3879.md), 6c) |
+| 6 | 6d′: edición de un lienzo guardado con `DATA` ilegible | 29 (F1) | — | **No aplica**: A.6 sin ilegibles |
+| 7 | 6e: contacto `Seges E3 "P29"` | 27 a (F1) | ADM | **OK**: el nombre se ve con sus comillas; `cierra_script` f (sesión 57) |
+| 8 | P-8e b y `X-Frame-Options`: carcasa, página compartida y sus descargas | 27 b y d (F1) | ADM, `pruebas_e3p_lab.py http` y Firefox | **OK**: HTTP 200 y prefijo CSP en las cuatro rutas; recursos externos bloqueados por la CSP; «script en linea: ok». Desviación sin efecto en la seguridad: en las descargas, `X-Frame-Options: SAMEORIGIN` lo pone Nginx por la URL pública; que Odoo no la pone se comprueba en el código de `522ce6e` (`chatboo.py` l. 1157 y l. 1250) |
+| 9 | 6b: cambiar el fondo de una página guardada | 29 (F1) | ADM, sesión 50 (`E3P_SESSION`) | **OK**: `canvas_rev` 1 → 2, mismas cifras, `pagina_rescate` f |
+
+- **Mediciones (A.6 y D.2b):** antes, 0 lienzos y 0 páginas con diseño, ninguno ilegible; después, 8
+  lienzos y 3 páginas, todos de las pruebas, ninguno ilegible. Lectores de portal guardados (m3): 0 antes y
+  después.
+- **No regresión (D.2):** R8 (cierra la de E1′), R-vis, R-desc y R-log conformes. Log: solo 429 y 503 de
+  Gemini y los dos «method 'paint_canvas' does not exist» de P-8c1 y P-8c3; P-8c2 y los rechazos de P-8h no
+  salen como `ERROR`.
+- **Proveedor:** el 03/11 diseñó `lite` (cuota agotada en 3.6 flash); el 04/11, 3.6 flash, y 3.5 flash en 5c
+  tras un 503.
+- **Limpieza:** datos de `preparar` borrados; contactos 59, 60 y 65 y usuario `e3p_portal` archivados (la
+  ciudad hostil de PT, vaciada); `demo` y `portal` archivados de nuevo; clave MCP temporal de `admin`
+  revocada (sin hash); `admin` con 1 compañía. Restos para la limpieza final, en el documento de staging.
+- **Desviaciones sin efecto en la seguridad:** el `X-Frame-Options` de Nginx en las descargas por la URL
+  pública, y la ciudad de PT corregida en D.3.
+
+**Resultado de E3′ en staging:** parches 25 a 29 validados en staging el 04/11/2026. R8 de E1′, cerrada.
