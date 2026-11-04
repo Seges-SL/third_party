@@ -1122,3 +1122,10 @@ Bajos)»:
   y `addons_antes_E3p`, y `addons_27cadbb`, `addons_27cadbb_b` y `addons_95d6b1a`. Disco al 87 %.
 - **`/tmp` del VPS:** `pns_u_E3p.log`, `pns_diff_E3p.txt`, `pns_e3p_medir_antes.txt`,
   `pns_e3p_medir_despues.txt` y `medir_data_ilegible.py` (se borran después de este [DOC]).
+- **`/tmp` del VPS, comprobado con `ls` el 04/11/2026 (no se borran ahora):** siguen los de E1/E1′ y E2′
+  anotados en [staging_e2_3879.md](staging_e2_3879.md), «Restos para la limpieza final». Por su nombre:
+  `pns_addons_27cadbb.tar.gz`, `pns_addons_63ee2dc.tar.gz` y `pns_addons_95d6b1a.tar.gz` (plan de staging,
+  §9, punto 4), `pns_p9_antes_E1p.txt` y `pns_p9_despues_E1p.txt`. `pns_liyben.snip`: no consta qué es;
+  **revisar antes de borrar**. Los cinco de E3′ (`pns_u_E3p.log`, `pns_diff_E3p.txt`,
+  `pns_e3p_medir_antes.txt`, `pns_e3p_medir_despues.txt` y `medir_data_ilegible.py`) se borraron el
+  04/11/2026 a las 16:07 UTC, después del commit `fcbeebd` (`rm -v`; comprobado con `ls`).

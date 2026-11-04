@@ -113,14 +113,15 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 | 14 | M13 | seguridad | `pns_ai_mcp/models/ai_context_disk.py` | E1′ | Validado en staging (26/10/2026) |
 | 15 | PNS-07 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | E1′ | Validado en staging (26/10/2026); R8 (lienzo) no concluyente por el proveedor (27/10/2026); R8 OK en el laboratorio de E3′ (30/10/2026), con un defecto previo del fabricante: la muestra para Design lleva `keys` y el DATA real (`_flat_rows`) no; los diseños que dependen de `keys` salen vacíos y los salva la tabla de rescate (para E4′); R8 validada en el staging de E3′ (03/11/2026) |
 | 16 | PNS-54 | seguridad | `pns_ai_mcp/models/safe_operation.py` | E1′ | Validado en staging (26/10/2026) |
-| 11 (adaptado) | PNS-82 | seguridad | `pns_ai_chatboo/models/chatboo_session.py` | E2′ | Aplicado; tests en verde (27/10/2026) |
-| 17 | PNS-37 | seguridad | `pns_ai_mcp/models/ai_change_journal.py`, `pns_ai_mcp/controllers/safe_plan.py` | E2′ | Aplicado; tests en verde (27/10/2026); P-37 y P-37b pendientes |
-| 18 | PNS-19 | seguridad | `pns_ai_mcp/models/box_a_guard.py` (nuevo), `pns_ai_mcp/models/__init__.py`, `pns_ai_mcp/controllers/tools_relaxaicode.py`, `pns_ai_chatboo/models/chatboo_session.py` (ventana del lienzo) | E2′ | Aplicado; rechazado en la revisión y corregido (27/10/2026: alias, ids, caché); tests en verde; P-19 pendiente |
-| 19 | PNS-17 | seguridad | `pns_ai_mcp/utils/fetch_url_safe.py`, `pns_ai_mcp/utils/mcp_client.py` | E2′ | Aplicado; tests en verde (27/10/2026); P-17 manual pendiente |
-| 20 | PNS-70 | compatibilidad | `pns_ai_chatboo/static/src/js/chart.umd.min.js`, `pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js` | E2′ | Aplicado (27/10/2026); sin test Python; P-70 pendiente |
-| 21 | PNS-20 | seguridad | `pns_base/models/operation_report_wizard.py` | E2′ | Aplicado; `clear_caches()` tras la revisión; tests en verde (27/10/2026); P-20 repetida pendiente |
-| 22 | PNS-100 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | E2′ | Aplicado; tests en verde (27/10/2026) |
-| 23 | PNS-101 | seguridad | `pns_ai_mcp/controllers/validators_base.py`, `pns_ai_mcp/controllers/validators.py`, `pns_ai_mcp/controllers/context_builder.py` | E2′ | Aplicado; tests en verde (27/10/2026); P-101 pendiente |
+| 11 (adaptado) | PNS-82 | seguridad | `pns_ai_chatboo/models/chatboo_session.py` | E2′ | Validado en staging (29/10/2026) |
+| 17 | PNS-37 | seguridad | `pns_ai_mcp/models/ai_change_journal.py`, `pns_ai_mcp/controllers/safe_plan.py` | E2′ | Validado en staging (29/10/2026) |
+| 18 | PNS-19 | seguridad | `pns_ai_mcp/models/box_a_guard.py` (nuevo), `pns_ai_mcp/models/__init__.py`, `pns_ai_mcp/controllers/tools_relaxaicode.py`, `pns_ai_chatboo/models/chatboo_session.py` (ventana del lienzo) | E2′ | Validado en staging (29/10/2026) |
+| 19 | PNS-17 | seguridad | `pns_ai_mcp/utils/fetch_url_safe.py`, `pns_ai_mcp/utils/mcp_client.py` | E2′ | Validado en staging (29/10/2026) |
+| 20 | PNS-70 | compatibilidad | `pns_ai_chatboo/static/src/js/chart.umd.min.js`, `pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js` | E2′ | Validado en staging (29/10/2026) |
+| 21 | PNS-20 | seguridad | `pns_base/models/operation_report_wizard.py` | E2′ | Validado en staging (29/10/2026) |
+| 22 | PNS-100 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | E2′ | Validado en staging (29/10/2026) |
+| 23 | PNS-101 | seguridad | `pns_ai_mcp/controllers/validators_base.py`, `pns_ai_mcp/controllers/validators.py`, `pns_ai_mcp/controllers/context_builder.py` | E2′ | Validado en staging (29/10/2026) |
+| 24 | PNS-102 | seguridad | `pns_ai_mcp/controllers/context_builder.py` | E2′ | Validado en staging (29/10/2026) |
 | 25 | M1 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | E3′ | Validado en staging (04/11/2026) |
 | 26 | M2 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | E3′ | Validado en staging (04/11/2026) |
 | 27 | F1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/controllers/chatboo.py` | E3′ | Validado en staging (04/11/2026) |
@@ -132,6 +133,12 @@ manuales del laboratorio pendientes ([lab_e2_3879.md](lab_e2_3879.md)). Tras la 
 parche 18 corregido, cambio en el 21 y parche 23 nuevo (PNS-101), con tests y neutralización
 («Revisión de E2′ (27/10/2026)», al final de la sección). Entradas más abajo, en «Parches
 de la rama 14.0-pns-ai-3879 (E2′)».
+
+Parches 11 adaptado y 17 a 24 (E2′): validados en el laboratorio el 28/10/2026 ([lab_e2_3879.md](lab_e2_3879.md),
+«Resultado (28/10/2026)») y en el staging `pns_demo` el 29/10/2026 (commit `9a2970d`;
+[staging_e2_3879.md](staging_e2_3879.md), apartado G, y [verificación](verificacion_seguridad_pns_ai.md),
+«Staging — entrega E2′ (29/10/2026)»). P-37b, confirmada a mano en staging; P-17, P-101′ y P-102 no se
+repitieron allí (laboratorio y tests).
 
 Parches 25 a 28 (E3′): validados en el laboratorio el 30/10/2026 ([lab_e3_3879.md](lab_e3_3879.md)); P-8c,
 P-8d, P-8h, P-8e b y X-Frame-Options OK. P-8e a falló y dio lugar al parche 29
