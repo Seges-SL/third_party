@@ -17,12 +17,19 @@ import json
 import logging
 import re
 import unicodedata
+# Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
+from contextvars import ContextVar
 # Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
 from html.parser import HTMLParser
 
 from odoo import _
 
 _logger = logging.getLogger(__name__)
+
+# Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
+# The Chatboo job whose turn is running in this thread, and whether a page
+# was refused in it. Only that job's _save_to_session reads it.
+_NO_PAGE_WATCH = ContextVar('pns_chatboo_no_page', default=None)
 
 # Seges: parche 27 (F1, seguridad). Ver docs/pendiente/parches_pns_ai.md
 # Inside a <script> the HTML parser ends the block at </script> and reads
@@ -643,6 +650,24 @@ def strip_fence(text):
     return '\n'.join(lines).strip()
 
 
+# Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
+def watch_no_page(job_id, session_id, rev):
+    """Open the watch for one Chatboo turn. Returns the token for ``reset``."""
+    return _NO_PAGE_WATCH.set({
+        'job': job_id, 'session': session_id, 'rev': rev or 0, 'refused': False,
+    })
+
+
+# Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
+def page_refused_in_job(job_id, session_id, rev):
+    """True when this job's turn refused a page and the page did not change."""
+    watch = _NO_PAGE_WATCH.get()
+    return bool(
+        watch and watch['job'] == job_id and watch['session'] == session_id
+        and watch['refused'] and (rev or 0) == watch['rev']
+    )
+
+
 def log_no_page(env, reason, session_id=False):
     """Leave the cause in ai.log and answer '' so the turn goes on.
 
@@ -651,6 +676,16 @@ def log_no_page(env, reason, session_id=False):
     asked for: where it sits is what tells you what had already happened.
     """
     _logger.info('Chatboo canvas: %s', reason)
+    # Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
+    watch = _NO_PAGE_WATCH.get()
+    if watch:
+        # The turn must go on: a session_id that is not an id does not count.
+        try:
+            same = not session_id or int(session_id) == watch['session']
+        except (TypeError, ValueError):
+            same = False
+        if same:
+            watch['refused'] = True
     try:
         from odoo.addons.pns_ai_mcp.models.ai_log import CAPABILITY_SKIPPED
         engine = env['ai.execution.engine']

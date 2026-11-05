@@ -15,6 +15,8 @@ import time
 
 from odoo import models, fields, api, _
 
+# Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
+from .chatboo_canvas import _NO_PAGE_WATCH, page_refused_in_job, watch_no_page
 from .chatboo_job import _env_manage, _get_registry, _is_test_mode
 from ..utils import file_text, turn_documents
 from ..utils.chatboo_product_icp import CHATBOO_AGENT_CODE
@@ -136,6 +138,9 @@ class ChatbooAsyncRequest(models.Model):
         self.sudo().write({'state': 'running', 'started_at': fields.Datetime.now()})
         self.env.cr.commit()
         self._notify('thinking')
+        # Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
+        no_page_token = watch_no_page(
+            self.id, self.session_id.id, self.session_id.canvas_rev)
 
         acc = ''
         struct = []
@@ -493,6 +498,8 @@ class ChatbooAsyncRequest(models.Model):
             self._release_turn_cursor()
             self._finalize(acc, struct, done_meta, error=str(exc) or exc.__class__.__name__)
         finally:
+            # Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
+            _NO_PAGE_WATCH.reset(no_page_token)
             # Parar el latido pase lo que pase (éxito o error).
             self._stop_heartbeat(beat)
             # Este cursor lleva un snapshot REPEATABLE READ de TODO el turno.
@@ -1289,6 +1296,13 @@ class ChatbooAsyncRequest(models.Model):
                 **({'clip_data': _clip_data} if _clip_data else {}),
             })
         else:
+            # Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
+            _content = acc or ''
+            if page_refused_in_job(self.id, session.id, session.canvas_rev):
+                _note = _('No page was built. The reason is in the AI History.')
+                _content = (f"{acc}\n\n_{_note}_" if (acc or '').strip()
+                            else f"_{_note}_")
+                _assistant_content = _content
             # Pie de respuesta: cada stack consume una forma distinta y hay que
             # reproducir AMBAS para que el pie sobreviva al recargar la sesión
             # (antes lo escribía el cliente en vivo; ahora lo autora el worker):
@@ -1346,7 +1360,7 @@ class ChatbooAsyncRequest(models.Model):
             }
             messages.append({
                 'role': 'assistant',
-                'content': acc or '',
+                'content': _content,  # Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
                 'original_content': acc or '',
                 'raw': True,
                 # ── owl1 (campos planos que lee chatboo_component_v2.js) ──
