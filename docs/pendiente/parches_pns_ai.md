@@ -8,7 +8,8 @@
 - **Fecha:** 2026-10-13 (parches 1 a 3) · actualizado el 2026-10-20 (N11 y N12), el 2026-10-21
   (staging de E2), el 2026-10-23 (cambio de base a 3.1.879 y E1′), el 2026-10-26 (staging de E1′), el
   2026-10-27 (repetición de R8; E2′: parches 11 adaptado y 17 a 22), el 2026-10-29 (E3′: parches 25 a 28),
-  el 2026-10-30 (parche 29) y el 2026-11-03 (laboratorio del parche 29)
+  el 2026-10-30 (parche 29), el 2026-11-03 (laboratorio del parche 29), el 2026-11-04 (staging de E3′:
+  parches 25 a 29) y el 2026-11-05 (E4′.a: parches 30 a 33)
 - **Versión del fabricante, base propia de Seges desde el 20/10/2026 (N12):** `pns_base` 14.0.1.2.32 ·
   `pns_ai_mcp` 14.0.3.1.782 · `pns_ai_chatboo` 14.0.2.1.453
 - **Desde el 23/10/2026 (N12, b′), en `14.0-pns-ai-3879`:** `pns_base` 14.0.1.2.47 · `pns_ai_mcp`
@@ -33,6 +34,11 @@
 >   corrección, sin diffs (D2).
 >
 > Sustituye a la regla anterior («cuando su versión los corrija, se revierte el commit del parche»).
+>
+> **Commits, desde E2′ (errata del 05/11/2026):** tres commits por entrega, código (todos sus parches),
+> tests y documentación, en lugar de «un commit por parche». Así se hizo en E2′, en E3′ (`a3762ec`,
+> `522ce6e` y `bdb9dda`, parche 29) y se hace en E4′.a y E4′.b (decisión de Sergio, tercera ronda de la
+> [propuesta de E4′](e4_propuesta_3879.md)).
 
 > **Cambio de base (N12, b′; 22/10/2026, mantenido el 23/10/2026):** Seges cambia **una sola vez** de
 > base a 3.1.879, en la rama `14.0-pns-ai-3879`. Solo para este cambio, y como excepción a «los parches
@@ -127,6 +133,10 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 | 27 | F1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/controllers/chatboo.py` | E3′ | Validado en staging (04/11/2026) |
 | 28 | D1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas_page.py`, `pns_ai_chatboo/security/security.xml` | E3′ | Validado en staging (04/11/2026) |
 | 29 | F1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_session.py` | E3′ | Validado en staging (04/11/2026) |
+| 30 | M11 | seguridad | `pns_ai_mcp/models/ai_execution_engine.py` | E4′.a | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
+| 31 | M12 | seguridad | `pns_ai_mcp/models/ai_execution_engine.py` | E4′.a | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
+| 32 | PNS-97 | seguridad | `pns_ai_mcp/models/ai_trusted_action.py` | E4′.a | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
+| 33 | PNS-29 | seguridad | `pns_ai_mcp/models/ai_provider.py`, `pns_ai_mcp/wizard/ai_provider_usage_wizard.py` | E4′.a | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
 
 Parches 11 adaptado y 17 a 22 (E2′, 27/10/2026): aplicados, con tests y neutralización hechos; pruebas
 manuales del laboratorio pendientes ([lab_e2_3879.md](lab_e2_3879.md)). Tras la revisión del mismo día:
@@ -146,6 +156,11 @@ P-8d, P-8h, P-8e b y X-Frame-Options OK. P-8e a falló y dio lugar al parche 29
 ([lab_p29_3879.md](lab_p29_3879.md)). Parches 25 a 29, validados en el staging `pns_demo` el 04/11/2026
 (commit `522ce6e`; [staging_e3_3879.md](staging_e3_3879.md) y [verificación](verificacion_seguridad_pns_ai.md),
 «Staging — entrega E3′ (03 y 04/11/2026)»). Entradas más abajo, en «Parches de la rama 14.0-pns-ai-3879 (E3′)».
+
+Parches 30 a 33 (E4′.a, 05/11/2026): aplicados, con tests en verde, neutralización hecha y aprobados en
+revisión; propuesta y decisiones en [e4_propuesta_3879.md](e4_propuesta_3879.md). Pendientes del
+laboratorio y del staging, que se hacen con E4′.b en una sola subida. Entradas más abajo, en «Parches de
+la rama 14.0-pns-ai-3879 (E4′.a)».
 
 Parches 10, 12 y 13 a 16 (E1′): validados en laboratorio el 23/10/2026 y en el staging `pns_demo` el 26/10/2026, con el cambio de base
 (commit `0366231`; [staging_e1_3879.md](staging_e1_3879.md) y
@@ -184,7 +199,9 @@ módulos, así que no llevan número de parche ni entran en el índice. Solo en 
     `TestSafePlanAtomicity.test_normal_execution_marks_executed_and_applies_mutation` dejó de dar
     error, y volvió a darlo al retirarlo. Se deduce que la revocación en `addCleanup` no surtió
     efecto; la causa no se ha investigado.
-  - Arreglarlo es rediseñar el test, no completar sus datos: pendiente de decisión de Sergio.
+  - Arreglarlo es rediseñar el test, no completar sus datos: **aceptado como desfasado**, no se rediseña
+    (plan sobre 3.1.879, E2′, «Papelera del diario»; parche 17, «Tests»). Errata del 05/11/2026: aquí
+    decía «pendiente de decisión de Sergio».
 - **Cómo comprobar si el fabricante ya lo ha corregido:**
   ```sh
   grep -n "group_ai_writer\|enter_test_mode\|new_test_user" pns_ai_mcp/tests/test_change_journal.py pns_ai_mcp/tests/test_paap_core.py
@@ -1610,8 +1627,9 @@ Solo lectura (código, core de Odoo 14 de referencia, OCA, `vertical-instaladore
     `test_engine_attrs_on_wrapper` (`cr` y `registry` para el motor).
   - `pns_ai_chatboo/tests/test_seges_skill_env.py` (1): la skill de fábrica `customer_360.py` (`env.user`,
     `env.company`, `env['res.partner']`, `'modelo' in env`) corre en la caja A real sin error. Sin cliente:
-    con uno, falla en esta BD por un error propio de la skill (`_iso` recibe una fecha como `str`), ajeno
-    al parche.
+    con uno, falla en esta BD por un defecto del fabricante ajeno al parche: `ensure_module_result_call`
+    añade al final del código `result = _iso(_q)` y `_iso` recibe el texto del cliente buscado (hoja de
+    E4′, ficha 22; errata del 05/11/2026: aquí decía «`_iso` recibe una fecha como `str`»).
 
 ### Línea base de E2′ (27/10/2026)
 
@@ -1707,7 +1725,9 @@ manual, P-70 casos 1 a 5 y P-20 repetida ([lab_e2_3879.md](lab_e2_3879.md)).
 Tests nuevos (22), todos en verde: `test_seges_sandbox_credentials.py` 7, `test_seges_sandbox_env.py` 13,
 `test_seges_canvas_box_a.py` 1 y `test_seges_skill_env.py` 1. Una primera ejecución dio 4 F de tests nuevos
 (el JSON de la respuesta va escapado dos veces; el proveedor creado en el test no existe para el cursor de
-la caja A; la skill con cliente falla por su `_iso`): corregidos los tests, no el código.
+la caja A; la skill con cliente falla por `ensure_module_result_call`, defecto del fabricante, [hoja de
+E4′](e4_hoja_3879.md), ficha 22; errata del 05/11/2026: decía «por su `_iso`»): corregidos los tests, no
+el código.
 
 **Neutralización (27/10/2026):** script `neutralizar.py` en el scratchpad de esta sesión
 (`/tmp/claude-1000/-home-soporte-GitHub-third-party/5b6a0dd0-041a-4357-ae79-6549a6ce09ac/scratchpad/`):
@@ -1924,7 +1944,7 @@ load-bearing; los tres archivos quedan idénticos (SHA-256 IGUAL):
 | Ejecución | Qué se retira | Resultado | Fallan (de E2′ ampliado) |
 |---|---|---|---|
 | N0 | nada | 337 · 18 F · 32 E | — |
-| NEU-A | formateador (compila sin reescribir `.format`) | 23 F · 32 E | `test_c1_exact_payload`, `test_template_in_variable`, `test_template_concatenated`, `test_str_format_unbound`, `test_format_map_dunder` (plantillas no literales que el AST no ve) |
+| NEU-A | formateador (compila sin reescribir `.format`) | 23 F · 32 E | `test_c1_exact_payload`, `test_template_in_variable`, `test_template_concatenated`, `test_str_format_unbound`, `test_format_map_dunder` (plantillas no literales que el AST no ve); además `TestSegesSkillFormat.test_skill_format_blocked`, de la segunda vuelta de E2′, posterior a esta ejecución (añadido el 05/11/2026: falla en N23f de E4′.a) |
 | NEU-B | predicado sin `DANGEROUS_FORMAT_NAMES`/`format`/`format_map` | 21 F · 32 E | `test_getattr_format` (subtests), `test_attrgetter_methodcaller_format` (obtienen el método nativo) |
 | NEU-C | parche 24 (`user`/`company`/`companies` con su) | 24 F · 32 E | `test_wrapper_user_not_su`, `test_wrapper_company_not_su`, `test_identity_helper_not_su`, `test_c2_no_access_field_via_user` |
 
@@ -2805,3 +2825,273 @@ se puede distinguir del del servidor sin las filas de ese turno, así que no se 
   [e3_hallazgo_p8ea_3879.md](e3_hallazgo_p8ea_3879.md), apartado 6). Siguiente: el staging.
   **Validado en staging el 04/11/2026**, con los parches 25 a 28 (commit `522ce6e` en `pns_demo`;
   [staging_e3_3879.md](staging_e3_3879.md), apartado G).
+
+## Parches de la rama 14.0-pns-ai-3879 (E4′.a)
+
+- **Fecha:** 05/11/2026. **Entrega:** E4′.a (seguridad de la hoja de Medios y Bajos: M11, M12, PNS-97 y
+  PNS-29 resto 3, y el test de PNS-36) del [plan sobre 3.1.879](plan_correccion_pns_ai_3879.md).
+- **Origen:** [hoja de E4′](e4_hoja_3879.md), fichas 1, 2, 3, 6 y 8, con las decisiones de Sergio del
+  04/11/2026. **Propuesta aprobada, comprobaciones previas (paso 0) y decisiones de la tercera y cuarta
+  ronda:** [e4_propuesta_3879.md](e4_propuesta_3879.md). HEAD de partida: `ca707a9` (el código es el de
+  `87bbd70`).
+- **Rutas:** de 3.1.879 con E1′ a E4′.a (copia de trabajo del 05/11/2026). Sin tocar `version`, `depends`,
+  `external_dependencies`, `i18n`, `ir.model.access.csv`, `LICENSE` ni `NOTICE`. Mensajes nuevos en inglés,
+  sin traducir. Solo cambia `pns_ai_mcp`.
+- **Marcadores:**
+  `grep -rn "Seges: parche 3[0-3] (" pns_ai_mcp pns_ai_chatboo --include=*.py | grep -v /tests/`:
+  **17 líneas** (30: 8; 31: 1; 32: 5; 33: 3).
+- **Commits** (tres, regla de arriba): `[FIX] pns_ai_mcp: parches 30 a 33 (E4′.a)`, `[TEST] pns_ai_mcp:
+  tests de E4′.a` y `[DOC] E4′.a`. Los sube Sergio.
+
+### Parche 30: los `log_*` públicos solo escriben a nombre del usuario actual e interno (M11)
+
+- **Qué falla sin él (hoja, ficha 1, Media):** los seis envoltorios públicos de `ai.execution.engine`
+  (`log_role_without_provider`, `log_provider_failover`, `log_provider_llm_request`,
+  `log_provider_llm_response`, `log_llm_inference` y `log_provider_inference`) usan el `user_id` recibido
+  tal cual y escriben en `ai.log` con `_create_log_entry`, en un cursor propio con `commit`.
+  `ai.execution.engine` es `AbstractModel`: `/web/dataset/call_kw` y XML-RPC no comprueban ninguna ACL. Por
+  RPC, cualquier usuario autenticado (también un portal) crea filas del Historial IA a nombre de otro, con
+  tokens y coste inventados. Daña la auditoría, no da acceso. El parche 15 solo los cierra en la caja A.
+- **Cambio** (`pns_ai_mcp/models/ai_execution_engine.py`):
+  - helper nuevo `_check_log_user(user_id=None)` (`:160-170`): en `su` no comprueba nada; fuera de `su`,
+    `AccessError` si el usuario no es interno («Only internal users can write AI History rows.») o si viene
+    un `user_id` distinto de `self.env.uid` («Only the system can write AI History rows for another user.»).
+    Un `user_id` falso (`None`, `False`, `0`) cuenta como «no viene», igual que el fabricante (`user_id or
+    self.env.user.id`); uno que no sea exactamente `self.env.uid` (también `"2"` por JSON) se rechaza;
+  - una llamada al principio de cada envoltorio, antes de `if 'ai.log' not in self.env:` (en
+    `log_provider_inference`, antes de `n_msgs = …`): `:424`, `:464`, `:570`, `:630`, `:712` y `:790`. Así el
+    rechazo no depende de que exista `ai.log` y llega antes de `_resolve_log_threading`;
+  - import de `AccessError` (`:9-10`), que usa también el parche 31.
+- **Llamadores internos** (propuesta, parche 30, paso 0): todos pasan `env.uid`, `self._turn_uid` o nada,
+  siempre desde el mismo `env` con el que se llama al motor (que solo cambia de contexto, nunca de usuario).
+  Ningún JS, vista ni dato los nombra; las rutas públicas (`/mcp`) autentican antes con la clave MCP, que
+  solo existe para internos. `log_provider_failover` no es explotable por RPC (necesita registros: da
+  `AttributeError` antes de escribir); se incluye por coherencia.
+- **Qué se degrada:**
+  - ningún interno crea filas a nombre de otro, por RPC ni desde Python fuera de `su`; un usuario externo,
+    ninguna;
+  - sigue abierto, **aceptado** (hoja, ficha 1): un interno crea filas a su propio nombre por RPC. Sin
+    `provider_id` no altera el tope; en LIYBEN no hay tope (D12);
+  - un código futuro que llame a un `log_*` con el `user_id` de otro fuera de `su` dará `AccessError`. Hoy
+    no hay ninguno. **Observación de la revisión (05/11/2026):** los `log_*` que llama el propio motor van
+    dentro de `try`, así que ese error se perdería **en silencio** (sin fila y sin aviso); solo
+    `log_provider_inference` llamado desde el driver (`_LoggedProviderDriver`) lo propagaría, y ese driver
+    corre siempre en `su` por el parche 31.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "def log_\|def _log_\|user_id != self.env.uid\|user_id or self.env.user.id" pns_ai_mcp/models/ai_execution_engine.py
+  ```
+  Corregido si los `log_*` pasan a privados o comprueban el usuario antes de escribir (ya no aparece
+  `user_id or self.env.user.id` sin comprobación previa).
+- **Tests** (`pns_ai_mcp/tests/test_seges_e4p.py`, 6). En un `HttpCase` `_create_log_entry` no escribe nunca
+  (`TestCursor`), así que el error se prueba por RPC y las filas, en un `TransactionCase` sin modo test:
+  - `TestSegesE4pRpc` (`:101`, interno y portal de prueba): `test_log_foreign_user_refused` (los seis
+    métodos con `user_id` del admin, `self.env.ref('base.user_admin').id` → `AccessError`),
+    `test_log_portal_refused` (portal sin `user_id` → `AccessError`) y el control `test_log_own_rpc_allowed`
+    (interno sin `user_id`, sin error);
+  - `TestSegesE4pLogRows` (`:206`, usuarios ya guardados en la BD, endpoint propio `seges_e4p_m11`, conteo
+    con un cursor nuevo): `test_foreign_user_leaves_no_row` y `test_external_user_leaves_no_row`
+    (`AccessError` y 0 filas) y el control `test_own_row_written` (1 fila del admin). `_purge` en `setUp` y en
+    `addCleanup`, con cursor propio y `commit`.
+- **Neutralización:** N30u y N30i (tabla de «Comprobaciones de E4′.a»).
+
+### Parche 31: `chat_completion` solo en `su` (M12)
+
+- **Qué falla sin él (hoja, ficha 2, Baja):** `ai.execution.engine.chat_completion` es público. Por RPC,
+  cualquier interno que lea `ai.agent` hace inferencia con la clave de la empresa
+  (`_driver_for_provider` → `_api_key_for_inference`, en `sudo`), sin Chatboo ni clave MCP: coste y, por
+  D10, datos que ya puede leer hacia el proveedor externo. Su único llamador
+  (`pns_ai_chatboo/models/chatboo_async_request.py:918`) ya llama con `sudo()`.
+- **Cambio** (`pns_ai_mcp/models/ai_execution_engine.py:895-897`): primera línea del cuerpo, tras el
+  docstring: fuera de `su`, `AccessError` («Only the system can call chat_completion.»). El nombre no cambia
+  (lo cita el docstring del fabricante como punto de entrada; decisión 1 de la segunda ronda).
+- **Efecto sobre el parche 30:** el driver con registro solo lo crea `chat_completion`, así que
+  `_LoggedProviderDriver` y su `log_provider_failover` corren siempre en `su`.
+- **Qué se degrada:** nadie usa la inferencia directa por RPC ni desde Python sin `sudo()`. Un módulo de
+  terceros que la llame sin `sudo()` tendrá que añadirlo (hoy no hay ninguno).
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "def chat_completion\|def _chat_completion\|self.env.su" pns_ai_mcp/models/ai_execution_engine.py
+  ```
+  Corregido si `chat_completion` pasa a privado o exige `su` (o un grupo) antes de resolver el proveedor.
+- **Tests** (3): `TestSegesE4pRpc.test_chat_completion_rpc_refused` (RPC como interno y portal con el agente
+  `pns_ai_mcp` y el driver simulado → `AccessError`, driver sin llamar; solo discrimina el interno: el
+  portal no lee `ai.agent`); `TestSegesE4pChatCompletion` (`:259`): `test_direct_call_refused` (desde
+  Python como interno → `AccessError`) y el control `test_sudo_call_works`.
+- **Neutralización:** N31.
+
+### Parche 32: `create`, `write` y `unlink` de `ai.trusted.action` exigen Ajustes fuera de `su` (PNS-97)
+
+- **Qué falla sin él (hoja, ficha 3, Media):** el AI Administrator tiene `1,1,1,1` sobre
+  `ai.trusted.action` (`security/ir.model.access.csv:74`) y el modelo no sobrescribe `create`, `write` ni
+  `unlink`. Puede crear o cambiar un `code` que apunte a cualquier método, también privado, de cualquier
+  modelo (`_resolve_method`) y proponerlo en un plan, que corre con la identidad de quien confirma. Vectores:
+  RPC; el propio Safe Plan (un paso CRUD sobre `ai.trusted.action` solo pasa `_meta_crud_block_error` y
+  `crud_cusp_error`); vaciar `group_ids` de `view.set_field_*` o `field.set_required` (las abre a cualquier
+  AI Writer); y cambiar `label` y `danger`, que es lo que ve quien confirma. **«Confused deputy»** (revisión
+  de la propuesta): un AI Administrator sin Ajustes propone el plan y lo confirma un administrador con
+  Ajustes; el plan corre con el `env` de quien confirma y `is_system()` sería verdadero.
+- **Cambio** (`pns_ai_mcp/models/ai_trusted_action.py`):
+  - helper `_check_settings_admin` (`:83-96`): `AccessError` («Only a Settings administrator can change
+    trusted actions.») si `not self.env.is_system()` **o** si el contexto trae `ai_journal_user_id` o
+    `ai_journal_confirmed_by_uid` (está corriendo el plan de una operación supervisada, que las pone
+    `execute_plan_now`) y `settings_admin_error(self.env)` (parche 12) da error: quien ejecuta, quien propuso
+    o quien confirmó no tiene Ajustes. Criterio combinado (D1 de la cuarta ronda): dentro de un plan, ni
+    `sudo()` lo salta; fuera de un plan, `sudo()` pasa. `settings_admin_error` se importa dentro del método,
+    como hace el fabricante con el mismo módulo (`ai_system_action.py:704`);
+  - `create` (`@api.model_create_multi`, `:98-102`), `write` (`:104-107`) y `unlink` (`:109-112`) llaman al
+    helper y después a `super()`. `copy()` pasa por `create`; archivar es `write`. `write` comprueba aunque
+    `vals` venga vacío (no hay escritores legítimos fuera de `su`; difiere del parche 17);
+  - imports de `_` y `AccessError` (`:23-25`).
+- **Por qué no rompe la carga de datos** (propuesta, parche 32, paso 0): `convert_file`, `_process_end` y
+  la desinstalación corren con `Environment(cr, SUPERUSER_ID, {})`, en `su` y sin las claves del plan. Los 9
+  registros de `data/trusted_actions_system.xml` tienen `noupdate` falso y se reescriben en cada `-u`.
+- **Cambio en un test de Seges existente** (decisión 1 de la tercera ronda):
+  `pns_ai_mcp/tests/test_seges_user_groups.py:78-79`, `test_registry_edit_does_not_lift_check`: el `write`
+  que vacía `group_ids` pasa a `action.sudo().write(…)`, con el marcador del parche 32. Sin el cambio, el
+  test daba `AccessError` (E). Sigue probando lo que probaba (el criterio del parche 12 no depende del
+  registro); que el AI Administrator no puede vaciar `group_ids` lo prueba ahora `test_ai_admin_cannot_write`.
+- **Lint:** dos avisos nuevos en `ai_trusted_action.py`, **aceptados por Sergio** (05/11/2026): I001 (el
+  bloque de imports ya estaba desordenado en el original del fabricante) y C0415 (import de
+  `settings_admin_error` dentro del método, como el fabricante en `ai_system_action.py:704`).
+- **Qué se degrada:**
+  - el AI Administrator sin Ajustes ya no crea, cambia, copia, archiva ni borra acciones de confianza (por
+    RPC ni con un plan); sigue leyéndolas y ejecutándolas con `_apply` según sus `group_ids`;
+  - un plan sobre `ai.trusted.action` solo se aplica si quien lo propuso **y** quien lo confirma tienen
+    Ajustes: un administrador de Ajustes ya no puede confirmar el de un AI Administrator sin Ajustes;
+  - **observación de la revisión (05/11/2026):** una operación ya confirmada y sin ejecutar con pasos sobre
+    `ai.trusted.action`, propuesta por un AI Administrator sin Ajustes, fallará en el reintento de
+    `_cleanup_stuck_state` y quedará como plan fallido (esperado). Se consulta en el staging y en LIYBEN
+    antes del despliegue (plan, §3.1);
+  - un módulo de terceros que contribuya acciones por XML sigue funcionando; uno que las cree en ejecución
+    fuera de `su` tendría que usar `sudo()` (hoy no hay ninguno);
+  - en LIYBEN, si los dos AI Administrators no tienen Ajustes, no pueden tocar el registro (decisión 10: se
+    consulta antes del despliegue).
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "def create\|def write\|def unlink\|group_system\|is_system" pns_ai_mcp/models/ai_trusted_action.py; grep -n "trusted_action" pns_ai_mcp/security/ir.model.access.csv
+  ```
+  Corregido si el modelo restringe las escrituras a Ajustes o al sistema (en Python o con una ACL de
+  `group_ai_admin` sin escritura, alta ni borrado).
+- **Tests** (`TestSegesE4pTrustedAction`, `:299`, 12):
+  - negativos, AI Administrator sin Ajustes (`AccessError` y sin cambios): `test_ai_admin_cannot_create`,
+    `test_ai_admin_cannot_write` (`apply_method`, `group_ids`, `label`, `danger` y `active`),
+    `test_ai_admin_cannot_unlink`, `test_ai_admin_cannot_copy`, y por la vía del plan
+    `test_plan_create_step_refused` y `test_plan_write_step_refused`;
+  - negativos del «confused deputy», con el contexto que pone `execute_plan_now`:
+    `test_plan_confirmed_for_ai_admin_refused` (plan con `env` de Ajustes, propuesto por el AI
+    Administrator sin Ajustes) y `test_sudo_in_plan_context_refused` (el mismo contexto y `sudo()`);
+  - controles: `test_settings_admin_can_edit`, `test_sudo_can_edit`, `test_factory_data_reload`
+    (`convert_file` del XML de fábrica en modo `update`; los 9 `xmlid` siguen) y
+    `test_plan_settings_admin_allowed` (plan propuesto y confirmado por Ajustes: se aplica).
+- **Neutralización:** N32 y N32j.
+
+### Parche 33: `_month_usage` privado y `default_get` del asistente de uso con la ACL (PNS-29, resto 3)
+
+- **Qué falla sin él (hoja, ficha 8, resto 3):** `ai.provider.month_usage` es público y lee en `sudo`: por
+  RPC, cualquier interno obtiene los tokens y el coste del mes de cada proveedor. Segunda vía: en Odoo 14
+  `default_get` no comprueba la ACL, y `default_get` de `ai.provider.usage.wizard` con
+  `default_provider_id` devuelve las mismas cifras aunque el asistente solo sea del AI Administrator
+  (`csv:56`); la primera llamada a `onchange` del asistente llama a `default_get` y las da también.
+  **Alcance mayor que el de la hoja** (N33n, 05/11/2026): sin el parche, `month_usage` daba las cifras
+  también al **portal**; la ficha 8 decía «cualquier interno».
+- **Cambio:**
+  - `month_usage` pasa a `_month_usage` (`pns_ai_mcp/models/ai_provider.py:1016-1017`) y su llamador
+    `spend_cap_reached` usa el nombre nuevo (`:1053-1054`; el marcador va encima de `return spend_cap_hit(`).
+    `spend_cap_reached` sigue público y solo devuelve un booleano;
+  - en `AIProviderUsageWizard.default_get` (`pns_ai_mcp/wizard/ai_provider_usage_wizard.py:37-39`),
+    `self.check_access_rights('create')` antes de leer las cifras, y `provider._month_usage()`. El mensaje es
+    el del core (traducido por Odoo).
+- **Qué se degrada:**
+  - ningún usuario sin AI Administrator obtiene las cifras del mes por RPC (`month_usage`, `default_get` u
+    `onchange` del asistente). El AI Administrator las sigue viendo con «This month»;
+  - **observación de la revisión (05/11/2026):** el botón «This month» del formulario del proveedor no tiene
+    `groups`; un interno sin AI Administrator que llegue al formulario y lo pulse verá el mensaje de ACL del
+    core. Degradación aceptada (no se tocan vistas);
+  - `default_get` sin `default_provider_id` no cambia (no lee cifras);
+  - restos 1 y 2 de PNS-29, aceptados (D12, D10).
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "def month_usage\|def _month_usage" pns_ai_mcp/models/ai_provider.py; grep -n "check_access_rights\|month_usage" pns_ai_mcp/wizard/ai_provider_usage_wizard.py
+  ```
+  Corregido si `month_usage` deja de ser público (o comprueba el grupo) y el asistente no da cifras a quien no
+  tiene su ACL.
+- **Tests** (7):
+  - `TestSegesE4pRpc`, interno y portal: `test_month_usage_rpc_refused` (`month_usage` → `AttributeError`,
+    `_month_usage` → `AccessError`), `test_usage_wizard_default_get_rpc_refused` y
+    `test_usage_wizard_onchange_rpc_refused` (`AccessError` y sin cifras en la respuesta). En los dos del
+    asistente el portal no discrimina (lo rechaza ya la ACL): queda como control de que el parche no le abre
+    nada;
+  - `TestSegesE4pUsage` (`:463`): `test_month_usage_public_name_gone`, `test_default_get_refused_for_internal`
+    y los controles `test_default_get_ai_admin_sees_figures` y `test_spend_cap_still_works`.
+- **Neutralización:** N33n y N33w.
+
+### Test de PNS-36 (`{0.cr.dbname}`), sin parche
+
+- **Por qué:** la hoja (ficha 6) comprobó en el laboratorio que PNS-36 queda cubierto del todo por el
+  parche 23 ampliado: la plantilla literal la rechaza el AST y la plantilla en variable, el formateador. Los
+  negativos que había usaban dunders; faltaba uno con `cr` y `registry`.
+- **Test:** `pns_ai_mcp/tests/test_seges_format_guard.py:131`, `TestSegesFormatGuard.test_pns36_cr_dbname`,
+  con el arnés de la clase (`_refused`, herramienta real como `base.user_admin`): `{0.cr.dbname}` y
+  `{0.registry.db_name}`, en literal y en variable (4 subtests); en todos, además,
+  `assertNotIn(self.env.cr.dbname, text, 'filtra')`. Cabecera del archivo con la línea
+  `# Seges: tests de la entrega E4′ (PNS-36). Ver docs/pendiente/parches_pns_ai.md`.
+- **Neutralización:** N23f (formateador del parche 23 ampliado).
+- Cierre de la ficha en la [comparación](../specs/comparacion_pns_ai_3-1-879.md), §3, PNS-36.
+
+### Comprobaciones de E4′.a (05/11/2026)
+
+1. `py_compile` con Python 3.7.3 de los ocho `.py` tocados (4 de código: `ai_execution_engine.py`,
+   `ai_provider.py`, `ai_trusted_action.py` y `wizard/ai_provider_usage_wizard.py`; 4 de tests:
+   `tests/__init__.py`, `test_seges_e4p.py`, `test_seges_format_guard.py` y `test_seges_user_groups.py`):
+   correcto.
+2. `python3 ~/.claude/hooks/odoo_lint.py --revisar --base ca707a9`: 0 avisos nuevos, salvo los dos de
+   `ai_trusted_action.py` aceptados por Sergio (parche 32, «Lint»).
+3. **Línea base repetida antes de tocar nada** (log `tests-20261105-095615.log`): **435 tests, 18 F, 32 E y
+   3 saltados**, los mismos 50 por nombre que `tests-20261030-173803.log`.
+4. **Con E4′.a** (log `tests-20261105-101526.log`; tras las sugerencias del revisor,
+   `tests-20261105-111902.log`): **464 tests, 18 F, 32 E y 3 saltados**. Los 50 que fallan son los mismos de
+   la línea base y ninguno es de Seges. Los **29 nuevos**, en verde: `TestSegesE4pRpc` 7,
+   `TestSegesE4pLogRows` 3, `TestSegesE4pChatCompletion` 2, `TestSegesE4pTrustedAction` 12,
+   `TestSegesE4pUsage` 4 y `TestSegesFormatGuard.test_pns36_cr_dbname` 1. El modificado,
+   `test_registry_edit_does_not_lift_check`, en verde.
+5. Marcadores fuera de tests: **17** (30: 8; 31: 1; 32: 5; 33: 3).
+
+**Neutralización (05/11/2026):** una cada vez, con el método de E3′: copia, cambio, batería completa,
+restauración y SHA-256 de cada archivo (restauración comprobada en todas). Logs en `~/odoo-dev/14.0/logs`.
+Los controles pasan en todas. Columna «Resultado»: F y E de la batería completa en cada ejecución
+(E siempre 32, como en la línea base). El runner cuenta cada subtest como un F, así que la F puede subir
+más que el número de tests que fallan (N30u: 25 F por dos tests).
+
+| Ejecución | Qué se retira | Log | Resultado | Fallan (de E4′.a) |
+|---|---|---|---|---|
+| N30u | 30, la comparación de `user_id` en `_check_log_user` | `tests-20261105-102611.log` | 25 F · 32 E | `test_log_foreign_user_refused`, `test_foreign_user_leaves_no_row` |
+| N30i | 30, el criterio «interno» | `tests-20261105-103054.log` | 25 F · 32 E | `test_log_portal_refused`, `test_external_user_leaves_no_row` (`test_log_foreign_user_refused` pasa: el `user_id` del admin no es el del portal) |
+| N31 | 31, la comprobación de `su` | `tests-20261105-103500.log` | 21 F · 32 E | `test_chat_completion_rpc_refused`, `test_direct_call_refused` |
+| N32 | 32, `_check_settings_admin` no comprueba nada | `tests-20261105-103839.log` | 31 F · 32 E | los 8 negativos: los 6 del AI Administrator sin Ajustes, `test_plan_confirmed_for_ai_admin_refused` y `test_sudo_in_plan_context_refused` |
+| N32j | 32, la segunda condición (claves del plan con `settings_admin_error`); queda solo `is_system()` | `tests-20261105-104229.log` | 20 F · 32 E | `test_plan_confirmed_for_ai_admin_refused`, `test_sudo_in_plan_context_refused` (los seis negativos del AI Administrator sin Ajustes pasan) |
+| N33n | 33, vuelve el nombre público `month_usage` | `tests-20261105-104625.log` | 21 F · 32 E | `test_month_usage_rpc_refused` (interno y portal), `test_month_usage_public_name_gone` |
+| N33w | 33, sin `check_access_rights('create')` en `default_get` | `tests-20261105-105005.log` | 21 F · 32 E | `test_usage_wizard_default_get_rpc_refused`, `test_usage_wizard_onchange_rpc_refused` (solo el interno; el portal lo rechaza la ACL), `test_default_get_refused_for_internal` |
+| N23f | 23 ampliado, el formateador (como NEU-A de E2′) | `tests-20261105-105416.log` | 26 F · 32 E | `test_pns36_cr_dbname`, solo en los dos casos en variable (los literales los rechaza el AST); además, los de NEU-A (`test_c1_exact_payload`, `test_template_in_variable`, `test_template_concatenated`, `test_str_format_unbound`, `test_format_map_dunder`) y `TestSegesSkillFormat.test_skill_format_blocked`, que se añade a la lista de NEU-A (es de la segunda vuelta de E2′) |
+
+Batería final, con todo restaurado (log `tests-20261105-105904.log`): **464 tests, 18 F, 32 E y 3
+saltados**.
+
+### Revisión de E4′.a (05/11/2026): APROBADA
+
+- **Revisión (`odoo-reviewer`):** APROBADA.
+- **Sugerencias aplicadas** (solo tests): `assertNotIn` sobre `json.dumps(res)` en `test_seges_e4p.py:188`
+  y `:202`, y `assertNotIn` en `test_seges_format_guard.py:140`. Batería después:
+  `tests-20261105-111902.log`, 464 · 18 F · 32 E · 3 saltados. **No aplicada:** la del docstring «only for
+  himself» de `_check_log_user`.
+- **Observaciones para el registro** (sin cambios de código):
+  - parche 30: los `log_*` internos que fallen fuera de `su` se pierden en silencio (en «Qué se degrada»);
+  - parche 32: operación confirmada y sin ejecutar con pasos sobre `ai.trusted.action`, propuesta por un AI
+    Administrator sin Ajustes, falla en el reintento de `_cleanup_stuck_state` (en «Qué se degrada»);
+  - parche 33: el botón «This month» sin `groups` y el alcance al portal de N33n (en «Qué falla sin él» y
+    «Qué se degrada»);
+  - **tests:** `_purge` de `TestSegesE4pLogRows` corre con el cursor del test abierto (las limpiezas van en
+    orden LIFO) y el `INSERT` del cursor propio toma `FOR KEY SHARE` sobre la fila de `res_users` del admin.
+    Si alguien añade en esa clase un `write` sobre el admin, el test se **colgaría** en vez de fallar.
+- **Estado de los parches 30 a 33:** aplicados, tests en verde, neutralizados y aprobados en revisión
+  (05/11/2026). Siguiente: E4′.b (parche 34); después, E4′.h y una sola subida al staging.

@@ -15,7 +15,8 @@
 - **Rutas:** salvo indicación, relativas a `_fabricante/3.1.879/`. Las del core, a
   `/opt/odoo-src/14.0/odoo/`.
 - **Estados:** **VERIFICADO** (el código cubre la ficha y sus puntos de entrada) · **PARCIAL** (queda un
-  resto concreto) · **NO CORREGIDO** · **REQUIERE PRUEBA** (no se puede decidir leyendo código).
+  resto concreto) · **NO CORREGIDO** · **REQUIERE PRUEBA** (no se puede decidir leyendo código) ·
+  **CERRADO (Seges)** (el resto lo cubre un parche de Seges con test; solo en §1.1 y §2.1, desde E4′.a).
 - **Verificación (fase 4, 22/10/2026):** `odoo-reviewer`, solo lectura, comprobó contra
   `_fabricante/3.1.879`, `_fabricante/3.1.782`, la rama y el core de Odoo 14 los parches 1 a 12, los
   agujeros M1, M2, M10, M11, M12, M13, F1, `collect_pin`, PNS-37, 54, 97 y 98, y §9. Las pruebas de M10
@@ -37,9 +38,10 @@
 | Estado | N.º | Fichas |
 |---|---|---|
 | VERIFICADO | 26 | PNS-90, 85, 91, 92, 30, 37, obs. 8, 01, 02, 33, 20, obs. 2, obs. 3, 89, 28, 60, 65, 35, 55, 66, 62, 16, 59, 86, 22, 40 |
-| PARCIAL | 9 | PNS-54 (Crítica), PNS-07 (Crítica), PNS-83 (Alta), PNS-19 (Alta), PNS-17 (Alta), PNS-82 (Alta), PNS-61, PNS-36, PNS-84 |
+| PARCIAL | 8 | PNS-54 (Crítica), PNS-07 (Crítica), PNS-83 (Alta), PNS-19 (Alta), PNS-17 (Alta), PNS-82 (Alta), PNS-61, PNS-84 |
+| CERRADO (Seges) | 1 | PNS-36 (antes PARCIAL; cerrado el 05/11/2026 por el parche 23 ampliado, con test negativo; §3, PNS-36, «Cierre») |
 | NO CORREGIDO | 0 | — |
-| REQUIERE PRUEBA (como estado principal) | 0 | Hay puntos concretos que requieren prueba dentro de 13 filas (PNS-83, 82, 07, 19, 84, 28, 60, 61, 36, 17, 54, 40 y parche 6); se detallan en §3 y §4 |
+| REQUIERE PRUEBA (como estado principal) | 0 | Hay puntos concretos que requieren prueba dentro de 12 filas (PNS-83, 82, 07, 19, 84, 28, 60, 61, 17, 54, 40 y parche 6; P-36 la sustituye un test desde E4′.a); se detallan en §3 y §4 |
 
 **Parches de Seges 1 a 12 (comprobación «Cómo comprobar si el fabricante ya lo ha corregido»):**
 
@@ -59,13 +61,13 @@ la comprobación definitiva con `odoo-dev 14 paridad` (fase 3).
 
 **Pasada B — fichas del fabricante de §4 a §7 (77, las de su recuento, auditoría `:62-68`):**
 
-| Sección | VERIFICADO | PARCIAL | NO CORREGIDO | REQUIERE PRUEBA | Total |
-|---|---|---|---|---|---|
-| §4 Seguridad (pasada A, §2.1) | 26 | 9 | 0 | 0 | 35 |
-| §5 Arquitectura y fallos (§5) | 18 | 5 | 0 | 1 | 24 |
-| §6 Features planificadas (§6) | 6 | 4 | 0 | 1 | 11 |
-| §7 No se hará (estado de la defensa alegada, §7) | 3 | 3 | 1 | 0 | 7 |
-| **Total** | **53** | **21** | **1** | **2** | **77** |
+| Sección | VERIFICADO | PARCIAL | CERRADO (Seges) | NO CORREGIDO | REQUIERE PRUEBA | Total |
+|---|---|---|---|---|---|---|
+| §4 Seguridad (pasada A, §2.1) | 26 | 8 | 1 | 0 | 0 | 35 |
+| §5 Arquitectura y fallos (§5) | 18 | 5 | 0 | 0 | 1 | 24 |
+| §6 Features planificadas (§6) | 6 | 4 | 0 | 0 | 1 | 11 |
+| §7 No se hará (estado de la defensa alegada, §7) | 3 | 3 | 0 | 1 | 0 | 7 |
+| **Total** | **53** | **20** | **1** | **1** | **2** | **77** |
 
 - **Salvedad sobre PNS-30 (§2.1, VERIFICADO):** M11 (§8.7) muestra que su «Check para Seges»
   (auditoría `:219-220`) sigue dando resultado por los envoltorios públicos `log_*` de
@@ -214,7 +216,7 @@ Columna «Fabricante»: estado y versión de su ficha. «Rama Seges»: parche o 
 | PNS-55 (resto) | Alta | Resuelto, 2.1.514 | ACL `1,0,0,0` (`pns_ai_chatboo/security/ir.model.access.csv:3`) y regla sin escritura (`security/security.xml:20-29`); jobs creados en `sudo` (`models/chatboo_async_request.py:104-118`); `recover_orphan_download_chips` comprueba dueño (`chatboo_session.py:597-599`). `cron_maintenance` sigue público (`chatboo_async_request.py:1559-1585`) | **VERIFICADO** | «Después» (D-3 de E2 en E4) | — | Sí: RPC `create`/`write` de un job (ahora `AccessError`) y `recover_orphan_download_chips` sobre sesión ajena |
 | PNS-66 | Media | Resuelto, 3.1.839 / 2.1.514 | `required_group_ids` (`models/ai_skill.py:230`); `user_may_run` (`:933-939`) al listar (`:941-946`), en disparadores (`utils/engine_skills.py:315-335`) y al resolver (`:337-352`); `required_groups: pns_ai_mcp.group_ai_admin` en `users_all.md`, `users_logged.md`, `sys_info.md` | **VERIFICADO** | — | — | Sí, en el chat (`/users-all` con usuario sin IA) |
 | PNS-62 (resto) | Media | Resuelto, 2.1.514 | Topes 20 ficheros / 50 MB y tope por fichero no desactivable (`pns_ai_chatboo/utils/chatboo_product_icp.py:37-106`), comprobados en servidor (`controllers/chatboo.py:835`) | **VERIFICADO** | — | — | Sí (RPC a `/chatboo/stream` con 21 ficheros) |
-| PNS-36 (parte) | Media | Resuelto, 3.1.839 / 2.1.514 | No se precargan `dbname`/`db_name`/`database` (`controllers/context_builder.py:452-461`). **Resto:** los campos de un `.format` solo se revisan por `_` y dunder (`validators.py:385-402`) y `GuardedSandboxEnv.__getattr__` entrega `cr` (`context_builder.py:104-117`): `'{0.cr.dbname}'.format(env)` devolvería el nombre | **PARCIAL** | «Después» | — | Su check (pedirlo en el chat) sí; añadir el `.format` por `/mcp` |
+| PNS-36 (parte) | Media | Resuelto, 3.1.839 / 2.1.514 | No se precargan `dbname`/`db_name`/`database` (`controllers/context_builder.py:452-461`). **Resto:** los campos de un `.format` solo se revisan por `_` y dunder (`validators.py:385-402`) y `GuardedSandboxEnv.__getattr__` entrega `cr` (`context_builder.py:104-117`): `'{0.cr.dbname}'.format(env)` devolvería el nombre. **Cerrado el 05/11/2026** por el parche 23 ampliado de Seges, con test negativo (§3, PNS-36) | **CERRADO (Seges)** (antes PARCIAL) | «Después» | — | Su check (pedirlo en el chat) sí; añadir el `.format` por `/mcp` |
 
 #### §4.5 Prompt injection y SSRF
 
@@ -399,7 +401,7 @@ Columna «Fabricante»: estado y versión de su ficha. «Rama Seges»: parche o 
   historial lo manda el navegador») no se cumple del todo.
 - **REQUIERE PRUEBA** (§4, P-61).
 
-### PNS-36 (Media) — PARCIAL: nombre de la BD por `.format`
+### PNS-36 (Media) — CERRADO (Seges): nombre de la BD por `.format`
 
 - La comprobación de `.format` del AST solo mira `_` y dunder en los campos del literal
   (`controllers/validators.py:385-402`); `cr` y `env` no se revisan ahí. En ejecución, `str.format`
@@ -408,6 +410,15 @@ Columna «Fabricante»: estado y versión de su ficha. «Rama Seges»: parche o 
   devolvería el nombre de la base de datos. Con una cadena construida en ejecución el AST tampoco la
   ve. Solo permite leer cadenas (no llamar métodos).
 - **REQUIERE PRUEBA** (§4, P-36).
+- **Cierre (05/11/2026, E4′.a):** el resto queda **cubierto del todo por el parche 23 ampliado** de Seges
+  (E2′, PNS-101): la plantilla literal la rechaza el AST (`[PROHIBITED:FORMAT] … 'cr'`) y la plantilla en
+  variable, el formateador propio (`AttributeError … 'cr' is not allowed`); igual con `registry`
+  (comprobado en el laboratorio, [hoja de E4′](../pendiente/e4_hoja_3879.md), ficha 6). Sin parche nuevo.
+  Test negativo de Seges con `{0.cr.dbname}` y `{0.registry.db_name}`, en literal y en variable:
+  `pns_ai_mcp/tests/test_seges_format_guard.py`, `TestSegesFormatGuard.test_pns36_cr_dbname`, en verde;
+  con el formateador neutralizado (N23f) fallan los dos casos en variable
+  ([registro de parches](../pendiente/parches_pns_ai.md), «Parches de la rama 14.0-pns-ai-3879 (E4′.a)»).
+  P-36 queda sustituida por ese test.
 
 ### PNS-84 (Media) — PARCIAL: PIN y clave en tránsito
 
@@ -943,7 +954,7 @@ existe tal como la describe). La columna (b) valora el argumento y el riesgo que
 |---|---|---|---|---|
 | PNS-18 (parte) — lista de modelos o campos que nunca van al LLM | La IA lee como quien pregunta; «Sin failover externo»; fusible de 50 000 filas / 2 MB; el permiso fino es de ACL | El sandbox corre como el usuario y bloquea `sudo`, `with_user`, `env` (`pns_ai_mcp/controllers/validators_base.py:257-264`); fusible (`controllers/relaxaicode_replies.py:21-22, 47-72`); la casilla no corta en todos los caminos (`models/ai_execution_engine.py:252-263, 305-316`) | **PARCIAL** | Argumento razonable (una lista de campos se queda corta y no sustituye a las ACL). Riesgo: la casilla no garantiza «solo local» (§6.1, PNS-18). Para Seges, aceptado con D10; para otros clientes con la opción 2, la mitigación sería no tener proveedores externos activos |
 | PNS-23 — que las skills nazcan inactivas | Ejecución de prueba en un `savepoint` que se revierte; el código que escribe se rechaza; la skill no tiene más permisos que quien la lanza; grupos por skill (PNS-66) | Rechazo por AST (`pns_ai_mcp/models/ai_skill.py:453-455`); ejecución de prueba en `cr.savepoint()` revertido (`:464-525`); `required_group_ids` y `user_may_run` (`:933-939`); las skills capturadas tienen dueño y solo las ve él (`filter_visible_for_user`, `:851-852`) | **VERIFICADO** | Razonable para lo capturado desde el chat (solo lo ve su autor). Riesgo que queda: (1) un paquete o copia importado sin dueño entra activo para todos y corre con los permisos de quien lo lanza (revisar paquetes antes de importarlos); (2) el contexto `skill_skip_body_check` salta la ejecución de prueba (`:464-467`; el AST sigue); (3) la ejecución de prueba puede llamar a métodos públicos con cursor propio y commit, cuyo efecto no deshace el `savepoint` (resto de PNS-07, §3, P-07) |
-| PNS-36 (parte) — ocultar `fields_get` en el sandbox | Odoo ya enseña los campos a cualquier interno; los valores siguen protegidos; el nombre de la BD deja de precargarse | `fields_get` del core no exige lectura y filtra `groups` (`odoo/models.py:2882-2912`); sin `dbname` precargado (`controllers/context_builder.py:452-461`) | **VERIFICADO** | Razonable: es el comportamiento del core. Salvedad: el nombre de la BD sigue saliendo con `.format` (§3, PNS-36, P-36). Riesgo a aceptar o no en D22 (nombres de campo sin valores) |
+| PNS-36 (parte) — ocultar `fields_get` en el sandbox | Odoo ya enseña los campos a cualquier interno; los valores siguen protegidos; el nombre de la BD deja de precargarse | `fields_get` del core no exige lectura y filtra `groups` (`odoo/models.py:2882-2912`); sin `dbname` precargado (`controllers/context_builder.py:452-461`) | **VERIFICADO** | Razonable: es el comportamiento del core. Salvedad: el nombre de la BD sigue saliendo con `.format` (§3, PNS-36, P-36); cerrada el 05/11/2026 por el parche 23 ampliado de Seges (§3, PNS-36, «Cierre»). Riesgo a aceptar o no en D22 (nombres de campo sin valores) |
 | PNS-54 (parte) — PIN o reautenticación para aprobar | La tarjeta solo actúa para el dueño; los métodos de confirmación ya no son públicos; `confirm`/`execute` exigen el token de un solo uso que el modelo no ve | Frente al modelo: el sandbox bloquea por nombre los métodos de confirmación (`controllers/validators_base.py:233-255`) y las rutas exigen token (`controllers/verification_ui.py:37-97`). Pero `action_confirm_and_execute` y `action_execute_plan` siguen públicos y sin token (`models/safe_operation.py:1765-1831`), y el token se obtiene por RPC (`:2003-2048`; `verification_ui.py:142-146`) | **PARCIAL** | El argumento contra el PIN es razonable frente al modelo (un secreto que el modelo puede leer no sirve). No cubre la amenaza original de PNS-54, un script en la página (§3, PNS-54; P-54a y P-54b). Riesgo que queda: el residual del saneador (D26 y D29) |
 | PNS-02 (parte) — acciones de vista y obligatoriedad con `group_ai_admin` | «Las acciones de grupos sí pasan a exigir `base.group_system`» | Ninguna exige `base.group_system`: se prohíbe la cúspide a todos (`models/ai_system_action.py:700-775`; §2.1, PNS-01/02). Las acciones de vista exigen `group_ai_admin` (`data/trusted_actions_system.xml:7-64`) | **NO CORREGIDO** (la defensa no existe tal como se describe) | Sobre las acciones de vista coincidimos (decisión de diseño aceptada). Sobre los grupos, el criterio es otro: un AI Administrator sin Ajustes puede dar o quitar cualquier grupo no cúspide (decisión N12; parche 12). Además, el AI Administrator puede editar el registro de acciones de confianza (PNS-97) |
 | PNS-26 (parte) — quitar los `commit()` de la Caja B | Si la herramienta falla, `/mcp` y el motor deshacen lo no guardado; lo que el plan confirmó se queda; el cursor es REPEATABLE READ y el claim va en cursor propio | `/mcp`: `rollback` (`controllers/main.py:1357-1360`). Motor: `SAVEPOINT` en SQL directo, que en Odoo 14 no cubre escrituras diferidas (`utils/engine_tool_run.py:323-357`; §5.6, PNS-26). REPEATABLE READ (`odoo/sql_db.py:420`). Claim en cursor propio (`models/safe_operation.py:1201-1265`) | **PARCIAL** | Razonable: los `commit` de confirmar y ejecutar son la función (la petición siguiente tiene que ver el cambio). Riesgo que queda: los `commit()` sobre el cursor de la petición (`safe_operation.py:918, 927, 1325, 1424, 1468`) confirman también lo que haya pendiente en esa transacción |
@@ -1557,7 +1568,7 @@ informe o propuesta). Los que vienen de fichas ya abiertas en 3.1.782 (PNS-54, 0
 - Alta desde el 23/10/2026: PNS-70, CONFIRMADO en 3.1.879 en la fase 3 (§5.6). En 3.1.782 Chart.js
   4.4.8 también ocupa `window.Chart`, sin efecto observado en los gráficos de Odoo (staging); el
   origen está en las dos (también con (a)).
-- Media: PNS-61, 36 y 84, PARCIAL (§3); PNS-29 parte y petición de §5, PARCIAL
+- Media: PNS-61 y 84, PARCIAL (§3; PNS-36, cerrada por Seges: parche 23 ampliado y test de E4′.a); PNS-29 parte y petición de §5, PARCIAL
   (§6.1); M1, M2 y F1, nuevos (§8.7).
 - Baja: PNS-88 y PNS-50/77, PARCIAL (§5.6); D1, nuevo (§8.7); F4, hallado en la fase 3 (§8.7).
 - Sin gravedad asignada: PNS-18, PARCIAL (§6.1, §7.1); PNS-81, degradación en Chatboo sin efecto de

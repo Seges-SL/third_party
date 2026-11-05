@@ -9,7 +9,8 @@
 - **Registro de los cambios en el código:** [parches_pns_ai.md](parches_pns_ai.md).
 - **Plan anterior:** [plan_correccion_pns_ai.md](plan_correccion_pns_ai.md) (base 3.1.782), referencia
   de la rama `14.0-pns-ai-correcciones`.
-- **Estado del plan:** E3′ validada en staging (04/11/2026; `522ce6e` en `pns_demo`); siguiente, E4′. Registro: aprobado (23/10/2026); E0′ terminada el 23/10/2026: parte A (tests) validada en
+- **Estado del plan:** E4′.a (parches 30 a 33) aplicada, con tests en verde, neutralizada y aprobada en
+  revisión (05/11/2026); siguiente, E4′.b (parche 34). Registro: aprobado (23/10/2026); E0′ terminada el 23/10/2026: parte A (tests) validada en
   laboratorio y diagnóstico de PNS-70 hecho ([pns70_diagnostico_3879.md](pns70_diagnostico_3879.md)).
   Rama `14.0-pns-ai-3879` publicada el 23/10/2026 (desde `dafb316`). Siguiente: E1′.
   E1′ validada en laboratorio el 23/10/2026 (parches 10 y 12 adaptados y 13 a 16); siguiente: subida al
@@ -43,11 +44,18 @@
   del parche 29 el 03/11/2026 ([lab_p29_3879.md](lab_p29_3879.md)): validado. Siguiente: el staging de E3′.
   E3′ validada en staging el 03 y 04/11/2026 (`522ce6e` en `pns_demo`; R8 de E1′ cerrada);
   [staging_e3_3879.md](staging_e3_3879.md), apartado G. Siguiente: E4′.
+  E4′.0 cerrada el 04/11/2026: hoja de Medios y Bajos con las decisiones de Sergio
+  ([e4_hoja_3879.md](e4_hoja_3879.md); `ca707a9`). Propuesta de E4′.a y E4′.b aprobada
+  ([e4_propuesta_3879.md](e4_propuesta_3879.md)).
+  E4′.a aplicada el 05/11/2026 (parches 30 a 33 y el test de PNS-36): tests en verde (464 · 18 F · 32 E,
+  los mismos 50 de la línea base), neutralizada y aprobada en revisión por `odoo-reviewer`. Siguiente: E4′.b
+  (parche 34); después, E4′.h y una sola subida al staging.
 
 ## 1. Cómo se trabaja
 
 **Reglas (las de N11):**
-- Un commit por parche y otro por los tests de cada entrega.
+- Tres commits por entrega desde E2′: código (todos sus parches), tests y documentación (errata del
+  05/11/2026: antes decía «un commit por parche y otro por los tests de cada entrega»).
 - Marcador `Seges: parche N` junto a cada cambio.
 - Entrada de cada parche en [parches_pns_ai.md](parches_pns_ai.md).
 - Test negativo de Seges para cada parche.
@@ -75,7 +83,7 @@
 | **E1′** | Críticos y Altos baratos: M10 con el parche 12 adaptado, PNS-54, PNS-07, M13, `collect_pin` (PNS-83) | 10 y 12 adaptados; 13 (M10), 14 (M13), 15 (PNS-07) y 16 (PNS-54) | Validada en laboratorio (23/10/2026) y en staging (26/10/2026); cerrada el 27/10/2026, con R8 no concluyente por el proveedor (se valida en E3′); R8 OK en el laboratorio de E3′ (30/10/2026), con el defecto de `keys` del fabricante (hoja de E4′); R8 validada en el staging de E3′ (03/11/2026) |
 | **E2′** | Resto de Altos: papelera del diario (PNS-37), PNS-19, PNS-17, PNS-82, PNS-70; PNS-20 (confirmado por P-20); PNS-100 y PNS-101 (nuevos) | 11 adaptado; 17 (PNS-37), 18 (PNS-19), 19 (PNS-17), 20 (PNS-70), 21 (PNS-20), 22 (PNS-100), 23 (PNS-101, ampliado) y 24 (PNS-102) | Aplicada (27/10/2026): tests en verde y neutralización hecha; parche 18 corregido tras la revisión y parche 23 nuevo (27/10/2026). **Aprobada en revisión (28/10/2026)** con la herramienta real (vía A, shell; vía B, `/mcp`): las dos evasiones críticas, cerradas. Validada en laboratorio (28/10/2026). **Validada en staging (29/10/2026)**: commit `9a2970d` ([staging_e2_3879.md](staging_e2_3879.md), apartado G) |
 | **E3′** | Lienzo: M1, M2, F1 y D1 (D1 pasa de E4′ a E3′: decisión de Sergio del 29/10/2026) | 25 (M1), 26 (M2), 27 (F1) y 28 (D1); la ventana del parche 18 se mantiene; 29 (F1, P-8e a, 30/10/2026) | **Aplicada (29/10/2026)**: tests en verde y neutralización hecha; rechazada en la primera revisión (B1, parche 27 b) y corregida; **aprobada en revisión (29/10/2026)**; pruebas manuales del laboratorio hechas el 30/10/2026 ([lab_e3_3879.md](lab_e3_3879.md)); P-8e a falló y se corrigió con el parche 29, validado en laboratorio el 03/11/2026 ([lab_p29_3879.md](lab_p29_3879.md)). **Validada en staging (04/11/2026)**: commit `522ce6e` ([staging_e3_3879.md](staging_e3_3879.md), apartado G) |
-| **E4′** | Hoja de Medios y Bajos (corregir o aceptar); después, lo elegido | Nuevos, si se corrige algo | Pendiente |
+| **E4′** | Hoja de Medios y Bajos (corregir o aceptar); después, lo elegido: E4′.a (seguridad: M11, M12, PNS-97, PNS-29 resto 3 y el test de PNS-36), E4′.b (el aviso del lienzo, fila 30 de la hoja) y E4′.h (script de pruebas) | 30 (M11), 31 (M12), 32 (PNS-97) y 33 (PNS-29), en E4′.a; 34 (PNS-96), en E4′.b | **E4′.0 cerrada (04/11/2026)**: hoja con las decisiones de Sergio ([e4_hoja_3879.md](e4_hoja_3879.md); `ca707a9`). **E4′.a aplicada (05/11/2026)**: tests en verde, neutralizada y **aprobada en revisión** ([propuesta](e4_propuesta_3879.md), «Resultado de E4′.a»). E4′.b y E4′.h, pendientes; después, una sola subida al staging |
 
 Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`; línea de 3.1.879).
 
@@ -118,7 +126,7 @@ Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`;
       propio de `request_safe_plan` vea al usuario.
   - Marcador sin número ni PNS: `Seges: parche de tests E0′ (datos de prueba)`. Registro en
     [parches_pns_ai.md](parches_pns_ai.md), «Cambios en tests del fabricante».
-  - Queda en F, sin tocar y pendiente de decisión de Sergio,
+  - Queda en F, sin tocar y aceptado como desfasado (igual que en el registro y en el apartado E2′),
     `test_failed_execute_journals_outside_rollback`: no se arregla con datos de prueba (texto de error
     antiguo y lectura con una transacción anterior al commit).
 - **Línea base nueva** con los tests de Seges. Referencia: 202 tests, 17 F y 35 E (fase 3, parte 1).
@@ -372,7 +380,7 @@ corrige lo elegido.
 | `onchange_email` y Gravatar (E2′) | Propuesta de E2′, «PNS-100: barrido» | core `res.partner.onchange_email` (`odoo/addons/base/models/res_partner.py:372, 870`): petición a Gravatar con el MD5 del correo desde la caja A |
 | `bus.presence.update` en cursor propio (E2′) | Propuesta de E2′, «PNS-100: barrido» | core `bus/models/bus_presence.py:36`; fuera de la lista del parche 22 porque bloquearía `dict.update` |
 | Orden por un campo secreto en la caja A (E2′) | [Registro](parches_pns_ai.md), parche 18, observaciones | `search(order='api_key')` no se filtra: oráculo débil entre filas existentes |
-| `customer_360._iso` (E2′, 28/10/2026) | [Registro](parches_pns_ai.md), parche 23, tests (`test_seges_skill_env.py`) | `pns_ai_chatboo/ai/skills/system/customer_360.py:70-75`, `_iso`: llama a `isoformat()` y falla cuando la fecha llega como `str`; la skill de fábrica falla con un cliente en `lab_pns_ai_3879_14`. Funcional, no de seguridad y ajeno a los parches; código de fábrica (decidir si se parchea o solo se comunica) |
+| `customer_360._iso` (E2′, 28/10/2026) | [Registro](parches_pns_ai.md), parche 23, tests (`test_seges_skill_env.py`) | `pns_ai_chatboo/ai/skills/system/customer_360.py:70-75`, `_iso`: la skill de fábrica falla con un cliente en `lab_pns_ai_3879_14` porque `ensure_module_result_call` (`pns_ai_mcp/utils/relaxaicode_recipe.py:370`) añade al final del código `result = _iso(_q)` y `_iso` recibe el texto del cliente buscado ([hoja de E4′](e4_hoja_3879.md), ficha 22). Errata del 05/11/2026: decía «llama a `isoformat()` y falla cuando la fecha llega como `str`»; ningún campo llega como `str`. Funcional, no de seguridad y ajeno a los parches; código de fábrica. **Decidido:** al informe, sin parche (segunda ronda de la hoja, decisión 4) |
 | «Test Connection» escribe en el proveedor (staging E2′, 29/10/2026) | [Staging E2′](staging_e2_3879.md), «Resultado de la subida (29/10/2026)», A.7 | `models/ai_provider.py:1078` (`test_connection`): asigna `temperature_support`, `stt_support` y `usage_support` (`:1140-1154`), y el registro `ai_provider` cambia de `write_date`. Afecta a la lectura de P-20 A: el «antes» se toma después de cualquier «Test Connection» |
 | Etiqueta del cliente MCP del script de pruebas (staging E2′, 29/10/2026) | [Staging E2′](staging_e2_3879.md), D.1 | [`scripts_e2/pruebas_e2p_lab.py`](scripts_e2/pruebas_e2p_lab.py) se identifica como `seges-e2p-lab` también en el staging y queda en `last_mcp_client_label` del usuario que conecta. Script de Seges, no código de fábrica: decidir si toma la etiqueta del entorno |
 | La autenticación MCP no consulta el estado de la clave (staging E2′, 29/10/2026) | [Staging E2′](staging_e2_3879.md), D.3 | `controllers/main.py:473, 689, 837`: buscan `ai.mcp.user` solo por `mcp_api_key_hash` y no miran `mcp_api_key_state`. Revocar (`models/mcp_api_key_wizard.py:85-90`) borra el hash, así que hoy funciona; queda anotado por si alguna vía deja `not_generated` con el hash puesto |
@@ -415,13 +423,65 @@ estándar), sin parche; en la caja A lo cubre el parche 18 (decisión de Sergio 
        LIYBEN se **revocaron el 27/10/2026** hasta el despliegue final de E2′ (C1/V1/V2 y C2 permitían leer
        credenciales y datos ajenos desde el sandbox). **Tras desplegar E2′, volver a generar las claves MCP**
        (ficha de `ai.api.server` / `ai.mcp.user`) y comprobar que los clientes vuelven a conectar.
+   - **Antes del despliegue (E4′.a, 05/11/2026):**
+     - **AI Administrators y Ajustes (parche 32, decisión 10 de la hoja):** consultar si los dos AI
+       Administrators de LIYBEN tienen Ajustes (`base.group_system`). Si no los tienen, ya no podrán crear,
+       cambiar ni borrar acciones de confianza (ni con un plan). Consulta de solo lectura; **borrador sin
+       ejecutar; revisar antes de usar**:
+       ```sql
+       SELECT u.id, u.login,
+              EXISTS (SELECT 1 FROM res_groups_users_rel r2 JOIN ir_model_data d2
+                        ON d2.model = 'res.groups' AND d2.res_id = r2.gid
+                       WHERE r2.uid = u.id AND d2.module = 'base' AND d2.name = 'group_system') AS ajustes
+         FROM res_users u
+         JOIN res_groups_users_rel r ON r.uid = u.id
+         JOIN ir_model_data d ON d.model = 'res.groups' AND d.res_id = r.gid
+        WHERE d.module = 'pns_ai_mcp' AND d.name = 'group_ai_admin' AND u.active;
+       ```
+     - **Llamadores en los módulos propios de LIYBEN (parches 30 a 33):** buscar en su repositorio de
+       módulos propios quién usa lo que cambia de comportamiento; si sale algo, revisarlo antes del `-u`
+       (`chat_completion` sin `sudo()`, escrituras en `ai.trusted.action` fuera de `su`, `month_usage`, que
+       deja de existir, o un `log_*` con el `user_id` de otro):
+       ```sh
+       grep -rnE "chat_completion|ai\.trusted\.action|ai_trusted_action|month_usage|log_llm_inference|log_provider_" <repo de módulos propios de LIYBEN> --include=*.py --include=*.xml --include=*.js
+       ```
+     - **Operaciones confirmadas y sin ejecutar con pasos sobre `ai.trusted.action` (parche 32,
+       observación de la revisión):** en el staging y en LIYBEN, antes del `-u`. Si las propuso un AI
+       Administrator sin Ajustes, fallarán en el reintento de `_cleanup_stuck_state` y quedarán como plan
+       fallido. **Borrador sin ejecutar; revisar antes de usar** (en especial, las columnas frente al
+       esquema real de `ai_safe_operation`; tomado del dominio de `_retry_confirmed_not_executed` y de
+       `operation_data`, donde van los `plan_steps`):
+       ```sql
+       SELECT id, user_id, create_date
+         FROM ai_safe_operation
+        WHERE status = 'confirmed' AND NOT executed
+          AND operation_data LIKE '%ai.trusted.action%';
+       ```
+     - **Casilla «Design» (hoja, ficha 29; decisión 6 de la segunda ronda):** tras el `-u`, «Design» solo en
+       `gemini-3.5-flash` (no en `lite`) y comprobar que al menos un proveedor la tiene.
 2. **Informe al fabricante:** M10, M13, `collect_pin`, PNS-54, PNS-07, PNS-97, PNS-98, PNS-70, PNS-100, F4, la
    nota falsa sobre `agent_id` (comparación §9.3) y, como observación, la numeración de `pns_base`
    1.2.47 (§9.1). Pendiente de comunicar al final (28/10/2026): PNS-101 y PNS-102 (Críticas) y
    `customer_360._iso` (fallo funcional de la skill de fábrica; hoja de E4′). Pendiente de comunicar al
    final (29/10/2026): la casilla AI Conversational de Usuarios MCP (`is_ai_conversational`,
    `models/mcp_user.py:174-181` y `:310-312`), que al marcarla y guardar no pone el grupo (hoja de E4′,
-   fila «Casilla AI Conversational en Usuarios MCP»). Sin rutas locales, kit, laboratorio, clientes ni personas.
+   fila «Casilla AI Conversational en Usuarios MCP»). Pendiente de comunicar al final (05/11/2026,
+   E4′.a; [hoja de E4′](e4_hoja_3879.md), «Candidatas al informe al fabricante»):
+   - **M11:** los `log_*` públicos de `ai.execution.engine` escriben filas del Historial IA a nombre de
+     cualquier usuario, por RPC y con cursor propio (Seges, parche 30);
+   - **M12:** `chat_completion` público hace inferencia con la clave de la empresa por RPC (Seges, parche 31);
+   - **PNS-29, resto 3:** `month_usage` público da tokens y coste del mes a cualquier usuario autenticado,
+     también a un portal, y `default_get` y la primera llamada a `onchange` del asistente de uso dan las
+     mismas cifras sin comprobar la ACL (Seges, parche 33);
+   - **PNS-97,** ampliado: además del RPC, la vía del plan (un paso CRUD sobre `ai.trusted.action`), los
+     campos `group_ids`, `label` y `danger`, y el «confused deputy» (plan propuesto por un AI Administrator
+     sin Ajustes y confirmado por un administrador con Ajustes) (Seges, parche 32);
+   - **defecto de `keys`:** la muestra para Design lleva `keys` y el DATA que escribe el servidor
+     (`_flat_rows`) no; los diseños que dependen de `keys` salen vacíos;
+   - **`customer_360._iso`,** con la causa corregida: es un defecto de `ensure_module_result_call`, que añade
+     `result = <última función>(…)` aunque `result` se asigne dentro de bloques (hoja, ficha 22).
+
+   Sin rutas locales, kit, laboratorio, clientes ni personas.
 3. **Limpieza:** staging `pns_demo`, `lab_pns_ai` / `lab_pns_ai_14` y `_fabricante/`.
 
 ## 4. Estado del entorno
@@ -449,6 +509,21 @@ estándar), sin parche; en la caja A lo cubre el parche 18 (decisión de Sergio 
     `admin` y `e2p_writer` revocadas. En el diario quedan las filas 13 a 16 de P-37b, R6 y R7.
   - Restos para la limpieza final (archivos en `/tmp` del VPS y en el equipo de Sergio): lista en el
     apartado G del documento de staging.
+- **Staging `pns_demo`, tras E3′ (03 y 04/11/2026):**
+  - Código de `522ce6e` montado (710 archivos, huella `6ac645fc…44e5`); versiones sin cambios (`1.2.47`,
+    `3.1.879` y `2.1.538`). Vuelta atrás: código anterior en `addons_antes_E3p` (huella `7a6c7144…`).
+  - R8 de E1′ cerrada, con `lite` como **excepción documentada a la decisión 6** (toda la tarde del 03/11
+    diseñó `lite`); se repite, sin bloquear, en la subida de E4′.
+  - Casillas «Design» de los tres Gemini, marcadas: se dejan hasta la subida de E4′ (hoja de E4′, ficha 29).
+  - De las pruebas: sesiones 49 a 57; contactos 59, 60 y 65 archivados; `e3p_portal` (26) archivado;
+    `demo` y `portal`, archivados como estaban; clave MCP de `admin` revocada. Disco al 87 %.
+  - Restos para la limpieza final: lista en [staging_e3_3879.md](staging_e3_3879.md), apartado G, «Restos
+    para la limpieza final».
+- **`lab_pns_ai_3879_14`, tras la revisión de la hoja de E4′ (04/11/2026):** filas **758 a 761** de
+  `ai_log` (`capability_skipped`, `user_id` 2), que dejó `log_no_page` al ejecutar la skill `customer_360`
+  en el shell (el `rollback` no deshace los cursores propios). Se conservan (decisión de Sergio).
+  Casilla «Design» de `lite` (proveedor 4) en el laboratorio: **pendiente de quitar** (la quita Sergio;
+  hoja de E4′, decisión 6 de la segunda ronda).
 - **LIYBEN:** usuarios externos archivados el 23/10/2026.
 - **LIYBEN, segundo rechazo de E2′ (27/10/2026):** claves MCP **revocadas** hasta el despliegue final de E2′
   (PNS-101 ampliado y PNS-102). Paso pendiente al terminar: **regenerarlas** (ver §3.1).
@@ -464,7 +539,7 @@ Estados (N11): aplicado → validado en laboratorio → validado en staging → 
 | 12 | PNS-01 y PNS-02 (criterio de grupos), con M10 | E1′ | Adaptado a 3.1.879; validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
 | 13 | M10 (`create` de `ai.safe.operation`; `_cleanup_stuck_state`) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
 | 14 | M13 (`_unlink_retired_from_module`) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
-| 15 | PNS-07 (métodos con cursor propio en la lista del sandbox) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026); R8 (lienzo) se valida en E3′; R8 OK en el laboratorio de E3′ (30/10/2026), con un defecto previo del fabricante: la muestra para Design lleva `keys` y el DATA real (`_flat_rows`) no; los diseños que dependen de `keys` salen vacíos y los salva la tabla de rescate (para E4′) |
+| 15 | PNS-07 (métodos con cursor propio en la lista del sandbox) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026); R8 (lienzo) se valida en E3′; R8 OK en el laboratorio de E3′ (30/10/2026), con un defecto previo del fabricante: la muestra para Design lleva `keys` y el DATA real (`_flat_rows`) no; los diseños que dependen de `keys` salen vacíos y los salva la tabla de rescate (para E4′); R8 validada en el staging de E3′ (03/11/2026), con `lite` como excepción documentada a la decisión 6 |
 | 16 | PNS-54 (`check_identity`; token solo para el dueño) | E1′ | Validado en laboratorio (23/10/2026); validado en staging (26/10/2026) |
 | 17 | PNS-37 (diario solo para el sistema; borrar con permiso de borrado) | E2′ | Aplicado, tests en verde (27/10/2026); validado en laboratorio (28/10/2026; P-37b por test); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): P-37w/c y P-37b a mano |
 | 18 | PNS-19 (credenciales en la caja A; ventana del lienzo) | E2′ | Aplicado, tests en verde (27/10/2026); rechazado en la revisión y corregido el mismo día (alias, ids, caché); validado en laboratorio (28/10/2026); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): P-19; ventana a revisar en E3′; revisada en E3′ (29/10/2026): se mantiene |
@@ -474,9 +549,13 @@ Estados (N11): aplicado → validado en laboratorio → validado en staging → 
 | 22 | PNS-100 (envíos y conexiones desde la caja A) | E2′ | Aplicado, tests en verde (27/10/2026); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): sin prueba propia, cubierto por los tests y la no regresión |
 | 23 | PNS-101 (el `env` de la caja A no lleva a los entornos reales del hilo) | E2′ | Aplicado, tests en verde (27/10/2026); validado en laboratorio (28/10/2026, P-101 y P-101′); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): P-101 |
 | 24 | PNS-102 (`user`/`company` del sandbox sin `su`) | E2′ | Aplicado; validación local y neutralización (28/10/2026); validado en laboratorio (28/10/2026, P-102); validado en staging (29/10/2026; [staging](staging_e2_3879.md), apartado G): sin prueba propia allí |
-| 25 | M1 (`paint_canvas` privado y con dueño) | E3′ | Aplicado; aprobado en revisión (29/10/2026); validado en laboratorio (30/10/2026): P-8c OK |
-| 26 | M2 (imágenes del lienzo sin `su`) | E3′ | Aplicado; aprobado en revisión (29/10/2026); validado en laboratorio (30/10/2026): P-8d OK |
-| 27 | F1 (JSON seguro en `<script>`, CSP al servir, regla de diseño, `X-Frame-Options`) | E3′ | Aplicado; aprobado en revisión (29/10/2026); P-8e b y X-Frame-Options OK en laboratorio (30/10/2026); P-8e a falló → parche 29 |
-| 28 | D1 (dueño fijo, solo internos, AI Administrator solo lee y borra) | E3′ | Aplicado; aprobado en revisión (29/10/2026); validado en laboratorio (30/10/2026): P-8h OK |
-| 29 | F1 (el lienzo no guarda un DATA que no escribió el servidor; P-8e a) | E3′ | Aplicado; aprobado en revisión (30/10/2026); validado en laboratorio (03/11/2026) |
+| 25 | M1 (`paint_canvas` privado y con dueño) | E3′ | Aplicado; aprobado en revisión (29/10/2026); validado en laboratorio (30/10/2026): P-8c OK; validado en staging (04/11/2026; [staging](staging_e3_3879.md), apartado G) |
+| 26 | M2 (imágenes del lienzo sin `su`) | E3′ | Aplicado; aprobado en revisión (29/10/2026); validado en laboratorio (30/10/2026): P-8d OK; validado en staging (04/11/2026; [staging](staging_e3_3879.md), apartado G) |
+| 27 | F1 (JSON seguro en `<script>`, CSP al servir, regla de diseño, `X-Frame-Options`) | E3′ | Aplicado; aprobado en revisión (29/10/2026); P-8e b y X-Frame-Options OK en laboratorio (30/10/2026); P-8e a falló → parche 29; validado en staging (04/11/2026; [staging](staging_e3_3879.md), apartado G) |
+| 28 | D1 (dueño fijo, solo internos, AI Administrator solo lee y borra) | E3′ | Aplicado; aprobado en revisión (29/10/2026); validado en laboratorio (30/10/2026): P-8h OK; validado en staging (04/11/2026; [staging](staging_e3_3879.md), apartado G) |
+| 29 | F1 (el lienzo no guarda un DATA que no escribió el servidor; P-8e a) | E3′ | Aplicado; aprobado en revisión (30/10/2026); validado en laboratorio (03/11/2026); validado en staging (04/11/2026; [staging](staging_e3_3879.md), apartado G) |
+| 30 | M11 (los `log_*` públicos solo a nombre del usuario actual e interno) | E4′.a | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
+| 31 | M12 (`chat_completion` solo en `su`) | E4′.a | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
+| 32 | PNS-97 (`create`, `write` y `unlink` de `ai.trusted.action` exigen Ajustes fuera de `su`; criterio combinado dentro de un plan) | E4′.a | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
+| 33 | PNS-29 resto 3 (`_month_usage` privado; `default_get` del asistente de uso con la ACL) | E4′.a | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
 | — | Parche de tests E0′ (datos de prueba de `test_change_journal` y `test_paap_core`) | E0′ | Validado en laboratorio (23/10/2026) |
