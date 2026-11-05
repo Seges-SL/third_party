@@ -6,7 +6,8 @@ import json
 import logging
 
 from odoo import api, models, _
-from odoo.exceptions import RedirectWarning, UserError
+# Seges: parche 30 (M11, seguridad). Ver docs/pendiente/parches_pns_ai.md
+from odoo.exceptions import AccessError, RedirectWarning, UserError
 
 from ..utils.llm_usage import (
     advertise_cost,
@@ -155,6 +156,18 @@ class AIExecutionEngine(models.AbstractModel):
             or stamp.get('client_label')
         )
         return code, door, label
+
+    # Seges: parche 30 (M11, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    def _check_log_user(self, user_id=None):
+        """The public log_* write AI History rows on their own cursor. Outside
+        the system, only an internal user, and only for himself."""
+        if self.env.su:
+            return
+        if not self.env.user.has_group('base.group_user'):
+            raise AccessError(_('Only internal users can write AI History rows.'))
+        if user_id and user_id != self.env.uid:
+            raise AccessError(_(
+                'Only the system can write AI History rows for another user.'))
 
     def _get_agent(self, agent_code):
         """Resolve an agent code to an ai.agent record.
@@ -408,6 +421,8 @@ class AIExecutionEngine(models.AbstractModel):
         tick the box reads the log. The row lands on the same turn thread,
         so the Historial IA shows what was asked and what was missing.
         """
+        # Seges: parche 30 (M11, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self._check_log_user(user_id)
         if 'ai.log' not in self.env:
             return
         from .ai_log import CAPABILITY_SKIPPED
@@ -446,6 +461,8 @@ class AIExecutionEngine(models.AbstractModel):
         hilo del histórico y con el usuario humano (no Administrator). Si no se
         pasan, se intenta resolver desde el request (compatibilidad).
         """
+        # Seges: parche 30 (M11, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self._check_log_user(user_id)
         if 'ai.log' not in self.env:
             return
         Log = self.env['ai.log'].sudo()
@@ -550,6 +567,8 @@ class AIExecutionEngine(models.AbstractModel):
         Streaming (Chatboo) and headless callers use this — they do not write
         ``ai.log`` themselves for provider traffic.
         """
+        # Seges: parche 30 (M11, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self._check_log_user(user_id)
         if 'ai.log' not in self.env:
             return
         Log = self.env['ai.log'].sudo()
@@ -608,6 +627,8 @@ class AIExecutionEngine(models.AbstractModel):
         The row keeps the text and the tool calls (with their arguments)
         the model sent back.
         """
+        # Seges: parche 30 (M11, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self._check_log_user(user_id)
         if 'ai.log' not in self.env:
             return
         Log = self.env['ai.log'].sudo()
@@ -688,6 +709,8 @@ class AIExecutionEngine(models.AbstractModel):
         A single row keeps what the model was sent (``prompt_data``) and what
         it answered (``result_data``) when the caller has them.
         """
+        # Seges: parche 30 (M11, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self._check_log_user(user_id)
         if 'ai.log' not in self.env:
             return
         agent_code, source_channel, client_label = self._bind_log_identity(
@@ -764,6 +787,8 @@ class AIExecutionEngine(models.AbstractModel):
         Writes the same ORCH→LLM / LLM→ORCH pair as streaming, so headless
         callers (OCR, ACL naming) and Chatboo share one logging gate.
         """
+        # Seges: parche 30 (M11, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self._check_log_user(user_id)
         n_msgs = len(messages or [])
         n_tools = len(tools or [])
         model_label = self._provider_model_label(provider)
@@ -867,6 +892,9 @@ class AIExecutionEngine(models.AbstractModel):
         :returns: OpenAI-shaped response dict
         :raises UserError: If all providers fail or context overflow detected
         """
+        # Seges: parche 31 (M12, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        if not self.env.su:
+            raise AccessError(_('Only the system can call chat_completion.'))
         agent_code = self.env['ai.agent'].resolve_inference_agent_code(agent_code)
         provider_id = kwargs.pop('provider_id', None)
         need = kwargs.pop('need', None)
