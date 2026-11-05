@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2026 Seges
-# Seges: parches 25 a 29 (tests de la entrega E3′). Ver docs/pendiente/parches_pns_ai.md
+# Seges: parches 25 a 29 (tests de la entrega E3′) y 34 (E4′.b). Ver docs/pendiente/parches_pns_ai.md
 """Entrega E3′, el lienzo (docs/pendiente/e3_propuesta_3879.md, «Propuesta final»).
 
 - Parche 25 (M1): ``paint_canvas`` pasa a ``_paint_canvas`` y comprueba el dueño.
@@ -12,6 +12,8 @@
 - Parche 29 (P-8e a): rescate si queda un DATA que no escribió el servidor o un valor con
   ``<``, ``>`` o ``"`` en crudo; muestra a Design escapada; la edición sin filas vuelve a
   meter las de la página abierta; regla de ``textContent``.
+- Parche 34 (PNS-96, E4′.b, docs/pendiente/e4_propuesta_3879.md): aviso fijo del servidor
+  cuando ``log_no_page`` rechaza en el turno de un job de Chatboo.
 
 Base ``HttpCase`` (``SegesChatbooCase``): los cursores propios de ``_store_design``
 comparten la transacción del test. El driver de diseño está sustituido, como en
@@ -749,3 +751,96 @@ class TestSegesCanvasModelData(_SegesCanvasCase):
         for prompt in (canvas._PAGE_RULES, canvas.DESIGN_SYSTEM, canvas.EDIT_SYSTEM):
             self.assertIn(rule, prompt)
             self.assertIn('Never insert them with innerHTML', prompt)
+
+
+# Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
+NO_PAGE_ACC = 'He actualizado el color de fondo.'
+NO_PAGE_NOTICE = 'No page was built. The reason is in the AI History.'
+
+
+@tagged('post_install', '-at_install', 'pns_ai_chatboo', 'seges_e4p')
+class TestSegesNoPageNotice(_SegesCanvasCase):
+    """Parche 34: aviso fijo del servidor cuando ``log_no_page`` rechaza en un turno."""
+
+    def setUp(self):
+        super().setUp()
+        self.env_a = self.env(user=self.user_a)
+        self.job = self._job()
+
+    def _job(self):
+        return self.env['chatboo.async.request'].with_user(self.user_a)._enqueue(
+            self.session_a.id, 'seges e4p',
+        )
+
+    def _watch(self, job, session):
+        """Abre la marca como ``_process`` y la deshace al acabar el test."""
+        token = canvas.watch_no_page(job.id, session.id, session.canvas_rev)
+        self.addCleanup(canvas._NO_PAGE_WATCH.reset, token)
+
+    def _save(self, job, acc=NO_PAGE_ACC):
+        res = job.with_user(self.user_a)._save_to_session(acc, {}, error=None)
+        last = self._fresh(self.session_a).get_messages()[-1]
+        self.assertEqual(last['role'], 'assistant')
+        return res, last
+
+    def _assert_notice(self, res, last, content, acc=NO_PAGE_ACC):
+        self.assertEqual(last['content'], content)
+        self.assertEqual(last['original_content'], acc)
+        self.assertEqual(res.get('assistant_content'), content)
+
+    def _assert_no_notice(self, res, last):
+        self.assertEqual(last['content'], NO_PAGE_ACC)
+        self.assertEqual(last['original_content'], NO_PAGE_ACC)
+        self.assertNotIn('assistant_content', res)
+
+    def test_notice_after_refusal(self):
+        self._watch(self.job, self.session_a)
+        canvas.log_no_page(self.env_a, 'seges e4p', self.session_a.id)
+        res, last = self._save(self.job)
+        self._assert_notice(
+            res, last, NO_PAGE_ACC + '\n\n_' + NO_PAGE_NOTICE + '_',
+        )
+
+    def test_notice_unknown_session(self):
+        self._watch(self.job, self.session_a)
+        canvas.log_no_page(self.env_a, 'seges e4p')
+        res, last = self._save(self.job)
+        self._assert_notice(
+            res, last, NO_PAGE_ACC + '\n\n_' + NO_PAGE_NOTICE + '_',
+        )
+
+    def test_notice_empty_answer(self):
+        self._watch(self.job, self.session_a)
+        canvas.log_no_page(self.env_a, 'seges e4p', self.session_a.id)
+        res, last = self._save(self.job, acc='')
+        self._assert_notice(res, last, '_' + NO_PAGE_NOTICE + '_', acc='')
+
+    def test_no_notice_without_refusal(self):
+        self._watch(self.job, self.session_a)
+        self._assert_no_notice(*self._save(self.job))
+
+    def test_no_notice_when_page_changed(self):
+        rev = self.session_a.canvas_rev
+        self._watch(self.job, self.session_a)
+        canvas.log_no_page(self.env_a, 'seges e4p', self.session_a.id)
+        self.session_a.sudo().write({'canvas_rev': rev + 1})
+        self._assert_no_notice(*self._save(self.job))
+
+    def test_no_notice_other_job(self):
+        self._watch(self.job, self.session_a)
+        canvas.log_no_page(self.env_a, 'seges e4p', self.session_a.id)
+        other = self._job()
+        self._assert_no_notice(*self._save(other))
+
+    def test_no_notice_other_session(self):
+        self._watch(self.job, self.session_a)
+        canvas.log_no_page(self.env_a, 'seges e4p', self.session_b.id)
+        self._assert_no_notice(*self._save(self.job))
+
+    def test_no_watch(self):
+        token = canvas._NO_PAGE_WATCH.set(None)
+        self.addCleanup(canvas._NO_PAGE_WATCH.reset, token)
+        self.assertEqual(
+            canvas.log_no_page(self.env_a, 'seges e4p', self.session_a.id), '',
+        )
+        self._assert_no_notice(*self._save(self.job))
