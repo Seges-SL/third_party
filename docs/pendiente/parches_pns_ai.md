@@ -9,7 +9,7 @@
   (staging de E2), el 2026-10-23 (cambio de base a 3.1.879 y E1′), el 2026-10-26 (staging de E1′), el
   2026-10-27 (repetición de R8; E2′: parches 11 adaptado y 17 a 22), el 2026-10-29 (E3′: parches 25 a 28),
   el 2026-10-30 (parche 29), el 2026-11-03 (laboratorio del parche 29), el 2026-11-04 (staging de E3′:
-  parches 25 a 29) y el 2026-11-05 (E4′.a: parches 30 a 33)
+  parches 25 a 29) y el 2026-11-05 (E4′.a: parches 30 a 33; E4′.b: parche 34)
 - **Versión del fabricante, base propia de Seges desde el 20/10/2026 (N12):** `pns_base` 14.0.1.2.32 ·
   `pns_ai_mcp` 14.0.3.1.782 · `pns_ai_chatboo` 14.0.2.1.453
 - **Desde el 23/10/2026 (N12, b′), en `14.0-pns-ai-3879`:** `pns_base` 14.0.1.2.47 · `pns_ai_mcp`
@@ -137,6 +137,7 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 | 31 | M12 | seguridad | `pns_ai_mcp/models/ai_execution_engine.py` | E4′.a | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
 | 32 | PNS-97 | seguridad | `pns_ai_mcp/models/ai_trusted_action.py` | E4′.a | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
 | 33 | PNS-29 | seguridad | `pns_ai_mcp/models/ai_provider.py`, `pns_ai_mcp/wizard/ai_provider_usage_wizard.py` | E4′.a | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
+| 34 | PNS-96 | funcional | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_async_request.py` | E4′.b | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
 
 Parches 11 adaptado y 17 a 22 (E2′, 27/10/2026): aplicados, con tests y neutralización hechos; pruebas
 manuales del laboratorio pendientes ([lab_e2_3879.md](lab_e2_3879.md)). Tras la revisión del mismo día:
@@ -161,6 +162,10 @@ Parches 30 a 33 (E4′.a, 05/11/2026): aplicados, con tests en verde, neutraliza
 revisión; propuesta y decisiones en [e4_propuesta_3879.md](e4_propuesta_3879.md). Pendientes del
 laboratorio y del staging, que se hacen con E4′.b en una sola subida. Entradas más abajo, en «Parches de
 la rama 14.0-pns-ai-3879 (E4′.a)».
+
+Parche 34 (E4′.b, 05/11/2026): aplicado, con tests en verde, neutralización hecha y aprobado en revisión;
+misma propuesta. Pendiente, con E4′.a, de E4′.h (script de pruebas de E4′) y de una sola subida al
+staging. Entrada más abajo, en «Parches de la rama 14.0-pns-ai-3879 (E4′.b)».
 
 Parches 10, 12 y 13 a 16 (E1′): validados en laboratorio el 23/10/2026 y en el staging `pns_demo` el 26/10/2026, con el cambio de base
 (commit `0366231`; [staging_e1_3879.md](staging_e1_3879.md) y
@@ -2137,6 +2142,10 @@ de los subtests), de modo que aparece como test y como 4 subtests.
   celda se queda con la ruta `/web/image/…` como texto); las de los registros que ve, igual. Las skills de
   fábrica que usan `page_html` (`cash_forecast`, `customer_360`, `pipeline`) apuntan a registros del
   usuario. En la caja A sigue mandando además el guardián del parche 18.
+  **Añadido el 05/11/2026 (E4′.b):** cuando una fila cita la imagen de un registro que el usuario no puede
+  leer, la ruta `/web/image/…` queda tal cual en las filas (`pictures_as_tokens`, en `chatboo_canvas.py`) y
+  la tarjeta que diseñó `lite` la pintó como «[object Object]» (staging de E3′, 03/11/2026, P-8d «oculto»).
+  Aceptado (decisión 7 de la segunda ronda de E4′; [hoja de E4′](e4_hoja_3879.md), fila 33).
 - **Cómo comprobar si el fabricante ya lo ha corregido:**
   ```sh
   grep -n "pictures_as_tokens(" pns_ai_chatboo/models/chatboo_session.py pns_ai_chatboo/models/chatboo_canvas.py
@@ -3095,3 +3104,148 @@ saltados**.
     Si alguien añade en esa clase un `write` sobre el admin, el test se **colgaría** en vez de fallar.
 - **Estado de los parches 30 a 33:** aplicados, tests en verde, neutralizados y aprobados en revisión
   (05/11/2026). Siguiente: E4′.b (parche 34); después, E4′.h y una sola subida al staging.
+
+## Parches de la rama 14.0-pns-ai-3879 (E4′.b)
+
+- **Fecha:** 05/11/2026. **Entrega:** E4′.b (el aviso del lienzo, fila 30 de la hoja) del
+  [plan sobre 3.1.879](plan_correccion_pns_ai_3879.md).
+- **Origen:** [hoja de E4′](e4_hoja_3879.md), ficha 30, con las decisiones de Sergio del 04/11/2026.
+  **Propuesta aprobada, comprobaciones previas (paso 0) y decisiones de la tercera y cuarta ronda:**
+  [e4_propuesta_3879.md](e4_propuesta_3879.md), «Parche 34». HEAD de partida: `039a5e5` (`[DOC] E4′.a`).
+- **Rutas:** de 3.1.879 con E1′ a E4′.b (copia de trabajo del 05/11/2026). Sin tocar `version`, `depends`,
+  `external_dependencies`, `i18n`, `ir.model.access.csv`, `LICENSE` ni `NOTICE`. Sin mensajes nuevos:
+  reutiliza un `msgid` que ya traduce `pns_ai_chatboo/i18n/es.po`. Solo cambia `pns_ai_chatboo`.
+- **Marcadores:**
+  `grep -rn "Seges: parche 34 (" pns_ai_mcp pns_ai_chatboo --include=*.py | grep -v /tests/`:
+  **10 líneas** (5 en `chatboo_canvas.py` y 5 en `chatboo_async_request.py`).
+- **Commits** (tres, regla de arriba): `[FIX] pns_ai_chatboo: parche 34 (PNS-96)`, `[TEST] pns_ai_chatboo:
+  tests de E4′.b` y `[DOC] E4′.b`. Los sube Sergio.
+
+### Parche 34: aviso fijo del servidor cuando `log_no_page` rechaza en un turno (PNS-96)
+
+- **Qué falla sin él (hoja, ficha 30, F):** tras un rechazo o un fallo del lienzo, `log_no_page`
+  (`pns_ai_chatboo/models/chatboo_canvas.py`) deja la causa en `ai.log` y devuelve `''` para que el turno
+  siga. La regla del contexto (`pns_ai_chatboo/ai/contexts/domain/page_tab/page_tab.xml:75-85`) le pide al
+  modelo que, con la URL vacía, no invente un motivo, y a menudo responde «He actualizado el color de fondo…» o «Se ha generado la página» sin página nueva (laboratorio de E3′, P-8d, y
+  laboratorio del parche 29, 6d′). El usuario no se entera del rechazo: el aviso solo existía en el botón
+  Canvas (`chatboo_canvas_job.py:133` y `:156`). Los parches 25, 26 y 29 añaden rechazos.
+- **Cambio:**
+  - `pns_ai_chatboo/models/chatboo_canvas.py`:
+    - import de `ContextVar` (`:20-21`), antes del marcador del parche 29, sin tocarlo;
+    - `_NO_PAGE_WATCH` (`:29-32`), un `ContextVar` con la marca del turno: id del job, id de la sesión,
+      `canvas_rev` al empezar y si hubo rechazo;
+    - `watch_no_page(job_id, session_id, rev)` (`:653-658`): abre la marca y devuelve el token para
+      `reset`;
+    - `page_refused_in_job(job_id, session_id, rev)` (`:661-668`): verdadero solo si la marca es de ese job
+      y esa sesión, hubo rechazo y `canvas_rev` no ha cambiado;
+    - en `log_no_page`, tras el `_logger.info` (`:679-688`): si hay marca, la anota **en su sitio** (no hace
+      `set`). Sin `session_id` cuenta para la sesión del job (la marca solo existe dentro de un job de
+      Chatboo, que tiene una sola sesión); con un `session_id` distinto, no cuenta; `int(session_id)` va en
+      un `try` (D3): `log_no_page` es el camino blando y no puede fallar por un `session_id` raro.
+  - `pns_ai_chatboo/models/chatboo_async_request.py`:
+    - import de `_NO_PAGE_WATCH`, `page_refused_in_job` y `watch_no_page` (`:18-19`), arriba del módulo (sin
+      import circular: paso 0, d);
+    - en `_process`, tras `self._notify('thinking')` (`:141-143`): abre la marca con el id del job, el de la
+      sesión y `self.session_id.canvas_rev`;
+    - primera línea del `finally` del `try` del motor (`:501-502`): `_NO_PAGE_WATCH.reset(no_page_token)`
+      (D3; higiene, no seguridad: la marca va ligada al id del job, que no se repite);
+    - `_save_to_session`, rama de éxito (`:1299-1305`): si `page_refused_in_job(...)`, añade
+      `_('No page was built. The reason is in the AI History.')` en cursiva, debajo de `acc` (o solo, si
+      `acc` está vacío), y lo pone también en `_assistant_content` para que se actualice la burbuja en vivo;
+    - `'content': _content` (`:1363`). `original_content` sigue siendo `acc` (decisión 3 de la tercera
+      ronda), como en la nota de respuesta incompleta del fabricante.
+- **Por qué la marca va ligada al job** (ajuste 3 del paso 0): `_cancel_pending` también llega a la rama de
+  éxito de `_save_to_session`, desde otro hilo o desde un hilo reutilizado del worker. En Python 3.7 un hilo
+  nuevo no hereda el contexto, así que el botón Canvas, el latido, la caja A desde `/mcp` y las peticiones
+  HTTP no ven la marca y la anotación no hace nada; en modo test (`_spawn` en línea, en el hilo del test) la
+  protegen el id del job y el token.
+- **Qué se degrada:**
+  - límites, ya en la hoja: no corrige lo que escribe el modelo (le añade debajo una corrección
+    determinista); no cubre los turnos en que el modelo afirma un cambio sin llamar a la herramienta; el
+    texto no es exacto cuando lo rechazado es una edición («No se ha creado la página»); la vía de respaldo
+    por SQL de `_finalize` no lleva el aviso;
+  - si en el mismo turno se crea una página y después se rechaza una edición, `canvas_rev` ha cambiado y no
+    sale aviso;
+  - si el modelo ya explica bien el rechazo, el aviso sale igual (redundante, no contradictorio);
+  - **turno vacío:** si el modelo no escribe nada y no hay entregable, `_finalize` convierte el turno en
+    error y la rama de error de `_save_to_session` no lleva aviso: el usuario ve el error genérico;
+  - **efecto secundario aceptado (revisión, 05/11/2026):** con aviso, `_finalize` escribe `response` y
+    `partial` con el aviso y vuelca los chips en `done_meta` (mismo camino que los SVG);
+  - **burbuja en vivo (revisión, 05/11/2026):** `result.content` toma `assistant_content`
+    (`chatboo_component_v2.js:3033`) y de ahí sale `originalContent` (`:3124`). Hasta recargar, copiar o
+    exportar desde la burbuja incluye el aviso; `_saveCurrentSession` (`:1380`, con `_messagesForPersist`
+    en `:1284`) podría guardarlo en `original_content`, y el historial que envía el cliente en el turno
+    siguiente (`original_content || content`) puede llevar el aviso al modelo. El historial del servidor
+    (`backend_history`, desde `acc`) va limpio. No reabre la decisión 3 de la tercera ronda; se comprueba en
+    el staging (plan, apartado E4′);
+  - **lectura de `canvas_rev` sin `try` (revisión, 05/11/2026):** la lectura de
+    `self.session_id.canvas_rev` en la apertura (`chatboo_async_request.py:142-143`) va sin `try`, a
+    diferencia de las lecturas de la sesión del fabricante en `_process` (`:156-196`). Si fallara (carrera
+    teórica; improbable por `ondelete='cascade'`), el turno acabaría en «crashed». **Aceptado por Sergio sin
+    cambio**; arreglo previsto si se viera: `try` con `rev = 0` de reserva.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -n "No page was built" pns_ai_chatboo/models/chatboo_async_request.py pns_ai_chatboo/models/chatboo_session.py; grep -n "def log_no_page" -A14 pns_ai_chatboo/models/chatboo_canvas.py
+  ```
+  Corregido si el servidor deja en la respuesta del turno (o en la burbuja) un aviso cuando el lienzo
+  rechaza, o si `log_no_page` devuelve algo que el turno muestre al usuario.
+- **Tests** (`pns_ai_chatboo/tests/test_seges_chatboo_canvas.py`, `TestSegesNoPageNotice(_SegesCanvasCase)`,
+  `:762`, etiqueta `seges_e4p`, 8). Job creado con `_enqueue` como en el controlador; cada test abre la marca
+  con `watch_no_page`, como `_process`, y la deshace con `addCleanup(_NO_PAGE_WATCH.reset, token)`:
+  - con aviso (contenido `acc` + aviso en cursiva, `original_content == acc` y `assistant_content` con el
+    aviso): `test_notice_after_refusal`, `test_notice_unknown_session` (`log_no_page` sin `session_id`) y
+    `test_notice_empty_answer` (`acc = ''`, solo el aviso);
+  - controles, sin aviso y sin `assistant_content`: `test_no_notice_without_refusal`,
+    `test_no_notice_when_page_changed` (sube `canvas_rev` tras el rechazo), `test_no_notice_other_job`
+    (marca del job 1, `_save_to_session` del job 2 de la misma sesión, como un `_cancel_pending`),
+    `test_no_notice_other_session` (`log_no_page` con el id de `session_b`) y `test_no_watch` (sin marca:
+    `_NO_PAGE_WATCH.set(None)` y `reset`; lo que pasa en el botón Canvas y por RPC).
+  - **Alcance (revisión, 05/11/2026):** prueban la anotación, la lectura y la composición en
+    `_save_to_session`. La conexión con `_process` (apertura tras `_notify('thinking')` y `reset` en el
+    `finally`) no tiene test y se valida en el staging (E4′.h).
+- **Neutralización:** N34m, N34s, N34r y N34j (tabla de «Comprobaciones de E4′.b»).
+
+### Comprobaciones de E4′.b (05/11/2026)
+
+1. `py_compile` con Python 3.7.3 de los tres `.py` tocados (`chatboo_canvas.py`,
+   `chatboo_async_request.py` y `tests/test_seges_chatboo_canvas.py`): correcto.
+2. `python3 ~/.claude/hooks/odoo_lint.py --revisar --base 039a5e5`: 0 avisos nuevos.
+3. **Línea base** (log `tests-20261105-111902.log`, mismo código que `039a5e5`): **464 tests, 18 F, 32 E y
+   3 saltados**.
+4. **Con E4′.b** (log `tests-20261105-115245.log`): **472 tests, 18 F, 32 E y 3 saltados**. Los 50 que
+   fallan son los mismos por nombre que en la línea base y ninguno es de Seges (`test_seges_*`). Los
+   **8 nuevos** de `TestSegesNoPageNotice`, en verde.
+5. Marcadores fuera de tests: **10** (5 en `chatboo_canvas.py`: import, `_NO_PAGE_WATCH`, `watch_no_page`,
+   `page_refused_in_job` y anotación en `log_no_page`; 5 en `chatboo_async_request.py`: import, apertura de
+   la marca, `reset` en el `finally` de `_process`, rama de éxito de `_save_to_session` y línea de
+   `content`).
+
+**Neutralización (05/11/2026):** una cada vez, con el método de E3′: copia, cambio, batería completa,
+restauración y SHA-256 de cada archivo (restauración comprobada en todas). Logs en `~/odoo-dev/14.0/logs`.
+Columna «Resultado»: F y E de la batería completa. Los tres controles (`test_no_notice_without_refusal`,
+`test_no_notice_other_session` y `test_no_watch`) pasan en todas.
+
+| Ejecución | Qué se retira | Log | Resultado | Fallan (de E4′.b) |
+|---|---|---|---|---|
+| N34m | `log_no_page` no anota | `tests-20261105-121133.log` | 21 F · 32 E | `test_notice_after_refusal`, `test_notice_unknown_session`, `test_notice_empty_answer` |
+| N34s | `_save_to_session` no añade el aviso | `tests-20261105-121505.log` | 21 F · 32 E | los mismos tres |
+| N34r | `page_refused_in_job` no compara `canvas_rev` | `tests-20261105-121829.log` | 19 F · 32 E | `test_no_notice_when_page_changed` |
+| N34j | `page_refused_in_job` no compara el job | `tests-20261105-122137.log` | 19 F · 32 E | `test_no_notice_other_job` |
+
+Batería final, con todo restaurado (log `tests-20261105-122437.log`): **472 tests, 18 F, 32 E y 3
+saltados**; los mismos 50 fallos por nombre, sin ninguno nuevo.
+
+### Revisión de E4′.b (05/11/2026): APROBADA
+
+- **Revisión (`odoo-reviewer`):** APROBADA, sin bloqueantes ni menores.
+- **Observaciones para el registro** (sin cambios de código; todas en el parche 34):
+  - alcance de los tests: la conexión con `_process` se valida en el staging (en «Tests»);
+  - la marca se modifica en su sitio y no la ven otros hilos en Python 3.7 (en «Por qué la marca va ligada
+    al job»);
+  - lectura de `canvas_rev` sin `try` en la apertura: **aceptado por Sergio sin cambio** (en «Qué se
+    degrada»);
+  - efecto secundario en `response`, `partial` y `done_meta`, aceptado (en «Qué se degrada»);
+  - burbuja en vivo: copiar, exportar, `original_content` guardado por el cliente e historial del turno
+    siguiente (en «Qué se degrada»).
+- **Estado del parche 34:** aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026).
+  Siguiente: E4′.h (script de pruebas de E4′); después, una sola subida de E4′ al staging.

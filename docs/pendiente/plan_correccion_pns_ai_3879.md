@@ -9,8 +9,9 @@
 - **Registro de los cambios en el código:** [parches_pns_ai.md](parches_pns_ai.md).
 - **Plan anterior:** [plan_correccion_pns_ai.md](plan_correccion_pns_ai.md) (base 3.1.782), referencia
   de la rama `14.0-pns-ai-correcciones`.
-- **Estado del plan:** E4′.a (parches 30 a 33) aplicada, con tests en verde, neutralizada y aprobada en
-  revisión (05/11/2026); siguiente, E4′.b (parche 34). Registro: aprobado (23/10/2026); E0′ terminada el 23/10/2026: parte A (tests) validada en
+- **Estado del plan:** E4′.a (parches 30 a 33) y E4′.b (parche 34) aplicadas, con tests en verde,
+  neutralizadas y aprobadas en revisión (05/11/2026); siguiente, E4′.h (script de pruebas de E4′) y después
+  una sola subida al staging. Registro: aprobado (23/10/2026); E0′ terminada el 23/10/2026: parte A (tests) validada en
   laboratorio y diagnóstico de PNS-70 hecho ([pns70_diagnostico_3879.md](pns70_diagnostico_3879.md)).
   Rama `14.0-pns-ai-3879` publicada el 23/10/2026 (desde `dafb316`). Siguiente: E1′.
   E1′ validada en laboratorio el 23/10/2026 (parches 10 y 12 adaptados y 13 a 16); siguiente: subida al
@@ -50,6 +51,9 @@
   E4′.a aplicada el 05/11/2026 (parches 30 a 33 y el test de PNS-36): tests en verde (464 · 18 F · 32 E,
   los mismos 50 de la línea base), neutralizada y aprobada en revisión por `odoo-reviewer`. Siguiente: E4′.b
   (parche 34); después, E4′.h y una sola subida al staging.
+  E4′.b aplicada el 05/11/2026 (parche 34): tests en verde (472 · 18 F · 32 E, los mismos 50 de la línea
+  base), neutralizada y aprobada en revisión por `odoo-reviewer`. Siguiente: E4′.h (script de pruebas de
+  E4′); después, una sola subida al staging.
 
 ## 1. Cómo se trabaja
 
@@ -83,7 +87,7 @@
 | **E1′** | Críticos y Altos baratos: M10 con el parche 12 adaptado, PNS-54, PNS-07, M13, `collect_pin` (PNS-83) | 10 y 12 adaptados; 13 (M10), 14 (M13), 15 (PNS-07) y 16 (PNS-54) | Validada en laboratorio (23/10/2026) y en staging (26/10/2026); cerrada el 27/10/2026, con R8 no concluyente por el proveedor (se valida en E3′); R8 OK en el laboratorio de E3′ (30/10/2026), con el defecto de `keys` del fabricante (hoja de E4′); R8 validada en el staging de E3′ (03/11/2026) |
 | **E2′** | Resto de Altos: papelera del diario (PNS-37), PNS-19, PNS-17, PNS-82, PNS-70; PNS-20 (confirmado por P-20); PNS-100 y PNS-101 (nuevos) | 11 adaptado; 17 (PNS-37), 18 (PNS-19), 19 (PNS-17), 20 (PNS-70), 21 (PNS-20), 22 (PNS-100), 23 (PNS-101, ampliado) y 24 (PNS-102) | Aplicada (27/10/2026): tests en verde y neutralización hecha; parche 18 corregido tras la revisión y parche 23 nuevo (27/10/2026). **Aprobada en revisión (28/10/2026)** con la herramienta real (vía A, shell; vía B, `/mcp`): las dos evasiones críticas, cerradas. Validada en laboratorio (28/10/2026). **Validada en staging (29/10/2026)**: commit `9a2970d` ([staging_e2_3879.md](staging_e2_3879.md), apartado G) |
 | **E3′** | Lienzo: M1, M2, F1 y D1 (D1 pasa de E4′ a E3′: decisión de Sergio del 29/10/2026) | 25 (M1), 26 (M2), 27 (F1) y 28 (D1); la ventana del parche 18 se mantiene; 29 (F1, P-8e a, 30/10/2026) | **Aplicada (29/10/2026)**: tests en verde y neutralización hecha; rechazada en la primera revisión (B1, parche 27 b) y corregida; **aprobada en revisión (29/10/2026)**; pruebas manuales del laboratorio hechas el 30/10/2026 ([lab_e3_3879.md](lab_e3_3879.md)); P-8e a falló y se corrigió con el parche 29, validado en laboratorio el 03/11/2026 ([lab_p29_3879.md](lab_p29_3879.md)). **Validada en staging (04/11/2026)**: commit `522ce6e` ([staging_e3_3879.md](staging_e3_3879.md), apartado G) |
-| **E4′** | Hoja de Medios y Bajos (corregir o aceptar); después, lo elegido: E4′.a (seguridad: M11, M12, PNS-97, PNS-29 resto 3 y el test de PNS-36), E4′.b (el aviso del lienzo, fila 30 de la hoja) y E4′.h (script de pruebas) | 30 (M11), 31 (M12), 32 (PNS-97) y 33 (PNS-29), en E4′.a; 34 (PNS-96), en E4′.b | **E4′.0 cerrada (04/11/2026)**: hoja con las decisiones de Sergio ([e4_hoja_3879.md](e4_hoja_3879.md); `ca707a9`). **E4′.a aplicada (05/11/2026)**: tests en verde, neutralizada y **aprobada en revisión** ([propuesta](e4_propuesta_3879.md), «Resultado de E4′.a»). E4′.b y E4′.h, pendientes; después, una sola subida al staging |
+| **E4′** | Hoja de Medios y Bajos (corregir o aceptar); después, lo elegido: E4′.a (seguridad: M11, M12, PNS-97, PNS-29 resto 3 y el test de PNS-36), E4′.b (el aviso del lienzo, fila 30 de la hoja) y E4′.h (script de pruebas) | 30 (M11), 31 (M12), 32 (PNS-97) y 33 (PNS-29), en E4′.a; 34 (PNS-96), en E4′.b | **E4′.0 cerrada (04/11/2026)**: hoja con las decisiones de Sergio ([e4_hoja_3879.md](e4_hoja_3879.md); `ca707a9`). **E4′.a aplicada (05/11/2026)**: tests en verde, neutralizada y **aprobada en revisión** ([propuesta](e4_propuesta_3879.md), «Resultado de E4′.a»). **E4′.b aplicada (05/11/2026)**: tests en verde, neutralizada y **aprobada en revisión** ([propuesta](e4_propuesta_3879.md), «Resultado de E4′.b»). E4′.h, pendiente; después, una sola subida al staging |
 
 Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`; línea de 3.1.879).
 
@@ -400,6 +404,22 @@ corrige lo elegido.
 `iap.account.account_token` legible por cualquier usuario interno: observación del core de Odoo (ACL
 estándar), sin parche; en la caja A lo cubre el parche 18 (decisión de Sergio del 27/10/2026).
 
+**Validaciones en staging que se añaden (parche 34, E4′.b, 05/11/2026),** para la subida conjunta de E4′
+(van en el script de E4′.h). Solo lectura salvo los turnos de Chatboo que se indican:
+
+- En un turno de Chatboo con un rechazo de página, la burbuja termina con el aviso en cursiva («No se ha
+  creado la página. El motivo está en el Historial IA.»).
+- En un turno con página creada, sin aviso.
+- Con el botón Canvas, su aviso de siempre, sin duplicado.
+- Copiar y exportar desde la burbuja en vivo y después de recargar la sesión (anotar si llevan el aviso).
+- `get_messages()[-1]['original_content']` de la sesión antes y después de recargar (anotar si lleva el
+  aviso: lo habría guardado `_messagesForPersist` del cliente).
+- Un segundo turno sin recargar: mirar en el Historial IA si el prompt lleva el aviso (el historial que
+  envía el cliente es `original_content || content`).
+- Cubre la conexión con `_process` (apertura de la marca y `reset` en el `finally`), que no tiene test
+  (revisión de E4′.b).
+- Repetir R8 sin bloquear (§4, «Staging `pns_demo`, tras E3′»).
+
 ## 3. Al terminar
 
 1. **LIYBEN:**
@@ -558,4 +578,5 @@ Estados (N11): aplicado → validado en laboratorio → validado en staging → 
 | 31 | M12 (`chat_completion` solo en `su`) | E4′.a | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
 | 32 | PNS-97 (`create`, `write` y `unlink` de `ai.trusted.action` exigen Ajustes fuera de `su`; criterio combinado dentro de un plan) | E4′.a | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
 | 33 | PNS-29 resto 3 (`_month_usage` privado; `default_get` del asistente de uso con la ACL) | E4′.a | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
+| 34 | PNS-96 (aviso fijo del servidor cuando `log_no_page` rechaza en un turno; fila 30 de la hoja) | E4′.b | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
 | — | Parche de tests E0′ (datos de prueba de `test_change_journal` y `test_paap_core`) | E0′ | Validado en laboratorio (23/10/2026) |

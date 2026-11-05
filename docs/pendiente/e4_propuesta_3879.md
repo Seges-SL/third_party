@@ -8,8 +8,8 @@
   resto 3) y 30 (el chat afirma cambios que no hizo), con las decisiones de Sergio del 04/11/2026 (primera
   y segunda ronda), que no se reabren; [plan sobre 3.1.879](plan_correccion_pns_ai_3879.md), apartado
   E4′; [registro de parches](parches_pns_ai.md) (N11, marcadores, formato de las entradas).
-- **Estado:** propuesta aprobada por Sergio (05/11/2026) tras dos revisiones de odoo-reviewer; E4′.a
-  implementada (ver «Resultado de E4′.a»); E4′.b pendiente.
+- **Estado:** propuesta aprobada por Sergio (05/11/2026) tras dos revisiones de odoo-reviewer; E4′.a y
+  E4′.b implementadas (ver «Resultado de E4′.a» y «Resultado de E4′.b»); pendiente, E4′.h.
 - **Alcance de las comprobaciones:** código de los tres módulos, `vertical-instaladores` y el repo del
   laboratorio; core de Odoo 14 de referencia (`/opt/odoo-src/14.0`); en el laboratorio, un script de
   `odoo-dev 14 shell` de solo lectura con `env.cr.rollback()` al final (sin motor, lienzo, skills,
@@ -937,3 +937,25 @@ así que no queda nada «Pendiente de decisión de Sergio».
 - **Revisión (`odoo-reviewer`):** **APROBADA**. Sugerencias de tests aplicadas; la del docstring, no.
   Observaciones, en el registro.
 - **Pendiente:** E4′.b (parche 34) y E4′.h; después, una sola subida al staging.
+
+## Resultado de E4′.b (05/11/2026)
+
+- **Implementada como se propuso:** parche 34. Entrada, neutralización y revisión en el
+  [registro](parches_pns_ai.md), «Parches de la rama 14.0-pns-ai-3879 (E4′.b)».
+- **Tests:** línea base, 464 · 18 F · 32 E · 3 saltados (`tests-20261105-111902.log`, mismo código que
+  `039a5e5`). Con E4′.b, **472 · 18 F · 32 E · 3 saltados** (`tests-20261105-115245.log`): los mismos 50
+  fallos por nombre, ninguno de Seges, y los 8 nuevos de `TestSegesNoPageNotice` en verde, como se esperaba.
+- **Comprobaciones:** `py_compile` con Python 3.7.3, correcto; lint con `--base 039a5e5`, 0 avisos nuevos;
+  10 marcadores fuera de tests, como se esperaba.
+- **Neutralización:** N34m y N34s (21 F · 32 E: los tres tests con aviso), N34r y N34j (19 F · 32 E:
+  `test_no_notice_when_page_changed` y `test_no_notice_other_job`), una cada vez, con restauración
+  comprobada por SHA-256; los tres controles pasan en todas. Batería final restaurada:
+  `tests-20261105-122437.log`, 472 · 18 F · 32 E · 3 saltados, con los mismos 50 fallos por nombre y
+  ninguno nuevo.
+- **Revisión (`odoo-reviewer`):** **APROBADA**, sin bloqueantes ni menores. Sugerencia **aceptada por Sergio
+  sin cambio:** la lectura de `canvas_rev` en la apertura de la marca va sin `try` (si fallara, el turno
+  acabaría en «crashed»; arreglo previsto si se viera: `try` con `rev = 0`). Las demás observaciones (alcance
+  de los tests, efecto en `response`/`partial`/`done_meta` y el aviso en la burbuja en vivo), en el registro;
+  no reabren la decisión 3 de la tercera ronda.
+- **Pendiente:** E4′.h (script de pruebas de E4′, con las validaciones del parche 34 del
+  [plan](plan_correccion_pns_ai_3879.md), apartado E4′); después, una sola subida al staging.
