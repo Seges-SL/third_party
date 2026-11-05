@@ -75,7 +75,8 @@ class TestSegesUserGroupActions(TransactionCase):
 
     def test_registry_edit_does_not_lift_check(self):
         action = self.env_adm['ai.trusted.action']._get('user.add_group')
-        action.write({'group_ids': [(5, 0, 0)]})
+        # Seges: parche 32 (PNS-97, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        action.sudo().write({'group_ids': [(5, 0, 0)]})
         with self.assertRaises(UserError):
             action._apply(user_id=self.adm.id, group=GROUP)
         self.assertFalse(self.adm.has_group(GROUP))

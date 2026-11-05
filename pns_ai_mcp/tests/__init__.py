@@ -50,3 +50,5 @@ from . import test_seges_sandbox_env
 from . import test_seges_format_guard
 from . import test_seges_facade_class
 from . import test_seges_identity_su
+# Seges: tests de la entrega E4′ (parches 30, 31, 32 y 33). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_e4p

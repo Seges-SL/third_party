@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2026 Seges
 # Seges: parche 23 ampliado (tests de la entrega E2′). Ver docs/pendiente/parches_pns_ai.md
+# Seges: tests de la entrega E4′ (PNS-36). Ver docs/pendiente/parches_pns_ai.md
 """Parche 23 ampliado (PNS-101): formateador propio de ``str.format`` /
 ``str.format_map``.
 
@@ -126,6 +127,17 @@ class TestSegesFormatGuard(TransactionCase):
         self._refused(
             "t = '{x.__class__}'\n"
             "result = {'data': [{'v': t.format_map({'x': user})}]}\n")
+
+    def test_pns36_cr_dbname(self):
+        # PNS-36: el nombre de la BD por el cursor o el registro del env.
+        for tpl in ('{0.cr.dbname}', '{0.registry.db_name}'):
+            for code in (
+                "result = {'data': [{'v': '" + tpl + "'.format(env)}]}\n",
+                "t = '" + tpl + "'\nresult = {'data': [{'v': t.format(env)}]}\n",
+            ):
+                with self.subTest(code=code):
+                    text = self._refused(code)
+                    self.assertNotIn(self.env.cr.dbname, text, 'filtra')
 
     def test_v1_import_formatter(self):
         # from string import Formatter: lo cierra el facade (sandbox_forbidden_name).
