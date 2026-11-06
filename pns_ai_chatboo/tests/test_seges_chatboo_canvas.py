@@ -783,9 +783,11 @@ class TestSegesNoPageNotice(_SegesCanvasCase):
         self.assertEqual(last['role'], 'assistant')
         return res, last
 
-    def _assert_notice(self, res, last, content, acc=NO_PAGE_ACC):
+    def _assert_notice(self, res, last, content):
+        # Opción A (Sergio, 05/11/2026): el aviso va también en original_content
+        # (mismo texto que content), no solo en content.
         self.assertEqual(last['content'], content)
-        self.assertEqual(last['original_content'], acc)
+        self.assertEqual(last['original_content'], content)
         self.assertEqual(res.get('assistant_content'), content)
 
     def _assert_no_notice(self, res, last):
@@ -813,7 +815,23 @@ class TestSegesNoPageNotice(_SegesCanvasCase):
         self._watch(self.job, self.session_a)
         canvas.log_no_page(self.env_a, 'seges e4p', self.session_a.id)
         res, last = self._save(self.job, acc='')
-        self._assert_notice(res, last, '_' + NO_PAGE_NOTICE + '_', acc='')
+        self._assert_notice(res, last, '_' + NO_PAGE_NOTICE + '_')
+
+    def test_notice_html_answer(self):
+        # F1 (Sergio, 06/11/2026): cuando acc ya es HTML (p. ej. una tabla del
+        # servidor) el aviso se anexa como HTML, no en markdown, para que el
+        # cliente lo pinte en su propio párrafo (mismo criterio isLikelyHtml).
+        self._watch(self.job, self.session_a)
+        canvas.log_no_page(self.env_a, 'seges e4p', self.session_a.id)
+        acc = (
+            '<div class="o_ai_table_block"><table><tr><td>x</td></tr>'
+            '</table></div>\n\nHe actualizado el color de fondo.'
+        )
+        res, last = self._save(self.job, acc=acc)
+        self._assert_notice(
+            res, last, acc + '<p><em>' + html.escape(NO_PAGE_NOTICE) + '</em></p>',
+        )
+        self.assertNotIn('\n\n_', last['content'])
 
     def test_no_notice_without_refusal(self):
         self._watch(self.job, self.session_a)
