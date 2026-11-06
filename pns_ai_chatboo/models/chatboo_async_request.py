@@ -9,6 +9,8 @@ truth is the database. The SSE at /chatboo/stream only tails this job.
 """
 
 import base64
+# Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
+import html
 import json
 import logging
 import time
@@ -1300,8 +1302,17 @@ class ChatbooAsyncRequest(models.Model):
             _content = acc or ''
             if page_refused_in_job(self.id, session.id, session.canvas_rev):
                 _note = _('No page was built. The reason is in the AI History.')
-                _content = (f"{acc}\n\n_{_note}_" if (acc or '').strip()
-                            else f"_{_note}_")
+                # When the answer is already HTML (a server-built table), the
+                # client paints it as HTML and markdown emphasis would render
+                # literally, so append the notice as HTML to keep it in its own
+                # paragraph. Same HTML test as the client's isLikelyHtml
+                # (chatboo_formatters.js:88-97); plain text keeps markdown.
+                if (acc or '').lstrip().startswith('<'):
+                    _content = acc + '<p><em>' + html.escape(_note) + '</em></p>'
+                elif (acc or '').strip():
+                    _content = f"{acc}\n\n_{_note}_"
+                else:
+                    _content = f"_{_note}_"
                 _assistant_content = _content
             # Pie de respuesta: cada stack consume una forma distinta y hay que
             # reproducir AMBAS para que el pie sobreviva al recargar la sesión
@@ -1361,7 +1372,10 @@ class ChatbooAsyncRequest(models.Model):
             messages.append({
                 'role': 'assistant',
                 'content': _content,  # Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
-                'original_content': acc or '',
+                # Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
+                # Opción A (Sergio, 05/11/2026): con aviso, original_content lleva
+                # el mismo texto que content; sin aviso, el valor de hoy (acc or '').
+                'original_content': _content,
                 'raw': True,
                 # ── owl1 (campos planos que lee chatboo_component_v2.js) ──
                 'usage': _usage,
