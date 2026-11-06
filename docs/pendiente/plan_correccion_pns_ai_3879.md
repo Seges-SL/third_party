@@ -10,8 +10,9 @@
 - **Plan anterior:** [plan_correccion_pns_ai.md](plan_correccion_pns_ai.md) (base 3.1.782), referencia
   de la rama `14.0-pns-ai-correcciones`.
 - **Estado del plan:** E4′.a (parches 30 a 33) y E4′.b (parche 34) aplicadas, con tests en verde,
-  neutralizadas y aprobadas en revisión (05/11/2026); siguiente, E4′.h (script de pruebas de E4′) y después
-  una sola subida al staging. Registro: aprobado (23/10/2026); E0′ terminada el 23/10/2026: parte A (tests) validada en
+  neutralizadas y aprobadas en revisión (05/11/2026); E4′.b ampliada con la opción A (05/11/2026) y el formato F1
+  (06/11/2026), validada en el laboratorio el 06/11/2026; siguiente, E4′.h (script de pruebas de
+  E4′) y después una sola subida al staging. Registro: aprobado (23/10/2026); E0′ terminada el 23/10/2026: parte A (tests) validada en
   laboratorio y diagnóstico de PNS-70 hecho ([pns70_diagnostico_3879.md](pns70_diagnostico_3879.md)).
   Rama `14.0-pns-ai-3879` publicada el 23/10/2026 (desde `dafb316`). Siguiente: E1′.
   E1′ validada en laboratorio el 23/10/2026 (parches 10 y 12 adaptados y 13 a 16); siguiente: subida al
@@ -54,6 +55,11 @@
   E4′.b aplicada el 05/11/2026 (parche 34): tests en verde (472 · 18 F · 32 E, los mismos 50 de la línea
   base), neutralizada y aprobada en revisión por `odoo-reviewer`. Siguiente: E4′.h (script de pruebas de
   E4′); después, una sola subida al staging.
+  E4′.b ampliada el 05-06/11/2026 (opción A, 05/11, y formato F1, 06/11): el aviso va también en
+  `original_content` y, con contenido HTML, como `<p><em>…</em></p>`; tests en verde (473 · 18 F · 32 E
+  · 3 saltados), neutralizada (N34o, N34h), aprobada en revisión y validada en el laboratorio el
+  06/11/2026 (sesiones 21 a 24). Siguiente: E4′.h (script de pruebas de E4′) y una sola subida al
+  staging.
 
 ## 1. Cómo se trabaja
 
@@ -87,7 +93,7 @@
 | **E1′** | Críticos y Altos baratos: M10 con el parche 12 adaptado, PNS-54, PNS-07, M13, `collect_pin` (PNS-83) | 10 y 12 adaptados; 13 (M10), 14 (M13), 15 (PNS-07) y 16 (PNS-54) | Validada en laboratorio (23/10/2026) y en staging (26/10/2026); cerrada el 27/10/2026, con R8 no concluyente por el proveedor (se valida en E3′); R8 OK en el laboratorio de E3′ (30/10/2026), con el defecto de `keys` del fabricante (hoja de E4′); R8 validada en el staging de E3′ (03/11/2026) |
 | **E2′** | Resto de Altos: papelera del diario (PNS-37), PNS-19, PNS-17, PNS-82, PNS-70; PNS-20 (confirmado por P-20); PNS-100 y PNS-101 (nuevos) | 11 adaptado; 17 (PNS-37), 18 (PNS-19), 19 (PNS-17), 20 (PNS-70), 21 (PNS-20), 22 (PNS-100), 23 (PNS-101, ampliado) y 24 (PNS-102) | Aplicada (27/10/2026): tests en verde y neutralización hecha; parche 18 corregido tras la revisión y parche 23 nuevo (27/10/2026). **Aprobada en revisión (28/10/2026)** con la herramienta real (vía A, shell; vía B, `/mcp`): las dos evasiones críticas, cerradas. Validada en laboratorio (28/10/2026). **Validada en staging (29/10/2026)**: commit `9a2970d` ([staging_e2_3879.md](staging_e2_3879.md), apartado G) |
 | **E3′** | Lienzo: M1, M2, F1 y D1 (D1 pasa de E4′ a E3′: decisión de Sergio del 29/10/2026) | 25 (M1), 26 (M2), 27 (F1) y 28 (D1); la ventana del parche 18 se mantiene; 29 (F1, P-8e a, 30/10/2026) | **Aplicada (29/10/2026)**: tests en verde y neutralización hecha; rechazada en la primera revisión (B1, parche 27 b) y corregida; **aprobada en revisión (29/10/2026)**; pruebas manuales del laboratorio hechas el 30/10/2026 ([lab_e3_3879.md](lab_e3_3879.md)); P-8e a falló y se corrigió con el parche 29, validado en laboratorio el 03/11/2026 ([lab_p29_3879.md](lab_p29_3879.md)). **Validada en staging (04/11/2026)**: commit `522ce6e` ([staging_e3_3879.md](staging_e3_3879.md), apartado G) |
-| **E4′** | Hoja de Medios y Bajos (corregir o aceptar); después, lo elegido: E4′.a (seguridad: M11, M12, PNS-97, PNS-29 resto 3 y el test de PNS-36), E4′.b (el aviso del lienzo, fila 30 de la hoja) y E4′.h (script de pruebas) | 30 (M11), 31 (M12), 32 (PNS-97) y 33 (PNS-29), en E4′.a; 34 (PNS-96), en E4′.b | **E4′.0 cerrada (04/11/2026)**: hoja con las decisiones de Sergio ([e4_hoja_3879.md](e4_hoja_3879.md); `ca707a9`). **E4′.a aplicada (05/11/2026)**: tests en verde, neutralizada y **aprobada en revisión** ([propuesta](e4_propuesta_3879.md), «Resultado de E4′.a»). **E4′.b aplicada (05/11/2026)**: tests en verde, neutralizada y **aprobada en revisión** ([propuesta](e4_propuesta_3879.md), «Resultado de E4′.b»). E4′.h, pendiente; después, una sola subida al staging |
+| **E4′** | Hoja de Medios y Bajos (corregir o aceptar); después, lo elegido: E4′.a (seguridad: M11, M12, PNS-97, PNS-29 resto 3 y el test de PNS-36), E4′.b (el aviso del lienzo, fila 30 de la hoja) y E4′.h (script de pruebas) | 30 (M11), 31 (M12), 32 (PNS-97) y 33 (PNS-29), en E4′.a; 34 (PNS-96), en E4′.b | **E4′.0 cerrada (04/11/2026)**: hoja con las decisiones de Sergio ([e4_hoja_3879.md](e4_hoja_3879.md); `ca707a9`). **E4′.a aplicada (05/11/2026)**: tests en verde, neutralizada y **aprobada en revisión** ([propuesta](e4_propuesta_3879.md), «Resultado de E4′.a»). **E4′.b aplicada (05/11/2026)**: tests en verde, neutralizada y **aprobada en revisión** ([propuesta](e4_propuesta_3879.md), «Resultado de E4′.b»); ampliada con la opción A (05/11/2026) y F1 (06/11/2026) y validada en el laboratorio (06/11/2026). E4′.h, pendiente (script y una sola subida al staging) |
 
 Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`; línea de 3.1.879).
 
@@ -416,9 +422,72 @@ estándar), sin parche; en la caja A lo cubre el parche 18 (decisión de Sergio 
   aviso: lo habría guardado `_messagesForPersist` del cliente).
 - Un segundo turno sin recargar: mirar en el Historial IA si el prompt lleva el aviso (el historial que
   envía el cliente es `original_content || content`).
+- **Errata (06/11/2026):** sobre «`get_messages()`…» (arriba) y «el historial que envía el cliente es
+  `original_content || content`»: el historial lo construye el servidor (`get_model_history`) desde
+  `content`.
 - Cubre la conexión con `_process` (apertura de la marca y `reset` en el `finally`), que no tiene test
   (revisión de E4′.b).
 - Repetir R8 sin bloquear (§4, «Staging `pns_demo`, tras E3′»).
+
+**Ajuste de las validaciones del parche 34 (opción A y F1, E4′.b2 y E4′.b3, 05-06/11/2026).** Tras ampliar
+el aviso (ver [registro](parches_pns_ai.md), «Parches de la rama 14.0-pns-ai-3879 (E4′.b2 y E4′.b3)»), las
+validaciones de arriba se concretan así en el staging:
+
+- En un turno de Chatboo con rechazo de página, la burbuja termina con el aviso **en cursiva y en su propio
+  párrafo**, también en los mensajes con tabla (opción A + F1). El aviso **no se ve en vivo** (no es un
+  token): aparece tras recargar o al cerrar el turno.
+- **Copiar no lleva el aviso** (lee `clip_data`; es del fabricante): comprobar que el icono de copiar de un
+  mensaje con tabla copia solo la tabla.
+- **PDF y DOCX sí** llevan el aviso (en párrafo aparte); el **XLSX con tabla, no**. Comprobar además que en un
+  mensaje de una sola tabla (`o_ai_table_block`) el PDF/DOCX de F1 ya **no** saca la tabla como HTML crudo.
+- **V5 y V6 por SQL de solo lectura** (`get_messages` por XML-RPC falla por los `null` de `meta`):
+
+  ```sql
+  BEGIN TRANSACTION READ ONLY;
+  -- V5: último mensaje del asistente de la sesión :sesion
+  WITH ult AS (
+    SELECT e.ord AS pos, e.msg
+      FROM chatboo_session s,
+           jsonb_array_elements(s.messages::jsonb) WITH ORDINALITY AS e(msg, ord)
+     WHERE s.id = :sesion AND e.msg->>'role' = 'assistant'
+     ORDER BY e.ord DESC LIMIT 1)
+  SELECT pos,
+         position('No page was built. The reason is in the AI History.' IN coalesce(msg->>'content', '')) > 0 AS content_en,
+         position('No se ha creado la página. El motivo está en el Historial IA.' IN coalesce(msg->>'content', '')) > 0 AS content_es,
+         msg ? 'original_content' AS hay_original,
+         coalesce(msg->>'original_content', '') = '' AS original_vacio,
+         position('No page was built. The reason is in the AI History.' IN coalesce(msg->>'original_content', '')) > 0 AS original_en,
+         position('No se ha creado la página. El motivo está en el Historial IA.' IN coalesce(msg->>'original_content', '')) > 0 AS original_es
+    FROM ult;
+  -- V5 (complemento): canvas_rev y el último job de la sesión
+  SELECT s.id, s.canvas_rev, r.id AS job, r.state,
+         position('No se ha creado la página. El motivo está en el Historial IA.' IN coalesce(r.response, '')) > 0 AS response_es,
+         position('No page was built. The reason is in the AI History.' IN coalesce(r.response, '')) > 0 AS response_en
+    FROM chatboo_session s
+    LEFT JOIN LATERAL (SELECT * FROM chatboo_async_request WHERE session_id = s.id ORDER BY id DESC LIMIT 1) r ON true
+   WHERE s.id = :sesion;
+  -- V6: historial que recibió el motor en cada job de la sesión
+  SELECT id, create_date, state,
+         position('No page was built. The reason is in the AI History.' IN coalesce(history, '')) > 0 AS historia_en,
+         position('No se ha creado la página. El motivo está en el Historial IA.' IN coalesce(history, '')) > 0 AS historia_es,
+         position('No page was built. The reason is in the AI History.' IN coalesce(done_meta, '')) > 0 AS done_meta_en,
+         position('No se ha creado la página. El motivo está en el Historial IA.' IN coalesce(done_meta, '')) > 0 AS done_meta_es
+    FROM chatboo_async_request
+   WHERE session_id = :sesion
+   ORDER BY id;
+  ROLLBACK;
+  ```
+- **Botón Canvas (Paso 1):** con «Design» desmarcado, pulsar el botón Canvas de una respuesta con tabla; el
+  job acaba en error y **el cliente no muestra ningún aviso explícito** (solo el borde rojo del botón y el
+  motivo en el tooltip; sin toast ni diálogo). Es defecto del fabricante (ver §3.2): anotarlo, no requiere
+  parche.
+- **Disparador T1:** quitar «Design» de todos los proveedores activos y pedir, en una conversación nueva,
+  exactamente «Hazme una página con los cinco primeros contactos ordenados por nombre, solo con su id y su
+  nombre. Una página nueva; no escribas la tabla en el chat.»
+- **V2:** con «Design» marcado, el mismo T1 crea la página (`canvas_rev` sube) y no sale aviso.
+- **V3:** con «Design» marcado, abrir el chat y una respuesta con tabla; en otra pestaña quitar «Design»
+  sin recargar el chat y pulsar Canvas; esperado: el job en error, sin aviso duplicado y la sesión sin
+  cambios.
 
 ## 3. Al terminar
 
@@ -477,6 +546,102 @@ estándar), sin parche; en la caja A lo cubre el parche 18 (decisión de Sergio 
         WHERE status = 'confirmed' AND NOT executed
           AND operation_data LIKE '%ai.trusted.action%';
        ```
+       **Errata (05/11/2026):** `_cleanup_stuck_state` no tiene llamador; los caminos reales del reintento
+       son `safe_plan_status` y `/verification/execute`. La consulta borrador de arriba se sustituye por las
+       consultas A (`confirmed` y `COALESCE(executed, false) = false`) y B (`pending`) de abajo. Antes, en el
+       staging: cuántas filas tienen un `operation_data` no vacío que no empieza por `'{'` (si hay alguna, la
+       variante con expresión regular del mismo bloque) y un recuento de pasos por `model` y `op` sobre todas
+       las operaciones (en `pns_demo` debe encontrar pasos reales); y el estado del cron `cleanup_expired`
+       (`pns_demo` no está neutralizado). En el laboratorio, la tabla estaba vacía; la expresión se validó
+       con un JSON de prueba.
+       ```sql
+       -- E4′.h P1 — operaciones de ai.safe.operation con pasos CRUD sobre ai.trusted.action (parche 32, PNS-97).
+       -- Solo lectura. Lanzar con PGOPTIONS='-c default_transaction_read_only=on'.
+       -- operation_data es Text con json.dumps(dict) (o '' si no hay datos); los pasos van en
+       -- operation_data->'plan_steps' (lista de dicts con 'op' y, en CRUD, 'model').
+       -- executed puede ser NULL: el dominio ORM ('executed', '=', False) lo incluye; por eso COALESCE.
+       -- Si una fila no fuera JSON válido el ::jsonb fallaría: el filtro LIKE '{%' lo evita en la práctica
+       -- (json.dumps siempre empieza por '{'); si aun así falla, usar la variante LIKE del final.
+
+       BEGIN TRANSACTION READ ONLY;
+
+       -- Consulta A: lo que reintentaría _retry_confirmed_not_executed (status = 'confirmed' y no executed)
+       WITH sys AS (
+           SELECT r.uid
+             FROM res_groups_users_rel r
+             JOIN ir_model_data d ON d.model = 'res.groups' AND d.res_id = r.gid
+            WHERE d.module = 'base' AND d.name = 'group_system'
+       ), ops AS (
+           SELECT o.*
+             FROM ai_safe_operation o
+            WHERE o.status = 'confirmed'
+              AND COALESCE(o.executed, false) = false
+              AND o.operation_data LIKE '{%'
+              AND jsonb_typeof(o.operation_data::jsonb -> 'plan_steps') = 'array'
+              AND EXISTS (
+                  SELECT 1
+                    FROM jsonb_array_elements(o.operation_data::jsonb -> 'plan_steps') s(step)
+                   WHERE jsonb_typeof(s.step) = 'object'
+                     AND s.step ->> 'model' = 'ai.trusted.action'
+                     AND s.step ->> 'op' IN ('create', 'write', 'copy', 'unlink')
+              )
+       )
+       SELECT o.id, o.status, o.executed,
+              o.user_id, up.login AS propone_login,
+              (o.user_id = 1 OR o.user_id IN (SELECT uid FROM sys)) AS propone_ajustes,
+              o.confirmed_by_uid, uc.login AS confirma_login,
+              COALESCE(o.confirmed_by_uid, o.user_id) AS uid_efectivo,
+              (COALESCE(o.confirmed_by_uid, o.user_id) = 1
+               OR COALESCE(o.confirmed_by_uid, o.user_id) IN (SELECT uid FROM sys)) AS confirma_ajustes,
+              o.create_date, o.write_date, o.resolved_at, o.expires_at,
+              o.expires_at < (now() AT TIME ZONE 'UTC') AS vencida
+         FROM ops o
+         JOIN res_users up ON up.id = o.user_id
+         LEFT JOIN res_users uc ON uc.id = o.confirmed_by_uid
+        ORDER BY o.id;
+
+       -- Consulta B: los demás estados no terminales (solo 'pending': se confirma y ejecuta por el toast,
+       -- Autorizaciones o auto-confirm; 'expired', 'cancelled' y 'executed' son terminales).
+       WITH sys AS (
+           SELECT r.uid
+             FROM res_groups_users_rel r
+             JOIN ir_model_data d ON d.model = 'res.groups' AND d.res_id = r.gid
+            WHERE d.module = 'base' AND d.name = 'group_system'
+       ), ops AS (
+           SELECT o.*
+             FROM ai_safe_operation o
+            WHERE o.status = 'pending'
+              AND COALESCE(o.executed, false) = false
+              AND o.operation_data LIKE '{%'
+              AND jsonb_typeof(o.operation_data::jsonb -> 'plan_steps') = 'array'
+              AND EXISTS (
+                  SELECT 1
+                    FROM jsonb_array_elements(o.operation_data::jsonb -> 'plan_steps') s(step)
+                   WHERE jsonb_typeof(s.step) = 'object'
+                     AND s.step ->> 'model' = 'ai.trusted.action'
+                     AND s.step ->> 'op' IN ('create', 'write', 'copy', 'unlink')
+              )
+       )
+       SELECT o.id, o.status, o.executed,
+              o.user_id, up.login AS propone_login,
+              (o.user_id = 1 OR o.user_id IN (SELECT uid FROM sys)) AS propone_ajustes,
+              o.confirmed_by_uid, uc.login AS confirma_login,
+              (o.confirmed_by_uid IS NOT NULL
+               AND (o.confirmed_by_uid = 1 OR o.confirmed_by_uid IN (SELECT uid FROM sys))) AS confirma_ajustes,
+              o.create_date, o.expires_at,
+              o.expires_at < (now() AT TIME ZONE 'UTC') AS vencida
+         FROM ops o
+         JOIN res_users up ON up.id = o.user_id
+         LEFT JOIN res_users uc ON uc.id = o.confirmed_by_uid
+        ORDER BY o.id;
+
+       ROLLBACK;
+
+       -- Variante sin ::jsonb (si alguna fila no es JSON válido). json.dumps escribe '"model": "ai.trusted.action"'
+       -- (separadores por defecto); el patrón admite espacios variables. Encuentra el modelo en cualquier
+       -- clave "model" del JSON, también fuera de plan_steps: revisar a mano lo que salga.
+       -- ... AND o.operation_data ~ '"model"\s*:\s*"ai\.trusted\.action"'
+       ```
      - **Casilla «Design» (hoja, ficha 29; decisión 6 de la segunda ronda):** tras el `-u`, «Design» solo en
        `gemini-3.5-flash` (no en `lite`) y comprobar que al menos un proveedor la tiene.
 2. **Informe al fabricante:** M10, M13, `collect_pin`, PNS-54, PNS-07, PNS-97, PNS-98, PNS-70, PNS-100, F4, la
@@ -500,6 +665,18 @@ estándar), sin parche; en la caja A lo cubre el parche 18 (decisión de Sergio 
      (`_flat_rows`) no; los diseños que dependen de `keys` salen vacíos;
    - **`customer_360._iso`,** con la causa corregida: es un defecto de `ensure_module_result_call`, que añade
      `result = <última función>(…)` aunque `result` se asigne dentro de bloques (hoja, ficha 22).
+
+   Pendiente de comunicar al final (06/11/2026, E4′.b2 y E4′.b3; validación del aviso del parche 34 en el
+   laboratorio):
+   - **El error del botón Canvas no se ve en pantalla:** cuando el job del botón Canvas acaba con
+     `state='error'` («No se ha creado la página. El motivo está en el Historial IA.»), el cliente solo pone
+     el borde del botón en rojo y deja el motivo en el tooltip; no hay toast, diálogo ni mensaje en el chat,
+     así que el usuario no se entera (Paso 1 de E4′.h; detalle y referencias de código en el registro).
+   - **HTML crudo en el PDF/DOCX** de mensajes de una sola tabla (la tabla se imprime como texto); es
+     independiente del aviso (un mensaje sin aviso también lo sufre).
+   - **La nota «incomplete response» del fabricante** es invisible en la burbuja (se añade a `content` pero
+     `original_content` va sin ella) y, de verse, con `_` literales.
+   - **Copiar y el XLSX con tabla no llevan la prosa** (observación).
 
    Sin rutas locales, kit, laboratorio, clientes ni personas.
 3. **Limpieza:** staging `pns_demo`, `lab_pns_ai` / `lab_pns_ai_14` y `_fabricante/`.
@@ -544,6 +721,10 @@ estándar), sin parche; en la caja A lo cubre el parche 18 (decisión de Sergio 
   en el shell (el `rollback` no deshace los cursores propios). Se conservan (decisión de Sergio).
   Casilla «Design» de `lite` (proveedor 4) en el laboratorio: **pendiente de quitar** (la quita Sergio;
   hoja de E4′, decisión 6 de la segunda ronda).
+  _Errata (06/11/2026):_ hecho — «Design» quedó en los proveedores 1 y 2 y el 4 (`lite`) sin marcar
+  (ver el estado del 06/11/2026 más abajo).
+- **`lab_pns_ai_3879_14`, tras validar E4′.b en el laboratorio (06/11/2026):** «Design» en los
+  proveedores 1 (Gemini 3.6 flash) y 2 (Gemini 3.5 flash); el 4 (`lite`) sin marcar.
 - **LIYBEN:** usuarios externos archivados el 23/10/2026.
 - **LIYBEN, segundo rechazo de E2′ (27/10/2026):** claves MCP **revocadas** hasta el despliegue final de E2′
   (PNS-101 ampliado y PNS-102). Paso pendiente al terminar: **regenerarlas** (ver §3.1).
@@ -578,5 +759,5 @@ Estados (N11): aplicado → validado en laboratorio → validado en staging → 
 | 31 | M12 (`chat_completion` solo en `su`) | E4′.a | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
 | 32 | PNS-97 (`create`, `write` y `unlink` de `ai.trusted.action` exigen Ajustes fuera de `su`; criterio combinado dentro de un plan) | E4′.a | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
 | 33 | PNS-29 resto 3 (`_month_usage` privado; `default_get` del asistente de uso con la ACL) | E4′.a | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
-| 34 | PNS-96 (aviso fijo del servidor cuando `log_no_page` rechaza en un turno; fila 30 de la hoja) | E4′.b | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
+| 34 | PNS-96 (aviso fijo del servidor cuando `log_no_page` rechaza en un turno; fila 30 de la hoja) | E4′.b | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026); ampliado con la opción A (05/11/2026: aviso también en `original_content`) y el formato F1 (06/11/2026: aviso en `<p><em>…</em></p>` cuando el contenido es HTML), tests en verde (9 en `TestSegesNoPageNotice`), neutralizado (N34o, N34h) y aprobado en revisión; validado en el laboratorio (sesiones 21 a 24, 05-06/11/2026) |
 | — | Parche de tests E0′ (datos de prueba de `test_change_journal` y `test_paap_core`) | E0′ | Validado en laboratorio (23/10/2026) |

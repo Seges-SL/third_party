@@ -137,7 +137,7 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 | 31 | M12 | seguridad | `pns_ai_mcp/models/ai_execution_engine.py` | E4′.a | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
 | 32 | PNS-97 | seguridad | `pns_ai_mcp/models/ai_trusted_action.py` | E4′.a | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
 | 33 | PNS-29 | seguridad | `pns_ai_mcp/models/ai_provider.py`, `pns_ai_mcp/wizard/ai_provider_usage_wizard.py` | E4′.a | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
-| 34 | PNS-96 | funcional | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_async_request.py` | E4′.b | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
+| 34 | PNS-96 | funcional | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_async_request.py` | E4′.b | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026); ampliado con la opción A (05/11/2026) y el formato F1 (06/11/2026): el aviso también en `original_content` y, cuando el contenido es HTML, en `<p><em>…</em></p>` (ver «Parches de la rama 14.0-pns-ai-3879 (E4′.b2 y E4′.b3)») |
 
 Parches 11 adaptado y 17 a 22 (E2′, 27/10/2026): aplicados, con tests y neutralización hechos; pruebas
 manuales del laboratorio pendientes ([lab_e2_3879.md](lab_e2_3879.md)). Tras la revisión del mismo día:
@@ -166,6 +166,14 @@ la rama 14.0-pns-ai-3879 (E4′.a)».
 Parche 34 (E4′.b, 05/11/2026): aplicado, con tests en verde, neutralización hecha y aprobado en revisión;
 misma propuesta. Pendiente, con E4′.a, de E4′.h (script de pruebas de E4′) y de una sola subida al
 staging. Entrada más abajo, en «Parches de la rama 14.0-pns-ai-3879 (E4′.b)».
+
+Parche 34, ampliación (E4′.b2 y E4′.b3, 05-06/11/2026): sobre la copia de trabajo de E4′.b, el aviso se
+amplió con la **opción A** (05/11/2026: con aviso, `original_content` lleva el mismo texto que `content`;
+sustituye la decisión 3 de la tercera ronda) y el **formato F1** (06/11/2026: cuando el contenido es HTML,
+el aviso se anexa como `<p><em>…</em></p>` en vez de en markdown). Tests en verde, neutralización (con N34o
+y N34h) y revisión aprobadas; validado en el laboratorio (sesiones 21 a 24). Pendiente, con E4′.a y E4′.b,
+de E4′.h y de una sola subida al staging. Entrada más abajo, en «Parches de la rama 14.0-pns-ai-3879
+(E4′.b2 y E4′.b3)».
 
 Parches 10, 12 y 13 a 16 (E1′): validados en laboratorio el 23/10/2026 y en el staging `pns_demo` el 26/10/2026, con el cambio de base
 (commit `0366231`; [staging_e1_3879.md](staging_e1_3879.md) y
@@ -3249,3 +3257,210 @@ saltados**; los mismos 50 fallos por nombre, sin ninguno nuevo.
     siguiente (en «Qué se degrada»).
 - **Estado del parche 34:** aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026).
   Siguiente: E4′.h (script de pruebas de E4′); después, una sola subida de E4′ al staging.
+
+## Parches de la rama 14.0-pns-ai-3879 (E4′.b2 y E4′.b3)
+
+- **Fecha:** 05/11/2026 (opción A, E4′.b2) y 06/11/2026 (formato F1, E4′.b3). **Entrega:** ampliación del
+  parche 34 (PNS-96) sobre la copia de trabajo de E4′.b (HEAD de partida `421a838`, `[DOC] E4′.b`). No es un
+  parche nuevo: el 34 pasa de 10 a 12 marcadores. Validado en el laboratorio `lab_pns_ai_3879_14` (proveedor
+  Gemini 3.6 flash).
+- **Origen:** la prueba del laboratorio del 05/11/2026 (sesión 21, job 50) mostró que el aviso del parche 34,
+  solo en `content`, **no se veía nunca** en la burbuja ni al copiar (el cliente pinta `original_content ||
+  content` y `original_content` iba sin aviso): análisis de solo lectura del cliente (resumen en
+  [e4_propuesta_3879.md](e4_propuesta_3879.md), «Resultado de E4′.b2 y E4′.b3»). De ahí la opción A; y, al
+  verse con la opción A pero mal formado (los `_` literales, pegado al párrafo) en los mensajes con tabla, el
+  formato F1.
+
+### Decisiones de Sergio (opción A y F1)
+
+- **Opción A (05/11/2026), sustituye la decisión 3 de la tercera ronda:** con aviso, `original_content` lleva
+  el mismo texto que `content` (el aviso); sin aviso, `original_content` sigue siendo exactamente el valor de
+  hoy (`acc or ''`), sin cambiar su tipo. Descartadas **C** (pintar el aviso en el JS sin tocar
+  `original_content`), **D** (aceptar la limitación) y **E** (retirar el parche).
+- **Formato F1 (06/11/2026), sobre la opción A:** si `(acc or '').lstrip().startswith('<')` (mismo criterio
+  que `isLikelyHtml` del cliente, `chatboo_formatters.js:88-97`), el aviso se añade como `'<p><em>' +
+  html.escape(_note) + '</em></p>'`; si no, el markdown de antes (`\n\n_…_`, o `_…_` con `acc` vacío).
+  Descartadas **F5** (`\n\n**…**`: reformatea la prosa del modelo y es frágil por la ventana de 1200
+  caracteres de `looksLikeMarkdownTail`, `chatboo_sse.js:113-124`) y **F4** (aceptar el formato actual, V0).
+- El **HTML crudo** en PDF/DOCX y la nota «incomplete response» del fabricante van al informe, **sin parche**
+  (ver «Para el informe al fabricante», abajo).
+
+### Cambio (sobre el parche 34 de E4′.b)
+
+- `pns_ai_chatboo/models/chatboo_async_request.py`, rama de éxito de `_save_to_session` (`:1298-1312`): cuando
+  `page_refused_in_job(...)` es verdadero, el aviso (`_note`) se compone según el tipo de `acc`:
+  - si `(acc or '').lstrip().startswith('<')`: `_content = acc + '<p><em>' + html.escape(_note) + '</em></p>'`
+    (F1);
+  - si no, y `(acc or '').strip()`: `_content = f"{acc}\n\n_{_note}_"` (como hoy);
+  - si no: `_content = f"_{_note}_"` (como hoy).
+  `_assistant_content = _content`, y **`content` y `original_content` llevan `_content`** (opción A). Sin
+  aviso, `_content` es `acc or ''`, idéntico al valor de hoy.
+- `'content': _content` (`:1363`, marcador inline preexistente) y `'original_content': _content` (`:1367`; el
+  marcador «nuevo» de la opción A está en el **comentario del bloque de `:1364`-`:1366`** sobre
+  `original_content`, no inline en `:1367`).
+- `import html` (biblioteca estándar, Python 3.7.3) añadido en el bloque de imports, con su marcador (es el
+  único marcador nuevo de F1). El comentario del bloque explica en inglés por qué va en HTML cuando el
+  contenido es HTML; sin marcador propio dentro del bloque (ya marcado en `:1299`).
+- **No se tocan:** la rama de error, la rama `incomplete` del fabricante (`:1266-1287`, sigue con
+  `'original_content': acc or ''` en `:1282`), la vía de respaldo por SQL de `_finalize` (`:712-720`) ni
+  `chatboo_canvas.py` (SHA-256 `e470e7a7…`, sin cambio).
+
+### Qué se degrada (matices de la opción A y F1)
+
+- **Burbuja:** con la opción A el aviso **se ve tras recargar** (`_loadSession` toma `original_content ||
+  content`, `chatboo_component_v2.js:1161`); con F1, además, **bien formado** (cursiva, en su propio párrafo)
+  también en los mensajes con tabla, porque el cliente pinta ese contenido como HTML
+  (`isLikelyHtml`→`enhanceHtmlProse`, sin pasar por markdown) y `<p>`/`<em>` sobreviven al sanitizador
+  (lista blanca `chatboo_formatters.js:122-133`). En prosa pura F1 ≡ hoy (como `acc` no es HTML, cae a la
+  rama markdown, que convierte `_…_` en `<em>`). **En vivo** el aviso no se ve (no es un token; lo añade el
+  servidor al guardar).
+- **Copiar:** **no lleva el aviso.** `_copyToClipboard` lee `clip_data` primero
+  (`chatboo_export.js:685`, `:704`) y copia **solo la tabla**; nunca `original_content` ni la prosa mientras
+  haya `clip_data`. Es comportamiento del fabricante, no del parche.
+- **Exportaciones:** **PDF y DOCX sí** llevan el aviso (vía `exportProseFromMessage`/`original_content`,
+  `chatboo_export.js:1667`, `:2135`, `:3713`); **XLSX no** cuando hay tabla (`extractTableSections`,
+  `:2994-2997`: solo cae a texto si no hay tabla). El aviso entra **dentro** del entregable PDF/DOCX como
+  prosa del documento (se asume con la opción A). Efecto colateral bueno de F1: en un mensaje de una sola
+  tabla (`o_ai_table_block`) añade un 2.º bloque de prosa que **evita el *fallback* de HTML crudo** de
+  `extractProseBlocks` (`chatboo_export.js:2684`) en ese caso.
+- **Frontera «texto + tabla» (Sin confirmar):** si `acc` empieza por texto y lleva una tabla embebida, el
+  criterio «empieza por `<`» no lo detecta y F1 usaría markdown, con lo que la burbuja (que sí entra por la
+  rama de HTML embebido) volvería a pintar el aviso literal. No observado en las cadenas reales (S21/2, S22/2,
+  S22/4 empiezan por `<`), pero posible.
+- **El modelo ve el aviso el turno siguiente vía `content`** (sin cambio frente a hoy): el motor compacta el
+  historial leyendo `content` y le aplica `_strip_html` (`pns_ai_mcp/utils/history_compact.py:386-389`,
+  llamado desde `engine_turn_messages.py:207-208`), así que el `<p><em>…</em></p>` queda como el mismo texto.
+  Con la opción A, además, sobrevive a un guardado del cliente por `_messagesForPersist`
+  (`chatboo_component_v2.js:1289`), que si no sobrescribiría `content` con `original_content`.
+- Los límites ya anotados en E4′.b (no corrige lo que escribe el modelo; turno vacío sin aviso;
+  `canvas_rev` cambiado; lectura de `canvas_rev` sin `try`, aceptada por Sergio) siguen igual.
+
+### Tests
+
+- `TestSegesNoPageNotice` (`pns_ai_chatboo/tests/test_seges_chatboo_canvas.py`): `_assert_notice` pasa a
+  `assertEqual(last['original_content'], content)` (antes `acc`; se retiró el parámetro `acc`, que quedaba sin
+  uso, y se ajustó la llamada de `test_notice_empty_answer`). Los controles (`_assert_no_notice`) no cambian
+  (`original_content == NO_PAGE_ACC`, texto plano). Los tres tests con aviso discriminan ahora también N34o.
+- Se **añade** `test_notice_html_answer` (F1): `acc` HTML
+  (`'<div class="o_ai_table_block"><table>…</table></div>\n\nHe actualizado el color de fondo.'`), con un
+  rechazo como en `test_notice_after_refusal`; exige `content == original_content == res['assistant_content']
+  == acc + '<p><em>' + html.escape(NOTICE) + '</em></p>'` y `assertNotIn('\n\n_', …)`. Reutiliza el helper
+  `_assert_notice`. La clase pasa de **8 a 9** tests, los 9 en verde.
+
+### Neutralización
+
+- **Opción A (05/11/2026):** se añade **N34o** (`original_content` vuelve a `acc or ''` aunque haya aviso):
+  fallan los tres tests con aviso en la aserción nueva `original_content == content`; los controles pasan
+  (`tests-20261105-165139.log`, 21 F · 32 E). N34m, N34s, N34r y N34j se repiten como en E4′.b (mismos tests
+  por nombre).
+- **F1 (06/11/2026):** con el test nuevo, en **N34m, N34s y N34o** falla **también** `test_notice_html_answer`
+  (4 con aviso → **22 F · 32 E**); en N34r y N34j, igual (**19 F · 32 E**). Se añade **N34h** (F1 fuerza
+  siempre el markdown, quita la rama HTML): falla **solo** `test_notice_html_answer` (**19 F · 32 E**). Tabla
+  final (una cada vez, con copia, cambio, batería, restauración y SHA-256 idéntico al post-F1 en todas; para
+  N34m/N34r/N34j se respaldó y restauró también `chatboo_canvas.py`):
+
+  | Ejecución | Qué se retira | Log | Resultado | Fallan |
+  |---|---|---|---|---|
+  | N34m | `log_no_page` no anota | `tests-20261106-121920.log` | 22 F · 32 E | after_refusal, unknown_session, empty_answer, **html_answer** |
+  | N34s | `_save_to_session` no añade el aviso | `tests-20261106-122312.log` | 22 F · 32 E | los mismos cuatro |
+  | N34r | `page_refused_in_job` no compara `canvas_rev` | `tests-20261106-122647.log` | 19 F · 32 E | `test_no_notice_when_page_changed` |
+  | N34j | `page_refused_in_job` no compara el job | `tests-20261106-123006.log` | 19 F · 32 E | `test_no_notice_other_job` |
+  | N34o | `original_content` vuelve a `acc or ''` aunque haya aviso | `tests-20261106-162014.log` | 22 F · 32 E | los cuatro con aviso |
+  | N34h | F1 fuerza siempre el markdown (quita la rama HTML) | `tests-20261106-162333.log` | 19 F · 32 E | **`test_notice_html_answer`** |
+
+### Comprobaciones
+
+- **Huellas (SHA-256) tras F1:** `chatboo_async_request.py` `c97e6a7b…`; `test_seges_chatboo_canvas.py`
+  `5ac525b8…`; `chatboo_canvas.py` `e470e7a7…` (sin cambio).
+- **`py_compile`** con Python 3.7.3 en la imagen `odoo-dev:14-lab_pns_ai_3879`: correcto (ambos archivos), en
+  las dos tandas.
+- **Lint:** `python3 ~/.claude/hooks/odoo_lint.py --revisar --base 421a838 pns_ai_chatboo/` → **0 avisos
+  nuevos** (168 preexistentes en `chatboo_async_request.py`, 0 en el test), en las dos tandas.
+- **Marcadores fuera de tests:** `grep … "Seges: parche 34 ("` → **11** con la opción A, **12** con F1 (5 en
+  `chatboo_canvas.py` sin cambio; 7 en `chatboo_async_request.py`: los 5 de E4′.b, la línea de
+  `original_content` de la opción A y el `import html` de F1). `grep … "Seges: parche 3[0-4] ("` fuera de
+  tests → **28** con la opción A, **29** con F1.
+- **Batería completa** (`odoo-dev 14 tests pns_base,pns_ai_mcp,pns_ai_chatboo`):
+  - opción A: `tests-20261105-163329.log` → 472 · 18 F · 32 E · 3 saltados; restaurada,
+    `tests-20261105-165501.log` → 472 · 18 F · 32 E; los 8 de `TestSegesNoPageNotice` en verde.
+  - F1: `tests-20261106-120903.log` → **473 · 18 F · 32 E · 3 saltados**; batería final restaurada,
+    `tests-20261106-162710.log` → **473 · 18 F · 32 E · 3 saltados**; los **mismos 50 fallos por nombre** que
+    en E4′.b, ninguno de Seges, y los **9** de `TestSegesNoPageNotice` en verde.
+
+### Validación en el laboratorio (`lab_pns_ai_3879_14`, Gemini 3.6 flash)
+
+- **05/11, sobre `421a838` (sin opción A):** sesión 21, job 50. El aviso estaba en `content`/`response`/
+  `done_meta`, pero **no se vio nunca** en la burbuja ni al copiar (el cliente pinta `original_content`, que
+  iba sin aviso).
+- **05-06/11, con opción A y sin F1:** sesión 22, jobs 51 y 52. **Se ve**, pero con los `_` literales y pegado
+  al párrafo (`raw=true` y `content` HTML). Se conserva al recargar y al cambiar de sesión. El modelo lo
+  recibe en el turno siguiente (history del job 52).
+- **06/11, con opción A y F1** (laboratorio reiniciado a las 15:36:19 UTC): sesión 23, jobs 53 y 54 (T1 con
+  «Design» desmarcado en todos los proveedores):
+  - **momento 1:** aviso en cursiva y en su párrafo; PDF y DOCX con el aviso en párrafo aparte; `content =
+    original_content = response`, terminados en `</em></p>`;
+  - **momento 2** (segundo turno, sin recargar): job 54, `history` con el aviso (en su forma HTML); burbuja
+    igual; la respuesta del job 54 es de una sola tabla (`o_ai_table_block`) y su PDF/DOCX sale **sin HTML
+    crudo** (sí lo sacaba la sesión 22 con V0);
+  - **momentos 3 (recargar) y 4 (cambiar de sesión y volver):** igual. El cliente reescribió `messages`
+    (cambió el md5) sin perder el aviso ni ninguna clave (17 en cada mensaje del asistente);
+  - **copiar:** solo la tabla (`clip_data`); el XLSX con tabla no lleva prosa (del fabricante);
+  - el PDF **sin aviso antes de recargar** del 05/11 **no se reproduce el 06/11** (el PDF lleva el aviso
+    nada más terminar el turno): **no reproducible**.
+- **V2 (06/11, «Design» en los proveedores 1 y 2):** sesión 24, job 55. Página creada (`canvas_rev = 1`),
+  **sin aviso** en la burbuja, en `messages`, en `response` ni en `done_meta`.
+- **V3 (06/11, botón Canvas sobre la sesión 23 tras quitar «Design» sin recargar):** jobs 3 y 4 de
+  `chatboo.canvas.job` con `state='error'` y el aviso en `error`, **sin llamar al modelo**
+  (`started_at = finished_at`); la sesión 23 **sin cambios** (md5 igual, 4 mensajes); **sin aviso
+  duplicado**; el usuario no ve el error (ver «Para el informe al fabricante»).
+- **Estado final del laboratorio:** «Design» en los proveedores 1 (Gemini 3.6 flash) y 2 (Gemini 3.5
+  flash); el 4 (`lite`) sin marcar.
+
+### Para el informe al fabricante (defectos del fabricante, sin parche)
+
+- **El error del botón Canvas no se ve en pantalla** (Paso 1 de E4′.h, laboratorio 06/11/2026, sesión 23,
+  jobs 3 y 4 de `chatboo.canvas.job`): cuando el job termina con `state='error'` y `error='No se ha creado la
+  página. El motivo está en el Historial IA.'` (`chatboo_canvas_job.py:131-134`), el controlador
+  `/chatboo/canvas/state` lo convierte en `state='failed'` del cliente con ese texto en `error`
+  (`chatboo_canvas_job.py:84-99`); el cliente (`chatboo_charts.js`) lo recibe en `waitForCanvas`, que rechaza
+  con el texto del error (`:3015-3017`), y `followCanvas` (o el `catch` de `startCanvas`) pone
+  `job.state='failed'`, `job.error=<texto>` y repinta (`:3038-3045`, `:3094-3101`). Pero `paintCanvasButton`
+  para `state==='failed'` (`:2991-2993`) **solo** (a) añade la clase `o_chatboo_canvas_btn--failed`, que
+  únicamente pone el borde del botón en rojo (`static/src/css/chatboo_floating.css:442-444`), y (b) devuelve
+  el texto del botón a la etiqueta normal «Canvas» (`label('canvas')`, `:61`) y deja el motivo en el atributo
+  `title` (tooltip al pasar el ratón). **No hay toast, diálogo, banner ni mensaje en el chat** (ningún
+  `notification`/`displayNotification`/`alert`/`dialog` en el flujo del canvas de `chatboo_charts.js`). Por
+  eso el usuario «no vio ningún aviso en pantalla»: el único rastro visible es el borde rojo (sutil) y el
+  texto del motivo, que solo aparece al pasar el ratón por encima. Es código del fabricante (sin marcadores
+  `Seges` en `chatboo_charts.js`) e **independiente del parche 34** (el aviso del parche 34 vive en el turno
+  de Chatboo, en `content`, no en el job del botón Canvas). **Candidato al informe.**
+- **HTML crudo en PDF/DOCX:** `extractProseBlocks` (`chatboo_export.js:2684`) cae a
+  `markdownToProseBlocks(original_content)` cuando la prosa queda en `< 2` bloques; como `original_content` es
+  HTML, la tabla se imprime como **texto crudo** (`class="o_ai_table_block"` → `oaitableblock`) y
+  `stripInlineMarkdown` se come los `_`/`**`. Afecta a mensajes de **una sola tabla** (`o_ai_table_block`).
+  Es del fabricante y es **independiente del aviso:** la cadena S21/2 **no lleva aviso y también lo sufre**.
+- **Nota «incomplete» del fabricante invisible:** la nota «(incomplete response…)»
+  (`chatboo_async_request.py:1266-1287`) se añade a `content` pero su `original_content = acc or ''`
+  (`:1282`); como `_loadSession` usa `original_content || content`, **no se ve en la burbuja**, y de verse
+  saldría con los `_` literales. No se toca (ni ella, ni la rama de error, ni el respaldo por SQL de
+  `_finalize`).
+- **Copiar y XLSX con tabla** no llevan la prosa (ni, por tanto, el aviso): copiar lee `clip_data`; el XLSX
+  solo exporta tablas cuando las hay.
+
+### Revisión de E4′.b2 y E4′.b3 (05 y 06/11/2026): APROBADAS
+
+- **Opción A (`odoo-reviewer`, 05/11/2026):** APROBADA, sin bloqueantes ni menores. Verificó que `_content` no
+  se reasigna entre `:1300-1305` y el dict, que la rama de error, la rama `incomplete` (`:1282`) y el respaldo
+  por SQL de `_finalize` no se tocan, y que los tres tests con aviso blindan N34o. Sugerencia no bloqueante y
+  no aplicada: el marcador inline de la línea de `content` (`:1363`) es algo redundante con el bloque sobre
+  `original_content`; esa línea es preexistente del parche 34 (fuera del alcance), así que no se toca.
+- **F1 (`odoo-reviewer`, 06/11/2026):** APROBADA, sin bloqueantes. Verificó: el criterio del servidor
+  `(acc or '').lstrip().startswith('<')` coincide con `isLikelyHtml` del cliente; `html.escape` es stdlib
+  (3.7.3) y solo escapa `_note` (literal traducible, sin entrada de usuario), mientras `acc` se concatena en
+  crudo (HTML ya construido); `<p>`/`<em>` están en la lista blanca del sanitizador; no se tocan la nota
+  «incomplete», la rama de error ni el respaldo por SQL; sin sintaxis posterior a 3.7.3; marcadores 12 y 29;
+  el test nuevo reutiliza los helpers sin romper los demás. Sugerencia no bloqueante, no aplicada: el lint
+  `--revisar --base 14.0` mezcla ruido de estilo del vendor; acotado a las líneas de F1, 0 incidencias nuevas
+  (como confirma el lint `--base 421a838`).
+- **Estado del parche 34 (ampliado):** aplicado con la opción A y F1, tests en verde, neutralizado y aprobado
+  en revisión (05 y 06/11/2026). Siguiente: E4′.h; después, una sola subida de E4′ al staging.

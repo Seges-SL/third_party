@@ -635,6 +635,8 @@ sale traducido sin tocar `i18n`.
   `_assistant_content` se devuelve en los chips (`:1468-1469`) y `_finalize` lo escribe en `response` y
   `partial` y en `done_meta` (`:668-687`), con lo que el cliente actualiza la burbuja en vivo (mismo camino
   que los SVG, `:1231-1232`).
+  - _Errata (06/11/2026):_ `original_content` **no** es «lo que reenvía como historial»: el historial lo
+    monta el servidor (`get_model_history`) desde `content`.
 - **`_save_to_session` sin cursor propio** en esta prueba [L]: `get_messages`, `set_messages`,
   `get_input_history`, `set_input_history`, `update_last_used`, `_consume_staged_assistant_download_chips`,
   `recover_orphan_download_chips` y `_claim_turn_file_chips` escriben o leen en el cursor del llamador;
@@ -800,6 +802,8 @@ session.id, session.canvas_rev)`, como `_process`, y la deshace con `addCleanup(
 - `test_notice_after_refusal`: `log_no_page(env_a, 'seges e4p', session.id)` y
   `job.with_user(user_a)._save_to_session(ACC, {}, error=None)` → el último mensaje del asistente es
   `ACC + '\n\n_' + NOTICE + '_'`, `original_content == ACC` y el resultado trae `assistant_content` con el aviso.
+  - _Errata (06/11/2026):_ con la opción A, `original_content == content` (no `== ACC`); y, cuando `acc`
+    es HTML, el aviso se anexa como `<p><em>…</em></p>` (F1).
 - `test_notice_unknown_session`: `log_no_page(env_a, 'seges e4p')` sin `session_id` → con aviso.
 - `test_notice_empty_answer`: `acc = ''` → contenido `'_' + NOTICE + '_'`. Llama a `_save_to_session`
   directamente con `error=None`: en un turno real sin entregable, `_finalize` lo habría convertido antes en
@@ -959,3 +963,40 @@ así que no queda nada «Pendiente de decisión de Sergio».
   no reabren la decisión 3 de la tercera ronda.
 - **Pendiente:** E4′.h (script de pruebas de E4′, con las validaciones del parche 34 del
   [plan](plan_correccion_pns_ai_3879.md), apartado E4′); después, una sola subida al staging.
+
+## Resultado de E4′.b2 y E4′.b3 (opción A y F1, 05-06/11/2026)
+
+Ampliación del parche 34 sobre la copia de trabajo de E4′.b (HEAD `421a838`). El registro completo (cambio,
+tests, neutralización con N34o y N34h, laboratorio e informe) está en el
+[registro](parches_pns_ai.md), «Parches de la rama 14.0-pns-ai-3879 (E4′.b2 y E4′.b3)»; aquí quedan las
+decisiones que **sustituyen o corrigen** lo escrito más arriba en esta propuesta.
+
+- **Decisión 3 de la tercera ronda, sustituida (opción A, Sergio 05/11/2026):** donde esta propuesta dice que
+  «el aviso del servidor solo va en `content`, no en `original_content`» (apartado «Decisiones de Sergio»,
+  punto 3; apartado «Cambio propuesto», viñeta «`original_content` sigue siendo `acc`»; esbozo del diff, línea
+  `'content': _content` sin tocar `original_content`), **con aviso `original_content` lleva ahora el mismo
+  texto que `content`**; sin aviso, el valor de hoy (`acc or ''`). El esbozo del diff queda desfasado en ese
+  punto: el código pone `'original_content': _content`. Descartadas C, D y E.
+- **Formato del aviso (F1, Sergio 06/11/2026):** cuando el contenido es HTML
+  (`(acc or '').lstrip().startswith('<')`), el aviso se anexa como `'<p><em>' + html.escape(_note) +
+  '</em></p>'` en vez de en markdown (se añade `import html`, stdlib); si no, el markdown del esbozo.
+  Descartadas F5 y F4.
+- **Imprecisión del apartado «Qué se degrada», corregida:** la frase «el aviso no entra en el
+  `original_content` que guarda el servidor: tras recargar la sesión no se copia, no se exporta y el modelo no
+  lo ve en el turno siguiente» es **inexacta**. (a) El modelo **ya veía** el aviso el turno siguiente, incluso
+  antes de la opción A, porque el motor compacta el historial leyendo `content`, no `original_content`
+  (`pns_ai_mcp/utils/history_compact.py:386-389`, desde `engine_turn_messages.py:207-208`). (b) Con la opción
+  A el aviso **sí** se ve en la burbuja tras recargar y entra en el PDF/DOCX; **copiar no lo lleva** (lee
+  `clip_data`, del fabricante) y el **XLSX con tabla tampoco**.
+- **Precedente del fabricante (nota «incomplete response»), al informe:** esa nota
+  (`chatboo_async_request.py:1266-1287`, `'original_content': acc or ''` en `:1282`) **tampoco se ve en la
+  burbuja** por el mismo mecanismo (`_loadSession` usa `original_content || content`); la opción A **no** la
+  toca. Candidata al informe al fabricante, junto con el HTML crudo en PDF/DOCX y el error invisible del botón
+  Canvas (ver el registro y el [plan](plan_correccion_pns_ai_3879.md), §3.2).
+- **Recuentos:** los marcadores del parche 34 pasan de **10** (esbozo y E4′.b) a **11** (opción A) y **12**
+  (F1); el grep de los parches 30-34 fuera de tests, de **27** a **28** (opción A) y **29** (F1). La clase
+  `TestSegesNoPageNotice` pasa de **8 a 9** tests (nuevo `test_notice_html_answer`). Batería final (F1):
+  `tests-20261106-162710.log`, **473 · 18 F · 32 E · 3 saltados**, mismos 50 fallos por nombre.
+- **Revisión:** opción A (05/11/2026) y F1 (06/11/2026), **APROBADAS** por `odoo-reviewer`, sin bloqueantes.
+- **Pendiente:** E4′.h (incluye el Paso 1, el error invisible del botón Canvas); después, una sola subida al
+  staging.
