@@ -64,6 +64,8 @@
   una versión anterior al filtro de contraseñas y el 09/11/2026 con la final (16/16 OK las dos veces);
   documento del staging preparado ([staging_e4_3879.md](staging_e4_3879.md)). Siguiente: una sola subida
   al staging.
+  E4′ validada en staging el 09/11/2026 (`8d218ea` en `pns_demo`; [staging_e4_3879.md](staging_e4_3879.md),
+  apartado G). Siguiente: informe al fabricante y LIYBEN (§3).
 
 ## 1. Cómo se trabaja
 
@@ -97,7 +99,7 @@
 | **E1′** | Críticos y Altos baratos: M10 con el parche 12 adaptado, PNS-54, PNS-07, M13, `collect_pin` (PNS-83) | 10 y 12 adaptados; 13 (M10), 14 (M13), 15 (PNS-07) y 16 (PNS-54) | Validada en laboratorio (23/10/2026) y en staging (26/10/2026); cerrada el 27/10/2026, con R8 no concluyente por el proveedor (se valida en E3′); R8 OK en el laboratorio de E3′ (30/10/2026), con el defecto de `keys` del fabricante (hoja de E4′); R8 validada en el staging de E3′ (03/11/2026) |
 | **E2′** | Resto de Altos: papelera del diario (PNS-37), PNS-19, PNS-17, PNS-82, PNS-70; PNS-20 (confirmado por P-20); PNS-100 y PNS-101 (nuevos) | 11 adaptado; 17 (PNS-37), 18 (PNS-19), 19 (PNS-17), 20 (PNS-70), 21 (PNS-20), 22 (PNS-100), 23 (PNS-101, ampliado) y 24 (PNS-102) | Aplicada (27/10/2026): tests en verde y neutralización hecha; parche 18 corregido tras la revisión y parche 23 nuevo (27/10/2026). **Aprobada en revisión (28/10/2026)** con la herramienta real (vía A, shell; vía B, `/mcp`): las dos evasiones críticas, cerradas. Validada en laboratorio (28/10/2026). **Validada en staging (29/10/2026)**: commit `9a2970d` ([staging_e2_3879.md](staging_e2_3879.md), apartado G) |
 | **E3′** | Lienzo: M1, M2, F1 y D1 (D1 pasa de E4′ a E3′: decisión de Sergio del 29/10/2026) | 25 (M1), 26 (M2), 27 (F1) y 28 (D1); la ventana del parche 18 se mantiene; 29 (F1, P-8e a, 30/10/2026) | **Aplicada (29/10/2026)**: tests en verde y neutralización hecha; rechazada en la primera revisión (B1, parche 27 b) y corregida; **aprobada en revisión (29/10/2026)**; pruebas manuales del laboratorio hechas el 30/10/2026 ([lab_e3_3879.md](lab_e3_3879.md)); P-8e a falló y se corrigió con el parche 29, validado en laboratorio el 03/11/2026 ([lab_p29_3879.md](lab_p29_3879.md)). **Validada en staging (04/11/2026)**: commit `522ce6e` ([staging_e3_3879.md](staging_e3_3879.md), apartado G) |
-| **E4′** | Hoja de Medios y Bajos (corregir o aceptar); después, lo elegido: E4′.a (seguridad: M11, M12, PNS-97, PNS-29 resto 3 y el test de PNS-36), E4′.b (el aviso del lienzo, fila 30 de la hoja) y E4′.h (script de pruebas) | 30 (M11), 31 (M12), 32 (PNS-97) y 33 (PNS-29), en E4′.a; 34 (PNS-96), en E4′.b | **E4′.0 cerrada (04/11/2026)**: hoja con las decisiones de Sergio ([e4_hoja_3879.md](e4_hoja_3879.md); `ca707a9`). **E4′.a aplicada (05/11/2026)**: tests en verde, neutralizada y **aprobada en revisión** ([propuesta](e4_propuesta_3879.md), «Resultado de E4′.a»). **E4′.b aplicada (05/11/2026)**: tests en verde, neutralizada y **aprobada en revisión** ([propuesta](e4_propuesta_3879.md), «Resultado de E4′.b»); ampliada con la opción A (05/11/2026) y F1 (06/11/2026) y validada en el laboratorio (06/11/2026). E4′.h, pendiente (script y una sola subida al staging) |
+| **E4′** | Hoja de Medios y Bajos (corregir o aceptar); después, lo elegido: E4′.a (seguridad: M11, M12, PNS-97, PNS-29 resto 3 y el test de PNS-36), E4′.b (el aviso del lienzo, fila 30 de la hoja) y E4′.h (script de pruebas) | 30 (M11), 31 (M12), 32 (PNS-97) y 33 (PNS-29), en E4′.a; 34 (PNS-96), en E4′.b | **E4′.0 cerrada (04/11/2026)**: hoja con las decisiones de Sergio ([e4_hoja_3879.md](e4_hoja_3879.md); `ca707a9`). **E4′.a aplicada (05/11/2026)**: tests en verde, neutralizada y **aprobada en revisión** ([propuesta](e4_propuesta_3879.md), «Resultado de E4′.a»). **E4′.b aplicada (05/11/2026)**: tests en verde, neutralizada y **aprobada en revisión** ([propuesta](e4_propuesta_3879.md), «Resultado de E4′.b»); ampliada con la opción A (05/11/2026) y F1 (06/11/2026) y validada en el laboratorio (06/11/2026). E4′.h, pendiente (script y una sola subida al staging). **Validada en staging (09/11/2026)**: commit `8d218ea` ([staging_e4_3879.md](staging_e4_3879.md), apartado G) |
 
 **Estado de E4′.h, fila E4′ (06/11/2026):** script [`scripts_e4/pruebas_e4p.py`](scripts_e4/pruebas_e4p.py)
 (parches 30 a 33 por XML-RPC) implementado (`a06d393`) y validado en el laboratorio: el 06/11/2026 con la
@@ -105,6 +107,10 @@ versión `ab1963e5…`, anterior al filtro de contraseñas, y el 09/11/2026 con 
 las dos veces; §4, «`lab_pns_ai_3879_14`, tras validar E4′.b2 y E4′.b3 y el script de E4′.h»);
 documento de la subida preparado ([staging_e4_3879.md](staging_e4_3879.md)), con el commit `8d218ea`.
 Pendiente: una sola subida de E4′ al staging.
+
+**Estado de E4′, fila E4′ (09/11/2026):** **E4′ validada en staging** (commit `8d218ea` en `pns_demo`, con
+`-u` de `pns_ai_mcp` sin errores; [staging_e4_3879.md](staging_e4_3879.md), apartado G): parches 30 a 33 con
+el script (16/16 OK; P-30, 0 filas) y parche 34 a mano y por SQL. V3 y F1-t, no concluyentes (no bloquean).
 
 Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`; línea de 3.1.879).
 
@@ -698,6 +704,20 @@ validaciones de arriba se concretan así en el staging:
      `original_content` va sin ella) y, de verse, con `_` literales.
    - **Copiar y el XLSX con tabla no llevan la prosa** (observación).
 
+   Pendiente de comunicar al final (09/11/2026, staging de E4′;
+   [staging_e4_3879.md](staging_e4_3879.md), G, «Observaciones»):
+   - **El botón Canvas, sin tooltip en el staging** (amplía lo del 06/11/2026): con el job en `error`, el
+     texto del botón pasa a «Creación de página» y vuelve a «Lienzo» con el borde rojo, **sin tooltip** con
+     el motivo (en el laboratorio sí lo había), sin toast ni mensaje: el único rastro es el borde rojo.
+   - **La carga de la sesión de Chatboo no reintenta** ante un fallo de serialización: al terminar un job,
+     la carga de la sesión por el cliente falló por la escritura concurrente del job («bad query: SELECT id
+     FROM chatboo_session WHERE id = 59 FOR UPDATE SKIP LOCKED» y «Error loading session: could not
+     serialize access due to concurrent update», de `pns_ai_chatboo.controllers.chatboo`); probable causa de
+     que no saliera el botón «Lienzo» de esa respuesta.
+   - **Exportación:** PDF y `.doc` ponen la prosa y el aviso antes de la tabla, y el aviso sin cursiva (un
+     `<p>`); PDF, `.doc` y XLSX solo con la columna `Name` (copiar lleva `id` y `name`); la exportación
+     «Word» es un `.doc` HTML, no `.docx`.
+
    Sin rutas locales, kit, laboratorio, clientes ni personas.
 3. **Limpieza:** staging `pns_demo`, `lab_pns_ai` / `lab_pns_ai_14` y `_fabricante/`.
 
@@ -736,6 +756,19 @@ validaciones de arriba se concretan así en el staging:
     `demo` y `portal`, archivados como estaban; clave MCP de `admin` revocada. Disco al 87 %.
   - Restos para la limpieza final: lista en [staging_e3_3879.md](staging_e3_3879.md), apartado G, «Restos
     para la limpieza final».
+- **Staging `pns_demo`, tras E4′ (09/11/2026):**
+  - Código de `8d218ea` montado (711 archivos, huella `e37be448…1844`); versiones sin cambios (`1.2.47`,
+    `3.1.879` y `2.1.538`). Vuelta atrás: código de `522ce6e` en `addons_antes_E4p` (huella `6ac645fc…`).
+    Disco al 87 %.
+  - «Design» solo en Gemini 3.5 flash (proveedor 3), como pide §3.1, «Casilla Design».
+  - De las pruebas: `seges.e4p` borrada (9 acciones de confianza, 0 restos); `demo` y `e1p_aiadmin`
+    archivados otra vez (con sus contraseñas de prueba); clave MCP de `admin` revocada (`not_generated`, sin
+    hash).
+  - Restos para la limpieza final: lista en [staging_e4_3879.md](staging_e4_3879.md), apartado G, «Restos
+    para la limpieza final» (`addons_antes_E4p`; sesiones 58 a 63, con sus páginas; jobs de Chatboo 199 a
+    208; job del botón Canvas 1; filas de `ai_log` 1681 a 1760).
+  - **Contraseña de `admin` de 5 caracteres**, en un staging accesible desde Internet: no es de E4′; decide
+    Sergio si se cambia (antes o en la limpieza final).
 - **`lab_pns_ai_3879_14`, tras la revisión de la hoja de E4′ (04/11/2026):** filas **758 a 761** de
   `ai_log` (`capability_skipped`, `user_id` 2), que dejó `log_no_page` al ejecutar la skill `customer_360`
   en el shell (el `rollback` no deshace los cursores propios). Se conservan (decisión de Sergio).
@@ -816,9 +849,9 @@ Estados (N11): aplicado → validado en laboratorio → validado en staging → 
 | 27 | F1 (JSON seguro en `<script>`, CSP al servir, regla de diseño, `X-Frame-Options`) | E3′ | Aplicado; aprobado en revisión (29/10/2026); P-8e b y X-Frame-Options OK en laboratorio (30/10/2026); P-8e a falló → parche 29; validado en staging (04/11/2026; [staging](staging_e3_3879.md), apartado G) |
 | 28 | D1 (dueño fijo, solo internos, AI Administrator solo lee y borra) | E3′ | Aplicado; aprobado en revisión (29/10/2026); validado en laboratorio (30/10/2026): P-8h OK; validado en staging (04/11/2026; [staging](staging_e3_3879.md), apartado G) |
 | 29 | F1 (el lienzo no guarda un DATA que no escribió el servidor; P-8e a) | E3′ | Aplicado; aprobado en revisión (30/10/2026); validado en laboratorio (03/11/2026); validado en staging (04/11/2026; [staging](staging_e3_3879.md), apartado G) |
-| 30 | M11 (los `log_*` públicos solo a nombre del usuario actual e interno) | E4′.a | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
-| 31 | M12 (`chat_completion` solo en `su`) | E4′.a | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
-| 32 | PNS-97 (`create`, `write` y `unlink` de `ai.trusted.action` exigen Ajustes fuera de `su`; criterio combinado dentro de un plan) | E4′.a | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
-| 33 | PNS-29 resto 3 (`_month_usage` privado; `default_get` del asistente de uso con la ACL) | E4′.a | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
-| 34 | PNS-96 (aviso fijo del servidor cuando `log_no_page` rechaza en un turno; fila 30 de la hoja) | E4′.b | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026); ampliado con la opción A (05/11/2026: aviso también en `original_content`) y el formato F1 (06/11/2026: aviso en `<p><em>…</em></p>` cuando el contenido es HTML), tests en verde (9 en `TestSegesNoPageNotice`), neutralizado (N34o, N34h) y aprobado en revisión; validado en el laboratorio (sesiones 21 a 24, 05-06/11/2026) |
+| 30 | M11 (los `log_*` públicos solo a nombre del usuario actual e interno) | E4′.a | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026); validado en staging (09/11/2026; [staging](staging_e4_3879.md), apartado G) |
+| 31 | M12 (`chat_completion` solo en `su`) | E4′.a | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026); validado en staging (09/11/2026; [staging](staging_e4_3879.md), apartado G) |
+| 32 | PNS-97 (`create`, `write` y `unlink` de `ai.trusted.action` exigen Ajustes fuera de `su`; criterio combinado dentro de un plan) | E4′.a | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026); validado en staging (09/11/2026; [staging](staging_e4_3879.md), apartado G) |
+| 33 | PNS-29 resto 3 (`_month_usage` privado; `default_get` del asistente de uso con la ACL) | E4′.a | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026); validado en staging (09/11/2026; [staging](staging_e4_3879.md), apartado G) |
+| 34 | PNS-96 (aviso fijo del servidor cuando `log_no_page` rechaza en un turno; fila 30 de la hoja) | E4′.b | Aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026); ampliado con la opción A (05/11/2026: aviso también en `original_content`) y el formato F1 (06/11/2026: aviso en `<p><em>…</em></p>` cuando el contenido es HTML), tests en verde (9 en `TestSegesNoPageNotice`), neutralizado (N34o, N34h) y aprobado en revisión; validado en el laboratorio (sesiones 21 a 24, 05-06/11/2026); validado en staging (09/11/2026; [staging](staging_e4_3879.md), apartado G) |
 | — | Parche de tests E0′ (datos de prueba de `test_change_journal` y `test_paap_core`) | E0′ | Validado en laboratorio (23/10/2026) |

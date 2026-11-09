@@ -3,7 +3,7 @@
 - **Rama:** `14.0-pns-ai-3879` · **Base (montada ahora):** `522ce6e` (E3′ y parche 29) · **Commit a
   desplegar:** `8d218ea`, el último que toca los módulos. Los posteriores (`3384567` y `a06d393`) solo son
   [DOC]: dan el mismo árbol, pero otra huella del `.tar.gz` (B.1) · **Preparado:** 06/11/2026 · **Estado:**
-  sin ejecutar; resultado en G, el día de la subida.
+  ejecutado el 09/11/2026 (montado ahora: `8d218ea`); resultado en G.
 - **Qué se sube:** E4′.a (parches 30 a 33, en `pns_ai_mcp`) y E4′.b con su ampliación E4′.b2 y E4′.b3
   (parche 34 con la opción A y el formato F1, en `pns_ai_chatboo`). Registro en [parches](parches_pns_ai.md),
   «Parches de la rama 14.0-pns-ai-3879 (E4′.a)», «(E4′.b)» y «(E4′.b2 y E4′.b3)».
@@ -779,10 +779,10 @@ de A.4 a: 9 acciones y 0 restos `seges.e4p`.
 
 | Paso | Qué anotar | Obtenido |
 |---|---|---|
-| `preparar` | id de `seges.e4p`; salida | [ ] |
-| `rpc` | `t0`; id del proveedor; OK/FALLO (16); reintentos 503; salida; archivo de resultado | [ ] |
-| Consulta de P-30 | número de filas | [ ] |
-| `limpiar` ×2 | borradas 1 y 0; salidas | [ ] |
+| `preparar` | id de `seges.e4p`; salida | [x] `ai.trusted.action` 10; salida 0 |
+| `rpc` | `t0`; id del proveedor; OK/FALLO (16); reintentos 503; salida; archivo de resultado | [x] t0 2026-11-09 10:03:19; proveedor 1; 16 OK / 0 FALLO; sin 503; salida 0; `resultado_e4p_20261109-110323.txt` |
+| Consulta de P-30 | número de filas | [x] 0 filas |
+| `limpiar` ×2 | borradas 1 y 0; salidas | [x] 1 [10] y 0; salidas 0 |
 
 ### D.2 Parche 34: aviso del lienzo (T1, V2, V3, V5, V6, botón Canvas, copiar y exportar)
 
@@ -889,11 +889,11 @@ Comprobación: la consulta de A.6, ningún activo con `fit_design` = `t`.
 
 | # | Prueba | Qué se hace | Esperado | Qué anotar | Obtenido |
 |---|---|---|---|---|---|
-| T1 | **Disparador** | Conversación nueva; exactamente: «Hazme una página con los cinco primeros contactos ordenados por nombre, solo con su id y su nombre. Una página nueva; no escribas la tabla en el chat.» Mirar la burbuja **mientras escribe** (D.3) y al terminar. Después, sesiones de `admin` (id → `SESION`), V5, forma del aviso y `ai_log` | No se crea página. En `ai_log`, una fila «No page was built…». La burbuja termina con «*No se ha creado la página. El motivo está en el Historial IA.*» en cursiva y en su propio párrafo, al cerrar el turno o tras recargar (no en vivo). V5: `content_es` = t, `hay_original` = t, `original_es` = t; complemento: `canvas_rev` 0, job `done`, `response_es` = t. Forma: si `empieza_por_menor` = t, `aviso_html` = t; si no, `aviso_markdown` = t; `content_igual_original` = t | id de sesión y de job; cuándo apareció el aviso; las columnas de V5 y de la forma; la fila de `ai_log` y su texto; modelo que contestó | [ ] |
-| V5′ | **Copiar y exportar** (burbuja de T1, sin recargar) | Icono de copiar; PDF, DOCX y, si la burbuja lleva tabla, XLSX | Copiar: si hay tabla, **solo la tabla** (lee `clip_data`, del fabricante), sin aviso; sin tabla, se anota qué copia. PDF y DOCX **con el aviso en párrafo aparte**. XLSX con tabla, **sin** el aviso. Si el mensaje es de una sola tabla (`o_ai_table_block`), el PDF/DOCX **sin HTML crudo** | qué copia; aviso sí/no en cada archivo; HTML crudo sí/no | [ ] |
-| V6 | **Segundo turno sin recargar** (misma sesión) | «Escribe aquí en el chat esa misma tabla.» Después, V6 y la forma del aviso | Job 2 con `historia_es` = t y `historia_html` = t (el aviso entra en el historial que guarda el job, con su HTML; D.3). El segundo turno no lleva aviso propio si no hay rechazo | ids de los dos jobs; `historia_es` y `historia_html` de cada uno; si el turno 2 tiene tabla | [ ] |
-| BC | **Botón Canvas (Paso 1)** | Huella (consulta de sesiones) antes; botón Canvas de la respuesta con tabla del turno 2; esperar a que acabe; jobs del botón Canvas; huella después | Job de `chatboo.canvas.job` en `error` con «No se ha creado la página. El motivo está en el Historial IA.» y `started_at` = `finished_at` (sin llamar al modelo). **En pantalla, ningún aviso explícito:** solo el borde rojo del botón y el motivo en el tooltip, sin toast ni diálogo (defecto del fabricante, al informe; plan, §3.2). La sesión, sin cambios (misma huella y mismos mensajes) | id del job; qué se ve (borde, tooltip, nada más); huella antes y después | [ ] |
-| R34 | **Recargar y cambiar de sesión** | Recargar el navegador (F5) y abrir la sesión; después, otra sesión y volver. V5 en cada momento | La burbuja de T1 sigue con el aviso, bien formado. V5 igual que en T1. La huella puede cambiar (el cliente reescribe `messages`), sin perder el aviso | V5 tras recargar y tras volver; huella | [ ] |
+| T1 | **Disparador** | Conversación nueva; exactamente: «Hazme una página con los cinco primeros contactos ordenados por nombre, solo con su id y su nombre. Una página nueva; no escribas la tabla en el chat.» Mirar la burbuja **mientras escribe** (D.3) y al terminar. Después, sesiones de `admin` (id → `SESION`), V5, forma del aviso y `ai_log` | No se crea página. En `ai_log`, una fila «No page was built…». La burbuja termina con «*No se ha creado la página. El motivo está en el Historial IA.*» en cursiva y en su propio párrafo, al cerrar el turno o tras recargar (no en vivo). V5: `content_es` = t, `hay_original` = t, `original_es` = t; complemento: `canvas_rev` 0, job `done`, `response_es` = t. Forma: si `empieza_por_menor` = t, `aviso_html` = t; si no, `aviso_markdown` = t; `content_igual_original` = t | id de sesión y de job; cuándo apareció el aviso; las columnas de V5 y de la forma; la fila de `ai_log` y su texto; modelo que contestó | [x] OK (sesión 59, job 200; aviso al cerrar el turno; V5 y forma como se esperaba; filas 1690/1691 y 1694/1695; Gemini 3.6 flash) |
+| V5′ | **Copiar y exportar** (burbuja de T1, sin recargar) | Icono de copiar; PDF, DOCX y, si la burbuja lleva tabla, XLSX | Copiar: si hay tabla, **solo la tabla** (lee `clip_data`, del fabricante), sin aviso; sin tabla, se anota qué copia. PDF y DOCX **con el aviso en párrafo aparte**. XLSX con tabla, **sin** el aviso. Si el mensaje es de una sola tabla (`o_ai_table_block`), el PDF/DOCX **sin HTML crudo** | qué copia; aviso sí/no en cada archivo; HTML crudo sí/no | [x] OK (copiar sin aviso; PDF y `.doc` con aviso en párrafo aparte, sin HTML crudo; XLSX sin aviso) |
+| V6 | **Segundo turno sin recargar** (misma sesión) | «Escribe aquí en el chat esa misma tabla.» Después, V6 y la forma del aviso | Job 2 con `historia_es` = t y `historia_html` = t (el aviso entra en el historial que guarda el job, con su HTML; D.3). El segundo turno no lleva aviso propio si no hay rechazo | ids de los dos jobs; `historia_es` y `historia_html` de cada uno; si el turno 2 tiene tabla | [x] OK (jobs 200 y 201; `historia_es` y `historia_html` t en el 201; turno 2 con tabla, sin aviso propio) |
+| BC | **Botón Canvas (Paso 1)** | Huella (consulta de sesiones) antes; botón Canvas de la respuesta con tabla del turno 2; esperar a que acabe; jobs del botón Canvas; huella después | Job de `chatboo.canvas.job` en `error` con «No se ha creado la página. El motivo está en el Historial IA.» y `started_at` = `finished_at` (sin llamar al modelo). **En pantalla, ningún aviso explícito:** solo el borde rojo del botón y el motivo en el tooltip, sin toast ni diálogo (defecto del fabricante, al informe; plan, §3.2). La sesión, sin cambios (misma huella y mismos mensajes) | id del job; qué se ve (borde, tooltip, nada más); huella antes y después | [x] OK (job 1 en `error`, sin llamar al modelo; huella igual; borde rojo, sin tooltip) |
+| R34 | **Recargar y cambiar de sesión** | Recargar el navegador (F5) y abrir la sesión; después, otra sesión y volver. V5 en cada momento | La burbuja de T1 sigue con el aviso, bien formado. V5 igual que en T1. La huella puede cambiar (el cliente reescribe `messages`), sin perder el aviso | V5 tras recargar y tras volver; huella | [x] OK (aviso conservado tras recargar y tras cambiar de sesión; huella `5670c960…`) |
 
 **Fase 2: «Design» en alguno** (decisión 2 de E4′.h). **[ALTERA la configuración]** Sergio marca «Design» en
 Gemini 3.6 flash y Gemini 3.5 flash (ids de A.6; como los proveedores 1 y 2 del laboratorio), no en `lite`.
@@ -901,8 +901,8 @@ Comprobación: la consulta de A.6.
 
 | # | Prueba | Qué se hace | Esperado | Qué anotar | Obtenido |
 |---|---|---|---|---|---|
-| V2 | **Con «Design», sin aviso** | Conversación nueva con el mismo texto de T1. Sesiones, V5, V6 y `ai_log` (con «Qué modelo diseñó» de E3′, D.1, si hace falta) | Página creada (`canvas_rev` 1), la tarjeta se abre; **sin aviso** en la burbuja, en `messages` (`content_es` y `original_es` = f), en `response` ni en `done_meta`; `ai_log` con «Design laid out the page in … s» | id de sesión y job; `canvas_rev`; modelo que diseñó | [ ] |
-| V3 | **Botón Canvas sin «Design», con el chat abierto** | Con «Design» marcado, abrir la sesión de T1 (respuesta con tabla del turno 2). En **otra pestaña**, quitar «Design» de los dos, **sin recargar el chat**, y pulsar Canvas. Huella antes y después; jobs del botón Canvas | Job en `error` con el aviso, sin llamar al modelo; **sin aviso duplicado** en la burbuja; la sesión **sin cambios** (misma huella y mismos mensajes); en pantalla, lo mismo que en BC | id del job; huella antes y después; número de mensajes | [ ] |
+| V2 | **Con «Design», sin aviso** | Conversación nueva con el mismo texto de T1. Sesiones, V5, V6 y `ai_log` (con «Qué modelo diseñó» de E3′, D.1, si hace falta) | Página creada (`canvas_rev` 1), la tarjeta se abre; **sin aviso** en la burbuja, en `messages` (`content_es` y `original_es` = f), en `response` ni en `done_meta`; `ai_log` con «Design laid out the page in … s» | id de sesión y job; `canvas_rev`; modelo que diseñó | [x] OK (sesión 60, job 202, `canvas_rev` 1; sin aviso; Gemini 3.6 flash diseñó) |
+| V3 | **Botón Canvas sin «Design», con el chat abierto** | Con «Design» marcado, abrir la sesión de T1 (respuesta con tabla del turno 2). En **otra pestaña**, quitar «Design» de los dos, **sin recargar el chat**, y pulsar Canvas. Huella antes y después; jobs del botón Canvas | Job en `error` con el aviso, sin llamar al modelo; **sin aviso duplicado** en la burbuja; la sesión **sin cambios** (misma huella y mismos mensajes); en pantalla, lo mismo que en BC | id del job; huella antes y después; número de mensajes | [x] no concluyente (sin botón «Lienzo» en la sesión 59; en la 61, el modelo creó página) |
 
 Al terminar V3 no queda «Design» en ningún proveedor: el estado final se pone en D.4.
 
@@ -910,9 +910,9 @@ Al terminar V3 no queda «Design» en ningún proveedor: el estado final se pone
 
 | # | Qué | Cómo se mira | Esperado / cómo se lee | Obtenido |
 |---|---|---|---|---|
-| F1-t | **Texto + tabla embebida.** El criterio de F1 («empieza por `<`») no detecta una respuesta que empieza por texto y lleva una tabla: usaría el markdown y la burbuja (que sí entra por la rama de HTML embebido) podría pintar el aviso con los `_` literales ([parches](parches_pns_ai.md), E4′.b2 y E4′.b3, «Frontera texto + tabla») | En la **fase 1** (sin «Design»), conversación nueva: «Escribe primero una frase que resuma lo que vas a hacer y después, aquí en el chat, una tabla con los cinco primeros contactos ordenados por nombre, con su id y su nombre. Después hazme una página nueva con esa tabla.» Forma del aviso y V5 | Si sale `empieza_por_menor` = f y `con_tabla` = t: es el caso; se anota `aviso_markdown` y **cómo se ve el aviso en la burbuja** (cursiva o con `_` literales) tras recargar. Si sale `empieza_por_menor` = t o `con_tabla` = f, **no concluyente** (el modelo no dio la forma buscada); se puede repetir una vez | [ ] |
-| Viv | **El aviso no se ve en vivo** durante el streaming (no es un token: lo añade el servidor al guardar) | En T1 (y en F1-t), mirar la burbuja mientras el modelo escribe y en el momento en que termina | Durante el streaming, sin aviso; aparece al cerrar el turno o al recargar. Se anota cuándo apareció | [ ] |
-| Hist | **`_strip_html` al compactar.** El motor compacta el historial leyendo `content` y le quita el HTML (`pns_ai_mcp/utils/history_compact.py:386-389`), así que el modelo recibe el aviso como texto | V6 y la forma del aviso del segundo turno (`historia_html`) | La columna `history` del job guarda el aviso **con su HTML** (`historia_html` = t). Lo que recibe el modelo después de compactar **no se ve por SQL**: en el laboratorio, ninguna fila de `ai_log` lleva el aviso (comprobado el 06/11/2026). Queda cubierto por lectura del código; se anota `historia_html` | [ ] |
+| F1-t | **Texto + tabla embebida.** El criterio de F1 («empieza por `<`») no detecta una respuesta que empieza por texto y lleva una tabla: usaría el markdown y la burbuja (que sí entra por la rama de HTML embebido) podría pintar el aviso con los `_` literales ([parches](parches_pns_ai.md), E4′.b2 y E4′.b3, «Frontera texto + tabla») | En la **fase 1** (sin «Design»), conversación nueva: «Escribe primero una frase que resuma lo que vas a hacer y después, aquí en el chat, una tabla con los cinco primeros contactos ordenados por nombre, con su id y su nombre. Después hazme una página nueva con esa tabla.» Forma del aviso y V5 | Si sale `empieza_por_menor` = f y `con_tabla` = t: es el caso; se anota `aviso_markdown` y **cómo se ve el aviso en la burbuja** (cursiva o con `_` literales) tras recargar. Si sale `empieza_por_menor` = t o `con_tabla` = f, **no concluyente** (el modelo no dio la forma buscada); se puede repetir una vez | [x] no concluyente (sesión 62: empieza por `<`; aviso en HTML, en cursiva) |
+| Viv | **El aviso no se ve en vivo** durante el streaming (no es un token: lo añade el servidor al guardar) | En T1 (y en F1-t), mirar la burbuja mientras el modelo escribe y en el momento en que termina | Durante el streaming, sin aviso; aparece al cerrar el turno o al recargar. Se anota cuándo apareció | [x] OK (no se ve en vivo; aparece al cerrar el turno) |
+| Hist | **`_strip_html` al compactar.** El motor compacta el historial leyendo `content` y le quita el HTML (`pns_ai_mcp/utils/history_compact.py:386-389`), así que el modelo recibe el aviso como texto | V6 y la forma del aviso del segundo turno (`historia_html`) | La columna `history` del job guarda el aviso **con su HTML** (`historia_html` = t). Lo que recibe el modelo después de compactar **no se ve por SQL**: en el laboratorio, ninguna fila de `ai_log` lleva el aviso (comprobado el 06/11/2026). Queda cubierto por lectura del código; se anota `historia_html` | [x] `historia_html` t (job 201) |
 
 Hist y un F1-t no concluyente se anotan en G: no cuentan como fallo ni bloquean la subida.
 
@@ -924,8 +924,8 @@ proveedor con `fit_design` = `t`. Es el estado en que queda el staging.
 
 | # | Caso | Quién | Esperado | Qué anotar | Obtenido |
 |---|---|---|---|---|---|
-| R8 | **Lienzo desde el chat**, con Gemini 3.5 flash. Conversación nueva: «Hazme una página con las ventas por mes de este año, con un gráfico de barras y una tabla». Consultas de R8 y «Qué modelo diseñó» de E3′ (D.1 y D.2) con el id de U1 | U1 | La tarjeta de la página en la burbuja y, al abrirla, el gráfico y la tabla; `canvas_open` = t y `canvas_rev` ≥ 1; en `ai_log`, «Design laid out the page in … s» y diseñó Gemini 3.5 flash; sin aviso. **Si falla por cuota (429) o 503 del proveedor: se anota y no bloquea** | sesión, filas de `ai_log`, modelo; si hubo 429/503 | [ ] |
-| R-log | **Log desde el arranque** (B.8) | — | Por comprobación de `rpc` (D.1), como en el laboratorio el 09/11/2026: **P-33.1, un `ERROR` de `odoo.http` con su `Traceback`** a la hora de `rpc` (`AttributeError` … `month_usage`; el texto exacto depende de la revisión de Odoo 14); **P-30, P-31, P-32 y P-33.2: nada** (`AccessError` hereda de `UserError` y `dispatch_rpc` lo relanza sin escribirlo); **P-33.3 y P-33.4: dos líneas INFO** «Access Denied by ACLs for operation: create, uid: `<uid de demo>`, model: ai.provider.usage.wizard». Fuera de eso, solo errores del proveedor (429/503), si los hay, a su hora | líneas `ERROR` y `Traceback`, por tipo y hora | [ ] |
+| R8 | **Lienzo desde el chat**, con Gemini 3.5 flash. Conversación nueva: «Hazme una página con las ventas por mes de este año, con un gráfico de barras y una tabla». Consultas de R8 y «Qué modelo diseñó» de E3′ (D.1 y D.2) con el id de U1 | U1 | La tarjeta de la página en la burbuja y, al abrirla, el gráfico y la tabla; `canvas_open` = t y `canvas_rev` ≥ 1; en `ai_log`, «Design laid out the page in … s» y diseñó Gemini 3.5 flash; sin aviso. **Si falla por cuota (429) o 503 del proveedor: se anota y no bloquea** | sesión, filas de `ai_log`, modelo; si hubo 429/503 | [x] OK (sesión 63 de `u1`, `canvas_rev` 1; fila 1758, Gemini 3.5 flash; sin 429/503) |
+| R-log | **Log desde el arranque** (B.8) | — | Por comprobación de `rpc` (D.1), como en el laboratorio el 09/11/2026: **P-33.1, un `ERROR` de `odoo.http` con su `Traceback`** a la hora de `rpc` (`AttributeError` … `month_usage`; el texto exacto depende de la revisión de Odoo 14); **P-30, P-31, P-32 y P-33.2: nada** (`AccessError` hereda de `UserError` y `dispatch_rpc` lo relanza sin escribirlo); **P-33.3 y P-33.4: dos líneas INFO** «Access Denied by ACLs for operation: create, uid: `<uid de demo>`, model: ai.provider.usage.wizard». Fuera de eso, solo errores del proveedor (429/503), si los hay, a su hora | líneas `ERROR` y `Traceback`, por tipo y hora | [x] P-33.1 a las 10:03:20 (esperado) y fallo de serialización de la sesión 59 a las 10:28:27 (observación) |
 
 Orden de R-log **[LECTURA]**, con `StartedAt` de B.8 tal como sale:
 
@@ -1001,59 +1001,168 @@ en `not_generated` y sin hash; una sola fila de proveedor con «Design»: Gemini
 
 ---
 
-## G. Resultado de la subida
+## G. Resultado de la subida (09/11/2026)
 
-_(Se rellena el día de la subida. Plantilla de E3′.)_
-
-Sergio con Claude; horas en UTC. Commit `8d218ea` de `14.0-pns-ai-3879`. Resultado por prueba en las columnas
-«Obtenido» de D.1 a D.4; resumen en la [verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega
-E4′».
+Sergio con Claude; horas en UTC. Commit `8d218ea` de `14.0-pns-ai-3879` (procedimiento en `b661446`).
+Resultado por prueba en las columnas «Obtenido» de D.1 a D.4; resumen en la
+[verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E4′ (09/11/2026)».
 
 ### A. Comprobaciones previas
 
-- **A.0 a A.3:**
-- **A.4 (módulos, cron de `cleanup_expired`, acciones de confianza; comprobaciones previas; A y B):**
-- **A.5 (grupos):**
-- **A.6 (proveedores y «Design»):**
+- **A.0 a A.3:** `e4sql` en solo lectura (`on`) y `UTC`. `odoo14_pns` y `odoo14_pns_db` en marcha (los de
+  LIYBEN, solo mirados); `POSTGRES_USER` = `odoo`. `docker port odoo14_pns`: `8069/tcp -> 127.0.0.1:8169` (y
+  `8072/tcp -> 127.0.0.1:8172`). Montajes de E3′ sin cambios (`addons` en `/mnt/extra-addons/pns`,
+  `rw=false`). Copias `addons_antes_E1`, `_E2`, `_E1p`, `_E2p` y `_E3p`, sin `addons_antes_E4p`; `addons`,
+  12 MB; disco al 87 % (9,5 GB libres). Código montado: 710 archivos, `6ac645fc…44e5` (el de `522ce6e`).
+- **A.4 (módulos, cron de `cleanup_expired`, acciones de confianza, dependientes; comprobaciones previas; A y
+  B):** versiones `14.0.1.2.47`, `14.0.3.1.879` y `14.0.2.1.538`, `installed`; 0 filas `odoo_dev.%`; 7 crons
+  de `pns_*`, activos, `user_id` 1; `ir_cron_ai_safe_operation_expire` activo, cada 5 minutos, `numbercall`
+  -1, `model.cleanup_expired()`, `lastcall` 09:38:12 y `nextcall` 09:42:23; 9 acciones de confianza
+  (`max(id)` 9) y 0 restos; ninguna transacción en curso; módulos instalados que dependen de `pns_ai_mcp`:
+  **solo `pns_ai_chatboo`**. A.4 b: 0 `operation_data` que no empiecen por `{`; 29 operaciones
+  (14 `cancelled`, 13 `executed`, 2 `expired`); pasos reales leídos (`res.partner`/`write`,
+  `mail.message`/`create`, `res.partner.category`/`unlink`, `res.groups`/`write`, `action`, `fetch_url`),
+  ninguno sobre `ai.trusted.action`. Consultas A y B: **0 filas**.
+- **A.5 (grupos):** `admin` (2) activo, Ajustes, los cinco grupos de IA, `es_ES`, clave MCP `not_generated`
+  sin hash; `demo` (6) inactivo, interno, sin Ajustes ni grupos de IA; `e1p_aiadmin` (19) inactivo, interno,
+  sin Ajustes, `group_ai_admin` (y los que implica) y `group_ai_conversational`; `u1` (8) activo, con
+  `group_ai_conversational` y clave MCP `generated`; ningún `e4p_*`. Precondición del script: se cumple.
+- **A.6 (proveedores y «Design»):** 1 Gemini 3.6 flash, 2 «Proveedor fuera de cadena» (inactivo, «Design»
+  vacío), 3 Gemini 3.5 flash y 4 Gemini 3.5 flash lite; «Design» en `t` en 1, 3 y 4. Cadena de
+  `pns_ai_chatboo`: 1 → 3 → 4. «Test Connection» de los tres Gemini, hecho por Sergio hacia las 09:44, antes
+  de C.
 
 ### B. Despliegue
 
-- **B.1 (huella del `.tar.gz`):**
-- **B.2 a B.4:**
-- **B.5 y B.6:**
-- **B.7 y B.8 (`-u` de `pns_ai_mcp`; `WARNING`):**
-- **Arranque (reinicio):**
+- **B.1 (huella del `.tar.gz`):** `8d218ea` es `commit`; ningún commit posterior toca los módulos;
+  `df42159a4ac5d048c32d9aa3206123a40ccbb8c805bea56b343ddc5b8cec0d5e`.
+- **B.2 a B.4:** copiado al VPS con la misma huella. Código extraído: versiones sin cambios; 142 marcadores
+  fuera de tests (8, 1, 5, 3 y 12 de los parches 30 a 34); las nueve comprobaciones de código como se esperaba
+  (`def month_usage(` en 0); `chatboo_async_request.py` `c97e6a7b…` y `chatboo_canvas.py` `e470e7a7…`;
+  `test_seges_e4p.py` presente; **711 archivos, `e37be448…1844`** (confirma la huella de A.3, calculada sin
+  git).
+- **B.5 y B.6:** `addons_antes_E4p` creada (huella `6ac645fc…44e5`; disco 87 %). `web` parado; ensayo del
+  `rsync` sin bajas; `rsync` con salida 0; `addons`: 711 archivos, `e37be448…1844`; `diff -rq`: 11 líneas
+  (10 archivos distintos, 1 nuevo, `test_seges_e4p.py`, y 0 solo en `addons_antes_E4p`).
+- **B.7 y B.8 (`-u` de `pns_ai_mcp`; `WARNING`):** salida 0, de 09:49 a 09:50:05. 0 `Traceback`, `ERROR` y
+  `CRITICAL`; 0 «Deleting field»; ningún módulo sin importar; **0 rechazos del parche 32** (las 9 acciones de
+  fábrica se reescribieron a las 09:49:22). Carga: `Loading module pns_ai_mcp (28/48)`,
+  `Module pns_ai_mcp loaded in 34.78s, 4636 queries`, `Loading module pns_ai_chatboo (34/48)` y
+  `Module pns_ai_chatboo loaded in 2.74s, 584 queries` (el `-u` arrastra a `pns_ai_chatboo`, como se
+  esperaba); 61 y 13 líneas `loading <módulo>/<archivo>`; `48 modules loaded in 38.22s, 5233 queries` y
+  `Modules loaded.`. `WARNING`: los de E2′ y E3′ (2 «Client» de `ai.log`, 1 «Model» de `ai.trusted.action`,
+  `skip retired unlink for pns_ai_mcp` y 2 `DeprecationWarning` de `distutils`), ninguno nuevo.
+- **Arranque (reinicio):** `StartedAt` = `2026-11-09T09:51:24.370379362Z`. Log, 0 errores; `/web/login` 200;
+  `/mcp` 403. `/tmp` del VPS: `.tar.gz` y extracción borrados.
 
 ### C. Usuarios y comprobaciones posteriores
 
-- **C.1:**
-- **C.2 (desarchivados o creados):**
-- **C.3:**
+- **C.1:** igual que A.4 a; 9 acciones (`max(id)` 9), 9 activas, 0 restos, última escritura 09:49:22 (la del
+  `-u`).
+- **C.2 (desarchivados o creados):** `demo` (6) y `e1p_aiadmin` (19) desarchivados a las 09:56:33, con
+  contraseñas de prueba nuevas de 8 o más, sin cambiar sus grupos; clave MCP temporal de `admin` generada.
+  Ningún `e4p_*`.
+- **C.3:** «Design» como en A.6 (1, 3 y 4 en `t`).
 
 ### D. Pruebas
 
-- **D.1 (script):**
-- **D.2, fase 1 (T1, V5′, V6, BC, R34):**
-- **D.2, fase 2 (V2, V3):**
-- **D.3 (F1-t, Viv, Hist):**
-- **D.4 (R8, R-log):**
+- **D.1 (script):** túnel `ssh -p … -N -L 18169:127.0.0.1:8169 …`, `/web/login` 200 por `localhost:18169`;
+  script `76f781f6…9b03`. `preparar`: `ai.trusted.action` 10. `rpc`: t0 = 2026-11-09 10:03:19, **16/16 OK**,
+  salida 0, `resultado_e4p_20261109-110323.txt`; P-33.1 con el texto «The method 'month_usage' does not exist
+  on the model 'ai.provider'» (otro texto que en el laboratorio; el script lo clasifica bien). Las contraseñas
+  de prueba de `demo` y `e1p_aiadmin` no aparecen en el resultado; la de `admin` (5 caracteres, por debajo del
+  umbral del filtro) coincide con el texto de los logins (6 líneas, 2 como palabra entera): no es una fuga.
+  Consulta de P-30: **0 filas** (última fila de `ai_log`, la 1680, del 04/11). `limpiar` ×2:
+  `borradas: 1 [10]` y `0`, salidas 0; 9 acciones y 0 restos; estado sin ids.
+- **D.2, fase 1 (T1, V5′, V6, BC, R34):** «Design» quitado de 1, 3 y 4. **T1** (sesión 59, job 200, Gemini
+  3.6 flash, 11 s): sin página (`canvas_rev` 0); el modelo dice «He creado la página nueva…» y la burbuja
+  termina con el aviso en cursiva y en su propio párrafo. V5: `content_es` y `original_es` en t; job `done`,
+  `response_es` t. Forma: empieza por `<`, con tabla, `aviso_html` t, `content` = `original_content`.
+  `ai_log`: dos intentos de diseño, filas 1690/1691 y 1694/1695 («Design failed after 0 s: No AI provider is
+  configured for agent pns_ai_chatboo» y «No page was built: …»). **V5′:** copiar, solo la tabla (`id` y
+  `name`), sin aviso; PDF, aviso en su propio párrafo, sin HTML crudo; «Word», un `.doc` (HTML), aviso en su
+  `<p>`, sin HTML crudo; XLSX, la tabla sin aviso. **V6** (job 201): `historia_es` t e `historia_html` t;
+  turno 2 con tabla y sin aviso propio. **BC:** job del botón Canvas 1, `error` con el aviso, `started_at` =
+  `finished_at` (10:17:36); sesión sin cambios (huella `8eba1ad3…124a`, 4 mensajes, `canvas_rev` 0); en
+  pantalla, el texto pasa a «Creación de página» y vuelve a «Lienzo» con el borde rojo, **sin tooltip**, sin
+  toast ni mensaje. **R34:** tras F5 y tras cambiar de sesión, el mensaje de T1 conserva el aviso (`content` y
+  `original_content`, HTML); huella nueva `5670c960…cfc8f` (la reescribe el cliente).
+- **D.2, fase 2 (V2, V3):** «Design» en 1 y 3. **V2** (sesión 60, job 202): página creada (`canvas_rev` 1) y
+  se abre; sin aviso en la burbuja, `messages`, `response`, `done_meta` ni historial; fila 1711, «Design laid
+  out the page in 26 s», Gemini 3.6 flash. **V3: no concluyente.** La respuesta con tabla del turno 2 de la
+  sesión 59 ya no tenía el botón «Lienzo» tras recargar; un turno nuevo en la sesión 59 (jobs 204 y 205)
+  tampoco lo trajo (ver observaciones); en una conversación nueva (sesión 61) el modelo creó una página aunque
+  se le pidió que no (`canvas_rev` 1), sin tabla ni botón. No se repite: lo esencial (job en error sin llamar
+  al modelo, sesión sin cambios, sin aviso duplicado) lo cubre BC.
+- **D.3 (F1-t, Viv, Hist):** **F1-t: no concluyente** (sesión 62, `canvas_rev` 0): el contenido empieza por
+  `<` (la frase va en HTML) y lleva tabla; `aviso_html` t y el aviso se ve en cursiva. No se repite: con las
+  herramientas de tablas el modelo responde en HTML desde la primera frase. **Viv:** el aviso no se ve durante
+  el streaming; aparece al terminar el turno (T1 y F1-t). **Hist:** `historia_html` t en el job 201; lo que
+  recibe el modelo tras compactar, por lectura del código.
+- **D.4 (R8, R-log):** «Design» solo en Gemini 3.5 flash (3). **R8** (`u1`, sesión 63): página con el gráfico
+  y la tabla, `canvas_rev` 1; fila 1758, «Design laid out the page in 37 s», **Gemini 3.5 flash**;
+  conversación con Gemini 3.6 flash, 61 s; sin 429 ni 503. **R-log** desde el `StartedAt`: el `ERROR` de
+  `odoo.http` de P-33.1 a las 10:03:20, con su `Traceback` (esperado); y, a las 10:28:27, dos `ERROR` («bad
+  query: SELECT id FROM chatboo_session WHERE id = 59 FOR UPDATE SKIP LOCKED» y «Error loading session: could
+  not serialize access due to concurrent update», de `pns_ai_chatboo.controllers.chatboo`; ver observaciones).
+  Sin errores del proveedor.
 
 ### F. Limpieza
 
--
+- `seges.e4p` borrada por `limpiar`; `demo` y `e1p_aiadmin` archivados otra vez (con sus contraseñas de
+  prueba); clave MCP de `admin` revocada; «Design» solo en Gemini 3.5 flash. Túnel cerrado y variables
+  quitadas en el equipo.
+- Comprobación final: 9 acciones y 0 restos; `demo` y `e1p_aiadmin` inactivos, ningún `e4p_*`; clave de
+  `admin` `not_generated` sin hash; una sola fila con «Design»: 3, Gemini 3.5 flash.
 
-**Resultado:**
+**Resultado:** **E4′ validada en staging (09/11/2026)**: parches 30 a 33 (script, 16/16 OK; P-30, 0 filas) y
+34 (T1, V5, V5′, V6, BC, R34, V2, Viv, Hist), con el `-u` de `pns_ai_mcp` sin errores y la recarga de las
+acciones de fábrica en `su`. V3 y F1-t, no concluyentes (no bloquean). R8 OK con Gemini 3.5 flash.
 
 ### Correcciones del procedimiento
 
 Anotadas aquí; los pasos de A a F no se cambian.
 
--
+- **D.1, túnel:** la orden `ssh -p "$VPS_PORT" -N -L 18169:127.0.0.1:8169 "$VPS_DEST"` funciona tal cual (deja
+  de estar «Sin confirmar»).
+- **A.6:** «Test Connection» no dejó filas en `ai_log` (la última seguía siendo la 1680, del 04/11): solo
+  escribe en el proveedor.
+- **D.1, comprobación del filtro:** solo tiene sentido con las contraseñas de 8 o más; una más corta (la de
+  `admin`) coincide con trozos de los logins.
+- **D.2, V3:** el botón «Lienzo» del turno 2 de la sesión de T1 no sigue tras recargar; se intentó con un
+  turno nuevo y con una conversación nueva (ver arriba).
+- **D.2, fase 1:** F1-t (D.3) va en la fase 1, sin «Design»; se hizo después de V2 y V3, con «Design» quitado
+  otra vez.
+- **D.4, R8:** la consulta de `ai_log` con «últimos 15 minutos» se quedó corta; se lanzó con hora fija.
+- **P-33.1:** en el staging el texto es «The method 'month_usage' does not exist on the model 'ai.provider'»
+  (en el laboratorio, «type object … has no attribute 'month_usage'»).
 
 ### Observaciones
 
--
+- **Sesión 58** (10:09:37): primer intento de T1, antes de quitar «Design»; creó una página (fila 1684,
+  «Design laid out the page in 41 s»).
+- **El modelo afirma haber creado la página** cuando se rechaza (PNS-96): en T1 y en F1-t, el aviso del parche
+  34 lo corrige en la burbuja.
+- **Botón Canvas:** en el staging, ni siquiera el tooltip con el motivo (en el laboratorio sí lo había): solo
+  el borde rojo. Defecto del fabricante; al informe (plan, §3 punto 2).
+- **Exportación:** PDF y `.doc` ponen la prosa y el aviso antes de la tabla, y el aviso sin cursiva (un
+  `<p>`); PDF, `.doc` y XLSX solo con la columna `Name` (copiar lleva `id` y `name`); la exportación «Word» es
+  un `.doc` HTML, no `.docx`. Del fabricante.
+- **Sesión 59, 10:27-10:28:** el job 204 acabó con «Se especificó una orden inválida» (el modelo pidió el
+  orden `name ascii`); Sergio reenvió el texto (job 205). Al terminar el 205, la carga de la sesión por el
+  cliente falló por la escritura concurrente del job (`FOR UPDATE SKIP LOCKED` con «could not serialize
+  access…», 10:28:27; la sesión, `write_date` 10:28:27.058): la carga no reintenta. Probable causa de que no
+  saliera el botón «Lienzo». Del fabricante; el parche 34 no intervino (sin rechazo de página en esos turnos).
+- **Sesión 61:** el orquestador creó una página aunque se le pidió «No hagas ninguna página» (plan, apartado
+  E4′, fila «El orquestador reinterpreta peticiones…»).
+- **Contraseña de `admin` en `pns_demo`:** 5 caracteres, en un staging accesible desde Internet. No es de E4′;
+  decide Sergio si se cambia (antes o en la limpieza final).
 
 ### Restos para la limpieza final (no se borran ahora)
 
--
+- VPS, `/opt/odoo/pns_staging`: `addons_antes_E4p` (además de las anteriores); `/tmp`: `pns_u_E4p.log` y
+  `pns_diff_E4p.txt` (se pueden borrar tras este [DOC]).
+- `pns_demo`: sesiones 58 a 62 (`admin`) y 63 (`u1`), con sus páginas (58, 60, 61 y 63); jobs de Chatboo 199 a
+  208; job del botón Canvas 1; filas de `ai_log` 1681 a 1760 (80, del 09/11); `demo` y `e1p_aiadmin`
+  archivados con contraseñas de prueba.
+- Equipo de Sergio: `~/staging_e4p` (script, estado y resultado; tras este [DOC]).

@@ -2169,3 +2169,55 @@ mediciones, no regresión (D.2) y limpieza: [staging_e3_3879.md](staging_e3_3879
   pública, y la ciudad de PT corregida en D.3.
 
 **Resultado de E3′ en staging:** parches 25 a 29 validados en staging el 04/11/2026. R8 de E1′, cerrada.
+
+## Staging — entrega E4′ (09/11/2026)
+
+Sergio con Claude; horas en UTC. Commit `8d218ea` de `14.0-pns-ai-3879` desplegado en `pns_demo` con `-u`
+de `pns_ai_mcp`, que arrastra a `pns_ai_chatboo` (reinicio 2026-11-09 09:51:24). Procedimiento, comprobaciones
+previas, despliegue, pruebas y limpieza: [staging_e4_3879.md](staging_e4_3879.md), columnas «Obtenido» y
+«Resultado de la subida (09/11/2026)».
+
+- **Comprobaciones previas (A):** código de `522ce6e` montado (710 archivos, `6ac645fc…44e5`); 9 acciones de
+  confianza y 0 restos; solo `pns_ai_chatboo` depende de `pns_ai_mcp`; consultas A y B (operaciones con pasos
+  sobre `ai.trusted.action`), 0 filas, con pasos reales leídos en A.4 b; grupos de `admin`, `demo`,
+  `e1p_aiadmin` y `u1` como pide la precondición del script.
+- **Despliegue (B):** código extraído y montado, 711 archivos, `e37be448…1844` (confirma la huella calculada
+  sin git); copia en `addons_antes_E4p`; `diff -rq`, 10 archivos distintos y 1 nuevo. `-u` de 09:49 a
+  09:50:05: 0 `Traceback`, `ERROR` y `CRITICAL`, 0 «Deleting field» y **0 rechazos del parche 32** (las 9
+  acciones de fábrica, reescritas en `su`); `WARNING`, los de E2′ y E3′. `/web/login` 200 y `/mcp` 403.
+
+| # | Prueba | Parche (PNS) | Quién / cómo | Resultado |
+|---|---|---|---|---|
+| 1 | P-30.1 a P-30.5: los `log_*` con el `user_id` de otro, por RPC | 30 (M11) | DEMO, `pruebas_e4p.py rpc`, por el túnel SSH | **OK**; consulta de P-30 en `ai_log`, 0 filas (la última, la 1680, del 04/11) |
+| 2 | P-31: `chat_completion` por RPC | 31 (M12) | DEMO, mismo paso | **OK** |
+| 3 | P-32.1 a P-32.4: `write`, `create`, `copy` y `unlink` de `ai.trusted.action`; P-32.5, control | 32 (PNS-97) | AA (`e1p_aiadmin`) y ADM, mismo paso | **OK**; `limpiar` ×2: 1 [10] y 0, y quedan 9 acciones y 0 restos |
+| 4 | P-33.1 a P-33.4: `month_usage`, `_month_usage` y el asistente de uso (`default_get` y `onchange`); P-33.5, control | 33 (PNS-29) | DEMO y ADM, mismo paso | **OK**; P-33.1, «The method 'month_usage' does not exist on the model 'ai.provider'» (otro texto que en el laboratorio; el script lo clasifica bien) |
+| 5 | T1 y V5: rechazo de página sin «Design» | 34 (PNS-96) | ADM, Chatboo, sesión 59, job 200 | **OK**: sin página; aviso en cursiva y en su propio párrafo al cerrar el turno; `content` = `original_content`, en HTML (`aviso_html` t); filas 1690/1691 y 1694/1695 |
+| 6 | V5′: copiar y exportar | 34 (PNS-96) | ADM, burbuja de T1 | **OK**: copiar, solo la tabla; PDF y `.doc` con el aviso en párrafo aparte, sin HTML crudo; XLSX sin aviso |
+| 7 | V6: segundo turno sin recargar | 34 (PNS-96) | ADM, job 201 | **OK**: `historia_es` y `historia_html` t; turno 2 con tabla, sin aviso propio |
+| 8 | BC: botón Canvas sin «Design» | 34 (PNS-96) | ADM, job del botón Canvas 1 | **OK**: `error` con el aviso, sin llamar al modelo; sesión sin cambios; en pantalla, solo el borde rojo, sin tooltip |
+| 9 | R34: recargar y cambiar de sesión | 34 (PNS-96) | ADM | **OK**: el aviso se conserva (huella nueva: la reescribe el cliente) |
+| 10 | V2: con «Design», sin aviso | 34 (PNS-96) | ADM, sesión 60, job 202 | **OK**: página creada (`canvas_rev` 1), sin aviso; diseñó Gemini 3.6 flash (fila 1711) |
+| 11 | V3: botón Canvas con el chat abierto | 34 (PNS-96) | ADM, sesiones 59 y 61 | **No concluyente**: sin botón «Lienzo» en la sesión 59 tras recargar; en la 61, el modelo creó una página. Lo esencial lo cubre BC |
+| 12 | F1-t: texto + tabla embebida | 34 (PNS-96) | ADM, sesión 62 | **No concluyente**: el contenido empieza por `<`; aviso en HTML, en cursiva |
+| 13 | Viv y Hist | 34 (PNS-96) | ADM | **OK**: el aviso no se ve en vivo y aparece al cerrar el turno; `historia_html` t (job 201) |
+
+- **No regresión (D.4):** R8 OK con `u1` (sesión 63, `canvas_rev` 1; fila 1758, diseñó Gemini 3.5 flash; sin
+  429 ni 503). R-log desde el reinicio: el `ERROR` de `odoo.http` de P-33.1 (10:03:20, esperado) y dos
+  `ERROR` de la carga de la sesión 59 por un fallo de serialización (10:28:27; observación). Sin errores del
+  proveedor.
+- **Limpieza (F):** `seges.e4p` borrada (9 acciones y 0 restos); `demo` y `e1p_aiadmin` archivados otra vez;
+  clave MCP temporal de `admin` revocada (`not_generated`, sin hash); «Design» solo en Gemini 3.5 flash.
+  Restos para la limpieza final, en el documento de staging.
+- **No concluyentes (no bloquean):** V3 y F1-t (filas 11 y 12).
+- **Observaciones** (detalle en el documento de staging, G): el modelo afirma haber creado la página cuando
+  se rechaza (T1 y F1-t; el aviso del parche 34 lo corrige en la burbuja); el botón Canvas, sin tooltip en el
+  staging; la exportación (prosa y aviso antes de la tabla, solo la columna `Name`, «Word» como `.doc` HTML);
+  la carga de la sesión sin reintento ante el fallo de serialización; en la sesión 61, el orquestador creó una
+  página aunque se le pidió que no. Del fabricante; el botón Canvas, la exportación y la carga de la sesión,
+  al informe (plan, §3 punto 2). La contraseña de `admin` de `pns_demo` (5 caracteres) no es de E4′: decide
+  Sergio.
+
+**Resultado de E4′ en staging:** parches 30 a 34 validados en staging el 09/11/2026: 30 a 33 con el script
+(16/16 OK; P-30, 0 filas) y 34 a mano y por SQL, con el `-u` de `pns_ai_mcp` sin errores y la recarga de las
+acciones de fábrica en `su`. V3 y F1-t, no concluyentes. R8 OK con Gemini 3.5 flash.

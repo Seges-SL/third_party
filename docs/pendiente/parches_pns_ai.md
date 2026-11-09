@@ -10,6 +10,8 @@
   2026-10-27 (repetición de R8; E2′: parches 11 adaptado y 17 a 22), el 2026-10-29 (E3′: parches 25 a 28),
   el 2026-10-30 (parche 29), el 2026-11-03 (laboratorio del parche 29), el 2026-11-04 (staging de E3′:
   parches 25 a 29) y el 2026-11-05 (E4′.a: parches 30 a 33; E4′.b: parche 34)
+  · actualizado el 2026-11-06 (E4′.b2 y E4′.b3: parche 34 ampliado)
+  · actualizado el 2026-11-09 (staging de E4′: parches 30 a 34)
 - **Versión del fabricante, base propia de Seges desde el 20/10/2026 (N12):** `pns_base` 14.0.1.2.32 ·
   `pns_ai_mcp` 14.0.3.1.782 · `pns_ai_chatboo` 14.0.2.1.453
 - **Desde el 23/10/2026 (N12, b′), en `14.0-pns-ai-3879`:** `pns_base` 14.0.1.2.47 · `pns_ai_mcp`
@@ -133,11 +135,11 @@ Las versiones nuevas **no se incorporan al repo**. Cuando el fabricante publique
 | 27 | F1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/controllers/chatboo.py` | E3′ | Validado en staging (04/11/2026) |
 | 28 | D1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas_page.py`, `pns_ai_chatboo/security/security.xml` | E3′ | Validado en staging (04/11/2026) |
 | 29 | F1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_session.py` | E3′ | Validado en staging (04/11/2026) |
-| 30 | M11 | seguridad | `pns_ai_mcp/models/ai_execution_engine.py` | E4′.a | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
-| 31 | M12 | seguridad | `pns_ai_mcp/models/ai_execution_engine.py` | E4′.a | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
-| 32 | PNS-97 | seguridad | `pns_ai_mcp/models/ai_trusted_action.py` | E4′.a | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
-| 33 | PNS-29 | seguridad | `pns_ai_mcp/models/ai_provider.py`, `pns_ai_mcp/wizard/ai_provider_usage_wizard.py` | E4′.a | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026) |
-| 34 | PNS-96 | funcional | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_async_request.py` | E4′.b | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026); ampliado con la opción A (05/11/2026) y el formato F1 (06/11/2026): el aviso también en `original_content` y, cuando el contenido es HTML, en `<p><em>…</em></p>` (ver «Parches de la rama 14.0-pns-ai-3879 (E4′.b2 y E4′.b3)») |
+| 30 | M11 | seguridad | `pns_ai_mcp/models/ai_execution_engine.py` | E4′.a | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026); validado en staging (09/11/2026) |
+| 31 | M12 | seguridad | `pns_ai_mcp/models/ai_execution_engine.py` | E4′.a | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026); validado en staging (09/11/2026) |
+| 32 | PNS-97 | seguridad | `pns_ai_mcp/models/ai_trusted_action.py` | E4′.a | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026); validado en staging (09/11/2026) |
+| 33 | PNS-29 | seguridad | `pns_ai_mcp/models/ai_provider.py`, `pns_ai_mcp/wizard/ai_provider_usage_wizard.py` | E4′.a | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026); validado en staging (09/11/2026) |
+| 34 | PNS-96 | funcional | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_async_request.py` | E4′.b | Aplicado; tests en verde, neutralizado y aprobado en revisión (05/11/2026); ampliado con la opción A (05/11/2026) y el formato F1 (06/11/2026): el aviso también en `original_content` y, cuando el contenido es HTML, en `<p><em>…</em></p>` (ver «Parches de la rama 14.0-pns-ai-3879 (E4′.b2 y E4′.b3)»); validado en staging (09/11/2026) |
 
 Parches 11 adaptado y 17 a 22 (E2′, 27/10/2026): aplicados, con tests y neutralización hechos; pruebas
 manuales del laboratorio pendientes ([lab_e2_3879.md](lab_e2_3879.md)). Tras la revisión del mismo día:
@@ -162,10 +164,15 @@ Parches 30 a 33 (E4′.a, 05/11/2026): aplicados, con tests en verde, neutraliza
 revisión; propuesta y decisiones en [e4_propuesta_3879.md](e4_propuesta_3879.md). Pendientes del
 laboratorio y del staging, que se hacen con E4′.b en una sola subida. Entradas más abajo, en «Parches de
 la rama 14.0-pns-ai-3879 (E4′.a)».
+Parches 30 a 33, validados en el staging `pns_demo` el 09/11/2026 (commit `8d218ea`;
+[staging_e4_3879.md](staging_e4_3879.md) y [verificación](verificacion_seguridad_pns_ai.md), «Staging —
+entrega E4′ (09/11/2026)»).
 
 Parche 34 (E4′.b, 05/11/2026): aplicado, con tests en verde, neutralización hecha y aprobado en revisión;
 misma propuesta. Pendiente, con E4′.a, de E4′.h (script de pruebas de E4′) y de una sola subida al
 staging. Entrada más abajo, en «Parches de la rama 14.0-pns-ai-3879 (E4′.b)».
+Parche 34, validado en el staging `pns_demo` el 09/11/2026, con su ampliación (commit `8d218ea`; ver el
+párrafo siguiente).
 
 Parche 34, ampliación (E4′.b2 y E4′.b3, 05-06/11/2026): sobre la copia de trabajo de E4′.b, el aviso se
 amplió con la **opción A** (05/11/2026: con aviso, `original_content` lleva el mismo texto que `content`;
@@ -174,6 +181,9 @@ el aviso se anexa como `<p><em>…</em></p>` en vez de en markdown). Tests en ve
 y N34h) y revisión aprobadas; validado en el laboratorio (sesiones 21 a 24). Pendiente, con E4′.a y E4′.b,
 de E4′.h y de una sola subida al staging. Entrada más abajo, en «Parches de la rama 14.0-pns-ai-3879
 (E4′.b2 y E4′.b3)».
+Parche 34 con la opción A y F1, validado en el staging `pns_demo` el 09/11/2026 (commit `8d218ea`;
+[staging_e4_3879.md](staging_e4_3879.md) y [verificación](verificacion_seguridad_pns_ai.md), «Staging —
+entrega E4′ (09/11/2026)»); V3 y F1-t, no concluyentes.
 
 Parches 10, 12 y 13 a 16 (E1′): validados en laboratorio el 23/10/2026 y en el staging `pns_demo` el 26/10/2026, con el cambio de base
 (commit `0366231`; [staging_e1_3879.md](staging_e1_3879.md) y
@@ -3113,6 +3123,20 @@ saltados**.
 - **Estado de los parches 30 a 33:** aplicados, tests en verde, neutralizados y aprobados en revisión
   (05/11/2026). Siguiente: E4′.b (parche 34); después, E4′.h y una sola subida al staging.
 
+### Validación en staging (09/11/2026)
+
+Commit `8d218ea` en `pns_demo`, con `-u` de `pns_ai_mcp` (arrastra a `pns_ai_chatboo`) sin errores; script
+[`scripts_e4/pruebas_e4p.py`](scripts_e4/pruebas_e4p.py) (`76f781f6…`) por el túnel SSH: **16/16 OK**.
+Detalle en [staging_e4_3879.md](staging_e4_3879.md), apartado G, y en la
+[verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E4′ (09/11/2026)».
+
+- **Parche 30:** validado en staging (P-30.1 a P-30.5 OK; consulta de P-30 en `ai_log`, 0 filas).
+- **Parche 31:** validado en staging (P-31 OK).
+- **Parche 32:** validado en staging (P-32.1 a P-32.5 OK; el `-u` reescribió en `su` las 9 acciones de
+  fábrica sin ningún rechazo; consultas A y B de A.4, 0 filas).
+- **Parche 33:** validado en staging (P-33.1 a P-33.5 OK; P-33.1 con el texto «The method 'month_usage' does
+  not exist on the model 'ai.provider'», otro que en el laboratorio; el script lo clasifica bien).
+
 ## Parches de la rama 14.0-pns-ai-3879 (E4′.b)
 
 - **Fecha:** 05/11/2026. **Entrega:** E4′.b (el aviso del lienzo, fila 30 de la hoja) del
@@ -3257,6 +3281,13 @@ saltados**; los mismos 50 fallos por nombre, sin ninguno nuevo.
     siguiente (en «Qué se degrada»).
 - **Estado del parche 34:** aplicado, tests en verde, neutralizado y aprobado en revisión (05/11/2026).
   Siguiente: E4′.h (script de pruebas de E4′); después, una sola subida de E4′ al staging.
+
+### Validación en staging (09/11/2026)
+
+- **Parche 34:** validado en staging con su ampliación (opción A y F1), commit `8d218ea` en `pns_demo`: T1,
+  V5, V5′, V6, BC, R34, V2, Viv y Hist OK; V3 y F1-t, no concluyentes (no bloquean). Detalle en
+  «Validación en staging» de la sección de E4′.b2 y E4′.b3 y en [staging_e4_3879.md](staging_e4_3879.md),
+  apartado G.
 
 ## Parches de la rama 14.0-pns-ai-3879 (E4′.b2 y E4′.b3)
 
@@ -3415,6 +3446,33 @@ saltados**; los mismos 50 fallos por nombre, sin ninguno nuevo.
   duplicado**; el usuario no ve el error (ver «Para el informe al fabricante»).
 - **Estado final del laboratorio:** «Design» en los proveedores 1 (Gemini 3.6 flash) y 2 (Gemini 3.5
   flash); el 4 (`lite`) sin marcar.
+
+### Validación en staging (`pns_demo`, 09/11/2026)
+
+Commit `8d218ea`; detalle en [staging_e4_3879.md](staging_e4_3879.md), apartado G (D.2 y D.3), y en la
+[verificación](verificacion_seguridad_pns_ai.md), «Staging — entrega E4′ (09/11/2026)».
+
+- **Parche 34 (opción A y F1): validado en staging.**
+- **T1 y V5** (sin «Design»; sesión 59, job 200, Gemini 3.6 flash): sin página (`canvas_rev` 0); el modelo
+  dice «He creado la página nueva…» y la burbuja termina con el aviso en cursiva y en su propio párrafo.
+  `content_es` y `original_es` t; job `done`, `response_es` t; el contenido empieza por `<`, con tabla,
+  `aviso_html` t y `content` = `original_content`. En `ai_log`, filas 1690/1691 y 1694/1695.
+- **V5′:** copiar, solo la tabla, sin aviso; PDF y «Word» (un `.doc` HTML) con el aviso en su propio párrafo y
+  sin HTML crudo; XLSX, la tabla sin aviso.
+- **V6** (job 201): `historia_es` t e `historia_html` t; turno 2 con tabla y sin aviso propio.
+- **BC** (job del botón Canvas 1): `error` con el aviso, `started_at` = `finished_at`; sesión sin cambios
+  (misma huella, 4 mensajes); en pantalla, solo el borde rojo, **sin tooltip** (en el laboratorio sí lo
+  había).
+- **R34:** tras F5 y tras cambiar de sesión, el mensaje de T1 conserva el aviso (el cliente reescribe
+  `messages`: huella nueva).
+- **V2** (con «Design»; sesión 60, job 202): página creada (`canvas_rev` 1), sin aviso; diseñó Gemini 3.6
+  flash.
+- **V3, no concluyente:** la respuesta con tabla del turno 2 de la sesión 59 ya no tenía el botón «Lienzo»
+  tras recargar; lo esencial lo cubre BC.
+- **F1-t, no concluyente** (sesión 62): el contenido empieza por `<` y lleva tabla; `aviso_html` t, aviso en
+  cursiva. No se repite: con las herramientas de tablas el modelo responde en HTML desde la primera frase.
+- **Viv:** el aviso no se ve durante el streaming; aparece al terminar el turno. **Hist:** `historia_html` t
+  en el job 201; lo que recibe el modelo tras compactar, por lectura del código.
 
 ### Para el informe al fabricante (defectos del fabricante, sin parche)
 
