@@ -331,6 +331,14 @@ Pasa: `test_sudo_call_works`.
     CRUD nunca lo es (`controllers/safe_plan.py:403-414`): ningún paso sobre `ai.trusted.action` llega por ahí.
   - **Se cumple.** Las recargas de datos (también un `module.update` dentro de un plan) usan
     `Environment(cr, SUPERUSER_ID, {})` (`odoo/tools/convert.py:701`): sin las claves, no les afecta.
+  - _Errata (06/11/2026):_ sobre «`_cleanup_stuck_state` (…) → `_retry_confirmed_not_executed` →
+    `execute_plan_now`» (arriba): `_cleanup_stuck_state` no tiene llamador; los caminos reales del reintento
+    son `safe_plan_status` y `/verification/execute` (como la errata del
+    [plan](plan_correccion_pns_ai_3879.md) del 05/11/2026, §3 punto 1). `/verification/execute`
+    (`controllers/verification_ui.py:94`) llama a `_resolve_execute` (definido en
+    `models/safe_operation.py:791`), que llama a `_execute_plan_with_timeouts` (`:863`; definido en `:948`), y
+    este llega a `execute_plan_now` (llamada en `:960`; definido en `:1344`) [L], así que la conclusión de b)
+    no cambia.
 
 ### 2. Cambio propuesto (esbozo)
 
@@ -1000,3 +1008,67 @@ decisiones que **sustituyen o corrigen** lo escrito más arriba en esta propuest
 - **Revisión:** opción A (05/11/2026) y F1 (06/11/2026), **APROBADAS** por `odoo-reviewer`, sin bloqueantes.
 - **Pendiente:** E4′.h (incluye el Paso 1, el error invisible del botón Canvas); después, una sola subida al
   staging.
+
+## Resultado de E4′.h (06/11/2026)
+
+Script de pruebas de E4′, [`scripts_e4/pruebas_e4p.py`](scripts_e4/pruebas_e4p.py) (en `a06d393`; SHA-256
+`76f781f6…9b03`), y documento de la subida, [staging_e4_3879.md](staging_e4_3879.md). Los scripts de E2′ y
+de E3′ no se tocan (hoja, punto 8).
+
+- **Alcance:** el script cubre los parches 30 a 33 por XML-RPC (16 comprobaciones: P-30.1 a P-30.5, P-31,
+  P-33.1 a P-33.5 y P-32.1 a P-32.5). El parche 34 y el Paso 1 del botón Canvas van en el documento del
+  staging, por SQL de solo lectura y a mano (D.2 y D.3), no en el script.
+- **Diseño (D1 a D9):**
+  - **D1, P-31 con un agente inexistente:** sin el parche, `resolve_inference_agent_code` da `UserError`
+    antes de llegar al proveedor; con él, `AccessError` primero. Así discrimina sin hacer inferencia ni gastar
+    cuota.
+  - **D2, P-30 identificado** por `endpoint` (`seges_e4p_staging`; de los `log_*`, solo `log_llm_inference`
+    admite `endpoint`) o por el `user_id` del admin desde t0 (con 300 s de margen por el reloj): el script no
+    se conecta a la BD: solo imprime la consulta de comprobación, que debe dar 0 filas.
+  - **D3, precondición de grupos:** antes de probar, con `has_group` de cada usuario sobre sí mismo: el
+    interno es interno y no tiene ningún grupo de IA, y el AI Administrator tiene `group_ai_admin` y no tiene
+    Ajustes; si no, para (salida 2).
+  - **D4, `preparar`:** crea `seges.e4p` sin duplicar (si existe, la reutiliza), **archivada** (`_get` no la
+    ve), **solo para Ajustes** y con `fields_get` (solo lee) como método.
+  - **D5, lo creado por error:** P-32 prueba `create` con `seges.e4p.b` y `copy` con `seges.e4p.copia` (otro
+    `code`: el mismo chocaría con `code_uniq` y no discriminaría); si se aplican (parche ausente), lo creado
+    va al estado en el momento; `limpiar` borra `code =like 'seges.e4p%'` y los ids del estado.
+  - **D6, clasificación** de cada respuesta por `faultCode` y por el texto del mensaje del parche: «rechazado,
+    pero no por el parche» no cuenta como OK. `faultCode` de `/xmlrpc/2`: 4 `AccessError`, 3 `AccessDenied`,
+    2 `UserError` y 1 el resto; «cannot marshal None» = el `log_*` se ejecutó y devolvió `None` (el parche 30
+    no está).
+  - **D7, logins en variables** (`E4P_ADMIN`, `E4P_INTERNO`, `E4P_AIADMIN`), **sin ids fijos** y **sin
+    `E4P_SESSION`** (ninguna prueba del script necesita una sesión de Chatboo).
+  - **D8, resumen OK/FALLO** en una tabla, copiada en `resultado_e4p_<fecha>.txt`, y códigos de salida 0
+    (todo OK), 1 (algún FALLO) y 2 (parada).
+  - **D9, validación antes del laboratorio:** `py_compile` con Python 3.7.3 y 3.12.3, `ruff` y un servidor
+    XML-RPC simulado (7 escenarios, OK). La versión final se probó además en el laboratorio el 09/11/2026
+    (abajo, «Laboratorio»).
+- **Añadidos del agente al implementarlo:** el estado queda ligado a la URL y la BD (otro servidor o BD →
+  parada); la contraseña de admin se pide **después** de la precondición; y espera máxima de 120 s por
+  llamada.
+- **Filtro de contraseñas:** la salida solo tapa las contraseñas de 8 caracteres o más (decisión de Sergio):
+  tapar una corta cambiaría trozos de otras palabras (logins y mensajes) y delataría la contraseña. Por eso
+  las contraseñas de prueba del staging son de 8 o más ([staging_e4_3879.md](staging_e4_3879.md), C.2).
+- **P-33.2 no distingue:** `_month_usage` por RPC lo rechaza el core por ser privado («Private methods …
+  cannot be called remotely.»), con o sin el parche. Lo que discrimina el parche 33 en el nombre es P-33.1
+  (`month_usage` ya no existe).
+- **Laboratorio (`lab_pns_ai_3879_14`):**
+  - **06/11/2026**, con la versión `ab1963e5…`, anterior al filtro de contraseñas: `rpc` **16/16 OK**
+    (t0 = 2026-11-06 18:08:07 UTC; `resultado_e4p_20261106-190808.txt`); la consulta de P-30, **0 filas**;
+    `limpiar` repetible (borra la acción 10 y, la segunda vez, nada); `e1p_aiadmin` (id 8) reactivado para la
+    prueba y archivado otra vez.
+  - **09/11/2026**, con la versión final (`76f781f6…`, en `a06d393`): `rpc` **16/16 OK**, salida 0
+    (t0 = 2026-11-09 08:51:03 UTC; `resultado_e4p_20261109-095104.txt`); la consulta de P-30, **0 filas**; las
+    contraseñas de prueba no aparecen en el resultado (`grep -cF`, 0); `preparar` creó la acción 11 (la
+    secuencia no retrocede) y `limpiar`, dos veces, dejó las 9 de fábrica y el estado sin ids; `e1p_aiadmin`,
+    con una contraseña de prueba nueva de 8 o más, desarchivado y archivado otra vez; `demo`, sin tocar.
+  - Restos y recuento de `ai_log`, en el [plan](plan_correccion_pns_ai_3879.md), §4.
+- **Documento del staging:** `8d218ea` con un solo `-u pns_ai_mcp`; por la dependencia, Odoo actualiza
+  también `pns_ai_chatboo` (`button_upgrade`, `odoo/addons/base/models/ir_module.py:636-669`) sin nombrarlo.
+  La decisión 3 de E4′.h («`-u` solo de `pns_ai_mcp`; `pns_ai_chatboo`, solo reinicio») queda matizada: el
+  `-u` actualiza también `pns_ai_chatboo` por la dependencia, sin otra orden (se comprueba en el staging,
+  A.4 a, que no hay otro módulo instalado que dependa de `pns_ai_mcp`).
+  Antes, las comprobaciones previas de `ai.trusted.action` (A.4) y los grupos de los usuarios de prueba
+  (A.5).
+- **Pendiente:** la subida al staging ([staging_e4_3879.md](staging_e4_3879.md)).

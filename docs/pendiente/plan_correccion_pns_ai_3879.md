@@ -60,6 +60,10 @@
   · 3 saltados), neutralizada (N34o, N34h), aprobada en revisión y validada en el laboratorio el
   06/11/2026 (sesiones 21 a 24). Siguiente: E4′.h (script de pruebas de E4′) y una sola subida al
   staging.
+  E4′.h: script `pruebas_e4p.py` implementado (`a06d393`) y validado en el laboratorio: el 06/11/2026 con
+  una versión anterior al filtro de contraseñas y el 09/11/2026 con la final (16/16 OK las dos veces);
+  documento del staging preparado ([staging_e4_3879.md](staging_e4_3879.md)). Siguiente: una sola subida
+  al staging.
 
 ## 1. Cómo se trabaja
 
@@ -94,6 +98,13 @@
 | **E2′** | Resto de Altos: papelera del diario (PNS-37), PNS-19, PNS-17, PNS-82, PNS-70; PNS-20 (confirmado por P-20); PNS-100 y PNS-101 (nuevos) | 11 adaptado; 17 (PNS-37), 18 (PNS-19), 19 (PNS-17), 20 (PNS-70), 21 (PNS-20), 22 (PNS-100), 23 (PNS-101, ampliado) y 24 (PNS-102) | Aplicada (27/10/2026): tests en verde y neutralización hecha; parche 18 corregido tras la revisión y parche 23 nuevo (27/10/2026). **Aprobada en revisión (28/10/2026)** con la herramienta real (vía A, shell; vía B, `/mcp`): las dos evasiones críticas, cerradas. Validada en laboratorio (28/10/2026). **Validada en staging (29/10/2026)**: commit `9a2970d` ([staging_e2_3879.md](staging_e2_3879.md), apartado G) |
 | **E3′** | Lienzo: M1, M2, F1 y D1 (D1 pasa de E4′ a E3′: decisión de Sergio del 29/10/2026) | 25 (M1), 26 (M2), 27 (F1) y 28 (D1); la ventana del parche 18 se mantiene; 29 (F1, P-8e a, 30/10/2026) | **Aplicada (29/10/2026)**: tests en verde y neutralización hecha; rechazada en la primera revisión (B1, parche 27 b) y corregida; **aprobada en revisión (29/10/2026)**; pruebas manuales del laboratorio hechas el 30/10/2026 ([lab_e3_3879.md](lab_e3_3879.md)); P-8e a falló y se corrigió con el parche 29, validado en laboratorio el 03/11/2026 ([lab_p29_3879.md](lab_p29_3879.md)). **Validada en staging (04/11/2026)**: commit `522ce6e` ([staging_e3_3879.md](staging_e3_3879.md), apartado G) |
 | **E4′** | Hoja de Medios y Bajos (corregir o aceptar); después, lo elegido: E4′.a (seguridad: M11, M12, PNS-97, PNS-29 resto 3 y el test de PNS-36), E4′.b (el aviso del lienzo, fila 30 de la hoja) y E4′.h (script de pruebas) | 30 (M11), 31 (M12), 32 (PNS-97) y 33 (PNS-29), en E4′.a; 34 (PNS-96), en E4′.b | **E4′.0 cerrada (04/11/2026)**: hoja con las decisiones de Sergio ([e4_hoja_3879.md](e4_hoja_3879.md); `ca707a9`). **E4′.a aplicada (05/11/2026)**: tests en verde, neutralizada y **aprobada en revisión** ([propuesta](e4_propuesta_3879.md), «Resultado de E4′.a»). **E4′.b aplicada (05/11/2026)**: tests en verde, neutralizada y **aprobada en revisión** ([propuesta](e4_propuesta_3879.md), «Resultado de E4′.b»); ampliada con la opción A (05/11/2026) y F1 (06/11/2026) y validada en el laboratorio (06/11/2026). E4′.h, pendiente (script y una sola subida al staging) |
+
+**Estado de E4′.h, fila E4′ (06/11/2026):** script [`scripts_e4/pruebas_e4p.py`](scripts_e4/pruebas_e4p.py)
+(parches 30 a 33 por XML-RPC) implementado (`a06d393`) y validado en el laboratorio: el 06/11/2026 con la
+versión `ab1963e5…`, anterior al filtro de contraseñas, y el 09/11/2026 con la final, `76f781f6…` (16/16 OK
+las dos veces; §4, «`lab_pns_ai_3879_14`, tras validar E4′.b2 y E4′.b3 y el script de E4′.h»);
+documento de la subida preparado ([staging_e4_3879.md](staging_e4_3879.md)), con el commit `8d218ea`.
+Pendiente: una sola subida de E4′ al staging.
 
 Rutas de las fichas: las de la comparación (salvo indicación, de `pns_ai_mcp`; línea de 3.1.879).
 
@@ -407,6 +418,12 @@ corrige lo elegido.
 | `ai_log` no guarda el detalle del error del proveedor en el failover (staging de E3′, 04/11/2026) | [Staging de E3′](staging_e3_3879.md), D.1 (5c) | Fila 1654: el HTTP 503 de Gemini 3.6 flash solo está en el log de Odoo (11:12:23). Diagnóstico; método: a determinar |
 | El validador AST rechaza `dir()` (staging de E3′, 04/11/2026) | [Staging de E3′](staging_e3_3879.md), D.1 (6e) | Fila 1668, «AST Validation Error: [PROHIBITED:DIR]»: el validador funciona como debe y el modelo lo corrigió en la segunda ronda. Se anota por el tiempo extra del turno |
 
+**Nota (06/11/2026) a las filas «Etiqueta del cliente MCP del script de pruebas» y «`pruebas_e3p_lab.py` no
+resiste un 503»:** se resuelven en el script de E4′.h,
+[`scripts_e4/pruebas_e4p.py`](scripts_e4/pruebas_e4p.py). Usa XML-RPC, así que no es un cliente MCP y no deja
+etiqueta en `last_mcp_client_label`; ante un HTTP 503 reintenta 3 veces y guarda el estado tras cada
+creación. Los scripts de E2′ y de E3′ no cambian.
+
 `iap.account.account_token` legible por cualquier usuario interno: observación del core de Odoo (ACL
 estándar), sin parche; en la caja A lo cubre el parche 18 (decisión de Sergio del 27/10/2026).
 
@@ -428,6 +445,9 @@ estándar), sin parche; en la caja A lo cubre el parche 18 (decisión de Sergio 
 - Cubre la conexión con `_process` (apertura de la marca y `reset` en el `finally`), que no tiene test
   (revisión de E4′.b).
 - Repetir R8 sin bloquear (§4, «Staging `pns_demo`, tras E3′»).
+- **Errata (06/11/2026):** sobre «(van en el script de E4′.h)» (arriba): estas validaciones van en
+  [staging_e4_3879.md](staging_e4_3879.md), D.2 a D.4, por SQL de solo lectura y a mano en la interfaz. El
+  script de E4′.h ([`scripts_e4/pruebas_e4p.py`](scripts_e4/pruebas_e4p.py)) cubre los parches 30 a 33.
 
 **Ajuste de las validaciones del parche 34 (opción A y F1, E4′.b2 y E4′.b3, 05-06/11/2026).** Tras ampliar
 el aviso (ver [registro](parches_pns_ai.md), «Parches de la rama 14.0-pns-ai-3879 (E4′.b2 y E4′.b3)»), las
@@ -725,6 +745,47 @@ validaciones de arriba se concretan así en el staging:
   (ver el estado del 06/11/2026 más abajo).
 - **`lab_pns_ai_3879_14`, tras validar E4′.b en el laboratorio (06/11/2026):** «Design» en los
   proveedores 1 (Gemini 3.6 flash) y 2 (Gemini 3.5 flash); el 4 (`lite`) sin marcar.
+- **`lab_pns_ai_3879_14`, tras validar E4′.b2 y E4′.b3 y el script de E4′.h (06/11/2026):**
+  - De E4′.b2 y E4′.b3: sesiones de `admin` 21 a 24, jobs de Chatboo 50 a 55 y jobs del botón Canvas 3 y 4
+    (sesión 23, los dos en `error`).
+  - Filas de `ai_log` que dejaron esos turnos: **115** (ids 762 a 876, del 05/11/2026 a las 15:01 al
+    06/11/2026 a las 16:13 UTC), todas de `user_id` 2; ninguna de otro usuario desde el 05/11/2026 (0 filas
+    con `user_id` distinto de 2 o vacío; segunda consulta, abajo, 09/11/2026). Por
+    `endpoint`: `capability_skipped` 38, `domain_index` 6, `llm_orchestration` 18, `llm_response` 36,
+    `orchestration_summary` 6 y `relaxaicode` 11. Consulta (solo lectura, 06/11/2026):
+    ```sql
+    BEGIN TRANSACTION READ ONLY;
+    SELECT endpoint, count(*) AS filas, min(id) AS primera, max(id) AS ultima
+      FROM ai_log WHERE user_id = 2 AND create_date >= '2026-11-05'
+     GROUP BY endpoint ORDER BY endpoint;
+    ROLLBACK;
+    ```
+    Filas de otros usuarios (solo lectura, 09/11/2026; dio 0):
+    ```sql
+    BEGIN TRANSACTION READ ONLY;
+    SELECT count(*) AS filas_otro_usuario FROM ai_log
+     WHERE (user_id <> 2 OR user_id IS NULL) AND create_date >= '2026-11-05';
+    ROLLBACK;
+    ```
+  - Recorrido del script (06/11/2026, con la versión `ab1963e5…`, anterior al filtro de contraseñas):
+    `ai.trusted.action` 10 (`seges.e4p`) creada por `preparar` y borrada por `limpiar`
+    (quedan las 9 de fábrica, `max(id)` 9); `e1p_aiadmin` (id 8) reactivado y archivado otra vez; contraseñas
+    de prueba puestas a `e1p_aiadmin` y, si hizo falta, a `demo` (el `write_date` de `demo` es del 06/11/2026
+    a las 18:03:09 UTC: probablemente, la contraseña de prueba puesta antes del primer recorrido (no consta));
+    estado y resultado en `~/e4h_trabajo/lab_e4p/` (estado sin ids
+    tras `limpiar`; `resultado_e4p_20261106-190808.txt`, 16/16 OK); 0 filas en `ai_log` desde t0 − 300 s
+    (t0 = 2026-11-06 18:08:07 UTC; la última fila de `ai_log` es la 876, de las 16:13).
+  - Recorrido del script del 09/11/2026, con la versión final (`76f781f6…`, la de `a06d393`): script copiado a
+    `~/e4h_trabajo/lab_e4p/` con su huella comprobada; `e1p_aiadmin` (id 8) desarchivado (08:48:50 UTC) con
+    una contraseña de prueba nueva de 8 o más y archivado otra vez (08:53:38 UTC); `demo`, sin tocar (su
+    contraseña de prueba ya tenía 8 o más); `preparar` creó la `ai.trusted.action` 11 (la 10 la usó el
+    recorrido del 06/11: la secuencia no retrocede); `rpc` con t0 = 2026-11-09 08:51:03 UTC, 16/16 OK, salida
+    0, `resultado_e4p_20261109-095104.txt`; la consulta de P-30, 0 filas (la última fila de `ai_log` sigue
+    siendo la 876); las contraseñas de prueba de `demo` y `e1p_aiadmin` no aparecen en el resultado
+    (`grep -cF`, 0); `limpiar` dos veces: quedan las 9 de fábrica (`max(id)` 9) y 0 restos, estado sin ids.
+    Restos: los mismos; `e1p_aiadmin`, archivado con la contraseña nueva. Observación cosmética: el script
+    imprime «en la BD del staging» también en el laboratorio (no se cambia).
+  - Se conservan (como las 758 a 761).
 - **LIYBEN:** usuarios externos archivados el 23/10/2026.
 - **LIYBEN, segundo rechazo de E2′ (27/10/2026):** claves MCP **revocadas** hasta el despliegue final de E2′
   (PNS-101 ampliado y PNS-102). Paso pendiente al terminar: **regenerarlas** (ver §3.1).
