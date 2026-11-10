@@ -890,3 +890,37 @@ una copia que carga Sergio. «Lab 973» = una BD instalada con 3.1.973; «lab co
 | P-19 | Carga de la sesión sin reintento | Lab 973, el caso de la sesión 59 del staging de E4′ | Si sigue el fallo de serialización |
 | P-20 | Parche 18 portado a `open_readonly_env` (§4) | Lab 973 con el 18 portado: ejecutar las skills de fábrica de `pns_ai_chatboo` (todas las de `ai/skills/system/`) como un usuario interno | Qué skills fallan bajo `box_a_guard` (lecturas de campos que no son de identificación en los 11 modelos que guarda) |
 | P-21 | Contextos y skills de fábrica en el `-u` (§7.3) | Copia de la BD (`pns_demo` o la que cargue Sergio), antes del `-u`, solo lectura | Contextos (`ai.context`) y skills (`ai.skill`) sin `owner_id` de `pns_ai_mcp` y `pns_ai_chatboo` cuyo código o archivo esté entre los cambiados o retirados, y si alguno se editó a mano (fecha de escritura posterior a la del último `-u`): se reescribirían o se borrarían |
+
+**Resultado de P-3 y P-4 (10/11/2026): NUEVO-3 y NUEVO-4 confirmados en ejecución en nuestra rama.** Lab copia:
+rama `14.0-pns-ai-3879` (módulos de `8d218ea`), contexto `odoo-dev 14` `lab_pns_ai_3879`, BD
+`lab_pns_ai_3879_14`; módulos cargados desde la copia de trabajo (`/mnt/compartidos/third_party/pns_*`).
+`odoo-dev 14 shell` con usuarios creados en la misma transacción, cada caso en un savepoint deshecho y
+`rollback` final. Sin claves ni hashes en la salida.
+
+- P-3 (un AI Administrator sin Ajustes frente a la fila MCP de un administrador de Ajustes; control: la de un
+  empleado, cambia): el hash **cambia, sin excepción**, por las seis vías: `set_mcp_api_key`,
+  `action_generate_mcp_api_key`, `write` del hash, `create` con el hash, asistente de importación de usuarios
+  MCP y `config_backup._import_users` (0 errores, 0 avisos).
+- P-4 (un interno frente a un adjunto de otro usuario que no puede leer; control: su `unlink` directo da
+  `AccessError` y el adjunto sigue): crear el asistente apuntando al adjunto y borrarlo → **adjunto borrado**;
+  crear el asistente y borrarlo como lo hace la limpieza de transitorios (`sudo().browse(ids).unlink()`,
+  `odoo/models.py:6548`) → **adjunto borrado**; solo crearlo → el adjunto sigue.
+- Restos: ninguno en la BD (usuarios, contactos, filas MCP, adjuntos y asistentes de prueba a 0; `ai_log` sin
+  filas nuevas). Fuera de la transacción: huecos en las secuencias y el JSON subido al asistente de
+  importación de P-3 en el filestore (login de prueba y clave de prueba sin uso), marcado para la limpieza del
+  filestore.
+
+**Resultado de P-21 (10/11/2026): en `pns_demo` no hay ediciones manuales que perder.** Consulta de solo
+lectura (`BEGIN TRANSACTION READ ONLY` … `ROLLBACK`), validada antes en `lab_pns_ai_3879_14` y lanzada por
+Sergio en el staging, BD `pns_demo`. Fecha del último `-u`: la mayor `ir_module_module.write_date` de
+`pns_ai_mcp` y `pns_ai_chatboo`, 09/11/2026 09:50 (E4′).
+
+- Reescribe: los 12 contextos de los archivos de §7.3 y las 3 skills `billing`, `financial_health` y
+  `forecast`. Todos activos, sin dueño, `write_uid` 1 y ninguno escrito después del último `-u`.
+- Borra: las 7 skills retiradas (`annual_billing`, `cash_forecast`, `credit_facility`,
+  `customer_risk_analysis`, `sys_info`, `users_all` y `users_logged`) existen, activas y sin dueño.
+- Adopta (`bill_draft`, `sales_board`, `top_sales`, `users`): ninguna fila. Ninguna skill archivada.
+- Riesgo (por lectura): al buscar la fila que reescribe o adopta, 3.1.973 no ve las skills archivadas
+  (búsqueda sin `active_test=False`, `models/ai_skill_disk.py:262-271`), así que intentaría crearla de nuevo
+  y el alta chocaría con `code_uniq` (`models/ai_skill.py:272-274`). En `pns_demo` no se da (ninguna
+  archivada). Queda por probar en P-15.

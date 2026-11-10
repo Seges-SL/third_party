@@ -2,7 +2,7 @@
 
 - **Comparado:** `pns_base` 1.2.69, `pns_ai_mcp` 3.1.973 y `pns_ai_chatboo` 2.1.587 (fabricante) frente a
   la rama `14.0-pns-ai-3879`, módulos de `8d218ea` (3.1.879 con los parches de Seges 10 a 34).
-- **Fuente:** `docs/specs/comparacion_pns_ai_3-1-973.md` (sha256 `a7cc03a9…`, con las 23 correcciones de
+- **Fuente:** `docs/specs/comparacion_pns_ai_3-1-973.md` (sha256 `229391ac…`, con las 23 correcciones de
   la verificación independiente aplicadas el 10/11/2026), §3, §4, §6 y §7. Sin análisis nuevo: cada fila
   remite a su sección.
 - **«Encaje»:** cómo quedaría el parche sobre el código de 3.1.973: aplica igual, con ajustes o hay que
@@ -52,8 +52,8 @@ no cargan.
 
 | Qué | Hallazgo | Gravedad | Ref. |
 |---|---|---|---|
-| Un AI Administrator sin Ajustes ya no puede generar, fijar o importar la clave MCP de un administrador de Ajustes (también por `create`/`write` del hash y por la importación de configuración) | NUEVO-3 | Alta | §3.4 |
-| El asistente de exportación de `pns_base` solo borra adjuntos de exportación del propio usuario. En nuestra versión, cualquier interno borra cualquier adjunto, aunque sea solo creando el asistente (la limpieza de transitorios lo borra como superusuario) | NUEVO-4 | Alta | §3.4 |
+| Un AI Administrator sin Ajustes ya no puede generar, fijar o importar la clave MCP de un administrador de Ajustes (también por `create`/`write` del hash y por la importación de configuración) | NUEVO-3 | Alta | §3.4. Confirmado en ejecución en nuestra rama (10/11/2026, P-3/P-4) |
+| El asistente de exportación de `pns_base` solo borra adjuntos de exportación del propio usuario. En nuestra versión, cualquier interno borra cualquier adjunto, aunque sea solo creando el asistente (la limpieza de transitorios lo borra como superusuario) | NUEVO-4 | Alta | §3.4. Confirmado en ejecución en nuestra rama (10/11/2026, P-3/P-4) |
 | `_static_str` funciona en Python 3.7 | PNS-81 resto | Alta (funcional) | §3.1 |
 | Comprobación del equipo que contesta, contra el DNS *rebinding* (`fetch_url_safe`, `remote_image`) | PNS-17 y PNS-59 (resto menor) | — | §3.1, §3.3 |
 | El código de las skills corre en una caja A propia, de solo lectura | PNS-06 (más amplio) | — | §3.2 |
@@ -92,6 +92,7 @@ AI Conversational propagado a los AI Administrators; `ai.safe.choice` de solo le
 «¿incluir secretos?» pierde el alta; reglas nuevas; se borran las 7 skills de fábrica retiradas sin dueño
 (con su caché) y se crean 4; **se reescriben los contextos de fábrica sin dueño de 12 archivos, entre ellos
 `core/system_prompt.xml`**; crons de NUEVO-2. Ningún script de `migrations/` se ejecuta.
+P-21 en `pns_demo` (10/11/2026; último `-u`, 09/11/2026 09:50, E4′): los 12 contextos y las 3 skills que se reescriben, sin ediciones manuales (sin dueño, `write_uid` 1, nada escrito después del último `-u`); las 7 skills retiradas existen y se borrarían; ninguna fila que adoptar ni skills archivadas.
 
 **Funciones nuevas** (§5): facturas de proveedor desde un adjunto y `/bill-draft`; `/sales-board`,
 `top_sales` y `users`; roles de proveedor con alternativa; multicompañía; marca «generado por IA»; pegar
