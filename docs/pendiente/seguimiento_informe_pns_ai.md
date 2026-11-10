@@ -22,6 +22,10 @@
   80 hallazgos del informe. Tercer bloque: hallazgos nuevos (PNS-81 a PNS-100) y compatibilidad con
   Odoo 14 (Python 3.7 y librerías de la imagen).
 
+> **Nota (10/11/2026):** este seguimiento está desfasado desde el staging de E2′ (29/10/2026) y no se
+> actualiza. La base del informe al fabricante es
+> [estado_hallazgos_3879.md](../specs/estado_hallazgos_3879.md).
+
 > **Fase 3 (laboratorio) hecha**, con el parche 1 aplicado para que los módulos se importen:
 > - **3a:** actualización de una copia a 3.1.782 (PNS-81, 87 y 88 e inventario);
 > - **3b-1:** permisos sin IA;

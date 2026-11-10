@@ -4,6 +4,10 @@
 - **Revisión:** segunda pasada (09/11/2026). Completa las lecturas que faltaban en la primera y sustituye
   sus dos supuestos por estados explícitos (CF782 y PSD). Cambios al final, en «Cambios respecto a la
   primera pasada».
+- **Decisiones registradas (10/11/2026):** las de Sergio del 09/11/2026
+  ([hoja de decisiones](../pendiente/decisiones_pendientes_hallazgos_3879.md)). Cambian el estado en §3 de
+  las filas de §2 y §2 bis, los recuentos de §1 y «A confirmar» (bloques «Decidido»). §4, §5 y §6 siguen
+  como en la segunda pasada.
 - **Rama y HEAD:** `14.0-pns-ai-3879`, `be934bc` (copia de trabajo limpia).
 - **Código comprobado:** `pns_base`, `pns_ai_mcp` y `pns_ai_chatboo` de `8d218ea` (validado en el staging
   `pns_demo` el 09/11/2026; ningún commit posterior toca los módulos).
@@ -69,28 +73,30 @@ Un hallazgo puede tener varios. Rutas de código: las de `8d218ea`, salvo cuando
 
 ## 1. Resumen
 
-**Filas: 186.** Recuento por estado (una fila cuenta en cada estado que tiene):
+**Filas: 186.** Recuento por estado (una fila cuenta en cada estado que tiene). Actualizado con las
+decisiones de Sergio del 09/11/2026 (bloques «Decidido» de §2 y §2 bis); antes: AC 17, AI 29, PSD 19 y
+SE 19.
 
 | Estado | Filas |
 |---|---|
 | CS — corregido por Seges | 33 |
 | CF — corregido por el fabricante, verificado en 3.1.879 | 82 |
 | CF782 — corregido por el fabricante en 3.1.782, no revisado en 3.1.879 | 33 |
-| AC — aceptado | 17 |
-| AI — al informe | 29 |
-| PSD — propuesta sin decisión | 19 |
-| SE — sin tratar o sin estado claro | 19 |
+| AC — aceptado | 35 |
+| AI — al informe | 56 |
+| PSD — propuesta sin decisión | 0 |
+| SE — sin tratar o sin estado claro | 1 |
 
 Por gravedad (la de los documentos; si cambia, la última) y estado:
 
 | Gravedad | Filas | CS | CF | CF782 | AC | AI | PSD | SE |
 |---|---|---|---|---|---|---|---|---|
-| Crítica | 12 | 7 | 3 | 5 | 1 | 5 | 0 | 2 (PNS-101 y PNS-102, solo por el recuento documental de marcadores) |
-| Alta | 34 | 8 | 13 | 15 | 1 | 4 | 2 (PNS-18, PNS-26) | 2 (PNS-23, PNS-81) |
-| Media | 36 | 10 | 24 | 3 | 3 | 5 | 1 (PNS-61) | 3 (PNS-28, PNS-33, PNS-99) |
-| Baja | 33 | 4 | 13 | 10 | 4 | 5 | 4 | 1 (PNS-51) |
-| Sin gravedad asignada | 71 | 4 | 29 | 0 | 8 | 10 | 12 | 11 |
-| **Total** | **186** | **33** | **82** | **33** | **17** | **29** | **19** | **19** |
+| Crítica | 12 | 7 | 3 | 5 | 1 | 5 | 0 | 0 |
+| Alta | 34 | 8 | 13 | 15 | 4 | 8 | 0 | 0 |
+| Media | 36 | 10 | 24 | 3 | 6 | 9 | 0 | 0 |
+| Baja | 33 | 4 | 13 | 10 | 8 | 10 | 0 | 0 |
+| Sin gravedad asignada | 71 | 4 | 29 | 0 | 16 | 24 | 0 | 1 (contraseña de `admin` de `pns_demo`: decisión retirada, fuera de alcance) |
+| **Total** | **186** | **33** | **82** | **33** | **35** | **56** | **0** | **1** |
 
 - **Marcadores (§4):** los 25 parches vigentes (10 a 34) suman **142** marcadores fuera de tests, igual que
   la comprobación B.4 del staging de E4′ (Grep repetido en esta pasada: 159 líneas en los tres módulos,
@@ -104,6 +110,11 @@ Por gravedad (la de los documentos; si cambia, la última) y estado:
     propone el informe, sin «Decidido»);
   - **CF782: 5 Críticas (PNS-03, 04, 05, 06 y 53) y 15 Altas** se dan por corregidas por lo comprobado en
     3.1.782; ningún documento las ha vuelto a mirar en el código de 3.1.879 (§2, «A confirmar»).
+- **Tras las decisiones del 09/11/2026:** ningún Crítico ni Alto queda sin estado ni sin decisión. PNS-23
+  y el resto de PNS-81 pasan a AC y AI; PNS-18, a AC (D10) y AI; el resto de PNS-26, a AI. PNS-101 y
+  PNS-102 pierden el SE documental: sus recuentos (23 y 4) se registran en `parches_pns_ai.md` (hoja de
+  decisiones, §4). La revisión de los CF782 queda acotada a las 13 Medias y Bajas («A confirmar»).
+  PNS-83 (Alta) suma AC por el resto de la mesa del PIN (decisión 3.2).
 
 ## 2. SIN TRATAR / SIN ESTADO CLARO
 
@@ -131,6 +142,32 @@ Lo que falta para cerrar cada uno:
 | 18 | Obs. 13 (tests que cambian la clave del administrador) | — | Comunicada el 16/10 (resto menor de PNS-34). Sin ficha ni revisión en comp | inf. 16/10 §6, obs. 13; seg PNS-34 |
 | 19 | Compatibilidad sin número (inf. 08/10 §7.1 a §7.4 y §8.5) | — | Ningún documento les da estado. Por Grep en `8d218ea`: §7.1 ya no aplica (`external_dependencies` sin `httpx` ni `pydantic`, `pns_ai_mcp/__manifest__.py:30-34`); §7.4 corregido (`numbercall` -1 en `data/api_result_cache_cron.xml:13`). §7.2 y §8.5 siguen (comp §9.1: no corre ningún script de `migrations/`; el fabricante lo asume y migra en `init()`). §7.3, en PNS-81 y en seg «Compatibilidad con Odoo 14». Decidir si se dan por cerrados o se citan | inf. 08/10 §7 y §8.5; comp §9.1 |
 
+**Decidido (Sergio, 09/11/2026)** ([hoja de decisiones](../pendiente/decisiones_pendientes_hallazgos_3879.md),
+§2 y §4; `OK` = se acepta la propuesta de la fila). La tabla de arriba es la de antes de decidir; el estado
+nuevo de cada fila está en §3.
+
+| # §2 | Fila de la hoja | Id | Estado nuevo | Lo decidido |
+|---|---|---|---|---|
+| 1 | §4 | PNS-101 | CS; AI | Recuento documental: 23 marcadores, que se registran en `parches_pns_ai.md` |
+| 2 | §4 | PNS-102 | CS; AI | Recuento documental: 4 marcadores, que se registran en `parches_pns_ai.md` |
+| 3 | 2.1 | PNS-99 | AC y AI | Aceptar e informe: no lo agrava ningún parche y solo afecta a planes del AI Administrator |
+| 4 | 2.2 | PNS-81 (resto) | AC y AI | Aceptar en 3.1.879; al informe como «corregido en 3.1.973». Con el camino C, candidato a parche (unas 8 líneas) |
+| 5 | 2.3 | PNS-51 | AC y AI | D28: aceptar y repetir la petición en el informe |
+| 6 | 2.4 | PNS-23 | AC y AI | Aceptar, con una regla en la guía de configuración: solo el AI Administrator importa paquetes de skills, y los revisa antes; informe |
+| 7 | 2.5 | PNS-33 (parte §7) | AC y AI | Aceptar (las claves se generan con el asistente, N4); informe |
+| 8 | 2.6 | PNS-28 (salvedad) | AI | Observación en el informe; P-28 no se hace |
+| 9 | 2.7 | Petición de §5 | AI | Repetir la petición en el informe |
+| 10 | 2.8 | U11 | AI | Informe sin prueba (P-9d no se hace) |
+| 11 | 2.9 | Hoja 26 | AI | Reproducción en el laboratorio (shell y `rollback`, decisión 5) con un usuario que **no** sea AI Administrator, antes del informe. Pendiente de hacer |
+| 12 | 2.10 | Escritura en la operación 27 | AC | Cerrar sin acción: sin efecto y sin causa en el código |
+| 13 | 2.11 | Cancelación de las verificaciones pendientes | AI | Informe (defecto del fabricante; no cumple el criterio del bloque F) |
+| 14 | 2.12 | `log_no_page` en `ai_log` | AI | Es un defecto (escritura fuera de la caja A de solo lectura); al informe junto a PNS-98, sin parche |
+| 15 | 2.13 | Contraseña de `admin` de `pns_demo` | SE (sin cambio) | Retirada por estar fuera del alcance; no se registra |
+| 16 | 2.14 | Obs. 6 | AI | Repetir en el informe |
+| 17 | 2.15 | Obs. 7 | AI | Repetir en el informe |
+| 18 | 2.16 | Obs. 13 | AI | Repetir solo si sigue en la versión que se tome como base |
+| 19 | 2.17 | Compatibilidad sin número | AC | Cerrar: §7.1 ya no aplica y §7.4 está corregido; §7.3 va con PNS-81; §7.2 y §8.5, cerrados (el fabricante migra en `init()`) |
+
 **A confirmar (no cambian el estado de la tabla):**
 
 - **CF782 sin revisar en 3.1.879:** 33 filas (5 Críticas, 15 Altas) se apoyan solo en seg (código y
@@ -150,6 +187,22 @@ Lo que falta para cerrar cada uno:
   PNS-51) siguen con «Decisión: ____».
 - **Envío del informe del 16/10:** el documento sigue con la cabecera «Borrador»; la auditoría tiene
   fichas de PNS-93 a PNS-96 y de sus observaciones, así que el contenido llegó al fabricante (§5, fila 15).
+
+**Decidido (Sergio, 09/11/2026), sobre «A confirmar»** (hoja de decisiones, §1 y filas 3.1 a 3.4):
+
+- **CF782 (3.1):** la comparación con 3.1.973 (§3.2) ya revisó en nuestra copia las 20 Críticas y Altas:
+  19 siguen corregidas y PNS-80 no aplica. Quedan las 13 Medias y Bajas: lectura dirigida, de solo
+  lectura, antes de cerrar el informe. Los estados CF782 no cambian hasta esa lectura.
+- **Lista «Candidatas» (§1):** aprobada como lista única del informe al fabricante. Confirma el AI de
+  PNS-84, M16 y la hoja 21 y cierra la contradicción 7 (§5).
+- **Resto de PNS-83 (3.2):** `close` y `notify_changed` de la mesa del PIN, aceptados (mesa sin uso, N4) y
+  al informe; 3.1.973 ya hace privado `_close`. La fila de PNS-83 de §3 suma AC por este resto (ya tenía
+  AI) y entra en los recuentos de §1.
+- **Pruebas sin registro de ejecución (3.3):** sus hallazgos quedan CF por código; no bloquean el informe.
+- **Decisiones abiertas en `dec` (3.4):** D9, PB-2 y D22 se deciden aparte (no son estados de hallazgo).
+  D28 queda decidida en §2, fila 5.
+- **Envío del informe del 16/10:** sin cambio; la decisión 3.5 se retiró por estar fuera del alcance.
+- Las decisiones 3.6 a 3.9 (contradicciones 4, 6, 8 y 9 de §5) se registran en `dec`; §5 no se cambia.
 
 ## 2 bis. PROPUESTA SIN DECISIÓN
 
@@ -177,6 +230,17 @@ E3′, plan, dec) les da una decisión expresa. Lo que falta en todas es la deci
 | 17 | 35 | Hoja 35 | — | Informe | En «Candidatas» (defectos) | hoja ficha 35 |
 | 18 | 36 | Hoja 36 | — | Informe | En «Candidatas» (defectos) | hoja ficha 36 |
 | 19 | 37 | Hoja 37 | — | Sin acción | Comportamiento correcto; «No van» al informe | hoja ficha 37 |
+
+**Decidido (Sergio, 09/11/2026)** (hoja de decisiones, §1): las 19 fichas, tal como las propone la hoja, y
+la lista «Candidatas» como lista única del informe. Ya no queda ninguna PSD. Estado nuevo en §3:
+
+- **AC y AI:** fichas 5 (PNS-61, como observación), 9 (PNS-18; el AC ya venía de D10), 11 (PNS-88), 14
+  (M5: la propuesta es aceptar y la lista «Candidatas» la lleva al informe), 17 y 25.
+- **AI:** fichas 10 (PNS-26, resto y anexo), 18, 28, 30 (PNS-96; el parche 34 sigue como CS), 31, 32, 35 y
+  36.
+- **AC, sin informe:** fichas 16, 19, 20, 23 y 37 («No van» en «Candidatas»).
+
+Criterio: «sin acción» cuenta como AC (decisión expresa de no actuar); «informe» solo, como AI.
 
 Fichas de la hoja que **no** entran aquí porque tienen decisión expresa o un estado de otra fuente: 1, 2, 3,
 6, 7, 8 (resto 3: «Decidido»; restos 1 y 2: D12 y D10), 15, 21, 22, 24, 26, 29, 33, 34 y 38 («Decidido» o
@@ -209,22 +273,22 @@ Abreviaturas de origen: **inf.** informes de Seges (PNS-01 a 80, 08/10/2026; 81 
 | PNS-15 | inf. | Alta | HTML sin sanear | CF782 | seg tabla (CORREGIDO; solo código) | comp no lo revisa |
 | PNS-16 | inf.; aud. §4 | Alta | Prompt injection y autoconfirmación | CF | comp §2.1 | — |
 | PNS-17 | inf.; aud. §4 | Alta | Cabeceras en redirecciones (SSRF) | CS (p19; lab 28/10 P-17; stg 29/10 sin prueba propia); CF (parcial) | comp §3; reg «Parche 19»; plan §5; prop E2′ decisiones 5 y 6 | Resto «params/data» en hoja 17. No figura en plan §3.2 |
-| PNS-18 | inf.; aud. §6 y §7 | Alta (seg); sin gravedad (comp) | «Sin failover externo» no corta en todos los caminos | AC (D10); PSD (al informe) | comp §6.1, §7; hoja ficha 9; dec D10 (ACEPTADA, 19/10/2026) | §2 bis, fila 2. Gravedad distinta entre documentos (§5) |
+| PNS-18 | inf.; aud. §6 y §7 | Alta (seg); sin gravedad (comp) | «Sin failover externo» no corta en todos los caminos | AC (D10); AI (09/11) | comp §6.1, §7; hoja ficha 9; dec D10 (ACEPTADA, 19/10/2026) | §2 bis, fila 2. Gravedad distinta entre documentos (§5) |
 | PNS-19 | inf.; aud. §4 | Alta | Credenciales alcanzables por relaciones | CS (p18; lab 28/10 P-19; stg 29/10 P-19); CF (parcial) | comp §3; reg «Parche 18»; plan §5; prop E2′ (tres rondas) | Ventana del lienzo mantenida (prop E3′, decisión 5). No figura en plan §3.2 |
 | PNS-20 | inf.; aud. §4 y §6 | Alta | Importación que sobrescribe; «Review» escribe | CS (p21; lab 28/10 P-20; stg 29/10 P-20); CF (resto) | comp §2.1, §6.1; reg «Parche 21»; prop E2′ «Resultado de P-20» | Caché del agente durante «Review»: hoja 18. No figura en plan §3.2 |
 | PNS-21 | inf. | Alta | Exportaciones sin sesión | CF782 | seg tabla (CORREGIDO; 3c) | Resto comunicado como obs. 6 (§3.2) |
 | PNS-22 | inf.; aud. §4 | Media | `is_write` no centralizado | CF | comp §2.1 | Su check no es reproducible |
-| PNS-23 | inf.; aud. §7 | Alta | Skills activas sin revisión | SE | comp §7; inf. 15/10 §7.1 | §2, fila 6 |
+| PNS-23 | inf.; aud. §7 | Alta | Skills activas sin revisión | AC (regla de importación de paquetes en la guía de configuración) y AI (09/11) | comp §7; inf. 15/10 §7.1 | §2, fila 6 |
 | PNS-24 | inf.; aud. §5 | Alta | `module.update` | CF | comp §5.3 | — |
 | PNS-25 | inf. | Alta | Doble ejecución tras failover | CF782 | seg tabla (CORREGIDO; solo código) | comp no lo revisa |
-| PNS-26 (anexo: serialización en `/execute` de la tarjeta) | inf.; aud. §5 y §7; stg E1′ | Alta (anexo Baja) | `SAVEPOINT` del motor y `commit` de la caja B | PSD (al informe) | comp §5.6, §7; hoja ficha 10; diag R6 5.2 | §2 bis, fila 3 |
+| PNS-26 (anexo: serialización en `/execute` de la tarjeta) | inf.; aud. §5 y §7; stg E1′ | Alta (anexo Baja) | `SAVEPOINT` del motor y `commit` de la caja B | AI (09/11) | comp §5.6, §7; hoja ficha 10; diag R6 5.2 | §2 bis, fila 3 |
 | PNS-27 | inf. | Alta | jsPDF/SheetJS con CVE | CF782 | seg tabla (CORREGIDO; solo código) | comp no lo revisa |
-| PNS-28 | inf.; aud. §4 | Media | CORS y `Origin` | CF; SE (salvedad) | comp §2.1, §3 | §2, fila 8 |
+| PNS-28 | inf.; aud. §4 | Media | CORS y `Origin` | CF; AI (salvedad, como observación; sin P-28; 09/11) | comp §2.1, §3 | §2, fila 8 |
 | PNS-29 | inf.; aud. §5 y §6 | Media | Tope de gasto y `month_usage` | CS (p33, resto 3; lab 05/11, script lab 06 y 09/11; stg 09/11); CF (parte); AC (restos 1 y 2: D12, D10); AI | comp §5.5, §6.1; hoja ficha 8 y decisión 1; reg «Parche 33»; plan §3.2 | Alcance real del resto 3: también portal (reg, N33n) |
 | PNS-30 | inf.; aud. §4 | Media | `ai.log` modificable a nombre de otro | CF (`_create_log_entry`); CS (p30, vía M11); AI | comp §2.1 salvedad, §8.7 M11 | El VERIFICADO de comp no cubría los `log_*` |
 | PNS-31 (obs. 4) | inf.; aud. §5 | Media | Parches globales | CF | comp §5.4, §5.7 | D9 sin decidir (§2) |
 | PNS-32 | inf.; aud. §5 | Media | Sincronización de fábrica | CF | comp §5.3 | Dos workers: REQUIERE PRUEBA, sin hacer |
-| PNS-33 | inf.; aud. §4 y §7 | Media | Claves MCP | CF (URL y log); SE (parte §7) | comp §2.1, §7; inf. 15/10 §7.7 | §2, fila 7 |
+| PNS-33 | inf.; aud. §4 y §7 | Media | Claves MCP | CF (URL y log); AC y AI (parte §7; 09/11) | comp §2.1, §7; inf. 15/10 §7.7 | §2, fila 7 |
 | PNS-34 | inf. | Media | Test con commit de una clave | CF782 | seg tabla (CORREGIDO; solo código) | Resto menor comunicado como obs. 13 (§3.2) |
 | PNS-35 | inf.; aud. §4 | Media | Fórmulas en XLSX | CF | comp §2.1 | — |
 | PNS-36 | inf.; aud. §4 y §7 | Media | Nombre de la BD por `.format` | CS (p23 ampliado; lab 28/10; stg 29/10; test E4′.a 05/11) | comp §3 «Cierre»; hoja ficha 6 y decisión 3; reg «Test de PNS-36» | Nombres de campo sin valores: D22 sin decidir |
@@ -242,7 +306,7 @@ Abreviaturas de origen: **inf.** informes de Seges (PNS-01 a 80, 08/10/2026; 81 
 | PNS-48 | inf. | Baja | Menú Settings | CF782 | seg tabla (CORREGIDO) | comp no lo revisa |
 | PNS-49 (obs. 12) | inf.; aud. §5 | Baja | Código muerto | CF | comp §5.5 | — |
 | PNS-50 | inf.; aud. §5 (con PNS-77) | Baja | Tests no cargados | CF (parcial); AC | comp §5.5, §5.6; dec 23/10 | Tests de Seges (E0′ en adelante); no se piden los `unit_tests/`. La columna «Rama Seges» de seg aún dice «previsto en ET» (§5, fila 2) |
-| PNS-51 | inf. | Baja | `platform` en el sandbox | SE | seg PNS-51; inf. 15/10 §7.2; dec D28 | §2, fila 5. Sigue en `validators_base.py:95` |
+| PNS-51 | inf. | Baja | `platform` en el sandbox | AC y AI (D28: aceptar y repetir la petición; 09/11) | seg PNS-51; inf. 15/10 §7.2; dec D28 | §2, fila 5. Sigue en `validators_base.py:95` |
 | PNS-52 | inf. | Baja | `settings_io` | CF782 | seg tabla (CORREGIDO) | comp no lo revisa |
 | PNS-53 | inf. | Crítica | XSS almacenado entre usuarios | CF782 | seg tabla (CORREGIDO; 3b-1) | comp no lo revisa |
 | PNS-54 (anexo: `missing_token`/`bad_token`) | inf.; aud. §4 y §7; stg E1′ | Crítica | Confirmación sin el usuario | CS (p16; lab 23/10; stg 26/10); AC (opción c, D29); AI | comp §3, §7; reg «Parche 16»; prop E1′ «Decisiones de Sergio»; plan §3.2; diag R6 5.3 | Anexo, Baja (añadido por decisión del 26/10) |
@@ -252,7 +316,7 @@ Abreviaturas de origen: **inf.** informes de Seges (PNS-01 a 80, 08/10/2026; 81 
 | PNS-58 | inf. | Alta | `/chatboo/stream` sin CSRF | CF782 | seg tabla (CORREGIDO; 3b-1) | comp no lo revisa |
 | PNS-59 | inf.; aud. §4 | Alta | Imágenes externas | CF | comp §2.1 | — |
 | PNS-60 | inf.; aud. §4 | Alta | HTML del asistente sin sanear | CF (código) | comp §2.1, §3 | P-60 sin hacer |
-| PNS-61 | inf.; aud. §4 | Media | Historial escrito por el navegador | PSD (aceptar; observación) | comp §3; hoja ficha 5 | §2 bis, fila 1 |
+| PNS-61 | inf.; aud. §4 | Media | Historial escrito por el navegador | AC y AI (observación; 09/11) | comp §3; hoja ficha 5 | §2 bis, fila 1 |
 | PNS-62 | inf.; aud. §4 | Media | Adjuntos sin límites | CF | comp §2.1 | — |
 | PNS-63 | inf. | Media | Retención de sesiones | CF782 | seg tabla (CORREGIDO); aud. obs. 5 | comp no lo revisa (sí la obs. 5) |
 | PNS-64 | inf.; aud. §6 | Media | Voces remotas | CF | comp §6 | — |
@@ -272,14 +336,14 @@ Abreviaturas de origen: **inf.** informes de Seges (PNS-01 a 80, 08/10/2026; 81 
 | PNS-78 | inf. | Baja | Etiquetas duplicadas en `ai.agent` | CF782 | seg tabla (CORREGIDO) | comp no lo revisa |
 | PNS-79 | inf. | Baja | `/mcp/message` con `SUPERUSER_ID` | CF782 | seg tabla (CORREGIDO; 3b-1 no concluyente) | comp no lo revisa |
 | PNS-80 | inf. | Alta | `read_progress` | CF782 (ya no aplica) | seg tabla (3c) | comp no lo revisa |
-| PNS-81 (parches 1 a 4) | inf. 15/10; aud. §5 | Alta | Incompatibilidades con Odoo 14 | CF (p1-p4 retirados; paridad de la fase 3); SE (resto) | comp §2.2, §2.4, §5.1; reg «Cambio de base» | §2, fila 4 |
+| PNS-81 (parches 1 a 4) | inf. 15/10; aud. §5 | Alta | Incompatibilidades con Odoo 14 | CF (p1-p4 retirados; paridad de la fase 3); AC y AI (resto, «corregido en 3.1.973»; 09/11) | comp §2.2, §2.4, §5.1; reg «Cambio de base» | §2, fila 4 |
 | PNS-82 (parche 11) | inf. 15/10; aud. §4 | Alta (resto Baja) | Reclamación y borrado de adjuntos ajenos | CS (p11 adaptado; lab 28/10; stg 29/10 P-82); CF (reclamación) | comp §3; reg «Parche 11 adaptado»; prop E2′ decisión 7 | No figura en plan §3.2 |
-| PNS-83 (`collect_pin`) | inf. 15/10; aud. §4 | Alta | Canje de PIN sin límite | CS (p10 adaptado; lab 23/10; stg 26/10); AI | comp §3; reg «Parche 10 adaptado»; plan §3.2 | `close` y `notify_changed`: §2, «A confirmar» |
+| PNS-83 (`collect_pin`) | inf. 15/10; aud. §4 | Alta | Canje de PIN sin límite | CS (p10 adaptado; lab 23/10; stg 26/10); AC (resto: `close` y `notify_changed`, 09/11); AI | comp §3; reg «Parche 10 adaptado»; plan §3.2 | `close` y `notify_changed`: §2, «A confirmar» |
 | PNS-84 (hoja 7) | inf. 15/10; aud. §4 | Media | PIN y clave en tránsito | CS (p10, en parte); AC (hoja, decisión 2); AI | comp §3; hoja ficha 7; «Candidatas» | AI solo por «Candidatas» (§2, «A confirmar») |
 | PNS-85 (parche 9) | inf. 15/10; aud. §4 | Media | Caché de parámetros de skills | CF (p9 retirado) | comp §2.1, §2.2 | — |
 | PNS-86 | inf. 15/10; aud. §4 | Media | Generador OpenAPI | CF | comp §2.1 | — |
 | PNS-87 | inf. 15/10; aud. §5 | Baja | Pérdida de datos de consumo al actualizar | CF | comp §5.2 | `agent_id`: fila U9 |
-| PNS-88 (hoja 11) | inf. 15/10; aud. §5 | Baja | Renombrados de 3.1.518 que faltan | PSD (sin acción; informe) | comp §5.6; hoja ficha 11 | §2 bis, fila 4 |
+| PNS-88 (hoja 11) | inf. 15/10; aud. §5 | Baja | Renombrados de 3.1.518 que faltan | AC (sin acción) y AI (09/11) | comp §5.6; hoja ficha 11 | §2 bis, fila 4 |
 | PNS-89 | inf. 15/10; aud. §4 | Baja | `key_pin/stop` sin CSRF | CF | comp §2.1 | — |
 | PNS-90 (parche 7) | inf. 15/10; aud. §4 | Alta | Caché de `fetch_url` | CF (p7 retirado) | comp §2.1, §2.2 | — |
 | PNS-91 (parche 8) | inf. 15/10; aud. §4 | Media | `ensure_domain_whitelisted` | CF (p8 retirado) | comp §2.1, §2.2 | — |
@@ -287,13 +351,13 @@ Abreviaturas de origen: **inf.** informes de Seges (PNS-01 a 80, 08/10/2026; 81 
 | PNS-93 (parche 5) | inf. 16/10; aud. §5 | Media | `thought_signature` de Gemini 3 | CF (p5 retirado) | comp §2.2, §5.1 | En uso con Gemini en el staging desde E1′ |
 | PNS-94 (parche 6) | inf. 16/10; aud. §5 | Alta | Bloqueo de `chatboo_session` | CF (p6 retirado; P-6 ampliada sin bloqueos, fase 3, 23/10) | comp §5.6 | Resto 4 (serialización al cargar): fila «Carga de la sesión» |
 | PNS-95 | inf. 16/10; aud. §5 | Baja | Formato de importes | CF (tablas y ficheros) | comp §5.5 | Texto del modelo sin probar |
-| PNS-96 (hoja 30; «el chat afirma cambios que no hizo») | inf. 16/10; aud. §6; lab E3′ y p29; stg E4′ | Baja | Calidad con modelos `lite` | CF (enlaces); CS (p34, aviso; lab 06/11; stg 09/11); PSD (al informe) | comp §6; hoja ficha 30 y decisión 9; reg «Parche 34», «E4′.b2 y E4′.b3» | §2 bis, fila 14. V3 y F1-t no concluyentes (no bloquean, stE4 G) |
+| PNS-96 (hoja 30; «el chat afirma cambios que no hizo») | inf. 16/10; aud. §6; lab E3′ y p29; stg E4′ | Baja | Calidad con modelos `lite` | CF (enlaces); CS (p34, aviso; lab 06/11; stg 09/11); AI (09/11) | comp §6; hoja ficha 30 y decisión 9; reg «Parche 34», «E4′.b2 y E4′.b3» | §2 bis, fila 14. V3 y F1-t no concluyentes (no bloquean, stE4 G) |
 | PNS-97 (hoja 3) | seg (nuevo) | Media | `ai.trusted.action` editable | CS (p32; lab 05/11, script lab 06 y 09/11; stg 09/11); AI | comp §2.3, §3; hoja decisión 1; reg «Parche 32»; plan §3.2 | Ampliado: vía del plan, campos y «confused deputy» |
 | PNS-98 (hoja 4) | seg (nuevo) | Baja | Adjuntos huérfanos | AI | comp §2.3, §3; hoja ficha 4; plan §3.2 | Confirmado en la fase 3; seg aún dice «fase posterior» (§5, fila 2) |
-| PNS-99 | seg (nuevo, stg E1′) | Media | `remove_group` sin efecto y diario `applied` | SE | seg PNS-99; diag R6 5.1 | §2, fila 3 |
+| PNS-99 | seg (nuevo, stg E1′) | Media | `remove_group` sin efecto y diario `applied` | AC y AI (09/11) | seg PNS-99; diag R6 5.1 | §2, fila 3 |
 | PNS-100 | seg (nuevo, E2′) | Alta | Efectos fuera de la BD desde la caja A | CS (p22; tests lab 27/10; stg 29/10 sin prueba propia); AI | reg «Parche 22»; prop E2′ tercera ronda, decisión 3; plan §3.2 | Gravedad Alta decidida el 27/10 |
-| PNS-101 | seg (nuevo, E2′) | Crítica | Entornos reales del hilo desde la caja A | CS (p23 ampliado; lab 28/10 P-101 y P-101′; stg 29/10 P-101); AI; SE (recuento) | reg «Parche 23»; prop E2′ «Revisión del parche 18», «Enfoque de raíz»; plan §3.2 | §2, fila 1 |
-| PNS-102 | seg (nuevo, E2′) | Crítica | `user`/`company` con `su` | CS (p24; lab 28/10 P-102; stg 29/10 sin prueba propia); AI; SE (recuento) | reg «Parche 24»; plan §3.2 | §2, fila 2. Claves MCP de LIYBEN: regenerar tras el despliegue (plan §3.1) |
+| PNS-101 | seg (nuevo, E2′) | Crítica | Entornos reales del hilo desde la caja A | CS (p23 ampliado; lab 28/10 P-101 y P-101′; stg 29/10 P-101); AI | reg «Parche 23»; prop E2′ «Revisión del parche 18», «Enfoque de raíz»; plan §3.2 | §2, fila 1 |
+| PNS-102 | seg (nuevo, E2′) | Crítica | `user`/`company` con `su` | CS (p24; lab 28/10 P-102; stg 29/10 sin prueba propia); AI | reg «Parche 24»; plan §3.2 | §2, fila 2. Claves MCP de LIYBEN: regenerar tras el despliegue (plan §3.1) |
 
 ### 3.2 Observaciones comunicadas, petición de §5 y compatibilidad sin número
 
@@ -306,16 +370,16 @@ Abreviaturas de origen: **inf.** informes de Seges (PNS-01 a 80, 08/10/2026; 81 
 | obs. 3 | inf. 15/10 §7.5; aud. §4 | — | `api_key` con `copy=False` | CF | comp §2.1 | — |
 | obs. 4 | inf. 15/10 §7.9; aud. §5 (con PNS-31) | — | Parches globales | CF | comp §5.4 | — |
 | obs. 5 | inf. 16/10 §6; aud. §5 | — | Retención de Chatboo | CF | comp §5.2 | Nota sobre PNS-63 |
-| obs. 6 | inf. 16/10 §6 | — | Descargas del chat fuera de la purga de 24 h | SE | seg PNS-21 | §2, fila 16. Sin ficha en la auditoría |
-| obs. 7 | inf. 16/10 §6 | — | `_fx_payload` devuelve `str(exc)` | SE | seg PNS-71 | §2, fila 17. Sin ficha en la auditoría |
+| obs. 6 | inf. 16/10 §6 | — | Descargas del chat fuera de la purga de 24 h | AI (repetir; 09/11) | seg PNS-21 | §2, fila 16. Sin ficha en la auditoría |
+| obs. 7 | inf. 16/10 §6 | — | `_fx_payload` devuelve `str(exc)` | AI (repetir; 09/11) | seg PNS-71 | §2, fila 17. Sin ficha en la auditoría |
 | obs. 8 | inf. 16/10 §6; aud. §4 | — | `_choose` privado | CF | comp §2.1 | — |
 | obs. 9 | inf. 16/10 §6; aud. §6 | — | Agente sin cadena | CF | comp §6 | Ver PNS-18 |
 | obs. 10 | inf. 16/10 §6; aud. §6 | — | Tipos de cambio al abrir Chatboo | CF (lo que dice la ficha) | comp §6 | La descarga sin control de host es M16 |
 | obs. 11 | inf. 16/10 §6; aud. §6 | — | Skill retirada borrada en cada `-u` | CF | comp §6 | — |
 | obs. 12 | inf. 15/10; aud. §5 (con PNS-49/74) | — | `detect_dangerous_operations` sin uso | CF | comp §5.5 | — |
-| obs. 13 | inf. 16/10 §6 | — | Tests que cambian la clave del administrador | SE | seg PNS-34 | §2, fila 18. Sin ficha en la auditoría |
-| Petición de §5 | inf. 16/10 §5; aud. §6 | — | El prompt que recibe el modelo, en `ai.log` | SE | comp §6, §6.1 | §2, fila 9 |
-| Compatibilidad sin número (§7.1 a §7.4 y §8.5) | inf. 08/10 | — | `external_dependencies`, migraciones `3.1.x`, APIs de 3.8+, cron sin `numbercall` | SE | comp §9.1; seg «Compatibilidad con Odoo 14» | §2, fila 19. Por Grep: §7.1 y §7.4, ya no están en el código |
+| obs. 13 | inf. 16/10 §6 | — | Tests que cambian la clave del administrador | AI (repetir solo si sigue en la versión base; 09/11) | seg PNS-34 | §2, fila 18. Sin ficha en la auditoría |
+| Petición de §5 | inf. 16/10 §5; aud. §6 | — | El prompt que recibe el modelo, en `ai.log` | AI (repetir; 09/11) | comp §6, §6.1 | §2, fila 9 |
+| Compatibilidad sin número (§7.1 a §7.4 y §8.5) | inf. 08/10 | — | `external_dependencies`, migraciones `3.1.x`, APIs de 3.8+, cron sin `numbercall` | AC (cerrada; 09/11) | comp §9.1; seg «Compatibilidad con Odoo 14» | §2, fila 19. Por Grep: §7.1 y §7.4, ya no están en el código |
 
 ### 3.3 Superficie nueva y cambios no anunciados (comp §8)
 
@@ -326,7 +390,7 @@ Abreviaturas de origen: **inf.** informes de Seges (PNS-01 a 80, 08/10/2026; 81 
 | M2 | comp §8.2 | Media | `page_html` lee imágenes en `sudo` | CS (p26; lab 30/10 P-8d; stg 04/11) | reg «Parche 26»; prop E3′ «Propuesta final», 2 | Ídem. Efecto visible aceptado: hoja 33 |
 | M3 | comp §8.2 | — | `page_url`, `page_edit` | CF (dueño); CS (p26, desde el sandbox) | comp §8.2 y nota del 29/10 | — |
 | M4 | comp §8.2 | — | `canvas_public_url` y otros | CF | comp §8.2 | — |
-| M5 (hoja 14) | comp §8.2 | Baja | `cron_maintenance` público | PSD (aceptar) | hoja ficha 14 | §2 bis, fila 5 |
+| M5 (hoja 14) | comp §8.2 | Baja | `cron_maintenance` público | AC y AI (09/11) | hoja ficha 14 | §2 bis, fila 5 |
 | M6 | comp §8.2 | — | `request_cancel`, `mark_seen` | CF | comp §8.2 | — |
 | M7 | comp §8.2 | — | `model_can_archive` | CF | comp §8.2 | — |
 | M8 | comp §8.2 | — | Vaciar la papelera | CF | comp §8.2 | — |
@@ -358,7 +422,7 @@ Abreviaturas de origen: **inf.** informes de Seges (PNS-01 a 80, 08/10/2026; 81 
 |---|---|---|---|---|---|---|
 | U9 | comp §9.2, §9.3 | — (datos) | El `-u` borra `ai_log.agent_id` (nota de versión falsa) | AC (no se conserva, dec 23/10); AI | comp §9.6 P-9b; plan §3.1 y §3.2 | — |
 | U6 | comp §9.2 | — (datos) | Cinco parámetros renombrados, no anunciado | AC (pérdidas de P-9, condición 4) | comp §9.6; verif E1′ | No figura en plan §3.2 |
-| U11 | comp §9.2 | — (datos) | Agente «Decision» huérfano, no anunciado | SE | comp §9.2, §9.6 | §2, fila 10 |
+| U11 | comp §9.2 | — (datos) | Agente «Decision» huérfano, no anunciado | AI (sin P-9d; 09/11) | comp §9.2, §9.6 | §2, fila 10 |
 | U15 | comp §9.2 | — (datos) | Resiembra y tres skills nuevas, no anunciadas | AC (P-9, condición 4) | comp §9.2; verif E1′ | Riesgo de las skills: PNS-23 |
 | U16 | comp §9.2 | — (datos) | Historial de Chatboo reescrito, no anunciado | AC (P-9e; R2 de E1′ conforme) | comp §9.6; verif E1′ | — |
 | Numeración de `pns_base` 1.2.47 | comp §1.4, §9.1 | — | Número que no casa con el contenido | AI (observación) | plan §3.2 | No se pide el commit (dec 23/10) |
@@ -368,36 +432,36 @@ Abreviaturas de origen: **inf.** informes de Seges (PNS-01 a 80, 08/10/2026; 81 
 
 | Id (alias) | Origen | Grav. | Título corto | Estado | Referencia | Notas |
 |---|---|---|---|---|---|---|
-| Hoja 16 | prop E2′ | — | Tokens de portal | PSD (sin acción) | hoja ficha 16 | §2 bis, fila 6 |
-| Hoja 17 | prop E2′ (PNS-17) | Baja | Reenvío de `params` y `data` en redirecciones | PSD (aceptar; informe) | hoja ficha 17 | §2 bis, fila 7 |
-| Hoja 18 | prop E2′ (parche 21) | — | Caché del agente confirmada durante «Review» | PSD (informe) | hoja ficha 18 | §2 bis, fila 8 |
-| Hoja 19 | prop E2′ | — | `onchange_email` y Gravatar | PSD (aceptar) | hoja ficha 19 | §2 bis, fila 9 |
-| Hoja 20 | prop E2′ | — | `bus.presence.update` en cursor propio | PSD (aceptar) | hoja ficha 20 | §2 bis, fila 10 |
+| Hoja 16 | prop E2′ | — | Tokens de portal | AC (sin acción; 09/11) | hoja ficha 16 | §2 bis, fila 6 |
+| Hoja 17 | prop E2′ (PNS-17) | Baja | Reenvío de `params` y `data` en redirecciones | AC y AI (09/11) | hoja ficha 17 | §2 bis, fila 7 |
+| Hoja 18 | prop E2′ (parche 21) | — | Caché del agente confirmada durante «Review» | AI (09/11) | hoja ficha 18 | §2 bis, fila 8 |
+| Hoja 19 | prop E2′ | — | `onchange_email` y Gravatar | AC (09/11) | hoja ficha 19 | §2 bis, fila 9 |
+| Hoja 20 | prop E2′ | — | `bus.presence.update` en cursor propio | AC (09/11) | hoja ficha 20 | §2 bis, fila 10 |
 | Hoja 21 | reg «Parche 18» | Baja (muy baja) | Orden por un campo secreto en la caja A | AC (hoja, decisión 2); AI | hoja ficha 21; «Candidatas» | AI solo por «Candidatas» (§2, «A confirmar») |
 | Hoja 22 (`customer_360._iso`) | reg «Parche 23», tests | — | `ensure_module_result_call` añade `result = …` | AI (hoja, decisión 4) | hoja ficha 22; plan §3.2 | — |
-| Hoja 23 | stE2 G A.7 | — | «Test Connection» escribe en el proveedor | PSD (sin acción) | hoja ficha 23 | §2 bis, fila 11 |
+| Hoja 23 | stE2 G A.7 | — | «Test Connection» escribe en el proveedor | AC (sin acción; 09/11) | hoja ficha 23 | §2 bis, fila 11 |
 | Hoja 24 | stE2 G D.1 | — | Etiqueta MCP del script de E2′ | CS (script de E4′.h, sin parche; lab 06 y 09/11; stg 09/11) | hoja decisión 8; plan, nota del 06/11 | — |
-| Hoja 25 | stE2 G D.3 | — | La autenticación MCP no consulta el estado de la clave | PSD (sin acción; informe) | hoja ficha 25 | §2 bis, fila 12 |
-| Hoja 26 | stE2 G D.0 y D.1 | — | Casilla AI Conversational de Usuarios MCP | AI; SE (reproducción) | hoja ficha 26, decisión 5; plan §3.2 | §2, fila 11 |
+| Hoja 25 | stE2 G D.3 | — | La autenticación MCP no consulta el estado de la clave | AC (sin acción) y AI (09/11) | hoja ficha 25 | §2 bis, fila 12 |
+| Hoja 26 | stE2 G D.0 y D.1 | — | Casilla AI Conversational de Usuarios MCP | AI | hoja ficha 26, decisión 5; plan §3.2 | §2, fila 11. Pendiente antes del informe: reproducción en el laboratorio con un usuario que no sea AI Administrator (decisión 5) |
 | Hoja 27 | lab E3′ R8 | — | Defecto de `keys` en la muestra para Design | AI | hoja ficha 27; plan §3.2 (05/11) | — |
-| Hoja 28 | lab E3′ | — | Nombre de la descarga del lienzo | PSD (informe) | hoja ficha 28 | §2 bis, fila 13 |
+| Hoja 28 | lab E3′ | — | Nombre de la descarga del lienzo | AI (09/11) | hoja ficha 28 | §2 bis, fila 13 |
 | Hoja 29 | lab p29; stE3 G | — | Casilla «Design» en `lite` | AC (hoja, decisión 6) | hoja ficha 29; plan §3.1 y §4 | Laboratorio y staging, hechos; LIYBEN, en §3.1 |
-| Hoja 31 | lab p29; stE3 G | — | Varias llamadas a Design por edición | PSD (informe) | hoja ficha 31 | §2 bis, fila 15 |
-| Hoja 32 | lab p29 6d; stE4 G (sesión 61) | — | El orquestador reinterpreta peticiones | PSD (informe) | hoja ficha 32 | §2 bis, fila 16 |
+| Hoja 31 | lab p29; stE3 G | — | Varias llamadas a Design por edición | AI (09/11) | hoja ficha 31 | §2 bis, fila 15 |
+| Hoja 32 | lab p29 6d; stE4 G (sesión 61) | — | El orquestador reinterpreta peticiones | AI (09/11) | hoja ficha 32 | §2 bis, fila 16 |
 | Hoja 33 | stE3 G D.1 | — | «[object Object]» en la tarjeta de `lite` | AC (hoja, decisión 7) | hoja ficha 33; reg «Parche 26», «Qué se degrada» | Efecto del p26 |
 | Hoja 34 | stE3 G D.0 | — | `pruebas_e3p_lab.py` no resiste un 503 | CS (script de E4′.h; lab 06 y 09/11; stg 09/11) | hoja decisión 8 | — |
-| Hoja 35 | stE3 G D.1 6b | — | `relaxaicode` aunque se pida no consultar | PSD (informe) | hoja ficha 35 | §2 bis, fila 17 |
-| Hoja 36 | stE3 G D.1 5c | — | `ai_log` sin el detalle del error del failover | PSD (informe) | hoja ficha 36 | §2 bis, fila 18 |
-| Hoja 37 | stE3 G D.1 6e | — | El validador rechaza `dir()` | PSD (sin acción) | hoja ficha 37 | §2 bis, fila 19. Comportamiento correcto |
+| Hoja 35 | stE3 G D.1 6b | — | `relaxaicode` aunque se pida no consultar | AI (09/11) | hoja ficha 35 | §2 bis, fila 17 |
+| Hoja 36 | stE3 G D.1 5c | — | `ai_log` sin el detalle del error del failover | AI (09/11) | hoja ficha 36 | §2 bis, fila 18 |
+| Hoja 37 | stE3 G D.1 6e | — | El validador rechaza `dir()` | AC (sin acción; 09/11) | hoja ficha 37 | §2 bis, fila 19. Comportamiento correcto |
 | Hoja 38 | plan E4′ | — | `iap.account.account_token` legible | AC (decisión del 27/10; p18 en la caja A) | hoja ficha 38; prop E2′ segunda ronda, decisión 5 | ACL del core |
 | Botón Canvas sin aviso (y sin tooltip en el staging) | lab E4′.b2-b3 (06/11); stE4 G | — | El error del botón Canvas no se ve en pantalla | AI | reg «Para el informe»; plan §3.2 (06 y 09/11) | — |
 | Nota «incomplete response» invisible | lab E4′.b2-b3 | — | La nota del fabricante no se ve en la burbuja | AI | reg «Para el informe»; plan §3.2 | — |
 | Copiar y XLSX con tabla sin prosa | lab E4′.b2-b3 | — | Observación de exportación | AI | reg «Para el informe»; plan §3.2 | — |
 | Carga de la sesión sin reintento (alias: resto 4 de PNS-94) | stE4 G (sesión 59) | — | Fallo de serialización al cargar la sesión tras un job | AI | stE4 G «Observaciones»; plan §3.2 (09/11); comp §5.6 punto 4 | — |
 | Exportación del staging | stE4 G | — | Prosa y aviso antes de la tabla; solo `Name`; «Word» como `.doc` HTML | AI | stE4 G; plan §3.2 (09/11) | — |
-| Escritura en la operación 27 | stg E1′ | — | Escritura sin causa ni efecto | SE | verif E1′; diag R6 §6 y §7 | §2, fila 12 |
-| Cancelación de todas las verificaciones pendientes | lab, validación de los scripts de E1′ | — | Un rechazo de escritura cancela todas las del usuario | SE | seg «Observaciones sin ficha» | §2, fila 13 |
-| `log_no_page` escribe en `ai_log` desde la caja A | lab E2′ (P-19j); hoja | — | Filas en cursor propio que el rollback no deshace | SE | lab_e2 «Resultado (28/10/2026)»; hoja, nota de procedimiento | §2, fila 14 |
+| Escritura en la operación 27 | stg E1′ | — | Escritura sin causa ni efecto | AC (cerrada sin acción; 09/11) | verif E1′; diag R6 §6 y §7 | §2, fila 12 |
+| Cancelación de todas las verificaciones pendientes | lab, validación de los scripts de E1′ | — | Un rechazo de escritura cancela todas las del usuario | AI (09/11) | seg «Observaciones sin ficha» | §2, fila 13 |
+| `log_no_page` escribe en `ai_log` desde la caja A | lab E2′ (P-19j); hoja | — | Filas en cursor propio que el rollback no deshace | AI (defecto, junto a PNS-98; 09/11) | lab_e2 «Resultado (28/10/2026)»; hoja, nota de procedimiento | §2, fila 14 |
 | Valores hostiles de portal en la página | lab p29 (apartado 3) | — | La regla de `account` no protege la ciudad ni la calle | CS (p27 a y p29: escape; lab 03/11; stg 04/11, 5c) | lab_p29 «Observaciones»; e3_hallazgo_p8ea §3.2 | Regla del core |
 | Contraseña de `admin` en `pns_demo` | stE4 G | — | 5 caracteres en un staging accesible | SE | stE4 G; plan §4 | §2, fila 15. Entorno, no código |
 

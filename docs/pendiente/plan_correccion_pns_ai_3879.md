@@ -718,6 +718,27 @@ validaciones de arriba se concretan así en el staging:
      `<p>`); PDF, `.doc` y XLSX solo con la columna `Name` (copiar lleva `id` y `name`); la exportación
      «Word» es un `.doc` HTML, no `.docx`.
 
+   **Lista única (decisión de Sergio del 09/11/2026):** la lista «Candidatas al informe al fabricante» de
+   la hoja de E4′ ([e4_hoja_3879.md](e4_hoja_3879.md)) es la lista única del informe; lo anterior de este
+   punto queda incluido en ella. Se añaden las filas de
+   [decisiones_pendientes_hallazgos_3879.md](decisiones_pendientes_hallazgos_3879.md) que van al informe:
+   - PNS-99 (2.1);
+   - el resto de PNS-81, como «corregido en 3.1.973» (2.2);
+   - PNS-51, repetir la petición (2.3);
+   - PNS-23, «No se hará» aceptado con regla de configuración (2.4);
+   - el resto de PNS-33 (2.5);
+   - la salvedad de PNS-28, como observación (2.6);
+   - el prompt en `ai.log`, repetir (2.7);
+   - U11, sin prueba (2.8);
+   - la casilla AI Conversational, tras la reproducción con un usuario no AI Administrator (2.9);
+   - la cancelación de las verificaciones pendientes (2.11);
+   - `log_no_page` en `ai_log`, junto a PNS-98 (2.12);
+   - obs. 6 y obs. 7 (2.14 y 2.15);
+   - obs. 13, solo si sigue en la base (2.16);
+   - el resto de PNS-83 (3.2);
+   - F4 y HTML crudo, una sola vez con `extractProseBlocks` (3.7);
+   - PNS-96, aclarando que el «Resuelto» cubre solo los enlaces (3.9).
+
    Sin rutas locales, kit, laboratorio, clientes ni personas.
 3. **Limpieza:** staging `pns_demo`, `lab_pns_ai` / `lab_pns_ai_14` y `_fabricante/`.
 

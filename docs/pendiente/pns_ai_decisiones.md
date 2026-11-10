@@ -1183,6 +1183,10 @@ Decisión: ____ / Fecha: ____
 - **Lo que la motivaba:** §7.3: `zoneinfo` corregido (`context_builder.py` con alternativa `dateutil`); PNS-51 SIN CAMBIOS.
 - **Nuevo alcance:** solo queda pedir que se quite `platform` del sandbox.
 
+**Decidido (Sergio, 09/11/2026):** aceptarlo y repetir la petición de quitar `platform` en el informe al
+fabricante (PNS-51; [decisiones_pendientes_hallazgos_3879.md](decisiones_pendientes_hallazgos_3879.md),
+fila 2.3).
+
 ### D32 — ¿Se pide actualizar jsPDF y SheetJS?
 
 **Contexto:** se cargan en todo el backend versiones con vulnerabilidades conocidas; `pns_ai_mcp`
@@ -1964,3 +1968,24 @@ llegara, `SandboxFormatter` (un `string.Formatter` normal) lo formatearía **per
 nombres prohibidos. **El formateador con escape (resolver los campos por `guarded_getattr` conservando el
 autoescape de `Markup.format`) se reabre solo si aparece un uso legítimo de `Markup` como receptor.**
 Fecha: 28/10/2026.
+
+## 12. Estado de los hallazgos sobre 3.1.879: decisiones del 09/11/2026
+
+Origen: [decisiones_pendientes_hallazgos_3879.md](decisiones_pendientes_hallazgos_3879.md), §3. Estado en
+[estado_hallazgos_3879.md](../specs/estado_hallazgos_3879.md). Decidido por Sergio el 09/11/2026:
+
+- **3.1:** las 13 CF782 Medias y Bajas tienen una lectura dirigida de solo lectura antes de cerrar el
+  informe. Las 20 Críticas y Altas ya están revisadas en la comparación con 3.1.973 (§3.2): 19 corregidas
+  y PNS-80 no aplica.
+- **3.2:** el resto de PNS-83 (`close` y `notify_changed`) se acepta, porque la mesa no se usa (N4), y va
+  al informe.
+- **3.3:** P-60, P-40, PNS-32 con dos workers, PNS-95/46 y PB-2 con `web_*` quedan como CF por código y
+  no bloquean el informe.
+- **3.4:** D9, PB-2 y D22 se deciden aparte. D28 se decidió en su ficha.
+- **3.6:** la gravedad de PNS-18 es Alta.
+- **3.7:** F4 y «HTML crudo en PDF/DOCX» son el mismo defecto y se comunican una vez, localizado en
+  `extractProseBlocks`.
+- **3.8:** la numeración de `pns_base` no se comunica, porque queda explicada con 3.1.973 (etiqueta
+  `owl1`).
+- **3.9:** en el informe se aclara que el «Resuelto» de PNS-96 cubre solo los enlaces.
+- **Retiradas:** 2.13 y 3.5, por estar fuera del alcance.

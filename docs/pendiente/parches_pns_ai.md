@@ -1224,6 +1224,13 @@ necesitan (contenedor nuevo cada vez).
   sin tests: 36 líneas (11: 2; 17: 5; 18: 7; 19: 3; 20: 4; 21: 6; 22: 1; 23: 8), tras la revisión del
   27/10/2026 (antes, 26). En la librería minificada de
   Chart.js el marcador va como `/* … */` en la cabecera.
+- **Marcadores, recuento actualizado (09/11/2026):** el anterior es previo al parche 23 ampliado y no
+  incluye el 24 (28/10/2026). Fuera de tests, el parche 23 tiene 23 marcadores y el parche 24, 4, como en
+  [staging_e2_3879.md](staging_e2_3879.md), G, B.4, y en
+  [estado_hallazgos_3879.md](../specs/estado_hallazgos_3879.md), §4.
+  - Parche 23: `context_builder.py` 11, `validators.py` 5, `validators_base.py` 3,
+    `tools_relaxaicode.py` 2, `relaxaicode_format_guard.py` 1 y `utils/skill_runtime.py` 1.
+  - Parche 24: los 4 en `context_builder.py`.
 - **Pruebas manuales del laboratorio** (preparadas, las ejecuta Sergio): [lab_e2_3879.md](lab_e2_3879.md).
 
 ### Comprobaciones previas a implementar (27/10/2026)
