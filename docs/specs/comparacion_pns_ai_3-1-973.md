@@ -67,7 +67,7 @@ Detalle de las Críticas y Altas en la tabla siguiente; del resto, en §3.6.
 
 | Id | Grav. (propuesta) | Afecta a | En una línea |
 |---|---|---|---|
-| NUEVO-1 | Alta | 3.1.973 sin el parche 18 | La guarda de columnas secretas no cubre valores ya en la caché del hilo (REQUIERE PRUEBA) |
+| NUEVO-1 | Alta | 3.1.973 sin el parche 18 | La guarda de columnas secretas no cubre valores ya en la caché del hilo (mecanismo confirmado en ejecución, P-1; por lectura, no se alcanza en los caminos revisados de un turno real) |
 | NUEVO-2 | Baja | `-u` de 3.1.879 a 3.1.973 | Dos crons `noupdate` quedan llamando a un método que ya no existe |
 | NUEVO-3 | Alta (AI Administrator) | Copia de trabajo; corregido en 3.1.973 | Un AI Administrator sin Ajustes fija la clave MCP de un administrador de Ajustes |
 | NUEVO-4 | Alta (cualquier interno) | Copia de trabajo (`pns_base`); corregido en 1.2.69 | El asistente de exportación borra en `sudo` cualquier adjunto; basta crearlo: lo borra la limpieza de transitorios, como superusuario |
@@ -264,12 +264,12 @@ la corrección difiere.
 
 | Id | Grav. | Estado (inventario) | Veredicto en 3.1.973 | 3.1.973 (archivo:línea) | Seges frente a fabricante |
 |---|---|---|---|---|---|
-| PNS-01 | Crítica | CS (p12); CF (cúspide) | **PARCIAL** | Cúspide igual (`models/ai_system_action.py:710-718`; `utils/privilege_cusp.py` idéntico). **Nuevo:** el plan corre como quien lo pidió (`models/safe_operation.py:1435-1440`) y el alta de grupo se escribe sin `su` con ese usuario (`ai_system_action.py:738-742`, `user.with_user(self.env.uid)`); en Odoo 14 escribir `groups_id` exige `base.group_erp_manager` (`odoo/addons/base/security/ir.model.access.csv:71`). Por CRUD, `res.groups` igual (`:54`; `safe_plan_execute.py:157-184`) | **Otro criterio, más estrecho:** el fabricante exige al solicitante el permiso de Odoo («Permisos de acceso»); Seges exige Ajustes a quien ejecuta, a quien propone y a quien confirma (`privilege_cusp.py:105-164` (copia)). REQUIERE PRUEBA |
+| PNS-01 | Crítica | CS (p12); CF (cúspide) | **PARCIAL** | Cúspide igual (`models/ai_system_action.py:710-718`; `utils/privilege_cusp.py` idéntico). **Nuevo:** el plan corre como quien lo pidió (`models/safe_operation.py:1435-1440`) y el alta de grupo se escribe sin `su` con ese usuario (`ai_system_action.py:738-742`, `user.with_user(self.env.uid)`); en Odoo 14 escribir `groups_id` exige `base.group_erp_manager` (`odoo/addons/base/security/ir.model.access.csv:71`). Por CRUD, `res.groups` igual (`:54`; `safe_plan_execute.py:157-184`) | **Otro criterio, más estrecho:** el fabricante exige al solicitante el permiso de Odoo («Permisos de acceso»); Seges exige Ajustes a quien ejecuta, a quien propone y a quien confirma (`privilege_cusp.py:105-164` (copia)). Medido en P-5 (§9): sin «Permisos de acceso» el plan falla con el error de escritura en `res.users` y no da el grupo; con él, lo da; corre con el uid del solicitante, sin `su` |
 | PNS-02 | Crítica | CS (p12); CF (cúspide) | **PARCIAL** | Quitar grupo: mismo cambio (`ai_system_action.py:768-772`) | Igual que PNS-01. El test del fabricante `test_paap_i7_…` (`tests/test_system_action.py:543-547`) sigue esperando que un AI Administrator sin Ajustes proponga un grupo normal: con el parche 12 sigue fallando por diseño |
 | PNS-07 | Crítica | CS (p15); CF (privados); AI | **PARCIAL** | `fulfill_client_export` pasa a `_fulfill_client_export` (`pns_ai_chatboo/models/chatboo_session.py:546`); `page_url`, `page_html`, `page_edit`, `paint_canvas` (`:888-1066`), los seis `log_*` y `chat_completion` (`models/ai_execution_engine.py:425-872`), `author_param_*` y `rewrite_code_for_params` (`models/ai_skill_authoring.py:215-341`) y `collect` (`models/key_pin_desk.py:195`), privados; `test_connection`, `get_content` y `get_for_agent`, en la lista (`controllers/validators_base.py:254-256`). **Siguen públicos y fuera de la lista** 9 de los 28 del parche 15: `mark_seen` (`chatboo_async_request.py:1535`), `sandbox_helpers` (`chatboo_session.py:831`), `action_suggest_detection` (`models/external_server.py:880`), `action_author_params`, `action_author_help`, `action_adapt_code` (`wizard/skill_capture_wizard.py:636-688`), `action_generate_openapi`, `action_generate`, `action_log_generation_usage` (`wizard/openapi_spec_generate_wizard.py:178-302`) | **Más estrecha** (19 de 28 cerrados). Parte de los 9 los frena la puerta de catálogos (modelos cerrados enteros, `validators_base.py:189-206`): detalle en la segunda pasada |
 | PNS-54 | Crítica | CS (p16); AC (D29); AI | **SIN CAMBIO** | `action_confirm_and_execute` sin `check_identity` (`models/safe_operation.py:1796-1835`); `card_payload` genera token a quien puede leer la operación (`:2034-2063`). Nuevo `held` en `pending_card_payloads` (`:2065-2087`): no rota el token de las tarjetas que la pantalla ya pinta. En el cliente, la tarjeta reintenta sola una vez tras un rechazo `too_soon` / `bad_token` / `missing_token` (`chatboo_component_v2.js`, `_retryRefusedCard`); la espera de 5 s sigue en servidor | — |
 | M10 | Crítica | CS (p13 con p12); AI | **CORREGIDO** | `create` solo en `su` (`models/safe_operation.py:545-551`, mismo texto que el parche 13); `_cleanup_stuck_state` privado (`:1030-1031`); el plan corre como el `user_id` de la operación (`:1435-1440`) | Mismo criterio que el parche 13. La parte del parche 12 (el AI Administrator se da Ajustes) queda como en PNS-01 |
-| PNS-101 | Crítica | CS (p23 ampliado); AI; SE (recuento) | **CORREGIDO** (REQUIERE PRUEBA) | `GuardedSandboxEnv` con lista blanca (`user`, `company`, `companies`, `context`, `lang`, `uid`, `ref`, `with_context`, `with_company`; `controllers/context_builder.py:71-157`); cursores, conexiones, `Environment`, `Environments`, `Cache` y `Registry` rechazados por clase, se llegue por donde se llegue (`:159-199, 247-261`); toda lectura de atributo reescrita en el AST a `__pns_sandbox_attr__` (`:350-381`); `str.format` / `format_map` con formateador propio (`:290-347`). Relaxaicode y skills compilan igual (`tools_relaxaicode.py:190`; `utils/skill_runtime.py:258`) | **Otro criterio, más amplio:** lista blanca y bloqueo por clase del objeto, frente a la lista de nombres de estado del ORM y el formateador de Seges. Hay que pasar contra 3.1.973 los tests de Seges del parche 23 (§4.1) |
+| PNS-101 | Crítica | CS (p23 ampliado); AI; SE (recuento) | **CORREGIDO** (P-6, §9) | `GuardedSandboxEnv` con lista blanca (`user`, `company`, `companies`, `context`, `lang`, `uid`, `ref`, `with_context`, `with_company`; `controllers/context_builder.py:71-157`); cursores, conexiones, `Environment`, `Environments`, `Cache` y `Registry` rechazados por clase, se llegue por donde se llegue (`:159-199, 247-261`); toda lectura de atributo reescrita en el AST a `__pns_sandbox_attr__` (`:350-381`); `str.format` / `format_map` con formateador propio (`:290-347`). Relaxaicode y skills compilan igual (`tools_relaxaicode.py:190`; `utils/skill_runtime.py:258`) | **Otro criterio, más amplio:** lista blanca y bloqueo por clase del objeto, frente a la lista de nombres de estado del ORM y el formateador de Seges. Tests de Seges del parche 23 pasados contra 3.1.973 (P-6, §9): los negativos se rechazan, sin el secreto ni nombres internos (fallan solo por el texto del error); fallan `test_allowed_attrs` y `test_engine_attrs_on_wrapper` (criterio del fabricante más restrictivo) y `test_type_itemgetter_class` (`itemgetter` nativo); restos sin vía de ataque conocida |
 | PNS-102 | Crítica | CS (p24); AI; SE (recuento) | **SIN CAMBIO** | `env.user`, `env.company` y `env.companies` del sandbox salen del ORM (`context_builder.py:95-97, 138-139`) y los globales `user` / `company` son `env.user` / `env.company` (`:659-660, 765-766`): en Odoo 14 `env.user` es `su` (`odoo/api.py:544-548`). **Alcance:** en la caja A de 3.1.973 solo `user`, y lo que cuelga de él, sigue como superusuario; `company` y `companies` no, porque la caja A fija `allowed_company_ids` (`utils/one_company.py:66-79`; `controllers/controller_helpers.py:188, 211-217`) y entonces Odoo los saca del entorno sin `su` (`odoo/api.py:571-577, 601-607`). Excepción: si el usuario no tiene ninguna compañía activa (y el contexto de origen no trae `allowed_company_ids`), `company` vuelve a ser `user.company_id` (y `companies`, `user.company_ids`), como superusuario (`odoo/api.py:578, 618`). **Agravante en 3.1.973:** la protección nueva de columnas secretas no actúa en lecturas `su` (`models/sandbox_secret_read.py:65-66`), así que por el `user` en `su` y sus relaciones no se aplica | — |
 | PNS-17 | Alta | CS (p19); CF (parcial) | **SIN CAMBIO** (el resto principal) | Al cambiar de host solo se quitan las cabeceras de `_AUTH_HEADER_NAMES` (`utils/fetch_url_safe.py:122-134`); el cliente MCP sigue las redirecciones de `requests` (`utils/mcp_client.py:103-108`). **Mejora:** comprobación del par que contesta, contra el DNS *rebinding* (`fetch_url_safe.py:47-68, 176-179`; también `utils/remote_image.py:44-46`) | — |
 | PNS-18 | Alta | AC (D10); PSD | **SIN CAMBIO** | «Sin failover externo» se aplica después de roles y topes, y con la red de «todos los proveedores activos» si la cadena no cubre el rol (`models/ai_execution_engine.py:256-287`). **Nuevo:** si nadie tiene el rol, se pide su alternativa (Parser → Conversación), que amplía los candidatos fuera de la cadena (`:271-286`) | — |
@@ -364,7 +364,7 @@ podría alcanzar exigen AI Administrator (`ensure_ai_admin`, p. ej.
 | PNS-29 | CS (p33); CF; AC; AI | **SIN CAMBIO** | `month_usage` público (`models/ai_provider.py:1096`), usado por `spend_cap_reached` (`:1132`); el asistente da las cifras sin comprobar la ACL (`wizard/ai_provider_usage_wizard.py:37`). Restos 1 y 2 (aceptados): sin cambio aparente |
 | PNS-30 | CF; CS (p30); AI | **CORREGIDO** | Los `log_*` pasan a privados (`models/ai_execution_engine.py:425-781`). Otro criterio que el parche 30: cierra el RPC por nombre, no comprueba el `user_id` (sus llamadores pasan `user_id or self.env.user.id`, `:445, 490, 606, 662, 753`) |
 | PNS-33 (parte §7) | CF; SE | **SIN CAMBIO** | `set_mcp_api_key` sigue aceptando una clave elegida o un hash ya calculado (`models/mcp_user.py:456-470`). Nuevo: no deja fijar la clave de un administrador de Ajustes a quien no lo es (`:740-766`; NUEVO-3) |
-| PNS-36 | CS (p23 ampliado) | **CORREGIDO** (REQUIERE PRUEBA) | Formateador propio de `str.format` y bloqueo de cursores por clase (`controllers/context_builder.py:159-199, 290-347`); el nombre de la BD no se publica (`:671-672`). Otro criterio que el parche 23; hay que pasar el test de Seges con `{0.cr.dbname}` |
+| PNS-36 | CS (p23 ampliado) | **CORREGIDO** (P-6, §9) | Formateador propio de `str.format` y bloqueo de cursores por clase (`controllers/context_builder.py:159-199, 290-347`); el nombre de la BD no se publica (`:671-672`). Otro criterio que el parche 23; el test de Seges con `{0.cr.dbname}` (`test_pns36_cr_dbname`) pasa contra 3.1.973 (P-6, §9) |
 | PNS-37 | CS (p17); CF | **SIN CAMBIO** | `ai_change_journal.py` idéntico (sin `create`/`write` propios); el paso `unlink` archiva con permiso de escritura (`controllers/safe_plan_execute.py:221-226`). Ahora con los permisos del solicitante, no de quien confirma |
 | PNS-61 | PSD | **SIN CAMBIO** | Solo cambian comentarios en `get_model_history` y en `/chatboo/sessions/save` (`controllers/chatboo.py:431`) |
 | PNS-84 | CS (p10, parte); AC; AI | **PARCIAL** (mejora) | `_touch`, `_close` y `_supply`, privados (`models/key_pin_desk.py:91, 127, 245`). Siguen el PIN y la clave en `ai.key.pin.ask`, que el AI Administrator lee (`security/ir.model.access.csv:85`), y `_touch` sigue dando los PIN pendientes a la mesa (`key_pin_desk.py:111-124`) |
@@ -479,9 +479,9 @@ modelos de credenciales (`:189-206`). Un registro al que se llega por una relaci
 |---|---|---|---|
 | `mark_seen` | `chatboo.async.request` | No | Alcanzable sobre los jobs propios (regla de dueño); escribe en cursor propio |
 | `sandbox_helpers` | `chatboo.session` | No | Alcanzable; devuelve los mismos helpers del lienzo que el sandbox ya recibe |
-| `action_suggest_detection` | `ai.api.server` | Sí en `env[...]`; **no** por relación (`ai.api.server.key.server_id`, `models/api_server_key.py:36`) | Alcanzable en turnos de un AI Administrator (`ensure_ai_admin`, `external_server.py:882`): llamada al proveedor y escritura |
+| `action_suggest_detection` | `ai.api.server` | Sí en `env[...]`; **no** por relación (`ai.api.server.key.server_id`, `models/api_server_key.py:36`) | Alcanzable en turnos de un AI Administrator (`ensure_ai_admin`, `external_server.py:882`): llamada al proveedor y escritura. Medido en P-8 (§9): por relación, el AI Administrator pasa `ensure_ai_admin` y llega a la llamada al LLM; el interno se para en `ensure_ai_admin`; por `env[...]` lo para la puerta |
 | `action_author_params`, `action_author_help`, `action_adapt_code` | `ai.skill.capture.wizard` (Chatboo lo hereda) | Sí (modelo de credenciales) | Frenados; transitorio, sin relación localizada que lleve a él |
-| `action_generate_openapi`, `action_generate`, `action_log_generation_usage` | `ai.openapi.spec.generate.wizard` | No | Transitorio: solo filas propias ya creadas por la interfaz (el AST no deja crearlas). Alcanzables sobre esas filas (REQUIERE PRUEBA) |
+| `action_generate_openapi`, `action_generate`, `action_log_generation_usage` | `ai.openapi.spec.generate.wizard` | No | Transitorio: solo filas ya creadas por la interfaz (el AST no deja crearlas). Medido en P-8 (§9): un AI Administrator llega sobre sus filas y sobre las de otro AI Administrator (Odoo 14 no limita los transitorios por `create_uid`; ACL solo de `group_ai_admin`): `action_generate_openapi` llega al LLM, `action_generate` a `requests` y `action_log_generation_usage` al intento de escritura en `ai_log`; al interno lo para la ACL del modelo |
 
 ## 4. Parches de Seges 10 a 34
 
@@ -611,6 +611,10 @@ Seges sin traer media versión.
   fallando por diseño.
 - Efecto en el parche 32: el caso del «confused deputy» (el plan corría con los permisos de quien confirma)
   ya no se da en 3.1.973; su comprobación de proponente y confirmador sigue siendo válida.
+- **Confirmado en ejecución (P-5, §9):** el plan corre con el uid del solicitante, sin `su`; sin «Permisos de
+  acceso» falla con el error de escritura en `res.users` y no da el grupo; con él, lo da. Para confirmar el
+  plan de otro, quien confirma tiene que ser AI Administrator (`_can_resolve`, `safe_operation.py:343-350`);
+  en P-5, Ajustes + AI Administrator.
 
 ### 6.4 `ai.trusted.action` y `_require_settings` frente al parche 32 y la decisión 10
 
@@ -660,9 +664,9 @@ tests del fabricante (18 F con el parche 12) hay que medirla de nuevo.
 |---|---|---|
 | 12 | Grupos del usuario (Ajustes) | No: los grupos no dependen de la compañía |
 | 16 | `user_id` de la operación | No |
-| 18 | Campos por modelo, en el cursor de la caja A | No por lectura; en 3.1.973 la caja A lleva `allowed_company_ids` (`controller_helpers.py:187-188`): las lecturas de identificación siguen la regla multicompañía del modelo |
+| 18 | Campos por modelo, en el cursor de la caja A | No por lectura; en 3.1.973 la caja A lleva `allowed_company_ids` (`controller_helpers.py:187-188`): las lecturas de identificación siguen la regla multicompañía del modelo. Medido en P-12 (§9): la caja A lee solo en las compañías marcadas en la pantalla (sin pantalla, la de por defecto; una ajena se ignora) |
 | 25 | Dueño de la sesión | No |
-| 26 | Lee las imágenes sin `su` | Con 3.1.973, las imágenes de registros de compañías no marcadas en la pantalla dejan de verse (regla multicompañía); en la copia se ven las de todas las compañías del usuario. REQUIERE PRUEBA |
+| 26 | Lee las imágenes sin `su` | Con 3.1.973, las imágenes de registros de compañías no marcadas en la pantalla dejan de verse (regla multicompañía); en la copia se ven las de todas las compañías del usuario. Medido en P-12 (§9): 3.1.973 tal cual muestra las de A, B y C (C no es del usuario); con el parche 26 simulado y pantalla A, solo A; con A y B, A y B |
 | 28 | Dueño y lectores internos | No |
 | 32 | Ajustes | No |
 | 33 | ACL del asistente | No; `ai.provider` no tiene compañía |
@@ -772,7 +776,7 @@ En orden aproximado de la carga de Odoo 14 (`odoo/modules/loading.py`):
 
 ### 7.4 Resumen: qué queda abierto en cada lado
 
-- Corregido por el fabricante y retirable: parches 10, 13, 14, 23 (REQUIERE PRUEBA), 30 y 31.
+- Corregido por el fabricante y retirable: parches 10, 13, 14, 23 (P-6, §9: negativos rechazados; restos sin vía de ataque conocida), 30 y 31.
 - Abierto en 3.1.973 sin parche de Seges: PNS-54, PNS-102, PNS-82 (`unlink`), PNS-17 (cabeceras), PNS-97,
   PNS-100 (21 nombres), PNS-07 (9 nombres), M2, F1 (escape y descargas), PNS-29 resto 3, NUEVO-1, NUEVO-2,
   NUEVO-5.
@@ -970,6 +974,12 @@ del módulo. En la salida solo se registró sí/no (nunca claves ni secretos).
   - `test_seges_identity_su.py`: la predicción decía «no se importa», pero se ejecutan cuatro de cinco.
     `test_wrapper_user_not_su` y `test_wrapper_company_not_su` fallan (`user` y `company` llevan `su`):
     **PNS-102 sigue abierto**. `test_positive_reads_own_user_company` pasa con el usuario confirmado.
+    Aclaración (10/11/2026, tras P-12): `test_wrapper_company_not_su` construye `GuardedSandboxEnv` sobre el
+    entorno del test, sin `allowed_company_ids` (`test_seges_identity_su.py:48-51`), y no pasa por la caja A:
+    sin esa clave, Odoo 14 da `user.company_id`, que viene de `env.user` en `su` (`odoo/api.py:578`). En la caja
+    A real, `one_company_context` fija `allowed_company_ids` (`controllers/controller_helpers.py:186`; medido en
+    P-12) y `company` sale sin `su` (`odoo/api.py:577`), como dice §3.1. El dato que vale es
+    `test_wrapper_user_not_su`: `env.user` siempre en `su` (`odoo/api.py:548`).
 - **C2** (`test_c2_no_access_field_via_user`, usuario interno confirmado): la lectura de `totp_secret` del
   administrador a través de `user` se hace sin error (la respuesta llega a `'leido'`). Confirma C2 en
   3.1.973. El test no devuelve el valor.
@@ -1031,3 +1041,84 @@ del módulo. En la salida solo se registró sí/no (nunca claves ni secretos).
   - La caché `ormcache` de `ir.config_parameter.get_param`, que es otra caché.
   - Otros canales (voz, Secretary) y columnas secretas distintas de la clave del proveedor leídas en `sudo`
     durante un turno.
+
+**Resultado de P-5, P-8 y P-12 (10/11/2026).** Laboratorio `lab_pns_ai_973` (el de P-18), módulo de tests
+`seges_pruebas_973` (`odoo-dev 14 tests`, BD de tests nueva que el kit borra). Caja A siempre la real
+(`tool_relaxaicode` con el stub de P-6, cursor propio `READ ONLY`), con usuarios, compañías, servidores,
+claves y lista blanca como datos XML del módulo (solo existen en la BD de tests). Para el plan (P-5 y la
+escritura de P-12) y las imágenes de P-12, `_test_cursor_view` del fabricante (`pns_ai_mcp/tests/_helpers.py:46-77`,
+como en `test_one_company_live.py:72-91`): lo que pide `registry.cursor()` corre en la transacción del test.
+Sin LLM ni red: las llamadas al LLM, `requests` y la resolución de nombres de `fetch_url_safe` se sustituyen
+por registradores que cortan. Cada diferencia con el original, en el README del módulo. Logs:
+`tests-20261110-131241.log` (P-5, P-8 primera parte, P-12), `tests-20261110-133023.log` (complemento de
+P-8) y `tests-20261110-135653.log` (P-8, `action_suggest_detection` real); batería completa: 92 tests, los
+32 F y 1 E de antes, ninguno de estas pruebas. En la salida solo sí/no (nunca claves ni tokens).
+Verificación de `odoo-reviewer` (solo lectura) de las seis partes (P-5, P-8 primera parte, complemento de
+P-8, P-12 lectura, escritura e imágenes): «mide lo que dice: sí» en las seis, con los límites que se indican.
+
+- **P-5** (plan `user.add_group` de un grupo normal, sin el parche 12; propuesta por `request_safe_plan`,
+  confirmación con `action_confirm_and_execute`). El confirmador tiene que ser **Ajustes + AI
+  Administrator**, no solo Ajustes como decía la fila: para confirmar el plan de otro hay que ser AI
+  Administrator (`_can_resolve`, `safe_operation.py:343-350`).
+
+  | Proponente (AI Administrator) | uid al ejecutar | `su` | Grupo dado | Error | Operación | Diario |
+  |---|---|---|---|---|---|---|
+  | (a) sin «Permisos de acceso» | el del proponente | no | no | `UserError` con el error de escritura en `res.users` («Administration/Access Rights») | `cancelled` | `user.add_group` `failed` |
+  | (b) con «Permisos de acceso» | el del proponente | no | sí | — | `executed` | `user.add_group` `applied` |
+
+  Origen del error de (a): `check_access_rights('write')` de `res.users` (`odoo/addons/base/security/ir.model.access.csv:71`)
+  al escribir los grupos (`ai_system_action.py:741` → `pns_base/utils/compat.py:139`);
+  `action_confirm_and_execute` lo presenta como `UserError` («Error confirming the operation: …»). Se predijo
+  `AccessError` y sale `UserError`: mismo origen. Límites: no se ejercitan la barrera de grupos de la
+  herramienta `safe_plan_request` ni el auto-confirmado (no aplica a `danger=high`).
+- **P-8** (4 de los 9 nombres de §3.7, caja A real, como AI Administrator y como interno).
+
+  | Nombre y camino | AI Administrator | Interno |
+  |---|---|---|
+  | `action_suggest_detection` por relación (`ai.api.server.key.server_id`), método real | pasa `ensure_ai_admin` y llega a la llamada al LLM | se para en `ensure_ai_admin` («Only AI Administrators…»); no llega al LLM |
+  | `action_suggest_detection` por `env['ai.api.server']` | lo para la puerta de catálogos (`[PROHIBITED:API_CATALOGUE]`) | ídem |
+  | `action_generate_openapi`, método real | llega a la llamada al LLM | `AccessError` de la ACL del modelo; no llega al LLM, a `requests` ni a `ai_log` |
+  | `action_generate`, método real | llega a `requests` (descarga de la documentación) | ídem |
+  | `action_log_generation_usage`, método real | llega al intento de escritura en `ai_log` | ídem |
+
+  Los tres del asistente OpenAPI, un AI Administrator llega igual sobre su fila y sobre la de otro AI
+  Administrator: Odoo 14 no limita los transitorios por `create_uid` y el modelo solo tiene la ACL de
+  `group_ai_admin`. Las escrituras en la fila no se guardan (caja A de solo lectura); ninguno intenta escribir
+  en el servidor. Con los métodos sustituidos (primera parte), el interno también «llega» a los del asistente:
+  solo indica que el sandbox no filtra el nombre; con el método real lo para la ACL. Límites: «llega al LLM» es
+  llegar a la llamada con los permisos de ese usuario, cortada por un registrador; no se ejercitan las
+  comprobaciones posteriores (agente activo, límite de gasto, modelo del proveedor); la resolución de nombres
+  es ficticia (con `seges.invalid` real, `action_generate` se pararía en «Cannot resolve»); `ai_log` solo
+  intento (en tests `_create_log_entry` no escribe, `models/ai_log.py:716`); el servidor OpenAPI, su entrada
+  de lista blanca de tipo openapi y la de tipo web para `seges.invalid` se crearon solo en la BD de tests. Sin
+  probar: `mark_seen`, `sandbox_helpers` y los tres de `ai.skill.capture.wizard` (siguen por lectura, §3.7).
+- **P-12** (usuario AI Administrator en A y B, A por defecto; C no es suya; la pantalla llega como en un turno:
+  `chatboo_async_request.py:392-395` → `one_company_context`).
+  - Lectura (caja A real):
+
+    | Pantalla | `allowed_company_ids` en la caja A | Ve |
+    |---|---|---|
+    | B | B | B |
+    | ninguna | A | A |
+    | A y B | A, B | A, B |
+    | C (ajena) | A | A |
+
+  - Escritura: propuesta con la pantalla en B (guardada por `safe_plan.py:322-325`) y confirmada por el mismo
+    usuario con el selector en A. El plan corre en B (`env.company` = B, `allowed_company_ids` = B, sin `su`).
+    Escribir en el contacto de B entra; en el de A, `UserError` por la regla multicompañía y operación
+    `cancelled`. La compañía de un registro creado no se mide con `res.partner` (sin compañía por defecto en
+    14): la medida es `env.company` = B.
+  - Imágenes (`page_html` y `page_url`; las dos dan lo mismo):
+
+    | Versión | Pantalla | A | B | C (ajena) |
+    |---|---|---|---|---|
+    | 3.1.973 tal cual | A | sí | sí | sí |
+    | 3.1.973 + parche 26 (simulado) | A | sí | no | no |
+    | 3.1.973 tal cual | A y B | sí | sí | sí |
+    | 3.1.973 + parche 26 (simulado) | A y B | sí | sí | no |
+
+    3.1.973 tal cual muestra la imagen de C, que no es del usuario: M2 abierto. El parche 26 se simula con una
+    sustitución de `pictures_as_tokens` que reproduce `chatboo_session.py:924` y `chatboo_canvas.py:1008` de la
+    rama (`env(su=False)`) en los dos puntos donde 3.1.973 la usa. `_store_design` guarda la página en un cursor
+    propio (`chatboo_session.py:1007-1022`): las llamadas van en el cursor compartido (segunda ejecución; en la
+    primera la página no se guardaba y la comprobación no medía).

@@ -2,7 +2,7 @@
 
 - **Comparado:** `pns_base` 1.2.69, `pns_ai_mcp` 3.1.973 y `pns_ai_chatboo` 2.1.587 (fabricante) frente a
   la rama `14.0-pns-ai-3879`, módulos de `8d218ea` (3.1.879 con los parches de Seges 10 a 34).
-- **Fuente:** `docs/specs/comparacion_pns_ai_3-1-973.md` (sha256 `8f2b9f9e…`, con las 23 correcciones de
+- **Fuente:** `docs/specs/comparacion_pns_ai_3-1-973.md` (sha256 `d2553bf5…`, con las 23 correcciones de
   la verificación independiente aplicadas el 10/11/2026), §3, §4, §6 y §7. Sin análisis nuevo: cada fila
   remite a su sección.
 - **«Encaje»:** cómo quedaría el parche sobre el código de 3.1.973: aplica igual, con ajustes o hay que
@@ -15,7 +15,7 @@
 | 10 | PNS-83 (`collect_pin`) | `_collect_pin` privado; además `_touch`, `_close` y `_supply` | Mismo criterio, más amplio | §3.1, §4 |
 | 13 | M10 (plan con la identidad de otro) | `create` solo en `su`; `_cleanup_stuck_state` privado; el plan corre como quien lo pidió | Mismo criterio | §3.1, §4 |
 | 14 | M13 (borrado de contextos de fábrica) | `_unlink_retired_from_module` privado | Mismo criterio | §3.1, §4 |
-| 23 | PNS-101 y PNS-36 (escape del sandbox) | `GuardedSandboxEnv` con lista blanca, bloqueo por clase de cursores y registros, lectura de atributos reescrita en el AST, formateador propio | Otro criterio, más amplio. Restos sin vía de ataque conocida: `itemgetter` nativo, `Markup` con campos simples, `with_context`/`with_company` envueltos. Parte de los tests de Seges no queda cubierta (§9, P-6) | §3.1, §3.7, §4 |
+| 23 | PNS-101 y PNS-36 (escape del sandbox) | `GuardedSandboxEnv` con lista blanca, bloqueo por clase de cursores y registros, lectura de atributos reescrita en el AST, formateador propio | Otro criterio, más amplio. Restos sin vía de ataque conocida: `itemgetter` nativo, `Markup` con campos simples, `with_context`/`with_company` envueltos. Parte de los tests de Seges no queda cubierta. En ejecución (§9, P-6): fallan `test_allowed_attrs` y `test_engine_attrs_on_wrapper` (criterio del fabricante más restrictivo) y `test_type_itemgetter_class`; los negativos se rechazan, con otro texto de error | §3.1, §3.7, §4, §9 |
 | 30 | M11 (`log_*` a nombre de otro) | Los seis `log_*`, privados | Otro criterio: cierra la llamada por nombre (RPC, portal y caja A); no comprueba el `user_id` por dentro, sin llamador afectado | §3.5, §4 |
 | 31 | M12 (`chat_completion` directo) | `_chat_completion` privado | Ídem | §3.5, §4 |
 
@@ -24,8 +24,8 @@
 | Parche | Hallazgo | Qué sigue abierto en 3.1.973 | Encaje | Ref. |
 |---|---|---|---|---|
 | 11 | PNS-82 | `unlink` de la sesión de Chatboo borra en `sudo` todos sus adjuntos | Con ajustes | §3.1, §4 |
-| 12 | PNS-01/02 (grupos por plan) | **En parte, otro criterio:** 3.1.973 exige al solicitante el permiso de Odoo «Permisos de acceso» y nada a quien confirma; Seges exige Ajustes a quien ejecuta, propone y confirma. Compatibles: gana el más estricto | Con ajustes | §3.1, §6.3 |
-| 15 | PNS-07 | **En parte:** 19 de los 28 métodos cerrados; 9 siguen públicos y fuera de la lista (parte los frena la puerta de catálogos) | Con ajustes | §3.1, §3.7 |
+| 12 | PNS-01/02 (grupos por plan) | **En parte, otro criterio:** 3.1.973 exige al solicitante el permiso de Odoo «Permisos de acceso» y nada a quien confirma; Seges exige Ajustes a quien ejecuta, propone y confirma. Compatibles: gana el más estricto. Medido (§9, P-5): sin «Permisos de acceso» el plan no da el grupo; con él, sí; corre como el solicitante, sin `su`. Para confirmar el plan de otro hace falta ser AI Administrator | Con ajustes | §3.1, §6.3, §9 |
+| 15 | PNS-07 | **En parte:** 19 de los 28 métodos cerrados; 9 siguen públicos y fuera de la lista (parte los frena la puerta de catálogos). Medidos 4 (§9, P-8): `action_suggest_detection` por relación y los tres del asistente OpenAPI, alcanzables por un AI Administrator (los del asistente, también sobre filas de otro AI Administrator) | Con ajustes | §3.1, §3.7, §9 |
 | 16 | PNS-54 | `action_confirm_and_execute` sin contraseña; `card_payload` da token a quien puede leer la operación. Nuevo: la tarjeta reintenta sola tras un rechazo (no choca con el parche) | Con ajustes | §3.1, §6.1 |
 | 17 | PNS-37 (papelera del diario) | `ai_change_journal.py` idéntico; el paso `unlink`, movido a `safe_plan_execute.py` | Aplica igual (ese paso, con ajustes) | §3.5, §4 |
 | 18 | PNS-19 (columnas secretas en la caja A) | **En parte, otro criterio:** 3.1.973 cierra por nombre las columnas secretas de todos los modelos (más amplio en modelos), pero no en lecturas `su` ni con valores ya en caché (NUEVO-1). Seges: solo campos de identificación de 11 modelos, también en `sudo`, y vacía la caché al abrir la caja A | **Reescribir:** la marca tendría que ir en `open_readonly_env` (las skills pasan por ahí) | §3.1, §3.4, §4 |
@@ -33,9 +33,9 @@
 | 20 | PNS-70 (Chart.js) | Archivos idénticos a 3.1.879 | Aplica igual | §3.1, §4 |
 | 21 | PNS-20 | `action_preview` igual | Aplica igual | §3.1, §4 |
 | 22 | PNS-100 | **En parte:** 3.1.973 añade 7 nombres a la lista del sandbox; faltan 21 de los 28 de Seges | Con ajustes | §3.1, §4 |
-| 24 | PNS-102 (`env.user` como superusuario) | `user` y lo que cuelga de él siguen como superusuario; con un agravante: el guardián de columnas secretas no actúa en `su`. `company` y `companies` ya no, salvo si el usuario no tiene compañía activa (entonces vuelven a salir como superusuario) | Con ajustes | §3.1, §4 |
+| 24 | PNS-102 (`env.user` como superusuario) | `user` y lo que cuelga de él siguen como superusuario; con un agravante: el guardián de columnas secretas no actúa en `su`. `company` y `companies` ya no, salvo si el usuario no tiene compañía activa (entonces vuelven a salir como superusuario). En ejecución (§9, P-6 y C2): `user`, y lo que cuelga de él, sale como superusuario; la lectura de `totp_secret` del administrador a través de `user` se hace sin error. El `su` de `company` en P-6 es del montaje (sandbox construido fuera de la caja A, sin `allowed_company_ids`), no de la caja A real | Con ajustes | §3.1, §4, §9 |
 | 25 | M1 (`paint_canvas`) | **En parte:** `_paint_canvas` privado, pero sin comprobación de dueño dentro | Con ajustes | §3.5, §4 |
-| 26 | M2 (imágenes en `sudo`) | `pictures_as_tokens` sigue en `sudo` | Con ajustes | §3.5, §4 |
+| 26 | M2 (imágenes en `sudo`) | `pictures_as_tokens` sigue en `sudo`. Medido (§9, P-12): muestra la imagen de un registro de una compañía que no es del usuario; con el parche 26 simulado, solo las de las compañías marcadas en la pantalla | Con ajustes | §3.5, §4, §9 |
 | 27 | F1 (lienzo) | **En parte:** CSP del fabricante en la cabecera HTTP (otra política; abre imágenes y conexiones al propio origen); datos dentro de `<script>` sin escapar; descargas sin CSP | Con ajustes en el modelo; reescribir la parte de las rutas | §3.5, §3.7, §4 |
 | 28 | D1 (páginas compartidas) | **En parte:** `owner_id` lo cierra el fabricante (más amplio); siguen sin comprobación los lectores internos y la regla del AI Administrator con escritura y alta | Con ajustes | §3.5, §4 |
 | 29 | F1, P-8e a | Muestra para Design sin escapar; la página guardada no se comprueba | Con ajustes | §3.5, §4 |
@@ -63,7 +63,7 @@ no cargan.
 | La sesión de Chatboo no cambia de dueño fuera de `su` | PNS-55, PNS-56 | — | §3.2 |
 | Asistente «¿incluir secretos?» de `pns_base`: no deja cambiar modelo, ids ni método | Endurecimiento | — | §3.4 |
 | `_touch`, `_close` y `_supply` de la mesa del PIN, privados | PNS-84 (en parte) | — | §3.5 |
-| **Multicompañía:** la IA trabaja en las compañías marcadas en la pantalla. En nuestra versión no se fija `allowed_company_ids`: lee todas las compañías del usuario y crea en la de por defecto, salvo los planes confirmados desde Autorizaciones, que usan la compañía activa de quien confirma | Alcance de compañía | — (funcional) | §5.4, §6.7 |
+| **Multicompañía:** la IA trabaja en las compañías marcadas en la pantalla. En nuestra versión no se fija `allowed_company_ids`: lee todas las compañías del usuario y crea en la de por defecto, salvo los planes confirmados desde Autorizaciones, que usan la compañía activa de quien confirma. Medido en 3.1.973 (§9, P-12): la caja A lee en las compañías marcadas; un plan pedido con la pantalla en B corre en B aunque se confirme con el selector en A | Alcance de compañía | — (funcional) | §5.4, §6.7, §9 |
 
 ## 4. Lo que 3.1.973 cambia o abre de nuevo
 
