@@ -2,8 +2,9 @@
 
 - **Comparado:** `pns_base` 1.2.69, `pns_ai_mcp` 3.1.973 y `pns_ai_chatboo` 2.1.587 (fabricante) frente a
   la rama `14.0-pns-ai-3879`, módulos de `8d218ea` (3.1.879 con los parches de Seges 10 a 34).
-- **Fuente:** `docs/specs/comparacion_pns_ai_3-1-973.md` (sha256 `d2553bf5…`, con las 23 correcciones de
-  la verificación independiente aplicadas el 10/11/2026), §3, §4, §6 y §7. Sin análisis nuevo: cada fila
+- **Fuente:** `docs/specs/comparacion_pns_ai_3-1-973.md` (sha256 `962db45e…`, con las 23 correcciones de
+  la verificación independiente aplicadas el 10/11/2026 y los resultados de la fase B de §9, hasta P-10 y
+  P-9), §3, §4, §6 y §7. Sin análisis nuevo: cada fila
   remite a su sección.
 - **«Encaje»:** cómo quedaría el parche sobre el código de 3.1.973: aplica igual, con ajustes o hay que
   reescribirlo.
@@ -36,8 +37,8 @@
 | 24 | PNS-102 (`env.user` como superusuario) | `user` y lo que cuelga de él siguen como superusuario; con un agravante: el guardián de columnas secretas no actúa en `su`. `company` y `companies` ya no, salvo si el usuario no tiene compañía activa (entonces vuelven a salir como superusuario). En ejecución (§9, P-6 y C2): `user`, y lo que cuelga de él, sale como superusuario; la lectura de `totp_secret` del administrador a través de `user` se hace sin error. El `su` de `company` en P-6 es del montaje (sandbox construido fuera de la caja A, sin `allowed_company_ids`), no de la caja A real | Con ajustes | §3.1, §4, §9 |
 | 25 | M1 (`paint_canvas`) | **En parte:** `_paint_canvas` privado, pero sin comprobación de dueño dentro | Con ajustes | §3.5, §4 |
 | 26 | M2 (imágenes en `sudo`) | `pictures_as_tokens` sigue en `sudo`. Medido (§9, P-12): muestra la imagen de un registro de una compañía que no es del usuario; con el parche 26 simulado, solo las de las compañías marcadas en la pantalla | Con ajustes | §3.5, §4, §9 |
-| 27 | F1 (lienzo) | **En parte:** CSP del fabricante en la cabecera HTTP (otra política; abre imágenes y conexiones al propio origen); datos dentro de `<script>` sin escapar; descargas sin CSP | Con ajustes en el modelo; reescribir la parte de las rutas | §3.5, §3.7, §4 |
-| 28 | D1 (páginas compartidas) | **En parte:** `owner_id` lo cierra el fabricante (más amplio); siguen sin comprobación los lectores internos y la regla del AI Administrator con escritura y alta | Con ajustes | §3.5, §4 |
+| 27 | F1 (lienzo) | **En parte:** CSP del fabricante en la cabecera HTTP (otra política); datos dentro de `<script>` sin escapar; descargas sin CSP. Medido (§9, P-9, Chrome): en el marco, lo externo bloqueado y el propio Odoo abierto: las imágenes llegan sin sesión (log de Odoo); el fetch sale y CORS no deja leer; en las descargas, sin CSP, nada para lo externo: el navegador lo intenta y solo falla por DNS (`ERR_NAME_NOT_RESOLVED`) | Con ajustes en el modelo; reescribir la parte de las rutas | §3.5, §3.7, §4, §9 |
+| 28 | D1 (páginas compartidas) | **En parte:** `owner_id` lo cierra el fabricante (más amplio); siguen sin comprobación los lectores internos y la regla del AI Administrator con escritura y alta. La vía de la sesión (D5: HTML escrito por RPC en `canvas_design` y compartido) está abierta en las dos versiones: 3.1.973 cierra solo la de la página; el parche 28 no limita `design`. Medido (§9, P-9): el HTML llega al otro usuario y se ejecuta dentro del marco | Con ajustes | §3.5, §3.7, §4, §9 |
 | 29 | F1, P-8e a | Muestra para Design sin escapar; la página guardada no se comprueba | Con ajustes | §3.5, §4 |
 | 32 | PNS-97 (acciones de confianza) | CRUD del AI Administrator igual; nuevo `_require_settings`, pero solo en tres métodos `_apply_*` | Con ajustes | §3.5, §6.4 |
 | 33 | PNS-29 resto 3 | `month_usage` público; asistente sin comprobación de ACL | Con ajustes | §3.5, §4 |
@@ -73,7 +74,7 @@ no cargan.
 |---|---|---|---|
 | NUEVO-1 | Alta | La protección de columnas secretas no cubre valores ya en la caché del hilo (en nuestra versión lo cubre el parche 18). Mecanismo confirmado en ejecución (P-1): con la clave en caché, la caja A la devuelve. Por lectura, no se alcanza en los caminos revisados de un turno real (el `commit` del log de cada ronda vacía la caché antes) | §3.4, §9 |
 | NUEVO-2 | Baja | Tras el `-u`, los dos crons de purga siguen llamando a `gc_expired`, que ya no existe | §3.4 |
-| NUEVO-5 | Baja | Sin proveedor con el rol Diseño, diseña la cadena de Conversación (la alternativa viene activa) y aparece el botón Canvas | §7.2 |
+| NUEVO-5 | Baja | Sin proveedor con el rol Diseño, diseña la cadena de Conversación (la alternativa viene activa) y aparece el botón Canvas. Confirmado en ejecución y en interfaz (P-10): sin rol Diseño o con el rol archivado diseña `lite`; con la alternativa desactivada, ni botón ni página | §7.2, §9 |
 
 **Cambios de comportamiento**
 
@@ -82,7 +83,7 @@ no cargan.
 | AI Administrator implica AI Conversational | El `-u` da acceso conversacional a todos los AI Administrators existentes | §6.2 |
 | El plan se ejecuta como quien lo pidió y en sus compañías | Cambia quién necesita permisos (ver parche 12) | §6.3 |
 | La tarjeta de confirmación reintenta sola una vez | Un Confirmar pulsado antes de los 5 s acaba confirmando sin segundo clic | §6.1 |
-| Roles de proveedor en lugar de las casillas `fit_*` | `fit_design` desaparece; el `-u` pasa las casillas a roles; «Design solo en X» exige además desactivar la alternativa del rol Diseño | §6.6 |
+| Roles de proveedor en lugar de las casillas `fit_*` | `fit_design` desaparece; el `-u` pasa las casillas a roles; «Design solo en X» exige además desactivar la alternativa del rol Diseño (archivar el rol no sirve; si X falla, no hay failover a otro; medido en P-10) | §6.6, §9 |
 | `_require_settings` en acciones de vistas y campos | Aplicarlas exige Ajustes al usuario real | §6.4 |
 | El env del sandbox ya no expone `is_admin`, `is_system` ni `su` | Puede afectar a código que los use | §4 (parche 23) |
 
@@ -111,3 +112,4 @@ imágenes con Ctrl+V; `pns.progress.job` (sin uso en los tres módulos).
 | PNS-84 resto (PIN y clave legibles por el AI Administrator) | Media | Aceptado | §3.5 |
 | PNS-98 (adjuntos en cursor propio) | Baja | Al informe | §3.5 |
 | M5, M16, PNS-51, PNS-88, F4, hoja 17 | Baja | Aceptados o al informe | §3.5 |
+| D5 (HTML libre escrito por RPC en `canvas_design` de la sesión propia; al compartirlo llega a otros usuarios) | — (inventario `estado_hallazgos_3879.md:408`: sin gravedad, estado CF en el inventario, que según su leyenda solo traslada el VERIFICADO de la comparación con 3.1.879 §8.3, no una corrección del fabricante; comparación con 3.1.879 §8.3: VERIFICADO, sin gravedad) | El parche 27 limita el alcance; no cierra la vía | §3.7, §9 |

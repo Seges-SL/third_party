@@ -71,7 +71,7 @@ Detalle de las Críticas y Altas en la tabla siguiente; del resto, en §3.6.
 | NUEVO-2 | Baja | `-u` de 3.1.879 a 3.1.973 | Dos crons `noupdate` quedan llamando a un método que ya no existe |
 | NUEVO-3 | Alta (AI Administrator) | Copia de trabajo; corregido en 3.1.973 | Un AI Administrator sin Ajustes fija la clave MCP de un administrador de Ajustes |
 | NUEVO-4 | Alta (cualquier interno) | Copia de trabajo (`pns_base`); corregido en 1.2.69 | El asistente de exportación borra en `sudo` cualquier adjunto; basta crearlo: lo borra la limpieza de transitorios, como superusuario |
-| NUEVO-5 | Baja | 3.1.973 | Sin rol Diseño, diseñan los proveedores con rol Conversación o sin rol de la cadena del agente de Chatboo, o todos los activos si no tiene cadena (alternativa activa por defecto) |
+| NUEVO-5 | Baja | 3.1.973 | Sin rol Diseño, diseñan los proveedores con rol Conversación o sin rol de la cadena del agente de Chatboo, o, si no tiene cadena, todos los proveedores activos con el rol Conversación o sin rol (alternativa activa por defecto). Confirmado en ejecución y en interfaz (P-10) |
 
 **Parches 10 a 34 (§4), ¿siguen haciendo falta con 3.1.973?**
 
@@ -90,7 +90,7 @@ propaga en el `-u`; afecta a la reproducción de la ficha 26, a usuarios de prue
 solicitante frente al parche 12 (criterios distintos, compatibles); `_require_settings` y la decisión 10;
 tests de E0′ (sobran con 3.1.973); roles frente a la decisión 6 (`fit_design` desaparece; Diseño cae en
 Conversación salvo que se
-desactive la alternativa); multicompañía (ningún parche choca por lectura; el 26 cambia de efecto).
+desactive la alternativa; archivar el rol no sirve; medido en P-10); multicompañía (ningún parche choca por lectura; el 26 cambia de efecto).
 
 **Camino C, candidatos claros (§8.1):** NUEVO-4, NUEVO-3, PNS-81 resto, comprobación del par contra el
 *rebinding*, asistente «¿incluir secretos?», `command_args` y `ensure_ai_admin`, ACL de `ai.safe.choice`,
@@ -458,10 +458,21 @@ apunta a él, así que la ficha de Aplicaciones deja de mostrarlo (REQUIERE PRUE
 |---|---|---|
 | Dónde | Cabecera HTTP de la carcasa (`/chatboo/canvas/<id>` y `/chatboo/page/<id>`, `controllers/chatboo.py:1171, 1277`); el diseño va en un `<iframe sandbox="allow-scripts allow-modals" srcdoc>` (`chatboo_canvas.py:568`), que hereda la política | `<meta>` como primer elemento del `<head>` del diseño, al servir (`_with_csp`), en la carcasa **y en las dos descargas** |
 | Política | `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; font-src data:; connect-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'self'` (`:1175-1180`) | `… img-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'none'; object-src 'none'; worker-src 'none'` |
-| Diferencias | Permite imágenes y conexiones al propio origen (con el marco sin `allow-same-origin`, qué es «propio» para el `srcdoc` hay que probarlo); no limita `frame-src`, `object-src` ni `worker-src` (caen en `default-src 'none'`, así que quedan cerrados igual) | Cierra también el propio origen |
+| Diferencias | Permite imágenes y conexiones al propio origen. Medido en P-9 (§9, Chrome): para el marco `srcdoc`, «propio» es el Odoo que sirve la carcasa; las imágenes del propio Odoo (`/web/binary/company_logo`, relativa y absoluta) cargan y **llegan sin sesión** (log de Odoo: BD «?»; la BD del log sale de la sesión de la petición antes de mirar la autenticación de la ruta, `odoo/http.py:204, 215-216`, también con `auth='none'`, `addons/web/controllers/main.py:1605-1609`, así que con la cookie de una sesión iniciada saldría `lab_pns_ai_973_14`); del fetch solo consta que sale (el GET simple llega, 200; el POST JSON se queda en el preflight, OPTIONS 400) y que CORS no deja leer la respuesta; lo externo, bloqueado. No limita `frame-src`, `object-src` ni `worker-src` (caen en `default-src 'none'`, así que quedan cerrados igual) | Cierra también el propio origen |
 | Enmarcado | `frame-ancestors 'self'` en la cabecera | `X-Frame-Options: SAMEORIGIN` |
-| Descargas | **Sin CSP** (`controllers/chatboo.py:1291-1300, 1319-1328`; solo `nosniff`) | Con la misma `<meta>` |
+| Descargas | **Sin CSP** (`controllers/chatboo.py:1291-1300, 1319-1328`; solo `nosniff`). Medido en P-9: abiertas como `file://`, nada para lo externo: el navegador lo intenta y solo falla por DNS (`ERR_NAME_NOT_RESOLVED`) | Con la misma `<meta>` |
 | Datos en `<script>` | Sin escape de `<` | Escapados (`_script_json`) |
+
+**Vía de la sesión (D5 de la comparación con 3.1.879), sin id nuevo.** El dueño escribe cualquier HTML en
+`canvas_design` de su sesión por RPC y lo comparte; la página llega al otro usuario y se ejecuta en su
+navegador, dentro del marco (P-9, §9). En 3.1.973 el fabricante cierra la vía por la página (fuera de `su`, ni
+`create` ni `write` de `design` u `owner_id`: `_SYSTEM_FIELDS`, `models/chatboo_canvas_page.py:71-86`) pero
+no por la sesión: la
+ruta de compartir crea la página en `sudo` con `session.canvas_design` (`controllers/chatboo.py:1228`). En la
+rama están abiertas las dos: `chatboo.session` no tiene `write` propio y `chatboo.canvas.page` solo protege
+`owner_id` (parche 28, `models/chatboo_canvas_page.py:77-93` (copia)); la ruta de compartir hace
+`pages.create(values)` (`controllers/chatboo.py:1200` (copia)). Su alcance lo limita la CSP del marco, no la
+descarga: en 3.1.973 las descargas no llevan CSP; con el parche 27, sí.
 
 **¿Puede el código del sandbox ligar `__pns_sandbox_attr__`?** No. `compile_sandbox` rechaza cualquier
 código que contenga ese texto, también dentro de una cadena (`controllers/context_builder.py:375-376`),
@@ -649,13 +660,24 @@ tests del fabricante (18 F con el parche 12) hay que medirla de nuevo.
   no había página.
 - **Qué es «la cadena de Conversación»:** los proveedores de la cadena del agente `pns_ai_chatboo` con el
   rol Conversación o sin ningún rol (`pns_ai_chatboo/models/chatboo_session.py:987-989`;
-  `utils/provider_fit.py:23-25`); si ese agente no tiene cadena, diseñan todos los proveedores activos
+  `utils/provider_fit.py:23-25`); si ese agente no tiene cadena, diseñan todos los proveedores activos con el rol Conversación o sin rol
   (`models/ai_execution_engine.py:236-238`).
 - **Cómo se expresa la decisión 6 con roles:** Diseño solo en `3.5-flash` y «Use the fallback» desactivado
-  en el rol Diseño (campo `use_fallback`, editable por el AI Administrator). Sin desactivarlo, la regla
-  «nunca en `lite`» no se cumple en cuanto `3.5-flash` no esté disponible. REQUIERE PRUEBA (P-10).
+  en el rol Diseño (campo `use_fallback`, editable por el AI Administrator). Así, fuera de `3.5-flash` no
+  diseña nadie ni aparece el botón Canvas (P-10, §9: C1b, C3, C6 y C8b). Sin desactivarlo, la regla «nunca
+  en `lite`» no se cumple si `3.5-flash` está archivado o sin cuota (C7, C8). Si `3.5-flash` falla en la
+  llamada no hay failover a `lite`, con o sin alternativa (C9, C9b): el failover solo recorre los
+  proveedores con el rol.
+- **La cadena del agente no limita Diseño:** con la cadena [lite], flash diseña aunque no esté en ella
+  (C1): la cadena no cubre Diseño y se busca entre los proveedores activos con el rol
+  (`models/ai_execution_engine.py:264-270`).
+- **Archivar el rol Diseño no sirve:** el motor sigue leyendo su alternativa (`Role._by_code` busca con
+  `active_test=False`, `models/ai_provider_role.py:203-208`), así que con ella activa diseña `lite` (C4) y,
+  sin ella, nadie (C5). Además, el proveedor pierde el rol (Odoo 14 quita los archivados del many2many) y
+  entra en la cadena de Conversación como proveedor sin rol (si el agente no tiene cadena o el proveedor
+  está en ella).
 - `canvas_available` pasa a ser verdadero si alguien cubre Diseño **o su alternativa**
-  (`chatboo_session.py:1284-1292`): el botón Canvas aparece aunque no haya proveedor de diseño. NUEVO-5
+  (`chatboo_session.py:1285-1293`): el botón Canvas aparece aunque no haya proveedor de diseño. NUEVO-5
   (§7.2).
 
 ### 6.7 Multicompañía frente a los parches que filtran por usuario o dueño
@@ -715,7 +737,7 @@ nuevos con `sudo`, cursor propio o `commit()`; `data/` (crons, `noupdate`); `ini
 
 | Id | Grav. (propuesta) | Afecta a | Qué pasa | Dónde | Estado |
 |---|---|---|---|---|---|
-| **NUEVO-5** | Baja (comportamiento) | 3.1.973 | Con el rol Diseño vacío, archivado o sin cuota, el lienzo diseña con la cadena de Conversación, porque la alternativa viene activa en los datos: los proveedores de la cadena del agente `pns_ai_chatboo` con el rol Conversación o sin ningún rol (`chatboo_session.py:987-989`; `utils/provider_fit.py:23-25`) o, si ese agente no tiene cadena, todos los proveedores activos (`models/ai_execution_engine.py:236-238`). No hay script de migración: el paso de casillas a roles lo hacen `init()` y `_register_hook` (§6.6). En una BD donde ningún proveedor tenía la casilla «Design» (p. ej. LIYBEN, donde es nueva desde 3.1.879), tras el `-u` aparece el botón Canvas y diseña el proveedor de conversación. El CHANGELOG anuncia los roles con alternativa, no este efecto | `data/ai_provider_role_data.xml:48-55`; `models/ai_execution_engine.py:271-286`; `pns_ai_chatboo/models/chatboo_session.py:1284-1292` | REQUIERE PRUEBA (P-10) |
+| **NUEVO-5** | Baja (comportamiento) | 3.1.973 | Con el rol Diseño vacío, archivado o sin cuota, el lienzo diseña con la cadena de Conversación, porque la alternativa viene activa en los datos: los proveedores de la cadena del agente `pns_ai_chatboo` con el rol Conversación o sin ningún rol (`chatboo_session.py:987-989`; `utils/provider_fit.py:23-25`) o, si ese agente no tiene cadena, todos los proveedores activos con el rol Conversación o sin rol (`models/ai_execution_engine.py:236-238`). No hay script de migración: el paso de casillas a roles lo hacen `init()` y `_register_hook` (§6.6). En una BD donde ningún proveedor tenía la casilla «Design» (p. ej. LIYBEN, donde es nueva desde 3.1.879), tras el `-u` aparece el botón Canvas y diseña el proveedor de conversación. El CHANGELOG anuncia los roles con alternativa, no este efecto | `data/ai_provider_role_data.xml:48-55`; `models/ai_execution_engine.py:271-286`; `pns_ai_chatboo/models/chatboo_session.py:1285-1293` | **Confirmado en ejecución (P-10, §9):** sin proveedor con Diseño o con el rol archivado, el botón aparece y diseña `lite` (tests; en la interfaz con Gemini, el caso sin rol, C2); con la alternativa desactivada, ni botón ni página |
 
 ### 7.3 Qué hace un `-u` desde 3.1.879 sobre una BD con datos
 
@@ -778,8 +800,10 @@ En orden aproximado de la carga de Odoo 14 (`odoo/modules/loading.py`):
 
 - Corregido por el fabricante y retirable: parches 10, 13, 14, 23 (P-6, §9: negativos rechazados; restos sin vía de ataque conocida), 30 y 31.
 - Abierto en 3.1.973 sin parche de Seges: PNS-54, PNS-102, PNS-82 (`unlink`), PNS-17 (cabeceras), PNS-97,
-  PNS-100 (21 nombres), PNS-07 (9 nombres), M2, F1 (escape y descargas), PNS-29 resto 3, NUEVO-1, NUEVO-2,
-  NUEVO-5.
+  PNS-100 (21 nombres), PNS-07 (9 nombres), M2, F1 (escape y descargas; descargas sin CSP, medido en P-9),
+  PNS-29 resto 3, NUEVO-1, NUEVO-2, NUEVO-5 (confirmado, P-10).
+- Abierto en los dos lados: la vía de la sesión de D5 (HTML escrito por RPC en `canvas_design` y compartido;
+  §3.7, P-9).
 - Abierto en la copia y corregido en 3.1.973: NUEVO-3, NUEVO-4, PNS-81 resto, el *rebinding* de `fetch_url`,
   el código de skills fuera de la caja A, la multicompañía. En la copia, sin `allowed_company_ids`, la IA
   lee en todas las compañías del usuario (`odoo/api.py:601-618`; `odoo/addons/base/models/ir_rule.py:57`) y
@@ -1122,3 +1146,106 @@ P-8, P-12 lectura, escritura e imágenes): «mide lo que dice: sí» en las seis
     rama (`env(su=False)`) en los dos puntos donde 3.1.973 la usa. `_store_design` guarda la página en un cursor
     propio (`chatboo_session.py:1007-1022`): las llamadas van en el cursor compartido (segunda ejecución; en la
     primera la página no se guardaba y la comprobación no medía).
+
+**Resultado de P-10 y P-9 (10/11/2026): NUEVO-5 confirmado en ejecución y en interfaz; la decisión 6 se
+expresa con Diseño solo en `flash` y la alternativa desactivada; la CSP del marco bloquea lo externo y deja
+salir peticiones al propio Odoo (las imágenes llegan sin sesión; el fetch, sin poder leer la respuesta); las
+descargas, sin CSP.** Laboratorio `lab_pns_ai_973` (el de P-18), BD
+`lab_pns_ai_973_14`, módulo de tests `seges_pruebas_973` (`odoo-dev 14 tests`, BD de tests nueva que el kit
+borra). En los tests, proveedores inventados (clave inventada, endpoint `.invalid`): P10-lite (rol
+Conversación) y P10-flash (solo Diseño); los demás proveedores y la cadena de `pns_ai_chatboo` se archivan
+durante el test; sin LLM ni red (el driver, `get_llm_driver`, se sustituye por un registrador; el motor y su
+failover son los reales). Logs: `tests-20261110-153355.log` (P-10 parte A y P-9 parte A; 108 tests) y
+`tests-20261110-172655.log` (P-10 parte B automatizada); batería completa: **115 tests, los mismos 32 F y 1 E
+de antes (por nombre)**, ninguno de estas pruebas; las líneas de la parte A salen idénticas en las dos
+ejecuciones. En la salida solo nombres de proveedor y sí/no. Diferencias con el original, en el README del
+módulo.
+
+- **P-10, parte A** (`tests/test_p10_roles_diseno.py`): lista completa y en orden de
+  `get_providers_for_agent('pns_ai_chatboo', need='design')` y `canvas_available()` como `base.user_admin`
+  sin `su`, con dos cadenas («sin cadena» y «cadena [lite]»); failover con
+  `llm_completion_for_agent(..., need='design')`, flash lanzando un error. Dónde se lee el rol:
+  `Role._by_code` busca con `active_test=False` (`models/ai_provider_role.py:203-208`) y el motor lee
+  `use_fallback` de ese registro (`ai_execution_engine.py:273-275`): un rol archivado sigue dando su
+  alternativa. Quién tiene el rol sale de `role_ids` (`ai_provider.py:242-245`), y Odoo 14 quita los
+  archivados al acceder al many2many (`odoo/fields.py:2965-2970`).
+- **P-10, parte B automatizada** (`tests/test_p10_interfaz.py`, `HttpCase`, cadena [lite], usuario con
+  acceso a Chatboo): botón por `/chatboo/check_health`, la petición que hace la pantalla al cargar Chatboo
+  (`static/src/js/chatboo_component_v2.js:1689-1691`; el botón depende de `canvas_available`, `:1707` →
+  `_applyCanvas`, `:3824-3829`); diseño por `/chatboo/canvas/build`, la ruta del botón
+  (`static/src/js/chatboo_charts.js:3070-3076`), con una tabla de dos filas. En modo test el trabajo se
+  ejecuta dentro de la petición (`models/chatboo_job.py:189-191`). El motivo se anota envolviendo
+  `log_no_page`, porque en modo test `ai.log` no se escribe (`pns_ai_mcp/models/ai_log.py:716-717`).
+
+  | Caso | Diseño, sin cadena | Diseño, cadena [lite] | Botón (A / B) | `/chatboo/canvas/build` (B): pedido a · página |
+  |---|---|---|---|---|
+  | C1 flash con Diseño, alternativa sí | [P10-flash] | [P10-flash] | sí / sí | [P10-flash] · sí |
+  | C1b ídem, alternativa no | [P10-flash] | [P10-flash] | sí / — | — |
+  | C2 nadie con Diseño, alternativa sí | [P10-lite, P10-flash] | [P10-lite] | sí / sí | [P10-lite] · sí |
+  | C3 ídem, alternativa no | [] | [] | no / no | [] · no |
+  | C4 rol archivado, alternativa sí | [P10-lite, P10-flash] | [P10-lite] | sí / sí | [P10-lite] · sí |
+  | C5 rol archivado, alternativa no | [] | [] | no / no | [] · no |
+  | C6 flash archivado, alternativa no | [] | [] | no / no | [] · no |
+  | C7 flash archivado, alternativa sí | [P10-lite] | [P10-lite] | sí / — | — |
+  | C8 flash sin cuota, alternativa sí | [P10-lite] | [P10-lite] | sí / — | — |
+  | C8b flash sin cuota, alternativa no | `UserError` «No AI provider has available quota this month.» | ídem | no / — | — |
+  | C9 flash falla, alternativa no | intentos [P10-flash], no responde nadie | ídem | — / sí | [P10-flash] · no |
+  | C9b flash falla, alternativa sí | intentos [P10-flash], no responde nadie | ídem | — | — |
+
+  - Sin failover a lite cuando flash falla (C9, C9b): el bucle solo recorre la lista de Diseño, y
+    `use_fallback` solo actúa si nadie tiene el rol, no si quien lo tiene falla. Mensaje de la ruta en C9:
+    «No page was built. The reason is in the AI History.»; el motivo que se deja para `ai.log` es el error
+    del proveedor.
+  - Cadena de Conversación: «sin cadena», en C2 a C5 es [P10-lite, P10-flash] (flash, al perder su único rol,
+    cuenta como proveedor sin rol, `utils/provider_fit.py:23-25`); en el resto, [P10-lite]. Con cadena
+    [lite], siempre [P10-lite]. En C4 y C5 la relación de flash con Diseño sigue en la BD, pero el rol
+    archivado no cuenta.
+  - Paso de casillas a roles (`TestP10Casillas`): **sintético; -u real pendiente de P-15 (fase C)**. Se
+    añaden `fit_design` y `fit_conversation` a `ai_provider` en la transacción del test y se llama a
+    `stash_fit_columns` y `promote_fit_columns` (`utils/schema_fossils.py:290-342`): columnas `fit_*` tras
+    `init`, 0; filas guardadas, 5; Diseño → [design], Conversación → [conversation], ambas →
+    [conversation, design], ninguna → []; un proveedor archivado con la casilla también recibe [design]; la
+    tabla temporal se borra.
+  - Recarga de los datos de roles (`TestP10Actualizar`: `data/ai_provider_role_data.xml` con `convert_file`
+    en modo `update`, no el -u completo): `use_fallback` desactivado y el rol archivado **se conservan**; la
+    alternativa no cambia.
+- **P-10 manual de Sergio** (interfaz, proveedor real Gemini):
+  - C1, sin cadena: botón sí, página sí, diseña `gemini-3.6-flash`; sin línea de rol en el log.
+  - C2, con cadena [P10-lite]: botón sí, página sí (tras dos HTTP 503 «high demand» de Google), diseña
+    `gemini-3.5-flash-lite`; log: «AI: no provider holds role "design" for agent "pns_ai_chatboo"; asking
+    "conversation"». **NUEVO-5 confirmado en interfaz.**
+- En el laboratorio, el proveedor «flash» usó `gemini-3.6-flash`; la decisión 6 se refiere a `3.5-flash`.
+  En la prueba cuentan los roles, no el modelo.
+- **Matices de P-10 (no cambian la decisión 6):**
+  - La ruta del lienzo acepta la petición aunque la pantalla no muestre el botón (C3, C5, C6) y termina sin
+    página: no diseña nadie.
+  - El motivo registrado en esos casos, «No AI provider is configured for agent pns_ai_chatboo», es
+    engañoso: el agente tiene proveedor; lo que falta es quien cubra Diseño.
+  - La fila de `ai.log` de un diseño fallido no guarda proveedor ni modelo (por lectura:
+    `models/chatboo_canvas.py:602-613`).
+- **P-9, parte A** (`tests/test_p9_csp_cabeceras.py`, `HttpCase`; usuarios de prueba `ann`, con acceso a
+  Chatboo, y `bob`, interno):
+
+  | Qué | Resultado |
+  |---|---|
+  | `/chatboo/canvas/<id>` y `/chatboo/page/<id>` | 200; CSP igual a la del fabricante: sí; `X-Frame-Options`: no; `nosniff`: sí |
+  | Escape de un marcador inofensivo (`"></iframe><b id=p9>`, sin script) | 1 marco abierto y 1 cerrado; sin escapar: no; escapado: sí (las dos rutas) |
+  | Las dos descargas | 200; CSP: no; `nosniff`: sí; adjunto: sí; diseño tal cual: sí |
+  | Control: crear `chatboo.canvas.page` por `call_kw` | no (`AccessError`) |
+  | `write` de `canvas_design` en la sesión propia por `call_kw` | aceptado: sí; guardado: sí |
+  | Compartir después por el panel (POST con CSRF) | página creada: sí; con el diseño escrito por RPC: sí; `bob` lector: sí; aviso a `bob`: sí |
+  | `bob` abre la página | 200; CSP: sí; el diseño va en la respuesta (en el `srcdoc`): sí |
+
+- **P-9, parte B de Sergio** (Chrome; sonda escrita por RPC en `canvas_design` de su sesión, sin LLM; página 2
+  compartida con un usuario interno; descargas abiertas como `file://`):
+
+  | Dónde | Externo (img y fetch) | Imágenes del propio Odoo | fetch al propio Odoo |
+  |---|---|---|---|
+  | Marco del lienzo (`/chatboo/canvas/2`, dueño) | bloqueado por la CSP (`connect-src`, `img-src`) | cargan, llegan sin sesión (log de Odoo: BD «?» frente a `lab_pns_ai_973_14` en las peticiones con sesión) | la CSP los deja salir; el GET simple llega (200) y CORS impide leer; el POST JSON se queda en el preflight (OPTIONS 400) |
+  | Página compartida (`/chatboo/page/2`, otro usuario) | igual | cargan | igual |
+  | Descargas (`file://`) | sin CSP: `ERR_NAME_NOT_RESOLVED`, «No hay problemas» | cargan | CORS (origen `null`) |
+  | Control: `/chatboo/canvas/2` como otro usuario | 404 | | |
+
+  - El HTML escrito por RPC en la sesión propia llega al otro usuario por Compartir y se ejecuta en su
+    navegador, dentro del marco (vía D5 de la comparación con 3.1.879; §3.7).
+  - Límite: solo Chrome; Firefox no probado.
