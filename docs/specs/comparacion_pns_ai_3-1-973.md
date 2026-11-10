@@ -338,7 +338,7 @@ Las que además son CS (PNS-01, 02, 07, 17, 19, 20, 82) están en §3.1.
 
 | Id | Grav. (propuesta) | Afecta a | Qué pasa | Dónde | Estado |
 |---|---|---|---|---|---|
-| **NUEVO-1** | Alta (como PNS-19) | 3.1.973 sin el parche 18 | La protección de columnas secretas se aplica al leer de la base de datos, no a lo que ya está en la caché. En Odoo 14 un campo en caché se devuelve sin comprobar permisos (`odoo/fields.py:993-996`), y la caché es una por hilo para todos los cursores. El motor lee la clave del proveedor en `sudo` en el mismo hilo antes de las herramientas, y la caja A no vacía la caché al abrirse. El fabricante solo quita la precarga de esas columnas, y sus tests vacían la caché antes de cada lectura. El único vaciado propio, `_forget_values`, solo afecta a `ir.config_parameter.value` tras un `get_param` en `sudo` sobre el cursor de la caja A, no al abrirla. **Lo hace más difícil:** cualquier `commit` o `rollback` del hilo vacía la caché compartida, si hay un entorno sobre ese cursor (`odoo/sql_db.py:65-86`, llamados en `:449-462`; `odoo/api.py:628-635`), así que la clave solo sigue en caché si no hay ninguno entre la lectura del motor y la caja A; P-1 debe reproducir ese caso. Core que lo sostiene: la caché es la de `Environments`, compartida por todos los entornos y cursores del hilo (`odoo/api.py:449-477, 765-769`), y un campo en caché se devuelve sin comprobar permisos (`odoo/fields.py:993-996`) | `models/sandbox_secret_read.py:15-16, 50-52, 58-63, 161-163`; `controllers/controller_helpers.py:179-238`; `tests/test_sandbox_secret_read.py:39-44` | **REQUIERE PRUEBA**. En la copia lo cubre el parche 18: la caché se vacía al abrir la caja A (`_box_a_clear_cache`, `models/box_a_guard.py:48-63`, llamado desde `controllers/tools_relaxaicode.py:190` (copia)), con `test_box_a_engine_cache_before_run` |
+| **NUEVO-1** | Alta (como PNS-19) | 3.1.973 sin el parche 18 | La protección de columnas secretas se aplica al leer de la base de datos, no a lo que ya está en la caché. En Odoo 14 un campo en caché se devuelve sin comprobar permisos (`odoo/fields.py:993-996`), y la caché es una por hilo para todos los cursores. El motor lee la clave del proveedor en `sudo` en el mismo hilo antes de las herramientas, y la caja A no vacía la caché al abrirse. El fabricante solo quita la precarga de esas columnas, y sus tests vacían la caché antes de cada lectura. El único vaciado propio, `_forget_values`, solo afecta a `ir.config_parameter.value` tras un `get_param` en `sudo` sobre el cursor de la caja A, no al abrirla. **Lo hace más difícil:** cualquier `commit` o `rollback` del hilo vacía la caché compartida, si hay un entorno sobre ese cursor (`odoo/sql_db.py:65-86`, llamados en `:449-462`; `odoo/api.py:628-635`), así que la clave solo sigue en caché si no hay ninguno entre la lectura del motor y la caja A; P-1 debe reproducir ese caso. Core que lo sostiene: la caché es la de `Environments`, compartida por todos los entornos y cursores del hilo (`odoo/api.py:449-477, 765-769`), y un campo en caché se devuelve sin comprobar permisos (`odoo/fields.py:993-996`) | `models/sandbox_secret_read.py:15-16, 50-52, 58-63, 161-163`; `controllers/controller_helpers.py:179-238`; `tests/test_sandbox_secret_read.py:39-44` | **Mecanismo confirmado en ejecución (P-1, 10/11/2026):** con la clave en la caché del hilo, la caja A la devuelve; con la caché vacía, la guarda la deniega. En un turno real, por lectura, no se alcanza en los caminos revisados (Chatboo, `/mcp` y varias herramientas en una respuesta): un `commit` con entorno vacía la caché antes de la caja A. Detalle y lo no revisado, en el resultado de P-1 (§9). En la copia lo cubre el parche 18: la caché se vacía al abrir la caja A (`_box_a_clear_cache`, `models/box_a_guard.py:48-63`, llamado desde `controllers/tools_relaxaicode.py:190` (copia)), con `test_box_a_engine_cache_before_run` |
 | **NUEVO-2** | Baja (actualización) | 3.1.973, `-u` desde 3.1.879 | Los crons de purga de `ai.fetch.cache` y `ai.api.result.cache` están en datos `noupdate="1"` y su código pasa de `model.gc_expired()` a `model._gc_expired()`; el método público desaparece. En una BD actualizada el registro del cron no se reescribe y falla en cada pasada (las cachés dejan de purgarse). El `init()` de `api_result_cache` no es nuevo (ya estaba, idéntico, en 3.1.879: `api_result_cache.py:51-53`), solo corrige `numbercall` y solo toca el cron de `api_result_cache` | `data/fetch_cache_cron.xml:2, 10`; `data/api_result_cache_cron.xml:2, 10`; `models/fetch_cache.py:135`; `models/api_result_cache.py:58-87, 146` | **REQUIERE PRUEBA** (P-2 en §9) |
 | **NUEVO-3** | Alta (requiere AI Administrator) | **Copia de trabajo** (3.1.879); corregido en 3.1.973 | Un AI Administrator sin Ajustes puede generar, fijar o importar la clave MCP de un usuario que tiene Ajustes: `_ensure_key_admin` solo mira el grupo de IA. Con esa clave actúa por `/mcp` con la identidad y los permisos de ese administrador. No figura en el inventario; el fabricante lo cierra en 3.1.972 (CHANGELOG) | Copia: `pns_ai_mcp/models/mcp_user.py:737-742` (copia); importación, `wizard/import_users_wizard.py:111-133` (copia). Otros dos caminos de la copia: `create`/`write` por RPC de `mcp_api_key_hash`, sin comprobación (`models/mcp_user.py:347-364` (copia)), y la importación de configuración, que escribe el hash en `sudo` (`utils/config_backup.py:610-640` (copia)). 3.1.973: `models/mcp_user.py:740-781` (`_may_set_key_of`, `_drop_key_unless_allowed`); cierra esos dos caminos en `create` y `write` fuera de `su` (`mcp_user.py:346-354, 370-372`) y en la importación de configuración (`utils/config_backup.py:735`); test `tests/test_key_of_settings_admin.py` | Por lectura. Prueba de confirmación P-3 (§9) |
 
@@ -924,3 +924,110 @@ Sergio en el staging, BD `pns_demo`. Fecha del último `-u`: la mayor `ir_module
   (búsqueda sin `active_test=False`, `models/ai_skill_disk.py:262-271`), así que intentaría crearla de nuevo
   y el alta chocaría con `code_uniq` (`models/ai_skill.py:272-274`). En `pns_demo` no se da (ninguna
   archivada). Queda por probar en P-15.
+
+**Resultado de P-18 (10/11/2026): 3.1.973 compila y el sandbox se ejecuta con Python 3.7.3; las 6
+reparaciones con `ast.unparse` no se aplican.** Laboratorio nuevo `lab_pns_ai_973` (contexto `odoo-dev 14`,
+BD `lab_pns_ai_973_14`, imagen con el mismo Dockerfile que `lab_pns_ai_3879`), sin repos compartidos
+montados: los tres módulos son una copia de `_fabricante/3.1.973` sin cambios de contenido (`diff -rq`
+vacío; solo se dio permiso de lectura, porque el zip los deja en `600`) y se cargan solo desde ahí
+(addons_path, línea `addons paths` del log de Odoo y `get_module_path`). `paridad`: se pueden instalar.
+Instalación limpia de `pns_ai_chatboo`: OK, sin avisos. Tests en el módulo aparte `seges_pruebas_973`
+(`odoo-dev 14 tests`, BD de tests nueva): 6 tests, 0 fallos.
+
+- `sys.version`: `3.7.3 (default, Mar 23 2024, 16:12:05) [GCC 8.3.0]`, la esperada.
+- `compile()` de los 372 `.py` de los tres módulos: 0 errores. Junto con la importación (`paridad` e
+  instalación) cubre la sintaxis y lo que se importa al cargar; no cubre las APIs de Python 3.8+ en código
+  que no se ejecuta, que es lo que cubre el grep de §3.3 (PNS-81).
+- `compile_sandbox` (`context_builder.py:368`): compila y redirige las lecturas de atributos. relaxaicode
+  completo (`tool_relaxaicode`, stub del test e2e del fabricante): pasa por `compile_sandbox` y se ejecuta;
+  el código legítimo y el del ORM devuelven datos y una fuga por `__class__` da un error controlado.
+- Las 6 reparaciones con `ast.unparse` (`validators_repair.py:106, 244, 397`, `validators_sort.py:548`,
+  `relaxaicode_recipe.py:192, 363`) no se aplican: devuelven el código sin cambios y no rompen nada; 4
+  escriben un `WARNING` con traceback y las 2 de `relaxaicode_recipe.py` fallan sin rastro (por lectura,
+  con esos datos llegan a `ast.unparse`). En un turno, el código que habría que reparar se rechaza con un
+  error que pide reescribirlo (con `%` literal, error al ejecutar con una pista): más vueltas con el
+  modelo, sin efecto en la seguridad. **Igual en nuestra rama**: los mismos 6 usos están en 3.1.879 y en
+  `pns_ai_mcp` de `14.0-pns-ai-3879`.
+
+**Resultado de P-6, C2 y P-1 (10/11/2026).** Laboratorio `lab_pns_ai_973` (el de P-18), módulo de tests
+`seges_pruebas_973` (`odoo-dev 14 tests`, BD de tests nueva que el kit borra). Copias de los tests de Seges
+de `14.0-pns-ai-3879` con el stub de `test_seges_sandbox_credentials.py:271-299` (sin nada del parche 18);
+cada diferencia con el original, en el README del módulo. La caja A es siempre la real: `registry.cursor()`
+da un cursor nuevo porque `TransactionCase` no activa el modo test (`odoo/tests/common.py:1403`, solo en
+`HttpCase`), así que solo ve datos confirmados; los usuarios y el proveedor de C2 y P-1 van como datos XML
+del módulo. En la salida solo se registró sí/no (nunca claves ni secretos).
+
+- **P-6** (51 tests ejecutados; no ejecutables: `test_identity_helper_not_su`, `test_markup_rejected_unit` y
+  los 11 de `TestSegesEngineNames`, porque usan código de los parches 23 ampliado y 24). Coincide con la
+  predicción de la fila P-6:
+  - `test_seges_sandbox_env.py`: fallan `test_allowed_attrs` (el `env` no expone `is_admin`) y
+    `test_engine_attrs_on_wrapper` (no expone `cr`), criterio del fabricante más restrictivo. Los nueve
+    negativos se rechazan sin que salga el secreto ni nombres internos y fallan solo por el texto del error.
+  - `test_seges_format_guard.py`: los 19 que no dependen de `relaxaicode_format_guard.py` pasan, incluido
+    `test_pns36_cr_dbname`.
+  - `test_seges_facade_class.py`: solo falla `test_type_itemgetter_class` (`itemgetter` nativo, que solo
+    resuelve subíndices).
+  - `test_seges_identity_su.py`: la predicción decía «no se importa», pero se ejecutan cuatro de cinco.
+    `test_wrapper_user_not_su` y `test_wrapper_company_not_su` fallan (`user` y `company` llevan `su`):
+    **PNS-102 sigue abierto**. `test_positive_reads_own_user_company` pasa con el usuario confirmado.
+- **C2** (`test_c2_no_access_field_via_user`, usuario interno confirmado): la lectura de `totp_secret` del
+  administrador a través de `user` se hace sin error (la respuesta llega a `'leido'`). Confirma C2 en
+  3.1.973. El test no devuelve el valor.
+- **P-1** (AI Administrator sin Ajustes; el motor lee la clave por `_api_key_for_inference`,
+  `models/ai_provider.py:202-210`):
+
+  | Caso | Clave en caché al abrir la caja A | `ERROR (` | Texto de la guarda de 3.1.973 | Aparece la clave |
+  |---|---|---|---|---|
+  | Copia de `test_box_a_engine_cache_before_run` (fila sin confirmar, por relación) | sí | no | no | sí |
+  | Proveedor confirmado, caché caliente, por relación | sí | no | no | sí |
+  | Proveedor confirmado, caché caliente, por `browse` | sí | no | no | sí |
+  | Control: caché vacía, por relación | no | no | sí | no |
+  | Control: caché vacía, por `browse` | no | no | sí | no |
+
+  **Mecanismo de NUEVO-1 confirmado:** con la clave en la caché del hilo la guarda no actúa. El rechazo de la
+  guarda no lleva `ERROR (` porque relaxaicode presenta los `AccessError` como mensaje para el usuario
+  (`controllers/relaxaicode_failures.py:55-76`).
+- **Condición de caché caliente.** §3.4 es correcta: `Cursor.commit` llama a `flush_env(self)` (con
+  `clear=True` por defecto), que ejecuta `env.clear()`, y `Cursor.rollback` llama a `clear_env(self)`, que
+  también ejecuta `env.clear()`. `Environment.clear` invalida la caché, que es la del hilo
+  (`odoo/sql_db.py:65-87, 449-468`; `odoo/api.py:472, 628-635, 904-907`). Basta un entorno sobre el cursor
+  que hace `commit`, sea cual sea ese cursor. En los tests no hay `commit` intermedio:
+  `_create_log_entry` no escribe con `test_is_running` (`models/ai_log.py:716`). La caché caliente reproduce
+  un turno sin escritura de log entre la lectura de la clave y la caja A.
+- **El `commit` de `_create_log_entry` en cada ronda.** `ai.log._create_log_entry` abre un cursor con
+  entorno (`models/ai_log.py:720-722`) y hace `commit` (`:847`). El motor lo llama antes de cada llamada al
+  LLM (`_log_provider_llm_request`, `utils/engine_tool_loop.py:488-495`) y tras cada respuesta
+  (`_tool_loop_log_response`), y lee la clave una vez al montar el turno (`utils/engine_tool_loop.py:172` →
+  `utils/engine_turn_messages.py:156`). En un turno de Chatboo, la clave ya no está en caché al abrir la caja
+  A. Entre medias no hay `commit` ni `rollback` del cursor del turno: el `commit` de Chatboo es anterior
+  (`pns_ai_chatboo/models/chatboo_async_request.py:161`), los otros son posteriores (`:329, 542, 590`) y cada
+  herramienta va en un `SAVEPOINT` lanzado con `cr.execute` (`utils/engine_tool_run.py:324-357`).
+- **Otros caminos, por lectura:**
+  - `/mcp` (relaxaicode o skill llamada por un cliente MCP): **no alcanzable** en lo revisado. Cada petición
+    empieza con la caché vacía (`odoo/service/wsgi_server.py:87`, `odoo/api.py:431-440`). La autenticación
+    busca `ai.mcp.user` por `mcp_api_key_hash` sin cargarlo en caché (`controllers/main.py:695-698,
+    845-847`; las columnas secretas no se precargan, `models/sandbox_secret_read.py:58-63`). Los
+    `get_param` son de claves no secretas (`controllers/main.py:314-315, 350`). La vía de skills no lee
+    secretos antes de la caja A (`utils/skill_runtime.py:171-250`). En `tools/call` solo hay `rollback` si
+    la herramienta falla (`controllers/main.py:1378`).
+  - Varias herramientas en una respuesta, una con LLM por dentro: **no alcanzable** en lo revisado.
+    - Parámetros híbridos de una skill (rol Parser): lee la clave en `llm_json_completion_result`
+      (`utils/agent_engine.py:107-140`) y escribe `_mcp_log('skill_param_hybrid')` antes de ejecutar la skill
+      (`utils/engine_skills.py:214, 267`).
+    - Cada herramienta registra su ejecución con `commit` (`controller._log_mcp_operation` →
+      `utils/engine_tool_run.py:46-70` → `utils/agent_engine.py:723`; relaxaicode,
+      `controllers/relaxaicode_replies.py:86-102`).
+    - En el failover, la ronda siguiente registra la petición antes de llamar
+      (`utils/engine_tool_loop.py:488-495`).
+    - Design corre en el hilo de un trabajo de Canvas, con su propia caché
+      (`pns_ai_chatboo/models/chatboo_canvas_job.py:67-69` → `chatboo_job.py:193-224`, hilo con
+      `Environment.manage()` propio).
+    - Visión es la elección del proveedor del turno (`utils/agent_engine.py:1034`).
+- **No revisado:**
+  - Si `_create_log_entry` falla antes del `commit` (el error se traga, `models/ai_log.py:853-856`), la caché
+    no se vacía.
+  - Métodos que llaman a un LLM y que el propio código de la caja A puede alcanzar (relacionado con P-8;
+    p. ej. `models/external_server.py:800`).
+  - La caché `ormcache` de `ir.config_parameter.get_param`, que es otra caché.
+  - Otros canales (voz, Secretary) y columnas secretas distintas de la clave del proveedor leídas en `sudo`
+    durante un turno.

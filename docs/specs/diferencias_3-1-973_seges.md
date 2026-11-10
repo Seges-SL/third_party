@@ -2,7 +2,7 @@
 
 - **Comparado:** `pns_base` 1.2.69, `pns_ai_mcp` 3.1.973 y `pns_ai_chatboo` 2.1.587 (fabricante) frente a
   la rama `14.0-pns-ai-3879`, módulos de `8d218ea` (3.1.879 con los parches de Seges 10 a 34).
-- **Fuente:** `docs/specs/comparacion_pns_ai_3-1-973.md` (sha256 `229391ac…`, con las 23 correcciones de
+- **Fuente:** `docs/specs/comparacion_pns_ai_3-1-973.md` (sha256 `8f2b9f9e…`, con las 23 correcciones de
   la verificación independiente aplicadas el 10/11/2026), §3, §4, §6 y §7. Sin análisis nuevo: cada fila
   remite a su sección.
 - **«Encaje»:** cómo quedaría el parche sobre el código de 3.1.973: aplica igual, con ajustes o hay que
@@ -71,7 +71,7 @@ no cargan.
 
 | Id | Gravedad | Qué | Ref. |
 |---|---|---|---|
-| NUEVO-1 | Alta | La protección de columnas secretas no cubre valores ya en la caché del hilo (en nuestra versión lo cubre el parche 18). REQUIERE PRUEBA | §3.4 |
+| NUEVO-1 | Alta | La protección de columnas secretas no cubre valores ya en la caché del hilo (en nuestra versión lo cubre el parche 18). Mecanismo confirmado en ejecución (P-1): con la clave en caché, la caja A la devuelve. Por lectura, no se alcanza en los caminos revisados de un turno real (el `commit` del log de cada ronda vacía la caché antes) | §3.4, §9 |
 | NUEVO-2 | Baja | Tras el `-u`, los dos crons de purga siguen llamando a `gc_expired`, que ya no existe | §3.4 |
 | NUEVO-5 | Baja | Sin proveedor con el rol Diseño, diseña la cadena de Conversación (la alternativa viene activa) y aparece el botón Canvas | §7.2 |
 
