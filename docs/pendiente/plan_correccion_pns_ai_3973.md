@@ -1,6 +1,6 @@
 # Plan de portado de los parches de Seges a pns_ai 3.1.973
 
-- **Fecha:** 10/11/2026 (propuesta y decisiones) · 11/11/2026 (fases 0 y 1; fase 2a).
+- **Fecha:** 10/11/2026 (propuesta y decisiones) · 11/11/2026 (fases 0 y 1; fases 2a y 2b).
 - **Decisión:** camino B de la [comparación con 3.1.973](../specs/comparacion_pns_ai_3-1-973.md), §8: pasar a
   3.1.973 entera y volver a portar los parches de Seges ([decisiones](pns_ai_decisiones.md), N15; Sergio,
   10/11/2026).
@@ -146,6 +146,25 @@ fabricante cierra también la escritura a nombre propio por RPC) y los controles
 | 26 | `chatboo_session.py:937`; `chatboo_canvas.py:910` | `sudo` → `env(su=False)` | `test_seges_chatboo_canvas` |
 | 25 | `chatboo_canvas.py:924, 948` | Solo la comprobación de dueño (`_paint_canvas` ya es privado) | `test_seges_chatboo_canvas` |
 | 28 | `chatboo_canvas_page.py:71-94`; `security.xml:67-76` | Sin la parte de `owner_id` (la cierra el fabricante) | `test_seges_chatboo_canvas` |
+
+**Fase 2b (aprobada por Sergio el 11/11/2026, con condiciones; hecha el 11/11/2026):** parches 15, 22, 19, 11, 26, 25
+y 28. Detalle en el [registro](parches_pns_ai.md), «Parches de la rama 14.0-pns-ai-3973 (fase 2b)».
+- Correcciones a la tabla anterior (no se reescribe):
+  - el 22 lleva **22** nombres, no 21 (el fabricante tiene 6 de los 28);
+  - el 25 va en `chatboo_session.py`, `_paint_canvas` (`:1085-1087`): los llamadores de `chatboo_canvas.py` ya
+    usan el nombre privado.
+- Tests: los de Seges de estos parches, `test_seges_chatboo_smoke` (E0′, sin parche) y el caso (b) de P-5 en
+  `test_seges_user_groups`. Adaptados a 3.1.973: `test_seges_rpc_access` (imports de `safe_plan_http` y
+  `safe_plan_execute`), `test_seges_chatboo_export` (16 nombres ya privados) y `TestSegesSharedPage` (alta solo en
+  `su`; `test_same_owner_refused_too`). De `test_seges_chatboo_canvas`, solo los casos de 25, 26 y 28.
+- Resultado (log `tests-20261111-135129.log`): **382 tests, 1 F (`test_paap_i7`, por diseño), 0 E y 4 saltados**;
+  76 nuevos frente a la 2a. 10 neutralizaciones, todas con el resultado previsto y SHA-256 igual al restaurar.
+  P-7, hecha (N19f y N19m).
+- **Segundo falso «FALLO» del analizador**, junto al de `TestOneCompanyLive` (1d): el
+  `ERROR odoo.sql_db … ir_attachment_create_uid_fkey` de `test_fulfill_client_export_claims_own`. El test pasa por
+  la vía de respaldo del fabricante (`_run_on_committed_cursor`). La línea ya salía en todas las baterías de la
+  rama 3879 que lo ejecutan. Detalle en el registro. No cuenta como F ni E.
+- Camino del job del botón Canvas (25): queda como prueba manual, sin test nuevo (Sergio, 11/11/2026).
 
 ## Fase 3 — Parches 24 y 18; tests del 23
 

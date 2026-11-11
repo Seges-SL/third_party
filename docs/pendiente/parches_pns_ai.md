@@ -236,24 +236,24 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
 | N.º | PNS / id | Tipo | Archivos en 3.1.973 (previstos) | Fase del plan | Estado |
 |---|---|---|---|---|---|
 | 10 | PNS-83 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
-| 11 | PNS-82 | seguridad | `pns_ai_chatboo/models/chatboo_session.py` | 2 | Pendiente de portar |
+| 11 | PNS-82 | seguridad | `pns_ai_chatboo/models/chatboo_session.py` | 2b | Aplicado (11/11/2026) |
 | 12 | PNS-01, PNS-02 | seguridad | `pns_ai_mcp/models/ai_system_action.py`, `pns_ai_mcp/utils/privilege_cusp.py` | 2a | Aplicado (11/11/2026) |
 | 13 | M10 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
 | 14 | M13 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
-| 15 | PNS-07 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | 2 | Pendiente de portar |
+| 15 | PNS-07 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | 2b | Aplicado (11/11/2026): 9 nombres |
 | 16 | PNS-54 | seguridad | `pns_ai_mcp/models/safe_operation.py` | 2a | Aplicado (11/11/2026) |
 | 17 | PNS-37 | seguridad | `pns_ai_mcp/models/ai_change_journal.py`, `pns_ai_mcp/controllers/safe_plan_execute.py` | 2a | Aplicado (11/11/2026) |
 | 18 | PNS-19 | seguridad | `pns_ai_mcp/controllers/controller_helpers.py` (opción B: vaciado de columnas secretas en `open_readonly_env`) | 3 | Pendiente de portar |
-| 19 | PNS-17 | seguridad | `pns_ai_mcp/utils/fetch_url_safe.py`, `pns_ai_mcp/utils/mcp_client.py` | 2 | Pendiente de portar |
+| 19 | PNS-17 | seguridad | `pns_ai_mcp/utils/fetch_url_safe.py`, `pns_ai_mcp/utils/mcp_client.py` | 2b | Aplicado (11/11/2026) |
 | 20 | PNS-70 | compatibilidad | `pns_ai_chatboo/static/src/js/chart.umd.min.js`, `pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js` | 2a | Aplicado (11/11/2026); prueba manual pendiente |
 | 21 | PNS-20 | seguridad | `pns_base/models/operation_report_wizard.py` | 2a | Aplicado (11/11/2026) |
-| 22 | PNS-100 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | 2 | Pendiente de portar |
+| 22 | PNS-100 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | 2b | Aplicado (11/11/2026): 22 nombres |
 | 23 | PNS-101 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
 | 24 | PNS-102 | seguridad | `pns_ai_mcp/controllers/context_builder.py` | 3 | Pendiente de portar |
-| 25 | M1 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | 2 | Pendiente de portar |
-| 26 | M2 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | 2 | Pendiente de portar |
+| 25 | M1 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | 2b | Aplicado (11/11/2026): solo la comprobación del dueño, en `chatboo_session.py` |
+| 26 | M2 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | 2b | Aplicado (11/11/2026) |
 | 27 | F1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/controllers/chatboo.py` | 4 | Pendiente de portar |
-| 28 | D1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas_page.py`, `pns_ai_chatboo/security/security.xml` | 2 | Pendiente de portar |
+| 28 | D1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas_page.py`, `pns_ai_chatboo/security/security.xml` | 2b | Aplicado (11/11/2026): sin la parte de `owner_id` |
 | 29 | F1 (P-8e a) | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_session.py` | 4 | Pendiente de portar |
 | 30 | M11 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
 | 31 | M12 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
@@ -3800,3 +3800,267 @@ archivos y líneas en 3.1.973, los ajustes, los tests y la neutralización.
   - «Review» de una importación no deja nada escrito (21).
 
   El staging se hace al final de la rama (plan, «Pruebas posteriores»).
+
+## Parches de la rama 14.0-pns-ai-3973 (fase 2b, 11/11/2026)
+
+Parches 15, 22, 19, 11, 26, 25 y 28 ([plan](plan_correccion_pns_ai_3973.md), «Fase 2»), con el método de la 2a
+(`.diff` de la fase 0 con `patch --dry-run` sobre copias; lo que no entra, a mano). Aprobada por Sergio el
+11/11/2026, con condiciones (más abajo, en cada parche). Cada parche conserva su número y su marcador. Lo que no
+cambia frente a la entrada de la rama 3879 sigue en esa entrada.
+
+**Correcciones a documentos anteriores (no se reescriben):**
+- **Parche 22:** faltan **22** nombres, no 21. El fabricante tiene 6 de los 28 en su lista, no 7
+  (comparación §4 y plan, tabla de la fase 2). `build_email` también está en su lista, pero no es de Seges.
+- **Parche 25:** la comprobación del dueño va en `chatboo_session.py`, no en `chatboo_canvas.py:924, 948`. Esos
+  dos llamadores ya usan `_paint_canvas` en 3.1.973.
+
+### Parche 15 en 3.1.973
+
+- **Archivo:** `pns_ai_mcp/controllers/validators_base.py`: bloque del 15 al final de
+  `RELAXAICODE_SIDE_EFFECT_METHODS` (`:266-277`, separado del 22).
+- **Ajuste:** a mano (el bloque 1 del `.diff` mezcla 15 y 22 y no entra). Se quedan los **9 nombres de §3.7**, que
+  siguen públicos en 3.1.973: `mark_seen` (`chatboo_async_request.py:1535`), `sandbox_helpers`
+  (`chatboo_session.py:831`), `action_suggest_detection` (`external_server.py:880`), `action_author_params`,
+  `action_author_help` y `action_adapt_code` (`pns_ai_mcp/wizard/skill_capture_wizard.py:636, 660, 688`; los
+  hereda `pns_ai_chatboo/models/skill_capture_wizard.py`), `action_generate_openapi`, `action_generate` y
+  `action_log_generation_usage` (`openapi_spec_generate_wizard.py:297, 302, 178`).
+- **Fuera de la lista:**
+  - 3 ya están en la del fabricante: `test_connection`, `get_content` y `get_for_agent`;
+  - 16 ya son privados, y el fabricante rechaza todo nombre que empieza por `_` (`blocked_private_attr`,
+    `validators_base.py:164`): `fulfill_client_export`, `page_url`, `page_html`, `page_edit` y `paint_canvas`
+    (`chatboo.session`); `chat_completion` y los seis `log_*` (`ai.execution.engine`); `author_param_schema`,
+    `author_param_help` y `rewrite_code_for_params` (`ai.skill`); `collect` (`ai.key.pin.ask`).
+- **`chat_completion`, fuera de la lista (decisión de Sergio, 11/11/2026):** el del modelo es privado
+  (`_chat_completion`, `ai_execution_engine.py:872`). El nombre sigue siendo público en los drivers
+  (`lib/llm/drivers/*.py`) y en el proxy `_LoggedProviderDriver` (`ai_execution_engine.py:38`), que escribe el log
+  en un cursor propio. Desde el sandbox no se llega a ellos: los entregan `_driver_for_provider` y `_get_driver`,
+  que son privados.
+- **Tests:** `test_seges_chatboo_export.py`, adaptado (ver «Tests de la fase 2b»).
+- **Neutralización N15** (sin los 9 nombres; log `tests-20261111-140038.log`): 2 F en `test_seges_chatboo_export`,
+  `test_names_in_denylist` y `test_ast_flags_literal_call`. No falla ninguno de:
+  - `test_seges_rpc_access`: comprueba los nombres privados de los parches 7 a 10, 13 y 14, no la lista del 15;
+  - `test_seges_chatboo_access`: comprueba los nombres privados del flujo de chips (`blocked_private_attr`);
+  - `test_private_names_blocked` y `test_box_a_leaves_no_attachment` de `export`: miden los 16 nombres privados,
+    que bloquea el fabricante.
+
+### Parche 22 en 3.1.973
+
+- **Archivo:** `pns_ai_mcp/controllers/validators_base.py`: bloque del 22 debajo del 15 (`:279-303`).
+- **Ajuste:** a mano, con los **22 nombres** que no tiene el fabricante. Los 6 que ya tiene: `send_email`, `send`,
+  `send_mail`, `process_email_queue`, `run` y `method_direct_trigger`.
+- **Comprobados públicos (11/11/2026)**, en `/opt/odoo-src/14.0/odoo` salvo indicación; ninguno es privado ni ha
+  desaparecido:
+
+  | Nombre | Módulo | Archivo:línea |
+  |---|---|---|
+  | `connect` | `base`; también `fetchmail` y `pns_ai_mcp` | `odoo/addons/base/models/ir_mail_server.py:175`; `addons/fetchmail/models/fetchmail.py:108`; `pns_ai_mcp/utils/mcp_client.py:260` |
+  | `test_smtp_connection` | `base` | `odoo/addons/base/models/ir_mail_server.py:114` |
+  | `load_remote_url` | `web_editor` | `addons/web_editor/models/ir_qweb.py:461` |
+  | `fetch_mail` | `fetchmail`; también `l10n_it_edi` | `addons/fetchmail/models/fetchmail.py:170`; `addons/l10n_it_edi/models/ir_mail_server.py:50` |
+  | `button_confirm_login` | `fetchmail` | `addons/fetchmail/models/fetchmail.py:137` |
+  | `get_credits` | `iap` | `addons/iap/models/iap_account.py:139` |
+  | `autocomplete` | `partner_autocomplete` | `addons/partner_autocomplete/models/res_partner.py:108` |
+  | `enrich_company` | `partner_autocomplete` | `addons/partner_autocomplete/models/res_partner.py:121` |
+  | `read_by_vat` | `partner_autocomplete` | `addons/partner_autocomplete/models/res_partner.py:146` |
+  | `start_sync` | `partner_autocomplete` | `addons/partner_autocomplete/models/res_partner_autocomplete_sync.py:17` |
+  | `send_letter` | `snailmail` | `addons/snailmail/models/mail_message.py:30` |
+  | `snailmail_print` | `snailmail` | `addons/snailmail/models/snailmail_letter.py:406` |
+  | `update_notification` | `mail` | `addons/mail/models/update.py:82` |
+  | `install_from_urls` | `base` | `odoo/addons/base/models/ir_module.py:769` |
+  | `action_process_edi_web_services` | `account_edi` | `addons/account_edi/models/account_move.py:436`, `account_payment.py:10` |
+  | `get_usd_fx` | **`pns_ai_mcp`** (no es del core) | `pns_ai_mcp/models/ai_fx_source.py:87`; también la función `pns_ai_chatboo/utils/fx_rates.py:12` |
+  | `execute_callback` | `payment` | `addons/payment/models/payment_acquirer.py:1113` |
+  | `upgrade_module` | `base` | `odoo/addons/base/wizard/base_module_upgrade.py:53` |
+  | `action_start_automatic_process` | `base` | `odoo/addons/base/wizard/base_partner_merge.py:538` |
+  | `parent_migration_process_cb` | `base` | `odoo/addons/base/wizard/base_partner_merge.py:562` |
+  | `message_process` | `mail` | `addons/mail/models/mail_thread.py:1099` |
+  | `message_route` | `mail` | `addons/mail/models/mail_thread.py:854` |
+
+- **Tests:** `test_seges_sandbox_side_effects.py` (10), sin cambios.
+- **Neutralización N22** (sin los 22 nombres; log `tests-20261111-140335.log`): 6 F, `test_names_in_denylist`,
+  `test_ast_flags_literal_call`, `test_box_a_connect_refused`, `test_box_a_load_remote_url_refused`,
+  `test_box_a_iap_refused` y `test_box_a_module_from_urls_refused`. Los demás casos de caja A
+  (`send_email`, `run`, `method_direct_trigger`, `process_email_queue` y `send`) pasan sin el parche porque
+  esos nombres ya están en la lista del fabricante.
+
+### Parche 19 en 3.1.973
+
+- **Archivos:**
+  - `pns_ai_mcp/utils/fetch_url_safe.py`: `_CROSS_HOST_HEADER_NAMES` y `_strip_auth_headers` (`:128-144`).
+    `_AUTH_HEADER_NAMES` sigue definida y sin uso;
+  - `pns_ai_mcp/utils/mcp_client.py`, `_http_post` (`:103-116`).
+- **Ajuste:** ninguno. Los dos `.diff` entran (en `fetch_url_safe.py`, desplazado +24). La comprobación nueva del
+  par (`non_public_peer_error`, `:47-68`, llamada en `request_public_http`) va antes y no cambia; el filtro de
+  cabeceras se aplica después, al cambiar de host. `mcp_client.py` solo tiene esa petición HTTP.
+- **P-7 (condición 3 de la aprobación):** con el `_Resp` del test, `non_public_peer_error` devuelve `''`
+  (`resp.raw` no existe y la excepción se captura, `:57-61`). La redirección se sigue y la segunda petición
+  registra las cabeceras: el test mide el 19. Lo confirman N19f y N19m. **P-7, hecha.**
+- **Tests:** `test_seges_fetch_redirect.py` (3), sin cambios.
+- **Neutralización:**
+  - N19f (vuelve `not in _AUTH_HEADER_NAMES`; log `tests-20261111-135455.log`):
+    `test_custom_auth_header_dropped_on_other_host`;
+  - N19m (sin `allow_redirects=False` ni el error; log `tests-20261111-135753.log`): `test_mcp_client_redirect_refused`.
+
+### Parche 11 en 3.1.973
+
+- **Archivo:** `pns_ai_chatboo/models/chatboo_session.py`, `unlink`: comprobación de acceso (`:1994-1996`) y filtro
+  de adjuntos por creador (`:2035-2040`).
+- **Ajuste:** a mano. `patch` lo colocaba en otro sitio (fuzz 2 y 1). Las líneas añadidas son las mismas que en la
+  rama 3879. El `write` nuevo del fabricante (`:1974-1978`, la sesión no cambia de dueño) no se toca.
+- **Tests:** `test_seges_chatboo_access.py` (14), sin cambios.
+- **Neutralización N11** (log `tests-20261111-140629.log`): `test_unlink_own_session_keeps_foreign` y
+  `test_cron_unlink_sudo_keeps_foreign`.
+
+### Parche 26 en 3.1.973
+
+- **Archivos:** `pictures_as_tokens(session.env(su=False), …)` en `_page_html` (`chatboo_session.py:937-938`) y
+  `pictures_as_tokens(sessions.env(su=False), …)` en `open_page` (`chatboo_canvas.py:910-911`).
+- **Ajuste:** ninguno; desplazado.
+- **Tests:** los 5 de `TestSegesCanvasPictures`, sin cambios.
+- **Neutralización:**
+  - N26h (`_page_html`; log `tests-20261111-140920.log`): `test_page_html_hidden_picture`;
+  - N26o (`open_page`; log `tests-20261111-141209.log`): `test_page_url_hidden_picture`.
+
+### Parche 25 en 3.1.973
+
+- **Archivo:** `pns_ai_chatboo/models/chatboo_session.py`, `_paint_canvas`, justo después de `ensure_one()`
+  (`:1085-1087`).
+- **Ajuste:** solo la comprobación del dueño. El renombre ya lo hizo el fabricante (`_paint_canvas`, `:1066`, y sus
+  llamadores, `chatboo_canvas.py:924, 948`) y `AccessError` ya se importa (`:13`). De los dos bloques mezclados de
+  la rama 3879 no van ahora el import de `_box_a_trusted` (18) ni los imports y el bloque del 29.
+- **Qué compara (condición 2):** `self.sudo().user_id.id != self.env.uid`, el uid del entorno. Con `sudo()` el
+  uid no cambia, así que los helpers publicados en `sudo` siguen comparando con el usuario real.
+- **Llamadores legítimos, que la pasan:**
+  - **turno de Chatboo:** los helpers del sandbox (`sandbox_helpers`, `chatboo_session.py:831`) llaman a
+    `_page_url`/`_page_edit` → `open_page`/`edit_page` → `_session_of_this_turn`, que ya exige que la sesión sea
+    del uid (`chatboo_canvas.py:643-648`, con la excepción del uid 1) y devuelve la sesión con ese uid;
+  - **botón Canvas:** el job se crea con `user_id = env.uid` del que pulsa (`chatboo_canvas_job.py:60`), y su hilo
+    abre el entorno con ese uid (`chatboo_job.py:186, 206`); `_process` llama a `open_page` con ese entorno
+    (`chatboo_canvas_job.py:113-119`).
+
+  Lo que deja de pintar, igual que en la rama 3879: un turno o un job como uid 1 sobre la sesión de otro.
+- **Tests:** los 4 de `TestSegesPaintCanvas`, sin cambios. Caso positivo: `test_own_session_paints` (llamada
+  directa del dueño); por los helpers en `sudo` (la vía del turno), `test_page_url_visible_picture`. El camino del
+  job del botón Canvas no tiene test de Seges ni del fabricante.
+- **Neutralización N25** (log `tests-20261111-141457.log`): `test_foreign_session_refused`.
+
+### Parche 28 en 3.1.973
+
+- **Archivos:**
+  - `pns_ai_chatboo/models/chatboo_canvas_page.py`: import de `ValidationError` (`:20-21`) y
+    `_check_user_ids_internal` (`:70-76`);
+  - `pns_ai_chatboo/security/security.xml`: `chatboo_canvas_page_admin_rule` con `perm_write` y `perm_create` en
+    `False` (`:67-79`). Sigue en `<data noupdate="0">`: el `-u` la cambia.
+- **Ajuste:** sin la parte de `owner_id`. 3.1.973 rechaza fuera de `su` cualquier `write` de `design` u `owner_id`
+  (`_SYSTEM_FIELDS`) y todo `create`. Su criterio es más amplio: también rechaza escribir el mismo dueño. La regla
+  `.diff` entra igual.
+- **Tests:** los 9 de `TestSegesSharedPage`, adaptados (ver «Tests de la fase 2b»).
+- **Neutralización:**
+  - N28c (sin la restricción; log `tests-20261111-141740.log`): `test_portal_reader_refused`;
+  - N28r (la regla vuelve a `True`; log `tests-20261111-142031.log`): `test_ai_admin_cannot_write_foreign`.
+
+### Tests de la fase 2b
+
+- **`pns_ai_mcp/tests/__init__.py`:** un bloque nuevo de Seges con su marcador, debajo del de la 2a (que no cambia):
+  `test_seges_rpc_access`, `test_seges_sandbox_side_effects` y `test_seges_fetch_redirect`.
+- **`pns_ai_chatboo/tests/__init__.py`:** el del fabricante sin cambios y, debajo, el bloque de Seges:
+  `test_seges_chatboo_smoke`, `test_seges_chatboo_access`, `test_seges_chatboo_export` y
+  `test_seges_chatboo_canvas`. `common.py`, copia de la fase 0.
+- **Sin cambios (copias de la fase 0):** `test_seges_sandbox_side_effects.py`, `test_seges_fetch_redirect.py`,
+  `test_seges_chatboo_access.py`, `test_seges_chatboo_smoke.py` y `common.py`.
+- **`test_seges_chatboo_smoke.py`** (2, E0′): sin parche y sin neutralización. Es el esqueleto de los tests de
+  Chatboo (decisión de Sergio, 11/11/2026).
+- **Cambios aprobados por Sergio (11/11/2026)**, con el marcador «adaptado a 3.1.973»:
+  - `test_seges_rpc_access.py`: `_execute_fetch_url` y `_fetch_url_request` viven en
+    `controllers/safe_plan_http.py`, y `_ensure_fetch_url_whitelist`, en `safe_plan_execute.py`. 3.1.973 no los
+    reexporta en `safe_plan.py`. Se importan de allí. El `patch` de `_fetch_url_request` va a `safe_plan_http`,
+    que es donde `_execute_fetch_url` lo busca (lo define y lo llama el mismo módulo). Los casos de los parches 10,
+    13 y 14 (retirados) no cambian: el nombre público da `AttributeError` y el privado, `AccessError`
+    (`check_method_name`), como esperaban.
+  - `test_seges_chatboo_export.py`:
+    - `E1P_NAMES` queda con los 12 de la lista (9 del 15 y 3 del fabricante);
+    - test nuevo `test_private_names_blocked` para los 16 privados: el nombre público no existe en su modelo (si
+      el fabricante lo vuelve a publicar, falla y hay que devolverlo a la lista), el privado existe y el AST lo
+      rechaza (`PRIVATE_ATTR`);
+    - `test_box_a_leaves_no_attachment` usa `'_fulfill_' + 'client_export'`;
+    - `test_fulfill_client_export_claims_own` llama a `_fulfill_client_export`.
+  - `test_seges_chatboo_canvas.py`: solo `TestSegesPaintCanvas` (25), `TestSegesCanvasPictures` (26) y
+    `TestSegesSharedPage` (28), con los imports y las constantes que usan. Los casos de 27, 29 y 34 vuelven en la
+    fase 4. En `TestSegesSharedPage`:
+    - el `setUp` crea las páginas en `sudo` con `owner_id`, como la ruta de compartir
+      (`controllers/chatboo.py:1228`), y deja cada una con el entorno de su dueño;
+    - en `test_portal_reader_refused`, el caso de alta pasa a `sudo().create` y espera `ValidationError`;
+    - `test_same_owner_is_not_a_change` pasa a `test_same_owner_refused_too` y espera `AccessError`: el
+      fabricante rechaza `owner_id` fuera de `su` aunque no cambie;
+    - `test_owner_cannot_change_owner`, `test_ai_admin_cannot_change_owner`, `test_sudo_changes_owner`,
+      `test_same_owner_refused_too` y `test_ai_admin_cannot_create_for_other` quedan como no regresión del
+      fabricante: pasan sin el 28.
+  - `test_seges_user_groups.py` (parche 12, de la 2a): caso nuevo `test_propose_rejected_with_access_rights`, el
+    (b) de P-5 al proponer (AI Administrator con «Permisos de acceso», sin Ajustes).
+- **Resultado** (log `tests-20261111-135129.log`): **382 tests, 1 F, 0 E y 4 saltados**. La F es `test_paap_i7_…`
+  (por diseño), como en la 2a. Los 4 saltados, los de la línea base.
+- **76 tests nuevos frente a la 2a (306):**
+
+  | Archivo | Tests |
+  |---|---|
+  | `test_seges_rpc_access.py` | 22 |
+  | `test_seges_sandbox_side_effects.py` | 10 |
+  | `test_seges_fetch_redirect.py` | 3 |
+  | `test_seges_user_groups.py` (caso nuevo) | 1 |
+  | `test_seges_chatboo_access.py` | 14 |
+  | `test_seges_chatboo_export.py` | 6 |
+  | `test_seges_chatboo_canvas.py` | 18 |
+  | `test_seges_chatboo_smoke.py` | 2 |
+
+  Son los 73 de la propuesta, más el smoke (2) y el caso (b) de P-5 (1).
+- **Logs esperados que no son F ni E:**
+  - el `ERROR … ai_change_journal: snapshot read failed` de la línea base;
+  - los `AttributeError`/`AccessError` de `odoo.http` de los negativos por RPC;
+  - un `ERROR odoo.sql_db … ir_attachment_create_uid_fkey` en `test_fulfill_client_export_claims_own`: el cursor
+    propio no ve al usuario creado en el test y el fabricante crea el adjunto por la vía de respaldo (lo explica
+    el docstring del test).
+- **Segundo falso «FALLO» del analizador** (comprobado el 11/11/2026, a petición de Sergio), junto al de
+  `TestOneCompanyLive` (plan, 1d): la línea `ERROR odoo.sql_db: bad query: INSERT INTO "ir_attachment" …
+  ir_attachment_create_uid_fkey` cuenta como bloqueante en el resumen de `odoo-dev`, pero no es un test fallido.
+  - **Por qué pasa el test:** `_fulfill_client_export` → `persist_turn_file` → `_run_on_committed_cursor`
+    (`pns_ai_mcp/utils/session_download.py:365-392`) crea el adjunto en un cursor propio con el uid del test
+    (432 en esta batería). Ese cursor no ve al usuario, que está sin confirmar en la transacción del test, y el
+    `INSERT` falla por la FK; PostgreSQL lo registra como ERROR. El `except` repite la creación con el `env` del
+    llamador (`return fn(env)`), y el test comprueba `create_uid` = usuario A y que la sesión lo reclama. Pasa: en
+    `tests-20261111-135129.log` no hay `FAIL:` ni `ERROR:` de `claims_own`.
+  - **También en la rama 3879:** la línea sale en los 105 logs de `test_lab_pns_ai_3879_14` que ejecutan el test,
+    del `tests-20261023-192224.log` al `tests-20261106-162710.log`, siempre tras `claims_own` y con el test en
+    verde. La sacan también las baterías limpias de esa rama (`tests-20261028-120823.log`, 0 F y 0 E de 28;
+    `tests-20261030-160631.log`, 0 F y 0 E de 76). En `test_lab_pns_ai_14` (rama 14.0-pns-ai-correcciones) no
+    sale.
+  - Se repetirá en cada batería: no cuenta como F ni E. Manda la línea del runner.
+- **Origen de los módulos:** en todas las baterías, `addons paths` con `/mnt/compartidos/third_party`. En el
+  contenedor no hay ningún `pns_*` en `/usr/lib/python3/dist-packages/odoo/addons`, `/var/lib/odoo/addons/14.0` ni
+  `/mnt/oca/*`.
+- **Neutralización:** con el método de la 2a, una cada vez y con la batería completa: copia, cambio comprobado
+  (una coincidencia exacta), batería, restauración y SHA-256. Las 10 restauraciones, con SHA-256 igual. Cada
+  neutralización da 382 tests, sin E, con la F de `test_paap_i7` más las suyas.
+
+### P-5 con el 12
+
+- **Cubierto por tests:**
+  - la propuesta del caso (a) (`test_propose_rejected_without_settings`) y la del (b)
+    (`test_propose_rejected_with_access_rights`, nuevo en la 2b);
+  - la ejecución con el usuario del (b) (`test_confirmed_*` y `test_registry_edit_does_not_lift_check`). Es lo que
+    hace `execute_plan_now`, que ejecuta con el `env` del solicitante (`safe_operation.py:1439`);
+  - el confirmador en el contexto (`test_context_identities_checked`) y el positivo con Ajustes.
+- **Queda manual** en `lab_pns_ai_3973`: el flujo real, del `safe_plan_request` a Confirmar, con la operación y el
+  diario. Confirmar exige HTTP y contraseña (16) y `execute_plan_now` hace `commit`. Con el 12 se espera que (a)
+  y (b) se rechacen al proponer, con el mensaje de Ajustes.
+
+### Pendiente de la fase 2b
+
+- Comprobaciones manuales, junto con las de la 2a («Pendiente de la fase 2a»), en `lab_pns_ai_3973`:
+  - P-5 (flujo real; ver arriba);
+  - el botón Canvas de una respuesta con tabla hace la página (25, camino del job). Decisión de Sergio del
+    11/11/2026: queda como prueba manual, sin test nuevo;
+  - una página compartida: el dueño la comparte con un interno; el AI Administrator la abre y la borra, pero no
+    la cambia (28);
+  - una página con imágenes de registros que el usuario ve (26);
+  - borrar una sesión de Chatboo con adjuntos (11).
+- P-7 queda hecha con N19f y N19m.
