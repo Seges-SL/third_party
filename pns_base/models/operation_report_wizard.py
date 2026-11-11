@@ -4,6 +4,8 @@
 """Mixin for wizards that show a bulk-operation result."""
 
 import ast
+# Seges: parche 21 (PNS-20, seguridad). Ver docs/pendiente/parches_pns_ai.md
+import contextlib
 import json
 
 from lxml import etree
@@ -288,7 +290,14 @@ class PnsOperationReportWizard(models.AbstractModel):
         }
 
     def _invalidate_after_preview_rollback(self):
-        self.invalidate_cache()
+        # Seges: parche 21 (PNS-20, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        # As cr.savepoint(): invalidate_cache() keeps towrite and tocompute,
+        # and tracking left in precommit would run on undone data.
+        self.env.cr.precommit.clear()
+        self.env.clear()
+        # Seges: parche 21 (PNS-20, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        # The ormcache (has_group…) may hold what the preview wrote.
+        self.env.registry.clear_caches()
 
     def _wizard_defines_import(self):
         for cls in type(self).mro():
@@ -308,11 +317,22 @@ class PnsOperationReportWizard(models.AbstractModel):
         if not self._wizard_defines_import():
             raise UserError(_("This wizard has no import to review."))
         cr = self.env.cr
+        # Seges: parche 21 (PNS-20, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        # Pending writes from before the review must not be undone with it.
+        self.env['base'].flush()
         cr.execute('SAVEPOINT %s' % _PREVIEW_SAVEPOINT)
         try:
             self.with_context(pns_import_preview=False).action_import()
+            # Seges: parche 21 (PNS-20, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            # The import's pending writes go to the database inside the savepoint,
+            # so the rollback undoes them instead of the end of the request.
+            self.env['base'].flush()
             snap = self._preview_snapshot()
         except Exception:
+            # Seges: parche 21 (PNS-20, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            # The flush may fail as the import did: the rollback undoes it.
+            with contextlib.suppress(Exception):
+                self.env['base'].flush()
             cr.execute('ROLLBACK TO SAVEPOINT %s' % _PREVIEW_SAVEPOINT)
             cr.execute('RELEASE SAVEPOINT %s' % _PREVIEW_SAVEPOINT)
             self._invalidate_after_preview_rollback()

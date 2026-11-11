@@ -1093,7 +1093,8 @@ class AIProvider(models.Model):
             start_utc = start_local
         return fields.Datetime.to_string(start_utc)
 
-    def month_usage(self):
+    # Seges: parche 33 (PNS-29, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    def _month_usage(self):
         """Tokens and cost of this provider since the start of the month."""
         self.ensure_one()
         start = self._spend_month_start()
@@ -1128,8 +1129,9 @@ class AIProvider(models.Model):
     def spend_cap_reached(self):
         self.ensure_one()
         from ..utils.provider_spend import spend_cap_hit
+        # Seges: parche 33 (PNS-29, seguridad). Ver docs/pendiente/parches_pns_ai.md
         return spend_cap_hit(
-            self.month_usage(),
+            self._month_usage(),
             cap_usd=self.spend_cap_usd,
             cap_tokens=self.spend_cap_tokens,
         )
