@@ -45,3 +45,7 @@ from . import test_seges_verification
 from . import test_seges_change_journal
 from . import test_seges_import_preview
 from . import test_seges_e4p
+# Seges: tests de la fase 2b sobre 3.1.973 (parches 15, 19 y 22; 10, 13 y 14 retirados, como no regresión). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_rpc_access
+from . import test_seges_sandbox_side_effects
+from . import test_seges_fetch_redirect

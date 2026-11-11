@@ -5,3 +5,8 @@
 
 from . import test_chat_agent_composition
 from . import test_chatboo_perimeter
+# Seges: tests de la fase 2b sobre 3.1.973 (parches 11, 15, 25, 26 y 28; esqueleto de E0′ sin parche). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_chatboo_smoke
+from . import test_seges_chatboo_access
+from . import test_seges_chatboo_export
+from . import test_seges_chatboo_canvas

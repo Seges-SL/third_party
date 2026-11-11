@@ -75,6 +75,20 @@ class TestSegesUserGroupActions(TransactionCase):
             self.assertFalse(ok)
             self.assertIn(SETTINGS_ONLY, err or '')
 
+    # Seges: parche 12, caso (b) de P-5 (fase 2b). Ver docs/pendiente/parches_pns_ai.md
+    def test_propose_rejected_with_access_rights(self):
+        # AI Administrator con «Permisos de acceso» y sin Ajustes: el fabricante
+        # le dejaría escribir los grupos; el 12 lo rechaza ya al proponer.
+        self.assertTrue(self.access_adm.has_group('base.group_erp_manager'))
+        self.assertFalse(self.access_adm.has_group('base.group_system'))
+        for step in (
+            self._step('user.add_group', self.access_adm),
+            self._step('user.remove_group', self.target_grp),
+        ):
+            ok, err = validate_safe_plan([step], self._env_access())
+            self.assertFalse(ok)
+            self.assertIn(SETTINGS_ONLY, err or '')
+
     def test_confirmed_add_group_rejected_without_settings(self):
         # Seges: adaptado a 3.1.973 (usuario con «Permisos de acceso»; mensaje del 12). Ver docs/pendiente/parches_pns_ai.md
         self.assertFalse(self.access_adm.has_group('base.group_system'))
