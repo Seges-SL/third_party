@@ -1,497 +1,236 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Open-Meteo forecast slash skill.
+"""Weather forecast from Open-Meteo, a site on the URL whitelist.
 
-Self-contained multi-round skill: geocode cities, fetch daily forecast, present
-tables. The engine only runs generic fetch_url steps when this script sets
-continue. Rounds are distinguished by previous_result (empty → geocode →
-forecast → present).
+Three rounds, told apart by ``previous_result``: geocode each place, fetch
+one forecast per place, present. The engine only runs the ``fetch_url``
+steps; the parameter reader already turned the user's words into a place,
+an ISO start date and a number of days.
 """
 import json
 import re
 from datetime import date, datetime, timedelta
 
-result = {}
-
-# --- Constantes de presentacion -------------------------------------------
-_WMO = {
-    0: ('Despejado', '\u2600\ufe0f'), 1: ('Mayormente despejado', '\U0001f324\ufe0f'),
-    2: ('Parcialmente nublado', '\u26c5'), 3: ('Nublado', '\u2601\ufe0f'),
-    45: ('Niebla', '\U0001f32b\ufe0f'), 48: ('Niebla', '\U0001f32b\ufe0f'),
-    51: ('Llovizna', '\U0001f326\ufe0f'), 53: ('Llovizna', '\U0001f326\ufe0f'),
-    55: ('Llovizna', '\U0001f326\ufe0f'), 61: ('Lluvia', '\U0001f327\ufe0f'),
-    63: ('Lluvia', '\U0001f327\ufe0f'), 65: ('Lluvia', '\U0001f327\ufe0f'),
-    71: ('Nieve', '\u2744\ufe0f'), 73: ('Nieve', '\u2744\ufe0f'),
-    75: ('Nieve', '\u2744\ufe0f'), 80: ('Chubascos', '\U0001f326\ufe0f'),
-    81: ('Chubascos', '\U0001f326\ufe0f'), 82: ('Chubascos', '\U0001f326\ufe0f'),
-    95: ('Tormenta', '\u26c8\ufe0f'), 96: ('Tormenta', '\u26c8\ufe0f'),
-    99: ('Tormenta', '\u26c8\ufe0f'),
-}
-_DOW_EN = ('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')
-_MONTHS = {
-    'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6,
-    'julio': 7, 'agosto': 8, 'septiembre': 9, 'setiembre': 9,
-    'octubre': 10, 'noviembre': 11, 'diciembre': 12,
-}
-_DAILY_FIELDS = (
+_DAILY = (
     'temperature_2m_max,temperature_2m_min,precipitation_sum,'
-    'windspeed_10m_max,winddirection_10m_dominant,uv_index_max,'
-    'weathercode,sunrise,sunset'
+    'windspeed_10m_max,uv_index_max,weathercode,sunrise,sunset'
 )
 _GEO_HOST = 'geocoding-api.open-meteo.com'
 _FC_HOST = 'api.open-meteo.com/v1/forecast'
 _URL_SAFE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~'
-_TRAIL = ('para', 'de', 'del', 'en', 'el', 'la', 'los', 'las', 'the', 'for', 'in')
 
 
-# --- Helpers URL (sin urllib) ---------------------------------------------
 def _urlq(text):
-    out = []
-    for ch in (text or ''):
-        if ch in _URL_SAFE:
-            out.append(ch)
-        else:
-            out.append(''.join('%%%02X' % b for b in ch.encode('utf-8')))
-    return ''.join(out)
+    return ''.join(
+        ch if ch in _URL_SAFE else ''.join('%%%02X' % b for b in ch.encode('utf-8'))
+        for ch in (text or '')
+    )
 
 
 def _unquote(text):
-    s = str(text or '').replace('+', ' ')
+    raw = str(text or '').replace('+', ' ')
     buf = bytearray()
-    i, n = 0, len(s)
-    while i < n:
-        c = s[i]
-        if c == '%' and i + 2 < n + 1 and i + 3 <= n:
+    i = 0
+    while i < len(raw):
+        if raw[i] == '%' and i + 3 <= len(raw):
             try:
-                buf.append(int(s[i + 1:i + 3], 16))
+                buf.append(int(raw[i + 1:i + 3], 16))
                 i += 3
                 continue
             except ValueError:
                 pass
-        buf.extend(c.encode('utf-8'))
+        buf.extend(raw[i].encode('utf-8'))
         i += 1
     return buf.decode('utf-8', 'replace')
 
 
-def _city_from_url(url):
-    m = re.search(r'[?&]city=([^&]+)', str(url or ''), re.I)
-    return _unquote(m.group(1)).strip() if m else None
-
-
-# --- Parseo de peticion (ciudades + fecha) ---------------------------------
-def _split_cities(text):
-    if not text:
-        return []
-    t = re.sub(r'(?i)\s+\b(?:y|e|and)\b\s+', '|', str(text).strip())
-    out = []
-    for p in re.split(r'[|,;]+', t):
-        p = p.strip()
-        p = re.sub(r'(?i)^(?:en|de|del|para|in|for|the)\s+', '', p)
-        p = re.sub(r'(?i)\s+(?:para|hoy|ma\u00f1ana|manana|today|tomorrow)$', '', p)
-        p = p.strip(' ,.;')
-        if p:
-            out.append(p)
-    return out
-
-
-def _lugar_fecha(text):
-    """'barcelona, roma manana' -> ('barcelona, roma', 'manana')."""
-    text = (text or '').strip()
-    if not text:
-        return None, None
-    date_pat = (
-        r'(?i)\b('
-        r'ma\u00f1ana|manana|hoy|pasado\s+ma\u00f1ana|pasado\s+manana|'
-        r'pr\u00f3ximos?\s+\d+\s+d[i\u00ed]as|proximos?\s+\d+\s+dias|'
-        r'\d{1,2}\s+de\s+\w+|\d{4}-\d{2}-\d{2}|'
-        r'\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?)\b'
-    )
-    m = re.search(date_pat, text)
-    if m:
-        return (text[:m.start()].strip(' ,;') or None,
-                text[m.start():].strip() or None)
-    return text, None
-
-
-def _parse_fecha_range(fecha_text, today):
-    """(start_date, end_date, forecast_days, single_date|None)."""
-    start, end = today + timedelta(days=1), today + timedelta(days=7)
-    if not fecha_text:
-        return start, end, 7, None
-    t = str(fecha_text).strip().lower()
-    if t == 'hoy':
-        return today, today, 1, str(today)
-    if t in ('ma\u00f1ana', 'manana'):
-        d = today + timedelta(days=1)
-        return d, d, 1, str(d)
-    if t in ('pasado ma\u00f1ana', 'pasado manana'):
-        d = today + timedelta(days=2)
-        return d, d, 1, str(d)
-    m = re.search(r'pr[o\u00f3]ximos?\s+(\d+)\s+d[i\u00ed]as', t)
-    if m:
-        n = max(1, min(16, int(m.group(1))))
-        return today + timedelta(days=1), today + timedelta(days=n), n, None
-    m = re.search(r'(\d{1,2})\s+de\s+([a-z\u00e1\u00e9\u00ed\u00f3\u00fa]+)', t)
-    if m:
-        mon = _MONTHS.get(m.group(2).lower())
-        if mon:
-            try:
-                d = date(today.year, mon, int(m.group(1)))
-            except ValueError:
-                d = None
-            if d and d < today:
-                try:
-                    d = date(today.year + 1, mon, int(m.group(1)))
-                except ValueError:
-                    d = None
-            if d:
-                fd = max(1, min(16, max(0, (d - today).days) + 1))
-                return d, d, fd, str(d)
-    m = re.search(r'(\d{4})-(\d{2})-(\d{2})', t)
-    if m:
-        try:
-            d = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-            fd = max(1, min(16, max(0, (d - today).days) + 1))
-            return d, d, fd, str(d)
-        except ValueError:
-            pass
-    return start, end, 7, None
-
-
-def _clean_city(raw):
-    """'toledo (espana)' -> ('toledo', 'espana'); limpia rellenos finales."""
-    s = str(raw or '').strip()
+def _split_place(raw):
+    """'Paris (France)' -> ('Paris', 'France'). The hint picks among homonyms."""
+    text = str(raw or '').strip()
     hint = None
-    m = re.search(r'\(([^)]*)\)', s)
-    if m:
-        hint = (m.group(1).strip() or None)
-        s = (s[:m.start()] + ' ' + s[m.end():]).strip()
-    s = re.sub(r'\s+', ' ', s)
-    changed = True
-    while changed and s:
-        changed = False
-        for f in _TRAIL:
-            m2 = re.search(r'(?i)\s+' + re.escape(f) + r'$', s)
-            if m2:
-                s = s[:m2.start()].rstrip()
-                changed = True
-    return s.strip(' ,.;'), hint
+    found = re.search(r'\(([^)]*)\)', text)
+    if found:
+        hint = found.group(1).strip() or None
+        text = (text[:found.start()] + ' ' + text[found.end():]).strip()
+    return re.sub(r'\s+', ' ', text).strip(' ,.;'), hint
 
 
-def _pick_geocode(results, hint):
+def _pick(results, hint):
     if not results:
         return None
-    if hint:
-        # Normalización inline (evita un def extra: el sandbox limita a 16).
-        h = re.sub(r'[^a-z0-9 ]', '', str(hint or '').strip().lower())
-        if h:
-            for r in results:
-                for key in ('country', 'country_code', 'admin1', 'admin2'):
-                    rv = re.sub(
-                        r'[^a-z0-9 ]', '',
-                        str(r.get(key) or '').strip().lower(),
-                    )
-                    if rv and (h in rv or rv in h):
-                        return r
+    wanted = re.sub(r'[^a-z0-9 ]', '', str(hint or '').lower()).strip()
+    if wanted:
+        for item in results:
+            for key in ('admin1', 'admin2', 'country', 'country_code'):
+                got = re.sub(r'[^a-z0-9 ]', '', str(item.get(key) or '').lower()).strip()
+                if not got:
+                    continue
+                if got == wanted or (
+                    min(len(got), len(wanted)) > 2 and (wanted in got or got in wanted)
+                ):
+                    return item
     return results[0]
 
 
-# --- Helpers de tabla ------------------------------------------------------
-def _cielo(code):
+def _bodies(prev, host):
+    out = []
+    for item in prev or []:
+        if not isinstance(item, dict) or host not in str(item.get('url') or ''):
+            continue
+        body = item.get('body')
+        if isinstance(body, str):
+            try:
+                body = json.loads(body)
+            except ValueError:
+                body = None
+        out.append((item, body if isinstance(body, dict) else None))
+    return out
+
+
+def _sky(code):
+    """WMO weather code -> emoji and label. Inside a def: a long module-level
+    literal is taken for pasted data and rebuilt through JSON (int keys lost)."""
+    table = {
+        0: ('Clear', '\u2600\ufe0f'), 1: ('Mainly clear', '\U0001f324\ufe0f'),
+        2: ('Partly cloudy', '\u26c5'), 3: ('Overcast', '\u2601\ufe0f'),
+        45: ('Fog', '\U0001f32b\ufe0f'), 48: ('Fog', '\U0001f32b\ufe0f'),
+        51: ('Drizzle', '\U0001f326\ufe0f'), 53: ('Drizzle', '\U0001f326\ufe0f'),
+        55: ('Drizzle', '\U0001f326\ufe0f'), 61: ('Rain', '\U0001f327\ufe0f'),
+        63: ('Rain', '\U0001f327\ufe0f'), 65: ('Heavy rain', '\U0001f327\ufe0f'),
+        71: ('Snow', '\u2744\ufe0f'), 73: ('Snow', '\u2744\ufe0f'),
+        75: ('Heavy snow', '\u2744\ufe0f'), 80: ('Showers', '\U0001f326\ufe0f'),
+        81: ('Showers', '\U0001f326\ufe0f'), 82: ('Showers', '\U0001f326\ufe0f'),
+        95: ('Thunderstorm', '\u26c8\ufe0f'), 96: ('Thunderstorm', '\u26c8\ufe0f'),
+        99: ('Thunderstorm', '\u26c8\ufe0f'),
+    }
     try:
-        label, emoji = _WMO.get(int(code), ('Variable', '\U0001f321\ufe0f'))
+        label, emoji = table.get(int(code), ('', ''))
     except (TypeError, ValueError):
-        return '\u2601\ufe0f Nublado'
-    return '%s %s' % (emoji, label)
-
-
-def _fmt_day(iso_date):
-    try:
-        d = datetime.strptime(str(iso_date)[:10], '%Y-%m-%d')
-        return '%s %s' % (_DOW_EN[d.weekday()], d.strftime('%d/%m'))
-    except Exception:
-        return str(iso_date)
-
-
-def _fmt_hm(iso_dt):
-    s = str(iso_dt or '')
-    if 'T' in s:
-        return s.split('T', 1)[1][:5]
-    return s[:5]
-
-
-def _num(val, suffix=''):
-    if val is None:
         return ''
-    try:
-        text = '%g' % float(val)
-        return text + suffix if suffix else text
-    except (TypeError, ValueError):
-        return str(val)
+    return ('%s %s' % (emoji, label)).strip()
 
 
-def _rows_from_daily(daily, single_date=None):
-    if not isinstance(daily, dict):
-        return []
+def _cell(values, i, suffix=''):
+    if i >= len(values) or values[i] is None:
+        return ''
+    return '%g%s' % (float(values[i]), suffix)
+
+
+def _rows(daily):
     times = daily.get('time') or []
     codes = daily.get('weathercode') or daily.get('weather_code') or []
-    tmax = daily.get('temperature_2m_max') or []
-    tmin = daily.get('temperature_2m_min') or []
-    precip = daily.get('precipitation_sum') or []
-    wind = daily.get('windspeed_10m_max') or daily.get('wind_speed_10m_max') or []
-    uv = daily.get('uv_index_max') or []
-    rise = daily.get('sunrise') or []
-    sett = daily.get('sunset') or []
     rows = []
     for i, day in enumerate(times):
-        if single_date and str(day)[:10] != str(single_date)[:10]:
-            continue
+        rise = (daily.get('sunrise') or [''] * len(times))[i] or ''
+        sset = (daily.get('sunset') or [''] * len(times))[i] or ''
         rows.append({
-            'Date': _fmt_day(day),
-            'Sky': _cielo(codes[i] if i < len(codes) else None),
-            'Max': _num(tmax[i] if i < len(tmax) else None, '\u00b0'),
-            'Min': _num(tmin[i] if i < len(tmin) else None, '\u00b0'),
-            'Precip mm': _num(precip[i] if i < len(precip) else None),
-            'Wind km/h': _num(wind[i] if i < len(wind) else None),
-            'UV': _num(uv[i] if i < len(uv) else None),
-            'Sunrise': _fmt_hm(rise[i] if i < len(rise) else None),
-            'Sunset': _fmt_hm(sett[i] if i < len(sett) else None),
+            'Date': datetime.strptime(str(day)[:10], '%Y-%m-%d').strftime('%a %d/%m'),
+            'Sky': _sky(codes[i] if i < len(codes) else None),
+            'Max': _cell(daily.get('temperature_2m_max') or [], i, '\u00b0'),
+            'Min': _cell(daily.get('temperature_2m_min') or [], i, '\u00b0'),
+            'Rain mm': _cell(daily.get('precipitation_sum') or [], i),
+            'Wind km/h': _cell(daily.get('windspeed_10m_max') or [], i),
+            'UV': _cell(daily.get('uv_index_max') or [], i),
+            'Sunrise': rise[11:16],
+            'Sunset': sset[11:16],
         })
     return rows
 
 
-def _to_temp(val):
-    m = re.search(r'-?\d+(?:\.\d+)?', str(val or '').replace(',', '.'))
-    return float(m.group(0)) if m else None
+def _notice(text):
+    return {'formatted_text': '<p class="text-muted">%s</p>' % text, '__return_direct__': True}
 
 
-def _footer(city_rows):
-    """Comparativa determinista entre ciudades/dias (sin alucinacion)."""
-    flat = []
-    for city, rows in city_rows:
-        for r in rows:
-            flat.append((city, r))
-    if len(flat) < 2:
-        return ''
-    multi_city = len(city_rows) > 1
-    # Etiqueta inline (ciudad si hay varias, si no la fecha): evita un def
-    # anidado extra (el sandbox cuenta también los def internos; tope 16).
-    lines = ['Comparison:']
-    hot = [(_to_temp(r.get('Max')),
-            (c if multi_city else r.get('Date') or '?'), r.get('Max'))
-           for c, r in flat if _to_temp(r.get('Max')) is not None]
-    if hot:
-        b = max(hot, key=lambda t: t[0])
-        lines.append('Warmest: %s (%s)' % (b[1], b[2]))
-    cold = [(_to_temp(r.get('Min')),
-             (c if multi_city else r.get('Date') or '?'), r.get('Min'))
-            for c, r in flat if _to_temp(r.get('Min')) is not None]
-    if cold:
-        b = min(cold, key=lambda t: t[0])
-        lines.append('Coolest: %s (min %s)' % (b[1], b[2]))
-    windy = [(_to_temp(r.get('Wind km/h')),
-              (c if multi_city else r.get('Date') or '?'), r.get('Wind km/h'))
-             for c, r in flat if _to_temp(r.get('Wind km/h')) is not None]
-    if windy:
-        b = max(windy, key=lambda t: t[0])
-        lines.append('Windiest: %s (%s km/h)' % (b[1], b[2]))
-    return '\n'.join(lines) if len(lines) > 1 else ''
-
-
-def _bodies(prev, host):
-    """Items de previous_result cuya url contiene `host` -> (item, body dict)."""
-    out = []
-    for it in (prev or []):
-        if not isinstance(it, dict):
-            continue
-        if host not in str(it.get('url') or ''):
-            continue
-        body = it.get('body')
-        if isinstance(body, str):
-            try:
-                body = json.loads(body)
-            except (TypeError, ValueError):
-                body = None
-        out.append((it, body if isinstance(body, dict) else None))
-    return out
-
-
-# --- Resolver ciudades + fecha de la peticion ------------------------------
 try:
-    _norm_cities = cities  # inyectado por el normalizador de params (opt-in)
+    _place = place
 except NameError:
-    _norm_cities = None
+    _place = None
 try:
-    _norm_fecha = fecha
-except NameError:
-    _norm_fecha = None
+    _start = date.fromisoformat(str(start)[:10])
+except (NameError, TypeError, ValueError):
+    _start = date.today()
 try:
-    _raw = arguments
-except NameError:
-    _raw = None
-try:
-    _lugar = lugar
-except NameError:
-    _lugar = None
+    _days = int(days)
+except (NameError, TypeError, ValueError):
+    _days = 7
+_days = max(1, min(16, _days))
+_end = _start + timedelta(days=_days - 1)
 
-_PLACEHOLDER = frozenset({'', 'none', 'null', 'default', 'n/a', 'na'})
+if not str(_place or '').strip():
+    _region = company.state_id.name if company.state_id else ''
+    _region = _region or (company.country_id.name if company.country_id else '')
+    if company.city:
+        _place = '%s (%s)' % (company.city, _region) if _region else company.city
+    else:
+        _place = _region
+_places = [p.strip() for p in re.split(r'[,;|]+', str(_place or '')) if p.strip()]
 
-def _blank(val):
-    if val is None:
-        return True
-    return str(val).strip().lower() in _PLACEHOLDER
-
-_cities = []
-if isinstance(_norm_cities, (list, tuple)) and _norm_cities:
-    _cities = [
-        str(c).strip() for c in _norm_cities
-        if str(c).strip() and str(c).strip().lower() not in _PLACEHOLDER
-    ]
-    _fecha = None if _blank(_norm_fecha) else _norm_fecha
-if not _cities:
-    _place, _date_txt = _lugar_fecha('' if _blank(_raw) else _raw)
-    if not _place:
-        _place, _extra = _lugar_fecha('' if _blank(_lugar) else _lugar)
-        if _extra and not _date_txt:
-            _date_txt = _extra
-    _fecha = None if _blank(_norm_fecha) else _norm_fecha
-    if _fecha is None:
-        _fecha = None if _blank(_date_txt) else _date_txt
-    if not _place:
-        _co_city = ''
-        _co_state = ''
-        try:
-            _co_city = (company.city or '').strip()
-            _co_state = (
-                company.state_id.name if company.state_id else ''
-            ) or ''
-        except NameError:
-            _co_city = ''
-            _co_state = ''
-        _place = _co_city or _co_state or None
-    if _place:
-        _cities = _split_cities(_place) or [_place.strip()]
-
-_today = date.today()
-_start, _end, _fdays, _single = _parse_fecha_range(_fecha, _today)
-
-# --- Despacho por ronda ----------------------------------------------------
 try:
     _prev = previous_result
 except NameError:
     _prev = None
-
 _geo = _bodies(_prev, _GEO_HOST)
 _fc = _bodies(_prev, _FC_HOST)
 
 if _fc:
-    # RONDA 3: presentar. El nombre de ciudad viaja en &city= de cada forecast.
-    city_rows = []
-    for it, body in _fc:
-        if not body or not body.get('daily'):
-            continue
-        city = _city_from_url(it.get('url')) or 'Location'
-        rows = _rows_from_daily(body.get('daily') or {}, single_date=_single)
-        if not rows and _single:
-            rows = _rows_from_daily(body.get('daily') or {}, single_date=None)
-        city_rows.append((city, rows))
-    if not city_rows:
-        # Renderizable siempre (formatted_text), nunca data vacia: evita que el
-        # fast-path degrade por 'presentation_no_html'.
+    _found = []
+    for _item, _body in _fc:
+        if _body and _body.get('daily'):
+            _m = re.search(r'[?&]city=([^&]+)', str(_item.get('url') or ''))
+            _found.append((_unquote(_m.group(1)) if _m else '', _rows(_body['daily'])))
+    if not _found:
+        result = _notice('Open-Meteo sent no forecast for %s.' % ', '.join(_places))
+    elif len(_found) == 1:
         result = {
-            'formatted_text': (
-                'Could not parse the Open-Meteo response for %s.'
-                % (', '.join(_cities) or 'the requested location')
-            ),
-            '__return_direct__': True,
+            'summary': 'Weather · %s · %s to %s (Open-Meteo).' % (_found[0][0], _start, _end),
+            'data': _found[0][1],
         }
     else:
-        n_cities = len(city_rows)
-        n_days = max((len(r) for _, r in city_rows), default=0)
-        footer = _footer(city_rows)
-        if n_cities == 1:
-            city, rows = city_rows[0]
-            if n_days <= 1 and rows:
-                summary = 'Forecast — %s, %s' % (city, rows[0].get('Date') or '')
-            else:
-                summary = 'Forecast — %s (next %s days)' % (city, n_days)
-            result = {'summary': summary.strip(), 'data': rows, 'footer': footer}
-        elif n_days <= 1:
-            names = ', '.join(c for c, _ in city_rows)
-            summary = ('Forecast — %s (%s)' % (names, _fecha)) if _fecha \
-                else ('Forecast — %s' % names)
-            data = []
-            for c, rows in city_rows:
-                for r in rows:
-                    data.append({'City': c, **r})
-            result = {'summary': summary, 'data': data, 'footer': footer}
-        else:
-            groups = [{'title': c, 'rows': rows} for c, rows in city_rows if rows]
-            result = {
-                'summary': 'Forecast — %s cities (next %s days)' % (
-                    n_cities, n_days),
-                'groups': groups,
-                'footer': footer,
-            }
-        result['__return_direct__'] = True
-
+        result = {
+            'summary': 'Weather · %s to %s (Open-Meteo).' % (_start, _end),
+            'groups': [{'title': name, 'rows': rows} for name, rows in _found],
+        }
+    result['__return_direct__'] = True
+    result['__no_footer__'] = True
 elif _geo:
-    # RONDA 2: geocodings resueltos -> 1 forecast por ciudad con &city=<nombre>.
-    steps = []
-    hints = [(_clean_city(c)[1]) for c in _cities]
-    for idx, (it, body) in enumerate(_geo):
-        results = (body or {}).get('results') or []
-        r0 = _pick_geocode(results, hints[idx] if idx < len(hints) else None)
-        if not r0:
+    _steps = []
+    for _i, (_item, _body) in enumerate(_geo):
+        _hint = _split_place(_places[_i])[1] if _i < len(_places) else None
+        _hit = _pick((_body or {}).get('results') or [], _hint)
+        if not _hit or _hit.get('latitude') is None:
             continue
-        lat, lon = r0.get('latitude'), r0.get('longitude')
-        if lat is None or lon is None:
-            continue
-        rname = r0.get('name') or (
-            _cities[idx] if idx < len(_cities) else 'Location')
-        tz = _urlq(r0.get('timezone') or 'auto')
-        if _single:
-            url = ('https://api.open-meteo.com/v1/forecast'
-                   '?latitude=%s&longitude=%s&daily=%s&timezone=%s'
-                   '&start_date=%s&end_date=%s&city=%s') % (
-                lat, lon, _DAILY_FIELDS, tz, _single, _single, _urlq(rname))
-        else:
-            url = ('https://api.open-meteo.com/v1/forecast'
-                   '?latitude=%s&longitude=%s&daily=%s&timezone=%s'
-                   '&forecast_days=%s&city=%s') % (
-                lat, lon, _DAILY_FIELDS, tz, _fdays, _urlq(rname))
-        steps.append({'op': 'fetch_url', 'url': url, 'name': rname})
-    if steps:
-        result = {'propose_steps': steps, 'continue': True}
-    else:
-        result = {
-            'formatted_text': (
-                'Could not geocode %s. Pass a city name, e.g. `/forecast Madrid`.'
-                % (', '.join(_cities) or 'the requested location')
+        _steps.append({
+            'op': 'fetch_url',
+            'name': _hit.get('name') or _item.get('name') or '',
+            'url': (
+                'https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s'
+                '&daily=%s&timezone=%s&start_date=%s&end_date=%s&city=%s'
+            ) % (
+                _hit['latitude'], _hit['longitude'], _DAILY,
+                _urlq(_hit.get('timezone') or 'auto'), _start, _end,
+                _urlq(_hit.get('name') or ''),
             ),
-            '__return_direct__': True,
-        }
-
+        })
+    if _steps:
+        result = {'propose_steps': _steps, 'continue': True}
+    else:
+        result = _notice('Open-Meteo does not know %s.' % ', '.join(_places))
+elif not _places:
+    result = _notice('The company has no city. Name a place, e.g. /forecast place=Paris.')
 else:
-    # RONDA 1: geocodificar cada ciudad (Open-Meteo geocoding API).
-    if not _cities:
-        result = {
-            'formatted_text': (
-                'No company city is set. Pass a place, e.g. `/forecast Madrid`.'
-            ),
-            '__return_direct__': True,
-        }
-    else:
-        lang = 'es'
-        steps = []
-        for name in _cities:
-            clean, _hint = _clean_city(name)
-            steps.append({
+    _lang = str(user_lang or 'en_US').split('_')[0].lower()
+    result = {
+        'propose_steps': [
+            {
                 'op': 'fetch_url',
-                'url': ('https://geocoding-api.open-meteo.com/v1/search'
-                        '?name=%s&count=10&language=%s&format=json') % (
-                    _urlq(clean or name), lang),
-                'name': name,
-            })
-        result = {'propose_steps': steps, 'continue': True}
+                'name': _p,
+                'url': (
+                    'https://geocoding-api.open-meteo.com/v1/search'
+                    '?name=%s&count=10&language=%s&format=json'
+                ) % (_urlq(_split_place(_p)[0]), _lang),
+            }
+            for _p in _places
+        ],
+        'continue': True,
+    }

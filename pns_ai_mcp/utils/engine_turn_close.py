@@ -62,8 +62,8 @@ class TurnCloseMixin:
                     "content": _body,
                 }
 
-        # Rondas agotadas sobre un lookup (catálogo + registros). Eso no es
-        # el alta. Una frase, sin la tabla y sin «Aquí lo tienes».
+        # Rounds ran out on a lookup (catalog + records). That is not
+        # the create. One sentence, no table and no «Aquí lo tienes».
         if (
             not turn.finished_with_answer
             and turn.last_tool_unmarked_probe
@@ -81,8 +81,8 @@ class TurnCloseMixin:
             turn.finished_with_answer = True
             yield {"event": "replace", "content": prose}
 
-        # Red de seguridad: se agotaron las rondas (MAX_ROUNDS) sin respuesta final.
-        # Nunca volcar ERROR (-NNNN) / Details JSON al usuario.
+        # Safety net: the rounds (MAX_ROUNDS) ran out with no final answer.
+        # Never dump ERROR (-NNNN) / Details JSON to the user.
         if not turn.finished_with_answer and not (
             turn.primary_artifact and turn.table_already_delivered
         ):
@@ -90,7 +90,7 @@ class TurnCloseMixin:
 
             human, is_perm = humanize_exhausted_tool_error(turn.last_retry_error or '')
             if is_perm and human:
-                # Permiso denegado: solo la razón (Odoo/ACL ya habla claro).
+                # Permission denied: only the reason (Odoo/ACL already says it clearly).
                 notice = human
             else:
                 notice = _(
@@ -137,13 +137,13 @@ class TurnCloseMixin:
                 round_n, MAX_ROUNDS, session_id,
         )):
             return True
-        # Respuesta final: si diferimos tokens (ronda con tools en payload),
-        # volcamos ahora el buffer al chat.
+        # Final answer: if we deferred tokens (round with tools in the payload),
+        # flush the buffer to the chat now.
         _visible = _user_visible_round_text(content_buffer, has_tool_calls=False)
         if _defer_user_tokens and _visible:
             yield {"event": "token", "content": _visible}
         messages.append({"role": "assistant", "content": content_buffer})
-        # Candado estructural: forzar tabla / linkify si el LLM narró.
+        # Structural lock: force table / linkify if the LLM narrated.
         _final = content_buffer or ''
         # Report outline: reuse this turn's earlier narrative if the
         # closer replaced it; then fill a truncated skeleton only.
@@ -314,7 +314,7 @@ class TurnCloseMixin:
 
         self._persist_provider_usage(provider, usage_out or turn_usage)
 
-        # Histórico: cierre del turno (auditoría) con los tokens del turno.
+        # History: turn close (audit) with the turn's tokens.
         self._mcp_log(
             operation_type='read',
             tool_name='orchestration_summary',

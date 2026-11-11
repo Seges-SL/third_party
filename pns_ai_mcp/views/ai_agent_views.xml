@@ -5,6 +5,9 @@
         <field name="model">ai.agent</field>
         <field name="arch" type="xml">
             <tree string="Agents" class="o_pns_list">
+                <header>
+                    <button name="action_export_selected" type="object" string="Export selected" class="btn-secondary" icon="fa-download" groups="pns_ai_mcp.group_ai_admin"/>
+                </header>
                 <field name="sequence" widget="handle"/>
                 <field name="name" optional="show"/>
                 <field name="code" optional="show"/>
@@ -140,7 +143,7 @@
                                     <field name="active" optional="show"/>
                                 </tree>
                             </field>
-                            <p class="text-muted">Empty list: every active provider, by id. For a role (vision, audio, decision, design, …) a provider with only that tick is tried before one that also does other jobs. The text turn keeps the order of this list.</p>
+                            <p class="text-muted">Empty list: every active provider, by id. A role (vision, audio, decision, design, …) is looked for in this list first, then among every active provider; a provider with only that role goes first. Nobody holding it: the fallback of the role, if it has one. The text turn keeps the order of this list.</p>
                         </page>
                         <page string="Cache" name="cache">
                             <group col="1">

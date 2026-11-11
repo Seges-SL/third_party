@@ -16,8 +16,7 @@ import logging
 from markupsafe import Markup
 
 from odoo import api, fields, models, _
-# Seges: parche 28 (D1, seguridad). Ver docs/pendiente/parches_pns_ai.md
-from odoo.exceptions import AccessError, ValidationError
+from odoo.exceptions import AccessError
 
 from odoo.addons.pns_ai_mcp.utils.markup_rename import rename_stored_markup
 
@@ -66,16 +65,15 @@ class ChatbooCanvasPage(models.Model):
         for page in self:
             page.url = '%s/chatboo/page/%s' % (base, page.id) if page.id else ''
 
-    # Seges: parche 28 (D1, seguridad). Ver docs/pendiente/parches_pns_ai.md
-    @api.constrains('user_ids')
-    def _check_user_ids_internal(self):
-        if self.mapped('user_ids').filtered('share'):
-            raise ValidationError(
-                _('A page can only be shared with internal users.'),
-            )
+    # The page is a copy of the owner's own canvas, made by the share route
+    # after it checked the session. Free HTML sent over RPC would be a page
+    # on Odoo's own address in someone else's inbox.
+    _SYSTEM_FIELDS = frozenset({'design', 'owner_id'})
 
     @api.model_create_multi
     def create(self, vals_list):
+        if not self.env.su:
+            raise AccessError(_('A shared page is made from your own canvas.'))
         pages = super(ChatbooCanvasPage, self.with_context(
             mail_create_nolog=True, mail_create_nosubscribe=True,
         )).create(vals_list).with_env(self.env)
@@ -84,13 +82,8 @@ class ChatbooCanvasPage(models.Model):
         return pages
 
     def write(self, vals):
-        # Seges: parche 28 (D1, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        if 'owner_id' in vals and not self.env.su and any(
-            page.owner_id.id != (vals['owner_id'] or False) for page in self
-        ):
-            raise AccessError(
-                _('Only the system can change the owner of a shared page.'),
-            )
+        if not self.env.su and self._SYSTEM_FIELDS.intersection(vals):
+            raise AccessError(_('A shared page is made from your own canvas.'))
         before = {
             page.id: page.user_ids for page in self
         } if 'user_ids' in vals else {}
@@ -158,6 +151,8 @@ class ChatbooCanvasPage(models.Model):
     @api.model
     def people_matching(self, text, limit=20):
         """Internal users whose name has ``text``, for the share box."""
+        if self.env.user.share:
+            return []
         users = self.env['res.users'].search([
             ('share', '=', False),
             ('id', '!=', self.env.uid),

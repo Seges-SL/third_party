@@ -10,8 +10,6 @@ to external MCP servers.
 
 from odoo import models, fields, api, _
 from odoo.exceptions import AccessError, UserError, ValidationError
-# Seges: parche 16 (PNS-54, seguridad). Ver docs/pendiente/parches_pns_ai.md
-from odoo.addons.base.models.res_users import check_identity
 from datetime import datetime, timedelta
 import hashlib
 import hmac
@@ -26,6 +24,10 @@ from ..utils.portable_io import export_record_dict
 
 _logger = logging.getLogger(__name__)
 
+# Last lazy expiry refresh per database (time.time()). Not on the model class:
+# Odoo 18+ rejects attributes set on a registry class at run time.
+_EXPIRY_REFRESH_LAST_TS = {}
+
 
 def _hash_confirm_token(raw):
     """SHA-256 of the card token. Empty in, empty out."""
@@ -35,7 +37,7 @@ def _hash_confirm_token(raw):
     return hashlib.sha256(raw.encode('utf-8')).hexdigest()
 
 class SafeOperation(models.Model):
-    """AI Supervised Operation — the 'Safe Plan' (Caja B).
+    """AI Supervised Operation — the 'Safe Plan' (Box B).
 
     The AI NEVER executes operations directly. It DECLARES an intent as data
     (a list of steps with closed verbs: create/write/copy/unlink/fetch_url/api_call).
@@ -53,7 +55,7 @@ class SafeOperation(models.Model):
     _order = 'create_date desc'
     _rec_name = 'display_name'
 
-    # Identificación de la operación
+    # Operation identification
     verification_id = fields.Char(
         string='Verification ID',
         required=True,
@@ -104,7 +106,7 @@ class SafeOperation(models.Model):
         help='Risk level of the operation: low (create/copy/url), medium (write), high (unlink)'
     )
     
-    # Información del modelo y registros
+    # Model and records info
     model_name = fields.Char(
         string='Model',
         required=True,
@@ -120,14 +122,14 @@ class SafeOperation(models.Model):
         help='Number of records that will be affected by the operation'
     )
     
-    # Información de cambios (JSON serializado)
+    # Changes info (serialized JSON)
     changes_info = fields.Text(
         string='Changes Info',
         readonly=True,
         help='Detailed information about the proposed changes (serialized JSON)'
     )
     
-    # Usuario que solicitó la operación
+    # User who requested the operation
     user_id = fields.Many2one(
         'res.users',
         string='User',
@@ -137,7 +139,7 @@ class SafeOperation(models.Model):
         ondelete='cascade'
     )
 
-    # Confirmación ligada a sesión: usuario humano que confirmó desde el navegador
+    # Session-bound confirmation: human user who confirmed from the browser
     confirmed_by_uid = fields.Many2one(
         'res.users',
         string='Confirmed by',
@@ -145,7 +147,7 @@ class SafeOperation(models.Model):
         help='User (browser session) who confirmed the operation from the toast'
     )
 
-    # Guarda contra doble ejecución de la misma verificación
+    # Guard against running the same verification twice
     executed = fields.Boolean(
         string='Executed',
         default=False,
@@ -153,14 +155,14 @@ class SafeOperation(models.Model):
         help='True when the confirmed operation has already been executed (prevents double execution)'
     )
 
-    # Resultado de la ejecución del plan declarativo (caja B), JSON serializado
+    # Result of running the declarative plan (box B), serialized JSON
     result_info = fields.Text(
         string='Execution result',
         readonly=True,
         help='Result of executing the plan after human confirmation (serialized JSON)'
     )
 
-    # Estado de la verificación
+    # Verification status
     status = fields.Selection(
         [
             ('pending', 'Pending'),
@@ -176,7 +178,7 @@ class SafeOperation(models.Model):
         index=True
     )
     
-    # Fecha de creación
+    # Creation date
     create_date = fields.Datetime(
         string='Creation Date',
         required=True,
@@ -185,7 +187,7 @@ class SafeOperation(models.Model):
         index=True
     )
     
-    # Fecha de expiración
+    # Expiration date
     expires_at = fields.Datetime(
         string='Expires at',
         required=True,
@@ -197,15 +199,15 @@ class SafeOperation(models.Model):
     
 
     
-    # Marca VIVA (no almacenada) de si una verificación pendiente ya caducó.
-    # Permite que el formulario muestre "caducada" sin esperar a un cron.
+    # LIVE flag (not stored): has a pending verification already expired?
+    # Lets the form show "expired" without waiting for a cron.
     is_expired = fields.Boolean(
         string='Expired',
         compute='_compute_is_expired',
         help='True when a pending verification has passed its expiration time'
     )
 
-    # Fecha de confirmación/cancelación
+    # Confirmation/cancellation date
     resolved_at = fields.Datetime(
         string='Resolved at',
         readonly=True,
@@ -239,7 +241,7 @@ class SafeOperation(models.Model):
         help='End of validity window for URL permissions. Empty = single-use (CRUD default).'
     )
     
-    # Información adicional (tool_name, arguments, etc.)
+    # Extra info (tool_name, arguments, etc.)
     tool_name = fields.Char(
         string='MCP Tool',
         readonly=True,
@@ -252,7 +254,7 @@ class SafeOperation(models.Model):
         help='Complete data of the pending operation (serialized JSON)'
     )
     
-    # Nombre para mostrar
+    # Display name
     display_name = fields.Char(
         string='Name',
         compute='_compute_display_name',
@@ -261,10 +263,15 @@ class SafeOperation(models.Model):
     
     @api.depends('operation_type', 'model_name', 'records_count', 'create_date')
     def _compute_display_name(self):
-        """Calcula el nombre para mostrar"""
+        """Compute the display name"""
         for record in self:
             op_type = dict(record._fields['operation_type'].selection).get(record.operation_type, '')
-            record.display_name = f"{op_type} - {record.model_name} ({record.records_count} registros) - {record.create_date.strftime('%Y-%m-%d %H:%M') if record.create_date else ''}"
+            record.display_name = _('%s - %s (%s records) - %s') % (
+                op_type,
+                record.model_name,
+                record.records_count,
+                record.create_date.strftime('%Y-%m-%d %H:%M') if record.create_date else '',
+            )
     
     @api.depends('create_date')
     def _compute_expires_at(self):
@@ -275,11 +282,11 @@ class SafeOperation(models.Model):
 
     @api.depends('expires_at', 'status', 'executed')
     def _compute_is_expired(self):
-        """True si ya pasó caducidad y no está ejecutada (pending/confirmed/expired).
+        """True if past expiry and not executed (pending/confirmed/expired).
 
-        No se almacena: se recalcula en cada lectura. El status persistido
-        ``expired`` se actualiza al abrir la lista/form o desde Herramientas
-        (sin cron nuevo).
+        Not stored: recomputed on every read. The stored status
+        ``expired`` is updated when the list/form opens or from Tools
+        (no new cron).
         """
         now = fields.Datetime.now()
         for record in self:
@@ -290,8 +297,8 @@ class SafeOperation(models.Model):
                 and record.status in ('pending', 'confirmed', 'expired')
             )
 
-    # Botones de UI: solo acciones que aún tienen sentido (como whitelist ya
-    # cubierta → sin botón «añadir»).
+    # UI buttons: only actions that still make sense (e.g. whitelist already
+    # covered → no «add» button).
     can_resolve = fields.Boolean(
         string='Can confirm/cancel',
         compute='_compute_action_flags',
@@ -320,7 +327,7 @@ class SafeOperation(models.Model):
             record.can_resolve = bool(
                 record.status == 'pending' and not past
             )
-            # Confirmed sin execute solo es accionable dentro de la ventana.
+            # Confirmed without execute is only actionable inside the window.
             record.can_apply = bool(
                 record.status == 'confirmed'
                 and not record.executed
@@ -334,15 +341,15 @@ class SafeOperation(models.Model):
             record.can_add_whitelist = show_wl
 
     def _can_resolve(self):
-        """Quién puede confirmar/cancelar: el usuario que la solicitó O un
-        administrador de MCP (group_ai_admin), que puede resolver las de otros."""
+        """Who can confirm/cancel: the user who requested it OR an MCP
+        administrator (group_ai_admin), who can resolve other people's ones."""
         self.ensure_one()
         return (
             self.env.user.id == self.user_id.id
             or self.env.user.has_group('pns_ai_mcp.group_ai_admin')
         )
     
-    # IP del solicitante (para auditoría / estadísticas de seguridad)
+    # Requester IP (for audit / security statistics)
     request_ip = fields.Char(
         string='Request IP',
         readonly=True,
@@ -396,7 +403,7 @@ class SafeOperation(models.Model):
     }
 
     def _get_verification_sequence(self, verb=None):
-        """Obtiene (o crea si no existe) la secuencia tipada por verbo.
+        """Get (or create if missing) the per-verb typed sequence.
 
         Each verb has its own ir.sequence with its own counter.
         Legacy sequence 'pns_ai_mcp.operation' is kept but not used for new records.
@@ -413,6 +420,7 @@ class SafeOperation(models.Model):
                 'implementation': 'standard',
                 'prefix': prefix,
                 'padding': 8,
+                'company_id': False,
             })
         else:
             vals = {}
@@ -420,12 +428,15 @@ class SafeOperation(models.Model):
                 vals['prefix'] = prefix
             if seq.padding != 8:
                 vals['padding'] = 8
+            # next_by_code only sees the active company's sequences.
+            if seq.company_id:
+                vals['company_id'] = False
             if vals:
                 seq.write(vals)
         return seq
 
     def _generate_verification_id(self, verb=None):
-        """Genera un ID tipado por verbo: CREA0001, WRIT0042, FURL0003, etc.
+        """Generate a per-verb typed ID: CREA0001, WRIT0042, FURL0003, etc.
 
         Falls back to the legacy sequence if verb is not provided (backwards
         compatible with the default= lambda on the field).
@@ -440,14 +451,14 @@ class SafeOperation(models.Model):
         vid = self.env['ir.sequence'].next_by_code(seq_code)
         if not vid:
             raise ValueError(
-                f"MCP: Error generando verification_id para verbo '{verb}': "
-                f"la secuencia '{seq_code}' no devolvió un valor."
+                f"MCP: Error generating verification_id for verb '{verb}': "
+                f"sequence '{seq_code}' returned no value."
             )
         return vid
     
     @api.model
     def _resolve_turn(self, turn=None):
-        """Turn id del turno MCP: argumento > context > http request."""
+        """Turn id of the MCP turn: argument > context > http request."""
         if turn:
             return turn
         ctx_turn = (self.env.context or {}).get('mcp_turn')
@@ -464,31 +475,31 @@ class SafeOperation(models.Model):
                             changes_info, user_id, tool_name=None,
                             operation_data=None, request_ip=None,
                             turn=None):
-        """Crea una nueva operación supervisada (Safe Plan).
+        """Create a new supervised operation (Safe Plan).
 
         :param operation_type: Primary verb ('create', 'write', 'unlink', 'fetch_url')
-        :param model_name: Nombre del modelo afectado
-        :param records_count: Número de registros / pasos
-        :param changes_info: Información de cambios (dict → JSON)
-        :param user_id: ID del usuario que solicitó la operación
-        :param tool_name: Nombre de la herramienta MCP (opcional)
-        :param operation_data: Datos completos de la operación (dict → JSON)
-        :param request_ip: IP del cliente (opcional, para auditoría)
+        :param model_name: Name of the affected model
+        :param records_count: Number of records / steps
+        :param changes_info: Changes info (dict → JSON)
+        :param user_id: ID of the user who requested the operation
+        :param tool_name: Name of the MCP tool (optional)
+        :param operation_data: Full operation data (dict → JSON)
+        :param request_ip: Client IP (optional, for audit)
         :param turn: Turn id of the MCP conversation turn (e.g. VWVN)
-        :return: Recordset de la verificación creada
+        :return: Recordset of the created verification
         """
-        # Caducar pendientes vencidos (SKIP LOCKED). No bloquear propose si hay
-        # filas locked por un execute a medias.
+        # Expire overdue pending rows (SKIP LOCKED). Do not block propose if
+        # rows are locked by a half-done execute.
         try:
             self.cleanup_expired()
         except Exception as cleanup_err:
             _logger.warning(
-                'MCP: cleanup_expired en create_verification ignorado: %s',
+                'MCP: cleanup_expired in create_verification ignored: %s',
                 cleanup_err,
             )
 
-        # La confirmación es por sesión (toast + endpoint auth='user'), NO por PIN:
-        # la IA puede leer la BD (relaxaicode), así que ningún secreto persistido es seguro.
+        # Confirmation is per session (toast + endpoint auth='user'), NOT by PIN:
+        # the AI can read the DB (relaxaicode), so no stored secret is safe.
         changes_info_json = json.dumps(changes_info, default=str) if isinstance(changes_info, dict) else (changes_info or '')
         operation_data_json = json.dumps(operation_data, default=str) if isinstance(operation_data, dict) else (operation_data or '')
 
@@ -528,21 +539,17 @@ class SafeOperation(models.Model):
         return verification
 
 
-    # Seges: parche 13 (M10, seguridad). Ver docs/pendiente/parches_pns_ai.md
-    @api.model_create_multi
-    def create(self, vals_list):
-        """Only the system creates supervised operations (``request_safe_plan``
-        runs as superuser). A row created by RPC could carry its own status,
-        ``confirmed_by_uid`` and plan, and run as that user."""
-        if not self.env.su:
-            raise AccessError(_(
-                'Only the system can create a supervised operation.'
-            ))
-        return super().create(vals_list)
-
     # RPC write() does not honour readonly=True. Every column is written by
     # the system (plan, expiry, danger, state), only inside sudo() after the
     # caller has passed _can_resolve().
+    @api.model_create_multi
+    def create(self, vals_list):
+        if not self.env.su:
+            raise AccessError(_(
+                'Only the system can open a supervised operation.'
+            ))
+        return super().create(vals_list)
+
     def write(self, vals):
         if not self.env.su and vals:
             raise AccessError(_(
@@ -594,11 +601,11 @@ class SafeOperation(models.Model):
 
     def _confirm_by_user(self, confirmed_uid=None):
         """
-        Confirma la operación desde la sesión del navegador del humano.
+        Confirm the operation from the human's browser session.
 
-        Preferir ``_resolve_confirm_and_execute`` (Autorizaciones).
-        El toast Chatboo sigue en dos HTTP. Este método queda para tests.
-        ``confirmed_uid`` se ignora: quien confirma es el usuario de la sesión.
+        Prefer ``_resolve_confirm_and_execute`` (Authorizations).
+        The host toast still uses two HTTP calls. This method stays for tests.
+        ``confirmed_uid`` is ignored: the confirmer is the session user.
         """
         self.ensure_one()
         if not self._can_resolve():
@@ -608,17 +615,21 @@ class SafeOperation(models.Model):
         confirmed_uid = self.env.uid
         now = fields.Datetime.now()
         if self.status != 'pending':
-            raise ValidationError(f"La verificación {self.verification_id} ya no está pendiente (estado: {self.status})")
+            raise ValidationError(_(
+                'Verification %s is no longer pending (status: %s)'
+            ) % (self.verification_id, self.status))
         if self.expires_at and now > self.expires_at:
             self.sudo().write({'status': 'expired', 'resolved_at': now})
-            raise ValidationError(f"La verificación {self.verification_id} ha expirado")
+            raise ValidationError(_(
+                'Verification %s has expired'
+            ) % self.verification_id)
         self.sudo().write({
             'status': 'confirmed',
             'confirmed_by_uid': confirmed_uid,
             'resolved_at': now,
         })
         _logger.info(
-            "MCP: Verificación %s confirmada por sesión (uid=%s)",
+            "MCP: Verification %s confirmed by session (uid=%s)",
             self.verification_id, confirmed_uid,
         )
 
@@ -630,7 +641,7 @@ class SafeOperation(models.Model):
         return True
 
     def _lock_row_nowait(self):
-        """FOR UPDATE NOWAIT: toast vs Autorizaciones no se bloquean mutuamente."""
+        """FOR UPDATE NOWAIT: toast and Authorizations do not block each other."""
         self.ensure_one()
         try:
             self.env.cr.execute(
@@ -654,11 +665,11 @@ class SafeOperation(models.Model):
             raise
 
     def _resolve_confirm(self, confirmed_uid=None):
-        """Fase A — SOLO confirmar (TX corta, NOWAIT). Nunca ejecuta el plan.
+        """Phase A — ONLY confirm (short TX, NOWAIT). Never runs the plan.
 
-        Contrato robusto: el HTTP de Confirmar del toast solo llama esto.
-        Así un lock en el destino / worker zombie no puede colgar Odoo al
-        confirmar. El apply es ``resolve_execute`` en otra petición.
+        Robust contract: the toast's Confirm HTTP call only calls this.
+        That way a lock on the target / zombie worker cannot hang Odoo on
+        confirm. The apply is ``resolve_execute`` in another request.
         """
         self.ensure_one()
         if not self._can_resolve():
@@ -672,7 +683,7 @@ class SafeOperation(models.Model):
         )
         from ..utils.compat import invalidate_recordset_fields
 
-        # El uid que llega por RPC no autoriza a otra persona.
+        # The uid that comes in over RPC does not authorize another person.
         confirmed_uid = self.env.uid
         data = self.get_operation_data() or {}
         title = data.get('title') or _('Supervised operation')
@@ -683,7 +694,7 @@ class SafeOperation(models.Model):
         context = dict(self.env.context)
 
         with registry.cursor() as cr1:
-            # Fail-fast: si hay contención, busy al momento (no esperar).
+            # Fail-fast: on contention, busy right away (do not wait).
             cr1.execute("SET LOCAL lock_timeout = '2s'")
             cr1.execute("SET LOCAL statement_timeout = '5s'")
             env1 = api.Environment(cr1, confirmed_uid, context)
@@ -757,7 +768,7 @@ class SafeOperation(models.Model):
                     'resolved_at': now,
                 })
                 _logger.info(
-                    'MCP: Verificación %s confirmada (uid=%s) — sin execute',
+                    'MCP: Verification %s confirmed (uid=%s) — no execute',
                     vid, confirmed_uid,
                 )
                 if op1.operation_type == 'fetch_url':
@@ -789,10 +800,10 @@ class SafeOperation(models.Model):
         )
 
     def _resolve_execute(self, confirmed_uid=None):
-        """Fase B — aplicar el plan (otra petición HTTP, con timeouts PG).
+        """Phase B — apply the plan (another HTTP request, with PG timeouts).
 
-        Idempotente. Si otro worker tiene el claim o el destino está locked,
-        devuelve busy/async sin colgar el worker más del statement_timeout.
+        Idempotent. If another worker holds the claim or the target is locked,
+        returns busy/async without hanging the worker past statement_timeout.
         """
         self.ensure_one()
         if not self._can_resolve():
@@ -870,8 +881,8 @@ class SafeOperation(models.Model):
                 steps=steps, env=self.env,
             )
         if out.get('status') == 'error':
-            # Una clave duplicada no es «aplicando…»: la escritura terminó y
-            # no ocurrió. Solo el claim ocupado merece que el host espere.
+            # A duplicate key is not «applying…»: the write finished and
+            # did not happen. Only a busy claim is worth the host waiting.
             return attach_verification_chat_hints(
                 {
                     'success': False,
@@ -884,7 +895,7 @@ class SafeOperation(models.Model):
                 title, action='confirm', error=out.get('error'),
                 steps=steps, env=self.env,
             )
-        # No tumbar la confirmación: el humano ya autorizó.
+        # Do not drop the confirmation: the human already authorized.
         soft = _ack_tr(self.env, _(
             '«%s» is confirmed. Applying the changes — this may take a moment.'
         )) % title
@@ -911,14 +922,14 @@ class SafeOperation(models.Model):
         )
 
     def _resolve_confirm_and_execute(self, confirmed_uid=None):
-        """Una fila, un vuelo: confirmar y aplicar.
+        """One row, one flight: confirm and apply.
 
-        Autorizaciones usan esto. El toast Chatboo sigue en dos HTTP
-        (confirm, luego execute). Entre fases hay que commitear: el cursor
-        de Odoo es REPEATABLE READ y, si no, execute ve pending. Tras
-        execute, otro commit: el host que lee la secuencia del registro
-        recién creado vería la fila ausente si se quedara en la foto de
-        antes.
+        Authorizations use this. The host toast still uses two HTTP calls
+        (confirm, then execute). We must commit between phases: the Odoo
+        cursor is REPEATABLE READ and, otherwise, execute sees pending. After
+        execute, another commit: a host reading the sequence of the newly
+        created record would see the row missing if it kept the snapshot
+        from before.
         """
         from ..utils.compat import invalidate_recordset_fields
 
@@ -946,7 +957,7 @@ class SafeOperation(models.Model):
 
     @api.model
     def _execute_plan_with_timeouts(self, op_id, uid, context, vid, title):
-        """Execute in a fresh cursor with PG fail-fast timeouts (un solo vuelo)."""
+        """Execute in a fresh cursor with PG fail-fast timeouts (single flight)."""
         from odoo import api
         from ..controllers.safe_plan import build_verification_followup_message
 
@@ -959,7 +970,7 @@ class SafeOperation(models.Model):
                 op2 = env2['ai.safe.operation'].browse(op_id)
                 results = op2.execute_plan_now()
                 if results is False:
-                    # Otra sesión ya tiene el claim de execute (NOWAIT).
+                    # Another session already holds the execute claim (NOWAIT).
                     return {
                         'success': False,
                         'busy': True,
@@ -970,7 +981,7 @@ class SafeOperation(models.Model):
                 cr2.commit()
         except Exception as exc:
             _logger.error(
-                'MCP: Error ejecutando plan %s: %s', vid, exc, exc_info=True,
+                'MCP: Error executing plan %s: %s', vid, exc, exc_info=True,
             )
             err = str(exc)
             low = err.lower()
@@ -980,10 +991,10 @@ class SafeOperation(models.Model):
                 or 'statement timeout' in low
                 or 'querycanceled' in low
             ):
-                err = (
-                    'timeout_or_lock: otro proceso bloquea el registro destino '
-                    '(suele ser un worker Odoo zombie). Reinicia el contenedor '
-                    'Odoo; la operación ya quedó confirmed. Detalle: %s'
+                err = 'timeout_or_lock: ' + _(
+                    'another process is locking the target record (usually '
+                    'a zombie Odoo worker). Restart the Odoo container; the '
+                    'operation is already confirmed. Detail: %s'
                 ) % err
             return {
                 'success': False,
@@ -1016,21 +1027,20 @@ class SafeOperation(models.Model):
             ),
         }
 
-    # Seges: parche 13 (M10, seguridad). Ver docs/pendiente/parches_pns_ai.md
     @api.model
     def _cleanup_stuck_state(self, older_than_minutes=10):
-        """Limpiador de estado Safe Plan (el que faltaba).
+        """Safe Plan state cleaner (the one that was missing).
 
-        ``cleanup_expired`` solo toca ``pending`` vencidos. El agujero real es
-        ``confirmed`` + ``executed=False`` (auto-confirm/toast a medias, 6YR2):
-        deja la cola zombie y el siguiente propose/orquestación se atasca.
+        ``cleanup_expired`` only touches overdue ``pending``. The real hole is
+        ``confirmed`` + ``executed=False`` (half-done auto-confirm/toast, 6YR2):
+        it leaves a zombie queue and the next propose/orchestration gets stuck.
 
-        1. Suelta claims ``_executing`` huérfanos.
-        2. Reintenta execute (un vuelo, con timeouts).
-        3. Lo que siga confirmed sin execute y más viejo que
-           ``older_than_minutes`` → ``cancelled`` con diagnóstico.
+        1. Releases orphan ``_executing`` claims.
+        2. Retries execute (one flight, with timeouts).
+        3. Whatever is still confirmed without execute and older than
+           ``older_than_minutes`` → ``cancelled`` with a diagnosis.
 
-        Early-exit barato: si no hay cola stuck, no abre cursores ni reintentos.
+        Cheap early exit: if there is no stuck queue, no cursors or retries.
         """
         stats = {'claims_cleared': 0, 'executed': 0, 'cancelled': 0}
         stuck_n = self.search_count([
@@ -1048,15 +1058,15 @@ class SafeOperation(models.Model):
         )
         if any(stats.values()):
             _logger.warning(
-                'MCP: cleanup_stuck_state claims=%s executed=%s cancelled=%s',
+                'MCP: _cleanup_stuck_state claims=%s executed=%s cancelled=%s',
                 stats['claims_cleared'], stats['executed'], stats['cancelled'],
             )
         return stats
 
     @api.model
     def _retry_confirmed_not_executed(self, limit=20):
-        """Un intento de execute por op confirmed pendiente."""
-        from odoo import api, SUPERUSER_ID
+        """One execute attempt per pending confirmed op."""
+        from odoo import api
 
         pending = self.search([
             ('status', '=', 'confirmed'),
@@ -1068,11 +1078,9 @@ class SafeOperation(models.Model):
         done = 0
         registry = self.env.registry
         for op_meta in pending:
-            uid = (
-                op_meta.confirmed_by_uid.id
-                or op_meta.user_id.id
-                or SUPERUSER_ID
-            )
+            uid = op_meta.user_id.id or op_meta.confirmed_by_uid.id
+            if not uid:
+                continue
             try:
                 with registry.cursor() as cr:
                     cr.execute("SET LOCAL lock_timeout = '8s'")
@@ -1096,7 +1104,7 @@ class SafeOperation(models.Model):
 
     @api.model
     def _cancel_stale_confirmed_not_executed(self, older_than_minutes=10):
-        """Cancela confirmed sin execute demasiado viejos (estado zombie)."""
+        """Cancel confirmed-without-execute rows that are too old (zombie state)."""
         mins = max(2, int(older_than_minutes))
         cutoff = fields.Datetime.now() - timedelta(minutes=mins)
         stuck = self.search([
@@ -1197,34 +1205,36 @@ class SafeOperation(models.Model):
         )
 
     def cancel_by_user(self, cancelled_uid=None):
-        """Cancela la operación desde la sesión del navegador del humano."""
+        """Cancel the operation from the human's browser session."""
         self.ensure_one()
         if not self._can_resolve():
             raise AccessError(_(
                 'Only the owner or an AI Administrator can resolve this operation.'
             ))
         if self.status != 'pending':
-            raise ValidationError(f"La verificación {self.verification_id} ya no está pendiente (estado: {self.status})")
+            raise ValidationError(_(
+                'Verification %s is no longer pending (status: %s)'
+            ) % (self.verification_id, self.status))
         self.sudo().write({
             'status': 'cancelled',
             'resolved_at': fields.Datetime.now(),
         })
-        _logger.info("MCP: Verificación %s cancelada por sesión", self.verification_id)
+        _logger.info("MCP: Verification %s cancelled by session", self.verification_id)
         self._notify_safe_plan_hosts(status='cancelled')
         return True
 
     def _claim_execute(self, stale_seconds=45):
-        """Claim atómico del execute (single-flight) en cursor propio.
+        """Atomic execute claim (single-flight) on its own cursor.
 
-        Importante: NO hace commit del cursor del caller. El claim antiguo
-        hacía ``env.cr.commit()`` y eso:
-        1) mataba los ``SET LOCAL lock/statement_timeout`` del toast/cron, y
-        2) soltaba el FOR UPDATE de ``ir.cron`` a mitad de job → worker
-           forever-busy (el síntoma «Another process… already busy»).
+        Important: it does NOT commit the caller's cursor. The old claim
+        did ``env.cr.commit()`` and that:
+        1) killed the toast/cron ``SET LOCAL lock/statement_timeout``, and
+        2) released the ``ir.cron`` FOR UPDATE halfway through the job → worker
+           forever-busy (the «Another process… already busy» symptom).
 
-        El claim vive en un cursor corto; el plan corre después en el cursor
-        del caller (con timeouts reaplicados en ``execute_plan_now``).
-        Roba claims huérfanos (> ``stale_seconds``) del mismo registro.
+        The claim lives in a short cursor; the plan then runs on the caller's
+        cursor (with timeouts reapplied in ``execute_plan_now``).
+        Steals orphan claims (> ``stale_seconds``) of the same record.
         """
         self.ensure_one()
         from ..utils.compat import invalidate_recordset_fields
@@ -1241,7 +1251,7 @@ class SafeOperation(models.Model):
         registry = self.env.registry
 
         with registry.cursor() as cr:
-            # Robar claim huérfano de ESTA fila (worker muerto / toast colgado).
+            # Steal an orphan claim of THIS row (dead worker / hung toast).
             cr.execute(
                 "UPDATE %s SET result_info = NULL, "
                 "write_date = (now() at time zone 'UTC') "
@@ -1285,7 +1295,7 @@ class SafeOperation(models.Model):
         return 'claimed'
 
     def _release_execute_claim(self, error=None):
-        """Quita el claim ``_executing`` (cursor propio; no commit del caller).
+        """Remove the ``_executing`` claim (own cursor; no caller commit).
 
         If *error* is set, the human authorization is revoked (``cancelled``).
         A failed execute must not stay ``confirmed``: later code fixes would
@@ -1324,7 +1334,7 @@ class SafeOperation(models.Model):
 
     @api.model
     def _clear_stale_execute_claims(self, older_than_seconds=45):
-        """Claims ``_executing`` huérfanos (worker muerto) → reintento posible."""
+        """Orphan ``_executing`` claims (dead worker) → retry possible."""
         secs = max(30, int(older_than_seconds))
         self.env.cr.execute(
             "UPDATE %s SET result_info = NULL, "
@@ -1342,42 +1352,42 @@ class SafeOperation(models.Model):
         return n
 
     def execute_plan_now(self):
-        """Ejecuta el plan declarativo (caja B) con el env del usuario ACTUAL.
+        """Run the declarative plan (box B) with the CURRENT user's env.
 
-        Single-flight por claim atómico (no FOR UPDATE durante el plan):
-        toast/cron/auto-confirm no pueden aplicar el mismo plan a la vez, y
-        el HTTP de fetch_url no retiene el lock de la op (evita 6YR2 colgada).
+        Single-flight via atomic claim (no FOR UPDATE during the plan):
+        toast/cron/auto-confirm cannot apply the same plan at once, and
+        the fetch_url HTTP call does not hold the op lock (avoids a hung 6YR2).
 
-        Atomicidad (crítico — no separar): las mutaciones de negocio
-        (``execute_safe_plan``) y la marca ``executed=True`` + ``result_info``
-        se comitean JUNTAS, en una única transacción de ESTE cursor
-        (``self.env.cr``). O queda todo, o no queda nada:
+        Atomicity (critical — do not split): the business mutations
+        (``execute_safe_plan``) and the ``executed=True`` + ``result_info``
+        mark are committed TOGETHER, in a single transaction of THIS cursor
+        (``self.env.cr``). Either everything stays, or nothing does:
 
-        - Falla el plan/commit → ni mutaciones ni ``executed``; la
-          autorización se **cancela** (nuevo toast si el humano insiste). El
-          "toast mentiroso" (éxito reportado sin cambios reales) es imposible.
-          Un ``confirmed`` zombie no debe sobrevivir a un fallo: al arreglar
-          el código, ``safe_plan_status`` / cron reaplicarían el
-          mismo Confirmar sin permiso nuevo.
-        - Éxito → mutaciones y ``executed=True`` durables a la vez. Tampoco
-          existe la ventana inversa (mutaciones comiteadas con ``executed``
-          aún False) que permitía a ``_retry_confirmed_not_executed`` relanzar
-          el plan entero y duplicar el trabajo tras caducar el claim.
+        - Plan/commit fails → no mutations and no ``executed``; the
+          authorization is **cancelled** (new toast if the human insists). The
+          "lying toast" (success reported without real changes) is impossible.
+          A zombie ``confirmed`` must not survive a failure: once the code is
+          fixed, ``safe_plan_status`` / cron would replay the
+          same Confirm without new permission.
+        - Success → mutations and ``executed=True`` durable at once. The
+          reverse window (mutations committed with ``executed`` still
+          False) that let ``_retry_confirmed_not_executed`` rerun the
+          whole plan and duplicate the work after the claim expired is gone too.
 
-        Para poder escribir la fila de la op en esta misma transacción sin el
-        ``SerializationFailure`` (PG 40001) contra el commit del claim (que
-        ocurre en su propio cursor DESPUÉS de que este cursor tomara su
-        snapshot REPEATABLE READ), se renueva el snapshot con un ``commit()``
-        inmediatamente después de obtener el claim. Todos los llamadores
-        (``_execute_plan_with_timeouts``, auto-confirm en propose,
+        To write the op row in this same transaction without a
+        ``SerializationFailure`` (PG 40001) against the claim commit (which
+        happens on its own cursor AFTER this cursor took its
+        REPEATABLE READ snapshot), the snapshot is renewed with a ``commit()``
+        right after getting the claim. All callers
+        (``_execute_plan_with_timeouts``, auto-confirm in propose,
         ``safe_plan_status``, ``_retry_confirmed_not_executed``)
-        llegan aquí con su cursor recién comiteado o sin trabajo pendiente,
-        así que ese commit temprano no persiste nada a medias de nadie; sus
-        ``cr.commit()`` posteriores quedan como no-ops inofensivos.
+        reach here with a freshly committed cursor or no pending work,
+        so that early commit persists nobody's half-done work; their
+        later ``cr.commit()`` calls become harmless no-ops.
 
         Returns:
-            list|dict results | [] si ya executed | None sin plan/skip |
-            False si otro ejecutor tiene el claim (busy).
+            list|dict results | [] if already executed | None no plan/skip |
+            False if another executor holds the claim (busy).
         """
         self.ensure_one()
         from ..utils.compat import invalidate_recordset_fields
@@ -1420,25 +1430,31 @@ class SafeOperation(models.Model):
             self._release_execute_claim(error='no_plan_steps')
             return None
         from ..utils.session_download import resolve_session_ref
+        from ..utils.one_company import SCREEN_COMPANIES, one_company_context
         session_ref = data.get('ai_session_ref') or resolve_session_ref(self.env)
-        exec_env = self.env
+        # The plan writes with the rights of whoever asked for it, not of
+        # whoever pressed confirm, and in the companies it was asked in.
+        exec_env = self.env(user=self.user_id.id) if self.user_id else self.env
+        exec_env = exec_env(context=one_company_context(
+            exec_env, requested=data.get(SCREEN_COMPANIES) or (),
+        ))
         if session_ref:
-            exec_env = self.env(context=dict(
-                self.env.context or {},
+            exec_env = exec_env(context=dict(
+                exec_env.context or {},
                 ai_session_ref=int(session_ref),
             ))
         vid = self.verification_id
         dbname = self.env.cr.dbname
         op_id = self.id
         try:
-            # Snapshot fresco POSTERIOR al commit del claim: así el UPDATE de
-            # executed=True de abajo puede vivir en la MISMA transacción que
-            # las mutaciones sin SerializationFailure (ver docstring). Los
-            # llamadores llegan con su cursor recién comiteado o sin trabajo
-            # pendiente, así que aquí no se persiste nada a medias.
+            # Fresh snapshot AFTER the claim commit: that way the
+            # executed=True UPDATE below can live in the SAME transaction as
+            # the mutations without SerializationFailure (see docstring).
+            # Callers arrive with a freshly committed cursor or no pending
+            # work, so nothing half-done is persisted here.
             self.env.cr.commit()
-            # SET LOCAL muere con el commit: reaplicar timeouts en la
-            # transacción nueva (sin ellos el plan cuelga forever ante un lock).
+            # SET LOCAL dies with the commit: reapply timeouts in the
+            # new transaction (without them the plan hangs forever on a lock).
             try:
                 from ..utils.module_update_heal import plan_has_module_update
                 if plan_has_module_update(steps):
@@ -1463,9 +1479,9 @@ class SafeOperation(models.Model):
                 ai_journal_note=(data.get('title') or '')[:500],
             ))
             results = execute_safe_plan(exec_env, steps)
-            # Mutaciones + executed=True en UNA transacción (todo o nada).
-            # Flush explícito antes del UPDATE crudo: cr.commit() no vuelca la
-            # caché ORM por sí solo en todas las versiones soportadas.
+            # Mutations + executed=True in ONE transaction (all or nothing).
+            # Explicit flush before the raw UPDATE: cr.commit() alone does not
+            # flush the ORM cache in every supported version.
             flush_all = getattr(self.env, 'flush_all', None)
             if flush_all is not None:
                 flush_all()  # Odoo 17+
@@ -1485,8 +1501,8 @@ class SafeOperation(models.Model):
             _logger.error(
                 'MCP: execute_plan_now %s — failed: %s', vid, exc, exc_info=True,
             )
-            # Dejar el cursor del caller utilizable (una tx PG abortada
-            # rechaza todo SQL posterior hasta rollback).
+            # Leave the caller's cursor usable (an aborted PG tx
+            # rejects all later SQL until rollback).
             try:
                 self.env.cr.rollback()
             except Exception:
@@ -1709,7 +1725,7 @@ class SafeOperation(models.Model):
             )
 
     def _notify_safe_plan_hosts(self, status=None, executed=None):
-        """Tell Autorizaciones / toast / walkie that this row changed.
+        """Tell Authorizations / toast / walkie that this row changed.
 
         One row is the fact. Hosts must not keep a private pending copy.
 
@@ -1761,12 +1777,12 @@ class SafeOperation(models.Model):
                     )
 
     def _notify_reload(self, message, ntype='success'):
-        """Acción de notificación que además recarga la vista.
+        """Notification action that also reloads the view.
 
-        Sin esto, un botón que devuelve un ``display_notification`` deja la
-        lista/formulario de Autorizaciones con el estado viejo hasta pulsar
-        F5. Encadenamos un ``reload`` en ``params.next`` para refrescar el
-        estado del registro tras confirmar/cancelar.
+        Without this, a button that returns a ``display_notification`` leaves
+        the Authorizations list/form with the old state until F5 is pressed.
+        We chain a ``reload`` in ``params.next`` to refresh the record
+        state after confirm/cancel.
         """
         from ..utils.mcp_ui import client_notification
         action = client_notification(
@@ -1777,14 +1793,13 @@ class SafeOperation(models.Model):
         }
         return action
 
-    # Seges: parche 16 (PNS-54, seguridad). Ver docs/pendiente/parches_pns_ai.md
-    @check_identity
     def action_confirm_and_execute(self):
-        """Botón Autorizaciones: un clic = confirmar + escribir + executed.
+        """Authorizations button: one click = confirm + write + executed.
 
-        UX simple (sin botón Aplicar). Anti-cuelgue: timeouts PG en el apply
-        (5s/15s) y se suelta claim huérfano antes. Si el destino está locked,
-        la op queda confirmed y el error es explícito — no spinner eterno.
+        Simple UX (no Apply button). Anti-hang: PG timeouts on the apply
+        (5s/15s) and any orphan claim is released first. If the target is
+        locked, the op stays confirmed and the error is explicit — no endless
+        spinner.
         """
         self.ensure_one()
         from ..utils.compat import invalidate_recordset_fields
@@ -1844,7 +1859,7 @@ class SafeOperation(models.Model):
         ))
 
     def action_execute_plan(self):
-        """Compat: redirige al mismo flujo de un clic (confirm+execute)."""
+        """Compat: redirects to the same one-click flow (confirm+execute)."""
         return self.action_confirm_and_execute()
 
     def action_cancel(self):
@@ -1898,9 +1913,8 @@ class SafeOperation(models.Model):
             'success',
         )
 
-    # Throttle del refresco lazy al abrir lista/form (segundos).
+    # Throttle of the lazy refresh when opening list/form (seconds).
     _EXPIRY_REFRESH_THROTTLE_S = 15
-    _expiry_refresh_last_ts = 0.0
 
     def init(self):
         super().init()
@@ -1918,19 +1932,19 @@ class SafeOperation(models.Model):
 
     @api.model
     def refresh_expiry_statuses(self, limit=100):
-        """Marca ``expired`` pendientes y confirmed-no-ejecutados vencidos.
+        """Mark overdue pending and confirmed-not-executed rows ``expired``.
 
-        Sin cron nuevo: se llama al abrir lista/form (últimas N) o desde
-        Herramientas (todas). ``limit=None`` = sin tope.
+        No new cron: called when opening list/form (last N) or from
+        Tools (all). ``limit=None`` = no cap.
         """
         if self.env.context.get('skip_expiry_refresh'):
             return 0
         self._align_executed_status()
         import time
         now_ts = time.time()
-        # Throttle solo en el camino lazy (lista/form); Herramientas fuerza.
+        # Throttle only on the lazy path (list/form); Tools forces it.
         if limit is not None:
-            last = type(self)._expiry_refresh_last_ts
+            last = _EXPIRY_REFRESH_LAST_TS.get(self.env.cr.dbname, 0.0)
             if now_ts - last < self._EXPIRY_REFRESH_THROTTLE_S:
                 return 0
         now = fields.Datetime.now()
@@ -1951,23 +1965,23 @@ class SafeOperation(models.Model):
         ids = [row[0] for row in cr.fetchall()]
         if not ids:
             if limit is not None:
-                type(self)._expiry_refresh_last_ts = now_ts
+                _EXPIRY_REFRESH_LAST_TS[self.env.cr.dbname] = now_ts
             return 0
         self.sudo().with_context(skip_expiry_refresh=True).browse(ids).write({
             'status': 'expired',
             'resolved_at': now,
         })
         if limit is not None:
-            type(self)._expiry_refresh_last_ts = now_ts
+            _EXPIRY_REFRESH_LAST_TS[self.env.cr.dbname] = now_ts
         _logger.info(
-            'MCP: %s verificación(es) marcadas expired (refresh, limit=%s)',
+            'MCP: %s verification(s) marked expired (refresh, limit=%s)',
             len(ids), limit,
         )
         return len(ids)
 
     @api.model
     def action_refresh_expiry_statuses(self):
-        """Herramientas: actualiza todos los estados de caducidad y recarga."""
+        """Tools: refresh every expiry status and reload."""
         n = self.refresh_expiry_statuses(limit=None)
         return {
             'type': 'ir.actions.client',
@@ -1990,7 +2004,7 @@ class SafeOperation(models.Model):
 
     @api.model
     def web_search_read(self, *args, **kwargs):
-        # Odoo 17+; en O14 la lista usa search_read.
+        # Odoo 17+; on O14 the list uses search_read.
         self.refresh_expiry_statuses(limit=100)
         parent = getattr(super(), 'web_search_read', None)
         if parent is None:
@@ -2004,11 +2018,11 @@ class SafeOperation(models.Model):
 
     @api.model
     def cleanup_expired(self):
-        """Compat/cron existente: mismo refresco sin tope (no añade cron nuevo)."""
+        """Compat/existing cron: same refresh with no cap (adds no new cron)."""
         return self.refresh_expiry_statuses(limit=None)
 
     def get_operation_data(self):
-        """Obtiene los datos de la operación deserializados"""
+        """Get the deserialized operation data"""
         self.ensure_one()
         if self.operation_data:
             try:
@@ -2044,17 +2058,19 @@ class SafeOperation(models.Model):
             'plan': plan,
             'danger_level': danger,
         }
-        # Seges: parche 16 (PNS-54, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        if mint_token and self.user_id == self.env.user:
+        if mint_token:
             payload['confirm_token'] = self._mint_confirm_token()
         return payload
 
     @api.model
-    def pending_card_payloads(self, mint_token=True):
+    def pending_card_payloads(self, mint_token=True, held=None):
         """Live pending cards for the current user. Read-only; does not create rows.
 
         ``mint_token=False`` is a count/peek: it must not rotate the card token.
+        ``held`` are the cards the screen already paints with their token: a new
+        token for them would leave the painted one behind.
         """
+        held = {str(one) for one in (held or []) if one}
         self.refresh_expiry_statuses(limit=100)
         now = fields.Datetime.now()
         ops = self.search([
@@ -2063,7 +2079,12 @@ class SafeOperation(models.Model):
             ('executed', '=', False),
             ('expires_at', '>', now),
         ], order='id desc')
-        return [op.card_payload(mint_token=mint_token) for op in ops]
+        return [
+            op.card_payload(
+                mint_token=mint_token and op.verification_id not in held,
+            )
+            for op in ops
+        ]
 
     # ── Export ────────────────────────────────────────────────────────
 

@@ -15,13 +15,6 @@ from .validators_base import (
     RELAXAICODE_NETWORK_IMPORT_MODULES,
     RELAXAICODE_PRIVILEGE_ATTRS,
     RELAXAICODE_SAFE_MODULES,
-    # Seges: parche 23 (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
-    RELAXAICODE_ENV_STATE_ATTRS,
-    RELAXAICODE_ENV_STATE_HINT,
-    # Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
-    sandbox_forbidden_name,
-    RELAXAICODE_ENGINE_NAME_HINT,
-    engine_name_binding,
     _ast_parent_map,
     _is_inside_function,
     _private_attr_error,
@@ -54,19 +47,20 @@ from .validators_sort import (
     _is_safe_sort_key_value,
 )
 
+_MATCH_CLASS = getattr(ast, 'MatchClass', None)
 
 def validate_relaxaicode_source_ast(code):
     """
-    Valida código Python usando AST completo.
-    Detecta imports peligrosos, funciones peligrosas, y código dinámico.
+    Validates Python code using the full AST.
+    Detects dangerous imports, dangerous functions and dynamic code.
     
     Returns:
         tuple: (is_valid, error_message, requires_write)
-            - is_valid: True si el código es válido
-            - error_message: Mensaje de error si no es válido, None si es válido
-            - requires_write: True si el código requiere permisos de escritura
+            - is_valid: True if the code is valid
+            - error_message: Error message if not valid, None if valid
+            - requires_write: True if the code needs write permissions
     """
-    # CRÍTICO: Validar que code sea string
+    # CRITICAL: Check that code is a string
     if not isinstance(code, str):
         return False, f"Invalid code type: expected string, got {type(code).__name__}. Code must be a Python string.", False
     
@@ -74,20 +68,20 @@ def validate_relaxaicode_source_ast(code):
         return False, "Code is empty or contains only whitespace", False
     
     try:
-        # Parsear código a AST
+        # Parse the code to an AST
         tree = ast.parse(code, '<relaxaicode>', 'exec')
     except SyntaxError as e:
-        # Proporcionar mensaje de error más descriptivo
+        # Give a more descriptive error message
         error_msg = str(e)
         error_line = getattr(e, 'lineno', None)
         
-        # Si hay información de línea, incluirla en el mensaje
+        # If there is line info, include it in the message
         if error_line:
-            # Obtener la línea problemática para contexto
+            # Get the offending line for context
             lines = code.split('\n')
             if error_line <= len(lines):
                 problem_line = lines[error_line - 1]
-                # Truncar si es muy larga
+                # Truncate if very long
                 if len(problem_line) > 100:
                     problem_line = problem_line[:97] + '...'
                 error_msg = f"Syntax error at line {error_line}: {error_msg}\nProblematic line: {problem_line}"
@@ -120,37 +114,31 @@ def validate_relaxaicode_source_ast(code):
     dangerous_modules = RELAXAICODE_DANGEROUS_MODULES
     safe_modules = RELAXAICODE_SAFE_MODULES
 
-    # Funciones peligrosas completamente prohibidas
+    # Dangerous functions, fully forbidden
     dangerous_functions = {
         'open', 'eval', 'exec', 'compile', '__import__',
         'input', 'raw_input', 'file',
     }
 
-    # Atributos peligrosos: denylist ÚNICA (DANGEROUS_ATTR_NAMES) compartida
-    # con guarded_getattr de runtime.
+    # Dangerous attributes: SINGLE denylist (DANGEROUS_ATTR_NAMES) shared
+    # with the runtime guarded_getattr.
     dangerous_attrs = DANGEROUS_ATTR_NAMES
 
-    # Variables peligrosas completamente prohibidas
+    # Dangerous variables, fully forbidden
     dangerous_vars = {
         'locals', 'globals', 'vars', 'dir',
     }
     
-    # Analizar AST completo
+    # Analyze the full AST
     for node in ast.walk(tree):
-        # Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        # Nombres internos del motor (_sandbox_str_attr): se leen, no se ligan.
-        engine_name = engine_name_binding(node)
-        if engine_name:
-            return False, format_ast_error(
-                'ENGINE_NAME', RELAXAICODE_ENGINE_NAME_HINT % (engine_name,)), False
         # ============================================================
-        # VALIDAR IMPORTS DIRECTOS
+        # VALIDATE DIRECT IMPORTS
         # ============================================================
         if isinstance(node, ast.Import):
             for alias in node.names:
-                module_name = alias.name.split('.')[0]  # Solo el primer nivel
+                module_name = alias.name.split('.')[0]  # Top level only
                 
-                # Bloquear módulos peligrosos
+                # Block dangerous modules
                 if module_name in dangerous_modules:
                     if module_name == 'odoo':
                         return False, (
@@ -169,21 +157,21 @@ def validate_relaxaicode_source_ast(code):
                     return False, _unsafe_import_error(module_name), False
 
         # ============================================================
-        # VALIDAR IMPORTS FROM
+        # VALIDATE IMPORT FROM
         # ============================================================
         if isinstance(node, ast.ImportFrom):
             if node.module:
-                # urllib.parse: funciones puras de texto (quote, urlencode, urlparse,
-                # parse_qs, urljoin...) para COMPONER/TROCEAR URLs. No tiene red ni FS.
-                # Se permite SOLO la forma `from urllib.parse import <nombre>`, que liga
-                # las funciones y nunca el paquete `urllib` (por el que se alcanzaría
-                # urllib.request). `import urllib.parse` sigue prohibido (ver ast.Import).
+                # urllib.parse: pure text functions (quote, urlencode, urlparse,
+                # parse_qs, urljoin...) to BUILD/SPLIT URLs. No network or FS.
+                # ONLY the form `from urllib.parse import <name>` is allowed, which binds
+                # the functions and never the `urllib` package (through which you could reach
+                # urllib.request). `import urllib.parse` is still forbidden (see ast.Import).
                 if node.module == 'urllib.parse':
                     continue
 
-                module_name = node.module.split('.')[0]  # Solo el primer nivel
+                module_name = node.module.split('.')[0]  # Top level only
 
-                # Bloquear módulos peligrosos
+                # Block dangerous modules
                 if module_name in dangerous_modules:
                     if module_name in RELAXAICODE_NETWORK_IMPORT_MODULES:
                         return False, _network_import_error(module_name), False
@@ -196,10 +184,10 @@ def validate_relaxaicode_source_ast(code):
                     return False, _unsafe_import_error(module_name), False
 
         # ============================================================
-        # VALIDAR LLAMADAS A FUNCIONES PELIGROSAS
+        # VALIDATE CALLS TO DANGEROUS FUNCTIONS
         # ============================================================
         if isinstance(node, ast.Call):
-            # Llamadas directas: open(), eval(), exec(), print(), etc.
+            # Direct calls: open(), eval(), exec(), print(), etc.
             if isinstance(node.func, ast.Name):
                 if node.func.id in dangerous_functions:
                     if node.func.id in ('eval', 'exec', 'compile'):
@@ -215,15 +203,15 @@ def validate_relaxaicode_source_ast(code):
                         "This function is prohibited for security."
                     ), False
             
-            # Llamadas a métodos: obj.open(), obj.eval(), etc.
+            # Method calls: obj.open(), obj.eval(), etc.
             if isinstance(node.func, ast.Attribute):
                 if node.func.attr in dangerous_functions:
                     return False, (
                         f"[PROHIBITED] Relaxaicode cannot use method '.{node.func.attr}()'. "
                         "This method is prohibited for security reasons."
                     ), False
-                # Métodos de cursor/transacción: SQL crudo y control de transacción quedan
-                # fuera de la caja A. Las escrituras se hacen SOLO vía la caja B (verbos ORM).
+                # Cursor/transaction methods: raw SQL and transaction control stay
+                # outside box A. Writes happen ONLY through box B (ORM verbs).
                 dangerous_cursor_methods = {
                     'execute', 'executemany', 'commit', 'rollback', 'savepoint',
                     'dictfetchall', 'dictfetchone',
@@ -235,16 +223,16 @@ def validate_relaxaicode_source_ast(code):
                         "through confirmed write operations, never raw SQL."
                     ), False
             
-            # Bloquear __import__() dinámico
+            # Block dynamic __import__()
             if isinstance(node.func, ast.Name) and node.func.id == '__import__':
                 return False, (
                     "[PROHIBITED] Relaxaicode cannot use '__import__()' dynamically. "
                     "Imports must be static/direct (import module or from module import)."
                 ), False
 
-            # Bloquear type(name, bases, dict): crea CLASES dinámicamente, saltándose
-            # la prohibición de 'class'. Se preserva type(x) de 1 argumento (chequeo
-            # de tipo, uso legítimo). 3 args = metaclase → fuera de la caja A.
+            # Block type(name, bases, dict): it creates CLASSES dynamically, bypassing
+            # the 'class' ban. The 1-argument type(x) is kept (type check,
+            # legitimate use). 3 args = metaclass → outside box A.
             if isinstance(node.func, ast.Name) and node.func.id == 'type' and len(node.args) == 3:
                 return False, (
                     "[PROHIBITED] Relaxaicode cannot use 'type(name, bases, dict)' to create "
@@ -252,7 +240,7 @@ def validate_relaxaicode_source_ast(code):
                 ), False
         
         # ============================================================
-        # VALIDAR RETURN: solo dentro de def (el script sigue usando result=)
+        # VALIDATE RETURN: only inside def (the script still uses result=)
         # ============================================================
         if isinstance(node, ast.Return):
             if not _is_inside_function(node, parents):
@@ -265,9 +253,9 @@ def validate_relaxaicode_source_ast(code):
                 ), False
 
         # ============================================================
-        # VALIDAR PATRONES INCORRECTOS COMUNES (self.env, context.get, etc.)
+        # VALIDATE COMMON WRONG PATTERNS (self.env, context.get, etc.)
         # ============================================================
-        # Detectar self.env (patrón de métodos de Odoo, NO existe en relaxaicode)
+        # Detect self.env (Odoo method pattern, does NOT exist in relaxaicode)
         if isinstance(node, ast.Attribute):
             if isinstance(node.value, ast.Name) and node.value.id == 'self' and node.attr == 'env':
                 return False, (
@@ -277,7 +265,7 @@ def validate_relaxaicode_source_ast(code):
                     "Wrong: partners = self.env['res.partner'].search([])"
                 ), False
         
-        # Detectar context.get('env') o context['env'] (patrón de wizards, NO existe en relaxaicode)
+        # Detect context.get('env') or context['env'] (wizard pattern, does NOT exist in relaxaicode)
         if isinstance(node, ast.Call):
             if isinstance(node.func, ast.Attribute):
                 if isinstance(node.func.value, ast.Name) and node.func.value.id == 'context':
@@ -296,7 +284,7 @@ def validate_relaxaicode_source_ast(code):
                             "Example: result = {'odoo_version': odoo_version}"
                         ), False
         
-        # Detectar acceso a context['env'] o context.get('env')
+        # Detect access to context['env'] or context.get('env')
         if isinstance(node, ast.Subscript):
             if isinstance(node.value, ast.Name) and node.value.id == 'context':
                 return False, (
@@ -306,26 +294,22 @@ def validate_relaxaicode_source_ast(code):
                 ), False
         
         # ============================================================
-        # VALIDAR ACCESO A ATRIBUTOS PELIGROSOS
+        # VALIDATE ACCESS TO DANGEROUS ATTRIBUTES
         # ============================================================
         if isinstance(node, ast.Attribute):
             if node.attr in RELAXAICODE_FORBIDDEN_ORM_ATTRS:
                 return False, _external_api_bypass_error(node.attr), False
             if node.attr in RELAXAICODE_PRIVILEGE_ATTRS:
                 return False, _privilege_error(node.attr), False
-            # Seges: parche 23 (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
-            if node.attr in RELAXAICODE_ENV_STATE_ATTRS:
-                return False, format_ast_error(
-                    'ENV_STATE', RELAXAICODE_ENV_STATE_HINT % (node.attr,)), False
             if blocked_private_attr(node.attr):
                 return False, _private_attr_error(node.attr), False
             if node.attr in dangerous_attrs:
-                # type(x).__name__ → string label; no abre introspección de sandbox.
+                # type(x).__name__ → string label; does not open sandbox introspection.
                 if not _is_safe_type_name_access(node):
                     return False, _dangerous_attr_error(node.attr), False
-            # string.Formatter().get_field(...) / .vformat(...) devuelven el OBJETO
-            # real (no su repr) → traversal de clases sin '.' ni getattr. Se bloquea
-            # por nombre, cubriendo tanto `string.Formatter` como `import string`.
+            # string.Formatter().get_field(...) / .vformat(...) return the real
+            # OBJECT (not its repr) → class traversal without '.' or getattr. Blocked
+            # by name, covering both `string.Formatter` and `import string`.
             if node.attr in DANGEROUS_FORMAT_NAMES:
                 return False, format_ast_error(
                     'FORMATTER',
@@ -334,22 +318,31 @@ def validate_relaxaicode_source_ast(code):
                     % node.attr,
                 ), False
         
+        # `case T(attr=x)` reads the attribute in C, past the sandbox's
+        # attribute reads. Python 3.10+ only (no node on older series).
+        if _MATCH_CLASS is not None and isinstance(node, _MATCH_CLASS):
+            return False, (
+                "[PROHIBITED] Relaxaicode cannot use class patterns in "
+                "'match' (case T(...)). Use isinstance(x, T) and read the "
+                "attributes with x.attr."
+            ), False
+
         # ============================================================
-        # VALIDAR USO DE VARIABLES PELIGROSAS
+        # VALIDATE USE OF DANGEROUS VARIABLES
         # ============================================================
         if isinstance(node, ast.Name):
             if node.id in dangerous_vars:
-                # Verificar si se está usando como llamada a función
-                # Buscar en el árbol si este Name está dentro de un Call
-                # Como ast.walk no mantiene relaciones padre-hijo, verificamos
-                # si hay un Call cercano que use esta variable
-                # La mejor forma es verificar el contexto: si es Load y está en un Call
+                # Check whether it is used as a function call
+                # Look in the tree whether this Name is inside a Call
+                # Since ast.walk does not keep parent-child links, we check
+                # whether there is a nearby Call that uses this variable
+                # The best way is to check the context: if it is Load and inside a Call
                 if isinstance(node.ctx, ast.Load):
-                    # Sin mapa padre aquí: cualquier Load de estas builtins se bloquea.
+                    # No parent map here: any Load of these builtins is blocked.
                     return False, _dangerous_name_error(node.id), False
         
         # ============================================================
-        # VALIDAR ACCESO A __BUILTINS__ DIRECTAMENTE
+        # VALIDATE DIRECT ACCESS TO __BUILTINS__
         # ============================================================
         if isinstance(node, ast.Attribute):
             if isinstance(node.value, ast.Name) and node.value.id == '__builtins__':
@@ -360,10 +353,10 @@ def validate_relaxaicode_source_ast(code):
                 ), False
         
         # ============================================================
-        # VALIDAR getattr()/setattr()/delattr() CON ATRIBUTOS PELIGROSOS
-        # OJO: esto cubre nombres fijos ('__class__', '__cla' + 'ss__'). El nombre
-        # que solo se conoce al correr lo bloquea el guarded_getattr de runtime
-        # en context_builder, que evalúa el nombre real contra la MISMA denylist.
+        # VALIDATE getattr()/setattr()/delattr() WITH DANGEROUS ATTRIBUTES
+        # NOTE: this covers fixed names ('__class__', '__cla' + 'ss__'). A name
+        # that is only known at run time is blocked by the runtime guarded_getattr
+        # in context_builder, which checks the real name against the SAME denylist.
         # ============================================================
         if isinstance(node, ast.Call):
             privileged = _privilege_attr_in_call(node)
@@ -393,11 +386,11 @@ def validate_relaxaicode_source_ast(code):
                             ), False
 
         # ============================================================
-        # VALIDAR FORMAT-STRINGS CON ACCESO A DUNDER: "{0.__class__}".format(x)
-        # str.format resuelve la cadena de atributos sobre el objeto REAL antes de
-        # formatear. Aunque devuelva su repr (no el objeto), es fuga de introspección
-        # y puede encadenarse. Se bloquea SOLO si el literal accede a un dunder
-        # ({...__x__...}); se preserva el uso normal ({0}, {name}, {0.name}).
+        # VALIDATE FORMAT-STRINGS WITH DUNDER ACCESS: "{0.__class__}".format(x)
+        # str.format resolves the attribute chain on the REAL object before
+        # formatting. Even if it returns its repr (not the object), it leaks introspection
+        # and can be chained. Blocked ONLY if the literal accesses a dunder
+        # ({...__x__...}); normal use is kept ({0}, {name}, {0.name}).
         # ============================================================
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
             if node.func.attr in ('format', 'format_map'):
@@ -411,18 +404,6 @@ def validate_relaxaicode_source_ast(code):
                     (p for p in _fmt_parts if blocked_private_attr(p)), None)
                 if _fmt_private:
                     return False, _private_attr_error(_fmt_private), False
-                # Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
-                # Defensa adicional en plantilla LITERAL: filtro completo de campos.
-                # El cierre real de la familia es el formateador propio en runtime
-                # (relaxaicode_format_guard), que cubre también plantillas en variable.
-                _fmt_forbidden = next(
-                    (p for p in _fmt_parts if sandbox_forbidden_name(p)), None)
-                if _fmt_forbidden:
-                    return False, format_ast_error(
-                        'FORMAT',
-                        f"Relaxaicode cannot use .format() with {_fmt_forbidden!r} "
-                        "in the template (blocked name).",
-                    ), False
                 if fmt_str and re.search(r'\{[^{}]*__[A-Za-z0-9_]*__', fmt_str):
                     return False, format_ast_error(
                         'FORMAT',
@@ -431,9 +412,9 @@ def validate_relaxaicode_source_ast(code):
                     ), False
         
         # ============================================================
-        # VALIDAR CONSTRUCCIONES: lambda segura; class prohibida.
-        # def/async def: permitidos (límites arriba); el cuerpo se valida
-        # en este mismo walk (open/eval/cr/imports…).
+        # VALIDATE CONSTRUCTS: safe lambda; class forbidden.
+        # def/async def: allowed (limits above); the body is validated
+        # in this same walk (open/eval/cr/imports…).
         # ============================================================
         if isinstance(node, ast.Lambda):
             if not _is_safe_lambda(node, extra_call_names=safe_sort_key_refs):
@@ -446,7 +427,7 @@ def validate_relaxaicode_source_ast(code):
             ), False
 
         # ============================================================
-        # VALIDAR SORT/SORTED/MIN/MAX CON KEY ARGUMENT
+        # VALIDATE SORT/SORTED/MIN/MAX WITH KEY ARGUMENT
         # ============================================================
         if isinstance(node, ast.Call):
             is_sort_call = False
@@ -466,26 +447,26 @@ def validate_relaxaicode_source_ast(code):
                         if not _is_safe_sort_key_value(kv, safe_sort_key_refs):
                             return False, _SAFE_LAMBDA_MSG, False
     # ============================================================
-    # VALIDAR ASIGNACIÓN REAL A 'result'
+    # VALIDATE REAL ASSIGNMENT TO 'result'
     # ============================================================
     assign_ok, assign_err = _validate_result_assignment(tree)
     if not assign_ok:
         return False, assign_err, False
     
     # ============================================================
-    # BLOQUEAR BYPASS DE API EXTERNA VÍA ORM (Caja A → red sin Safe Plan)
+    # BLOCK EXTERNAL API BYPASS THROUGH THE ORM (Box A → network without Safe Plan)
     # ============================================================
     bypass_err = _detect_external_api_bypass_from_ast(tree)
     if bypass_err:
         return False, bypass_err, False
 
     # ============================================================
-    # DETECTAR OPERACIONES DE ESCRITURA (AST, sin falsos positivos)
+    # DETECT WRITE OPERATIONS (AST, no false positives)
     # ============================================================
     requires_write = _detect_requires_write_from_ast(tree)
     
     # ============================================================
-    # VALIDAR QUE NO SE REDEFINAN MÓDULOS PERMITIDOS
+    # VALIDATE THAT ALLOWED MODULES ARE NOT REDEFINED
     # ============================================================
     shadowed = _shadowed_module(tree)
     if shadowed:

@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Sugerencias estructurales de modelo ante KeyError en RelaxAICode.
+"""Structural model suggestions on a KeyError in RelaxAICode.
 
-Invariante: el registry de Odoo ya conoce los modelos instalados; no hace falta
-un contexto de dominio para que el motor se “conozca a sí mismo”. Ante
-``env['mcp.log']`` fallido, proponer vecinos del registry (difflib + mismo
-sufijo técnico), sin listas de sinónimos de negocio.
+Invariant: the Odoo registry already knows the installed models; no domain
+context is needed for the engine to "know itself". When ``env['mcp.log']``
+fails, suggest neighbors from the registry (difflib + same technical
+suffix), with no lists of business synonyms.
 """
 from __future__ import annotations
 
@@ -14,11 +14,11 @@ import difflib
 
 
 def suggest_model_names(wanted, available, *, limit=5, cutoff=0.45):
-    """Devuelve nombres de modelo instalados parecidos a ``wanted``.
+    """Return installed model names that look like ``wanted``.
 
-    Criterios (sin hardcode de dominio):
-    1. ``difflib.get_close_matches`` sobre el registry.
-    2. Mismo segmento final tras el último punto (``mcp.log`` → ``*.log``).
+    Criteria (no domain hardcode):
+    1. ``difflib.get_close_matches`` over the registry.
+    2. Same last segment after the last dot (``mcp.log`` → ``*.log``).
     """
     wanted = (wanted or '').strip()
     if not wanted or limit <= 0:
@@ -59,7 +59,7 @@ def suggest_model_names(wanted, available, *, limit=5, cutoff=0.45):
 
 
 def format_missing_model_hint(wanted, suggestions, *, locale='en_US'):
-    """Texto de hint para el error KeyError de modelo ausente."""
+    """Hint text for the missing-model KeyError."""
     wanted = (wanted or '').strip() or '?'
     lines = [
         f"Error executing code: '{wanted}'",

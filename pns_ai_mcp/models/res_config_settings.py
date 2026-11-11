@@ -128,16 +128,19 @@ class ResConfigSettings(models.TransientModel):
     key_pin_length = fields.Integer(
         string='PIN length',
         default=DEFAULT_PIN_LENGTH,
+        config_parameter=ICP_PIN_LENGTH,
         help='Digits in a temporary key PIN. From 4 to 12. Empty or out of range stays 8.',
     )
     key_pin_attempts = fields.Integer(
         string='PIN attempts per IP',
         default=DEFAULT_PIN_ATTEMPTS,
+        config_parameter=ICP_PIN_ATTEMPTS,
         help='Wrong PINs from the same address before that address is paused. A correct API key is not counted.',
     )
     key_pin_block_hours = fields.Integer(
         string='PIN block (hours)',
         default=DEFAULT_PIN_BLOCK_HOURS,
+        config_parameter=ICP_PIN_BLOCK_HOURS,
         help='How long a paused address stays unable to redeem a PIN, right or wrong.',
     )
 

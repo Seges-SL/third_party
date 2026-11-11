@@ -15,7 +15,7 @@ class PresentationMixin:
     """Part of ``AgentEngine``; only used through it."""
 
     def _resolve_done_meta(self, agent_code, provider=None, provider_id=None):
-        """Modelo/proveedor/límite para eventos ``done`` (también sin ronda LLM)."""
+        """Model/provider/limit for ``done`` events (also without an LLM round)."""
         meta = {
             'model': '',
             'provider': '',
@@ -70,10 +70,10 @@ class PresentationMixin:
         local=False,
         clip_data=None,
     ):
-        """Evento ``done`` completo para que Chatboo pinte modelo/tokens.
+        """Full ``done`` event so the host paints model/tokens.
 
-        ``local=True``: tarjeta determinista (ayuda / ask / reject). No hay
-        inferencia ni ocupación de contexto; Chatboo no la manda al histórico.
+        ``local=True``: deterministic card (help / ask / reject). There is no
+        inference nor context use; the host does not send it to the history.
         A page or map card is not local: Design or the query already spent
         tokens, time and money, and the footer must show them.
         """
@@ -170,10 +170,17 @@ class PresentationMixin:
         except Exception:
             pass
         label = ('skill/%s' % skill_code) if skill_code else 'direct'
+        spender = getattr(self, '_side_spender', lambda _side: None)(side)
+        if spender is not None:
+            model_name = (
+                getattr(getattr(spender, 'model_id', None), 'name', '')
+                or getattr(spender, 'model_name', '') or model_name
+            )
         self._mcp_log(
             operation_type='read',
             tool_name='orchestration_summary',
             request_type='LLM',
+            provider_id=spender.id if spender is not None else None,
             agent_llm=model_name or None,
             result_summary='Turn completed · %s · side calls only' % label,
             usage=usage,
@@ -187,7 +194,11 @@ class PresentationMixin:
 
         Helpers that opted in see ``matched_domain_codes`` and may mark
         the turn as a page. The engine does not name those helpers.
+        A slash command's own name is not a word of the sentence: only what
+        follows it is scored.
         """
+        command = self._parse_slash_command(message)
+        sentence = command[1] if command else (message or '')
         try:
             from .domain_index import (
                 TARGET_KIND_DOMAIN, filter_entries_by_kind, match_domains,
@@ -198,7 +209,7 @@ class PresentationMixin:
             ) or []
             matched = list(
                 (match_domains(
-                    message or '',
+                    sentence,
                     filter_entries_by_kind(entries, TARGET_KIND_DOMAIN),
                 ) or {}).get('codes') or [],
             )
@@ -231,7 +242,7 @@ class PresentationMixin:
     def _intercept_session_file_propose(
         self, user_message, session_id, tool_args, rows=None, payload=None,
     ):
-        """Block caja B dumps of a named download onto orphan ir.attachment.
+        """Block box B dumps of a named download onto orphan ir.attachment.
 
         Returns a fake tool result (never creates ``ai.safe.operation``), or
         None when the plan is not a session-file propose. If rows already

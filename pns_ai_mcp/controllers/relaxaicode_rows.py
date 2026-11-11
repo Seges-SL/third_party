@@ -13,20 +13,20 @@ _B64_IMG_PREFIXES = ('iVBORw', '/9j/', 'R0lGOD', 'UklGR')
 _B64_PLACEHOLDER = '[image omitted: return the URL /web/image/<model>/<id>/image_128]'
 
 
-# Nombres de campo de imagen ESTÁNDAR de Odoo. Con model+id conocidos podemos
-# servir la imagen desde /web/image/model/id/campo aunque la celda no traiga el
-# base64 (el LLM a veces devuelve un booleano/placeholder). Solo estos nombres
-# para no arriesgar 404 con alias raros.
+# STANDARD Odoo image field names. With a known model+id we can
+# serve the image from /web/image/model/id/field even if the cell does not carry the
+# base64 (the LLM sometimes returns a boolean/placeholder). Only these names,
+# so we do not risk a 404 with odd aliases.
 _ODOO_IMAGE_FIELD_RE = re.compile(r'^(image|avatar|logo|photo|picture)(_\w+)?$', re.I)
 
 
-# Nombre técnico de modelo Odoo (res.partner). Un texto con espacios o mayúsculas
-# es una etiqueta de negocio (el modelo del coche), no el modelo del registro.
+# Technical Odoo model name (res.partner). A text with spaces or capitals
+# is a business label (the car's model), not the record's model.
 _TECHNICAL_MODEL_RE = re.compile(r'^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$')
 
 
 def _is_technical_model(name, env=None):
-    """True si *name* es un modelo del registro (``fleet.vehicle``), no una etiqueta."""
+    """True if *name* is a registry model (``fleet.vehicle``), not a label."""
     if not isinstance(name, str) or not _TECHNICAL_MODEL_RE.match(name):
         return False
     if env is None:
@@ -38,7 +38,7 @@ def _is_technical_model(name, env=None):
 
 
 def _row_technical_model(item, env=None):
-    """Modelo técnico ya escrito en la fila (``__model`` o columna ``model``)."""
+    """Technical model already written in the row (``__model`` or a ``model`` column)."""
     if not isinstance(item, dict):
         return None
     for key in ('__model', 'model'):
@@ -46,6 +46,17 @@ def _row_technical_model(item, env=None):
         if _is_technical_model(name, env):
             return name
     return None
+
+
+def _image_size_rank(name):
+    """Smallest variant first (image_128 before image_1920): rows show thumbnails."""
+    match = _ODOO_IMAGE_FIELD_RE.match(name)
+    prefix = match.group(1).lower()
+    size = re.search(r'_(\d+)$', name)
+    return (
+        int(size.group(1)) if size else float('inf'),
+        ('image', 'avatar', 'logo', 'photo', 'picture').index(prefix),
+    )
 
 
 def _image_field_names(model_cls):
@@ -56,7 +67,7 @@ def _image_field_names(model_cls):
         if getattr(field, 'type', None) != 'binary':
             continue
         names.append(name)
-    return names
+    return sorted(names, key=_image_size_rank)
 
 
 def _record_has_image(record, fname):
@@ -67,11 +78,11 @@ def _record_has_image(record, fname):
 
 
 def _picture_target(env, model, rec_id, preferred):
-    """(modelo, id, campo) de una imagen que existe.
+    """(model, id, field) of an image that exists.
 
-    El campo pedido, si está en el modelo y tiene datos. Si no, otra imagen
-    del propio registro. Si tampoco, la de un many2one (y un salto más), para
-    no pintar una URL rota cuando la foto vive en el registro de al lado.
+    The requested field, if it is on the model and has data. If not, another image
+    of the record itself. If not that either, one from a many2one (and one more hop), so
+    we do not paint a broken URL when the photo lives on the record next door.
     """
     if not env or not _is_technical_model(model, env) or not rec_id:
         return None
@@ -121,8 +132,8 @@ def _picture_target(env, model, rec_id, preferred):
 
 
 def _is_b64_img(value):
-    """True si el valor parece base64 de imagen.
-    Acepta str (JSON serializado) y bytes (campo Binary de Odoo tal cual)."""
+    """True if the value looks like image base64.
+    Accepts str (serialized JSON) and bytes (Odoo Binary field as is)."""
     if isinstance(value, bytes):
         if len(value) < 256:
             return False
@@ -138,10 +149,10 @@ def _is_b64_img(value):
 
 
 def _sanitize_binary_for_llm(obj):
-    """Sustituye blobs base64 de imagen por un placeholder corto para que el
-    resultado que viaja al LLM no desborde la ventana de contexto (causa real
-    de los fallos "context_length_exceeded"). No muta el original ni toca la
-    clave 'formatted_text' (HTML de presentación destinado al usuario)."""
+    """Replace image base64 blobs with a short placeholder so the
+    result sent to the LLM does not overflow the context window (the real cause
+    of the "context_length_exceeded" failures). Does not mutate the original nor touch the
+    'formatted_text' key (presentation HTML meant for the user)."""
 
     def _walk(node):
         if isinstance(node, dict):
@@ -159,7 +170,7 @@ def _sanitize_binary_for_llm(obj):
 
 
 def _coerce_record_id(value):
-    """Normaliza id de fila a int (acepta str numérico / float entero)."""
+    """Normalize a row id to int (accepts a numeric str / whole float)."""
     if isinstance(value, bool) or value is None or value is False:
         return None
     if isinstance(value, int):
@@ -174,7 +185,7 @@ def _coerce_record_id(value):
 
 
 def _row_record_id(item):
-    """id de fila: acepta ``id`` / ``ID`` (capitalización típica del LLM)."""
+    """Row id: accepts ``id`` / ``ID`` (the LLM's usual capitalization)."""
     if not isinstance(item, dict):
         return None
     for key in ('id', 'ID', 'Id'):
@@ -190,10 +201,10 @@ _XMLID_RE = re.compile(r'^[a-z0-9_]+\.[a-zA-Z0-9_]+$')
 
 
 def _model_id_from_xmlid_row(env, row):
-    """Si una celda es un XMLID (``module.name``), resuelve modelo+id reales.
+    """If a cell is an XMLID (``module.name``), resolve the real model+id.
 
-    Genérico (ir.model.data / env.ref), no de dominio. Evita fallos de stamp
-    cuando el mismo id numérico existe en muchos modelos.
+    Generic (ir.model.data / env.ref), not domain. Avoids stamp failures
+    when the same numeric id exists in many models.
     """
     if not env or not isinstance(row, dict):
         return None, None
@@ -226,11 +237,11 @@ def _is_dict_row_list(value):
 
 
 def _iter_all_tabular_row_lists(result):
-    """Todas las listas de dicts tabulables del resultado (multi-criterio incluido).
+    """Every list of tabular dicts in the result (multi-criteria included).
 
-    Cubre ``data``/``items``, sobres ``groups``/``sections``/``tables`` y listas
-    hermanas (p. ej. by_units + by_amount). Antes solo se miraba la primera lista
-    → la 2ª tabla (y a veces ambas si el stamp fallaba) quedaban sin ``__model``.
+    Covers ``data``/``items``, ``groups``/``sections``/``tables`` envelopes and sibling
+    lists (e.g. by_units + by_amount). Before, only the first list was checked
+    → the 2nd table (and sometimes both if the stamp failed) were left without ``__model``.
     """
     seen = set()
 
@@ -280,7 +291,7 @@ def _iter_all_tabular_row_lists(result):
 
 
 def _web_image_model_segment(url):
-    """Trozo de modelo en ``/web/image/<modelo>/<id>/...``, o ''."""
+    """Model part of ``/web/image/<model>/<id>/...``, or ''."""
     if not isinstance(url, str) or not url.startswith('/web/image/'):
         return ''
     parts = url.split('/')
@@ -288,11 +299,11 @@ def _web_image_model_segment(url):
 
 
 def _postprocess_images(result, model_hint=None, env=None):
-    """Convierte campos de imagen a URLs ``/web/image/<modelo técnico>/<id>/<campo>``.
+    """Turn image fields into ``/web/image/<technical model>/<id>/<field>`` URLs.
 
-    Una columna llamada ``model`` con el nombre del coche no es el modelo del
-    registro. Si el campo pedido no existe, se usa una imagen que sí está
-    (en el registro o en un many2one), en vez de una URL que el navegador no abre.
+    A column named ``model`` holding the car's name is not the record's
+    model. If the requested field does not exist, an image that does exist is used
+    (on the record or on a many2one), instead of a URL the browser cannot open.
     """
     def _process_items(items, model_hint=None):
         if not items or not isinstance(items, list):
@@ -304,16 +315,16 @@ def _postprocess_images(result, model_hint=None, env=None):
             rec_id = _coerce_record_id(item.get('id'))
             if not rec_id:
                 continue
-            # NO consumimos __model (antes .pop): lo dejamos en la fila para que
-            # el render de tabla pinte el widget de enlace por fila. Como empieza
-            # por '_' no aparece como columna de datos ni se exporta.
+            # We do NOT consume __model (it used to be .pop): we leave it in the row so
+            # the table render paints the per-row link widget. Since it starts
+            # with '_' it does not show up as a data column and is not exported.
             model = _row_technical_model(item, env) or hint
             if not model:
                 continue
 
-            # La columna la decide su valor (base64 de imagen) o un nombre de
-            # campo de imagen de Odoo; el alias que puso el modelo puede estar
-            # en cualquier idioma.
+            # The column is decided by its value (image base64) or by an Odoo image
+            # field name; the alias the model gave may be
+            # in any language.
             keys_to_process = [k for k in list(item.keys()) if not k.startswith('_')]
             for key in keys_to_process:
                 val = item[key]
@@ -335,8 +346,8 @@ def _postprocess_images(result, model_hint=None, env=None):
                     url = '/web/image/%s/%d/%s' % (model, rec_id, key)
                     item[key] = url
                     continue
-                # Campo inventado (logo en un modelo que no lo tiene) y sin
-                # otra imagen: no dejar una ruta que pinta el icono roto.
+                # Made-up field (logo on a model that has none) and no
+                # other image: do not leave a path that paints the broken icon.
                 if isinstance(val, str) and val.startswith('/web/image/'):
                     item[key] = False
 

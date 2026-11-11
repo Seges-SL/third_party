@@ -3,13 +3,13 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Import custom contexts from .txt, .md, .xml or .zip."""
 
-import base64
 import io
 import zipfile
 import logging
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 
+from ..utils.compat import binary_bytes
 from .operation_result import context_zip_files_to_result
 
 _logger = logging.getLogger(__name__)
@@ -65,15 +65,15 @@ class ContextImportWizard(models.TransientModel):
 
     def action_import(self):
         """
-        Procesa el archivo (TXT, MD, XML, o ZIP), lee los contextos y los importa/actualiza.
-        Si replace_existing=True, sobrescribe existentes (mismo code + rel_path).
+        Process the file (TXT, MD, XML or ZIP), read the contexts and import/update them.
+        If replace_existing=True, overwrite existing ones (same code + rel_path).
         """
         self.ensure_one()
         if not self.import_file:
             raise UserError(_("Please upload a file (.txt, .md, .xml or .zip)."))
 
         try:
-            file_content = base64.b64decode(self.import_file)
+            file_content = binary_bytes(self.import_file)
             filename = self.filename or 'unknown'
 
             if self.import_mode in ('zip', 'zip_selected'):

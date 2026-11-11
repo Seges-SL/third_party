@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com> */
 /**
- * Chatboo SVG cards — hydrate data-ai-card JSON (clock / fact / link).
+ * Chatboo SVG cards — hydrate data-ai-card JSON (clock / fact / link / form).
  * Clock/fact: click opens/downloads the SVG (blob), like a PDF chip.
  * Link: real <a> banner (same gesture as the map card).
  */
@@ -328,6 +328,27 @@
         try {
             card = JSON.parse(raw);
         } catch (e) {
+            return;
+        }
+        if (String(card.kind || "").toLowerCase() === "form") {
+            var open = el.querySelector(".o_ai_form_card_open");
+            if (!open) {
+                return;
+            }
+            open.addEventListener("click", function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                el.dispatchEvent(new CustomEvent("chatboo-open-form", {
+                    bubbles: true,
+                    detail: {
+                        action: card.action || null,
+                        model: card.model || null,
+                        res_id: card.res_id || null,
+                        values: card.values || null,
+                    },
+                }));
+            });
+            el.setAttribute("data-chatboo-card-ready", "1");
             return;
         }
         if (String(card.kind || "").toLowerCase() === "link") {

@@ -2,32 +2,36 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Journal rows from execute_safe_plan; revert without Safe Plan toast."""
+import uuid
+
 from odoo import SUPERUSER_ID, api
 from odoo.exceptions import UserError
 from odoo.tests import tagged, TransactionCase
+from odoo.tools import mute_logger
 
 from odoo.addons.pns_ai_mcp.controllers.safe_plan import execute_safe_plan
-
-
-# Seges: parche de tests E0′ (datos de prueba). Ver docs/pendiente/parches_pns_ai.md
-def _set_superuser_ai_writer(env):
-    """execute_safe_plan exige AI Writer; el usuario 1 no lo tiene en una BD nueva.
-
-    Solo en la transacción del test (se deshace al terminar)."""
-    env.ref('pns_ai_mcp.group_ai_writer').write({
-        'users': [(4, SUPERUSER_ID)],
-    })
+from odoo.addons.pns_ai_mcp.tests._helpers import (
+    AI_PLAN_GROUPS,
+    SKIP_CONTACT_ORIGIN,
+    create_test_user,
+    grant_groups,
+)
 
 
 @tagged('standard', 'post_install', '-at_install', 'pns_ai_mcp')
 class TestChangeJournal(TransactionCase):
 
+    def setUp(self):
+        super().setUp()
+        self.env = self.env(context=dict(self.env.context, **SKIP_CONTACT_ORIGIN))
+
     def _exec(self, steps, **ctx):
-        # Seges: parche de tests E0′ (datos de prueba). Ver docs/pendiente/parches_pns_ai.md
-        _set_superuser_ai_writer(self.env)
         env = api.Environment(
             self.env.cr, SUPERUSER_ID, dict(self.env.context or {}, **ctx),
         )
+        # Not in setUp: an uncommitted grant locks the user row, and a test
+        # that grants again on its own cursor would wait on it forever.
+        grant_groups(env.user, AI_PLAN_GROUPS)
         return execute_safe_plan(env, steps)
 
     def test_create_write_sequence_and_revert(self):
@@ -131,6 +135,7 @@ class TestChangeJournal(TransactionCase):
         op.action_cancel()
         self.assertEqual(self.env['ai.change.journal'].search_count([]), before)
 
+    @mute_logger('odoo.addons.pns_ai_mcp.models.safe_operation')
     def test_failed_execute_journals_outside_rollback(self):
         field = self.env['ir.model.fields'].search([
             ('model', '=', 'res.partner'),
@@ -144,37 +149,58 @@ class TestChangeJournal(TransactionCase):
             'values': {'required': True},
         }]
         op_id = None
+        turn = 'FAIL%s' % uuid.uuid4().hex[:8].upper()
+        # A user of its own, committed: on O16+ the class transaction would
+        # hit a serialization failure writing a row another cursor changed.
         with self.env.registry.cursor() as cr:
             env = api.Environment(cr, SUPERUSER_ID, {})
+            user = create_test_user(
+                env, prefix='pns_journal_fail',
+                groups=[env.ref(x).id for x in ('base.group_user',) + AI_PLAN_GROUPS],
+            )
+            user_id = user.id
             op = env['ai.safe.operation'].create_verification(
                 operation_type='write',
                 model_name='ir.model.fields',
                 records_count=1,
                 changes_info={'plan': ['write field'], 'danger_level': 'medium'},
-                user_id=SUPERUSER_ID,
+                user_id=user_id,
                 tool_name='test_change_journal',
                 operation_data={
                     'plan_steps': steps, 'title': 'fail journal',
                     'plan': ['write field'], 'danger_level': 'medium',
                     'log_origin': 'internal',
                 },
-                turn='FAILTEST',
+                turn=turn,
             )
-            op._confirm_by_user()
+            op.with_user(user_id)._confirm_by_user()
             cr.commit()
             op_id = op.id
             try:
-                env['ai.safe.operation'].browse(op_id).execute_plan_now()
+                env(user=user_id)['ai.safe.operation'].browse(op_id).execute_plan_now()
             except Exception:
                 pass
-        failed = self.env['ai.change.journal'].search([
-            ('turn', '=', 'FAILTEST'),
-            ('state', '=', 'failed'),
-        ])
-        self.assertTrue(failed)
-        self.assertIn('base fields', (failed[0].note or '').lower() + (failed[0].after_json or '').lower())
-        failed.sudo().unlink()
+        # The journal row is committed on its own cursor; this test's cursor
+        # still reads the database as it was before.
         with self.env.registry.cursor() as cr:
-            env = api.Environment(cr, SUPERUSER_ID, {})
+            env = api.Environment(cr, SUPERUSER_ID, dict(SKIP_CONTACT_ORIGIN))
+            failed = env['ai.change.journal'].search([
+                ('turn', '=', turn),
+                ('state', '=', 'failed'),
+            ])
+            text = ' '.join(
+                (row.note or '') + (row.after_json or '') for row in failed
+            ).lower()
+            failed.unlink()
             env['ai.safe.operation'].browse(op_id).unlink()
+            user = env['res.users'].browse(user_id)
+            try:
+                with cr.savepoint():
+                    partner = user.partner_id
+                    user.unlink()
+                    partner.unlink()
+            except Exception:
+                user.active = False
             cr.commit()
+        self.assertTrue(failed)
+        self.assertIn('op=field_required', text)

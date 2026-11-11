@@ -52,9 +52,9 @@
 
             <missing_data severity="critical">
                 <rule>ABSENT DATA IS A VALID, REPORTABLE ANSWER. Before grouping, filtering or ranking by a geographic dimension, remember the field may be EMPTY on the records.</rule>
-                <rule>If the requested dimension is not populated (e.g. partners with state_id unset), SAY SO explicitly (e.g. "los clientes no tienen provincia asignada — el campo state_id está vacío"). Do NOT invent provinces, do NOT infer them from the name/city/zip, and do NOT silently drop the dimension and return an unrelated list as if it answered the question.</rule>
+                <rule>If the requested dimension is not populated (e.g. partners with state_id unset), SAY SO explicitly (e.g. "the customers have no province set — the state_id field is empty"). Do NOT invent provinces, do NOT infer them from the name/city/zip, and do NOT silently drop the dimension and return an unrelated list as if it answered the question.</rule>
                 <rule>Distinguish two different outcomes and word them differently: (a) FILTER MATCHED NOTHING = the province exists but no record falls in it; (b) FIELD NOT POPULATED = the field is empty across the data, so the grouping cannot be done at all. NEVER present (b) as if it were (a), and never disguise (b) with fabricated rows.</rule>
-                <rule>When a grouping is impossible due to missing data, state it clearly and, only if genuinely useful, offer what CAN be answered with the data that DOES exist (e.g. "puedo darte el ranking global sin desglose por provincia"). Never fabricate the missing breakdown to look complete.</rule>
+                <rule>When a grouping is impossible due to missing data, state it clearly and, only if genuinely useful, offer what CAN be answered with the data that DOES exist (e.g. "I can give you the overall ranking without a breakdown by province"). Never fabricate the missing breakdown to look complete.</rule>
                 <coverage_check>Good practice: when asked to group by a geo dimension, first measure COVERAGE (how many records have that field set, e.g. search_count with the field != False). If coverage is 0 or very low, lead with that fact instead of returning a misleading or empty table.</coverage_check>
             </missing_data>
 

@@ -5,6 +5,9 @@
         <field name="model">ai.skill</field>
         <field name="arch" type="xml">
             <tree string="Skills" class="o_pns_list o_pns_skill_list">
+                <header>
+                    <button name="action_export_selected" type="object" string="Export selected to ZIP" class="btn-secondary" icon="fa-download" groups="pns_ai_mcp.group_ai_admin"/>
+                </header>
                 <field name="sequence" widget="handle"/>
                 <field name="code" optional="show"/>
                 <field name="agent_ids" widget="many2many_tags" optional="show"/>
@@ -169,8 +172,7 @@
     <record id="action_server_skill_export_selected" model="ir.actions.server">
         <field name="name">Export selected skills to ZIP</field>
         <field name="model_id" ref="model_ai_skill"/>
-        <field name="binding_model_id" ref="model_ai_skill"/>
-        <field name="binding_view_types">list</field>
+        <field name="binding_model_id" eval="False"/>
         <field name="groups_id" eval="[(4, ref('pns_ai_mcp.group_ai_admin'))]"/>
         <field name="state">code</field>
         <field name="code">action = records.action_export_selected()</field>
@@ -179,8 +181,7 @@
     <record id="action_server_skill_import_zip" model="ir.actions.server">
         <field name="name">Import skills from ZIP</field>
         <field name="model_id" ref="model_ai_skill"/>
-        <field name="binding_model_id" ref="model_ai_skill"/>
-        <field name="binding_view_types">list</field>
+        <field name="binding_model_id" eval="False"/>
         <field name="groups_id" eval="[(4, ref('pns_ai_mcp.group_ai_admin'))]"/>
         <field name="state">code</field>
         <field name="code">action = model.action_open_import_wizard()</field>

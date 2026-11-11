@@ -13,9 +13,7 @@ odoo.define('pns_ai_chatboo.heavy_libs', function (require) {
         '/pns_ai_chatboo/static/src/js/jspdf.umd.min.js',
         '/pns_ai_chatboo/static/src/js/jspdf.plugin.autotable.min.js',
         '/pns_ai_chatboo/static/src/js/html2canvas.min.js',
-        // Seges: parche 20 (PNS-70, compatibilidad). Ver docs/pendiente/parches_pns_ai.md
-        // New url: a browser must not reuse its cached copy of the original.
-        '/pns_ai_chatboo/static/src/js/chart.umd.min.js?seges=20',
+        '/pns_ai_chatboo/static/src/js/chart.umd.min.js',
         '/pns_ai_chatboo/static/src/js/echarts.min.js',
     ];
 
@@ -28,8 +26,7 @@ odoo.define('pns_ai_chatboo.heavy_libs', function (require) {
                 return ajax.loadJS(url);
             });
         }, Promise.resolve()).then(function () {
-            // Seges: parche 20 (PNS-70, compatibilidad). Ver docs/pendiente/parches_pns_ai.md
-            var chart = window.PnsChatbooChart;
+            var chart = window.Chart;
             var echarts = window.echarts;
             if (window.ChatbooCharts && window.ChatbooCharts.bindEngines) {
                 window.ChatbooCharts.bindEngines(chart, echarts);

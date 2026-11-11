@@ -6,7 +6,7 @@
 import json
 import logging
 
-from odoo import _
+from odoo import _, api
 from .relaxaicode_render import render_context_from_env
 
 _logger = logging.getLogger(__name__)
@@ -57,8 +57,8 @@ class DummyController:
         context_type=None,
         agent_llm=None,
     ):
-        # Reutiliza la correlación y el usuario del turno (engine),
-        # para que la herramienta caiga en el mismo hilo del histórico.
+        # Reuse the turn's correlation and user (engine),
+        # so the tool lands in the same history thread.
         self._engine._mcp_log(
             operation_type=operation_type,
             tool_name=tool_name,
@@ -83,8 +83,8 @@ class DummyController:
         except Exception:
             return False
 
-    def _cancel_pending_verifications_for_user(self, user_id, reason="falta de permisos"):
-        # Solo se usa en la rama de permiso denegado (no en flujo normal).
+    def _cancel_pending_verifications_for_user(self, user_id, reason="missing permissions"):
+        # Only used on the permission-denied branch (not in the normal flow).
         return 0
 
     def _resolve_locale_placeholders(self, text_content):
@@ -96,13 +96,14 @@ class ToolRunMixin:
     """Part of ``AgentEngine``; only used through it."""
 
     def _tool_loop_inject_previous_result(self, turn, tool_name, tool_args):
+        from .record_delivery_gate import previous_result_envelope
         from .response_anti_echo import code_references_reuse_names
 
-        # Nivel 2: inyectar previous_result si el código AST usa
-        # previous_result/raw_data, O si pega un dataset module-level
-        # (strip→rebind en tools_relaxaicode). Auto-inyectar siempre
-        # colaba datasets de otro tema; el gate de literales cubre el
-        # caso de literal de filas (rows=[{…}]) sin nombrar previous_result.
+        # Level 2: inject previous_result if the AST code uses
+        # previous_result/raw_data, OR if it pastes a module-level dataset
+        # (strip→rebind in tools_relaxaicode). Always auto-injecting
+        # leaked datasets from another topic; the literals gate covers the
+        # row-literal case (rows=[{…}]) without naming previous_result.
         if (
             tool_name == 'relaxaicode'
             and (turn.turn_query_data or turn.primary_artifact)
@@ -129,9 +130,9 @@ class ToolRunMixin:
                             presentation_payload(turn.primary_artifact)
                         )
                     except Exception:
-                        tool_args['previous_result'] = {
-                            'data': turn.turn_query_data,
-                        }
+                        tool_args['previous_result'] = previous_result_envelope(
+                            turn.turn_query_data,
+                        )
                 elif turn.turn_safe_plan_steps:
                     from .record_delivery_gate import (
                         previous_result_envelope_from_safe_plan,
@@ -144,9 +145,9 @@ class ToolRunMixin:
                         or {'data': turn.turn_query_data}
                     )
                 else:
-                    tool_args['previous_result'] = {
-                        'data': turn.turn_query_data,
-                    }
+                    tool_args['previous_result'] = previous_result_envelope(
+                        turn.turn_query_data,
+                    )
 
     def _tool_loop_run_tool(
             self,
@@ -237,11 +238,11 @@ class ToolRunMixin:
                     turn._payload if isinstance(turn._payload, dict) else None,
                 ):
                     self._turn_sent_tabular_to_model = True
-                # Ancla de reutilización: si una consulta de datos se
-                # ejecutó BIEN, publicamos su código para que el worker lo
-                # guarde en la sesión y lo reinyecte en el próximo turno
-                # (ver prior_query_code). Solo el ÚLTIMO éxito del turno
-                # cuenta (el worker se queda con el más reciente).
+                # Reuse anchor: if a data query ran FINE, we publish its
+                # code so the worker stores it in the session and
+                # reinjects it on the next turn (see prior_query_code).
+                # Only the LAST success of the turn counts (the worker
+                # keeps the most recent one).
                 if (
                     tool_name == 'relaxaicode'
                     and isinstance(result, dict)
@@ -252,10 +253,10 @@ class ToolRunMixin:
                         turn, result, tool_args, _try_session_export,
                     )
             except Exception as e:
-                _logger.error(f"Error ejecutando {tool_name}: {e}")
+                _logger.error(f"Error running {tool_name}: {e}")
                 # Drop this tool's uncommitted writes (savepoint inside
                 # _tool_loop_call_tool). Do not roll back the host cursor:
-                # Chatboo's worker keeps session/job on it for the whole
+                # the host's worker keeps session/job on it for the whole
                 # turn. A caja B plan that already committed itself stays.
                 self._drop_failed_tool_writes()
                 try:
@@ -264,7 +265,7 @@ class ToolRunMixin:
                     pass
                 result_str = json.dumps({"error": str(e)})
         else:
-            result_str = json.dumps({"error": f"Tool '{tool_name}' no encontrada en Odoo."})
+            result_str = json.dumps({"error": f"Tool '{tool_name}' not found in Odoo."})
         return (
             _blocked,
             result,
@@ -307,7 +308,7 @@ class ToolRunMixin:
         """Drop cached rows the failed tool may have left after the savepoint.
 
         A TestCursor *is* the test transaction: do not touch it.
-        Never ``cr.rollback()`` here — that would undo the Chatboo
+        Never ``cr.rollback()`` here — that would undo the host's
         turn (session, job, later tools) sitting on the same cursor.
         """
         if type(self.env.cr).__name__ == 'TestCursor':
@@ -365,9 +366,9 @@ class ToolRunMixin:
             if self._turn_untrusted else self.env,
             self,
         )
-        # Lo que el turno ya colocó en un modelo viaja con la
-        # llamada: si este paso rehace las filas sin tocar el
-        # ORM, el id sigue sabiendo de quién es.
+        # What the turn already placed on a model travels with the
+        # call: if this step rebuilds the rows without touching the
+        # ORM, the id still knows whose it is.
         from .turn_record_models import known_models
         _ctl.turn_record_models = known_models(
             turn.turn_record_models,
@@ -407,14 +408,14 @@ class ToolRunMixin:
 
     def _tool_loop_note_outcome(self, turn, result, tool_name):
         """Note what the tool result means for the rest of the turn."""
-        # Error recuperable (auto-corrección): guardar el texto por si
-        # se agotan los turnos sin respuesta final.
+        # Recoverable error (self-correction): keep the text in case
+        # the rounds run out with no final answer.
         if isinstance(result, dict) and result.get('__force_retry__'):
             try:
                 turn.last_retry_error = (result.get('content') or [{}])[0].get('text') or turn.last_retry_error
             except Exception:
                 pass
-            # Un hermano que pide reintento gana al stop del recurso.
+            # A sibling asking for a retry beats the resource stop.
             turn.stop_after_direct = False
         elif (
             tool_name == 'relaxaicode'
@@ -430,11 +431,11 @@ class ToolRunMixin:
                 _free_report = contract_from_payload(turn._payload)
                 if _free_report:
                     self._report_contract = _free_report
-        # Enlaces a registros: refs (model,id,name) que relaxaicode
-        # recolecta ANTES de consumir __model. Se leen del PAYLOAD ya
-        # desempaquetado (unwrap_tool_payload), no del envoltorio MCP
-        # {'content':[{'text':...}]}, donde viajan dentro del texto.
-        # Se publican en collected_records → ficha del documento.
+        # Record links: refs (model,id,name) that relaxaicode
+        # collects BEFORE consuming __model. Read from the already
+        # unwrapped PAYLOAD (unwrap_tool_payload), not from the MCP
+        # wrapper {'content':[{'text':...}]}, where they ride in the text.
+        # Published in collected_records → document sheet.
         if isinstance(turn._payload, dict) and turn._payload.get('__records__'):
             for _ref in (turn._payload.get('__records__') or []):
                 if isinstance(_ref, dict):
@@ -457,7 +458,7 @@ class ToolRunMixin:
         _qc = tool_args.get('code')
         if isinstance(_qc, str) and _qc.strip():
             yield {"event": "query_code", "code": _qc}
-        # Guardar payload tabulable del turno (candado 1a).
+        # Keep the turn's tabular payload (lock 1a).
         try:
             from .record_delivery_gate import first_tabular_rows
             from .relaxaicode_render import is_tabulable
@@ -472,14 +473,14 @@ class ToolRunMixin:
                 self._harvest_file_labels(_src)
         except Exception:
             pass
-        # Nivel 2: cachear las FILAS crudas del resultado (si las
-        # hay) para reutilizarlas como previous_result el próximo
-        # turno. Con topes de filas/bytes: si el dataset es enorme
-        # no se cachea (se cae a reutilizar solo el código). Nunca
-        # viaja al LLM: solo BD → namespace del sandbox.
+        # Level 2: cache the raw ROWS of the result (if any) to
+        # reuse them as previous_result on the next turn. With
+        # row/byte caps: if the dataset is huge it is not cached
+        # (falls back to reusing only the code). It never travels
+        # to the LLM: only DB → sandbox namespace.
         try:
-            from .record_delivery_gate import first_tabular_rows
-            _rows = first_tabular_rows(
+            from .record_delivery_gate import all_tabular_rows
+            _rows = all_tabular_rows(
                 turn._payload if isinstance(turn._payload, dict) else result
             )
         except Exception:
@@ -527,9 +528,9 @@ class ToolRunMixin:
                 turn, result, tool_args, _try_session_export, remote_llm_format,
             )
 
-        # safe_plan_status: recupera resultados de operaciones
-        # confirmadas MANUALMENTE (no whitelisted). El payload trae 'result'
-        # con la lista de pasos ya ejecutados; de ahí sacamos las fuentes.
+        # safe_plan_status: fetches results of MANUALLY confirmed
+        # operations (not whitelisted). The payload carries 'result'
+        # with the list of steps already run; the sources come from there.
         elif tool_name == 'safe_plan_status' and isinstance(result, dict):
             yield from self._tool_loop_after_plan_status(
                 turn, result, _try_session_export, remote_llm_format,
@@ -540,15 +541,22 @@ class ToolRunMixin:
         vid = (verification_id or '').strip()
         if not vid or 'ai.safe.operation' not in self.env:
             return ''
+        # Own cursor, committed now: the turn's cursor commits when the turn
+        # ends, and a Confirm pressed before that finds no hash.
         try:
-            op = self.env['ai.safe.operation'].sudo().search(
-                [('verification_id', '=', vid)], limit=1,
-            )
-            if not op or op.user_id.id != self.env.uid:
-                return ''
-            return op._mint_confirm_token()
+            with self.env.registry.cursor() as ncr:
+                ncr.execute("SET LOCAL lock_timeout = '5s'")
+                nenv = api.Environment(ncr, self.env.uid, dict(self.env.context or {}))
+                op = nenv['ai.safe.operation'].sudo().search(
+                    [('verification_id', '=', vid)], limit=1,
+                )
+                if not op or op.user_id.id != self.env.uid:
+                    return ''
+                token = op._mint_confirm_token()
+                ncr.commit()
+                return token
         except Exception:
-            _logger.debug(
+            _logger.warning(
                 'MCP: could not mint card token for %s', vid, exc_info=True,
             )
             return ''
@@ -596,17 +604,17 @@ class ToolRunMixin:
                 # toast is still waiting (o14pruebas / module.update).
                 turn.stop_after_direct = True
                 turn.direct_formatted = _('Confirm in Odoo to continue.')
-            # Fuentes externas: cuando el plan se auto-confirma
-            # (status='confirmed') se ejecuta AHORA, así que rastreamos
-            # los pasos propuestos. Cubre fetch_url (dominio) y api_call
-            # (servidor externo). La confirmación manual se rastrea al
-            # recuperar el resultado con safe_plan_status.
+            # External sources: when the plan auto-confirms
+            # (status='confirmed') it runs NOW, so we track the
+            # proposed steps. Covers fetch_url (domain) and api_call
+            # (external server). Manual confirmation is tracked when
+            # the result is fetched with safe_plan_status.
             if _info.get('success') and _info.get('status') == 'confirmed':
                 self._turn_effects_done = True
                 self._collect_sources(turn, tool_args.get('steps'))
                 self._collect_records_steps(turn, _info.get('result'))
-                # Nivel 2: filas de api_call/fetch_url → turn_query_data
-                # para que relaxaicode (strip/rebind) no reciba vacío.
+                # Level 2: api_call/fetch_url rows → turn_query_data
+                # so relaxaicode (strip/rebind) does not get an empty set.
                 try:
                     from .record_delivery_gate import (
                         rows_from_safe_plan_steps,
@@ -649,7 +657,7 @@ class ToolRunMixin:
                         "content": "",
                     }
                 _try_session_export()
-                # Presenters genéricos (skill_runtime) → HTML directo.
+                # Generic presenters (skill_runtime) → direct HTML.
                 _pres = _info.get('presentation')
                 try:
                     from .artifact_export import wants_on_screen_blocks
@@ -798,7 +806,7 @@ class ToolRunMixin:
             pass
 
     def _log_agent_tool_step(self, tool_name, tool_args, result_str, model_name):
-        # relaxaicode registra en tool_relaxaicode (incl. code_to_execute)
+        # relaxaicode logs in tool_relaxaicode (incl. code_to_execute)
         if (tool_name or '').lower() == 'relaxaicode':
             return
         operation_type = 'read'

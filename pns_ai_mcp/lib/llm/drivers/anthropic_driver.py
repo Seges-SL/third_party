@@ -12,6 +12,13 @@ from ..utils.timeouts import LLM_HTTP_DEFAULT, LLM_HTTP_RETRY  # noqa: F401 (LLM
 
 _logger = logging.getLogger(__name__)
 
+try:
+    from odoo import _
+except ImportError:
+    def _(text):
+        return text
+
+
 class AnthropicDriver(LLMDriver):
     """Driver for Anthropic Claude Messages API.
 
@@ -92,7 +99,9 @@ class AnthropicDriver(LLMDriver):
             "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
         }
     """
-    
+
+    endpoint_path = '/messages'
+
     def __init__(self):
         super().__init__()
         self.endpoint = ""
@@ -109,8 +118,8 @@ class AnthropicDriver(LLMDriver):
         self.endpoint = config.get("endpoint", "")
         self.api_key = config.get("api_key", "")
         self.temperature = float(config.get("temperature", 0.7))
-        # Algunos modelos recientes rechazan `temperature`. El proveedor cachea esa
-        # capacidad (sonda) y la pasa aqui: si es False, no se envia el parametro.
+        # Some recent models reject `temperature`. The provider caches that
+        # capability (probe) and passes it here: if False, the parameter is not sent.
         self.send_temperature = bool(config.get("send_temperature", True))
         self.extra_headers = config.get("extra_headers", {})
         self._model_name_internal = (config.get("model_name") or "").strip()
@@ -311,15 +320,15 @@ class AnthropicDriver(LLMDriver):
         return blocks
 
     def probe_temperature(self, timeout=15):
-        """Sonda mínima: ¿acepta este modelo el parámetro `temperature`?
+        """Minimal probe: does this model accept the `temperature` parameter?
 
-        Envía una petición de 1 token con `temperature`. Devuelve:
-          • True  -> el modelo acepta temperature (HTTP 200).
-          • False -> el modelo la rechaza (HTTP 400 'temperature ... deprecated/
+        Sends a 1-token request with `temperature`. Returns:
+          • True  -> the model accepts temperature (HTTP 200).
+          • False -> the model rejects it (HTTP 400 'temperature ... deprecated/
                      not supported/unsupported/not allowed').
-        Para cualquier otro fallo (credenciales, modelo inválido, red) lanza
-        RuntimeError con el mensaje real, para que el llamador lo distinga de
-        un veredicto de la sonda.
+        For any other failure (credentials, invalid model, network) it raises
+        RuntimeError with the real message, so the caller can tell it apart
+        from a probe verdict.
         """
         headers = {
             "Content-Type": "application/json",
@@ -345,7 +354,7 @@ class AnthropicDriver(LLMDriver):
             or "not allowed" in text
         ):
             return False
-        # Otro error: extraer el mensaje real de Anthropic y relanzarlo.
+        # Another error: extract Anthropic's real message and raise it again.
         err_msg = response.text
         try:
             body = response.json()
@@ -529,9 +538,9 @@ class AnthropicDriver(LLMDriver):
         _logger.info("AnthropicDriver request to %s model %s", self.endpoint, self.model_name)
         response = requests.post(self.endpoint, headers=headers, json=payload, timeout=timeout)
 
-        # Algunos modelos recientes (p.ej. los de razonamiento) rechazan el parametro
-        # `temperature`. En lugar de hardcodear que modelos lo soportan, detectamos el
-        # rechazo y reintentamos una sola vez sin ese campo (agnostico al modelo).
+        # Some recent models (e.g. reasoning ones) reject the `temperature`
+        # parameter. Instead of hardcoding which models support it, we detect the
+        # rejection and retry once without that field (model-agnostic).
         if response.status_code == 400 and "temperature" in payload:
             _retry_text = (response.text or "").lower()
             if "temperature" in _retry_text and (
@@ -541,7 +550,7 @@ class AnthropicDriver(LLMDriver):
                 or "not allowed" in _retry_text
             ):
                 _logger.warning(
-                    "AnthropicDriver: el modelo %s rechaza 'temperature'; reintentando sin ese parametro",
+                    "AnthropicDriver: model %s rejects 'temperature'; retrying without that parameter",
                     self.model_name,
                 )
                 payload.pop("temperature", None)
@@ -576,21 +585,21 @@ class AnthropicDriver(LLMDriver):
             # confusing. Give an actionable hint pointing to the account, not the config.
             low_text = (err_msg or "").lower()
             if "credit balance" in low_text or "billing" in low_text:
-                raise RuntimeError(
-                    "Anthropic: la cuenta no tiene saldo suficiente. "
-                    "Revisa Plans & Billing en console.anthropic.com (la API key es valida). "
-                    "Detalle: %s" % err_msg
-                )
+                raise RuntimeError(_(
+                    "Anthropic: the account does not have enough credit. "
+                    "Check Plans & Billing at console.anthropic.com (the API key is valid). "
+                    "Detail: %s"
+                ) % err_msg)
 
             # Invalid/deprecated model
             if response.status_code == 400 and (
                 "model" in low_text and ("not found" in low_text or "does not exist" in low_text)
                 or (err_type == "invalid_request_error" and self.model_name in (err_msg or ""))
             ):
-                raise RuntimeError(
-                    "Modelo '%s' no valido o no disponible en Anthropic. "
-                    "Actualiza el proveedor en Odoo. Detalle: %s" % (self.model_name, err_msg)
-                )
+                raise RuntimeError(_(
+                    "Model '%s' is not valid or not available in Anthropic. "
+                    "Update the provider in Odoo. Detail: %s"
+                ) % (self.model_name, err_msg))
 
             raise RuntimeError(
                 "HTTP %s from %s: %s" % (response.status_code, self.endpoint, err_msg)

@@ -14,6 +14,7 @@ from ..utils.schema_fossils import (
     promote_decision_provider,
     promote_engine_params,
     promote_turn_columns,
+    stash_fit_columns,
     rename_leftover_xmlids,
 )
 
@@ -35,5 +36,6 @@ class AiSchemaFossil(models.AbstractModel):
         promote_compose_column(cr)
         promote_turn_columns(cr)
         promote_decision_provider(cr)
+        stash_fit_columns(cr)
         drop_leftover_columns(cr)
         promote_engine_params(cr)

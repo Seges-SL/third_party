@@ -156,7 +156,8 @@
         if (!html || typeof html !== "string") {
             return "";
         }
-        var root = document.createElement("div");
+        // An inert document: an onerror in raw content must not run here.
+        var root = document.implementation.createHTMLDocument("").createElement("div");
         root.innerHTML = html;
         stripChrome(root);
         return capText(root.innerText || root.textContent || "");

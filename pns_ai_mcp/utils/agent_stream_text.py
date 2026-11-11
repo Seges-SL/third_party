@@ -49,7 +49,7 @@ def _looks_like_data_dump(text):
         return True
     if s.count('{') + s.count('[') >= 2:
         return True
-    # Una barra de progreso es una sola frase; varias oraciones = rumiar detalle.
+    # A progress bar is a single phrase; several sentences = chewing over detail.
     if sum(s.count(c) for c in '.!?。') >= 2:
         return True
     return False

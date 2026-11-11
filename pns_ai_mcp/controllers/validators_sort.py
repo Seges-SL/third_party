@@ -55,7 +55,7 @@ def _collect_user_def_names(tree):
 
 
 def _is_safe_accessor_expr(expr, extra_call_names=()):
-    """True si la expresión solo usa accesos/calls permitidos (cuerpo de lambda o return de def).
+    """True if the expression only uses allowed accesses/calls (lambda body or def return).
 
     Comprehensions are OK when nested calls stay on the allow-list (same sandbox
     surface as a for-loop). yield/raise remain forbidden inside key=/lambda.
@@ -81,7 +81,7 @@ def _is_safe_accessor_expr(expr, extra_call_names=()):
 
 
 def _is_safe_lambda(node, extra_call_names=()):
-    """True si el cuerpo de la lambda solo usa accesos/calls permitidos."""
+    """True if the lambda body only uses allowed accesses/calls."""
     return (
         isinstance(node, ast.Lambda)
         and _is_safe_accessor_expr(node.body, extra_call_names=extra_call_names)
@@ -89,15 +89,15 @@ def _is_safe_lambda(node, extra_call_names=()):
 
 
 def _is_safe_sort_key_function(node, extra_call_names=()):
-    """def sort_key(x): return x['field'] — un arg, un return accessor."""
+    """def sort_key(x): return x['field'] — one arg, one return accessor."""
     if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
         return False
     args = node.args
     if len(args.args) != 1 or args.vararg or args.kwarg or args.kwonlyargs:
         return False
     stmts = list(node.body or [])
-    if (stmts and isinstance(stmts[0], ast.Expr)
-            and isinstance(getattr(stmts[0], 'value', None), (ast.Constant, ast.Str))):
+    # get_docstring reads Str (3.7) and Constant (3.8+) alike.
+    if ast.get_docstring(node, clean=False) is not None:
         stmts = stmts[1:]
     if len(stmts) != 1 or not isinstance(stmts[0], ast.Return):
         return False
@@ -119,7 +119,7 @@ def _is_safe_itemgetter_call(node):
 
 
 def _collect_safe_sort_key_refs(tree):
-    """Nombres usables como key=: lambdas/itemgetter, defs del script, builtins."""
+    """Names usable as key=: lambdas/itemgetter, script defs, builtins."""
     user_defs = _collect_user_def_names(tree)
     safe = set(user_defs)
     for node in ast.walk(tree):
@@ -152,8 +152,8 @@ def _collect_safe_sort_key_refs(tree):
 
 
 def _is_safe_sort_key_value(node, safe_sort_key_refs):
-    """True si key= de sorted/sort/min/max es seguro."""
-    # (lambda x: ...) con paréntesis extra
+    """True if the key= of sorted/sort/min/max is safe."""
+    # (lambda x: ...) with extra parentheses
     if isinstance(node, ast.Tuple) and len(node.elts) == 1:
         node = node.elts[0]
     if ast_literal(node)[0]:

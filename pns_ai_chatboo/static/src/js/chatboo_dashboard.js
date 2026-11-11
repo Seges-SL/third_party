@@ -151,7 +151,7 @@
             'xmlns="http://www.w3.org/2000/svg" width="11" height="11" ' +
             'viewBox="0 0 11 11" aria-hidden="true" focusable="false"';
         if (kind === "min") {
-            // Raya inferior — minimizar MDI.
+            // Bottom bar — MDI minimize.
             return (
                 "<svg " + common + ">" +
                 '<rect x="1" y="8" width="9" height="1.6" fill="currentColor"/>' +
@@ -159,7 +159,7 @@
             );
         }
         if (kind === "max") {
-            // Cuadrado vacío — maximizar.
+            // Empty square — maximize.
             return (
                 "<svg " + common + ">" +
                 '<rect x="1.2" y="1.2" width="8.6" height="8.6" fill="none" ' +
@@ -168,7 +168,7 @@
             );
         }
         if (kind === "restore") {
-            // Dos cuadrados solapados — restaurar tamaño estándar.
+            // Two overlapping squares — restore standard size.
             return (
                 "<svg " + common + ">" +
                 '<rect x="3" y="1" width="7" height="7" fill="none" ' +
@@ -178,7 +178,7 @@
                 "</svg>"
             );
         }
-        // Cerrar ×
+        // Close ×
         return (
             "<svg " + common + ">" +
             '<path d="M2 2 L9 9 M9 2 L2 9" fill="none" stroke="currentColor" ' +
@@ -235,7 +235,7 @@
             closeBtn.classList.remove("btn", "btn-sm", "btn-link");
         }
 
-        // Orden MDI: minimizar · maximizar/restaurar · cerrar.
+        // MDI order: minimize · maximize/restore · close.
         actions.appendChild(collapse);
         actions.appendChild(maximize);
         actions.appendChild(closeBtn);
@@ -715,7 +715,7 @@
         if (w <= 0) {
             return;
         }
-        /* Objetivo ~3 columnas en canvas ancho; mínimo 280px por celda. */
+        /* Aim for ~3 columns on a wide canvas; at least 280px per cell. */
         var minCol = Math.max(280, Math.min(380, Math.floor(w / 3)));
         grid.style.setProperty("--chatboo-dash-col-min", minCol + "px");
     }
@@ -730,7 +730,7 @@
         var scheduled = null;
         var placed = false;
         var ro = new global.ResizeObserver(function () {
-            // Nunca mutar layout dentro del callback del RO (provoca
+            // Never change layout inside the ResizeObserver callback (it causes
             // "ResizeObserver loop completed with undelivered notifications").
             if (scheduled !== null) {
                 return;

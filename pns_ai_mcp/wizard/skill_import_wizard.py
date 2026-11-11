@@ -3,11 +3,10 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Import skills from a ZIP export."""
 
-import base64
-
 from odoo import fields, models, _
 from odoo.exceptions import UserError
 
+from ..utils.compat import binary_bytes
 
 class AISkillImportWizard(models.TransientModel):
     _name = 'ai.skill.import.wizard'
@@ -29,7 +28,7 @@ class AISkillImportWizard(models.TransientModel):
         if not (self.filename or '').lower().endswith('.zip'):
             raise UserError(_('The file must be a .zip export of skills.'))
         stats = self.env['ai.skill'].import_skills_zip(
-            base64.b64decode(self.import_file),
+            binary_bytes(self.import_file),
             replace_existing=self.replace_existing,
         )
         detail_parts = []

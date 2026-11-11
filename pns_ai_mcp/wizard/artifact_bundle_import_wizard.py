@@ -3,18 +3,18 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Import an AI artifacts bundle ZIP."""
 
-import base64
-
 from odoo import fields, models, _
 from odoo.exceptions import UserError
 
 from ..utils import artifact_bundle
+from ..utils.compat import binary_bytes
 
 
 # English source strings only — never call _() at import time (Odoo 19 warns
 # "no translation language detected" during module load).
 _SECTION_LABELS = {
     'providers': 'Providers',
+    'provider_roles': 'Provider roles',
     'agents': 'Agents',
     'mcp_servers': 'External servers',
     'mcp_users': 'MCP users',
@@ -46,7 +46,7 @@ class AIArtifactBundleImportWizard(models.TransientModel):
 
         report = artifact_bundle.import_bundle(
             self.env,
-            base64.b64decode(self.import_file),
+            binary_bytes(self.import_file),
             replace_existing=self.replace_existing,
         )
         skills = report.get('skills') or {}

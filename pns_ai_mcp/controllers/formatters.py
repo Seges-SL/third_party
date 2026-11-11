@@ -3,294 +3,25 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Data-formatting helpers for the MCP server."""
 
+import importlib.util
 import logging
+from pathlib import Path
 
 _logger = logging.getLogger(__name__)
 
 
-def format_currency(value):
-    """Formatea un valor como moneda"""
-    if value is None:
-        return "-"
-    return f"{value:,.2f} €"
+def _load_ai_disclosure():
+    path = Path(__file__).resolve().parents[1] / 'utils' / 'ai_disclosure.py'
+    spec = importlib.util.spec_from_file_location('_ae_ai_disclosure', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
-def format_percentage(value):
-    """Formatea un valor como porcentaje"""
-    if value is None:
-        return "-"
-    return f"{value:.2f}%"
+_ai = _load_ai_disclosure()
+mark_ai_workbook = _ai.mark_ai_workbook
 
-
-def format_data_as_html_table(data, title, columns_config):
-    """
-    Formatea datos tabulares como HTML
-    
-    Args:
-        data: Lista de diccionarios con los datos
-        title: Título del reporte
-        columns_config: Lista de tuplas (key, label, formatter, align)
-            formatter puede ser: 'currency', 'percentage', 'number', 'text', None
-            align puede ser: 'left', 'right', 'center'
-    """
-    from datetime import datetime
-    
-    generation_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    # Generar filas
-    rows_html = []
-    for idx, row_data in enumerate(data, 1):
-        cells = []
-        for key, label, formatter, align in columns_config:
-            value = row_data.get(key, '')
-            
-            # Aplicar formateo
-            if formatter == 'currency':
-                formatted_value = format_currency(value)
-            elif formatter == 'percentage':
-                formatted_value = format_percentage(value)
-            elif formatter == 'number':
-                formatted_value = f"{value:,.0f}" if value is not None else "-"
-            else:
-                formatted_value = str(value) if value is not None else "-"
-            
-            align_class = f"text-{align}" if align else ""
-            cells.append(f'<td class="{align_class}">{formatted_value}</td>')
-        
-        row_html = f'                    <tr>\n                        <td class="text-center">{idx}</td>\n' + '\n                        '.join(cells) + '\n                    </tr>'
-        rows_html.append(row_html)
-    
-    # Generar encabezados
-    headers = ['<th>#</th>']
-    for key, label, formatter, align in columns_config:
-        align_class = f' class="text-{align}"' if align else ""
-        headers.append(f'<th{align_class}>{label}</th>')
-    
-    html_content = f"""<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title}</title>
-    <style>
-        * {{
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }}
-        body {{
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px;
-            min-height: 100vh;
-        }}
-        .container {{
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            overflow: hidden;
-        }}
-        .header {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }}
-        .header h1 {{
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }}
-        .table-container {{
-            padding: 30px;
-            overflow-x: auto;
-        }}
-        table {{
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.95em;
-        }}
-        thead {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }}
-        th {{
-            padding: 15px;
-            text-align: left;
-            font-weight: 600;
-            text-transform: uppercase;
-            font-size: 0.85em;
-            letter-spacing: 0.5px;
-        }}
-        tbody tr {{
-            border-bottom: 1px solid #e9ecef;
-        }}
-        tbody tr:hover {{
-            background-color: #f8f9fa;
-        }}
-        tbody tr:nth-child(even) {{
-            background-color: #fafbfc;
-        }}
-        td {{
-            padding: 12px 15px;
-        }}
-        .text-right {{
-            text-align: right;
-        }}
-        .text-center {{
-            text-align: center;
-        }}
-        .footer {{
-            padding: 20px 30px;
-            background: #f8f9fa;
-            text-align: center;
-            color: #6c757d;
-            font-size: 0.9em;
-            border-top: 2px solid #e9ecef;
-        }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>{title}</h1>
-        </div>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-{''.join(headers)}
-                    </tr>
-                </thead>
-                <tbody>
-{''.join(rows_html)}
-                </tbody>
-            </table>
-        </div>
-        <div class="footer">
-            Generado el {generation_date} | Sistema MCP Odoo
-        </div>
-    </div>
-</body>
-</html>"""
-    return html_content
-
-
-def format_data_as_csv(data, columns_config):
-    """
-    Formatea datos tabulares como CSV
-    
-    Args:
-        data: Lista de diccionarios con los datos
-        columns_config: Lista de tuplas (key, label, formatter, align)
-    """
-    import csv
-    import io
-    
-    output = io.StringIO()
-    writer = csv.writer(output, delimiter=';')
-    
-    # Encabezados
-    headers = ['#']
-    for key, label, formatter, align in columns_config:
-        headers.append(label)
-    writer.writerow(headers)
-    
-    # Datos
-    for idx, row_data in enumerate(data, 1):
-        row = [idx]
-        for key, label, formatter, align in columns_config:
-            value = row_data.get(key, '')
-            
-            # Aplicar formateo
-            if formatter == 'currency':
-                formatted_value = f"{value:,.2f}" if value is not None else "-"
-            elif formatter == 'percentage':
-                formatted_value = f"{value:.2f}%" if value is not None else "-"
-            elif formatter == 'number':
-                formatted_value = f"{value:,.0f}" if value is not None else "-"
-            else:
-                formatted_value = str(value) if value is not None else ""
-            
-            row.append(formatted_value)
-        
-        writer.writerow(row)
-    
-    return output.getvalue()
-
-
-def format_data_as_xml(data, root_name, item_name, columns_config):
-    """
-    Formatea datos tabulares como XML
-    
-    Args:
-        data: Lista de diccionarios con los datos
-        root_name: Nombre del elemento raíz
-        item_name: Nombre del elemento para cada fila
-        columns_config: Lista de tuplas (key, label, formatter, align)
-    """
-    import xml.etree.ElementTree as ET
-    from datetime import datetime
-    
-    # Crear elemento raíz
-    root = ET.Element(root_name)
-    root.set('generated', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    root.set('total_items', str(len(data)))
-    
-    # Añadir metadatos
-    metadata = ET.SubElement(root, 'metadata')
-    ET.SubElement(metadata, 'columns')
-    for key, label, formatter, align in columns_config:
-        col_elem = ET.SubElement(metadata.find('columns'), 'column')
-        col_elem.set('key', key)
-        col_elem.set('label', label)
-        if formatter:
-            col_elem.set('formatter', formatter)
-        if align:
-            col_elem.set('align', align)
-    
-    # Añadir datos
-    items = ET.SubElement(root, 'items')
-    for idx, row_data in enumerate(data, 1):
-        item = ET.SubElement(items, item_name)
-        item.set('index', str(idx))
-        
-        for key, label, formatter, align in columns_config:
-            value = row_data.get(key, '')
-            
-            # Aplicar formateo
-            if formatter == 'currency':
-                formatted_value = f"{value:,.2f}" if value is not None else ""
-            elif formatter == 'percentage':
-                formatted_value = f"{value:.2f}" if value is not None else ""
-            elif formatter == 'number':
-                formatted_value = f"{value:,.0f}" if value is not None else ""
-            else:
-                formatted_value = str(value) if value is not None else ""
-            
-            # Usar nombre válido para XML (sin espacios ni caracteres especiales)
-            xml_key = key.replace(' ', '_').replace('-', '_')
-            field = ET.SubElement(item, xml_key)
-            field.text = formatted_value
-            field.set('label', label)
-            if formatter:
-                field.set('formatter', formatter)
-            if align:
-                field.set('align', align)
-    
-    # Convertir a string XML con indentación
-    try:
-        ET.indent(root, space="  ")
-    except AttributeError:
-        # ET.indent no disponible en Python < 3.9, usar alternativa
-        pass
-    
-    xml_string = ET.tostring(root, encoding='unicode', xml_declaration=True)
-    return xml_string
-
-
-def format_data_as_excel(data, columns_config, title="Reporte",
+def format_data_as_excel(data, columns_config, title="Report",
                          include_row_index=True, caption=None, widths=None,
                          cell_formulas=None, number_style=None):
     """One-sheet wrapper around ``format_excel_workbook``."""
@@ -324,16 +55,17 @@ def format_excel_workbook(sheets):
             else:
                 ws = wb.create_sheet()
             _fill_excel_sheet(ws, spec)
+        mark_ai_workbook(wb)
         output = io.BytesIO()
         wb.save(output)
         output.seek(0)
         return output.getvalue()
     except ImportError:
-        _logger.error("MCP: openpyxl no está instalado. Instala con: pip install openpyxl")
-        raise Exception("openpyxl no está instalado. Instala con: pip install openpyxl")
+        _logger.error("MCP: openpyxl is not installed. Install it with: pip install openpyxl")
+        raise Exception("openpyxl is not installed. Install it with: pip install openpyxl")
     except Exception as e:
-        _logger.error("MCP: Error generando Excel: %s", e)
-        raise Exception("Error generando Excel: %s" % e)
+        _logger.error("MCP: Error generating Excel: %s", e)
+        raise Exception("Error generating Excel: %s" % e)
 
 
 def _excel_safe_text(text):
@@ -711,7 +443,7 @@ def _pdf_flowable_image(raw, max_side):
     else:
         height = max_side
         width = max_side * float(iw) / float(ih)
-    return Image(reader, width=width, height=height)
+    return Image(BytesIO(raw), width=width, height=height)
 
 
 def _pdf_paragraph(text, style):
@@ -817,9 +549,9 @@ def _pdf_chart_drawing(spec, width, height):
     return drawing
 
 
-def format_data_as_pdf(data, columns_config, title="Reporte", landscape=True,
+def format_data_as_pdf(data, columns_config, title="Report", landscape=True,
                        env=None, chart_series=None):
-    """Tabular PDF with Chatboo table tokens (no row #, no MCP footer).
+    """Tabular PDF with the chat table tokens (no row #, no MCP footer).
 
     Cells that are photos (data-URI, raw base64, /web/image via env) become
     thumbnails. Rows split between pages; a photo stays inside its row.
@@ -831,7 +563,7 @@ def format_data_as_pdf(data, columns_config, title="Reporte", landscape=True,
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import cm
         from reportlab.platypus import (
-            KeepTogether, SimpleDocTemplate, Spacer, Table, TableStyle,
+            SimpleDocTemplate, Spacer, Table, TableStyle,
         )
         import io
 
@@ -844,11 +576,14 @@ def format_data_as_pdf(data, columns_config, title="Reporte", landscape=True,
             leftMargin=1 * cm,
             topMargin=1.4 * cm,
             bottomMargin=1 * cm,
+            creator=_ai.AI_GENERATOR,
+            keywords=_ai.AI_KEYWORD,
+            subject=_ai.AI_DESCRIPTION,
         )
 
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle(
-            'ChatbooPdfTitle',
+            'AiPdfTitle',
             parent=styles['Heading1'],
             fontName='Helvetica-Bold',
             fontSize=14,
@@ -858,7 +593,7 @@ def format_data_as_pdf(data, columns_config, title="Reporte", landscape=True,
             alignment=0,
         )
         cell_style = ParagraphStyle(
-            'ChatbooPdfCell',
+            'AiPdfCell',
             parent=styles['Normal'],
             fontName='Helvetica',
             fontSize=8,
@@ -866,7 +601,7 @@ def format_data_as_pdf(data, columns_config, title="Reporte", landscape=True,
             textColor=colors.HexColor('#282828'),
         )
         head_style = ParagraphStyle(
-            'ChatbooPdfHead',
+            'AiPdfHead',
             parent=cell_style,
             fontName='Helvetica-Bold',
             textColor=colors.HexColor('#1a1a1a'),
@@ -902,7 +637,7 @@ def format_data_as_pdf(data, columns_config, title="Reporte", landscape=True,
                 if raw:
                     flow = _pdf_flowable_image(raw, thumb)
                     if flow is not None:
-                        row.append(KeepTogether([flow]))
+                        row.append(flow)
                         has_image = True
                         continue
                 if _pdf_is_image_ref(value):
@@ -959,7 +694,7 @@ def format_data_as_pdf(data, columns_config, title="Reporte", landscape=True,
         buffer.seek(0)
         return buffer.getvalue()
     except ImportError:
-        raise Exception("reportlab no está instalado. Instala con: pip install reportlab")
+        raise Exception("reportlab is not installed. Install it with: pip install reportlab")
     except Exception as e:
-        raise Exception(f"Error generando PDF: {str(e)}")
+        raise Exception(f"Error generating PDF: {str(e)}")
 

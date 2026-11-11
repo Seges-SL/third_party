@@ -46,22 +46,19 @@
                                attrs="{'invisible': [('protocol', '!=', 'anthropic')]}"/>
                     </group>
                     <group string="Capabilities" name="capabilities">
-                        <field name="fit_conversation"
-                               attrs="{'invisible': [('protocol', '=', 'systemone')]}"/>
-                        <field name="fit_audio"
-                               attrs="{'invisible': [('protocol', '=', 'systemone')]}"/>
-                        <field name="fit_vision"
-                               attrs="{'invisible': [('protocol', '=', 'systemone')]}"/>
-                        <field name="fit_video"
-                               attrs="{'invisible': [('protocol', '=', 'systemone')]}"/>
-                        <field name="fit_design"/>
-                        <field name="fit_decision"/>
+                        <field name="role_ids" widget="many2many_checkboxes"/>
+                        <field name="has_decision" invisible="1"/>
                         <field name="decision_min_confidence"
-                               attrs="{'invisible': [('fit_decision', '=', False)]}"/>
+                               attrs="{'invisible': [('has_decision', '=', False)]}"/>
                         <field name="usage_support"
                                attrs="{'invisible': [('protocol', '=', 'systemone')]}"/>
                         <field name="stt_support"
                                attrs="{'invisible': [('protocol', '=', 'systemone')]}"/>
+                        <field name="hears_by_chat" invisible="1"/>
+                        <div class="alert alert-warning" role="alert" colspan="2"
+                             attrs="{'invisible': [('hears_by_chat', '=', False)]}">
+                            This model hears audio as a chat: it can copy the hint words or answer instead of transcribing. For voice, a provider with file transcriptions is more reliable.
+                        </div>
                     </group>
                     <group string="Monthly cap" name="spend_cap">
                         <field name="spend_cap_usd"/>
@@ -88,6 +85,9 @@
         <field name="model">ai.provider</field>
         <field name="arch" type="xml">
             <tree string="Providers" class="o_pns_list o_pns_provider_list">
+                <header>
+                    <button name="action_export_selected" type="object" string="Export selected" class="btn-secondary" icon="fa-download" groups="pns_ai_mcp.group_ai_admin"/>
+                </header>
                 <field name="name" optional="show"/>
                 <field name="active" optional="show"/>
                 <field name="fit_chips_html" string="Fits" widget="pns_html_readonly" readonly="1" optional="show"/>

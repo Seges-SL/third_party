@@ -8,7 +8,6 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
 
     var SystrayMenu = require('web.SystrayMenu');
     var Widget = require('web.Widget');
-    var ActionManager = require('web.ActionManager');
     var core = require('web.core');
     var session = require('web.session');
     var _t = core._t;
@@ -34,9 +33,9 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
             var self = this;
             this.el.style.display = 'none';
             this.$el.addClass('o_chatboo_systray_item');
-            // App click llega por ActionManager, no por el icono. El listener
-            // vive aquí (no solo en _enableSystray) para que el overlay abra
-            // aunque el flag del tray esté apagado.
+            // The app click comes through the ActionManager, not the icon. The
+            // listener lives here (not only in _enableSystray) so the overlay
+            // opens even when the tray flag is off.
             core.bus.on('chatboo_overlay_show', this, function (context) {
                 self._showOverlay(context || {});
             });
@@ -53,8 +52,8 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
         },
 
         /**
-         * Muestra el icono y engancha los listeners. Idempotente: si ya se
-         * activó, no repite el trabajo (puede llamarse desde el then o el catch).
+         * Shows the icon and hooks the listeners. Idempotent: if already
+         * enabled, it does nothing again (may be called from then or catch).
          */
         _enableSystray: function () {
             var self = this;
@@ -165,9 +164,9 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
                         || (payload.type === 'pns_chatboo_sync'
                             && (payload.action === 'async_done' || payload.action === 'error'));
                     if (_isAsyncDone) {
-                        // Con auto-promoción todos los turnos avisan por bus; solo
-                        // molestamos (campanita) si el overlay está oculto o
-                        // si hubo error. Si lo estás viendo en vivo, silencio.
+                        // With auto-promotion every turn notifies over the bus; we
+                        // only ring the bell if the overlay is hidden or there
+                        // was an error. If you are watching it live, stay quiet.
                         var _isErr = payload.is_error || payload.action === 'error';
                         if (_isErr) {
                             this._showBadge('error');
@@ -265,7 +264,7 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
             opts = opts || {};
             return this._rpc({
                 route: '/pns_ai_mcp/verification/pending',
-                params: {},
+                params: { peek: true },
             }).then(function (res) {
                 var items = (res && res.items) || [];
                 if (!self._isOverlayHidden()) {
@@ -336,7 +335,7 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
             try { localStorage.removeItem('chatboo_unread'); } catch (_) {}
         },
 
-        /** Refresca el contexto de pantalla activa (vista/registro bajo el overlay). */
+        /** Refreshes the active screen context (view/record under the overlay). */
         _refreshChatbooScreenFocus: function () {
             var comp = window.__chatboo_component;
             if (comp && comp._refreshScreenFocus) {
@@ -442,7 +441,7 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
                 'left: 0',
                 'right: 0',
                 'bottom: 0',
-                'z-index: 1039', /* Debajo del modal de Odoo (1050); pns_base lo oculta al pulsar el navbar */
+                'z-index: 1039', /* Below the Odoo modal (1050); pns_base hides it on a navbar click */
                 'display: flex',
                 'flex-direction: column',
                 'background-color: #fff',
@@ -484,8 +483,8 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
             try {
                 var ChatbooModule = require('pns_ai_chatboo.Chatboo');
                 var ChatbooComponent = ChatbooModule.ChatbooComponent;
-                // shadow:true — los RPC de Chatboo NUNCA bloquean el spinner
-                // global de Odoo (abrir el elefante no puede congelar la UI).
+                // shadow:true — Chatboo RPCs NEVER block the global Odoo
+                // spinner (opening the elephant must not freeze the UI).
                 var chatbooRpc = function (params) {
                     return self._rpc(params, {shadow: true});
                 };
@@ -545,17 +544,10 @@ odoo.define('pns_ai_chatboo.chatboo_systray', function (require) {
         return ctx;
     }
 
-    // App / menú: mostrar el overlay y NO empujar la client action
-    // (esa acción vacía es la página en blanco al retraer).
-    ActionManager.include({
-        _executeClientAction: function (action, options) {
-            if (action && CHATBOO_CLIENT_TAGS[action.tag]) {
-                core.bus.trigger('chatboo_overlay_show', chatbooContextFromAction(action));
-                return $.when();
-            }
-            return this._super.apply(this, arguments);
-        },
-    });
+    // The app / menu click opens the overlay; how it is caught depends on the
+    // action manager: chatboo_open_o14.js (Odoo 14), chatboo_open_o15.js (15).
+    ChatbooSystrayItem.CLIENT_TAGS = CHATBOO_CLIENT_TAGS;
+    ChatbooSystrayItem.contextFromAction = chatbooContextFromAction;
 
     return ChatbooSystrayItem;
 

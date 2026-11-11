@@ -23,7 +23,7 @@ from .validators_base import (
 
 
 def _dangerous_name_error(name):
-    """Hint al rechazar builtins de introspección (dir/locals/…)."""
+    """Hint when rejecting introspection builtins (dir/locals/…)."""
     if name == 'dir':
         return format_ast_error(
             'DIR',
@@ -44,7 +44,7 @@ def _dangerous_name_error(name):
 
 
 def _dangerous_attr_error(attr):
-    """Hint al rechazar attrs de sandbox (registry/cr/frames…)."""
+    """Hint when rejecting sandbox attrs (registry/cr/frames…)."""
     if attr in ('registry', '_registry', 'pool'):
         return format_ast_error(
             'REGISTRY',
@@ -76,7 +76,7 @@ def _dangerous_attr_error(attr):
 
 
 def _is_safe_type_name_access(node):
-    """True solo para type(...).__name__ (etiqueta str; no vector de escape)."""
+    """True only for type(...).__name__ (a str label; not an escape vector)."""
     if not isinstance(node, ast.Attribute) or node.attr != '__name__':
         return False
     val = node.value
@@ -293,7 +293,7 @@ def _check_search_domain_not_prior_result(tree):
 
 
 def _check_function_def_limits(tree):
-    """Valida nº total y profundidad de anidamiento de def/async def.
+    """Check the total count and nesting depth of def/async def.
 
     Returns:
         (ok, error_message|None)
@@ -463,16 +463,16 @@ def _ast_static_str(node):
 
 def _detect_requires_write_from_ast(tree):
     """
-    Detecta escritura ORM intencional (caja B).
+    Detect an intended ORM write (box B).
 
-    No marca .sudo() (solo eleva permisos), acumuladores locales (total += 1)
-    ni copy.deepcopy() / copy.copy() del módulo copy.
+    Does not flag .sudo() (it only raises rights), local accumulators (total += 1)
+    nor copy.deepcopy() / copy.copy() from the copy module.
 
-    También marca métodos de Safe Plan que escriben sin llamarse .write()
-    (confirm_by_user, execute_plan_now, …): si corren en caja A toman locks
-    de fila y el toast humano se queda en spinner hasta el rollback.
+    It also flags Safe Plan methods that write without calling .write()
+    (confirm_by_user, execute_plan_now, …): if they run in box A they take row
+    locks and the human toast keeps spinning until the rollback.
 
-    Cubre ofuscación estática: getattr(rec, 'wr'+'ite'), attrgetter('write').
+    Covers static obfuscation: getattr(rec, 'wr'+'ite'), attrgetter('write').
     """
     orm_write_methods = frozenset({'create', 'write', 'unlink'})
     side_effect_methods = RELAXAICODE_SIDE_EFFECT_METHODS
@@ -553,7 +553,7 @@ def _stmt_assigns_result(node):
 
 def _validate_result_assignment(tree):
     """
-    Valida que `result` se asigne antes de cualquier uso (código plano, sin funciones).
+    Check that `result` is assigned before any use (flat code, no functions).
     Returns:
         tuple: (is_valid, error_message)
     """

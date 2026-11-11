@@ -187,6 +187,8 @@ msgstr "Habilidades"
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_agent_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_search
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_tree
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_role__provider_count
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_role_form
 msgid "Providers"
 msgstr "Proveedores"
 
@@ -758,6 +760,7 @@ msgstr "Restauración completada"
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_import_whitelist_result_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_role_context_import_result_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_skill_import_result_form
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_import_provider_roles_result_form
 msgid "Updated"
 msgstr "Actualizado"
 
@@ -1205,21 +1208,6 @@ msgstr "Usuario MCP no válido"
 
 #. module: pns_ai_mcp
 #: code:addons/pns_ai_mcp/models/mcp_api_key_wizard.py:0
-msgid "API Key eliminada correctamente"
-msgstr "API Key eliminada correctamente"
-
-#. module: pns_ai_mcp
-#: code:addons/pns_ai_mcp/models/mcp_api_key_wizard.py:0
-msgid "API Key importada correctamente"
-msgstr "API Key importada correctamente"
-
-#. module: pns_ai_mcp
-#: code:addons/pns_ai_mcp/models/mcp_api_key_wizard.py:0
-msgid "Error generando API key"
-msgstr "Error generando API key"
-
-#. module: pns_ai_mcp
-#: code:addons/pns_ai_mcp/models/mcp_api_key_wizard.py:0
 msgid "API Key generada correctamente"
 msgstr "API Key generada correctamente"
 
@@ -1242,6 +1230,8 @@ msgstr "API Key generada correctamente"
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_tools_restore_result_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_skill_import_result_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_skill_tools_reload_result_form
+#: code:addons/pns_ai_mcp/static/src/js/mcp_api_key_widget_v14.js:0
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_import_provider_roles_result_form
 msgid "Success"
 msgstr "Éxito"
 
@@ -1340,6 +1330,7 @@ msgstr "El archivo debe ser un .zip exportado como paquete de contextos."
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_import_whitelist_result_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_role_context_import_result_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_skill_import_result_form
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_import_provider_roles_result_form
 msgid "Import result"
 msgstr "Resultado de la importación"
 
@@ -1493,11 +1484,6 @@ msgstr "No hay skills disponibles para este rol."
 
 #. module: pns_ai_mcp
 #: code:addons/pns_ai_mcp/utils/agent_engine.py:0
-msgid "No existe el skill `/%s`."
-msgstr "No existe el skill `/%s`."
-
-#. module: pns_ai_mcp
-#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
 msgid "Maximum response time exceeded (%ss). Please try again."
 msgstr "Tiempo máximo de respuesta excedido (%ss). Por favor, inténtelo de nuevo."
 
@@ -1601,6 +1587,7 @@ msgstr "Registros exportados"
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_import_users_wizard__filename
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_import_whitelist_wizard__filename
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_json_export_wizard__export_filename
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_import_provider_roles_wizard__filename
 msgid "File name"
 msgstr "Nombre de archivo"
 
@@ -1615,6 +1602,7 @@ msgstr "Si no está marcado, se omiten usuarios existentes, salvo si aún no tie
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_import_agents_wizard_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_import_roles_wizard_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_import_servers_wizard_form
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_import_provider_roles_wizard_form
 msgid "Upload a previously exported JSON file."
 msgstr "Subir un archivo JSON exportado previamente."
 
@@ -1824,6 +1812,20 @@ msgid "Export selected JSON"
 msgstr "Exportar JSON seleccionados"
 
 #. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_agent_tree
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_tree
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_external_server_tree
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_user_tree
+msgid "Export selected"
+msgstr "Exportar seleccionados"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_context_tree
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_skill_tree
+msgid "Export selected to ZIP"
+msgstr "Exportar seleccionados a ZIP"
+
+#. module: pns_ai_mcp
 #: code:addons/pns_ai_mcp/wizard/__init__.py:0
 #: model:ir.actions.server,name:pns_ai_mcp.action_server_context_export
 msgid "Export all contexts to ZIP"
@@ -2002,6 +2004,7 @@ msgstr "Estadísticas"
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_skill_search
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_external_server_search
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_url_whitelist_search
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_role__active
 msgid "Active"
 msgstr "Activo"
 
@@ -2013,8 +2016,9 @@ msgstr "Activo"
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_mcp_server__code
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_context_search
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_log_search
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_role__code
 msgid "Code"
-msgstr "Code"
+msgstr "Código"
 
 #. module: pns_ai_mcp
 #: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_context__context_type__core
@@ -2045,6 +2049,7 @@ msgstr "discovery"
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_skill_capture_param_line__desc
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_skill_param_line__desc
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_context_search
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_role__description
 msgid "Description"
 msgstr "Descripción"
 
@@ -2157,6 +2162,17 @@ msgstr "Copiar catálogo"
 
 #. module: pns_ai_mcp
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_form
+msgid ""
+"This model hears audio as a chat: it can copy the hint words or answer "
+"instead of transcribing. For voice, a provider with file transcriptions is "
+"more reliable."
+msgstr ""
+"Este modelo oye el audio como un chat: puede copiar las palabras de la pista "
+"o contestar en vez de transcribir. Para voz es más fiable un proveedor con "
+"transcripción de ficheros."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_form
 msgid "Browse"
 msgstr "Ver modelos"
 
@@ -2210,6 +2226,7 @@ msgstr "Apto para"
 #. module: pns_ai_mcp
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_model__apt_conversation
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_model_search
+#: model:ai.provider.role,name:pns_ai_mcp.ai_provider_role_conversation
 msgid "Conversation"
 msgstr "Conversación"
 
@@ -2228,12 +2245,15 @@ msgstr "Lote"
 #. module: pns_ai_mcp
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_model__apt_vision
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_model_search
+#: model:ai.provider.role,name:pns_ai_mcp.ai_provider_role_vision
 msgid "Vision"
 msgstr "Visión"
 
 #. module: pns_ai_mcp
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_model__apt_audio
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_model_search
+#: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_provider_role__accepts__audio
+#: model:ai.provider.role,name:pns_ai_mcp.ai_provider_role_audio
 msgid "Audio"
 msgstr "Audio"
 
@@ -2257,24 +2277,10 @@ msgid "Fits"
 msgstr "Sirve para"
 
 #. module: pns_ai_mcp
-#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__fit_chips_html
-msgid "The ticks as chips, for the list. No tick reads Text."
-msgstr "Las marcas como chips, para la lista. Sin marca se lee Texto."
-
-#. module: pns_ai_mcp
 #: code:addons/pns_ai_mcp/models/ai_provider.py:0
+#: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_provider_role__accepts__text
 msgid "Text"
 msgstr "Texto"
-
-#. module: pns_ai_mcp
-#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider__fit_video
-msgid "Video"
-msgstr "Vídeo"
-
-#. module: pns_ai_mcp
-#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__fit_conversation
-msgid "Empty ticks: text only. A tick admits that kind of input and no other. A photo or a clip never uses a text provider."
-msgstr "Sin marcas: solo texto. Una marca admite ese tipo de entrada y ningún otro. Una foto o un audio no usa un proveedor de texto."
 
 #. module: pns_ai_mcp
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_catalogue_copy__catalogue_json
@@ -2288,6 +2294,9 @@ msgstr "Catálogo de modelos"
 
 #. module: pns_ai_mcp
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_catalogue_copy_form
+#: code:addons/pns_ai_mcp/static/src/js/mcp_api_key_widget_v14.js:0
+#: code:addons/pns_ai_mcp/static/src/js/mcp_json_compressed_widget_v14.js:0
+#: code:addons/pns_ai_mcp/static/src/xml/mcp_field_widgets.xml:0
 msgid "Copy to clipboard"
 msgstr "Copiar al portapapeles"
 
@@ -2373,6 +2382,7 @@ msgid "Discover Tools"
 msgstr "Descubrir Herramientas"
 
 #. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
 #: code:addons/pns_ai_mcp/models/external_server.py:0
 msgid "%s (copy)"
 msgstr "%s (copia)"
@@ -2509,6 +2519,7 @@ msgstr "stdio (local)"
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_safe_operation_tools_wizard_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_whitelist_tools_wizard_form
 #: model:ir.actions.server,name:pns_ai_mcp.action_server_safe_operation_cancel
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_import_provider_roles_wizard_form
 msgid "Cancel"
 msgstr "Cancelar"
 
@@ -2516,11 +2527,6 @@ msgstr "Cancelar"
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_api_key_wizard_form
 msgid "Delete Key"
 msgstr "Eliminar Key"
-
-#. module: pns_ai_mcp
-#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_api_key_wizard_form
-msgid "Genera una nueva clave o importa una existente de otra instancia."
-msgstr "Genera una nueva clave o importa una existente de otra instancia."
 
 #. module: pns_ai_mcp
 #: model:ir.actions.act_window,name:pns_ai_mcp.action_mcp_api_key_wizard
@@ -2695,6 +2701,8 @@ msgstr "Herramientas de Proveedores"
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_skill_tools_reload_result_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_whitelist_tools_wizard_form
 #: code:addons/pns_ai_mcp/utils/relaxaicode_render.py:0
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_role_tools_wizard_form
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_import_provider_roles_result_form
 msgid "Close"
 msgstr "Cerrar"
 
@@ -2883,6 +2891,7 @@ msgstr "Administración completa de IA: proveedores, claves API, servidores, usu
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_user_tools_wizard_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_safe_operation_tools_wizard_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_whitelist_tools_wizard_form
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_role_tools_wizard_form
 msgid "Select the operation to perform:"
 msgstr "Select the operation to perform:"
 
@@ -2916,6 +2925,7 @@ msgstr "Selecciona la operación a realizar sobre los contextos del sistema:"
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_user_tools_wizard_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_safe_operation_tools_wizard_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_whitelist_tools_wizard_form
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_role_tools_wizard_form
 msgid "Export JSON"
 msgstr "Exportar JSON"
 
@@ -2933,6 +2943,7 @@ msgstr "Exportar JSON"
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_geo_cache_tools_wizard_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_user_tools_wizard_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_whitelist_tools_wizard_form
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_role_tools_wizard_form
 msgid "Import JSON"
 msgstr "Importar JSON"
 
@@ -3028,6 +3039,7 @@ msgstr "Exportar JSON: descarga un archivo con todos los agentes actuales."
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_geo_cache_tools_wizard_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_user_tools_wizard_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_whitelist_tools_wizard_form
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_role_tools_wizard_form
 msgid "Import JSON: Open the wizard to upload a previously exported file."
 msgstr "Importar JSON: abre el asistente para subir un archivo exportado previamente."
 
@@ -3118,6 +3130,7 @@ msgstr "Subir un archivo .txt, .md, .xml o .zip"
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_import_servers_wizard__replace_existing
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_import_users_wizard__replace_existing
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_import_whitelist_wizard__replace_existing
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_import_provider_roles_wizard__replace_existing
 msgid "Replace existing"
 msgstr "Reemplazar existentes"
 
@@ -3138,6 +3151,7 @@ msgstr "Modo de importación"
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_import_servers_wizard__json_file
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_import_users_wizard__json_file
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_import_whitelist_wizard__json_file
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_import_provider_roles_wizard__json_file
 msgid "JSON File"
 msgstr "Archivo JSON"
 
@@ -3793,6 +3807,8 @@ msgstr "Ventana de contexto (tokens)"
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider__name
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_safe_operation__display_name
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_user__name
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_role__name
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_role_tree
 msgid "Name"
 msgstr "Nombre"
 
@@ -3848,11 +3864,6 @@ msgstr "Consumo en respuesta"
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider__is_on_premise
 msgid "On premises"
 msgstr "Servidor propio"
-
-#. module: pns_ai_mcp
-#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__is_on_premise
-msgid "Self-hosted / own-server inference (Lemonade, Ollama, vLLM, …).\n\nWhen checked: if the API omits cost, Chatboo advertises 0 so the chip shows 0,00 € (or display currency) instead of \"-\". If the gateway does report a cost (e.g. estimated electricity), that value is kept.\n\nWhen unchecked (cloud): missing cost stays unknown (\"-\")."
-msgstr "Inferencia autoalojada / en servidor propio (Lemonade, Ollama, vLLM, …).\n\nSi está marcado: cuando la API no envía coste, Chatboo anuncia 0 y el chip muestra 0,00 € (o la moneda de visualización) en lugar de \"-\". Si el gateway sí informa un coste (p. ej. electricidad estimada), se respeta ese valor.\n\nSi no está marcado (nube): el coste ausente sigue siendo desconocido (\"-\")."
 
 #. module: pns_ai_mcp
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_res_config_settings__display_currency
@@ -4505,6 +4516,7 @@ msgstr "%(label)s: %(created)s creados, %(updated)s actualizados, %(skipped)s om
 
 #. module: pns_ai_mcp
 #: code:addons/pns_ai_mcp/wizard/config_backup_wizard.py:0
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_import_provider_roles_result_form
 msgid "Skipped"
 msgstr "Omitidos"
 
@@ -4690,11 +4702,6 @@ msgstr "There are no pending operations"
 #: model_terms:ir.actions.act_window,help:pns_ai_mcp.action_ai_safe_operation
 msgid "Here you will find the operations proposed by the AI that require your confirmation."
 msgstr "Here you will find the operations proposed by the AI that require your confirmation."
-
-#. module: pns_ai_mcp
-#: model_terms:ir.actions.act_window,help:pns_ai_mcp.action_mcp_users
-msgid "Gestión de Usuarios MCP"
-msgstr "Gestión de Usuarios MCP"
 
 #. module: pns_ai_mcp
 #: model_terms:ir.actions.act_window,help:pns_ai_mcp.action_url_whitelist
@@ -5360,8 +5367,9 @@ msgstr "Keep recent"
 #: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_change_journal__op__action
 #: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_safe_operation__operation_type__action
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_log_tree_simple
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
 msgid "Action"
-msgstr "Action"
+msgstr "Acción"
 
 #. module: pns_ai_mcp
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_log__client_display
@@ -6353,8 +6361,9 @@ msgstr "Custom Header"
 #. module: pns_ai_mcp
 #: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_change_journal__op__create
 #: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_safe_operation__operation_type__create
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
 msgid "Create"
-msgstr "Create"
+msgstr "Crear"
 
 #. module: pns_ai_mcp
 #: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_change_journal__op__write
@@ -6365,13 +6374,15 @@ msgstr "Update"
 #. module: pns_ai_mcp
 #: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_change_journal__op__unlink
 #: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_safe_operation__operation_type__unlink
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
 msgid "Delete"
-msgstr "Delete"
+msgstr "Borrar"
 
 #. module: pns_ai_mcp
 #: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_safe_operation__operation_type__fetch_url
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
 msgid "Fetch URL"
-msgstr "Fetch URL"
+msgstr "Consultar URL"
 
 #. module: pns_ai_mcp
 #: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_safe_operation__danger_level__low
@@ -6795,6 +6806,7 @@ msgstr "Solo OSM"
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_tools_restore_result_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_skill_import_result_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_skill_tools_reload_result_form
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_import_provider_roles_result_form
 msgid "Warning"
 msgstr "Aviso"
 
@@ -6906,11 +6918,6 @@ msgstr "Geocodificación OSM"
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_res_config_settings__osm_distance_api_key
 msgid "OSM Route"
 msgstr "Ruta OSM"
-
-#. module: pns_ai_mcp
-#: model:ir.model.fields,help:pns_ai_mcp.field_res_config_settings__google_maps_distance_key
-msgid "Optional. Google Routes API key for road distances and travel times (computeRoutes) between points in Chatboo. Separate from the GM Geocoding key so quotas stay independent. Enable Routes API on this key in Google Cloud."
-msgstr "Opcional. Clave de Google Routes API para distancias y tiempos por carretera (computeRoutes) en Chatboo. Separada de Geocodificación GM para cuotas independientes. Activa Routes API en esta clave en Google Cloud."
 
 #. module: pns_ai_mcp
 #: model:ir.model.fields,help:pns_ai_mcp.field_res_config_settings__osm_distance_api_key
@@ -7265,11 +7272,6 @@ msgstr "Descubrimiento"
 
 #. module: pns_ai_mcp
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_external_server_form
-msgid "Chatboo can propose the rows from this server's"
-msgstr "Chatboo puede proponer las filas a partir del nombre"
-
-#. module: pns_ai_mcp
-#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_external_server_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_external_server_tree
 msgid "Suggest triggers"
 msgstr "Sugerir disparadores"
@@ -7411,41 +7413,49 @@ msgid "AI View Modifier Policy"
 msgstr "Política de modificadores de vista IA"
 
 #. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
 #: model:ai.trusted.action,label:pns_ai_mcp.trusted_action_view_set_field_required
 msgid "Set field required on views"
 msgstr "Marcar el campo como obligatorio en las vistas"
 
 #. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
 #: model:ai.trusted.action,label:pns_ai_mcp.trusted_action_view_set_field_readonly
 msgid "Set field readonly on views"
 msgstr "Marcar el campo como solo lectura en las vistas"
 
 #. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
 #: model:ai.trusted.action,label:pns_ai_mcp.trusted_action_view_set_field_invisible
 msgid "Set field invisible on views"
 msgstr "Ocultar el campo en las vistas"
 
 #. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
 #: model:ai.trusted.action,label:pns_ai_mcp.trusted_action_view_set_field_domain
 msgid "Set field domain on views"
 msgstr "Establecer el dominio del campo en las vistas"
 
 #. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
 #: model:ai.trusted.action,label:pns_ai_mcp.trusted_action_view_reset_field_modifiers
 msgid "Reset view field modifiers"
 msgstr "Restablecer modificadores de campo en vistas"
 
 #. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
 #: model:ai.trusted.action,label:pns_ai_mcp.trusted_action_module_update
 msgid "Install, upgrade or uninstall a module"
 msgstr "Instalar, actualizar o desinstalar un módulo"
 
 #. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
 #: model:ai.trusted.action,label:pns_ai_mcp.trusted_action_user_add_group
 msgid "Add native security group to user"
 msgstr "Añadir grupo de seguridad nativo al usuario"
 
 #. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
 #: model:ai.trusted.action,label:pns_ai_mcp.trusted_action_user_remove_group
 msgid "Remove native security group from user"
 msgstr "Quitar grupo de seguridad nativo al usuario"
@@ -7621,6 +7631,7 @@ msgid "Named leftover table drop"
 msgstr "Borrado de tablas leftover nombradas"
 
 #. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
 #: model:ai.trusted.action,label:pns_ai_mcp.trusted_action_field_set_required
 msgid "Set field required on the model"
 msgstr "Marcar el campo como obligatorio en el modelo"
@@ -7628,6 +7639,7 @@ msgstr "Marcar el campo como obligatorio en el modelo"
 #. module: pns_ai_mcp
 #: code:addons/pns_ai_mcp/controllers/safe_plan.py:0
 #: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_change_journal__op__field_required
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
 msgid "Field required"
 msgstr "Campo obligatorio"
 
@@ -7688,6 +7700,8 @@ msgstr " El registro de este worker queda actualizado; los demás, hasta reinici
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_context_tools_restore_result_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_skill_import_result_form
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_skill_tools_reload_result_form
+#: code:addons/pns_ai_mcp/static/src/js/mcp_api_key_widget_v14.js:0
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_import_provider_roles_result_form
 msgid "Error"
 msgstr "Error"
 
@@ -7713,8 +7727,8 @@ msgstr "Exportar los parámetros globales de configuración de IA (ir.config_par
 
 #. module: pns_ai_mcp
 #: model:ir.model.fields,help:pns_ai_mcp.field_ai_artifact_bundle_export_wizard__export_tag
-msgid "Optional label (e.g. piloto, occ) inserted into the download file name between the Odoo instance and the artifact type. Pattern: timestamp_instance_tag_artifact.zip"
-msgstr "Etiqueta opcional (p. ej. piloto, occ) insertada en el nombre del archivo descargado entre la instancia Odoo y el tipo de artefacto. Patrón: timestamp_instance_tag_artifact.zip"
+msgid "Optional label (e.g. staging, test) inserted into the download file name between the Odoo instance and the artifact type. Pattern: timestamp_instance_tag_artifact.zip"
+msgstr "Etiqueta opcional (p. ej. staging, test) insertada en el nombre del archivo descargado entre la instancia Odoo y el tipo de artefacto. Patrón: timestamp_instance_tag_artifact.zip"
 
 #. module: pns_ai_mcp
 #: model:ir.model.fields,help:pns_ai_mcp.field_ai_artifact_bundle_export_wizard__export_artifact_name
@@ -7788,8 +7802,8 @@ msgstr "Identificador técnico = nombre de módulo: pns_ai_mcp, pns_ai_admin, �
 
 #. module: pns_ai_mcp
 #: model:ir.model.fields,help:pns_ai_mcp.field_ai_agent__agent_type
-msgid "inference: the agent runs the LLM via an internal provider (chatboo, secretary).\nendpoint: the agent serves contexts/tools to an external LLM client (MCP)."
-msgstr "inference: el agente ejecuta el LLM a través de un proveedor interno (chatboo, secretary).\nendpoint: el agente sirve contextos/herramientas a un cliente LLM externo (MCP)."
+msgid "inference: the agent runs the LLM via an internal provider (chat, voice).\nendpoint: the agent serves contexts/tools to an external LLM client (MCP)."
+msgstr "inference: el agente ejecuta el LLM a través de un proveedor interno (chat, voz).\nendpoint: el agente sirve contextos/herramientas a un cliente LLM externo (MCP)."
 
 #. module: pns_ai_mcp
 #: model:ir.model.fields,help:pns_ai_mcp.field_ai_agent__origin
@@ -8004,8 +8018,8 @@ msgstr "Fecha y hora de la última consulta de este contexto"
 
 #. module: pns_ai_mcp
 #: model:ir.model.fields,help:pns_ai_mcp.field_ai_fx_source__url
-msgid "HTTPS JSON feed with a USD-based 'rates' map. Not subject to the Safe Plan URL whitelist. Chatboo requests this feed when the chat opens."
-msgstr "Fuente JSON HTTPS con un mapa 'rates' basado en USD. No está sujeta a la lista blanca de URL del plan seguro. Chatboo pide esta fuente al abrir el chat."
+msgid "HTTPS JSON feed with a USD-based 'rates' map. Not subject to the Safe Plan URL whitelist. The chat requests this feed when it opens."
+msgstr "Fuente JSON HTTPS con un mapa 'rates' basado en USD. No está sujeta a la lista blanca de URL del plan seguro. El chat pide esta fuente al abrirse."
 
 #. module: pns_ai_mcp
 #: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__alias
@@ -8016,31 +8030,6 @@ msgstr "Etiqueta opcional del selector de proveedor del chat (p. ej. 'Grok 4.5 (
 #: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__protocol
 msgid "Protocolo de transporte / dialecto de API que habla el driver. OpenAI-compatible cubre OpenAI, Azure y gateways locales (LM Studio, Ollama en modo OpenAI); Anthropic usa la Messages API."
 msgstr "Protocolo de transporte / dialecto de API que habla el driver. OpenAI-compatible cubre OpenAI, Azure y gateways locales (LM Studio, Ollama en modo OpenAI); Anthropic usa la Messages API."
-
-#. module: pns_ai_mcp
-#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__endpoint
-msgid "URL POST exacta que usa el driver (chat/completions o messages). Pégala tal cual desde la documentación de tu gateway; no se reescribe al guardar."
-msgstr "URL POST exacta que usa el driver (chat/completions o messages). Pégala tal cual desde la documentación de tu gateway; no se reescribe al guardar."
-
-#. module: pns_ai_mcp
-#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__api_key
-msgid "Clave de autenticación que se envía al proveedor de IA."
-msgstr "Clave de autenticación que se envía al proveedor de IA."
-
-#. module: pns_ai_mcp
-#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__model_name
-msgid "Nombre efectivo del modelo; refleja el modelo seleccionado (no editable)."
-msgstr "Nombre efectivo del modelo; refleja el modelo seleccionado (no editable)."
-
-#. module: pns_ai_mcp
-#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__temperature
-msgid "Control de creatividad del modelo (0.0 - 1.0):\n- 0.0: Determinista (siempre la misma respuesta)\n- 0.1-0.3: Preciso (código, SQL, datos)\n- 0.4-0.7: Equilibrado (conversación natural) - Recomendado\n- 0.8-1.0: Creativo (lluvia de ideas, redacción)"
-msgstr "Control de creatividad del modelo (0.0 - 1.0):\n- 0.0: Determinista (siempre la misma respuesta)\n- 0.1-0.3: Preciso (código, SQL, datos)\n- 0.4-0.7: Equilibrado (conversación natural) - Recomendado\n- 0.8-1.0: Creativo (lluvia de ideas, redacción)"
-
-#. module: pns_ai_mcp
-#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__temperature_support
-msgid "Indica si el modelo seleccionado acepta el parámetro `temperature`. Se detecta con una sonda mínima al seleccionar un modelo o probar la conexión. Si es 'No soportado', el parámetro se omite en cada petición (algunos modelos recientes lo rechazan)."
-msgstr "Indica si el modelo seleccionado acepta el parámetro `temperature`. Se detecta con una sonda mínima al seleccionar un modelo o probar la conexión. Si es 'No soportado', el parámetro se omite en cada petición (algunos modelos recientes lo rechazan)."
 
 #. module: pns_ai_mcp
 #: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__stt_support
@@ -8056,16 +8045,6 @@ msgstr "Si el cuerpo de la completion incluye un objeto usage (tokens, y coste s
 #: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__context_window
 msgid "Physical context window of this provider's model (in tokens): the largest conversation the inference orchestrator sends. Applies only in inference-client mode (a chat, OCR); it has no effect when an external MCP client (Cursor, Claude Desktop) drives the model.\n\nMUST be <= the real context the backend loaded the model with (e.g. Lemonade's LEMONADE_CTX_SIZE). If set HIGHER, large prompts overflow the model and the request fails over to the next provider in the chain.\n\nWhen the limit is exceeded, the orchestrator drops the OLDEST turns first; the system prompt and the agent's context composition are ALWAYS kept (never trimmed)."
 msgstr "Ventana de contexto física del modelo de este proveedor (en tokens): la memoria máxima de conversación que envía el orquestador de inferencia. Solo aplica en modo cliente de inferencia (un chat, OCR); no tiene efecto cuando un cliente MCP externo (Cursor, Claude Desktop) gobierna el modelo.\n\nDEBE ser <= al contexto real con el que el backend cargó el modelo (p. ej. LEMONADE_CTX_SIZE de Lemonade). Si se pone MÁS ALTO, los prompts grandes desbordan el modelo y la petición hace failover al siguiente proveedor de la cadena.\n\nCuando se supera el límite, el orquestador descarta primero los turnos MÁS ANTIGUOS; el system prompt y la composición de contextos del agente se conservan SIEMPRE (nunca se recortan)."
-
-#. module: pns_ai_mcp
-#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__context_window_display
-msgid "Ventana de contexto legible (K = 1024 tokens, M = 1024K)."
-msgstr "Ventana de contexto legible (K = 1024 tokens, M = 1024K)."
-
-#. module: pns_ai_mcp
-#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__context_window_tokens
-msgid "Ventana de contexto en tokens, como texto plano para copiar/pegar en configuraciones de inferencia (LEMONADE_CTX_SIZE, --ctx-size, num_ctx…)."
-msgstr "Ventana de contexto en tokens, como texto plano para copiar/pegar en configuraciones de inferencia (LEMONADE_CTX_SIZE, --ctx-size, num_ctx…)."
 
 #. module: pns_ai_mcp
 #: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__usage_day_ids
@@ -9079,17 +9058,23 @@ msgid "Choice answers below this confidence are ignored. The word list result is
 msgstr "Las respuestas Choice por debajo de esta confianza se ignoran. Se mantiene el resultado de la lista de palabras."
 
 #. module: pns_ai_mcp
-#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider__fit_decision
 #: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_model__apt_decision
 #: code:addons/pns_ai_mcp/models/ai_provider.py:0
+#: model:ai.provider.role,name:pns_ai_mcp.ai_provider_role_decision
 msgid "Decision"
 msgstr "Decisión"
 
 #. module: pns_ai_mcp
-#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider__fit_design
 #: code:addons/pns_ai_mcp/models/ai_provider.py:0
+#: model:ai.provider.role,name:pns_ai_mcp.ai_provider_role_design
 msgid "Design"
 msgstr "Diseño"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+#: model:ai.provider.role,name:pns_ai_mcp.ai_provider_role_parser
+msgid "Parser"
+msgstr "Parser"
 
 #. module: pns_ai_mcp
 #: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_provider__protocol__systemone
@@ -9334,6 +9319,24 @@ msgstr "Solo un administrador de IA puede gestionar las claves API de MCP."
 
 #. module: pns_ai_mcp
 #: code:addons/pns_ai_mcp/models/mcp_user.py:0
+msgid ""
+"Only a Settings administrator can set the API key of another Settings "
+"administrator."
+msgstr ""
+"Solo un administrador de Ajustes puede poner la clave API de otro "
+"administrador de Ajustes."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_user.py:0
+msgid ""
+"%s is a Settings administrator: the API key was not imported (only a "
+"Settings administrator can set it). The AI permissions were."
+msgstr ""
+"%s es administrador de Ajustes: la clave API no se ha importado (solo la "
+"puede poner un administrador de Ajustes). Los permisos de IA sí."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_user.py:0
 msgid "Only AI Administrators can manage temporary key PINs."
 msgstr "Solo un administrador de IA puede gestionar los pines temporales de clave."
 
@@ -9356,11 +9359,6 @@ msgstr "Solo el sistema puede cambiar el estado de una operación supervisada."
 #: code:addons/pns_ai_mcp/models/safe_operation.py:0
 msgid "Only the owner or an AI Administrator can resolve this operation."
 msgstr "Solo el dueño o un administrador de IA puede resolver esta operación."
-
-#. module: pns_ai_mcp
-#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__fit_decision
-msgid "Answers a closed Choice (yes or none, with a confidence). The decision agent chain only takes providers with this tick. The protocol must be able to choose."
-msgstr "Responde un Choice cerrado (sí o ninguno, con una confianza). La cadena del agente de decisión solo admite proveedores con esta marca. El protocolo tiene que saber elegir."
 
 #. module: pns_ai_mcp
 #: code:addons/pns_ai_mcp/models/ai_provider.py:0
@@ -9666,6 +9664,7 @@ msgstr "No hay proveedor con cuota disponible este mes."
 
 #. module: pns_ai_mcp
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_config_backup_wizard_form
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_import_provider_roles_wizard_form
 msgid "Review"
 msgstr "Revisar"
 
@@ -9757,16 +9756,659 @@ msgstr "Sobrescribir"
 
 #. module: pns_ai_mcp
 #: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_agent_form
-msgid "Empty list: every active provider, by id. For a role (vision, audio, decision, design, …) a provider with only that tick is tried before one that also does other jobs. The text turn keeps the order of this list."
-msgstr "Lista vacía: todos los proveedores activos, por id. Para un rol (visión, audio, decisión, diseño, …) se prueba antes el que solo tiene esa casilla, y después el que también hace otras cosas. El turno de texto sigue el orden de esta lista."
+msgid "Empty list: every active provider, by id. A role (vision, audio, decision, design, …) is looked for in this list first, then among every active provider; a provider with only that role goes first. Nobody holding it: the fallback of the role, if it has one. The text turn keeps the order of this list."
+msgstr "Lista vacía: todos los proveedores activos, por id. Un rol (visión, audio, decisión, diseño, …) se busca primero en esta lista y luego en todos los proveedores activos; va delante el que solo tiene ese rol. Si nadie lo tiene: el respaldo del rol, si tiene. El turno de texto sigue el orden de esta lista."
 
 #. module: pns_ai_mcp
 #: model_terms:ir.actions.act_window,help:pns_ai_mcp.action_ai_fx_source
-msgid "HTTPS JSON feeds with a USD-based rates map. The first active source that answers wins; the next is failover. Not the Safe Plan whitelist. Chatboo requests this feed when the chat opens, so spend can show in the company currency."
-msgstr "Fuentes JSON HTTPS con un mapa de tipos basado en USD. La primera activa que responde gana; la siguiente es el failover. No es la lista blanca del plan seguro. Chatboo pide esta fuente al abrir el chat, para mostrar el gasto en la moneda de la empresa."
+msgid "HTTPS JSON feeds with a USD-based rates map. The first active source that answers wins; the next is failover. Not the Safe Plan whitelist. The chat requests this feed when it opens, so spend can show in the company currency."
+msgstr "Fuentes JSON HTTPS con un mapa de tipos basado en USD. La primera activa que responde gana; la siguiente es el failover. No es la lista blanca del plan seguro. El chat pide esta fuente al abrirse, para mostrar el gasto en la moneda de la empresa."
 
 #. module: pns_ai_mcp
 #: code:addons/pns_ai_mcp/wizard/import_servers_wizard.py:0
 #, python-format
 msgid "(no name)"
 msgstr "(sin nombre)"
+
+#. module: pns_ai_mcp
+#: model:ir.model,name:pns_ai_mcp.model_ai_provider_role
+msgid "AI Provider Role"
+msgstr "Rol de proveedor de IA"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_role__sequence
+msgid "Sequence"
+msgstr "Secuencia"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_role__accepts
+msgid "Accepts"
+msgstr "Acepta"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_role__fallback_id
+msgid "Fallback"
+msgstr "Respaldo"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_role__module
+msgid "Module"
+msgstr "Módulo"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider__role_ids
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_role_tree
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_role_search
+msgid "Roles"
+msgstr "Roles"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider__has_decision
+msgid "Has Decision"
+msgstr "Tiene decisión"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider_role__code
+msgid "What an agent asks for (need=code). Set by the module that ships the role."
+msgstr "Lo que pide un agente (need=código). Lo fija el módulo que trae el rol."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider_role__active
+msgid "An archived role holds no provider: whoever asks for it gets its fallback, or nobody."
+msgstr "Un rol archivado no lo tiene ningún proveedor: quien lo pide recibe su respaldo, o nadie."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider_role__accepts
+msgid "What the model has to accept. A tick on a model whose catalogue does not accept it fails on save."
+msgstr "Lo que tiene que aceptar el modelo. Marcarlo en un modelo cuyo catálogo no lo acepta falla al guardar."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider_role__fallback_id
+msgid "When no provider holds this role, whoever asks for it is served by this one. Empty: nobody."
+msgstr "Si ningún proveedor tiene este rol, a quien lo pide lo atiende este otro. Vacío: nadie."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider_role__module
+msgid "The module that ships this role."
+msgstr "El módulo que trae este rol."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__role_ids
+msgid "No role: text only. A role admits that kind of turn and no other. A photo or a clip never uses a text provider."
+msgstr "Sin roles: solo texto. Un rol admite ese tipo de turno y ningún otro. Una foto o un audio no usa un proveedor de texto."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__fit_chips_html
+msgid "The roles as chips, for the list. No role reads Text."
+msgstr "Los roles como chips, para la lista. Sin rol se lee Texto."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_provider_role__accepts__image
+msgid "Image"
+msgstr "Imagen"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields.selection,name:pns_ai_mcp.selection__ai_provider_role__accepts__video
+#: model:ai.provider.role,name:pns_ai_mcp.ai_provider_role_video
+msgid "Video"
+msgstr "Vídeo"
+
+#. module: pns_ai_mcp
+#: model:ai.provider.role,description:pns_ai_mcp.ai_provider_role_conversation
+msgid "Holds the dialogue: the ordinary text turn of a chat. A provider with no role does the same."
+msgstr "Lleva el diálogo: el turno de texto normal de un chat. Un proveedor sin roles hace lo mismo."
+
+#. module: pns_ai_mcp
+#: model:ai.provider.role,description:pns_ai_mcp.ai_provider_role_audio
+msgid "Turns a voice clip into text. Saving it sends a silent clip to check the model answers speech."
+msgstr "Convierte un audio de voz en texto. Al guardar se envía un audio en silencio para comprobar que el modelo responde a la voz."
+
+#. module: pns_ai_mcp
+#: model:ai.provider.role,description:pns_ai_mcp.ai_provider_role_vision
+msgid "Reads a photo or a scanned page."
+msgstr "Lee una foto o una página escaneada."
+
+#. module: pns_ai_mcp
+#: model:ai.provider.role,description:pns_ai_mcp.ai_provider_role_video
+msgid "Reads a video clip."
+msgstr "Lee un vídeo."
+
+#. module: pns_ai_mcp
+#: model:ai.provider.role,description:pns_ai_mcp.ai_provider_role_decision
+msgid "Answers a closed Choice (yes or none, with a confidence). The protocol must be able to choose. Nobody holding it means no."
+msgstr "Responde un Choice cerrado (sí o ninguno, con una confianza). El protocolo tiene que saber elegir. Si nadie lo tiene, es no."
+
+#. module: pns_ai_mcp
+#: model:ai.provider.role,description:pns_ai_mcp.ai_provider_role_design
+msgid "Lays out a page from the data of a turn. Nobody holding it: Conversation answers."
+msgstr "Maqueta una página con los datos de un turno. Si nadie lo tiene, responde Conversación."
+
+#. module: pns_ai_mcp
+#: model:ai.provider.role,description:pns_ai_mcp.ai_provider_role_parser
+msgid "Turns a short phrase into the fields of a contract (JSON), such as the arguments of a slash. A small model without reasoning is enough. Nobody holding it: Conversation answers."
+msgstr "Convierte una frase corta en los campos de un contrato (JSON), como los argumentos de un slash. Basta un modelo pequeño sin razonamiento. Si nadie lo tiene, responde Conversación."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_role_form
+msgid "Role"
+msgstr "Rol"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_role_search
+msgid "Archived"
+msgstr "Archivado"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.actions.act_window,help:pns_ai_mcp.action_ai_provider_role
+msgid "Each role comes from the module that asks for it. A provider holds a role with a tick on its form."
+msgstr "Cada rol lo trae el módulo que lo pide. Un proveedor tiene un rol marcándolo en su ficha."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider_role.py:0
+msgid "Roles come from the module that uses them."
+msgstr "Los roles los trae el módulo que los usa."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider_role.py:0
+msgid "What a role is, what it accepts and its fallback are set by the module that ships it."
+msgstr "Qué es un rol, qué acepta y su respaldo los fija el módulo que lo trae."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider_role.py:0
+msgid "A role goes when the module that ships it is uninstalled. Archive it instead."
+msgstr "Un rol se va al desinstalar el módulo que lo trae. Archívalo."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+msgid "Protocol %s does not answer a closed Choice. Clear the Decision role."
+msgstr "El protocolo %s no responde un Choice cerrado. Quita el rol Decisión."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+msgid "Protocol %s does not chat. It can only hold the Decision role."
+msgstr "El protocolo %s no conversa. Solo puede tener el rol Decisión."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+#: code:addons/pns_ai_mcp/utils/config_backup.py:0
+msgid "Role '%s' is not installed here; skipped."
+msgstr "El rol '%s' no está instalado aquí; se omite."
+
+#. module: pns_ai_mcp
+#: model:ir.actions.act_window,name:pns_ai_mcp.action_ai_provider_role
+#: code:addons/pns_ai_mcp/wizard/config_backup_wizard.py:0
+#: code:addons/pns_ai_mcp/wizard/artifact_bundle_import_wizard.py:0
+#: model:ir.ui.menu,name:pns_ai_mcp.menu_ai_provider_role
+msgid "Provider roles"
+msgstr "Roles de proveedor"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_role__provider_ids
+msgid "Held by"
+msgstr "Lo tienen"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_role__use_fallback
+msgid "Use the fallback"
+msgstr "Usar el respaldo"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider_role__use_fallback
+msgid "Off: when nobody holds this role, nobody answers, even if it has a fallback. The module sets the fallback; this database only decides whether to use it."
+msgstr "Desmarcado: si nadie tiene este rol, no responde nadie, aunque tenga respaldo. El respaldo lo fija el módulo; esta base solo decide si se usa."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/config_backup.py:0
+msgid "Role without 'code' skipped."
+msgstr "Rol sin 'code' omitido."
+
+#. module: pns_ai_mcp
+#: model:ir.actions.server,name:pns_ai_mcp.action_server_duplicate_ai_providers
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
+msgid "Duplicate"
+msgstr "Duplicar"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_role__module_bg_color
+msgid "Module background"
+msgstr "Fondo del módulo"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_role__module_fg_color
+msgid "Module text colour"
+msgstr "Color de texto del módulo"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_role__own_bg_color
+msgid "Own background"
+msgstr "Fondo propio"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_role__own_fg_color
+msgid "Own text colour"
+msgstr "Color de texto propio"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_role__bg_color
+msgid "Background"
+msgstr "Fondo"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_role__fg_color
+msgid "Text colour"
+msgstr "Color del texto"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,field_description:pns_ai_mcp.field_ai_provider_role__chip_html
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_role_form
+msgid "Chip"
+msgstr "Chip"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_role_form
+msgid "Sample"
+msgstr "Muestra"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider_role__bg_color
+msgid "The chip's background. The module's colour until this database picks another."
+msgstr "El fondo del chip. El del módulo hasta que esta base elija otro."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider_role__fg_color
+msgid "The chip's text. The module's colour until this database picks another."
+msgstr "El texto del chip. El del módulo hasta que esta base elija otro."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider_role.py:0
+msgid "A colour is written #RRGGBB: %s"
+msgstr "Un color se escribe #RRGGBB: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+msgid "Connection Failed: the model answered with no text. Check that the protocol matches the endpoint."
+msgstr "Conexión fallida: el modelo respondió sin texto. Comprueba que el protocolo corresponde al endpoint."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider.py:0
+msgid "Protocol %s posts to an endpoint ending in %s, and this one does not. A router that speaks the OpenAI format (/chat/completions) needs its own protocol."
+msgstr "El protocolo %s envía a un endpoint que termina en %s, y este no. Un router que habla el formato OpenAI (/chat/completions) necesita su propio protocolo."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/main.py:0
+#: code:addons/pns_ai_mcp/controllers/relaxaicode_prepare.py:0
+msgid "unknown"
+msgstr "desconocido"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/main.py:0
+#: code:addons/pns_ai_mcp/controllers/relaxaicode_prepare.py:0
+msgid "User \"%s\" has no write permission on the MCP server. Operation aborted."
+msgstr "Usuario \"%s\" no tiene permisos de escritura con el servidor MCP. Operación abortada."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
+msgid "adds new"
+msgstr "añade nuevo"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
+msgid "updates"
+msgstr "actualiza"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
+msgid "⚠️ DELETES"
+msgstr "⚠️ BORRA"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
+msgid "⚠️ removes"
+msgstr "⚠️ quita"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
+msgid "adds"
+msgstr "añade"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
+msgid "⚠️ CLEARS (removes all)"
+msgstr "⚠️ VACÍA (quita todos)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
+msgid "⚠️ REPLACES all with"
+msgstr "⚠️ REEMPLAZA todos por"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
+msgid "Connect to %s"
+msgstr "Conectarse a %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
+msgid "Connect to %s (domain in the whitelist, deactivated — it will be reactivated on confirm)"
+msgstr "Conectarse a %s (dominio en lista blanca, desactivado — se reactivará al confirmar)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
+msgid "Connect to %s (add to the whitelist — AI administrator only)"
+msgstr "Conectarse a %s (añadir a lista blanca — solo administrador IA)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
+msgid "Call %s → %s"
+msgstr "Llamar a %s → %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
+msgid "(preview not available: %s)"
+msgstr "(vista previa no disponible: %s)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
+msgid "%s 1 record in «%s»"
+msgstr "%s 1 registro en «%s»"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
+msgid "%s %s records in «%s»"
+msgstr "%s %s registros en «%s»"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
+msgid "Modify"
+msgstr "Modificar"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/controllers/safe_plan_describe.py:0
+msgid "External API call"
+msgstr "Llamada API externa"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/safe_operation.py:0
+msgid "%s - %s (%s records) - %s"
+msgstr "%s - %s (%s registros) - %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/safe_operation.py:0
+msgid "Verification %s is no longer pending (status: %s)"
+msgstr "La verificación %s ya no está pendiente (estado: %s)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/safe_operation.py:0
+msgid "Verification %s has expired"
+msgstr "La verificación %s ha expirado"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/safe_operation.py:0
+msgid "another process is locking the target record (usually a zombie Odoo worker). Restart the Odoo container; the operation is already confirmed. Detail: %s"
+msgstr "otro proceso bloquea el registro destino (suele ser un worker Odoo zombie). Reinicia el contenedor Odoo; la operación ya quedó confirmed. Detalle: %s"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__endpoint
+msgid "Exact POST URL the driver uses (chat/completions or messages). Paste it as is from your gateway's documentation; it is not rewritten on save."
+msgstr "URL POST exacta que usa el driver (chat/completions o messages). Pégala tal cual desde la documentación de tu gateway; no se reescribe al guardar."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__api_key
+msgid "Authentication key sent to the AI provider."
+msgstr "Clave de autenticación que se envía al proveedor de IA."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__model_name
+msgid "Effective model name; mirrors the selected model (not editable)."
+msgstr "Nombre efectivo del modelo; refleja el modelo seleccionado (no editable)."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__temperature
+msgid "Model creativity control (0.0 - 1.0):\n- 0.0: Deterministic (always the same answer)\n- 0.1-0.3: Precise (code, SQL, data)\n- 0.4-0.7: Balanced (natural conversation) - Recommended\n- 0.8-1.0: Creative (brainstorming, writing)"
+msgstr "Control de creatividad del modelo (0.0 - 1.0):\n- 0.0: Determinista (siempre la misma respuesta)\n- 0.1-0.3: Preciso (código, SQL, datos)\n- 0.4-0.7: Equilibrado (conversación natural) - Recomendado\n- 0.8-1.0: Creativo (lluvia de ideas, redacción)"
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__temperature_support
+msgid "Whether the selected model accepts the `temperature` parameter. Detected with a minimal probe when a model is selected or the connection is tested. If 'Not supported', the parameter is omitted on every request (some recent models reject it)."
+msgstr "Indica si el modelo seleccionado acepta el parámetro `temperature`. Se detecta con una sonda mínima al seleccionar un modelo o probar la conexión. Si es 'No soportado', el parámetro se omite en cada petición (algunos modelos recientes lo rechazan)."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__context_window_display
+msgid "Readable context window (K = 1024 tokens, M = 1024K)."
+msgstr "Ventana de contexto legible (K = 1024 tokens, M = 1024K)."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_provider__context_window_tokens
+msgid "Context window in tokens, as plain text to copy/paste into inference settings (LEMONADE_CTX_SIZE, --ctx-size, num_ctx…)."
+msgstr "Ventana de contexto en tokens, como texto plano para copiar/pegar en configuraciones de inferencia (LEMONADE_CTX_SIZE, --ctx-size, num_ctx…)."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_context.py:0
+msgid "The code must be in snake_case: only lowercase letters, digits and underscores, starting with a letter. Exception: an _aa_AA suffix is allowed for locale codes (e.g. glosario_contabilidad or decimals_and_separators_es_ES)"
+msgstr "El código debe estar en formato snake_case: solo letras minúsculas, números y guiones bajos, empezando con letra. Excepción: permite patrón _aa_AA al final para códigos de locale (ej: glosario_contabilidad o decimals_and_separators_es_ES)"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_context.py:0
+msgid "The code \"%s\" already exists. It must be unique."
+msgstr "El código \"%s\" ya existe. Debe ser único."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_context.py:0
+msgid "⚠️ Read-only record\n\nSystem (hardcoded) contexts cannot be modified. These contexts are synchronised automatically from the module code."
+msgstr "⚠️ Registro de solo lectura\n\nNo se pueden modificar los contextos del sistema (hardcodeados). Estos contextos se sincronizan automáticamente desde el código del módulo."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_skill.py:0
+msgid "The code_body of skill «%s» assigned a %s to `result`. The contract requires a dict: {'data': [...]} (table), {'formatted_text': '<html>'} (card) or {'propose_steps': [...]} (HTTP). Wrap your list, e.g. result = {'data': rows, '__return_direct__': True}."
+msgstr "El code_body del skill «%s» asignó a `result` un %s. El contrato exige un dict: {'data': [...]} (tabla), {'formatted_text': '<html>'} (tarjeta) o {'propose_steps': [...]} (HTTP). Envuelve tu lista, p. ej. result = {'data': filas, '__return_direct__': True}."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/skill_runtime.py:0
+msgid "code_body assigned `result` of type %s; the contract requires a dict (data / groups / formatted_text / propose_steps)."
+msgstr "code_body asignó `result` de tipo %s; el contrato exige un dict (data / groups / formatted_text / propose_steps)."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_user.py:0
+msgid "Delete MCP API Key"
+msgstr "Eliminar API Key MCP"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_user.py:0
+msgid "Import MCP API Key"
+msgstr "Importar API Key MCP"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_user.py:0
+msgid "No user"
+msgstr "Sin usuario"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_api_key_wizard.py:0
+msgid "API Key deleted successfully"
+msgstr "API Key eliminada correctamente"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_api_key_wizard.py:0
+msgid "API Key imported successfully"
+msgstr "API Key importada correctamente"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/mcp_api_key_wizard.py:0
+msgid "Error generating API key"
+msgstr "Error generando API key"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/agent_engine.py:0
+msgid "There is no skill `/%s`."
+msgstr "No existe el skill `/%s`."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/lib/llm/drivers/openai_driver.py:0
+msgid "Model '%s' is not valid or is deprecated in OpenAI. Update the provider settings in Odoo (Settings → AI Providers). Detail: %s"
+msgstr "Modelo '%s' no válido o deprecado en OpenAI. Actualiza la configuración del proveedor en Odoo (Settings → AI Providers). Detalle: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/lib/llm/drivers/anthropic_driver.py:0
+msgid "Anthropic: the account does not have enough credit. Check Plans & Billing at console.anthropic.com (the API key is valid). Detail: %s"
+msgstr "Anthropic: la cuenta no tiene saldo suficiente. Revisa Plans & Billing en console.anthropic.com (la API key es válida). Detalle: %s"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/lib/llm/drivers/anthropic_driver.py:0
+msgid "Model '%s' is not valid or not available in Anthropic. Update the provider in Odoo. Detail: %s"
+msgstr "Modelo '%s' no válido o no disponible en Anthropic. Actualiza el proveedor en Odoo. Detalle: %s"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_api_key_wizard_form
+msgid "Generate a new key or import an existing one from another instance."
+msgstr "Genera una nueva clave o importa una existente de otra instancia."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_mcp_api_key_wizard_form
+msgid "⚠️ Warning"
+msgstr "⚠️ Advertencia"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_context_form
+msgid "e.g. accounting_glossary"
+msgstr "ej: glosario_contabilidad"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_context_form
+msgid "Context author"
+msgstr "Autor del contexto"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.actions.act_window,help:pns_ai_mcp.action_mcp_users
+msgid "MCP User Management"
+msgstr "Gestión de Usuarios MCP"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.actions.act_window,help:pns_ai_mcp.action_mcp_users
+msgid "Manage the users' API keys for access to the MCP server and who belongs to the MCP Manager group. Active Odoo users are added automatically when this list opens. ⚙️ menu: <strong>Import JSON</strong> / <strong>Export JSON</strong> between instances."
+msgstr "Gestiona las API keys de los usuarios para acceso al servidor MCP y controla quién pertenece al grupo MCP Manager. Los usuarios Odoo activos se añaden solos al abrir esta lista. Menú ⚙️: <strong>Import JSON</strong> / <strong>Export JSON</strong> entre instancias."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/static/src/js/mcp_api_key_widget_v14.js:0
+#: code:addons/pns_ai_mcp/static/src/js/mcp_api_key_widget.js:0
+msgid "MCP API Key copied to clipboard"
+msgstr "API Key MCP copiada al portapapeles"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/static/src/js/mcp_api_key_widget_v14.js:0
+#: code:addons/pns_ai_mcp/static/src/js/mcp_api_key_widget.js:0
+msgid "Error copying the MCP API Key"
+msgstr "Error al copiar API Key MCP"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/static/src/js/mcp_api_key_widget_v14.js:0
+#: code:addons/pns_ai_mcp/static/src/js/mcp_api_key_widget.js:0
+msgid "No API Key"
+msgstr "Sin API Key"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/static/src/js/mcp_log_form_v14.js:0
+#: code:addons/pns_ai_mcp/static/src/js/mcp_json_compressed_widget_v14.js:0
+#: code:addons/pns_ai_mcp/static/src/js/mcp_json_compressed_widget.js:0
+msgid "Copied"
+msgstr "Copiado"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/static/src/js/mcp_log_form_v14.js:0
+#: code:addons/pns_ai_mcp/static/src/js/mcp_json_compressed_widget_v14.js:0
+#: code:addons/pns_ai_mcp/static/src/js/mcp_json_compressed_widget.js:0
+msgid "Content copied to clipboard"
+msgstr "Contenido copiado al portapapeles"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/static/src/js/mcp_json_compressed_widget_v14.js:0
+#: code:addons/pns_ai_mcp/static/src/js/mcp_json_compressed_widget.js:0
+msgid "Loading..."
+msgstr "Cargando..."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/static/src/js/mcp_json_compressed_widget.js:0
+msgid "Error copying"
+msgstr "Error al copiar"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/safe_operation.py:0
+msgid "Only the system can open a supervised operation."
+msgstr "Solo el sistema puede abrir una operación supervisada."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_system_action.py:0
+msgid "Changing views or fields needs the Settings administrator role."
+msgstr "Cambiar vistas o campos requiere el rol de administrador de Ajustes."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/relaxaicode_render_cards.py:0
+msgid "Fields filled in:"
+msgstr "Campos rellenados:"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/relaxaicode_render_cards.py:0
+msgid "Open the form"
+msgstr "Abrir el formulario"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/relaxaicode_render_cards.py:0
+msgid "Open the record"
+msgstr "Abrir el registro"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/relaxaicode_render_cards.py:0
+msgid "Nothing is saved until you press Save."
+msgstr "No se guarda nada hasta que pulses Guardar."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider_role.py:0
+msgid "%s provider role(s) exported."
+msgstr "%s rol(es) de proveedor exportado(s)."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/models/ai_provider_role.py:0
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_import_provider_roles_wizard_form
+msgid "Import provider roles"
+msgstr "Importar roles de proveedor"
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/config_backup.py:0
+msgid "Role '%(role)s': provider '%(provider)s' not found."
+msgstr "Rol «%(role)s»: no se encuentra el proveedor «%(provider)s»."
+
+#. module: pns_ai_mcp
+#: code:addons/pns_ai_mcp/utils/config_backup.py:0
+msgid "Odoo user '%s' not found; skipped."
+msgstr "No se encuentra el usuario de Odoo «%s»; se omite."
+
+#. module: pns_ai_mcp
+#. openerp-web
+#: model:ir.actions.act_window,name:pns_ai_mcp.action_provider_role_tools_wizard
+#: code:addons/pns_ai_mcp/static/src/js/ai_provider_role_tree_v14.js:0
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_role_tools_wizard_form
+msgid "Provider Roles Tools"
+msgstr "Herramientas de Roles de proveedor"
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_ai_provider_role_tools_wizard_form
+msgid "Export JSON: Download a file with every role, its settings and the providers that hold it."
+msgstr "Exportar JSON: descarga un archivo con todos los roles, sus ajustes y los proveedores que los tienen."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_import_provider_roles_wizard_form
+msgid "Roles come from their modules: a role this database does not have is skipped, never created."
+msgstr "Los roles vienen de sus módulos: un rol que esta base de datos no tiene se omite, nunca se crea."
+
+#. module: pns_ai_mcp
+#: model_terms:ir.ui.view,arch_db:pns_ai_mcp.view_import_provider_roles_wizard_form
+msgid "If \"Replace existing\" is checked, each role takes the settings of the file and is held by exactly the providers it names."
+msgstr "Si «Reemplazar existentes» está marcado, cada rol toma los ajustes del archivo y lo tienen exactamente los proveedores que nombra."
+
+#. module: pns_ai_mcp
+#: model:ir.model.fields,help:pns_ai_mcp.field_ai_import_provider_roles_wizard__replace_existing
+msgid "If checked, each role takes the settings and the providers of the file. Otherwise, roles are left as they are."
+msgstr "Si está marcado, cada rol toma los ajustes y los proveedores del archivo. Si no, los roles se quedan como están."
+
+#. module: pns_ai_mcp
+#: model:ir.model,name:pns_ai_mcp.model_ai_import_provider_roles_wizard
+msgid "Wizard to import provider roles from JSON"
+msgstr "Asistente para importar roles de proveedor desde JSON"

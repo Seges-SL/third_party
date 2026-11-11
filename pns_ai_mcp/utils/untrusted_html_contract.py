@@ -8,7 +8,7 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
-# Solo estos __fmt_type__ pueden pintar formatted_text en Chatboo.
+# Only these __fmt_type__ values may paint formatted_text in the chat.
 _TRUSTED_FMT_TYPES = frozenset({
     'server_side_python',
     'author_html',
@@ -28,12 +28,12 @@ def reject_untrusted_formatted_text(
     - skill runtime → ``author_html``
     - ``maybe_attach_formatted_text`` → ``server_side_python`` (after attach)
 
-    ``after_server_render=True``: segunda pasada tras ``maybe_attach``; no
-    eliminar ``server_side_python`` (lo pone el servidor, no el LLM).
+    ``after_server_render=True``: second pass after ``maybe_attach``; do not
+    drop ``server_side_python`` (the server sets it, not the LLM).
     """
     if not isinstance(result, dict) or not result.get('formatted_text'):
         return False
-    # Quitar auto-atribución del sandbox libre (solo antes del render servidor).
+    # Drop self-attribution from the free sandbox (only before the server render).
     if (
         not after_server_render
         and result.get('__fmt_type__') in _TRUSTED_FMT_TYPES

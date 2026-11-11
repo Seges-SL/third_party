@@ -4,7 +4,7 @@
 """AI Engine menu visibility: hide operator-only menus from AI administrators.
 
 The AI Engine app icon follows XML ``groups_id`` (IA groups), not the MCP API
-key carnet. The carnet gates Chatboo. Forcing the app root into the drawer for
+key carnet. The carnet gates the hosts. Forcing the app root into the drawer for
 key holders without IA groups yields an empty root and crashes Odoo 14
 AppsMenu (``action.split`` on ``false``).
 """

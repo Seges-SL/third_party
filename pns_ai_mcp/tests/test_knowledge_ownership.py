@@ -1,23 +1,19 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Knowledge ownership without creating res.users (O14 + website_slides hangs)."""
+"""Knowledge ownership: private and shared contexts and skills between two writers."""
 
 import uuid
 
 from odoo.exceptions import AccessError
 from odoo.tests import tagged, TransactionCase
 
-from odoo.addons.pns_ai_mcp.tests._helpers import ensure_test_agents
+from odoo.addons.pns_ai_mcp.tests._helpers import create_test_user, ensure_test_agents
 from odoo.addons.pns_ai_mcp.utils.compat import user_add_group, user_has_group_direct
 
 
 @tagged('post_install', '-at_install', 'pns_ai_mcp')
 class TestKnowledgeOwnership(TransactionCase):
-    """Ownership sin create de res.users (en O14+website_slides cuelga el suite).
-
-    Usa ``base.user_admin`` + ``base.user_demo`` si existe; si no, skip.
-    """
 
     def setUp(self):
         super().setUp()
@@ -28,26 +24,9 @@ class TestKnowledgeOwnership(TransactionCase):
         if not user_has_group_direct(self.admin_user, self.admin_group):
             user_add_group(self.admin_user, self.admin_group)
 
-        demo = self.env.ref('base.user_demo', raise_if_not_found=False)
-        if not demo:
-            self.skipTest('base.user_demo no instalado — se evita create res.users')
-        self.user_a = demo
-        if not user_has_group_direct(self.user_a, self.writer_group):
-            user_add_group(self.user_a, self.writer_group)
-
-        # Segundo “escritor”: el propio admin sin quitarle AI Admin no sirve para
-        # privacidad. Usamos un partner/usuario portal si hay; si no, reutilizamos
-        # demo solo en tests que no necesiten dos escritores distintos.
-        self.user_b = self.env['res.users'].search([
-            ('share', '=', False),
-            ('id', 'not in', [self.admin_user.id, self.user_a.id]),
-            ('active', '=', True),
-        ], limit=1)
-        if not self.user_b:
-            self.user_b = False
-        else:
-            if not user_has_group_direct(self.user_b, self.writer_group):
-                user_add_group(self.user_b, self.writer_group)
+        writers = [self.env.ref('base.group_user').id, self.writer_group.id]
+        self.user_a = create_test_user(self.env, prefix='pns_ownership_a', groups=writers)
+        self.user_b = create_test_user(self.env, prefix='pns_ownership_b', groups=writers)
 
         self._uid = uuid.uuid4().hex[:8]
 
@@ -74,8 +53,6 @@ class TestKnowledgeOwnership(TransactionCase):
         return ctx
 
     def test_private_context_not_in_other_user_prompt(self):
-        if not self.user_b:
-            self.skipTest('hace falta un segundo usuario interno además de demo')
         code = self._code('ownership_private_ctx')
         self._create_owned_context(
             self.env(user=self.user_a), code, self.user_a,
@@ -107,11 +84,9 @@ class TestKnowledgeOwnership(TransactionCase):
             module_ctx.with_user(self.user_a).write({'description': 'hacked'})
 
     def test_skill_visibility_get_for_agent(self):
-        if not self.user_b:
-            self.skipTest('hace falta un segundo usuario interno además de demo')
         Skill = self.env['ai.skill']
-        private_code = self._code('ownership-private-skill')
-        shared_code = self._code('ownership-shared-skill')
+        private_code = self._code('ownership_private_skill')
+        shared_code = self._code('ownership_shared_skill')
         Skill.with_user(self.user_a).create({
             'code': private_code,
             'name': 'Private',

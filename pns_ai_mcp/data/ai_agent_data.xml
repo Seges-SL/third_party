@@ -22,7 +22,7 @@ Baseline knowledge: @pns_ai_mcp.</field>
     </record>
 
     <!-- Inference agent for engine admin jobs (OpenAPI-from-docs, detection
-         triggers, skill authoring). Not Chatboo; no product contexts. -->
+         triggers, skill authoring). Not a chat; no product contexts. -->
     <record id="ai_agent_admin" model="ai.agent">
         <field name="name">AI Admin</field>
         <field name="code">pns_ai_admin</field>
@@ -33,8 +33,8 @@ Baseline knowledge: @pns_ai_mcp.</field>
         <field name="description">Internal inference agent for AI Engine admin jobs.
 Owns OpenAPI generation from documentation, API-server detection triggers,
 and skill authoring. Uses the provider failover chain configured on this agent.
-Not an MCP endpoint and not the Chatboo chat agent.</field>
+Not an MCP endpoint and not a chat agent.</field>
     </record>
-    <!-- El antiguo agente semilla `ocr` se retiró. Un `-u pns_ai_mcp` NO borra
-         el registro obsoleto; la purga idempotente está en `i_restore.py`. -->
+    <!-- The old `ocr` seed agent was retired. A `-u pns_ai_mcp` does NOT delete
+         the obsolete record; the idempotent purge lives in `i_restore.py`. -->
 </odoo>

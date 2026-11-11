@@ -8,6 +8,9 @@ from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 
 _METHOD_PREFIX = '_pns_export_'
+# What the answer calls. Only ask() sets them: over RPC they would let any
+# internal user reach a private _pns_export_* method of any model.
+_TARGET_FIELDS = ('res_model', 'res_ids', 'method')
 
 
 class PnsExportSecretsWizard(models.TransientModel):
@@ -28,7 +31,9 @@ class PnsExportSecretsWizard(models.TransientModel):
         """Open the question; the answer calls ``records.<method>(include_secrets)``."""
         if not method.startswith(_METHOD_PREFIX):
             raise UserError(_('This export cannot ask for secrets.'))
-        wizard = self.create({
+        # Internal users may not create it; sudo() keeps the caller's uid, so
+        # the row is still theirs.
+        wizard = self.sudo().create({
             'res_model': records._name,
             'res_ids': json.dumps(records.ids),
             'method': method,
@@ -42,6 +47,11 @@ class PnsExportSecretsWizard(models.TransientModel):
             'views': [[False, 'form']],
             'target': 'new',
         }
+
+    def write(self, vals):
+        if not self.env.su and any(name in vals for name in _TARGET_FIELDS):
+            raise UserError(_('This export cannot ask for secrets.'))
+        return super().write(vals)
 
     def action_export(self):
         self.ensure_one()

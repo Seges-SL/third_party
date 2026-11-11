@@ -62,11 +62,6 @@ class AIAgent(models.Model):
         return code
 
     @api.model
-    def get_mcp_bare_agent_code(self):
-        """Agent code for bare /mcp URLs (no path segment)."""
-        return MCP_BARE_AGENT_CODE
-
-    @api.model
     def resolve_mcp_agent_code(self, agent_code=None):
         """MCP entry: explicit path segment or fixed bare /mcp agent."""
         explicit = (agent_code or '').strip()

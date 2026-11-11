@@ -19,7 +19,7 @@ from odoo.addons.pns_ai_mcp.controllers.context_builder import guarded_import
 
 @tagged('post_install', '-at_install', 'pns_ai_mcp')
 class TestRelaxAICodeImports(TransactionCase):
-    """Frontera de red del sandbox: urllib.parse sí (from-import), red no."""
+    """Sandbox network boundary: urllib.parse yes (from-import), network no."""
 
     def _ok(self, code):
         is_valid, err, _req = validate_relaxaicode_source_ast(code)
@@ -46,15 +46,15 @@ class TestRelaxAICodeImports(TransactionCase):
             self.assertFalse(is_valid, "Debería bloquearse: %s" % code)
 
     def test_guarded_import_only_allows_urllib_parse_from_form(self):
-        # from urllib.parse import quote -> permitido y funcional
+        # from urllib.parse import quote -> allowed and working
         mod = guarded_import('urllib.parse', None, None, ['quote'], 0)
         self.assertEqual(mod.quote('Nueva York'), 'Nueva%20York')
 
-        # import urllib.parse (fromlist vacío) -> bloqueado
+        # import urllib.parse (empty fromlist) -> blocked
         with self.assertRaises(ImportError):
             guarded_import('urllib.parse', None, None, None, 0)
 
-        # red / paquete urllib -> bloqueado
+        # network / urllib package -> blocked
         for name, fromlist in (
             ('urllib', None),
             ('urllib.request', None),

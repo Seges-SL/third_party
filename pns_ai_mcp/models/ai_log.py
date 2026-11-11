@@ -4,8 +4,9 @@
 """One row per AI/MCP operation (read or write). Audit trail."""
 
 from odoo import models, fields, api, SUPERUSER_ID, _
-from odoo.tools import config, html_escape
+from odoo.tools import html_escape
 from ..utils import mcp_ui
+from ..utils.compat import read_sums, test_is_running
 from ..utils.import_export_guard import ensure_ai_admin
 from ..utils.portable_io import export_record_dict
 import json
@@ -45,9 +46,9 @@ class AILog(models.Model):
     """
     _name = 'ai.log'
     _description = 'AI Operation Log'
-    # Desempate por turn_step: los pasos de un mismo turno comparten timestamp
-    # (granularidad de segundo), así que sin este desempate Postgres los devuelve
-    # en orden arbitrario y el turno se ve "descolocado" (8,7,2,6,5,...).
+    # Tie-break by turn_step: steps of the same turn share a timestamp
+    # (second granularity), so without this tie-break Postgres returns them
+    # in arbitrary order and the turn looks "out of order" (8,7,2,6,5,...).
     _order = 'timestamp desc, turn_step desc'
     _rec_name = 'display_name'
 
@@ -427,7 +428,7 @@ class AILog(models.Model):
                 rec.flow_label = 'MCP client -> %s: %s' % (verb, ep)
                 continue
 
-            # Internal orchestration (Chatboo / internal processes).
+            # Internal orchestration (hosts / internal processes).
             if ep == CAPABILITY_SKIPPED:
                 rec.flow = 'skipped'
                 # Keep English: ai.log surface, shared with logs and AIs.
@@ -479,7 +480,7 @@ class AILog(models.Model):
     # ``render_flow_legend``), so grid and form never drift again.
     #   (background, text_color, label, italic, icon_key)
     # Icons: clean paths from pns_suite/design/AI/icons (no C2PA metadata).
-    # Order = Chatboo negotiation start → end, then outliers (failover, MCP).
+    # Order = turn negotiation start → end, then outliers (failover, MCP).
     _FLOW_WRENCH = (
         '<path d="M20.6 3.9a5.4 5.4 0 0 0-7.2 7.0L5.1 19.2a2.1 2.1 0 0 0 '
         '3.0 3.0l8.3-8.3a5.4 5.4 0 0 0 7.0-7.2l-3.3 3.3-2.8-2.8 3.3-3.3z" '
@@ -518,7 +519,7 @@ class AILog(models.Model):
             '<line x1="6.1" y1="17.9" x2="17.9" y2="6.1"/>'
         ),
         'mcp_client_to_odoo': (
-            # Same silhouette as Chatboo's fa-plug, rotated 90° CW so
+            # Same silhouette as Font Awesome fa-plug, rotated 90° CW so
             # the prongs do not read as cat ears at 15px.
             '<g transform="rotate(90 12 12)">'
             '<line x1="9" y1="3" x2="9" y2="8"/>'
@@ -712,10 +713,7 @@ class AILog(models.Model):
         Returns:
             ai.log record, or None on error (logging never breaks operations).
         """
-        # Skip only when truly inside a test (TestCursor), not merely because the
-        # server was started with --test-enable (which stays True for the whole
-        # process life and would otherwise disable the whole history).
-        if config['test_enable'] and type(self.env.cr).__name__ == 'TestCursor':
+        if test_is_running(self.env):
             return None
         try:
             _logger.info(f"TRACE_MCP: _create_log_entry START - Endpoint: {tool_name}, User: {user_id}")
@@ -929,7 +927,7 @@ class AILog(models.Model):
         return count
 
     # Round-level endpoints already rolled into ``orchestration_summary``.
-    # Counting them again would double Chatboo turn spend.
+    # Counting them again would double the turn spend.
     _USAGE_SUMMARY_EXCLUDE_ENDPOINTS = (
         'llm_orchestration',
         'llm_response',
@@ -949,8 +947,6 @@ class AILog(models.Model):
         Legacy callers without ``domain`` keep the old 30-day / own-user window.
         """
         from datetime import timedelta
-
-        from odoo.osv import expression
 
         from ..utils.display_currency import get_display_currency
         from ..utils.usage_display import format_usage_chip
@@ -972,14 +968,10 @@ class AILog(models.Model):
                 ('primitive', '=', 'llm'),
                 ('timestamp', '>=', since),
             ]
-        merged = expression.AND([base, exclude])
-        groups = self.read_group(merged, ['total_tokens', 'cost_usd'], [])
-        total_tokens = 0
-        cost_usd = 0.0
-        if groups:
-            row = groups[0]
-            total_tokens = int(row.get('total_tokens') or 0)
-            cost_usd = float(row.get('cost_usd') or 0.0)
+        merged = base + exclude
+        sums = read_sums(self, merged, ['total_tokens', 'cost_usd'])
+        total_tokens = int(sums['total_tokens'])
+        cost_usd = float(sums['cost_usd'])
         usage = {}
         if total_tokens:
             usage['total_tokens'] = total_tokens

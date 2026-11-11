@@ -3,10 +3,11 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 # Odoo reads this file with ast.literal_eval — no module docstring before `{`.
 {
-    'name': 'Chatboo',
-    'version': '2.1.538',
-    'category': 'Patanegra AI',
-    'summary': 'Conversational chat client (Chatboo) for the PNS AI MCP server.',
+    'name': 'Chatboo — AI Chat Assistant',
+    'version': '14.0.2.1.587',
+    'images': ['static/description/banner_store.png'],
+    'category': 'Productivity',
+    'summary': 'Open-source AI chatbot for Odoo Community 14 to 20: ask about your records in plain words with OpenAI, Claude or Ollama, and get tables, charts, PDF or Excel. Each user sees only what they may see.',
     'description': """
 Part of Patanegra Soft Suite (pns_suite). Consumes the Patanegra Application Agent Protocol (PAAP).
 
@@ -18,12 +19,12 @@ inference loop. Chatboo owns the conversation: session history, the chat
 turn endpoint (SSE streaming) and the user interface.
 """,
     'author': 'PATANEGRA Soft',
-    'website': '/pns_ai_chatboo/static/description/index.html',
+    'website': 'https://www.patanegra.com/chatboo.html',
     # Apache License 2.0 — see LICENSE file
     'license': 'Other OSI approved licence',
     'depends': ['web', 'bus', 'mail', 'pns_base', 'pns_ai_mcp'],
-    # openpyxl: extracción de .xlsx adjuntos (también en pns_ai_mcp; lo
-    # declaramos aquí para que el deploy de Chatboo no se olvide en O14).
+    # openpyxl reads attached .xlsx files. pns_ai_mcp declares it too;
+    # it is listed here as well so a Chatboo deploy on O14 does not miss it.
     'external_dependencies': {
         'python': ['openpyxl'],
     },

@@ -9,6 +9,9 @@ odoo.define('pns_ai_mcp.mcp_api_key_widget', function (require) {
 
     var AbstractField = require('web.AbstractField');
     var field_registry = require('web.field_registry');
+    var core = require('web.core');
+
+    var _t = core._t;
 
     var MCPApiKeyWidget = AbstractField.extend({
         className: 'o_field_mcp_api_key',
@@ -17,7 +20,7 @@ odoo.define('pns_ai_mcp.mcp_api_key_widget', function (require) {
         _render: function () {
             var self = this;
             
-            // Llamar al m├®todo padre para asegurar que this.$el est├® inicializado
+            // Call the parent method to make sure this.$el is initialized
             this._super.apply(this, arguments);
             
             if (!this.$el || !this.$el.length) {
@@ -26,17 +29,17 @@ odoo.define('pns_ai_mcp.mcp_api_key_widget', function (require) {
             
             this.$el.empty();
             
-            // Contenedor flex
+            // Flex container
             var $container = $('<div>', {
                 class: 'd-flex align-items-center'
             });
             
-            // Botones de acci├│n si hay valor (a la izquierda)
+            // Action buttons when there is a value (on the left)
             if (this.value) {
-                // Bot├│n de copiar
+                // Copy button
                 var $copyButton = $('<button>', {
                     class: 'btn btn-sm btn-link',
-                    title: 'Copiar al portapapeles'
+                    title: _t('Copy to clipboard')
                 }).append($('<i>', {
                     class: 'fa fa-copy'
                 }));
@@ -47,14 +50,14 @@ odoo.define('pns_ai_mcp.mcp_api_key_widget', function (require) {
                     navigator.clipboard.writeText(self.value).then(function() {
                         self.displayNotification({
                             type: 'success',
-                            title: '├ëxito',
-                            message: 'API Key MCP copiada al portapapeles',
+                            title: _t('Success'),
+                            message: _t('MCP API Key copied to clipboard'),
                         });
                     }).catch(function() {
                         self.displayNotification({
                             type: 'danger',
-                            title: 'Error',
-                            message: 'Error al copiar API Key MCP',
+                            title: _t('Error'),
+                            message: _t('Error copying the MCP API Key'),
                         });
                     });
                 });
@@ -62,10 +65,10 @@ odoo.define('pns_ai_mcp.mcp_api_key_widget', function (require) {
                 $container.append($copyButton);
             }
             
-            // Span para el valor (a la derecha del bot├│n)
+            // Span for the value (right of the button)
             var $value = $('<span>', {
                 class: 'flex-grow-1',
-                text: this.value || 'No API Key'
+                text: this.value || _t('No API Key')
             });
             
             $container.append($value);

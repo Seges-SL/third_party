@@ -5,7 +5,7 @@
  *
  * Reads the Odoo screen underneath the Chatboo overlay via the action service
  * (OWL2) or URL hash (OWL1 fallback). Loaded as a plain script (global
- * ChatbooScreenContext). Deploy copies common/ into the stack addon via i.sh.
+ * ChatbooScreenContext). Deploy copies common/ into the stack addon by the installer.
  */
 (function (global) {
     "use strict";

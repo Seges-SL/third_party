@@ -9,29 +9,22 @@ from odoo.tests import tagged, TransactionCase
 class TestFlowLegend(TransactionCase):
 
     def test_legend_chips_include_svg_icons(self):
-        html = self.env['ai.log'].render_flow_legend(layout='form')
-        self.assertEqual(html.count('o_mcp_flow_chip_icon'), 8)
-        self.assertEqual(html.count('class="o_mcp_flow_chip"'), 8)
+        Log = self.env['ai.log']
+        rows = len(Log._FLOW_LEGEND)
+        html = Log.render_flow_legend(layout='form')
+        self.assertEqual(html.count('o_mcp_flow_chip_icon'), rows)
+        self.assertEqual(html.count('class="o_mcp_flow_chip"'), rows)
         self.assertNotIn('c2pa', html)
         self.assertIn('viewBox="0 0 24 24"', html)
-        for label in (
-            'Discovery',
-            'AI Engine \u2192 LLM (request)',
-            'LLM \u2192 AI Engine (response)',
-            'AI Engine \u2192 Tool',
-            'Supervised',
-            'Turn completed',
-            'Provider failover',
-            'MCP client \u2192 Odoo',
-        ):
+        for _bg, _fg, label, _italic, _icon in Log._FLOW_LEGEND:
             self.assertIn(label, html)
-        grid = self.env['ai.log'].render_flow_legend(layout='grid')
+        grid = Log.render_flow_legend(layout='grid')
         self.assertIn('o_mcp_log_legend_bar', grid)
         self.assertIn('o_mcp_log_usage_chip', grid)
         self.assertIn('o_mcp_log_legend_chips', grid)
         self.assertNotIn('Colors:', grid)
         self.assertNotIn('o_mcp_log_legend_prefix', grid)
-        self.assertEqual(grid.count('o_mcp_flow_chip_icon'), 8)
+        self.assertEqual(grid.count('o_mcp_flow_chip_icon'), rows)
 
     def test_every_legend_row_has_an_icon(self):
         Log = self.env['ai.log']

@@ -18,16 +18,16 @@
     var SHOW_MODE_TABLE_ONLY = "table";
     var ENGINE_CHARTJS = "chartjs";
     var ENGINE_ECHARTS = "echarts";
-    // Ratio para decidir barra vs línea en modo combinado (no eje).
+    // Ratio to pick bar vs line in combined mode (not the axis).
     var SCALE_RATIO_DUAL = 3;
-    // Solo magnitudes absolutas extremas (p.ej. € vs nº) → 2º eje.
-    // Umbral bajo (3) hacía dual Facturación/Salarios (~4–5×) y mentía la comparación.
+    // Only extreme absolute gaps (e.g. € vs counts) → 2nd axis.
+    // A low threshold (3) split Revenue/Salaries (~4–5×) and misled the comparison.
     var SCALE_RATIO_DUAL_EXTREME = 50;
     var SKIP_KEYS = { id: 1, __model: 1 };
-    // Columnas ratio/% → eje derecho cuando conviven con importes absolutos.
+    // Ratio/% columns → right axis when shown with absolute amounts.
     var RATIO_KEY_RE =
         /%|percent|pct\b|ratio|tasa|margen|índice|indice|\bshare\b|\bpeso\b/i;
-    // Auto-chart Y: solo forma de clave (dinero / % / contador), sin dominio de negocio.
+    // Auto-chart Y: key shape only (money / % / count), no business domain.
     var MONEY_KEY_RE =
         /amount|total|importe|monto|saldo|balance|revenue|ingreso|precio|price|coste|cost\b|debe|haber|beneficio|deuda|pend|subtotal|neto|gasto|expense|sales?|venta|factur|payroll|n[oó]mina|salary|sueldo|wage|pago|payment|cobro|recib|honor/i;
     var COUNT_KEY_RE =
@@ -336,8 +336,8 @@
     }
 
     /**
-     * Métrica dominante = eje / título (no reordena series).
-     * Pondera monotonía × log(rango) para no elegir columnas casi planas.
+     * Dominant metric = axis / title (does not reorder series).
+     * Weighs monotony × log(range) so nearly flat columns are not picked.
      */
     function pickDominantMetric(rows, seriesKeys) {
         if (!seriesKeys.length) {
@@ -385,15 +385,15 @@
         return COUNT_KEY_RE.test(String(key || ""));
     }
 
-    /** Serie Y apta para auto-gráfico: dinero, %/ratio o contador (forma de clave). */
+    /** Y series fit for an auto chart: money, %/ratio or count (key shape). */
     function isChartMetricKey(key) {
         return isMoneyLikeKey(key) || isRatioLikeKey(key) || isCountLikeKey(key);
     }
 
     /**
-     * Dual Y solo si mezclamos absolutos + ratio/%, o hueco de escala extremo
-     * (€ vs conteos). Nunca por un ratio moderado entre dos series en la misma
-     * unidad (Facturación vs Salarios): eso infla la serie menor y engaña.
+     * Dual Y only when mixing absolutes + ratio/%, or an extreme scale gap
+     * (€ vs counts). Never for a moderate ratio between two series in the same
+     * unit (Revenue vs Salaries): that inflates the smaller series and misleads.
      */
     function needsDualAxis(series) {
         if (!series || series.length < 2) {
@@ -425,7 +425,7 @@
         return lo > 0 && hi / lo >= SCALE_RATIO_DUAL_EXTREME;
     }
 
-    /** Override desde data-ai-dual-axis o toggle UI; null = auto. */
+    /** Override from data-ai-dual-axis or the UI toggle; null = auto. */
     function parseDualAxisAttr(raw) {
         if (raw === null || raw === undefined) {
             return null;
@@ -519,7 +519,7 @@
         var seriesCandidates = numericKeys.filter(function (k) {
             return k !== categoryKey;
         });
-        // Auto (metricsOnly): solo dinero / % / contador. Petición explícita: todas.
+        // Auto (metricsOnly): money / % / count only. Explicit request: all.
         if (opts.metricsOnly) {
             seriesCandidates = seriesCandidates.filter(isChartMetricKey);
         }
@@ -674,9 +674,9 @@
     }
 
     /**
-     * Altura del host: más aire vertical en series temporales / multi-serie,
-     * y filas altas en barras horizontales. Sin hardcode de dominio.
-     * Tarjeta dashboard compacta = más baja; maximizada = misma fórmula que chat.
+     * Host height: more vertical room for time / multi-series,
+     * and tall rows for horizontal bars. No domain hardcode.
+     * Compact dashboard card = lower; maximized = same formula as chat.
      */
     function resolveChartHostHeightPx(meta, mode, block) {
         var nLab = meta && meta.labels ? meta.labels.length : 0;
@@ -696,8 +696,8 @@
             block.closest(".o_chatboo_dashboard_card_maximized")
         );
 
-        // Solo las tarjetas compactas del grid se quedan bajas y sin scroll.
-        // Maximizada → misma lógica que un gráfico de chat normal.
+        // Only compact grid cards stay low and without scroll.
+        // Maximized → same logic as a normal chat chart.
         if (inDash && !maximized) {
             var body =
                 block.closest && block.closest(".o_ai_dashboard_card_body");
@@ -713,12 +713,12 @@
                 title && title.offsetParent !== null ? title.offsetHeight + 6 : 0;
             var avail;
             if (bodyH > 60) {
-                // Padding del body (~16) + margen pequeño.
+                // Body padding (~16) + small margin.
                 avail = bodyH - tbH - titleH - 18;
             } else {
                 avail = Math.min(200, Math.round(vh * 0.22));
             }
-            // Techo bajo: leyenda ECharts va dentro del host; no empujar el body.
+            // Low ceiling: the ECharts legend sits inside the host; do not push the body.
             return Math.max(140, Math.min(avail, 210));
         }
 
@@ -734,7 +734,7 @@
             return Math.max(300, Math.min(hBar, Math.round(vh * 0.72), 680));
         }
 
-        // Cartesian (barras / líneas / combinado / área / stack).
+        // Cartesian (bars / lines / combined / area / stack).
         var h = 360;
         if (nLab > 6) {
             h += Math.min(140, (nLab - 6) * 12);
@@ -767,7 +767,7 @@
         );
         host.style.height = px + "px";
         host.style.maxHeight = px + "px";
-        // En tarjeta compacta no forzar minHeight alto (provoca scroll del body).
+        // In a compact card do not force a high minHeight (it scrolls the body).
         host.style.minHeight =
             inDash && !maximized
                 ? Math.min(px, 140) + "px"
@@ -775,7 +775,7 @@
         host.setAttribute("data-chatboo-chart-height", String(px));
     }
 
-    /** Recalcula altura (p. ej. al maximizar/restaurar tarjeta) y pide resize. */
+    /** Recompute height (e.g. on card maximize/restore) and ask for a resize. */
     function relayoutChartsIn(root) {
         if (!root || !root.querySelectorAll) {
             return;
@@ -824,49 +824,49 @@
         var multi = meta.series.length >= 2;
         if (engine === ENGINE_ECHARTS) {
             if (multi && meta.periodBuckets) {
-                opts.push({ v: "bar", t: "Barras agrupadas" });
+                opts.push({ v: "bar", t: _t("Grouped bars") });
                 if (meta.stackedOk) {
-                    opts.push({ v: "stack", t: "Apilado" });
+                    opts.push({ v: "stack", t: _t("Stacked") });
                 }
-                opts.push({ v: "mix", t: "Combinado" });
+                opts.push({ v: "mix", t: _t("Combined") });
             } else if (multi) {
-                opts.push({ v: "mix", t: "Combinado" });
+                opts.push({ v: "mix", t: _t("Combined") });
             }
             if (!meta.periodBuckets || !multi) {
-                opts.push({ v: "bar", t: "Barras" });
+                opts.push({ v: "bar", t: _t("Bars") });
             }
-            opts.push({ v: "line", t: "Líneas" });
+            opts.push({ v: "line", t: _t("Lines") });
             if (multi) {
-                opts.push({ v: "area", t: "Área" });
+                opts.push({ v: "area", t: _t("Area") });
             }
             if (meta.stackedOk && !(multi && meta.periodBuckets)) {
-                opts.push({ v: "stack", t: "Apilado" });
+                opts.push({ v: "stack", t: _t("Stacked") });
             }
             if (meta.horizontalOk) {
-                opts.push({ v: "bar_h", t: "Horizontal" });
+                opts.push({ v: "bar_h", t: _t("Horizontal") });
             }
             if (meta.radarOk) {
-                opts.push({ v: "radar", t: "Radar" });
+                opts.push({ v: "radar", t: _t("Radar") });
             }
             if (meta.categoricalPieOk) {
-                opts.push({ v: "donut", t: "Quesito" }, { v: "pie", t: "Tarta" });
+                opts.push({ v: "donut", t: _t("Donut") }, { v: "pie", t: _t("Pie") });
                 if (meta.labels.length >= 3) {
-                    opts.push({ v: "rose", t: "Rosa" });
+                    opts.push({ v: "rose", t: _t("Rose") });
                 }
             }
         } else {
             if (multi) {
-                opts.push({ v: "mix", t: "Combinado" });
+                opts.push({ v: "mix", t: _t("Combined") });
             }
-            opts.push({ v: "bar", t: "Barras" }, { v: "line", t: "Líneas" });
+            opts.push({ v: "bar", t: _t("Bars") }, { v: "line", t: _t("Lines") });
             if (meta.pieOk) {
-                opts.push({ v: "pie", t: "Tarta" });
+                opts.push({ v: "pie", t: _t("Pie") });
             }
         }
         return opts;
     }
 
-    /** Ciclo corto de rotación (Chart.js / cartesian). */
+    /** Short rotation cycle (Chart.js / cartesian). */
     function rotateCycle(meta) {
         if (!meta || !meta.series || meta.series.length < 2) {
             return ["bar", "line"];
@@ -924,25 +924,25 @@
             if (isPieLikeMode(currentMode)) {
                 return {
                     show: meta.categoricalPieOk,
-                    title: "Rotar quesito / tarta / rosa",
+                    title: _t("Rotate donut / pie / rose"),
                     icon: "pie",
                 };
             }
             return {
                 show: true,
-                title: "Rotar tipo (combinado, apilado, horizontal…)",
+                title: _t("Rotate type (combined, stacked, horizontal…)"),
                 icon: "combo",
             };
         }
         return {
             show: currentMode !== "pie",
-            title: "Rotar combinación (barra/línea por serie)",
+            title: _t("Rotate combination (bar/line per series)"),
             icon: "combo",
         };
     }
 
     /**
-     * Tipo por serie: mix = mayor absMax → barra, resto → línea; mix_inv invierte.
+     * Type per series: mix = largest absMax → bar, rest → line; mix_inv flips it.
      */
     function resolveSeriesTypes(meta, mode) {
         var n = meta.series.length;
@@ -985,7 +985,7 @@
             types.push(loType);
         }
         types[ranked[0].idx] = hiType;
-        // 3 series: la 2ª de mayor escala también barra si no es “pequeña” vs la 1ª.
+        // 3 series: the 2nd largest is also a bar unless it is “small” vs the 1st.
         if (n >= 3 && ranked.length >= 2) {
             var top = ranked[0].m || 1;
             var mid = ranked[1].m;
@@ -1040,8 +1040,8 @@
     }
 
     /**
-     * Chart.js/ECharts, si nació con host 0×0, dejan el surface en unos px.
-     * resize() sin args relee ese box; hay que pasar el tamaño del host.
+     * Chart.js/ECharts born with a 0×0 host leave the surface a few px wide.
+     * resize() without args rereads that box; pass the host size instead.
      */
     function resizeChartToHost(block) {
         var host =
@@ -1196,8 +1196,8 @@
         }
 
         var seriesTypes = resolveSeriesTypes(meta, mode);
-        // Chart.js 4: si el tipo raíz es "line", las barras del dataset casi no se ven.
-        // Raíz = bar si hay alguna barra; si no, line.
+        // Chart.js 4: if the root type is "line", dataset bars barely show.
+        // Root = bar if any bar exists; otherwise line.
         var hasBar = seriesTypes.indexOf("bar") >= 0;
         var rootType = hasBar ? "bar" : "line";
 
@@ -1265,7 +1265,7 @@
                 pointRadius: isLine ? 3 : 0,
                 pointHoverRadius: isLine ? 5 : 0,
                 yAxisID: axisIds[idx],
-                // Menor order = delante; barras detrás de líneas.
+                // Lower order = in front; bars behind lines.
                 order: isLine ? 1 : 2,
             };
         });
@@ -1299,10 +1299,10 @@
     }
 
     /**
-     * Dual Y: dominante + series de la misma magnitud → izquierda;
-     * ratios / contadores (forma de clave) / hueco de escala extremo → derecha.
-     * Invariante: no empujar a y1 toda serie no-dominante (aplasta la pequeña
-     * cuando comparte eje con otra de magnitud alta).
+     * Dual Y: dominant + series of the same magnitude → left;
+     * ratios / counts (key shape) / extreme scale gap → right.
+     * Invariant: do not push every non-dominant series to y1 (it flattens the
+     * small one when it shares an axis with a large one).
      */
     function resolveAxisIds(meta) {
         if (!meta.dualAxis) {
@@ -1790,7 +1790,7 @@
         return block.getAttribute("data-chatboo-chart-open") === "1";
     }
 
-    /** Marca la burbuja del turno; el ancho lo pone --o-chatboo-card-width (2/3). */
+    /** Marks the turn bubble; --o-chatboo-card-width (2/3) sets the width. */
     function expandChartMessageCanvas(block) {
         if (!block || !shouldExpandChartCanvas(block)) {
             return;
@@ -1829,7 +1829,7 @@
         resizeChartToHost(block);
     }
 
-    /** Solo resize del motor; no cambia altura del host (evita bucles de RO). */
+    /** Engine resize only; host height stays (avoids ResizeObserver loops). */
     function softResizeChartsIn(root) {
         if (!root || !root.querySelectorAll) {
             return;
@@ -1980,8 +1980,8 @@
         if (!mode) {
             mode = meta.defaultMode;
         }
-        // Host visible ANTES de init: si está display:none, ECharts/Chart.js
-        // miden 0×0 y el primer frame sale aplastado ("burruño").
+        // Host visible BEFORE init: with display:none, ECharts/Chart.js
+        // measure 0×0 and the first frame comes out squashed.
         applyChartHostHeight(host, meta, mode, block);
         host.style.display = "";
         void host.offsetHeight;
@@ -2033,7 +2033,7 @@
     }
 
     function rotateSvg() {
-        // Icono tipo “combo chart”: barras + línea (Material-ish).
+        // “Combo chart” icon: bars + line (Material-ish).
         return (
             '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" ' +
             'viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
@@ -2064,12 +2064,12 @@
             return;
         }
         var dual = !!meta.dualAxis;
-        btn.textContent = dual ? "1 eje Y" : "2 ejes Y";
+        btn.textContent = dual ? _t("1 Y axis") : _t("2 Y axes");
         btn.setAttribute(
             "title",
             dual
-                ? "Usar un solo eje Y (misma escala para todas las series)"
-                : "Usar dos ejes Y (útil si mezclas € y %)"
+                ? _t("Use one Y axis (same scale for every series)")
+                : _t("Use two Y axes (useful when mixing € and %)")
         );
         btn.setAttribute("aria-pressed", dual ? "true" : "false");
         btn.setAttribute("aria-label", btn.getAttribute("title"));
@@ -2107,7 +2107,7 @@
 
         var select = document.createElement("select");
         select.className = "form-select form-select-sm o_chatboo_chart_type";
-        select.setAttribute("aria-label", "Tipo de gráfico");
+        select.setAttribute("aria-label", _t("Chart type"));
         fillTypeSelect(select, engine, meta, meta.defaultMode);
 
         var rotate = document.createElement("button");
@@ -2140,7 +2140,7 @@
         });
         select.addEventListener("change", function () {
             var v = select.value || meta.defaultMode;
-            // "mix" en el selector = combinado default (no invertido).
+            // "mix" in the selector = default combined (not flipped).
             var mode = v === "mix" ? "mix" : v;
             if (block.getAttribute("data-chatboo-chart-open") === "1") {
                 renderChart(block, currentMeta(), mode);
@@ -3500,7 +3500,7 @@
         getShowSeriesStats: getShowSeriesStats,
     };
 
-    // Copiar texto de celda (coords, etc.): data-copy-text en .o_ai_cell_copy
+    // Copy cell text (coords, etc.): data-copy-text on .o_ai_cell_copy
     function bindCellCopyOnce() {
         if (global.__chatbooCellCopyBound) {
             return;

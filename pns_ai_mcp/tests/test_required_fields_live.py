@@ -12,10 +12,15 @@ from odoo.addons.pns_ai_mcp.utils.required_fields import (
     form_pending_by_record,
     missing_required_fields,
 )
+from odoo.addons.pns_ai_mcp.tests._helpers import SKIP_CONTACT_ORIGIN, grant_groups
 
 
 @tagged('post_install', '-at_install', 'pns_ai_mcp')
 class TestRequiredFieldsLive(TransactionCase):
+
+    def setUp(self):
+        super().setUp()
+        self.env = self.env(context=dict(self.env.context, **SKIP_CONTACT_ORIGIN))
 
     def test_a_field_with_no_default_is_asked_for(self):
         found = dict(missing_required_fields(self.env, 'res.partner.category', {}))
@@ -76,7 +81,7 @@ class TestRequiredFieldsLive(TransactionCase):
             )
 
     def _as_writer(self):
-        self.env.user.groups_id |= self.env.ref('pns_ai_mcp.group_ai_writer')
+        grant_groups(self.env.user, ['pns_ai_mcp.group_ai_writer'])
 
     def test_a_pending_field_is_left_on_the_record_itself(self):
         """The note goes to the chatter, so the hole outlives the conversation."""

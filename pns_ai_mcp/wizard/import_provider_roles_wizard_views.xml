@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_import_provider_roles_wizard_form" model="ir.ui.view">
+        <field name="name">pns.ai.mcp.import.provider.roles.wizard.form</field>
+        <field name="model">ai.import.provider.roles.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import provider roles">
+                <sheet>
+                    <div class="alert alert-info" role="alert">
+                        <p>Upload a previously exported JSON file.</p>
+                        <p>Roles come from their modules: a role this database does not have is skipped, never created.</p>
+                        <p>If "Replace existing" is checked, each role takes the settings of the file and is held by exactly the providers it names.</p>
+                    </div>
+                    <group>
+                        <field name="json_file" filename="filename"/>
+                        <field name="filename" invisible="1"/>
+                        <field name="replace_existing"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_preview" string="Review" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

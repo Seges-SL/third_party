@@ -6,7 +6,7 @@ from datetime import timedelta
 
 from odoo import api, fields
 from odoo.tests import tagged, TransactionCase
-from odoo.tests.common import new_test_user
+from odoo.addons.pns_ai_mcp.tests._helpers import make_user
 
 
 def _make_pending(env, user_id, title='card restore', vid_suffix='own'):
@@ -37,8 +37,8 @@ class TestPendingCards(TransactionCase):
         closed = _make_pending(self.env, self.env.uid, title='already done')
         closed.sudo().write({'status': 'cancelled'})
 
-        other = new_test_user(
-            self.env, login='pns_other_pending_card',
+        other = make_user(
+            self.env, 'pns_other_pending_card',
             groups='base.group_user,pns_ai_mcp.group_ai_writer',
         )
         _make_pending(
@@ -78,7 +78,7 @@ class TestPendingCards(TransactionCase):
     def test_expired_pending_is_not_restored(self):
         op = _make_pending(self.env, self.env.uid, title='stale')
         past = fields.Datetime.now() - timedelta(hours=1)
-        op.sudo().write({'create_date': past, 'expires_at': past})
+        op.sudo().write({'expires_at': past})
         items = self.env['ai.safe.operation'].pending_card_payloads()
         self.assertNotIn(op.verification_id, [
             row['verification_id'] for row in items

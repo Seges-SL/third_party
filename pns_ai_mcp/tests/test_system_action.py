@@ -2,10 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Trusted system actions: view modifiers, propose group gate, reset."""
-from odoo import SUPERUSER_ID, api
+from odoo import api
 from odoo.exceptions import AccessError, UserError
 from odoo.tests import tagged, TransactionCase
-from odoo.tests.common import new_test_user
+from odoo.tools import mute_logger
+from odoo.addons.pns_ai_mcp.tests._helpers import make_user, one_cursor
 
 from odoo.addons.pns_ai_mcp.controllers.safe_plan import (
     request_safe_plan,
@@ -14,9 +15,21 @@ from odoo.addons.pns_ai_mcp.controllers.safe_plan import (
 )
 from odoo.addons.pns_ai_mcp.utils.field_required_plan import accept_choice
 
+# Messages are asserted in English; the instance may give users another language.
+EN = {'lang': 'en_US'}
+# Views and fields are Settings work: the AI admin who changes them also has Settings.
+ADMIN_GROUPS = 'base.group_user,base.group_system,pns_ai_mcp.group_ai_admin'
+
 
 @tagged('post_install', '-at_install', 'pns_ai_mcp')
 class TestSystemTrustedActions(TransactionCase):
+
+    def setUp(self):
+        super().setUp()
+        # Odoo logs ERROR when existing rows keep NULL in a column made required.
+        muted = mute_logger('odoo.schema')
+        muted.__enter__()
+        self.addCleanup(muted.__exit__, None, None, None)
 
     def _form(self, field_name='comment'):
         return self.env['ir.ui.view'].create({
@@ -85,12 +98,12 @@ class TestSystemTrustedActions(TransactionCase):
 
     def test_propose_rejects_view_without_field(self):
         """Propose lists views later; execute still fails if the view hides the field."""
-        admin = new_test_user(
-            self.env, login='pns_aiadmin_noview',
-            groups='base.group_user,pns_ai_mcp.group_ai_admin',
+        admin = make_user(
+            self.env, 'pns_aiadmin_noview',
+            groups=ADMIN_GROUPS,
         )
         view = self._form('name')
-        env_a = api.Environment(self.env.cr, admin.id, {})
+        env_a = api.Environment(self.env.cr, admin.id, EN)
         ok, err = validate_safe_plan([{
             'op': 'field_required',
             'model': 'res.partner',
@@ -207,11 +220,11 @@ class TestSystemTrustedActions(TransactionCase):
         self.assertIn("not(@invisible='1')", inherit.arch)
 
     def test_propose_rejects_view_and_field_crud(self):
-        admin = new_test_user(
-            self.env, login='pns_aiadmin_noviewcrud',
-            groups='base.group_user,pns_ai_mcp.group_ai_admin',
+        admin = make_user(
+            self.env, 'pns_aiadmin_noviewcrud',
+            groups=ADMIN_GROUPS,
         )
-        env_a = api.Environment(self.env.cr, admin.id, {})
+        env_a = api.Environment(self.env.cr, admin.id, EN)
         ok, err = validate_safe_plan([{
             'op': 'write',
             'model': 'ir.ui.view',
@@ -231,11 +244,11 @@ class TestSystemTrustedActions(TransactionCase):
 
     def test_propose_without_ai_admin_fails(self):
         """PAAP I6: A system action needs the AI Administrator group."""
-        writer = new_test_user(
-            self.env, login='pns_writer_sysact',
+        writer = make_user(
+            self.env, 'pns_writer_sysact',
             groups='base.group_user,pns_ai_mcp.group_ai_writer',
         )
-        env_w = api.Environment(self.env.cr, writer.id, {})
+        env_w = api.Environment(self.env.cr, writer.id, EN)
         ok, err = validate_safe_plan([{
             'op': 'field_required',
             'model': 'res.partner',
@@ -245,13 +258,34 @@ class TestSystemTrustedActions(TransactionCase):
         self.assertFalse(ok)
         self.assertIn('Administrator', (err or ''))
 
-    def test_apply_via_safe_plan_as_admin(self):
-        admin = new_test_user(
-            self.env, login='pns_aiadmin_sysact',
+    def test_ai_admin_without_settings_is_refused(self):
+        """Validation and apply agree: no Settings role, no field_required."""
+        ai_admin = make_user(
+            self.env, 'pns_aiadmin_nosettings',
             groups='base.group_user,pns_ai_mcp.group_ai_admin',
         )
         view = self._form()
-        env_a = api.Environment(self.env.cr, admin.id, {})
+        env_n = api.Environment(self.env.cr, ai_admin.id, EN)
+        step = {
+            'op': 'field_required',
+            'model': 'res.partner',
+            'field': 'comment',
+            'required': True,
+            'view_ids': [view.id],
+        }
+        ok, err = validate_safe_plan([dict(step)], env_n)
+        self.assertFalse(ok)
+        self.assertIn('Settings', (err or ''))
+        with self.assertRaises(AccessError):
+            execute_safe_plan(env_n, [dict(step)])
+
+    def test_apply_via_safe_plan_as_admin(self):
+        admin = make_user(
+            self.env, 'pns_aiadmin_sysact',
+            groups=ADMIN_GROUPS,
+        )
+        view = self._form()
+        env_a = api.Environment(self.env.cr, admin.id, EN)
         ok, err = validate_safe_plan([{
             'op': 'field_required',
             'model': 'res.partner',
@@ -295,8 +329,8 @@ class TestSystemTrustedActions(TransactionCase):
         self.assertIn('base', alias_text.lower())
 
     def test_user_group_preview(self):
-        target = new_test_user(
-            self.env, login='pns_grp_target',
+        target = make_user(
+            self.env, 'pns_grp_target',
             groups='base.group_user',
         )
         text = self.env['ai.system.action']._preview_user_add_group(
@@ -317,11 +351,11 @@ class TestSystemTrustedActions(TransactionCase):
         self.assertFalse(target.has_group('pns_ai_mcp.group_ai_writer'))
 
     def test_propose_rejects_required_atoms(self):
-        admin = new_test_user(
-            self.env, login='pns_aiadmin_atoms',
-            groups='base.group_user,pns_ai_mcp.group_ai_admin',
+        admin = make_user(
+            self.env, 'pns_aiadmin_atoms',
+            groups=ADMIN_GROUPS,
         )
-        env_a = api.Environment(self.env.cr, admin.id, {})
+        env_a = api.Environment(self.env.cr, admin.id, EN)
         ok, err = validate_safe_plan([{
             'op': 'action',
             'action_code': 'field.set_required',
@@ -331,29 +365,29 @@ class TestSystemTrustedActions(TransactionCase):
         self.assertIn('field_required', (err or ''))
 
     def test_field_required_propose_opens_choice(self):
-        admin = new_test_user(
-            self.env, login='pns_aiadmin_choice',
-            groups='base.group_user,pns_ai_mcp.group_ai_admin',
+        admin = make_user(
+            self.env, 'pns_aiadmin_choice',
+            groups=ADMIN_GROUPS,
         )
-        env_a = api.Environment(self.env.cr, admin.id, {})
-        pending = request_safe_plan(env_a, [{
-            'op': 'field_required',
-            'model': 'res.partner',
-            'field': 'comment',
-            'required': True,
-        }], title='Alias required')
+        env_a = api.Environment(self.env.cr, admin.id, EN)
+        with one_cursor(self):
+            pending = request_safe_plan(env_a, [{
+                'op': 'field_required',
+                'model': 'res.partner',
+                'field': 'comment',
+                'required': True,
+            }], title='Alias required')
         self.assertTrue(pending.get('success'), pending)
         self.assertEqual(pending.get('status'), 'pending_choice')
         self.assertTrue(pending.get('choice_id'))
         self.assertFalse(pending.get('verification_id'))
-        self.addCleanup(self._unlink_choice, pending['choice_id'])
 
     def test_views_picked_stripped_on_validate(self):
-        admin = new_test_user(
-            self.env, login='pns_aiadmin_strip',
-            groups='base.group_user,pns_ai_mcp.group_ai_admin',
+        admin = make_user(
+            self.env, 'pns_aiadmin_strip',
+            groups=ADMIN_GROUPS,
         )
-        env_a = api.Environment(self.env.cr, admin.id, {})
+        env_a = api.Environment(self.env.cr, admin.id, EN)
         step = {
             'op': 'field_required',
             'model': 'res.partner',
@@ -367,11 +401,11 @@ class TestSystemTrustedActions(TransactionCase):
         self.assertNotIn('_views_picked', step)
 
     def test_view_only_empty_execute_rejected(self):
-        admin = new_test_user(
-            self.env, login='pns_aiadmin_vonly',
-            groups='base.group_user,pns_ai_mcp.group_ai_admin',
+        admin = make_user(
+            self.env, 'pns_aiadmin_vonly',
+            groups=ADMIN_GROUPS,
         )
-        env_a = api.Environment(self.env.cr, admin.id, {})
+        env_a = api.Environment(self.env.cr, admin.id, EN)
         with self.assertRaises(UserError):
             execute_safe_plan(env_a, [{
                 'op': 'field_required',
@@ -382,29 +416,28 @@ class TestSystemTrustedActions(TransactionCase):
             }])
 
     def test_accept_choice_creates_verification(self):
-        admin = new_test_user(
-            self.env, login='pns_aiadmin_accept',
-            groups='base.group_user,pns_ai_mcp.group_ai_admin',
+        admin = make_user(
+            self.env, 'pns_aiadmin_accept',
+            groups=ADMIN_GROUPS,
         )
         view = self._form()
-        env_a = api.Environment(self.env.cr, admin.id, {})
-        pending = request_safe_plan(env_a, [{
-            'op': 'field_required',
-            'model': 'res.partner',
-            'field': 'comment',
-            'required': True,
-        }], title='Comment required')
-        self.addCleanup(self._unlink_choice, pending.get('choice_id'))
-        item_ids = [it['id'] for it in (pending.get('items') or [])]
-        self.assertIn(view.id, item_ids)
-        result = accept_choice(
-            env_a, pending['choice_id'], [view.id],
-            request_safe_plan,
-        )
+        env_a = api.Environment(self.env.cr, admin.id, EN)
+        with one_cursor(self):
+            pending = request_safe_plan(env_a, [{
+                'op': 'field_required',
+                'model': 'res.partner',
+                'field': 'comment',
+                'required': True,
+            }], title='Comment required')
+            item_ids = [it['id'] for it in (pending.get('items') or [])]
+            self.assertIn(view.id, item_ids)
+            result = accept_choice(
+                env_a, pending['choice_id'], [view.id],
+                request_safe_plan,
+            )
         self.assertTrue(result.get('success'), result)
         self.assertTrue(result.get('verification_id'))
         self.assertEqual(result.get('status'), 'pending_confirmation')
-        self.addCleanup(self._unlink_verification, result['verification_id'])
 
     def test_apply_uniform_marks_all_copies(self):
         view = self.env['ir.ui.view'].create({
@@ -428,11 +461,11 @@ class TestSystemTrustedActions(TransactionCase):
         self.assertIn("expr=\"//field[@name='comment']\"", inherit.arch)
 
     def test_internal_user_cannot_run_public_system_or_factory_maintenance(self):
-        user = new_test_user(
-            self.env, login='pns_plain_internal_rpc',
+        user = make_user(
+            self.env, 'pns_plain_internal_rpc',
             groups='base.group_user',
         )
-        env_u = api.Environment(self.env.cr, user.id, {})
+        env_u = api.Environment(self.env.cr, user.id, EN)
         Action = env_u['ai.system.action']
         self.assertFalse(hasattr(Action, 'apply_user_add_group'))
         self.assertFalse(hasattr(Action, 'preview_user_add_group'))
@@ -444,11 +477,11 @@ class TestSystemTrustedActions(TransactionCase):
 
     def test_internal_user_cannot_reach_system_action_through_trusted_action(self):
         """PAAP I6: A plain internal user cannot reach a system action."""
-        user = new_test_user(
-            self.env, login='pns_plain_internal_trusted',
+        user = make_user(
+            self.env, 'pns_plain_internal_trusted',
             groups='base.group_user',
         )
-        env_u = api.Environment(self.env.cr, user.id, {})
+        env_u = api.Environment(self.env.cr, user.id, EN)
         trusted = env_u['ai.trusted.action']._get('user.add_group')
         self.assertTrue(trusted)
         self.assertFalse(hasattr(trusted, 'apply'))
@@ -461,12 +494,12 @@ class TestSystemTrustedActions(TransactionCase):
         """PAAP I7: not even an AI Administrator gets a plan that touches Settings / Access Rights."""
         from odoo.addons.pns_base.utils.compat import USER_GROUPS_FIELD
 
-        admin = new_test_user(
-            self.env, login='pns_aiadmin_cusp',
+        admin = make_user(
+            self.env, 'pns_aiadmin_cusp',
             groups='base.group_user,pns_ai_mcp.group_ai_writer,pns_ai_mcp.group_ai_admin',
         )
-        target = new_test_user(self.env, login='pns_cusp_target', groups='base.group_user')
-        env_a = api.Environment(self.env.cr, admin.id, {})
+        target = make_user(self.env, 'pns_cusp_target', groups='base.group_user')
+        env_a = api.Environment(self.env.cr, admin.id, EN)
         system = self.env.ref('base.group_system')
         carrier = self.env['res.groups'].create({
             'name': 'pns test group that carries Settings',
@@ -512,23 +545,3 @@ class TestSystemTrustedActions(TransactionCase):
             'args': {'user_id': target.id, 'group': plain.id},
         }], env_a)
         self.assertTrue(ok, err)
-
-    def _unlink_choice(self, choice_id):
-        if not choice_id:
-            return
-        with self.env.registry.cursor() as cr:
-            env = api.Environment(cr, SUPERUSER_ID, {})
-            env['ai.safe.choice'].search([
-                ('choice_id', '=', choice_id),
-            ]).unlink()
-            cr.commit()
-
-    def _unlink_verification(self, verification_id):
-        if not verification_id:
-            return
-        with self.env.registry.cursor() as cr:
-            env = api.Environment(cr, SUPERUSER_ID, {})
-            env['ai.safe.operation'].search([
-                ('verification_id', '=', verification_id),
-            ]).unlink()
-            cr.commit()

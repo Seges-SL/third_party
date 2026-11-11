@@ -1,5 +1,4 @@
 PATANEGRA Soft SL
-Plaza Fernando VI, 14 - 1D, 41014 Sevilla, Spain
 https://patanegra.com
 
 This product is part of Patanegra Soft Suite.
@@ -11,6 +10,13 @@ Chatboo elephant-and-speech-bubble device are trademarks of PATANEGRA Soft SL.
 The Apache License 2.0 does not grant any right to use these names or the
 device as a product mark. You may fork the code; you may not call a fork
 PATANEGRA, Chatboo, or PAAP.
+
+Third-party
+-----------
+On Odoo 20 and later, static/src/css/pns_fa_compat.css (stacks/owl3 in the
+multi-version tree) is the Font Awesome 4.7.0 stylesheet by Dave Gandy (MIT
+License), with only the font path changed. The font itself (SIL OFL 1.1) is
+not shipped here: it is the copy Odoo 20 still serves from its web module.
 
 Text and data mining / AI training
 ----------------------------------

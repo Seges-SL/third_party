@@ -58,32 +58,28 @@ def _slug(text):
     return slug[:50]
 
 
-# Structural particles / request verbs / format words — not business nouns.
-_FUNCTION_WORDS = frozenset({
-    'a', 'an', 'the', 'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas',
-    'de', 'del', 'al', 'y', 'o', 'e', 'u', 'en', 'con', 'por', 'para', 'sin',
-    'mi', 'me', 'te', 'se', 'le', 'les', 'nos', 'os', 'tu', 'su', 'my', 'your',
-    'que', 'qué', 'como', 'cómo', 'cual', 'cuál', 'when', 'where', 'what', 'who',
-    'please', 'porfa', 'porfavor', 'pls', 'plz', 'gracias', 'favor',
-    'can', 'could', 'would', 'will', 'want',
-    'quiero', 'quieres', 'quisiera', 'puedes', 'puede', 'podrias', 'podrias',
-    'haz', 'hazme', 'dame', 'dame', 'pasame', 'mandame', 'envia', 'enviame',
-    'make', 'create', 'generate', 'give', 'show', 'need', 'necesito',
-    'draw', 'paint', 'pinta', 'pintas', 'pintame', 'dibuja', 'dibujas', 'dibujame',
-    'escribe', 'muestra', 'ponme', 'pon', 'this', 'that', 'esto', 'eso',
-    'here', 'ahi', 'aquí', 'aqui', 'there', 'va', 'un',
+_EXTENSIONS = frozenset({
+    'svg', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'html', 'htm',
+    'xlsx', 'xls', 'csv', 'zip', 'docx', 'doc',
 })
 
-_FORMAT_WORDS = frozenset({
-    'svg', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'html', 'htm',
-    'xlsx', 'xls', 'csv', 'zip', 'docx', 'doc', 'file', 'archivo', 'fichero',
-    'documento', 'imagen', 'image', 'drawing', 'dibujo', 'export', 'download',
-    'descarga', 'descargar', 'descargame', 'bajame',
-})
+
+def _spoken():
+    try:
+        from . import spoken_words
+        return spoken_words
+    except ImportError:
+        import importlib.util
+        import os
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'spoken_words.py')
+        spec = importlib.util.spec_from_file_location('spoken_words', path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
 
 _GENERIC_STEMS = frozenset({
     'download', 'file', 'document', 'attachment', 'drawing', 'export',
-    'unnamed', 'response', 'chatboo', 'bin', 'data',
+    'unnamed', 'response', 'bin', 'data',
 })
 
 _EXPLICIT_FILE = re.compile(
@@ -142,7 +138,8 @@ def split_utterance(text):
 def _content_slug(text):
     tokens = re.split(r'[^A-Za-z0-9]+', _slug(text).replace('_', ' '))
     kept = []
-    skip = _FUNCTION_WORDS | _FORMAT_WORDS
+    spoken = _spoken()
+    skip = _EXTENSIONS | spoken.words('filler') | spoken.words('file')
     for tok in tokens:
         if not tok or tok in skip or tok.isdigit():
             continue

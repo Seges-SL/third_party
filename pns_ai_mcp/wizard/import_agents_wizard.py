@@ -3,7 +3,6 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Import AI agents from JSON."""
 
-import base64
 import json
 import logging
 
@@ -11,6 +10,7 @@ from odoo import api, models, fields, _
 from odoo.exceptions import UserError
 
 from ..utils import mcp_ui
+from ..utils.compat import binary_bytes
 
 _logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class ImportAgentsWizard(models.TransientModel):
             raise UserError(_("Please upload a JSON file."))
 
         try:
-            json_content = base64.b64decode(self.json_file)
+            json_content = binary_bytes(self.json_file)
             json_data, extract_warnings = mcp_ui.extract_json_from_upload(json_content)
         except (ValueError, Exception) as e:
             raise UserError(_("Error reading the file: %s") % e)

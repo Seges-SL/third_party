@@ -107,7 +107,12 @@ def format_amount_with_symbol(code, amount):
     if zero or n >= 0.01:
         fmt = '%.2f' % n
     else:
-        fmt = '%.4f' % n
+        # Two significant digits: a cheap call is never painted as 0.
+        import math
+        decimals = min(8, max(4, 1 - math.floor(math.log10(n))))
+        fmt = '%.*f' % (decimals, n)
+        if decimals > 4:
+            fmt = fmt.rstrip('0')
     sym = CURRENCY_SYMBOLS.get(iso)
     if not sym:
         return '%s %s' % (iso, fmt)
@@ -123,7 +128,7 @@ def normalize_currency(code):
 
 
 def get_display_currency(env):
-    """Global Chatboo cost-chip currency from AI Engine settings."""
+    """Global cost-chip currency from AI Engine settings."""
     try:
         raw = env['ir.config_parameter'].sudo().get_param(
             ICP_DISPLAY_CURRENCY, 'USD',

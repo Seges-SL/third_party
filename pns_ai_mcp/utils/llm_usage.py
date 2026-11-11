@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from contextvars import ContextVar
 
-# Satellite spend (Design, skill params, …) of the open Chatboo turn.
+# Satellite spend (Design, skill params, …) of the open turn.
 # The engine binds it at turn start so helpers that do not hold the
 # AgentEngine instance can still fold their usage into the footer.
 _turn_side_usage = ContextVar('pns_turn_side_usage', default=None)

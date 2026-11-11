@@ -1,17 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Archivo: views/mcp_user_views.xml
-    Creado: 2025-11-16 03:50:00
-    Modificado: 2025-11-26 06:59:53
-    Descripción: Vistas para gestión de usuarios MCP
+    File: views/mcp_user_views.xml
+    Created: 2025-11-16 03:50:00
+    Modified: 2025-11-26 06:59:53
+    Description: Views for managing MCP users
 -->
 <odoo>
-    <!-- Vista tree para usuarios MCP -->
+    <!-- Tree view for MCP users -->
     <record id="view_mcp_user_tree" model="ir.ui.view">
         <field name="name">pns_ai_mcp.user.tree</field>
         <field name="model">ai.mcp.user</field>
         <field name="arch" type="xml">
             <tree create="0" delete="0" string="MCP Users" class="o_pns_list o_pns_mcp_user_list">
+                <header>
+                    <button name="action_export_selected" type="object" string="Export selected" class="btn-secondary" icon="fa-download" groups="pns_ai_mcp.group_ai_admin"/>
+                </header>
                 <field name="name" readonly="1" optional="show"/>
                 <field name="login" readonly="1" optional="show"/>
                 <field name="is_mcp_manager" readonly="1" optional="show"/>
@@ -25,7 +28,7 @@
         </field>
     </record>
 
-    <!-- Vista form para usuarios MCP -->
+    <!-- Form view for MCP users -->
     <record id="view_mcp_user_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.user.form</field>
         <field name="model">ai.mcp.user</field>
@@ -108,7 +111,7 @@
         <field name="code">action = records.action_import_mcp_api_key()</field>
     </record>
 
-    <!-- Menú: server action sincroniza usuarios y abre la lista -->
+    <!-- Menu: server action syncs users and opens the list -->
     <record id="action_server_open_mcp_users" model="ir.actions.server">
         <field name="name">MCP Users</field>
         <field name="model_id" ref="model_ai_mcp_user"/>
@@ -116,7 +119,7 @@
         <field name="code">action = model.action_open_mcp_users_list()</field>
     </record>
 
-    <!-- Ventana lista/form (abierta por action_open_mcp_users_list) -->
+    <!-- List/form window (opened by action_open_mcp_users_list) -->
     <record id="action_mcp_users" model="ir.actions.act_window">
         <field name="name">MCP Users</field>
         <field name="type">ir.actions.act_window</field>
@@ -127,13 +130,13 @@
         <field name="context">{'create': False, 'no_create': True, 'no_delete': True, 'ensure_all_users': True}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                Gestión de Usuarios MCP
+                MCP User Management
             </p>
             <p>
-                Gestiona las API keys de los usuarios para acceso al servidor MCP
-                y controla quién pertenece al grupo MCP Manager. Los usuarios Odoo activos
-                se añaden solos al abrir esta lista. Menú ⚙️: <strong>Import JSON</strong> /
-                <strong>Export JSON</strong> entre instancias.
+                Manage the users' API keys for access to the MCP server
+                and who belongs to the MCP Manager group. Active Odoo users
+                are added automatically when this list opens. ⚙️ menu: <strong>Import JSON</strong> /
+                <strong>Export JSON</strong> between instances.
             </p>
         </field>
     </record>
@@ -165,7 +168,7 @@
               sequence="40"
               groups="pns_ai_mcp.group_ai_admin,pns_ai_mcp.group_ai_writer,pns_ai_mcp.group_ai_external_url,pns_ai_mcp.group_ai_external_api"/>
 
-    <!-- Menú de usuarios MCP (quién autentica / autoriza el motor) -->
+    <!-- MCP users menu (who authenticates / authorizes the engine) -->
     <menuitem id="menu_mcp_users"
               name="Users"
               parent="menu_ai_security"

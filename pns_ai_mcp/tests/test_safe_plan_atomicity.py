@@ -25,10 +25,20 @@ from unittest.mock import patch
 from odoo import SUPERUSER_ID, api
 from odoo.exceptions import UserError
 from odoo.tests import tagged, TransactionCase
+from odoo.tools import mute_logger
+
+from odoo.addons.pns_ai_mcp.tests._helpers import (
+    AI_PLAN_GROUPS,
+    SKIP_CONTACT_ORIGIN,
+    grant_groups,
+    revoke_groups,
+)
 
 
 @tagged('post_install', '-at_install', 'pns_ai_mcp')
 class TestSafePlanAtomicity(TransactionCase):
+
+    _granted = ()
 
     def _propose_and_confirm(self, cr, partner_name):
         """Create + confirm a one-step 'create res.partner' plan on ``cr``.
@@ -37,7 +47,8 @@ class TestSafePlanAtomicity(TransactionCase):
         (possibly failing) mutation attempt below — exactly like a real
         pending operation confirmed in an earlier HTTP request/transaction.
         """
-        env = api.Environment(cr, SUPERUSER_ID, {})
+        env = api.Environment(cr, SUPERUSER_ID, dict(SKIP_CONTACT_ORIGIN))
+        self._granted = grant_groups(env.user, AI_PLAN_GROUPS)
         steps = [{
             'op': 'create',
             'model': 'res.partner',
@@ -61,18 +72,20 @@ class TestSafePlanAtomicity(TransactionCase):
 
     def _cleanup(self, op_id, partner_name):
         with self.env.registry.cursor() as cr:
-            env = api.Environment(cr, SUPERUSER_ID, {})
+            env = api.Environment(cr, SUPERUSER_ID, dict(SKIP_CONTACT_ORIGIN))
             env['ai.safe.operation'].browse(op_id).unlink()
             env['res.partner'].search([('name', '=', partner_name)]).unlink()
+            revoke_groups(env.user, self._granted)
             cr.commit()
 
+    @mute_logger('odoo.addons.pns_ai_mcp.models.safe_operation')
     def test_commit_failure_keeps_executed_false_and_no_mutation(self):
         """PAAP I8: Simulated failure of the final commit → no false 'executed'."""
         partner_name = 'pns-atomicity-fail-%s' % self.env.cr.dbname
         op_id = None
         with self.env.registry.cursor() as cr:
             op_id = self._propose_and_confirm(cr, partner_name)
-            env = api.Environment(cr, SUPERUSER_ID, {})
+            env = api.Environment(cr, SUPERUSER_ID, dict(SKIP_CONTACT_ORIGIN))
             op = env['ai.safe.operation'].browse(op_id)
             # execute_plan_now commits twice on the caller cursor: (1) the
             # post-claim snapshot renewal (empty tx) and (2) the FINAL commit
@@ -122,7 +135,7 @@ class TestSafePlanAtomicity(TransactionCase):
         op_id = None
         with self.env.registry.cursor() as cr:
             op_id = self._propose_and_confirm(cr, partner_name)
-            env = api.Environment(cr, SUPERUSER_ID, {})
+            env = api.Environment(cr, SUPERUSER_ID, dict(SKIP_CONTACT_ORIGIN))
             op = env['ai.safe.operation'].browse(op_id)
             results = op.execute_plan_now()
             self.assertTrue(results, 'execute_plan_now should return the step results')
@@ -139,6 +152,7 @@ class TestSafePlanAtomicity(TransactionCase):
         finally:
             self._cleanup(op_id, partner_name)
 
+    @mute_logger('odoo.addons.pns_ai_mcp.models.safe_operation')
     def test_failed_execute_cancels_authorization_no_replay(self):
         """PAAP I8: Invalid module.update must cancel Confirm; a later execute is a no-op."""
         op_id = None
@@ -148,7 +162,8 @@ class TestSafePlanAtomicity(TransactionCase):
             'args': {'module': 'base', 'operation': 'not_a_real_op'},
         }]
         with self.env.registry.cursor() as cr:
-            env = api.Environment(cr, SUPERUSER_ID, {})
+            env = api.Environment(cr, SUPERUSER_ID, dict(SKIP_CONTACT_ORIGIN))
+            self._granted = grant_groups(env.user, AI_PLAN_GROUPS)
             op = env['ai.safe.operation'].create_verification(
                 operation_type='action',
                 model_name='ir.module.module',
@@ -183,6 +198,7 @@ class TestSafePlanAtomicity(TransactionCase):
                 self.assertEqual(reread.status, 'cancelled')
         finally:
             with self.env.registry.cursor() as cr:
-                env = api.Environment(cr, SUPERUSER_ID, {})
+                env = api.Environment(cr, SUPERUSER_ID, dict(SKIP_CONTACT_ORIGIN))
                 env['ai.safe.operation'].browse(op_id).unlink()
+                revoke_groups(env.user, self._granted)
                 cr.commit()

@@ -39,7 +39,7 @@ class MCPApiKeyWizard(models.TransientModel):
 
     @api.depends('mcp_user_id', 'mcp_user_id.mcp_api_key_hash')
     def _compute_has_api_key(self):
-        """Determina si el usuario ya tiene una API key (por su hash)."""
+        """Tell whether the user already has an API key (by its hash)."""
         for record in self:
             if record.mcp_user_id:
                 record.has_api_key = bool(record.mcp_user_id.mcp_api_key_hash)
@@ -71,7 +71,7 @@ class MCPApiKeyWizard(models.TransientModel):
 
     def action_generate(self):
         """
-        Genera una nueva API key después de validar la confirmación.
+        Generate a new API key after checking the confirmation.
         """
         self.ensure_one()
 
@@ -82,37 +82,37 @@ class MCPApiKeyWizard(models.TransientModel):
             raise ValidationError(_("Invalid MCP User"))
 
         if self.is_clear:
-            # Eliminar la API key (borra el hash)
+            # Remove the API key (clears the hash)
             self.mcp_user_id.sudo().write({
                 'mcp_api_key_hash': False,
                 'mcp_api_key_state': 'not_generated',
                 'mcp_api_key_generated_date': False
             })
-            _logger.info("MCP: API key eliminada para usuario %s (ID: %s)",
+            _logger.info("MCP: API key deleted for user %s (ID: %s)",
                         self.mcp_user_id.user_id.name, self.mcp_user_id.user_id.id)
             return mcp_ui.client_notification_close(
                 _('Success'),
-                _('API Key eliminada correctamente'),
+                _('API Key deleted successfully'),
             )
 
         if self.is_import:
-            # Forzar/importar una key elegida por el admin (texto plano o hash
-            # de otra instancia). Se guarda solo el hash; el admin ya la conoce,
-            # así que no hace falta mostrarla de nuevo.
+            # Force/import a key chosen by the admin (plain text or a hash
+            # from another instance). Only the hash is stored; the admin already
+            # knows it, so there is no need to show it again.
             if not self.manual_key or not self.manual_key.strip():
                 raise ValidationError(_("You must paste a valid API key in the 'Existing API Key' field"))
             self.mcp_user_id.set_mcp_api_key(self.manual_key.strip())
             return mcp_ui.client_notification_close(
                 _('Success'),
-                _('API Key importada correctamente'),
+                _('API Key imported successfully'),
             )
 
-        # Generar nueva key automáticamente. La clave en claro se muestra UNA
-        # vez en este mismo wizard (patrón "cópiala ahora"): solo guardamos su
-        # hash y no se puede volver a recuperar.
+        # Generate a new key automatically. The plain key is shown ONCE
+        # in this same wizard ("copy it now" pattern): we only store its
+        # hash and it cannot be recovered again.
         raw_key = self.mcp_user_id.action_generate_mcp_api_key()
         if not raw_key:
-            raise ValidationError(_("Error generando API key"))
+            raise ValidationError(_("Error generating API key"))
         self.write({'generated_key': raw_key, 'confirmed': False})
         return {
             'type': 'ir.actions.act_window',

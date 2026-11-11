@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Archivo: views/mcp_context_views.xml
-    Creado: 2025-11-22 22:23:42
-    Modificado: 2025-11-26 07:01:12
-    Descripción: Vistas para gestión de contextos dinámicos MCP
+    File: views/mcp_context_views.xml
+    Created: 2025-11-22 22:23:42
+    Modified: 2025-11-26 07:01:12
+    Description: Views to manage MCP dynamic contexts
 -->
 <odoo>
-    <!-- Vista tree para contextos MCP -->
+    <!-- Tree view for MCP contexts -->
     <record id="view_ai_context_tree" model="ir.ui.view">
         <field name="name">pns_ai_mcp.context.tree</field>
         <field name="model">ai.context</field>
@@ -14,6 +14,9 @@
             <tree string="MCP Contexts" create="1" delete="1"
                   class="o_pns_list o_pns_context_list"
                   decoration-info="context_type == 'core'">
+                <header>
+                    <button name="action_export_selected" type="object" string="Export selected to ZIP" class="btn-secondary" icon="fa-download" groups="pns_ai_mcp.group_ai_admin"/>
+                </header>
                 <field name="active" optional="show" attrs="{'readonly': [('context_type', '=', 'core')]}"/>
                 <field name="context_type" optional="show"/>
                 <field name="code" optional="show" attrs="{'readonly': [('context_type', '=', 'core')]}"/>
@@ -31,7 +34,7 @@
         </field>
     </record>
     
-    <!-- Vista search para filtrar contextos -->
+    <!-- Search view to filter contexts -->
     <record id="view_ai_context_search" model="ir.ui.view">
         <field name="name">pns_ai_mcp.context.search</field>
         <field name="model">ai.context</field>
@@ -69,7 +72,7 @@
                 
                 <separator/>
                 
-                <!-- Filtros por estado -->
+                <!-- Filters by state -->
                 <filter name="active" string="Active" 
                         domain="[('active', '=', True)]"/>
                 <filter name="inactive" string="Inactive" 
@@ -86,7 +89,7 @@
         </field>
     </record>
 
-    <!-- Vista form para contextos MCP -->
+    <!-- Form view for MCP contexts -->
     <record id="view_ai_context_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.context.form</field>
         <field name="model">ai.context</field>
@@ -100,7 +103,7 @@
                     <group>
                         <group>
                             <field name="code" 
-                                   placeholder="ej: glosario_contabilidad"
+                                   placeholder="e.g. accounting_glossary"
                                    attrs="{'readonly': [('context_type', '=', 'core')]}"/>
                             <field name="active" 
                                    attrs="{'readonly': [('context_type', '=', 'core')]}"/>
@@ -128,7 +131,7 @@
                     <group>
                         <group>
                             <field name="author" 
-                                   placeholder="Autor del contexto"
+                                   placeholder="Context author"
                                    attrs="{'readonly': [('context_type', '=', 'core')]}"/>
                             <field name="version" 
                                    placeholder="Context version"
@@ -171,7 +174,7 @@
         </field>
     </record>
 
-    <!-- Acción para abrir contextos MCP -->
+    <!-- Action to open MCP contexts -->
     <record id="action_ai_context" model="ir.actions.act_window">
         <field name="name">Contexts</field>
         <field name="type">ir.actions.act_window</field>
@@ -195,7 +198,7 @@
         </field>
     </record>
 
-    <!-- Menú de contextos MCP. Visible para AI Administrator. -->
+    <!-- MCP contexts menu. Visible to AI Administrator. -->
     <menuitem id="menu_ai_context"
               name="Contexts"
               parent="menu_ai_knowledge"

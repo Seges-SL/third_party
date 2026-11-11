@@ -3,14 +3,13 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Import MCP users from JSON."""
 
-import base64
 import json
 import logging
 
 from odoo import api, models, fields, _
 from odoo.exceptions import UserError
 
-from ..utils.compat import format_login_name_line
+from ..utils.compat import binary_bytes, format_login_name_line
 from ..utils import mcp_ui
 
 _logger = logging.getLogger(__name__)
@@ -36,7 +35,7 @@ class ImportUsersWizard(models.TransientModel):
             raise UserError(_("Please upload a JSON file."))
 
         try:
-            json_content = base64.b64decode(self.json_file)
+            json_content = binary_bytes(self.json_file)
             json_data, extract_warnings = mcp_ui.extract_json_from_upload(json_content)
         except (ValueError, Exception) as e:
             raise UserError(_("Error reading the file: %s") % e)
@@ -89,6 +88,10 @@ class ImportUsersWizard(models.TransientModel):
                 # Report field-level warnings but NEVER skip the user
                 for w in row_warnings:
                     other_errors.append("%s: (warn) %s" % (login, w))
+                key_warning = user_model._drop_key_unless_allowed(vals, odoo_user)
+                if key_warning:
+                    has_key = False
+                    other_errors.append("%s: (warn) %s" % (login, key_warning))
 
                 existing = user_model.search([('user_id', '=', odoo_user.id)], limit=1)
 

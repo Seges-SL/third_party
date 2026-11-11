@@ -19,18 +19,21 @@ Safe host suite: ``./t.sh --intrusion-only``.
 import json
 
 from odoo.tests import tagged, TransactionCase
+from odoo.tools import mute_logger
 
 from odoo.addons.pns_ai_mcp.controllers.tools_relaxaicode import (
     tool_relaxaicode,
 )
 from odoo.addons.pns_ai_mcp.tests._helpers import (
+    SKIP_CONTACT_ORIGIN,
     skip_unless_safe_test_db_for_intrusion,
 )
+from odoo.addons.pns_ai_mcp.utils.compat import invalidate_recordset_fields
 
 
-# Payloads que DEBEN fallar de forma controlada (AST o runtime).
+# Payloads that MUST fail under control (AST or runtime).
 ESCAPE_PAYLOADS = [
-    # ── Bloqueo AST (literal) ──────────────────────────────────────────────
+    # ── AST block (literal) ────────────────────────────────────────────────
     "result = ().__class__.__bases__[0].__subclasses__()",
     "result = {}.__class__.__mro__",
     "result = '{0.__class__}'.format(())",
@@ -40,33 +43,46 @@ ESCAPE_PAYLOADS = [
     "class X(object):\n    pass\nresult = 1",
     "result = type('X', (), {})",
     "try:\n    1 / 0\nexcept Exception as e:\n    result = e.__traceback__\n",
-    # ── Bloqueo en RUNTIME (nombre dinámico, invisible al AST) ──────────────
+    # ── RUNTIME block (dynamic name, invisible to the AST) ─────────────────
     "n = '__cla' + 'ss__'\nresult = getattr((), n)",
     "n1 = '__cla' + 'ss__'\nn2 = '__ba' + 'ses__'\nresult = getattr(getattr((), n1), n2)",
     "n = 'f_' + 'globals'\nresult = getattr((lambda: 0), n, 'NO')",
-    # ── Bypass API externa vía ORM (Safe Plan api_call obligatorio) ───────
+    # ── External API bypass via ORM (Safe Plan api_call is mandatory) ─────
     "srv = env['ai.api.server'].search([], limit=1)\nresult = srv._get_driver().call(srv, 'X', {}, auth_token='t')",
     "n = '_get_' + 'driver'\nresult = getattr(env['ai.api.server'].search([], limit=1), n)",
-    # Teatro F1IZ: search/browse + spec_json (sin drivers).
+    # F1IZ theater: search/browse + spec_json (no drivers).
     "srv = env['ai.api.server'].search([('code', '=', 'x')], limit=1)\nresult = srv.spec_json",
     "srv = env['ai.api.server'].browse(6)\nresult = srv.spec_json",
     "recs = env['ai.context'].search([('code', 'ilike', 'self')])\nresult = [{'id': r.id, 'code': r.code} for r in recs]",
     "result = env.sudo()['ai.context'].search([])",
     "recs = env['ai.skill'].search([])\nresult = [{'code': r.code} for r in recs]",
     "result = env.sudo()['ai.skill'].search([])",
-    # ── Un módulo seguro no es puerta a os/sys ni a open() ────────────────
+    # ── A safe module is not a door to os/sys or to open() ────────────────
     "import platform\nresult = platform.os.getcwd()",
     "result = uuid.os.getcwd()",
     "result = datetime.sys.modules",
     "result = io.open('/etc/hostname').read()",
-    # ── Siempre como el usuario que pregunta: sin sudo / with_user / env(su) ─
+    # ── Always as the user who asks: no sudo / with_user / env(su) ─────────
     "result = env.sudo()['ai.provider'].search([]).mapped('api_key')",
     "result = getattr(env.user, 'su' + 'do')().name",
     "result = env(su=True)['res.users'].search_count([])",
+    # ── A public name that leads to the connection (env.args, env.all, .cursor) ─
+    "result = str(type(env.args[0]))",
+    "x = getattr(env.args[0], 'exe' + 'cute')\nx('ROLLBACK')\nresult = 1",
+    "result = type(env.all[0])",
+    "try:\n    env['res.partner'].search([('create_date', '=', 'not-a-date')])\n"
+    "except Exception as e:\n    run = e.cursor.execute\n    run('ROLLBACK')\nresult = 1",
+    # ── Readers that walk attributes in C (Formatter, str.format, match) ───
+    "import string\nF = getattr(string, 'Form' + 'atter')()\n"
+    "x = getattr(F, 'get_' + 'field')('0.env.cr.execute', [env.user], {})[0]\n"
+    "x('ROLLBACK')\nresult = 1",
+    "t = '{0.e' + 'nv.cr}'\nresult = t.format(env.user)",
+    "result = str.format('{u.e' + 'nv.cr}', u=env.user)",
+    "u = env.user\nT = type(u)\nmatch u:\n    case T(env=E):\n        pass\nresult = str(E)",
 ]
 
-# Mutadores ORM ofuscados: deben marcar requires_write (caja B) o fallar
-# controlado — nunca ejecutar write en caja A (hallazgo A6 2026-08-12).
+# Obfuscated ORM mutators: they must flag requires_write (box B) or fail
+# under control — never run a write in box A (finding A6 2026-08-12).
 WRITE_BYPASS_PAYLOADS = [
     "p = env['res.partner'].search([], limit=1)\ngateway = getattr(p, 'wr' + 'ite')\nresult = gateway({'comment': 'PNS_INTRUSION_SHOULD_NOT_PERSIST'})",
     "p = env['res.partner'].search([], limit=1)\nresult = getattr(p, 'write')({'comment': 'PNS_INTRUSION_SHOULD_NOT_PERSIST'})",
@@ -74,7 +90,7 @@ WRITE_BYPASS_PAYLOADS = [
 ]
 
 
-# Marcadores que jamás deben aparecer en una respuesta (indicarían fuga real).
+# Markers that must never show up in a reply (they would mean a real leak).
 LEAK_MARKERS = (
     "subprocess",
     "posix",
@@ -86,7 +102,7 @@ LEAK_MARKERS = (
 
 
 def _is_controlled_write_reject(text):
-    """True si caja A rechazó escritura (requires_write) o error controlado."""
+    """True if box A rejected the write (requires_write) or a controlled error."""
     if 'requires_write' in text:
         return True
     if 'ERROR (' in text:
@@ -99,7 +115,7 @@ def _is_controlled_write_reject(text):
 
 @tagged('post_install', '-at_install', 'pns_ai_mcp', 'pns_intrusion')
 class TestRelaxAICodeSandboxEscapesE2E(TransactionCase):
-    """Cada intento de fuga acaba en error controlado; lo legítimo funciona."""
+    """Each escape attempt ends in a controlled error; legitimate code works."""
 
     def setUp(self):
         super(TestRelaxAICodeSandboxEscapesE2E, self).setUp()
@@ -149,17 +165,19 @@ class TestRelaxAICodeSandboxEscapesE2E(TransactionCase):
             text = json.dumps(resp, default=str)
         return resp, text
 
+    # Some payloads send PostgreSQL a bad value on purpose; it logs the query.
+    @mute_logger('odoo.sql_db')
     def test_escape_payloads_fail_controlled(self):
         """PAAP I9: Escape payloads fail under control on a live registry."""
         for code in ESCAPE_PAYLOADS:
             resp, text = self._run(code)
-            # 1) Terminó en error controlado (nunca dict de éxito con datos).
+            # 1) It ended in a controlled error (never a success dict with data).
             self.assertIn(
                 'ERROR (', text,
                 "El payload de fuga debería fallar de forma controlada:\n%s\n→ %s"
                 % (code, text[:400]),
             )
-            # 2) No filtró evidencia de haber alcanzado objetos peligrosos.
+            # 2) It leaked no sign of having reached dangerous objects.
             low = text.lower()
             for marker in LEAK_MARKERS:
                 self.assertNotIn(
@@ -169,12 +187,12 @@ class TestRelaxAICodeSandboxEscapesE2E(TransactionCase):
                 )
 
     def test_legit_code_still_works(self):
-        # Anti falso-positivo: cálculo puro no debe bloquearse ni fallar.
+        # Anti false-positive: pure computation must not be blocked or fail.
         resp, text = self._run("result = {'ok': sum([1, 2, 3])}")
         self.assertNotIn('ERROR (', text, "Código legítimo NO debería fallar: %s" % text[:400])
 
     def test_legit_getattr_and_format_ok(self):
-        # getattr ORM (nombre normal) y str.format sin dunder siguen permitidos.
+        # ORM getattr (normal name) and str.format without dunders stay allowed.
         resp, text = self._run(
             "u = env.user\n"
             "result = {'name': getattr(u, 'name', ''), 's': '{0}-{1}'.format('a', 'b')}"
@@ -182,7 +200,7 @@ class TestRelaxAICodeSandboxEscapesE2E(TransactionCase):
         self.assertNotIn('ERROR (', text, text[:400])
 
     def test_obfuscated_orm_write_rejected(self):
-        """PAAP I2 / A6: getattr/attrgetter hacia write no debe ejecutar en caja A."""
+        """PAAP I2 / A6: getattr/attrgetter towards write must not run in box A."""
         for code in WRITE_BYPASS_PAYLOADS:
             resp, text = self._run(code)
             self.assertTrue(
@@ -192,8 +210,8 @@ class TestRelaxAICodeSandboxEscapesE2E(TransactionCase):
             )
 
     def test_obfuscated_write_does_not_persist(self):
-        """A6 oráculo de no-persistencia: comment no cambia tras el intento."""
-        partner = self.env['res.partner'].create({
+        """A6 no-persistence oracle: comment does not change after the attempt."""
+        partner = self.env['res.partner'].with_context(**SKIP_CONTACT_ORIGIN).create({
             'name': 'PNS_INTRUSION_E2E_CANARY',
             'comment': False,
         })
@@ -208,7 +226,7 @@ class TestRelaxAICodeSandboxEscapesE2E(TransactionCase):
             _is_controlled_write_reject(text),
             "Debe rechazar write ofuscado:\n%s" % text[:500],
         )
-        partner.invalidate_cache()
+        invalidate_recordset_fields(partner, ['comment'])
         self.assertNotEqual(
             partner.comment,
             marker,

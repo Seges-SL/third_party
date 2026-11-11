@@ -86,6 +86,14 @@ def note(documents):
     return '\n'.join(lines)
 
 
+def listing(documents):
+    """Name and page count of each document, oldest first (the last one is the newest)."""
+    return [
+        {'name': doc['name'], 'pages': len(doc['pages'])}
+        for doc in clean(documents)
+    ]
+
+
 def _pick(documents, name):
     wanted = (name or '').strip()
     for doc in documents:

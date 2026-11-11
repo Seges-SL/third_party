@@ -10,7 +10,8 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
     var AbstractField = require('web.AbstractField');
     var fieldRegistry = require('web.field_registry');
     var core = require('web.core');
-    var Notification = require('web.Notification');
+
+    var _t = core._t;
 
     var MCPJsonCompressedWidget = AbstractField.extend({
         className: 'o_field_mcp_json_compressed',
@@ -25,7 +26,7 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
             var self = this;
             var compressedValue = this.value || '';
             
-            // Limpiar contenido anterior
+            // Clear previous content
             this.$el.empty();
             
             if (!compressedValue) {
@@ -33,39 +34,39 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
                 return;
             }
             
-            // Limpiar escapes si el valor los tiene (puede venir de doble serializaci├│n)
-            // Intentar parsear como JSON string primero
+            // Clean escapes if the value has them (may come from double serialization)
+            // Try to parse as a JSON string first
             try {
                 var parsed = JSON.parse(compressedValue);
                 if (typeof parsed === 'string') {
-                    // Si es un string JSON, intentar parsearlo de nuevo (doble serializaci├│n)
+                    // If it is a JSON string, try to parse it again (double serialization)
                     try {
                         parsed = JSON.parse(parsed);
                     } catch (e) {
-                        // Si falla, usar el string parseado
+                        // If that fails, use the parsed string
                     }
                 }
-                // Serializar limpiamente sin escapes innecesarios
+                // Serialize cleanly, with no needless escapes
                 compressedValue = JSON.stringify(parsed, null, 0).replace(/\s+/g, ' ').trim();
             } catch (e) {
-                // Si no es JSON v├ílido, limpiar escapes manualmente
-                // Primero intentar limpiar escapes comunes
+                // If it is not valid JSON, clean escapes by hand
+                // First try to clean common escapes
                 compressedValue = compressedValue
                     .replace(/\\n/g, ' ')
                     .replace(/\\"/g, '"')
                     .replace(/\\t/g, ' ')
                     .replace(/\\r/g, ' ')
-                    .replace(/\\\\/g, '\\')  // Reemplazar \\ por \
+                    .replace(/\\\\/g, '\\')  // Replace \\ with \
                     .replace(/\s+/g, ' ')
                     .trim();
             }
             
-            // Crear contenedor principal - sin width inline para respetar el ancho de la columna
+            // Main container - no inline width, so the column width is respected
             var $container = $('<div>', {
                 class: 'mcp_json_container'
             });
             
-            // Contenedor para la l├¡nea comprimida (flex para alinear bot├│n a la derecha)
+            // Container for the compressed line (flex to push the button to the right)
             var $compressedLine = $('<div>', {
                 css: {
                     'display': 'flex',
@@ -74,7 +75,7 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
                 }
             });
             
-            // Contenedor para texto comprimido (flexible)
+            // Container for the compressed text (flexible)
             var $compressedWrapper = $('<span>', {
                 css: {
                     'flex': '1',
@@ -85,7 +86,7 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
                 }
             });
             
-            // Texto comprimido (siempre visible)
+            // Compressed text (always visible)
             var $compressed = $('<span>', {
                 class: 'mcp_json_compressed',
                 text: compressedValue,
@@ -96,7 +97,7 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
                 }
             });
             
-            // Bot├│n de copiar al clipboard (pegado a la derecha del campo)
+            // Copy-to-clipboard button (stuck to the right of the field)
             var $copyButton = $('<button>', {
                 class: 'btn btn-sm btn-link mcp_json_copy_btn',
                 html: '<i class="fa fa-copy"></i>',
@@ -113,7 +114,7 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
                     'line-height': '1',
                     'flex-shrink': '0'
                 },
-                title: 'Copiar al portapapeles',
+                title: _t('Copy to clipboard'),
                 click: function(e) {
                     e.stopPropagation();
                     self._copyToClipboard();
@@ -124,7 +125,7 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
             $compressedLine.append($compressedWrapper);
             $compressedLine.append($copyButton);
             
-            // Contenedor para JSON expandido (oculto por defecto)
+            // Container for the expanded JSON (hidden by default)
             var $expandedContainer = $('<div>', {
                 class: 'mcp_json_expanded_container',
                 css: {
@@ -140,10 +141,10 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
                 }
             });
             
-            // Placeholder mientras se carga
+            // Placeholder while it loads
             var $expanded = $('<pre>', {
                 class: 'mcp_json_expanded',
-                text: 'Cargando...',
+                text: _t('Loading...'),
                 css: {
                     'margin': '0',
                     'white-space': 'pre-wrap',
@@ -153,7 +154,7 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
                 }
             });
             
-            // Bot├│n de copiar en el contenedor expandido
+            // Copy button in the expanded container
             var $copyButtonExpanded = $('<button>', {
                 class: 'btn btn-sm btn-link mcp_json_copy_btn_expanded',
                 html: '<i class="fa fa-copy"></i>',
@@ -169,7 +170,7 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
                     'cursor': 'pointer',
                     'border-radius': '3px'
                 },
-                title: 'Copiar al portapapeles',
+                title: _t('Copy to clipboard'),
                 click: function(e) {
                     e.stopPropagation();
                     self._copyToClipboard();
@@ -182,12 +183,12 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
             $container.append($expandedContainer);
             this.$el.append($container);
             
-            // Guardar referencias
+            // Keep references
             this._$expandedContainer = $expandedContainer;
             this._$expanded = $expanded;
             this._fullValueLoaded = false;
             
-            // Toggle al hacer click
+            // Toggle on click
             $compressed.on('click', function(e) {
                 e.stopPropagation();
                 self._toggleExpanded();
@@ -202,7 +203,7 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
                 $expandedContainer.slideUp(200);
                 this._expanded = false;
             } else {
-                // Si no se ha cargado el valor completo, cargarlo ahora
+                // If the full value is not loaded yet, load it now
                 if (!this._fullValueLoaded) {
                     this._loadFullValue();
                 }
@@ -216,24 +217,24 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
             var record = this.record;
             var fieldName = this.name;
             
-            // Determinar el campo original seg├║n el campo comprimido
+            // Find the original field from the compressed field
             var originalFieldName = '';
             if (fieldName === 'prompt_data_compressed') {
                 originalFieldName = 'prompt_data';
             } else if (fieldName === 'result_summary_compressed') {
-                // Para resultado, usar result_data (el JSON completo) en lugar de result_summary
+                // For the result, use result_data (the full JSON) instead of result_summary
                 originalFieldName = 'result_data';
             } else {
                 originalFieldName = fieldName.replace('_compressed', '');
             }
             
             if (!record || !record.res_id) {
-                // Si no hay record ID, usar el valor comprimido
+                // If there is no record ID, use the compressed value
                 this._formatAndDisplayValue(this.value || '');
                 return;
             }
             
-            // Hacer RPC para obtener el valor completo desde el campo original
+            // RPC call to get the full value from the original field
             this._rpc({
                 model: record.model || 'ai.log',
                 method: 'read',
@@ -252,24 +253,24 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
         _formatAndDisplayValue: function(fullValue) {
             var formattedValue = fullValue;
             
-            // Limpiar escapes si el valor los tiene (puede venir de doble serializaci├│n)
+            // Clean escapes if the value has them (may come from double serialization)
             try {
-                // Intentar parsear como JSON (puede tener escapes si fue doblemente serializado)
+                // Try to parse as JSON (may have escapes if it was serialized twice)
                 var parsed = JSON.parse(fullValue);
                 
-                // Si el resultado parseado es un string, puede ser JSON dentro de JSON
+                // If the parsed result is a string, it may be JSON inside JSON
                 if (typeof parsed === 'string') {
                     try {
                         parsed = JSON.parse(parsed);
                     } catch (e) {
-                        // Si falla, usar el string parseado
+                        // If that fails, use the parsed string
                     }
                 }
                 
-                // Formatear el JSON limpiamente
+                // Format the JSON cleanly
                 formattedValue = JSON.stringify(parsed, null, 2);
             } catch (e) {
-                // Si no es JSON v├ílido, limpiar escapes manualmente y mostrar tal cual
+                // If it is not valid JSON, clean escapes by hand and show it as is
                 formattedValue = fullValue
                     .replace(/\\n/g, '\n')
                     .replace(/\\"/g, '"')
@@ -279,7 +280,7 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
             
             this._$expanded.text(formattedValue);
             this._fullValueLoaded = true;
-            // Guardar el valor formateado para poder copiarlo (igual que en form)
+            // Keep the formatted value so it can be copied (same as in form)
             this._formattedValue = formattedValue;
         },
         
@@ -288,24 +289,24 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
             var record = this.record;
             var fieldName = this.name;
             
-            // Determinar el campo original seg├║n el campo comprimido (igual que en _loadFullValue)
+            // Find the original field from the compressed field (same as in _loadFullValue)
             var originalFieldName = '';
             if (fieldName === 'prompt_data_compressed') {
                 originalFieldName = 'prompt_data';
             } else if (fieldName === 'result_summary_compressed') {
-                // Para resultado, usar result_data (el JSON completo) igual que en form
+                // For the result, use result_data (the full JSON), same as in form
                 originalFieldName = 'result_data';
             } else {
                 originalFieldName = fieldName.replace('_compressed', '');
             }
             
-            // Si el valor completo ya est├í cargado y formateado, usarlo directamente
+            // If the full value is already loaded and formatted, use it directly
             if (this._fullValueLoaded && this._formattedValue) {
                 this._doCopy(this._formattedValue);
                 return;
             }
             
-            // Si hay record ID, cargar el valor completo desde el campo original
+            // If there is a record ID, load the full value from the original field
             if (record && record.res_id) {
                 this._rpc({
                     model: record.model || 'ai.log',
@@ -313,7 +314,7 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
                     args: [[record.res_id], [originalFieldName]],
                 }).then(function(result) {
                     if (result && result.length > 0 && result[0][originalFieldName]) {
-                        // Formatear el valor igual que en _formatAndDisplayValue
+                        // Format the value as in _formatAndDisplayValue
                         var fullValue = result[0][originalFieldName];
                         var formattedValue = fullValue;
                         
@@ -323,7 +324,7 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
                                 try {
                                     parsed = JSON.parse(parsed);
                                 } catch (e) {
-                                    // Si falla, usar el string parseado
+                                    // If that fails, use the parsed string
                                 }
                             }
                             formattedValue = JSON.stringify(parsed, null, 2);
@@ -337,22 +338,22 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
                         
                         self._doCopy(formattedValue);
                     } else {
-                        // Si no hay valor, usar el comprimido como fallback
+                        // If there is no value, fall back to the compressed one
                         self._doCopy(self.value || '');
                     }
                 }).catch(function() {
-                    // Si falla, usar el comprimido como fallback
+                    // If that fails, fall back to the compressed one
                     self._doCopy(self.value || '');
                 });
             } else {
-                // Si no hay record ID, usar el valor comprimido como fallback
+                // If there is no record ID, fall back to the compressed value
                 this._doCopy(this.value || '');
             }
         },
         
         _doCopy: function(text) {
             var self = this;
-            // Crear elemento temporal para copiar
+            // Create a temporary element to copy from
             var $temp = $('<textarea>', {
                 css: {
                     'position': 'fixed',
@@ -368,23 +369,23 @@ odoo.define('pns_ai_mcp.mcp_json_compressed_widget', function (require) {
             try {
                 var successful = document.execCommand('copy');
                 if (successful) {
-                    // Siempre usar toast para todas las copias
+                    // Always use a toast for every copy
                     this._showCopyToast();
                 } else {
-                    console.warn('No se pudo copiar al portapapeles');
+                    console.warn('Could not copy to clipboard');
                 }
             } catch (err) {
-                console.error('Error al copiar:', err);
+                console.error('Error copying:', err);
             }
             
             $temp.remove();
         },
         
         _showCopyToast: function() {
-            // Usar el sistema de notificaciones de Odoo
+            // Use the Odoo notification system
             this.displayNotification({
-                title: 'Copiado',
-                message: 'Contenido copiado al portapapeles',
+                title: _t('Copied'),
+                message: _t('Content copied to clipboard'),
                 type: 'success',
                 sticky: false,
                 className: 'o_mcp_copy_toast'

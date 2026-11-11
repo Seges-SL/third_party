@@ -8,7 +8,6 @@ in Settings (no upload needed); the import side needs a file, hence this wizard.
 Review first (dry-run), then confirm writes.
 """
 
-import base64
 import logging
 
 from odoo import _, fields, models
@@ -16,12 +15,14 @@ from odoo.exceptions import UserError
 
 from ..utils import mcp_ui
 from ..utils import config_backup
+from ..utils.compat import binary_bytes
 from ..utils.import_export_guard import ensure_ai_admin
 
 _logger = logging.getLogger(__name__)
 
 _SECTION_LABELS = {
     'providers': 'Providers',
+    'provider_roles': 'Provider roles',
     'agents': 'Agents',
     'contexts': 'Contexts',
     'skills': 'Skills',
@@ -54,7 +55,7 @@ class ConfigBackupWizard(models.TransientModel):
         if not self.json_file:
             raise UserError(_("Please upload a backup JSON file."))
         try:
-            raw = base64.b64decode(self.json_file)
+            raw = binary_bytes(self.json_file)
             data, extract_warnings = mcp_ui.extract_json_from_upload(
                 raw, expect_list=False)
         except (ValueError, Exception) as e:

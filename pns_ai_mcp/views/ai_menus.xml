@@ -27,9 +27,9 @@
 
 
 
-    <!-- ─── Server action bindings (replaces JS list button patches) ─────────── -->
-    <!-- These appear in the "Action" dropdown (⚙️) of each model's list view   -->
-    <!-- NOTE: groups_id removed in Odoo 19 (Invalid field on ir.actions.server) -->
+    <!-- ─── Server actions ─────────────────────────────────────────────────── -->
+    <!-- Global operations live in each list's Tools wizard; "Export selected"  -->
+    <!-- is a list header button. Same in every stack.                          -->
 
     <!-- pns_ai_mcp.user: Import/Export JSON — O14 toolbar JS; no cog binding -->
     <record id="action_server_export_mcp_users" model="ir.actions.server">
@@ -81,6 +81,16 @@
         <field name="code">action = model.action_import_providers()</field>
     </record>
 
+    <!-- O14 lists have no Duplicate of their own; O19 lists and both forms do. -->
+    <record id="action_server_duplicate_ai_providers" model="ir.actions.server">
+        <field name="name">Duplicate</field>
+        <field name="model_id" ref="model_ai_provider"/>
+        <field name="binding_model_id" ref="model_ai_provider"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_duplicate()</field>
+    </record>
+
     <!-- ai.agent: Import/Export JSON — cog menu JS (ai_agent_action_buttons.js).
          binding_model_id=False so they do not duplicate the ⚙️ entries. -->
     <record id="action_server_export_ai_agents" model="ir.actions.server">
@@ -112,48 +122,42 @@
     <record id="action_server_context_stats" model="ir.actions.server">
         <field name="name">MCP context statistics</field>
         <field name="model_id" ref="model_ai_context"/>
-        <field name="binding_model_id" ref="model_ai_context"/>
-        <field name="binding_view_types">list</field>
+        <field name="binding_model_id" eval="False"/>
         <field name="state">code</field>
         <field name="code">action = model.action_open_stats_wizard()</field>
     </record>
     <record id="action_server_context_restore" model="ir.actions.server">
         <field name="name">Restore MCP contexts from module</field>
         <field name="model_id" ref="model_ai_context"/>
-        <field name="binding_model_id" ref="model_ai_context"/>
-        <field name="binding_view_types">list</field>
+        <field name="binding_model_id" eval="False"/>
         <field name="state">code</field>
         <field name="code">action = model.action_restore_from_module()</field>
     </record>
     <record id="action_server_context_export" model="ir.actions.server">
         <field name="name">Export all contexts to ZIP</field>
         <field name="model_id" ref="model_ai_context"/>
-        <field name="binding_model_id" ref="model_ai_context"/>
-        <field name="binding_view_types">list</field>
+        <field name="binding_model_id" eval="False"/>
         <field name="state">code</field>
         <field name="code">action = model.export_all_to_zip()</field>
     </record>
     <record id="action_server_context_export_selected" model="ir.actions.server">
         <field name="name">Export selected contexts to ZIP</field>
         <field name="model_id" ref="model_ai_context"/>
-        <field name="binding_model_id" ref="model_ai_context"/>
-        <field name="binding_view_types">list</field>
+        <field name="binding_model_id" eval="False"/>
         <field name="state">code</field>
         <field name="code">action = records.action_export_selected()</field>
     </record>
     <record id="action_server_context_import_zip" model="ir.actions.server">
         <field name="name">Import contexts from ZIP</field>
         <field name="model_id" ref="model_ai_context"/>
-        <field name="binding_model_id" ref="model_ai_context"/>
-        <field name="binding_view_types">list</field>
+        <field name="binding_model_id" eval="False"/>
         <field name="state">code</field>
         <field name="code">action = model.action_open_import_zip_wizard()</field>
     </record>
     <record id="action_server_context_import_selected_zip" model="ir.actions.server">
         <field name="name">Import selected contexts from ZIP</field>
         <field name="model_id" ref="model_ai_context"/>
-        <field name="binding_model_id" ref="model_ai_context"/>
-        <field name="binding_view_types">list</field>
+        <field name="binding_model_id" eval="False"/>
         <field name="state">code</field>
         <field name="code">action = model.action_open_import_selected_zip_wizard()</field>
     </record>
@@ -222,8 +226,7 @@
     <record id="action_server_export_skills" model="ir.actions.server">
         <field name="name">Export all skills to ZIP</field>
         <field name="model_id" ref="model_ai_skill"/>
-        <field name="binding_model_id" ref="model_ai_skill"/>
-        <field name="binding_view_types">list</field>
+        <field name="binding_model_id" eval="False"/>
         <field name="state">code</field>
         <field name="code">action = model.action_export_skills()</field>
     </record>

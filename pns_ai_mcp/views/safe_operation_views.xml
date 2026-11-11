@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Vista de "AI Requests" (Safe Plan / Caja B).
-    Permite confirmar/cancelar desde Odoo las operaciones propuestas por la IA,
-    útil para clientes de inferencia externos (Claude, Cursor...) que no tienen
-    la UI de chatboo. La seguridad la dan los métodos del modelo (solo el dueño)
-    y las reglas de registro (cada usuario ve solo las suyas).
+    View of "AI Requests" (Safe Plan / Box B).
+    Lets you confirm/cancel from Odoo the operations proposed by the AI,
+    useful for external inference clients (Claude, Cursor...) that do not have
+    a host UI. Security comes from the model methods (owner only)
+    and the record rules (each user sees only their own).
 -->
 <odoo>
     <record id="view_ai_safe_operation_search" model="ir.ui.view">

@@ -7,12 +7,13 @@ SVG drawings open in the tab (sanitized); every other file downloads.
 """
 from __future__ import annotations
 
-import base64
 import logging
 
 from odoo import http
 from odoo.exceptions import AccessError
-from odoo.http import request, content_disposition
+from odoo.http import request
+
+from odoo.addons.pns_base.utils.compat import ODOO_VERSION, content_disposition
 
 _logger = logging.getLogger(__name__)
 
@@ -25,14 +26,17 @@ def _may_read(env, att):
         return False
     try:
         record = env[att.res_model].browse(att.res_id)
-        record.check_access_rights('read')
-        record.check_access_rule('read')
+        if ODOO_VERSION >= 18:
+            record.check_access('read')
+        else:
+            record.check_access_rights('read')
+            record.check_access_rule('read')
     except AccessError:
         return False
     return record.exists()
 
 
-class ChatbooSessionFile(http.Controller):
+class SessionFile(http.Controller):
 
     @http.route([
         '/pns_ai_mcp/session_file/<int:attachment_id>',
@@ -43,9 +47,9 @@ class ChatbooSessionFile(http.Controller):
         if not att.exists() or att.res_field or not _may_read(request.env, att):
             return request.not_found()
         try:
-            raw = base64.b64decode(att.datas or b'')
+            raw = bytes(att.raw or b'')
         except Exception:
-            _logger.warning('session_file: could not decode attachment %s', att.id)
+            _logger.warning('session_file: could not read attachment %s', att.id)
             return request.not_found()
         mime = (att.mimetype or '').split(';', 1)[0].strip().lower()
         name = att.name or 'download'

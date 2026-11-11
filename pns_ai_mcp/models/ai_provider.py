@@ -5,6 +5,7 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
 from ..utils import mcp_ui
+from ..utils.compat import read_sums
 from ..utils.import_export_guard import ensure_ai_admin
 from ..utils.portable_io import export_record_dict
 import logging
@@ -13,7 +14,7 @@ import json
 _logger = logging.getLogger(__name__)
 
 def safe_error_message(msg):
-    """Convierte un mensaje a ASCII seguro para evitar problemas de codificación en UserError"""
+    """Turn a message into safe ASCII to avoid encoding issues in UserError"""
     if isinstance(msg, bytes):
         msg = msg.decode('utf-8', errors='replace')
     return str(msg).encode('ascii', errors='replace').decode('ascii')
@@ -182,9 +183,9 @@ class AIProvider(models.Model):
              "What a provider is used for is its ticks, not its protocol.")
     endpoint = fields.Char(
         string='Endpoint URL',
-        help="URL POST exacta que usa el driver (chat/completions o messages). "
-             "Pégala tal cual desde la documentación de tu gateway; no se "
-             "reescribe al guardar.",
+        help="Exact POST URL the driver uses (chat/completions or messages). "
+             "Paste it as is from your gateway's documentation; it is not "
+             "rewritten on save.",
     )
     endpoint_setup_guide = fields.Html(
         string='Endpoint setup guide',
@@ -193,7 +194,7 @@ class AIProvider(models.Model):
     )
     api_key = fields.Char(
         string='API Key',
-        help="Clave de autenticación que se envía al proveedor de IA.",
+        help="Authentication key sent to the AI provider.",
         groups="pns_ai_mcp.group_ai_admin",
         copy=False,
     )
@@ -201,7 +202,7 @@ class AIProvider(models.Model):
     def _api_key_for_inference(self):
         """Return provider API key for server-side LLM calls (private).
 
-        The field is admin-only in UI; inference clients (Chatboo, MCP) must
+        The field is admin-only in UI; inference clients (chat, voice, MCP) must
         still authenticate to external LLMs on behalf of permitted users.
         Not a public RPC entry point — leading underscore blocks call_kw.
         """
@@ -211,7 +212,7 @@ class AIProvider(models.Model):
     # Model Selection
     model_name = fields.Char(
         related='model_id.name', string='Model', readonly=True, store=True,
-        help="Nombre efectivo del modelo; refleja el modelo seleccionado (no editable).",
+        help="Effective model name; mirrors the selected model (not editable).",
     )
     model_id = fields.Many2one('ai.provider.model', string='Selected Model', domain="[('provider_id', '=', id)]")
     available_model_ids = fields.One2many('ai.provider.model', 'provider_id', string='Available Models')
@@ -221,41 +222,83 @@ class AIProvider(models.Model):
         help='Choice answers below this confidence are ignored. '
              'The word list result is kept.',
     )
-    fit_conversation = fields.Boolean(
-        string='Conversation',
-        help='Empty ticks: text only. A tick admits that kind of input '
-             'and no other. A photo or a clip never uses a text provider.',
+    role_ids = fields.Many2many(
+        'ai.provider.role',
+        'ai_provider_role_rel', 'provider_id', 'role_id',
+        string='Roles',
+        help='No role: text only. A role admits that kind of turn and no '
+             'other. A photo or a clip never uses a text provider.',
     )
-    fit_audio = fields.Boolean(string='Audio')
-    fit_vision = fields.Boolean(string='Vision')
-    fit_video = fields.Boolean(string='Video')
-    fit_decision = fields.Boolean(
-        string='Decision',
-        help='Answers a closed Choice (yes or none, with a confidence). '
-             'The decision agent chain only takes providers with this tick. '
-             'The protocol must be able to choose.',
-    )
-    fit_design = fields.Boolean(string='Design')
+    has_decision = fields.Boolean(compute='_compute_has_decision')
+    hears_by_chat = fields.Boolean(compute='_compute_hears_by_chat')
     fit_chips_html = fields.Html(
         string='Fits',
         compute='_compute_fit_chips_html',
         sanitize=False,
         readonly=True,
-        help='The ticks as chips, for the list. No tick reads Text.',
+        help='The roles as chips, for the list. No role reads Text.',
     )
 
     def _fit_flags(self):
-        """The ticks keyed like ``provider_fit.FITS``."""
-        from ..utils.provider_fit import FITS
-
+        """The provider's role codes, each True."""
         self.ensure_one()
-        return {need: bool(self['fit_%s' % need]) for need in FITS}
+        return {role.code: True for role in self.role_ids}
 
     def _fits(self, need):
         """True when this provider may take a turn that needs ``need``."""
         from ..utils.provider_fit import provider_fits
 
         return provider_fits(self._fit_flags(), need)
+
+    def _has_role(self, code):
+        self.ensure_one()
+        return code in self.role_ids.mapped('code')
+
+    def _portable_roles(self):
+        """Role codes for an export row (``roles``)."""
+        self.ensure_one()
+        return self.with_context(active_test=False).role_ids.mapped('code')
+
+    @api.model
+    def _roles_from_portable(self, row):
+        """``(role_ids command or None, warnings)`` from an import row.
+
+        Reads ``roles`` and the ``fit_<code>`` ticks of older files. A row
+        that names neither leaves the provider's roles alone. A code with
+        no role in this database is said, not invented.
+        """
+        if not isinstance(row, dict):
+            return None, []
+        named = row.get('roles')
+        ticks = [
+            key[4:] for key in row
+            if key.startswith('fit_') and key != 'fit_chips_html'
+        ]
+        if not isinstance(named, list) and not ticks:
+            return None, []
+        codes = [str(code) for code in named] if isinstance(named, list) else []
+        codes += [code for code in ticks if row.get('fit_' + code) is True]
+        Role = self.env['ai.provider.role'].sudo().with_context(active_test=False)
+        found = Role.search([('code', 'in', codes)])
+        missing = sorted(set(codes) - set(found.mapped('code')))
+        warnings = [
+            _("Role '%s' is not installed here; skipped.") % code
+            for code in missing
+        ]
+        return [(6, 0, found.ids)], warnings
+
+    @staticmethod
+    def _portable_role_keys(row):
+        """Keys of an import row that are roles, not fields."""
+        keys = {'roles'}
+        if isinstance(row, dict):
+            keys.update(key for key in row if key.startswith('fit_'))
+        return keys
+
+    def _hears(self):
+        """A role that takes audio: the speech probe guards it."""
+        self.ensure_one()
+        return any(role.accepts == 'audio' for role in self.role_ids)
 
     def _driver(self):
         from ..lib.llm.drivers import get_llm_driver
@@ -267,8 +310,21 @@ class AIProvider(models.Model):
         """False when this protocol only answers a closed Choice."""
         return bool(self._driver().chats)
 
-    @api.depends('fit_conversation', 'fit_audio', 'fit_vision', 'fit_video',
-                 'fit_decision', 'fit_design', 'stt_support')
+    @api.depends('role_ids')
+    def _compute_has_decision(self):
+        for rec in self:
+            rec.has_decision = 'decision' in rec.role_ids.mapped('code')
+
+    @api.depends('role_ids', 'role_ids.accepts', 'stt_support')
+    def _compute_hears_by_chat(self):
+        """It takes audio, and the probe says it hears it as a chat."""
+        for rec in self:
+            rec.hears_by_chat = rec.stt_support == 'chat' and rec._hears()
+
+    @api.depends(
+        'role_ids', 'role_ids.name', 'role_ids.accepts',
+        'role_ids.bg_color', 'role_ids.fg_color', 'stt_support',
+    )
     def _compute_fit_chips_html(self):
         from odoo.tools import html_escape
 
@@ -277,41 +333,30 @@ class AIProvider(models.Model):
             'transcriptions': _('file transcriptions'),
         }
         for rec in self:
-            chips = []
-            if rec.fit_conversation:
-                chips.append(('conversation', _('Conversation'), ''))
-            if rec.fit_audio:
-                chips.append((
-                    'audio', _('Audio'), verbs.get(rec.stt_support or '', ''),
-                ))
-            if rec.fit_vision:
-                chips.append(('vision', _('Vision'), ''))
-            if rec.fit_video:
-                chips.append(('video', _('Video'), ''))
-            if rec.fit_decision:
-                chips.append(('decision', _('Decision'), ''))
-            if rec.fit_design:
-                chips.append(('design', _('Design'), ''))
-            if not chips:
-                chips.append(('text', _('Text'), ''))
-            rec.fit_chips_html = ''.join(
-                '<span class="o_pns_fit_chip o_pns_fit_chip--%s"%s>%s</span>' % (
-                    key,
-                    (' title="%s"' % html_escape(tip)) if tip else '',
-                    html_escape(label),
+            roles = rec.role_ids.sorted(lambda r: (r.sequence, r.id))
+            if not roles:
+                rec.fit_chips_html = (
+                    '<span class="o_pns_fit_chip o_pns_fit_chip--text">%s</span>'
+                    % html_escape(_('Text'))
                 )
-                for key, label, tip in chips
+                continue
+            rec.fit_chips_html = ''.join(
+                role._chip(
+                    verbs.get(rec.stt_support or '', '')
+                    if role.accepts == 'audio' else ''
+                )
+                for role in roles
             )
 
     # Creativity Configuration
     temperature = fields.Float(
         string='Temperature',
         default=0.7,
-        help="Control de creatividad del modelo (0.0 - 1.0):\n"
-             "- 0.0: Determinista (siempre la misma respuesta)\n"
-             "- 0.1-0.3: Preciso (código, SQL, datos)\n"
-             "- 0.4-0.7: Equilibrado (conversación natural) - Recomendado\n"
-             "- 0.8-1.0: Creativo (lluvia de ideas, redacción)",
+        help="Model creativity control (0.0 - 1.0):\n"
+             "- 0.0: Deterministic (always the same answer)\n"
+             "- 0.1-0.3: Precise (code, SQL, data)\n"
+             "- 0.4-0.7: Balanced (natural conversation) - Recommended\n"
+             "- 0.8-1.0: Creative (brainstorming, writing)",
     )
     temperature_support = fields.Selection(
         [
@@ -323,10 +368,10 @@ class AIProvider(models.Model):
         default='unknown',
         readonly=True,
         copy=False,
-        help="Indica si el modelo seleccionado acepta el parámetro `temperature`. "
-             "Se detecta con una sonda mínima al seleccionar un modelo o probar la "
-             "conexión. Si es 'No soportado', el parámetro se omite en cada "
-             "petición (algunos modelos recientes lo rechazan).",
+        help="Whether the selected model accepts the `temperature` parameter. "
+             "Detected with a minimal probe when a model is selected or the "
+             "connection is tested. If 'Not supported', the parameter is "
+             "omitted on every request (some recent models reject it).",
     )
     usage_support = fields.Selection(
         [
@@ -443,14 +488,14 @@ class AIProvider(models.Model):
     context_window_display = fields.Char(
         string='Context window',
         compute='_compute_context_window_display',
-        help="Ventana de contexto legible (K = 1024 tokens, M = 1024K).",
+        help="Readable context window (K = 1024 tokens, M = 1024K).",
     )
 
     context_window_tokens = fields.Char(
         string='Context tokens',
         compute='_compute_context_window_tokens',
-        help="Ventana de contexto en tokens, como texto plano para copiar/pegar "
-             "en configuraciones de inferencia (LEMONADE_CTX_SIZE, --ctx-size, "
+        help="Context window in tokens, as plain text to copy/paste into "
+             "inference settings (LEMONADE_CTX_SIZE, --ctx-size, "
              "num_ctx…).",
     )
 
@@ -522,45 +567,53 @@ class AIProvider(models.Model):
             if record.temperature < 0.0 or record.temperature > 2.0:
                 raise ValidationError("Temperature must be between 0.0 and 2.0 (recommended: 0.0-1.0)")
 
+    # What a role accepts, against what the gateway says the model accepts.
+    _CATALOGUE_ACCEPTS = {
+        'text': 'apt_conversation',
+        'image': 'apt_vision',
+        'audio': 'apt_audio',
+    }
+
     def _model_known_fits(self):
-        """What the gateway declared for the selected model, or {} if silent."""
+        """What the gateway declared for the selected model, or {} if silent.
+
+        Keyed by role code. A role whose input the catalogue does not
+        publish (video) is not judged.
+        """
         self.ensure_one()
         model = self.model_id
         if not model or not (model.modality_label or '').strip():
             return {}
-        return {
-            'conversation': bool(model.apt_conversation),
-            'audio': bool(model.apt_audio),
-            'vision': bool(model.apt_vision),
-        }
+        known = {}
+        for role in self.role_ids:
+            column = self._CATALOGUE_ACCEPTS.get(role.accepts)
+            if column:
+                known[role.code] = bool(model[column])
+        return known
 
-    @api.constrains('model_id', 'fit_conversation', 'fit_audio', 'fit_vision')
+    @api.constrains('model_id', 'role_ids')
     def _check_model_honours_ticks(self):
         """A tick is the anchor. The model under it must be one that fits."""
         from ..utils.provider_fit import fit_mismatches
 
-        labels = {
-            'conversation': _('Conversation'),
-            'audio': _('Audio'),
-            'vision': _('Vision'),
-        }
         for rec in self:
             bad = fit_mismatches(rec._fit_flags(), rec._model_known_fits())
             if bad:
+                names = {role.code: role.name for role in rec.role_ids}
                 raise ValidationError(_(
                     'Model %(model)s does not accept %(ticks)s '
                     '(catalogue: %(modality)s). Pick a model that does, '
                     'or clear the tick.'
                 ) % {
                     'model': rec.model_id.name,
-                    'ticks': ', '.join(labels[need] for need in bad),
+                    'ticks': ', '.join(names[need] for need in bad),
                     'modality': rec.model_id.modality_label,
                 })
 
-    @api.constrains('fit_decision', 'decision_min_confidence')
+    @api.constrains('role_ids', 'decision_min_confidence')
     def _check_decision_confidence(self):
         for rec in self:
-            if not rec.fit_decision:
+            if not rec.has_decision:
                 continue
             conf = rec.decision_min_confidence
             if conf is None or conf < 0.0 or conf > 1.0:
@@ -569,17 +622,42 @@ class AIProvider(models.Model):
                 ))
 
 
+    @api.constrains('protocol', 'role_ids')
+    def _check_roles_match_protocol(self):
+        for rec in self:
+            driver = rec._driver()
+            codes = set(rec.role_ids.mapped('code'))
+            if 'decision' in codes and not driver.chooses:
+                raise ValidationError(_(
+                    'Protocol %s does not answer a closed Choice. '
+                    'Clear the Decision role.'
+                ) % rec.protocol)
+            if not driver.chats and codes - {'decision'}:
+                raise ValidationError(_(
+                    'Protocol %s does not chat. It can only hold the '
+                    'Decision role.'
+                ) % rec.protocol)
+
+    @api.constrains('protocol', 'endpoint')
+    def _check_endpoint_matches_protocol(self):
+        for rec in self:
+            want = rec._driver().endpoint_path
+            path = (rec.endpoint or '').split('?', 1)[0].rstrip('/')
+            if want and path and not path.endswith(want):
+                raise ValidationError(_(
+                    'Protocol %s posts to an endpoint ending in %s, and this one '
+                    'does not. A router that speaks the OpenAI format '
+                    '(/chat/completions) needs its own protocol.'
+                ) % (rec.protocol, want))
+
     @api.onchange('protocol')
     def _onchange_protocol_ticks(self):
         driver = self._driver()
+        decision = self.env['ai.provider.role']._by_code('decision')
         if not driver.chooses:
-            self.fit_decision = False
+            self.role_ids -= decision
         if not driver.chats:
-            self.fit_conversation = False
-            self.fit_audio = False
-            self.fit_vision = False
-            self.fit_video = False
-            self.fit_decision = True
+            self.role_ids = decision
         fixed = getattr(driver, 'default_endpoint', None)
         if fixed:
             self.endpoint = fixed
@@ -606,7 +684,7 @@ class AIProvider(models.Model):
         return driver.choose(state, criteria, instructions, timeout=timeout)
 
     # Saving one of these with the Audio tick on sends the silent clip.
-    _SPEECH_GATE_KEYS = ('model_id', 'fit_audio', 'endpoint', 'protocol', 'api_key')
+    _SPEECH_GATE_KEYS = ('model_id', 'role_ids', 'endpoint', 'protocol', 'api_key')
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -637,7 +715,7 @@ class AIProvider(models.Model):
         if self.env.context.get('pns_skip_speech_gate'):
             return
         for rec in self:
-            if not rec.fit_audio or rec.protocol == 'anthropic':
+            if not rec._hears() or rec.protocol == 'anthropic':
                 continue
             model = (rec.model_id.name if rec.model_id else '') or rec.model_name
             if not model or not rec.endpoint:
@@ -812,7 +890,7 @@ class AIProvider(models.Model):
 
     @api.onchange('protocol', 'endpoint')
     def _onchange_reset_temperature_support(self):
-        # Cambiar de endpoint/tipo invalida la capacidad cacheada del modelo.
+        # Changing endpoint/type invalidates the cached model capability.
         self.temperature_support = 'unknown'
         self.usage_support = 'unknown'
         self.stt_support = 'unknown'
@@ -900,6 +978,7 @@ class AIProvider(models.Model):
                     request_type='system',
                     agent_llm=target_model,
                     source_channel='internal',
+                    provider_id=self.id,
                 )
         except Exception as exc:
             _logger.warning("Failed to log speech test connection: %s", exc)
@@ -910,10 +989,10 @@ class AIProvider(models.Model):
         )
 
     def _probe_temperature_support(self, target_model=None, timeout=15):
-        """Devuelve 'yes'/'no'/'unknown' según si el modelo acepta `temperature`.
+        """Return 'yes'/'no'/'unknown' depending on whether the model accepts `temperature`.
 
-        Solo aplica a Anthropic; para el resto se asume 'yes'. Best-effort: si
-        no hay datos suficientes o la red falla, devuelve 'unknown' (no lanza).
+        Only applies to Anthropic; the rest are assumed 'yes'. Best-effort: if
+        there is not enough data or the network fails, returns 'unknown' (does not raise).
         """
         self.ensure_one()
         model = target_model or (self.model_id.name if self.model_id else None) or self.model_name
@@ -985,6 +1064,7 @@ class AIProvider(models.Model):
                     request_type='system',
                     agent_llm=answer.get('model') or target_model,
                     source_channel='internal',
+                    provider_id=self.id,
                     prompt_tokens=usage.get('input_tokens'),
                     completion_tokens=usage.get('output_tokens'),
                 )
@@ -1013,8 +1093,7 @@ class AIProvider(models.Model):
             start_utc = start_local
         return fields.Datetime.to_string(start_utc)
 
-    # Seges: parche 33 (PNS-29, seguridad). Ver docs/pendiente/parches_pns_ai.md
-    def _month_usage(self):
+    def month_usage(self):
         """Tokens and cost of this provider since the start of the month."""
         self.ensure_one()
         start = self._spend_month_start()
@@ -1024,20 +1103,19 @@ class AIProvider(models.Model):
                 'total_tokens': 0, 'cost': 0.0, 'cost_usd': 0.0,
                 'since': start,
             }
-        groups = self.env['ai.log'].sudo().read_group(
+        row = read_sums(
+            self.env['ai.log'].sudo(),
             [
                 ('provider_id', '=', self.id),
                 ('primitive', '=', 'llm'),
                 ('timestamp', '>=', start),
             ],
             ['prompt_tokens', 'completion_tokens', 'total_tokens', 'cost_usd'],
-            [],
         )
-        row = groups[0] if groups else {}
-        prompt = int(row.get('prompt_tokens') or 0)
-        completion = int(row.get('completion_tokens') or 0)
-        total = int(row.get('total_tokens') or 0) or (prompt + completion)
-        cost = float(row.get('cost_usd') or 0.0)
+        prompt = int(row['prompt_tokens'])
+        completion = int(row['completion_tokens'])
+        total = int(row['total_tokens']) or (prompt + completion)
+        cost = float(row['cost_usd'])
         return {
             'prompt_tokens': prompt,
             'completion_tokens': completion,
@@ -1050,9 +1128,8 @@ class AIProvider(models.Model):
     def spend_cap_reached(self):
         self.ensure_one()
         from ..utils.provider_spend import spend_cap_hit
-        # Seges: parche 33 (PNS-29, seguridad). Ver docs/pendiente/parches_pns_ai.md
         return spend_cap_hit(
-            self._month_usage(),
+            self.month_usage(),
             cap_usd=self.spend_cap_usd,
             cap_tokens=self.spend_cap_tokens,
         )
@@ -1065,6 +1142,41 @@ class AIProvider(models.Model):
                 'Provider "%s" has reached its monthly inference cap. '
                 'The next call does not run.'
             ) % self.name)
+
+    def copy(self, default=None):
+        """Duplicate under a new name, with its own row for the chosen model.
+
+        The model belongs to one provider's catalogue (``model_id`` is
+        domained on ``provider_id``), so the twin gets a copy of that row.
+        The key stays behind (``api_key`` is ``copy=False``).
+        """
+        twins = self.browse()
+        for rec in self:
+            vals = dict(default or {})
+            if not vals.get('name'):
+                vals['name'] = _('%s (copy)') % rec.name
+            vals['model_id'] = False
+            twin = super(AIProvider, rec).copy(vals)
+            if rec.model_id:
+                twin.with_context(pns_skip_speech_gate=True).model_id = (
+                    rec.model_id.copy({'provider_id': twin.id})
+                )
+            twins |= twin
+        return twins
+
+    def action_duplicate(self):
+        """List action: duplicate the selected providers; one opens its twin."""
+        ensure_ai_admin(self.env)
+        twins = self.copy()
+        if len(twins) == 1:
+            return {
+                'type': 'ir.actions.act_window',
+                'res_model': 'ai.provider',
+                'res_id': twins.id,
+                'view_mode': 'form',
+                'target': 'current',
+            }
+        return {'type': 'ir.actions.client', 'tag': 'reload'}
 
     def action_open_usage(self):
         self.ensure_one()
@@ -1086,7 +1198,7 @@ class AIProvider(models.Model):
         target_model = self.model_id.name or self.model_name
         if not target_model:
             raise UserError(_("Please select a model or enter a Model Name."))
-        if self.fit_audio and not self.fit_conversation:
+        if self._hears() and not self._has_role('conversation'):
             return self._test_speech_connection(target_model)
 
         try:
@@ -1102,8 +1214,8 @@ class AIProvider(models.Model):
                 "send_temperature": self.temperature_support != 'no',
             }
             
-            # La API key solo se guarda hasheada; no se propaga X-Mcp-Token a la
-            # LLM (las tools se ejecutan in-process, la LLM no reentra en /mcp).
+            # The API key is only stored hashed; X-Mcp-Token is not passed to the
+            # LLM (tools run in-process, the LLM does not re-enter /mcp).
             config["extra_headers"] = {}
                 
             driver.initialize(config)
@@ -1130,12 +1242,19 @@ class AIProvider(models.Model):
                         request_type='system',
                         agent_llm=target_model,
                         source_channel='internal',
+                        provider_id=self.id,
                     )
             except Exception as e:
                 _logger.warning(f"Failed to log test connection to DB: {e}")
 
-            # Sonda de temperatura: detecta y cachea si el modelo acepta el
-            # parámetro. Best-effort; no convierte un test correcto en fallo.
+            if not str(content or '').strip():
+                raise UserError(_(
+                    'Connection Failed: the model answered with no text. '
+                    'Check that the protocol matches the endpoint.'
+                ))
+
+            # Temperature probe: detects and caches whether the model accepts the
+            # parameter. Best-effort; does not turn a passing test into a failure.
             support = self._probe_temperature_support(target_model=target_model)
             extra = ""
             if support != 'unknown':
@@ -1149,7 +1268,7 @@ class AIProvider(models.Model):
                 self.stt_support = speech
                 extra += _("\nSpeech API: %s") % self._speech_label(speech)
 
-            # Sonda de consumo: forma del JSON de completion, no el host.
+            # Usage probe: shape of the completion JSON, not the host.
             from ..utils.llm_usage import classify_usage_support
             usage_flag = classify_usage_support(response)
             if usage_flag != 'unknown':
@@ -1243,6 +1362,7 @@ class AIProvider(models.Model):
                 server_data['selected_model'] = server.model_id.name if server.model_id else None
             except Exception:
                 pass
+            server_data['roles'] = server._portable_roles()
             export_data.append(server_data)
 
         filename = mcp_ui.build_export_filename(

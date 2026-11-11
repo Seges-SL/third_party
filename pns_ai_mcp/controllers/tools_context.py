@@ -41,21 +41,21 @@ def refuse_foreign_identity_pack(controller, env, context_code):
 
 def generate_contexts_index_core(available_contexts, max_desc_len=200):
     """
-    Genera un índice compacto de contextos disponibles con estructura por prioridades.
+    Builds a compact index of the available contexts, structured by priority.
     
     Args:
-        available_contexts: Lista de registros de contextos (mcp_context)
-        max_desc_len: Longitud máxima de descripción por contexto (por defecto 80)
+        available_contexts: List of context records (mcp_context)
+        max_desc_len: Max description length per context (default 80)
     
     Returns:
-        str: Índice compacto en formato texto estructurado
+        str: Compact index as structured text
     """
-    lines = ["=== CONTEXTOS DISPONIBLES ==="]
-    lines.append("Usa get_context(context_name='...') para obtener el contenido completo de un contexto.")
-    lines.append("Alternativa: puedes usar prompts/get directamente si prefieres el método estándar MCP.")
+    lines = ["=== AVAILABLE CONTEXTS ==="]
+    lines.append("Use get_context(context_name='...') to read the full content of a context.")
+    lines.append("Alternative: prompts/get, the standard MCP method.")
     lines.append("")
     
-    # Separar contextos por nivel de directiva
+    # Split contexts by directive level
     mandatory = []
     prohibited = []
     required = []
@@ -67,20 +67,20 @@ def generate_contexts_index_core(available_contexts, max_desc_len=200):
     for context in available_contexts:
         context_code = context.code
         
-        # FILTRAR VARIANTES por el campo explícito base_code (no por regex del code)
+        # FILTER VARIANTS by the explicit base_code field (not by a regex on code)
         base_name = context.base_code or context_code
         
         if base_name in seen_bases:
             continue
         seen_bases.add(base_name)
         
-        description = context.description or f'Contexto: {base_name}'
+        description = context.description or f'Context: {base_name}'
         
         # Add auto-resolve hint if it's a base for multiple variants
         if base_name != context_code:
             description += " [AUTO-RESOLVED]"
         
-        # Truncar descripción si es necesario
+        # Truncate the description if needed
         if len(description) > max_desc_len:
             truncated = description[:max_desc_len - 3]
             last_space = truncated.rfind(' ')
@@ -90,7 +90,7 @@ def generate_contexts_index_core(available_contexts, max_desc_len=200):
         
         entry = f"- [ID]: {base_name} | {description}"
         
-        # Detectar nivel de directiva desde la descripción (buscar tags exactos)
+        # Detect the directive level from the description (look for exact tags)
         desc_upper = description.upper()
         if '[MANDATORY]' in desc_upper:
             mandatory.append(entry)
@@ -105,8 +105,8 @@ def generate_contexts_index_core(available_contexts, max_desc_len=200):
         else:
             others.append(entry)
     
-    # Generar índice estructurado siguiendo jerarquía
-    lines.append("Para Consultar: use get_context(context_name='ID')")
+    # Build the structured index following the hierarchy
+    lines.append("To read one: get_context(context_name='ID')")
     lines.append("")
 
     if mandatory:
@@ -139,7 +139,7 @@ def generate_contexts_index_core(available_contexts, max_desc_len=200):
         lines.extend(others)
     
     lines.append("")
-    lines.append("--- FINAL DEL ÍNDICE ---")
+    lines.append("--- END OF INDEX ---")
     return "\n".join(lines)
 
 
@@ -171,17 +171,17 @@ from ..utils.context_utils import strip_xml_metadata
 )
 def tool_get_context(controller, arguments: dict) -> dict:
     """
-    Tool: Obtiene el contenido de un contexto específico bajo demanda.
+    Tool: Gets the content of a specific context on demand.
     
     Args:
-        controller: Instancia del controlador MCP
-        arguments: Diccionario con los argumentos:
-            - context_name (str, requerido): Nombre del contexto a consultar
-                Ejemplos: 'relaxaicode_accounting_searches', 'relaxaicode_calendar_events', 
+        controller: MCP controller instance
+        arguments: Dictionary with the arguments:
+            - context_name (str, required): Name of the context to look up
+                Examples: 'relaxaicode_accounting_searches', 'relaxaicode_calendar_events', 
                 'corporate_terms', 'relaxaicode_filters', etc.
     
     Returns:
-        dict: Contenido del contexto solicitado en formato MCP estándar
+        dict: Content of the requested context in standard MCP format
     """
     context_name = arguments.get('context_name')
     
@@ -220,14 +220,14 @@ def tool_get_context(controller, arguments: dict) -> dict:
             _logger.error("MCP: Error generating contexts index: %s", str(e))
 
     # Special case: system_prompt = Discovery Bundle
-    # El Router carga prompts críticos vía get_context; prompts/get usa otra ruta.
-    # Ambas deben devolver el mismo bundle (core+locale+domain según locale).
+    # The Router loads critical prompts via get_context; prompts/get uses another route.
+    # Both must return the same bundle (core+locale+domain by locale).
     if context_name == 'system_prompt':
         try:
             env = tool_env(controller, sudo=True)
             if 'ai.context' not in env:
                 raise ValueError("mcp_context model not available")
-            # Siempre cascada intrínseca (User > Compañía > Default). No payload/router.
+            # Always the intrinsic cascade (User > Company > Default). No payload/router.
             user_lang = controller._get_user_locale()
             mcp_agent = controller._get_mcp_agent_code() if hasattr(controller, '_get_mcp_agent_code') else ''
             if not mcp_agent:
@@ -276,7 +276,7 @@ def tool_get_context(controller, arguments: dict) -> dict:
         if blocked:
             return blocked
         if 'ai.context' in env:
-            # Siempre cascada intrínseca (User > Compañía > Default). No payload/router.
+            # Always the intrinsic cascade (User > Company > Default). No payload/router.
             user_lang = controller._get_user_locale()
 
             # Extract base name (remove _ES, _FR, _es_ES, etc. if present)
@@ -321,7 +321,7 @@ def tool_get_context(controller, arguments: dict) -> dict:
             }
         }
     
-    # Si no se encontró en ningún lugar - mensaje de error mejorado con HINT semántico
+    # Not found anywhere - better error message with a semantic HINT
     return {
         'error': {
             'code': -32602,

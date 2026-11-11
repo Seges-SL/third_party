@@ -66,8 +66,8 @@ def _clean_prefix(prefix):
 def new_turn_id(prefix=''):
     """One algorithm for every host.
 
-    Chatboo / MCP keep the historic 4-char chip (no prefix). Other hosts
-    pass a short prefix so a walkie turn cannot group with a Chatboo chip.
+    A host that passes no prefix gets the historic 4-char chip. Others
+    pass a short prefix so a walkie turn cannot group with a chat chip.
     Stored ``ai.log.turn`` is at most 8 chars.
     """
     head = _clean_prefix(prefix)
@@ -76,7 +76,7 @@ def new_turn_id(prefix=''):
 
 
 def start_new_turn(req, prefix=''):
-    """Start a new conversation turn. Hosts that are not Chatboo pass prefix."""
+    """Start a new conversation turn. A host may pass its own prefix."""
     req.mcp_turn = new_turn_id(prefix=prefix)
     req.mcp_turn_step_counter = {}
     return req.mcp_turn

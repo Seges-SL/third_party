@@ -3,47 +3,37 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Deterministic relative/absolute *day* resolution for skill args.
 
-Agnostic of domain: no business rules, only common calendar day phrases (ES/EN).
+Agnostic of domain: no business rules, only common calendar day phrases.
+The words come from ``data/spoken/*.json`` (one file per language).
 Used before any LLM param extraction so common day cases stay zero-cost.
 
-Month / period phrases (hace N meses, last quarter, …) are NOT resolved here —
+Month / period phrases (last quarter, …) are NOT resolved here —
 those stay free text so the hybrid path invokes the LLM via param_schema.
 """
 from __future__ import annotations
 
 import re
-import unicodedata
 from datetime import date, timedelta
 
-# Folded keys only (accents stripped).
-_WEEKDAYS = {
-    'lunes': 0, 'monday': 0, 'mon': 0,
-    'martes': 1, 'tuesday': 1, 'tue': 1, 'tues': 1,
-    'miercoles': 2, 'wednesday': 2, 'wed': 2,
-    'jueves': 3, 'thursday': 3, 'thu': 3, 'thur': 3, 'thurs': 3,
-    'viernes': 4, 'friday': 4, 'fri': 4,
-    'sabado': 5, 'saturday': 5, 'sat': 5,
-    'domingo': 6, 'sunday': 6, 'sun': 6,
-}
+_QUESTION_MARKS = '?¿？'
 
-# Longest names first so "thursday" wins over "thu".
-_WEEKDAY_NAMES = sorted(_WEEKDAYS.keys(), key=len, reverse=True)
 
-_NEXT_MARKERS = (
-    'que viene', 'proximo', 'siguiente', 'next',
-)
-_THIS_MARKERS = (
-    'este', 'esta', 'this',
-)
+def _spoken():
+    try:
+        from . import spoken_words
+        return spoken_words
+    except ImportError:
+        import importlib.util
+        import os
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'spoken_words.py')
+        spec = importlib.util.spec_from_file_location('spoken_words', path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
 
 
 def _fold(text):
-    text = (text or '').strip().lower()
-    text = ''.join(
-        c for c in unicodedata.normalize('NFD', text)
-        if unicodedata.category(c) != 'Mn'
-    )
-    return ' '.join(text.split())
+    return _spoken().fold(text)
 
 
 def _next_weekday(today, weekday, allow_today=False):
@@ -55,33 +45,29 @@ def _next_weekday(today, weekday, allow_today=False):
 
 
 def _find_weekday(folded_text):
-    for name in _WEEKDAY_NAMES:
+    days = _spoken().weekdays()
+    # Longest names first so "thursday" wins over "thu".
+    for name in sorted(days, key=len, reverse=True):
         if re.search(r'\b%s\b' % re.escape(name), folded_text):
-            return _WEEKDAYS[name]
+            return days[name]
     return None
 
 
 def is_help_like(text):
-    """True for ?, help, ayuda, options… — deterministic; never hybrid LLM."""
+    """True for ?, or a help word of any language file — deterministic; never hybrid LLM."""
     raw = (text or '').strip()
     if not raw:
         return False
     t = _fold(raw)
-    if t in (
-        '?', '¿', '？', 'ayuda', 'help', 'opciones', 'options', 'params',
-        'parametros', 'parametros', 'uso', 'usage', '/?', '/ayuda', '/help',
-        '/options', '/opciones',
-    ):
+    if re.fullmatch(r'/?[%s]+' % re.escape(_QUESTION_MARKS), t):
         return True
-    if re.fullmatch(r'[?¿？]+', t):
+    help_words = _spoken().words('help')
+    if t.lstrip('/') in help_words:
         return True
-    # Short phrases that are clearly help (e.g. "ayuda?", "help please", "options")
+    # Short phrases that are clearly help (e.g. "help?", "help please")
     if len(t) <= 32 and any(
         re.search(r'(^|\s|/)' + re.escape(w) + r'(\s|$|\?|!|\.)', t)
-        for w in (
-            'ayuda', 'help', 'opciones', 'options', 'params', 'parametros',
-            'usage', 'uso',
-        )
+        for w in help_words
     ):
         return True
     return False
@@ -108,7 +94,7 @@ def skill_args_are_help(args):
 def try_resolve_date(text, today=None):
     """Parse a free-text day phrase → ``date`` or None if unresolved.
 
-    Handles: hoy/ayer/mañana/ISO, weekdays with este/próximo/que viene/next.
+    Handles: today/yesterday/tomorrow/ISO, weekdays with this/next markers.
     Returns None when the phrase is empty, help-like, or not a date.
     """
     if today is None:
@@ -120,16 +106,13 @@ def try_resolve_date(text, today=None):
     if is_help_like(raw):
         return None
 
-    if t in ('hoy', 'today'):
-        return today
-    if t in ('ayer', 'yesterday'):
-        return today - timedelta(days=1)
-    if t in ('anteayer', 'day before yesterday'):
-        return today - timedelta(days=2)
-    if t in ('manana', 'tomorrow'):
-        return today + timedelta(days=1)
-    if t in ('pasado manana', 'pasadomanana', 'day after tomorrow'):
-        return today + timedelta(days=2)
+    spoken = _spoken()
+    for key, delta in (
+        ('today', 0), ('yesterday', -1), ('day_before_yesterday', -2),
+        ('tomorrow', 1), ('day_after_tomorrow', 2),
+    ):
+        if t in spoken.words(key):
+            return today + timedelta(days=delta)
 
     m = re.fullmatch(r'(20\d{2}|19\d{2})-(\d{2})-(\d{2})', t)
     if m:
@@ -140,9 +123,9 @@ def try_resolve_date(text, today=None):
 
     wd = _find_weekday(t)
     if wd is not None:
-        if any(mkr in t for mkr in _NEXT_MARKERS):
+        if any(mkr in t for mkr in spoken.words('next')):
             return _next_weekday(today, wd, allow_today=False)
-        if any(mkr in t for mkr in _THIS_MARKERS):
+        if any(mkr in t for mkr in spoken.words('this')):
             return _next_weekday(today, wd, allow_today=True)
         return _next_weekday(today, wd, allow_today=False)
 

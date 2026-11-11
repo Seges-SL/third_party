@@ -269,15 +269,6 @@ odoo.define('pns_ai_mcp.openapi_spec_generate_wizard', function (require) {
             }
         },
 
-        _pnsOpenapiSetCancelled: function () {
-            var els = this._pnsOpenapiProgressEls();
-            els.box.css('display', 'flex');
-            els.dots.hide();
-            els.stop.hide().prop('disabled', true);
-            els.label.text(_t('Cancelled.'));
-            els.buttons.prop('disabled', false);
-        },
-
         _pnsOpenapiLogUsage: function (id, usage, status) {
             if (!id || !usageHasTokens(usage)) {
                 return Promise.resolve();

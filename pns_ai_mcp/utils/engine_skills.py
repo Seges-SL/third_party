@@ -50,17 +50,23 @@ class SkillsMixin:
         )
 
     def _param_provider_chain(self, provider, agent_code):
-        """Turn provider first, then the agent's conversation chain by priority."""
-        chain = [provider] if provider is not None else []
-        try:
-            provs = self.env['ai.execution.engine'].get_providers_for_agent(
-                agent_code, need='conversation',
-            )
-        except Exception as exc:
-            _logger.debug('param norm: no provider chain for %s: %s', agent_code, exc)
-            provs = []
-        seen = {getattr(p, 'id', None) for p in chain}
-        for p in provs or []:
+        """The agent's parser chain, then the turn provider, then its
+        conversation chain. Each by priority; a provider appears once."""
+        engine = self.env['ai.execution.engine']
+
+        def _role(need):
+            try:
+                return list(engine.get_providers_for_agent(agent_code, need=need))
+            except Exception as exc:
+                _logger.debug(
+                    'param norm: no %s chain for %s: %s', need, agent_code, exc,
+                )
+                return []
+
+        chain = []
+        seen = set()
+        turn = [provider] if provider is not None else []
+        for p in _role('parser') + turn + _role('conversation'):
             pid = getattr(p, 'id', None)
             if pid in seen:
                 continue
@@ -70,17 +76,17 @@ class SkillsMixin:
 
     def _normalize_skill_params(self, skill, args, agent_code,
                                 provider=None, provider_id=None):
-        """LLM fallback for free-text args when deterministic parse leaves holes.
+        """Slash args → schema params. Opt-in via ``param_schema``.
 
-        Opt-in via ``param_schema``. Order:
-        1. ``parse_skill_arguments`` + ``clave=valor`` + ordinals onto empty
-           schema keys + ``enrich_params_with_dates`` (zero cost)
-        2. If schema keys still missing and unbound prose remains → one
-           short LLM JSON call
-        3. LLM ``_reject`` is not a veto: merge with deterministic fill.
-           Reject only when leftover prose still has no formal key
-           (caller paints help; never falls through to ReAct)
-        Without a formal schema, leftover text travels as ``arguments``.
+        1. Empty or help: no call.
+        2. Every token ``clave=valor``: those values, no call.
+        3. Anything unnamed: param cache, then one short LLM JSON call down
+           the provider chain. Named values win on merge.
+        4. No provider, or no usable reply: formal tokens bound by their
+           shape (year, ISO, code CSV, integer) are the plan B.
+        Reject only when leftover prose still has no formal key (caller
+        paints help; never falls through to ReAct). Without a formal schema,
+        leftover text travels as ``arguments``.
         """
         raw = (args or '').strip()
         # Help/?/ayuda: never call the hybrid LLM.
@@ -117,31 +123,28 @@ class SkillsMixin:
             build_param_extraction_prompt,
             deterministic_schema_hits,
             enrich_params_with_dates,
-            leftover_after_ordinals,
-            hybrid_unresolved_text,
             finalize_skill_params,
             merge_hybrid_params,
+            named_schema_params,
             parse_and_validate_params,
             parse_skill_arguments,
             schema_needs_ai_resolution,
         )
 
-        params = parse_skill_arguments(raw)
-        enrich_params_with_dates(params)
-        params, bound_map = apply_schema_ordinals(params, schema, raw)
-        enrich_params_with_dates(params)
-        leftover = leftover_after_ordinals(raw, params, bound_map, schema)
-        unresolved = hybrid_unresolved_text(raw, leftover, bound_map)
-        # Deterministic-only extras we can already hand to the sandbox.
-        # Temporal keys only win when canonical (YYYY-MM / YYYY-MM-DD) so a
-        # leftover phrase never blocks the LLM from resolving it.
-        det = deterministic_schema_hits(params, schema, raw)
-        if not schema_needs_ai_resolution(
-            params, schema, raw, leftover=leftover,
-        ):
-            if skill_args_unmapped(raw, det, schema, policy):
-                return {'_skill_args_reject': True}
-            return finalize_skill_params(det or {}, schema, env=self.env) or None
+        def _by_shape():
+            """Formal tokens bound by their shape. Only when inference gave nothing."""
+            params = parse_skill_arguments(raw)
+            enrich_params_with_dates(params)
+            params, _bound = apply_schema_ordinals(params, schema, raw)
+            enrich_params_with_dates(params)
+            return deterministic_schema_hits(params, schema, raw)
+
+        # All named: the values are the answer. Anything unnamed is read by
+        # the short call; a named value still wins on merge.
+        det, all_named = named_schema_params(raw, schema)
+        if all_named:
+            return finalize_skill_params(det, schema, env=self.env) or None
+        unresolved = ' '.join(raw.split())
 
         cached = None
         lookup = getattr(skill, '_lookup_param_cache', None)
@@ -190,6 +193,7 @@ class SkillsMixin:
 
         chain = self._param_provider_chain(provider, agent_code)
         if not chain:
+            det = dict(_by_shape(), **det)
             if skill_args_unmapped(raw, det, schema, policy):
                 return {'_skill_args_reject': True}
             return finalize_skill_params(det or {}, schema, env=self.env) or None
@@ -212,14 +216,19 @@ class SkillsMixin:
                 max_tokens=HYBRID_PARAM_MAX_TOKENS,
             )
             spent = normalize_usage((result or {}).get('usage') or {})
-            self._accumulate_side_usage(spent)
+            self._accumulate_side_usage(spent, provider=cand)
             piece = add_usage(piece, spent) if spent else piece
             text = (result or {}).get('content') or ''
-            tried.append(getattr(cand, 'name', '') or '')
+            name = getattr(cand, 'name', '') or ''
             norm = parse_and_validate_params(text, schema)
             if norm is not None:
+                tried.append(name)
                 prov = cand
                 break
+            why = (result or {}).get('error') or (
+                'unreadable: %s' % text[:120] if text.strip() else 'empty reply'
+            )
+            tried.append('%s (%s)' % (name, str(why)[:200]))
         if (
             not norm
             or (isinstance(norm, dict) and norm.get('_skill_args_reject'))
@@ -228,6 +237,7 @@ class SkillsMixin:
                 'Skill %s: hybrid LLM returned nothing (raw=%r text=%r)',
                 getattr(skill, 'code', '?'), raw[:80], (text or '')[:120],
             )
+            det = dict(_by_shape(), **det)
         merged = merge_hybrid_params(
             det, norm, schema, raw, policy, env=self.env,
         )
@@ -284,13 +294,20 @@ class SkillsMixin:
                     )
                 )[:480],
                 request_type='tool',
+                user_prompt=raw,
+                result_data={'reply': (text or '')[:800], 'params': merged},
+                provider_id=prov.id if prov else None,
+                agent_llm=(
+                    getattr(getattr(prov, 'model_id', None), 'name', '')
+                    or getattr(prov, 'model_name', '') or None
+                ) if prov else None,
             )
         except Exception:
             pass
         return merged
 
     # ------------------------------------------------------------------
-    # Slash commands (skills) — chatboo inference client
+    # Slash commands (skills) — inference host
     # ------------------------------------------------------------------
     @staticmethod
     def _parse_slash_command(message):

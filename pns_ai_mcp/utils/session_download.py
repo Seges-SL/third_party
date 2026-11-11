@@ -386,7 +386,7 @@ def _run_on_committed_cursor(env, fn):
             return result
     except Exception:
         _logger.debug(
-            'Chatboo: committed cursor fallback to caller env',
+            'Session download: committed cursor fallback to caller env',
             exc_info=True,
         )
         return fn(env)
@@ -436,12 +436,10 @@ def persist_turn_file_detail(env, session_id, raw_bytes, filename,
                 name = better[:255]
     except Exception:
         pass
-    b64 = base64.b64encode(raw_bytes).decode('ascii')
-
     def _create(env2):
         att = env2['ir.attachment'].sudo().create({
             'name': name,
-            'datas': b64,
+            'raw': raw_bytes,
             'mimetype': mimetype,
         })
         chip = {

@@ -5,9 +5,10 @@
 
 {
     'name': 'PNS Base',
-    'version': '1.2.47',
+    'version': '14.0.1.2.69',
+    'images': ['static/description/banner_store.png'],
     'category': 'Technical',
-    'summary': 'PNS ecosystem base layer: single-branch view compatibility and cross-version Odoo utilities (13-19+)',
+    'summary': 'PNS ecosystem base layer: single-branch view compatibility and cross-version Odoo utilities (14.0 and later)',
     'description': """
         Common base module for all pns_* modules (logical dependency).
 
@@ -28,6 +29,9 @@
           dynamic record/settings discovery, JSON/ZIP last-mile, and
           fault-tolerant import.
         - Operation report wizard mixin (models/operation_report_wizard.py).
+        - Long work in a thread with a progress dialog (models/progress_job.py):
+          the caller checks who may run it and calls pns.progress.job._launch;
+          the dialog shows the step, the bar and the summary the work returns.
         - Apps sheet embeds a module's static/description/index.html below the
           Odoo chrome (Update / Uninstall) only when that module's manifest
           points website at it (models/ir_module_module.py). Other vendors'
@@ -38,7 +42,7 @@
           panels claim the layer; opening one hides the other.
         - One picture full screen with zoom (static/src/js/pns_image_viewer.js):
           the host opens it with what it has; a larger copy replaces it.
-        - Language/PO import guard (Odoo 13-15): dedupe code/model rows that
+        - Language/PO import guard (Odoo 14-15): dedupe code/model rows that
           would crash overwrite with CardinalityViolation (models/ir_translation.py).
         - List many2one that keeps the row in the breadcrumb (widget
           pns_row_link): opens this row's form, then the linked record.
@@ -46,18 +50,22 @@
         Other pns_* modules declare it in 'depends' and reuse these pieces.
     """,
     'author': 'PATANEGRA Soft',
-    'website': '/pns_base/static/description/index.html',
+    'website': 'https://github.com/patanegra-soft/pns_base',
     # Apache License 2.0 — see LICENSE file
     'license': 'Other OSI approved licence',
     'depends': ['web', 'mail'],
     'data': [
         'security/ir.model.access.csv',
+        'security/progress_job_rules.xml',
         'views/assets.xml',
         'views/operation_report_wizard_views.xml',
         'views/export_file_wizard_views.xml',
         'views/export_secrets_wizard_views.xml',
         'views/ir_module_views.xml',
         'data/export_purge_cron.xml',
+    ],
+    'qweb': [
+        'static/src/xml/pns_progress_dialog.xml',
     ],
     'installable': True,
     'application': False,

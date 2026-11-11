@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Policy for when server-rendered tool output reaches the Chatboo bubble."""
+"""Policy for when server-rendered tool output reaches the chat bubble."""
 
 TRUSTED_CHAT_FMT_TYPES = frozenset({
     'server_side_python', 'author_html', 'local_json', 'local_raw',
@@ -94,18 +94,18 @@ def should_show_direct_to_chat(
         return False
     if payload.get('__fmt_type__') not in TRUSTED_CHAT_FMT_TYPES:
         return False
-    # Fase 2 / presentación terminada: mostrar aunque no sea la última ronda
-    # del orquestador (3.1.5 ocultaba probes mid-turn pero también estos finals).
+    # Phase 2 / presentation done: show it even if it is not the last round
+    # of the orchestrator (3.1.5 hid mid-turn probes but also these finals).
     if (
         payload.get('__presentation_complete__')
         or payload.get('__phase__') == 'presentation'
         or payload.get('__satisfied__')
     ):
         return True
-    # Extracción final con tabla server-side + summary en result (p. ej. ranking):
-    # el LLM devuelve {data, summary} sin phase=presentation; maybe_attach
-    # ya generó formatted_text pero el gating lo ocultaba mid-turn. Los probes
-    # no suelen incluir summary en el dict result — siguen ocultos.
+    # Final extraction with a server-side table + summary in result (e.g. ranking):
+    # the LLM returns {data, summary} without phase=presentation; maybe_attach
+    # already generated formatted_text but the gating hid it mid-turn. Probes
+    # do not usually include summary in the result dict — they stay hidden.
     if (
         payload.get('__extraction_complete__')
         and payload.get('__ready_for_presentation__')

@@ -25,14 +25,14 @@ class KeyPinDeskController(http.Controller):
         user = _admin()
         if not user:
             return {'ok': False}
-        return request.env['ai.key.pin.desk'].touch(token, user)
+        return request.env['ai.key.pin.desk']._touch(token, user)
 
     @http.route('/pns_ai_mcp/key_pin/supply', type=JSON_ROUTE_TYPE, auth='user')
     def key_pin_supply(self, ask_id=None, api_key=None, **kwargs):
         user = _admin()
         if not user:
             return {'ok': False}
-        return request.env['ai.key.pin.ask'].supply(ask_id, api_key, user)
+        return request.env['ai.key.pin.ask']._supply(ask_id, api_key, user)
 
     @http.route(
         '/pns_ai_mcp/key_pin/stop', type='http', auth='user',
@@ -49,7 +49,7 @@ class KeyPinDeskController(http.Controller):
                 token = (json.loads(raw) or {}).get('token') or ''
             except (TypeError, ValueError):
                 token = ''
-        request.env['ai.key.pin.desk'].close(token)
+        request.env['ai.key.pin.desk']._close(token)
         return request.make_response(
             '{"ok": true}',
             headers=[('Content-Type', 'application/json')],

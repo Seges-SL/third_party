@@ -9,8 +9,6 @@ matching the headings the skill already provided.
 """
 from __future__ import annotations
 
-_NEUTRAL_RECO_STUB = 'Revisar las tablas anteriores.'
-
 
 def _heading_label(heading):
     return (heading or '').lstrip('#').strip().lower()
@@ -59,8 +57,8 @@ def is_report_closer(text, outline=None):
     """True when the text never opened the report (warm footer / aside).
 
     After tools the model is told to write 1–2 warm sentences. That must
-    not be treated as a truncated report (which used to spawn
-    ``Pendiente de narrativa`` stubs and wipe the real prose).
+    not be treated as a truncated report (which used to spawn empty
+    headings and wipe the real prose).
     """
     body = (text or '').strip()
     if not body:
@@ -149,19 +147,13 @@ def ensure_report_completion(
         chunks.append(heading)
         chunks.append('')
         if stub_label and _heading_label(heading) == stub_label:
-            if stub:
-                for b in stub:
-                    chunks.append('- %s' % b)
-            else:
-                chunks.append('- %s' % _NEUTRAL_RECO_STUB)
+            for b in stub:
+                chunks.append('- %s' % b)
             if closing and isinstance(closing, str) and closing.strip():
                 chunks.append(closing.strip())
                 need_closing = False
-        else:
-            chunks.append(
-                '_Pendiente de narrativa; cifras en las tablas anteriores._'
-            )
-        chunks.append('')
+            if stub or closing:
+                chunks.append('')
 
     if need_closing and closing and isinstance(closing, str) and closing.strip():
         chunks.append(closing.strip())
@@ -196,24 +188,23 @@ def contract_from_payload(payload):
 
 
 _LISTING_FOLLOWUP = (
-    'El documento principal YA está en pantalla '
-    '(%s fila(s) renderizadas). Las tools siguientes '
-    'solo pueden MEJORARLO (previous_result / raw_data) '
-    'o añadir un documento menor. PROHIBIDO emitir un '
-    'volcado autónomo que lo sustituya u oculte. Si ese '
-    'número es 0 o MUY inferior a lo pedido (p. ej. te '
-    'pidieron "los 50" y hay 0/unas pocas), NO afirmes '
-    'que estan todos: tu filtro es casi seguro erróneo '
-    '(ojo REGIÓN vs PROVINCIA). Corrige el código y '
-    'VUELVE A LLAMAR a la herramienta. Si las filas '
-    'coinciden con lo pedido, escribe 1–2 frases de '
-    'cierre CÁLIDAS y NO reproduzcas la tabla. PROHIBIDO '
-    'en ese cierre: cifras, importes, fechas, años, '
-    'periodos, nombres propios, totales o "insights" '
-    'numéricos — el artefacto visible es la fuente de '
-    'verdad; el pie solo puede ser acogida u oferta de '
-    'ayuda ("si quieres otro periodo…"), SIN nombrar el '
-    'año ni el periodo.'
+    'The main document is ALREADY on screen '
+    '(%s row(s) rendered). Further tool calls may only '
+    'IMPROVE it (previous_result / raw_data) or add a '
+    'minor document. FORBIDDEN: a standalone dump that '
+    'replaces or hides it. If that number is 0 or FAR '
+    'below what was asked (e.g. they asked for "the 50" '
+    'and there are 0 or a few), do NOT claim they are '
+    'all there: your filter is almost certainly wrong '
+    '(watch region vs province). Fix the code and CALL '
+    'the tool AGAIN. If the rows match the request, write '
+    '1–2 WARM closing sentences in the user\'s language and '
+    'do NOT repeat the table. FORBIDDEN in that closing: '
+    'figures, amounts, dates, years, periods, proper '
+    'names, totals or numeric "insights" — the visible '
+    'artifact is the source of truth; the footer may only '
+    'welcome or offer help (another period…), WITHOUT '
+    'naming the year or the period.'
 )
 
 _REPORT_FOLLOWUP = (

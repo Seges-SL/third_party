@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 
 def resolve_tzinfo(tz_name):
-    """``tzinfo`` para un nombre IANA. UTC si el nombre no resuelve."""
+    """``tzinfo`` for an IANA name. UTC if the name does not resolve."""
     name = (tz_name or '').strip() or 'UTC'
     try:
         from zoneinfo import ZoneInfo
@@ -28,12 +28,12 @@ def resolve_tzinfo(tz_name):
 
 
 def user_local_now(tz_name=None):
-    """``datetime`` aware en el huso del usuario (ahora)."""
+    """Aware ``datetime`` in the user's timezone (now)."""
     return datetime.now(resolve_tzinfo(tz_name))
 
 
 def parse_iso_datetime(iso):
-    """Parsea ISO-8601. ``Z`` → UTC. None si no es parseable."""
+    """Parse ISO-8601. ``Z`` → UTC. None if it cannot be parsed."""
     raw = (iso or '').strip()
     if not raw:
         return None
@@ -46,11 +46,11 @@ def parse_iso_datetime(iso):
 
 
 def normalize_clock_iso(iso, tz_name=None):
-    """ISO de card reloj → (iso_con_offset, tz_name).
+    """Clock card ISO → (iso_with_offset, tz_name).
 
-    Invariante: un instante naive se trata como UTC (reloj de proceso) y
-    se reescribe en ``tz_name`` (huso de la card, o el de sesión si la
-    card no trae ``tz``). Si no hay ``tz_name``, se deja el iso.
+    Invariant: a naive instant is treated as UTC (process clock) and
+    rewritten in ``tz_name`` (the card's timezone, or the session one if
+    the card has no ``tz``). With no ``tz_name``, the iso is left as is.
     """
     name = (tz_name or '').strip()
     dt = parse_iso_datetime(iso)

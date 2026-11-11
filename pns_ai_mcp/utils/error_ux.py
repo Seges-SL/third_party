@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2026 Patanegra Soft <https://patanegra.com>
-"""Pure helpers: strip RelaxAICode / JSON-RPC noise from errors shown in Chatboo.
+"""Pure helpers: strip RelaxAICode / JSON-RPC noise from errors shown in the chat.
 
 No Odoo imports — unit-testable without the runtime.
 """
@@ -16,15 +16,9 @@ _JOIN_SEQUENCE_RE = re.compile(
     r'sequence item \d+: expected str instance, \w+ found',
     re.IGNORECASE,
 )
+# Odoo translates the denial sentence; the exception name is the only stable mark.
 _PERM_HINTS = (
     'accesserror',
-    'permission',
-    'permiso',
-    'not allowed',
-    'no tienes',
-    'restricciones de seguridad',
-    'due to security',
-    'security restrictions',
 )
 
 
@@ -227,7 +221,7 @@ def retry_nudge_after_tool_error(raw):
 
 
 def humanize_exhausted_tool_error(raw):
-    """Sanitize last RelaxAICode retry error for Chatboo.
+    """Sanitize last RelaxAICode retry error for the chat.
 
     Returns ``(message, is_permission)``. ``message`` is None when nothing
     useful remains after stripping technical wrappers.

@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Anti-eco de tablas: no reemitir datasets ya mostrados en el historial.
+"""Table anti-echo: do not emit again datasets already shown in the history.
 
-Invariante: el contexto (historial + cache) se recuerda; la burbuja del turno
-NO puede repetir un bloque tabular cuya huella de dataset ya salió en un
-mensaje assistant anterior, salvo que este mismo turno lo haya regenerado
-vía tool (``allow_fingerprints``).
+Invariant: the context (history + cache) is remembered; the turn's bubble
+can NOT repeat a tabular block whose dataset fingerprint already came out in
+an earlier assistant message, unless this same turn regenerated it through
+a tool (``allow_fingerprints``).
 
-Sin hardcode de dominio: solo huella estructural de ``data-ai-dataset``.
+No domain hardcode: only the structural fingerprint of ``data-ai-dataset``.
 """
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ _TABLE_OPEN_RE = re.compile(
 
 
 def fingerprint_dataset_payload(raw_json_or_obj) -> str:
-    """Huella estable del dataset (JSON canónico)."""
+    """Stable fingerprint of the dataset (canonical JSON)."""
     if isinstance(raw_json_or_obj, (list, dict)):
         data = raw_json_or_obj
     else:
@@ -45,7 +45,7 @@ def fingerprint_dataset_payload(raw_json_or_obj) -> str:
 
 
 def extract_dataset_fingerprints(content: str) -> set:
-    """Huellas de todos los data-ai-dataset en un HTML/texto."""
+    """Fingerprints of every data-ai-dataset in an HTML/text."""
     fps = set()
     if not content or not isinstance(content, str):
         return fps
@@ -55,7 +55,7 @@ def extract_dataset_fingerprints(content: str) -> set:
 
 
 def fingerprints_from_history(history) -> set:
-    """Huellas de tablas ya entregadas en mensajes assistant previos."""
+    """Fingerprints of tables already delivered in earlier assistant messages."""
     fps = set()
     for msg in history or []:
         if not isinstance(msg, dict):
@@ -67,7 +67,7 @@ def fingerprints_from_history(history) -> set:
 
 
 def _find_div_block_end(text: str, start: int) -> int:
-    """Fin (exclusivo) del ``<div>...</div>`` que empieza en ``start``."""
+    """End (exclusive) of the ``<div>...</div>`` that starts at ``start``."""
     if start < 0 or start >= len(text) or not text.startswith('<div', start):
         return -1
     i = start
@@ -118,7 +118,7 @@ def strip_echoed_table_blocks(
     *,
     allow_fingerprints: set | None = None,
 ) -> str:
-    """Elimina bloques tabla cuyo dataset ya salió en historial (salvo allow)."""
+    """Remove table blocks whose dataset already came out in the history (unless allowed)."""
     if not content or not prior_fingerprints:
         return content
     allow = allow_fingerprints or set()
@@ -144,7 +144,7 @@ def strip_echoed_table_blocks(
 
 
 def code_references_reuse_names(code: str) -> bool:
-    """True si el AST usa ``previous_result`` o ``raw_data`` como Name (no comentario)."""
+    """True if the AST uses ``previous_result`` or ``raw_data`` as a Name (not a comment)."""
     if not code or not isinstance(code, str):
         return False
     import ast

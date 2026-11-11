@@ -1,50 +1,50 @@
 ---
 code: sale_order_duplicate_workflow
 tipo: domain
-description: Procedimiento para duplicar un pedido de venta y modificar sus líneas en dos pasos separados. Incluye cómo obtener la URL del nuevo pedido.
-version: 1.1
+description: How to duplicate a sale order and change its lines in two separate steps. Includes how to get the URL of the new order.
+version: 1.2
 ---
 
-# Duplicar pedido de venta y modificar líneas
+# Duplicate a sale order and change its lines
 
-## Flujo OBLIGATORIO (dos pasos separados)
+## MANDATORY flow (two separate steps)
 
-NUNCA intentes duplicar y modificar líneas en un solo safe_plan_request encadenado con $ref.
-El ID del pedido duplicado NO está disponible hasta que el usuario confirma el paso 1.
+NEVER try to duplicate and change lines in a single safe_plan_request chained with $ref.
+The ID of the duplicated order is NOT available until the user confirms step 1.
 
-### Paso 1 — Duplicar el pedido
+### Step 1 — Duplicate the order
 ```
 op: copy
 model: sale.order
-id: <id_pedido_original>
-overrides: {}   # sin overrides; las líneas se copian tal cual
+id: <original_order_id>
+overrides: {}   # no overrides; lines are copied as they are
 ```
-Informa al usuario: "Confirma en Odoo para duplicar el pedido."
-Espera confirmación. Llama a safe_plan_status() para obtener el ID del nuevo pedido.
+Tell the user to confirm in Odoo to duplicate the order.
+Wait for the confirmation. Call safe_plan_status() to get the ID of the new order.
 
-### Paso 2 — Modificar la cantidad de la línea
-Una vez tengas el ID del nuevo pedido (resultado del paso 1):
-1. Ejecuta relaxaicode para obtener los IDs de las líneas del nuevo pedido:
+### Step 2 — Change the line quantity
+Once you have the ID of the new order (result of step 1):
+1. Run relaxaicode to get the line IDs of the new order:
    ```python
-   order = env['sale.order'].browse(<nuevo_id>)
+   order = env['sale.order'].browse(<new_id>)
    result = [{'line_id': l.id, 'product': l.name, 'qty': l.product_uom_qty} for l in order.order_line]
    ```
-2. Propón la escritura sobre la línea concreta:
+2. Propose the write on that line:
    ```
    op: write
    model: sale.order.line
    ids: [<line_id>]
-   values: {product_uom_qty: <nueva_cantidad>}
+   values: {product_uom_qty: <new_quantity>}
    ```
 
-## URL del nuevo pedido
+## URL of the new order
 
-Para construir el enlace al nuevo pedido, obtén la URL base del host
-(no asumas que ``ir.config_parameter`` ``web.base.url`` está relleno — puede
-devolver 'Unknown').
-Construye: `<base_url>/web#model=sale.order&id=<nuevo_id>&view_type=form`
+To build the link to the new order, get the host base URL
+(do not assume ``ir.config_parameter`` ``web.base.url`` is filled — it can
+return 'Unknown').
+Build: `<base_url>/web#model=sale.order&id=<new_id>&view_type=form`
 
-## Errores comunes a evitar
-- NO encadenar copy + write en un solo safe_plan_request con $ref: el $ref de un op=copy no resuelve el ID de las líneas hijas.
-- NO asumir que la URL base está en ir.config_parameter.
-- NO intentar modificar líneas del pedido ORIGINAL: siempre trabajar sobre el duplicado.
+## Common mistakes to avoid
+- Do NOT chain copy + write in a single safe_plan_request with $ref: the $ref of an op=copy does not resolve the IDs of the child lines.
+- Do NOT assume the base URL is in ir.config_parameter.
+- Do NOT try to change lines of the ORIGINAL order: always work on the duplicate.

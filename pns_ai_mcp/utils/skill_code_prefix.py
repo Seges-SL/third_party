@@ -60,7 +60,7 @@ def _fold_prefix_forms(raw):
 def strip_prefix_stem(token, prefixes):
     """Token without the first matching prefix. Stem is snake_case.
 
-    Longer prefixes win (``custom_occ_`` before leftover ``custom_``).
+    Longer prefixes win (``custom_acme_`` before leftover ``custom_``).
     """
     raw = (token or '').strip().lower()
     if not raw:
@@ -170,20 +170,20 @@ def get_skill_command_prefix(env):
 def reserved_slash_commands():
     """Builtin / axis slash tokens the prefixes must not equal."""
     tokens = {
-        'skill', 'skills', 'help', 'ayuda', '?',
-        # Retired Chatboo slash: keep reserved so nobody recycles the name.
+        # Retired chat slash: keep reserved so nobody recycles the name.
         'reload-skills',
         'create-skill', 'delete-skill', 'rename-skill', 'edit-skill',
-        # Retired Chatboo slash: keep reserved so nobody recycles the name.
+        # Retired chat slash: keep reserved so nobody recycles the name.
         'set-skill-parameters', 'mode',
         'compose-agent', 'compose-model', 'foot-verbose', 'foot-laconic',
         'show-table', 'show-chart',
     }
     try:
-        from .skill_help import BUILTIN_SLASH_META
+        from .skill_help import BUILTIN_SLASH_META, skills_list_commands
         tokens.update(BUILTIN_SLASH_META.keys())
+        tokens.update(skills_list_commands())
     except Exception:
-        pass
+        tokens.update({'skill', 'skills', '?'})
     try:
         from .formatting_mode_policy import AXIS_COMMANDS
         tokens.update(AXIS_COMMANDS.keys())

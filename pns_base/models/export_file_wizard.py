@@ -5,6 +5,8 @@
 from odoo import fields, models, _
 from odoo.exceptions import UserError
 
+from ..utils.portable_io import EXPORT_MARK
+
 
 class PnsExportFileWizard(models.TransientModel):
     _name = 'pns.export.file.wizard'
@@ -15,7 +17,11 @@ class PnsExportFileWizard(models.TransientModel):
     export_filename = fields.Char(string='File name', readonly=True)
 
     def unlink(self):
-        files = self.sudo().mapped('attachment_id')
+        # attachment_id is writable over RPC: only the caller's own export goes.
+        files = self.sudo().mapped('attachment_id').filtered(
+            lambda a: a.description == EXPORT_MARK
+            and (self.env.su or a.create_uid == self.env.user)
+        )
         res = super().unlink()
         files.unlink()
         return res

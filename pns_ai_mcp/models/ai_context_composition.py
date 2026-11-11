@@ -156,7 +156,7 @@ class AIContextComposition(models.Model):
             ('active', '=', True),
         ], limit=1)
         
-        # Fallback a contexto pelao (sin locale): válido para cualquier locale
+        # Fallback to the bare context (no locale): valid for any locale
         return generic
 
     @api.model

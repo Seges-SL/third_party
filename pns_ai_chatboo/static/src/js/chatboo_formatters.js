@@ -6,6 +6,8 @@
 odoo.define('pns_ai_chatboo.formatters', function (require) {
     "use strict";
 
+    var _t = require('web.core')._t;
+
     /**
      * pns_ai_chatboo.formatters — Pure formatting utilities for Chatboo.
      *
@@ -24,7 +26,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
     var DEFAULT_DECIMAL_PLACES = 3;
 
     /**
-     * Locale activo de la sesión Odoo (user_context.lang), BCP47 para Intl.
+     * Active Odoo session locale (user_context.lang), BCP47 for Intl.
      * @returns {string} e.g. 'es-ES', 'en-US'
      */
     function getSessionLocale() {
@@ -684,8 +686,8 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
     /**
      * True only for genuine CSV (aligned short columns), not Spanish/English
      * prose that happens to contain commas on every paragraph line.
-     * Bug: "¿Quién eres?" replies were rendered as wide tables because every
-     * line included a comma ("Chatboo, el asistente…", "clientes, pedidos…").
+     * Bug: "Who are you?" replies were rendered as wide tables because every
+     * line included a comma ("Chatboo, the assistant…", "customers, orders…").
      */
     function looksLikeCsv(lines) {
         if (!lines || lines.length < 2) {
@@ -1066,9 +1068,9 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
 
         var trimmed = content.trim();
 
-        // Tabla HTML del servidor + pie Markdown del LLM (tras data_rendered).
-        // Sin este split, isLikelyHtml traga el bloque entero y el informe queda
-        // como tocho con ##/** crudos (p. ej. `...</div>## Análisis…`).
+        // Server HTML table + LLM Markdown footer (after data_rendered).
+        // Without this split, isLikelyHtml swallows the whole block and the report
+        // ends up as a wall of raw ##/** (e.g. `...</div>## Analysis…`).
         if (typeof ChatbooSse !== 'undefined' && ChatbooSse.splitHtmlAndMarkdownTail) {
             var split = ChatbooSse.splitHtmlAndMarkdownTail(trimmed);
             if (split) {
@@ -1127,7 +1129,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
                 // Diagnostic bags (counts, state tuples…): do not paint as <pre>.
                 if (typeof ChatbooSse !== 'undefined' && ChatbooSse.isDiagnosticJsonDump
                         && ChatbooSse.isDiagnosticJsonDump(parsed)) {
-                    return '<p class="text-muted small"><em>(datos intermedios omitidos — pide de nuevo el listado)</em></p>';
+                    return '<p class="text-muted small"><em>' + escapeHtml(_t("(intermediate data left out — ask for the list again)")) + '</em></p>';
                 }
 
                 var formatted = formatJsonWithLineBreaks(parsed);
@@ -1141,8 +1143,8 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
             return _wrapStandaloneImages(enhanceHtmlProse(content));
         }
 
-        // HTML embebido en texto (p.ej. el LLM devuelve texto + <div class="card">...)
-        // Detecta bloques HTML significativos en cualquier posición del texto.
+        // HTML embedded in text (e.g. the LLM returns text + <div class="card">...)
+        // Detects meaningful HTML blocks anywhere in the text.
         if (/<(div|table|thead|tbody|tr|td|th|ul|ol|pre|section|article|aside|nav|header|footer|caption)\b/i.test(trimmed)) {
             return _wrapStandaloneImages(enhanceHtmlProse(content));
         }
@@ -1157,7 +1159,7 @@ odoo.define('pns_ai_chatboo.formatters', function (require) {
 
         if (typeof ChatbooMarkdown !== 'undefined') {
             // Detect actual markdown structure (not just any character).
-            // Avoid false positives: a paragraph mentioning "20-30 grados" is NOT markdown.
+            // Avoid false positives: a paragraph mentioning "20-30 degrees" is NOT markdown.
             var looksLikeMarkdown =
                 trimmed.includes('#') ||           // heading
                 trimmed.includes('`') ||            // inline code or code block

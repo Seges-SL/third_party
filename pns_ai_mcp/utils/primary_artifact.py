@@ -158,11 +158,11 @@ def is_complete_artifact(payload):
 
 
 def _shares_envelope(primary, payload):
-    """Same document: identical title (restyle without renaming)."""
+    """Same document: identical heading (title, else summary)."""
     if not isinstance(primary, dict) or not isinstance(payload, dict):
         return False
-    pt = primary.get('title')
-    nt = payload.get('title')
+    pt = primary.get('title') or primary.get('summary')
+    nt = payload.get('title') or payload.get('summary')
     return bool(pt and nt and pt == nt)
 
 
@@ -171,8 +171,9 @@ def _is_upgrade(primary, payload, code):
         return False
     if _code_references_reuse(code):
         return True
-    if payload.get('__phase__') == 'presentation' and _shares_envelope(
-        primary, payload,
+    if _shares_envelope(primary, payload) and (
+        payload.get('__phase__') == 'presentation'
+        or is_complete_artifact(payload)
     ):
         return True
     return False

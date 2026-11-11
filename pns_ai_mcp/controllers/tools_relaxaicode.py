@@ -3,17 +3,10 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """MCP tools for relaxaicode."""
 
-import logging
-
-# Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
-from ..models.box_a_guard import _box_a_clear_cache
-from .context_builder import build_safe_context
-# Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
-from .relaxaicode_format_guard import compile_sandbox_code, run_sandbox_code
+from .context_builder import build_safe_context, compile_sandbox
 from .mcp_decorators import mcp_tool
 from .relaxaicode_replies import (
     _format_error_response,
-    _log_where,
     _reject_untrusted_formatted_text,
 )
 from .relaxaicode_prepare import (
@@ -42,8 +35,6 @@ from .relaxaicode_outcome import (
     _too_large_response,
 )
 
-_logger = logging.getLogger(__name__)
-
 
 @mcp_tool(
     name='relaxaicode',
@@ -57,8 +48,8 @@ _logger = logging.getLogger(__name__)
         'for tables; the server renders HTML. If a value can vary between calls, '
         'pass it as a parameter (same-kind filters → one list, not many positionals).'
     ),
-    is_write=True,  # Puede ser escritura según el código
-    validate_schema=True,  # Habilitar validación con equema explícito
+    is_write=True,  # May be a write, depending on the code
+    validate_schema=True,  # Enable validation with an explicit schema
     input_schema={
         "type": "object",
         "properties": {
@@ -114,8 +105,8 @@ def tool_relaxaicode(
     controller,
     arguments: dict
 ):
-    # Herramienta MCP: Ejecuta código Python nativo bajo entorno relaxaicode
-    # Cursor aislado de la "caja A" (rollback + close en el finally).
+    # MCP tool: runs native Python code in the relaxaicode environment
+    # Isolated "box A" cursor (rollback + close in the finally).
     ro_cr = None
     try:
         code = arguments.get('code')
@@ -125,8 +116,8 @@ def tool_relaxaicode(
         previous_result = arguments.get('previous_result')
         agent_llm = _agent_llm_label()
 
-        # CRÍTICO: Asegurar que code sea string
-        # Puede venir como None, dict, list, etc. desde JSON deserializado incorrectamente
+        # CRITICAL: make sure code is a string
+        # It can arrive as None, dict, list, etc. from badly deserialized JSON
         if code is not None and not isinstance(code, str):
             code = str(code)
         context_data = arguments.get('context') or {}
@@ -139,9 +130,9 @@ def tool_relaxaicode(
             if error_response:
                 return error_response
 
-        # Validar que code sea string no vacío después de todas las operaciones.
-        # Reintentable: el modelo llamó a la tool sin el código; que se autocorrija
-        # (bucle ReAct acotado por MAX_ROUNDS) en vez de cortar y volcar al usuario.
+        # Check that code is a non-empty string after all the steps above.
+        # Retryable: the model called the tool without code; let it fix itself
+        # (ReAct loop bounded by MAX_ROUNDS) instead of stopping and dumping to the user.
         if not code or not isinstance(code, str):
             return _format_error_response(
                 -32602,
@@ -183,11 +174,8 @@ def tool_relaxaicode(
         if phase == 'auto':
             phase = _detect_phase(code)
 
-        # CAJA A: cursor aislado; rollback al cerrar (escrituras colaterales no persisten).
+        # BOX A: isolated cursor; rollback on close (side-effect writes do not persist).
         ro_env, ro_cr = controller._get_readonly_env()
-        # Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        ro_cr._seges_box_a = True
-        _box_a_clear_cache(ro_env)
         safe_context = build_safe_context(
             controller,
             operation_type,
@@ -199,8 +187,7 @@ def tool_relaxaicode(
             return error_response
 
         try:
-            # Compilar reescribiendo .format/.format_map (relaxaicode_format_guard).
-            byte_code = compile_sandbox_code(code)
+            byte_code = compile_sandbox(code, '<relaxaicode>')
         except SyntaxError as e:
             return _format_error_response(
                 -32602,
@@ -220,7 +207,7 @@ def tool_relaxaicode(
         if error_response:
             return error_response
 
-        # Fallback final: locale no resuelto (cascada default en_US)
+        # Final fallback: locale not resolved (cascade default en_US)
         if 'user_lang' not in safe_context:
             safe_context['user_lang'] = 'en_US'
         if 'userlang' not in safe_context:
@@ -231,21 +218,13 @@ def tool_relaxaicode(
             safe_context['locale'] = safe_context['user_lang']
 
         try:
-            # CRÍTICO: exec() con el mismo diccionario como globals y locals
-            # garantiza que las asignaciones se guarden en safe_context
-            # Verificar que env es accesible justo antes de exec
-            test_env = safe_context.get('env')
-            if test_env is None:
-                _logger.error(f"[{_log_where()}] CRÍTICO: env es None en safe_context antes de exec")
-
-            # Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
-            # run_sandbox_code inyecta el formateador propio (_sandbox_str_attr) y
-            # solo ejecuta código compilado con la reescritura de .format.
-            run_sandbox_code(safe_context, byte_code)
+            # CRITICAL: exec() with the same dict as globals and locals
+            # makes sure assignments are stored in safe_context
+            exec(byte_code, safe_context, safe_context)
         except Exception as exec_error:
             return _exec_error_response(
                 controller, exec_error, code, safe_context, agent_llm,
-                context_data, phase, return_mode,
+                context_data, phase, return_mode, env=ro_env,
             )
 
         result = _result_of(safe_context)
@@ -263,17 +242,17 @@ def tool_relaxaicode(
 
         error_response = _link_and_picture_rows(
             controller, result, safe_context, code, agent_llm,
-            context_data, phase, return_mode,
+            context_data, phase, return_mode, env=ro_env,
         )
         if error_response:
             return error_response
         error_response = _present_result(
-            result, safe_context, phase, return_mode, summary,
+            result, safe_context, phase, return_mode, summary, env=ro_env,
         )
         if error_response:
             return error_response
 
-        # Si no hay resultado, el código no asignó 'result'
+        # No result: the code did not assign 'result'
         if result is None:
             return _missing_result_response(
                 controller, code, safe_context, agent_llm,
@@ -290,10 +269,8 @@ def tool_relaxaicode(
         return _tool_error_response(controller, e)
 
     finally:
-        # Cerrar el cursor aislado de la caja A (rollback descarta cualquier escritura colateral).
+        # Close the isolated box A cursor (rollback drops any side-effect write).
         if ro_cr is not None:
-            # Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
-            ro_cr._seges_box_a = False
             try:
                 ro_cr.rollback()
             except Exception:

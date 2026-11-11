@@ -1,4 +1,4 @@
-/* Capture wizard: Chatboo-style typing dots (no Odoo blockUI spinner). */
+/* Capture wizard: chat-style typing dots (no Odoo blockUI spinner). */
 .o_skill_capture_progress {
     display: flex;
     align-items: center;

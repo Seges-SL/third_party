@@ -9,7 +9,7 @@
  *   - status, done, verification, error → handled by stack-specific UI code
  *
  * Loaded as a plain script (global ChatbooSse). Deploy copies common/ into the
- * stack addon via i.sh before Odoo loads assets.
+ * stack addon by the installer before Odoo loads assets.
  */
 (function (global) {
     "use strict";
@@ -115,7 +115,7 @@
         if (!s) {
             return false;
         }
-        // Lead markers, or prose prefix + glued heading (e.g. "fuerzo….## Análisis")
+        // Lead markers, or prose prefix + glued heading (e.g. "effort….## Analysis")
         if (/^(#{1,6}\s|\*\*|[-*+]\s|\d+\.\s|\|)/.test(s)) {
             return true;
         }
@@ -124,10 +124,10 @@
     }
 
     /**
-     * Insert newlines before glued ATX headers (e.g. "texto.## Título").
+     * Insert newlines before glued ATX headers (e.g. "text.## Title").
      * Showdown needs a line break; the model often streams without one.
      * Do NOT touch pipe characters: a global "|…|" rewrite shreds Markdown
-     * tables (`| Año | Ventas |` → broken rows / stray #).
+     * tables (`| Year | Sales |` → broken rows / stray #).
      * @param {string} md
      * @returns {string}
      */
@@ -353,7 +353,7 @@
 
     /**
      * Split server HTML table + trailing Markdown prose (common after data_rendered).
-     * Production pattern: `...</div>## Análisis…` (no newline). Returns null if
+     * Production pattern: `...</div>## Analysis…` (no newline). Returns null if
      * there is no clear HTML body + markdown tail.
      * @param {string} text
      * @returns {{ html: string, md: string }|null}

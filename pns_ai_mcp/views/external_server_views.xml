@@ -9,6 +9,10 @@
         <field name="model">ai.api.server</field>
         <field name="arch" type="xml">
             <tree string="External API Servers" class="o_pns_list">
+                <header>
+                    <button name="action_export_selected" type="object" string="Export selected" class="btn-secondary" icon="fa-download" groups="pns_ai_mcp.group_ai_admin"/>
+                    <button name="action_suggest_detection" type="object" string="Suggest triggers" class="btn-secondary" icon="fa-lightbulb-o" groups="pns_ai_mcp.group_ai_admin"/>
+                </header>
                 <field name="code" optional="show"/>
                 <field name="name" optional="show"/>
                 <field name="api_type" optional="show"/>

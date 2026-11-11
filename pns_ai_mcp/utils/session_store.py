@@ -15,7 +15,7 @@ _logger = logging.getLogger(__name__)
 
 
 class Session:
-    """Sesión SSE: correlaciona stream con peticiones POST."""
+    """SSE session: ties the stream to POST requests."""
 
     def __init__(self, session_id: str, api_key: str, mcp_user_id: int = None):
         self.session_id = session_id
@@ -31,16 +31,16 @@ class Session:
 
 class MCPClientRegistry:
     """
-    Registro en memoria del cliente MCP (nombre + versión) por usuario.
+    In-memory record of the MCP client (name + version) per user.
 
-    El protocolo MCP solo envía `clientInfo` en el `initialize`; las llamadas
-    posteriores (tools/call, prompts/list…) no lo repiten. Aquí guardamos la
-    etiqueta del cliente tras el initialize para poder rellenar la columna
-    "Modelo/Agente" del histórico en TODAS las filas MCP de esa conexión.
+    The MCP protocol only sends `clientInfo` on `initialize`; later calls
+    (tools/call, prompts/list…) do not repeat it. Here we keep the client
+    label after initialize so we can fill the history column
+    "Modelo/Agente" on ALL MCP rows of that connection.
 
-    Nota: es un caché de proceso. Con varios workers Odoo el initialize y las
-    llamadas posteriores podrían caer en procesos distintos; en modo threaded
-    (dev) o con sticky sessions funciona de forma fiable.
+    Note: it is a process cache. With several Odoo workers, initialize and the
+    later calls could land in different processes; in threaded mode
+    (dev) or with sticky sessions it works reliably.
     """
 
     _instance = None
@@ -69,7 +69,7 @@ class MCPClientRegistry:
                 mu = env['ai.mcp.user'].sudo().search(
                     [('user_id', '=', user_id)], limit=1)
                 if mu:
-                    mu.register_mcp_client(label, remote_ip=remote_ip)
+                    mu._register_mcp_client(label, remote_ip=remote_ip)
             except Exception as exc:
                 _logger.debug('MCPClientRegistry: DB persist failed: %s', exc)
 
@@ -82,7 +82,7 @@ class MCPClientRegistry:
             return label
         if env is not None:
             try:
-                return env['ai.mcp.user'].get_last_mcp_client_label(user_id)
+                return env['ai.mcp.user']._get_last_mcp_client_label(user_id)
             except Exception:
                 pass
         return None
@@ -90,8 +90,8 @@ class MCPClientRegistry:
 
 class SessionStore:
     """
-    Store en memoria para sesiones SSE standalone.
-    Requiere sticky sessions en proxy si Odoo usa múltiples workers.
+    In-memory store for standalone SSE sessions.
+    Needs sticky sessions on the proxy if Odoo runs several workers.
     """
 
     _instance = None
@@ -113,13 +113,13 @@ class SessionStore:
     def create(self, api_key: str, base_url: str, mcp_user_id: int = None,
                agent_code: str = None) -> tuple:
         """
-        Crea sesión SSE.
+        Create an SSE session.
 
         Args:
-            api_key: API key validada del cliente.
-            base_url: URL base (ej. https://ejemplo.com o https://ejemplo.com/odoo)
-            mcp_user_id: ID de usuario Odoo (opcional, cache).
-            agent_code: Sufijo de agente en ruta MCP (opcional).
+            api_key: the client's validated API key.
+            base_url: base URL (e.g. https://example.com or https://example.com/odoo)
+            mcp_user_id: Odoo user ID (optional, cache).
+            agent_code: agent suffix in the MCP path (optional).
 
         Returns:
             (session_id, message_url)
@@ -139,20 +139,25 @@ class SessionStore:
         _logger.debug("MCP SSE: Session created: %s", session_id[:8])
         return session_id, message_url
 
-    def get(self, session_id: str):
-        """Obtiene sesión activa. Retorna None si no existe o está cerrada."""
+    def get(self, session_id: str, max_age_seconds: int = 3600):
+        """Get an active session. None if it does not exist, is closed or idle too long."""
         with self._sessions_lock:
             session = self._sessions.get(session_id)
+            if session is not None and not session.closed and (
+                    datetime.utcnow() - session.touched_at
+            ).total_seconds() > max_age_seconds:
+                session.closed = True
+                self._sessions.pop(session_id, None)
         if session is None or session.closed:
             return None
         return session
 
     def enqueue_response(self, session_id: str, response: dict) -> bool:
         """
-        Encola respuesta JSON-RPC para que el stream SSE la emita.
+        Queue a JSON-RPC reply for the SSE stream to emit.
 
         Returns:
-            True si la sesión existe y no está cerrada.
+            True if the session exists and is not closed.
         """
         session = self.get(session_id)
         if session is None:
@@ -167,14 +172,14 @@ class SessionStore:
 
     def get_pending(self, session_id: str, timeout: float):
         """
-        Bloquea hasta que haya respuesta en la cola o timeout.
+        Block until there is a reply in the queue or a timeout.
 
         Args:
-            session_id: ID de sesión.
-            timeout: Segundos máximos a esperar.
+            session_id: session ID.
+            timeout: max seconds to wait.
 
         Returns:
-            dict con respuesta JSON-RPC, o None si timeout o sesión cerrada.
+            dict with the JSON-RPC reply, or None on timeout or closed session.
         """
         session = self.get(session_id)
         if session is None:
@@ -187,7 +192,7 @@ class SessionStore:
             return None
 
     def close(self, session_id: str) -> None:
-        """Marca sesión como cerrada y la elimina del store."""
+        """Mark the session closed and drop it from the store."""
         with self._sessions_lock:
             session = self._sessions.get(session_id)
             if session:
@@ -196,7 +201,7 @@ class SessionStore:
         _logger.debug("MCP SSE: Session closed: %s", session_id[:8] if session_id else "?")
 
     def cleanup_expired(self, max_age_seconds: int = 3600) -> int:
-        """Elimina sesiones sin actividad. Retorna número eliminadas."""
+        """Drop idle sessions. Returns how many were dropped."""
         now = datetime.utcnow()
         to_remove = []
         with self._sessions_lock:

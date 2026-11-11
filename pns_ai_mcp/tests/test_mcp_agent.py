@@ -3,6 +3,7 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """MCP bare-agent code resolution and delete guards."""
 
+from odoo.addons.base.models.ir_model import MODULE_UNINSTALL_FLAG
 from odoo.exceptions import AccessError, UserError
 from odoo.tests import tagged, TransactionCase
 
@@ -20,10 +21,6 @@ class TestMcpAgent(TransactionCase):
     def setUp(self):
         super().setUp()
         ensure_test_agents(self.env)
-
-    def test_get_mcp_bare_agent_code(self):
-        Agent = self.env['ai.agent']
-        self.assertEqual(Agent.get_mcp_bare_agent_code(), MCP_BARE_AGENT_CODE)
 
     def test_resolve_mcp_agent_none_is_bare(self):
         Agent = self.env['ai.agent']
@@ -76,7 +73,7 @@ class TestMcpAgent(TransactionCase):
         })
         with self.assertRaises(UserError):
             agent.unlink()
-        agent.with_context(_force_unlink=True).unlink()
+        agent.with_context(**{MODULE_UNINSTALL_FLAG: True}).unlink()
         self.assertFalse(agent.exists())
         self.assertFalse(link.exists())
 
@@ -152,8 +149,9 @@ class TestMcpAgent(TransactionCase):
         ], limit=1)
         self.assertTrue(agent, 'admin agent must exist')
         if not agent.provider_ids:
-            provider = self.env['ai.provider'].search([], limit=1)
-            self.assertTrue(provider, 'need at least one ai.provider for test')
+            provider = self.env['ai.provider'].search([], limit=1) or self.env['ai.provider'].create({
+                'name': 'Test provider', 'protocol': 'openai',
+            })
             self.env['ai.agent.provider'].sudo().create({
                 'agent_id': agent.id,
                 'provider_id': provider.id,
@@ -164,7 +162,7 @@ class TestMcpAgent(TransactionCase):
         engine = self.env['ai.execution.engine'].with_user(plain_user)
         providers = engine.get_providers_for_agent(ADMIN_AGENT_CODE)
         self.assertTrue(providers, 'plain user should resolve providers')
-        resolved = engine.resolve_provider(ADMIN_AGENT_CODE)
+        resolved = engine._resolve_provider(ADMIN_AGENT_CODE)
         self.assertTrue(resolved)
 
         # Entering the agent form reads the One2many; that is not admin-only.
@@ -179,8 +177,9 @@ class TestMcpAgent(TransactionCase):
         """Inference must read provider credentials without exposing them in UI."""
         from odoo.addons.pns_ai_mcp.utils.compat import invalidate_recordset_fields
 
-        provider = self.env['ai.provider'].search([], limit=1)
-        self.assertTrue(provider, 'need at least one ai.provider for test')
+        provider = self.env['ai.provider'].search([], limit=1) or self.env['ai.provider'].create({
+            'name': 'Test provider', 'protocol': 'openai',
+        })
         provider.sudo().write({'api_key': 'test-secret-key'})
         invalidate_recordset_fields(provider, ['api_key'])
 

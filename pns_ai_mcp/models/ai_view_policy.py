@@ -6,6 +6,7 @@
 Persistence for reset and for the change-journal JSON. No business literals.
 """
 from odoo import fields, models
+from odoo.addons.pns_base.utils.compat import ODOO_VERSION
 
 
 class AiViewPolicy(models.Model):
@@ -33,11 +34,15 @@ class AiViewPolicy(models.Model):
         help="Extension view created by the trusted action.",
     )
 
-    _sql_constraints = [
-        ('policy_uniq',
-         'unique(model_name, field_name, modifier, view_id)',
-         'A view-modifier policy already exists for this field and view.'),
-    ]
+    if ODOO_VERSION >= 19:
+        _policy_uniq = models.Constraint(
+            'unique(model_name, field_name, modifier, view_id)',
+            'A view-modifier policy already exists for this field and view.',
+        )
+    else:
+        _sql_constraints = [
+            ('policy_uniq', 'unique(model_name, field_name, modifier, view_id)', 'A view-modifier policy already exists for this field and view.'),
+        ]
 
     def unlink(self):
         inherits = self.mapped('inherit_view_id')

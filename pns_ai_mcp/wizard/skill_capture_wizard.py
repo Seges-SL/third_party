@@ -431,7 +431,7 @@ class AISkillCaptureWizard(models.TransientModel):
         provider = None
         if help_extracted is None and extracted is None:
             provider = self._resolve_param_provider()
-        help_txt, help_usage = self.env['ai.skill'].author_param_help(
+        help_txt, help_usage = self.env['ai.skill']._author_param_help(
             rows,
             provider=provider,
             extracted=help_extracted,
@@ -449,6 +449,19 @@ class AISkillCaptureWizard(models.TransientModel):
         if leftover and leftover not in prose:
             return (prose + '\n' + leftover).strip() if prose else leftover
         return prose
+
+    def _authored_hint_within(self, schema):
+        """The authored usage example, while every key it names is in ``schema``.
+
+        A generated placeholder (``key=…``) is not authored and gives way.
+        """
+        hint = (self.arg_hint or '').strip()
+        if not hint or '…' in hint or not schema:
+            return False
+        named = re.findall(r'(?<![\w-])([A-Za-z_]\w*)=', hint)
+        if not named or not set(named) <= set(schema):
+            return False
+        return hint
 
     def _capture_param_fields(self):
         """List → schema. Empty list = no params. Help from Procedure/Code."""
@@ -490,7 +503,7 @@ class AISkillCaptureWizard(models.TransientModel):
             provider = None
             if extracted is None:
                 provider = self._resolve_param_provider()
-            schema_txt, hint, usage, _help_from_author = Skill.author_param_schema(
+            schema_txt, hint, usage, _help_from_author = Skill._author_param_schema(
                 self.param_schema, prose, self.code_body, self.arg_hint,
                 provider=provider, extracted=extracted,
             )
@@ -531,6 +544,7 @@ class AISkillCaptureWizard(models.TransientModel):
         schema_txt = param_schema_to_json(cleaned) or False
         if cleaned:
             hint = infer_arg_hint_from_schema(cleaned) or hint
+        hint = self._authored_hint_within(cleaned) or hint
         rows = [
             row for row in rows
             if (row.get('key') or '').strip() != 'page_url'
@@ -567,7 +581,7 @@ class AISkillCaptureWizard(models.TransientModel):
         leftover = self._prose_without_turn_chips(self.param_prose)
         if leftover and leftover not in prose:
             prose = (prose + '\n' + leftover).strip() if prose else leftover
-        code, rewrite_usage = self.env['ai.skill'].rewrite_code_for_params(
+        code, rewrite_usage = self.env['ai.skill']._rewrite_code_for_params(
             self.code_body, schema, prose,
             provider=provider,
             rewritten=rewritten,

@@ -164,6 +164,11 @@ def xls_to_text(raw):
     return format_excel_sheets(sheet_rows)
 
 
+# A few kilobytes of ZIP can unpack to gigabytes. No real letter or report
+# has a body this big; past it the file is refused, not cut.
+DOCX_BODY_MAX_BYTES = 64 * 1024 * 1024
+
+
 def docx_to_text(raw):
     """The text of a .docx with no library: unzip and strip the XML tags."""
     import io
@@ -171,6 +176,9 @@ def docx_to_text(raw):
     import zipfile
     import html as _html
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
+        if z.getinfo('word/document.xml').file_size > DOCX_BODY_MAX_BYTES:
+            raise ValueError('the Word body unpacks past %d MB'
+                             % (DOCX_BODY_MAX_BYTES // (1024 * 1024)))
         xml = z.read('word/document.xml').decode('utf-8', 'replace')
     # Paragraph and line breaks become newlines before the tags go.
     xml = re.sub(r'</w:p>', '\n', xml)

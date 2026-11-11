@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from urllib.parse import urljoin, urlsplit
 
-from .fetch_url_safe import non_public_host_error
+from .fetch_url_safe import non_public_host_error, non_public_peer_error
 
 REMOTE_IMAGE_PATH = '/pns_ai_mcp/remote_image'
 REMOTE_IMAGE_MAX_BYTES = 8 * 1024 * 1024
@@ -40,6 +40,9 @@ def fetch_image_bytes(url, host_allowed):
                 url, timeout=(3, 10), allow_redirects=False, stream=True,
             )
         except _requests.RequestException:
+            return None
+        if non_public_peer_error(resp, url):
+            resp.close()
             return None
         location = resp.headers.get('Location') if resp.is_redirect else None
         if not location:

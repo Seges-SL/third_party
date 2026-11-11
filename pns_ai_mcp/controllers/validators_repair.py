@@ -16,13 +16,13 @@ _logger = logging.getLogger(__name__)
 
 
 def repair_locals_dir_checks(code):
-    """Reescribe comprobaciones `in dir()/locals()/globals()/vars()` → uso directo
-    y ``dir(model)`` → ``sorted(model._fields)``.
+    """Rewrite `in dir()/locals()/globals()/vars()` checks → direct use
+    and ``dir(model)`` → ``sorted(model._fields)``.
 
-    El sandbox ya define previous_result/raw_data/lugar/fecha (None si faltan),
-    así que `if lugar:` basta. ``dir(obj)`` es el patrón típico del LLM para
-    listar campos; el validador lo prohíbe — aquí se reescribe al idiom
-    documentado. Devuelve (nuevo_código, hubo_cambio).
+    The sandbox already defines previous_result/raw_data/lugar/fecha (None if missing),
+    so `if lugar:` is enough. ``dir(obj)`` is the typical LLM pattern to
+    list fields; the validator forbids it — here it is rewritten to the
+    documented idiom. Returns (new_code, changed).
     """
     if not code or not isinstance(code, str):
         return code, False
@@ -40,13 +40,13 @@ def repair_locals_dir_checks(code):
         r"\2",
         code,
     )
-    # 'name' in dir()  →  (\2 is not None)  — presencia del nombre inyectado
+    # 'name' in dir()  →  (\2 is not None)  — presence of the injected name
     code = re.sub(
         r"(['\"])(\w+)\1\s+in\s+(?:dir|locals|globals|vars)\(\)",
         r"(\2 is not None)",
         code,
     )
-    # name in locals() / name in globals() (sin comillas) → name is not None
+    # name in locals() / name in globals() (no quotes) → name is not None
     code = re.sub(
         r"\b(\w+)\s+in\s+(?:locals|globals|vars)\(\)",
         r"(\1 is not None)",
@@ -120,11 +120,11 @@ _CR_DBNAME_ATTR = re.compile(r"\benv\._?cr\.dbname\b")
 
 
 def repair_cr_dbname(code):
-    """Reescribe `env.cr.dbname` (y variantes) → `''`.
+    """Rewrite `env.cr.dbname` (and variants) → `''`.
 
-    El cursor está prohibido en el sandbox y el nombre de la base de datos ya
-    no se publica: la expresión queda como cadena vacía, sin filtrar el nombre.
-    No reescribe `env.cr` genérico (sigue bloqueado). Devuelve (código, cambió).
+    The cursor is forbidden in the sandbox and the database name is no longer
+    published: the expression becomes an empty string, without leaking the name.
+    It does not rewrite plain `env.cr` (still blocked). Returns (code, changed).
     """
     if not code or not isinstance(code, str):
         return code, False
@@ -289,10 +289,10 @@ def _ir_model_names_expr():
 
 
 class _RewriteRegistryModels(ast.NodeTransformer):
-    """Idioma Odoo de listar modelos vía registry → ``ir.model``.
+    """Odoo idiom for listing models via registry → ``ir.model``.
 
-    Reescribe solo listing/membership/subscript. ``env.registry.cursor()`` y
-    otros attrs siguen prohibidos.
+    Rewrites only listing/membership/subscript. ``env.registry.cursor()`` and
+    other attrs stay forbidden.
     """
 
     def __init__(self):
@@ -373,11 +373,11 @@ class _RewriteRegistryModels(ast.NodeTransformer):
 
 
 def repair_registry_models(code):
-    """Reescribe listing/membership de ``env.registry`` → ``ir.model``.
+    """Rewrite listing/membership of ``env.registry`` → ``ir.model``.
 
-    Idioma típico del LLM (UBWS/PR1Y): iterar ``env.registry.models`` o
-    ``env.registry`` para descubrir nombres. El candado sigue bloqueando
-    ``env.registry.cursor()`` y el resto de attrs. Devuelve (código, cambió).
+    Typical LLM idiom (UBWS/PR1Y): iterate ``env.registry.models`` or
+    ``env.registry`` to discover names. The lock still blocks
+    ``env.registry.cursor()`` and the other attrs. Returns (code, changed).
     """
     if not code or not isinstance(code, str):
         return code, False

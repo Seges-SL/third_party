@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2026 Patanegra Soft <https://patanegra.com>
 """__model stamp: universal formula (display_name + overlap), no domain hardcode."""
+import uuid
+
 from odoo.tests import tagged, TransactionCase
 
 from odoo.addons.pns_ai_mcp.controllers.relaxaicode_models import (
@@ -20,6 +22,13 @@ from odoo.addons.pns_ai_mcp.controllers.relaxaicode_rows import (
 @tagged('post_install', '-at_install', 'pns_ai_mcp')
 class TestRelaxAICodeModelStamp(TransactionCase):
 
+    def _unique_partners(self, count):
+        """Backfill only fills an unambiguous label, so the names are unique."""
+        tag = uuid.uuid4().hex[:8]
+        return self.env['res.partner'].create([
+            {'name': 'ACME Backfill %s %s' % (n, tag)} for n in range(count)
+        ])
+
     def test_coerce_record_id(self):
         self.assertEqual(_coerce_record_id(12), 12)
         self.assertEqual(_coerce_record_id('42'), 42)
@@ -36,13 +45,13 @@ class TestRelaxAICodeModelStamp(TransactionCase):
         self.assertEqual(len(lists), 2)
 
     def test_fit_prefers_record_whose_display_name_is_in_row(self):
-        """Mismo id en dos modelos → gana el cuyo display_name está en la fila."""
+        """Same id in two models → the one whose display_name is in the row wins."""
         Partner = self.env['res.partner']
         partner = Partner.search([('name', '!=', False)], limit=1)
         if not partner:
             self.skipTest('no res.partner')
-        # Modelo inventado en candidatos: el partner encaja por nombre; un move
-        # con el mismo id (si existe) no tendrá ese display_name.
+        # Made-up model among candidates: the partner fits by name; a move
+        # with the same id (if there is one) will not have that display_name.
         row = {
             'id': partner.id,
             'Cliente': partner.name,
@@ -62,36 +71,33 @@ class TestRelaxAICodeModelStamp(TransactionCase):
         best = _pick_best_model_fit(self.env, candidates, partner.id, row)
         self.assertEqual(best, 'res.partner')
 
-    def test_related_models_from_product_id(self):
+    def test_related_models_from_many2one_name(self):
         code = (
-            "lines = env['sale.order.line'].search([])\n"
-            "pid = lines[0].product_id.id\n"
+            "users = env['res.users'].search([])\n"
+            "pid = users[0].partner_id.id\n"
         )
         extras = _related_models_from_code(
-            code, self.env, {'sale.order.line'},
+            code, self.env, {'res.users'},
         )
-        self.assertIn('product.product', extras)
+        self.assertIn('res.partner', extras)
 
     def test_stamp_both_sibling_lists_with_env(self):
-        product = self.env['product.product'].search([], limit=1)
-        if not product:
-            self.skipTest('no product.product')
+        partner = self.env.user.partner_id
         result = {
             'by_units': [{
-                'id': product.id,
-                'Producto': product.display_name,
-                'Unidades': 1.0,
+                'id': partner.id,
+                'Contact': partner.display_name,
+                'Units': 1.0,
             }],
             'by_amount': [{
-                'id': product.id,
-                'Producto': product.display_name,
-                'Importe': 9.0,
+                'id': partner.id,
+                'Contact': partner.display_name,
+                'Amount': 9.0,
             }],
         }
         code = (
-            "lines = env['sale.order.line'].search([])\n"
-            "Product = env['product.product']\n"
-            "p = lines[:1].product_id\n"
+            "users = env['res.users'].search([])\n"
+            "p = users[:1].partner_id\n"
         )
         candidates = _models_from_code(code)
         candidates |= _related_models_from_code(code, self.env, candidates)
@@ -102,11 +108,11 @@ class TestRelaxAICodeModelStamp(TransactionCase):
             env=self.env,
             candidate_models=candidates,
         )
-        self.assertEqual(result['by_units'][0].get('__model'), 'product.product')
-        self.assertEqual(result['by_amount'][0].get('__model'), 'product.product')
+        self.assertEqual(result['by_units'][0].get('__model'), 'res.partner')
+        self.assertEqual(result['by_amount'][0].get('__model'), 'res.partner')
 
     def test_stamp_partners_by_display_name_when_id_collides(self):
-        """Varios partners: todos enlazables aunque el id choque con otros modelos."""
+        """Several partners: all linkable even if the id clashes with other models."""
         Partner = self.env['res.partner']
         partners = Partner.search([('name', '!=', False)], limit=3)
         if len(partners) < 2:
@@ -137,15 +143,12 @@ class TestRelaxAICodeModelStamp(TransactionCase):
             )
 
     def test_backfill_id_from_namespace_recordset(self):
-        """Filas sin id: se rellenan emparejando name con el recordset del sandbox."""
+        """Rows without id: filled by matching name against the sandbox recordset."""
         from odoo.addons.pns_ai_mcp.controllers.relaxaicode_models import (
             _backfill_missing_record_ids,
             _stamp_models,
         )
-        Partner = self.env['res.partner']
-        partners = Partner.search([('name', '!=', False)], limit=2)
-        if len(partners) < 2:
-            self.skipTest('need ≥2 partners')
+        partners = self._unique_partners(2)
         result = {
             'data': [
                 {'Cliente': p.name, 'Importe': 10.0 * (i + 1)}
@@ -173,14 +176,11 @@ class TestRelaxAICodeModelStamp(TransactionCase):
             self.assertEqual(result['data'][i].get('__model'), 'res.partner')
 
     def test_backfill_id_via_rec_name_search(self):
-        """Sin recordset en namespace: search por _rec_name si hay un solo modelo."""
+        """No recordset in namespace: search by _rec_name if there is only one model."""
         from odoo.addons.pns_ai_mcp.controllers.relaxaicode_models import (
             _backfill_missing_record_ids,
         )
-        Partner = self.env['res.partner']
-        partner = Partner.search([('name', '!=', False)], limit=1)
-        if not partner:
-            self.skipTest('no partner')
+        partner = self._unique_partners(1)
         result = {'data': [{'name': partner.name, 'note': 'x'}]}
         filled = _backfill_missing_record_ids(
             result,
@@ -207,11 +207,11 @@ class TestRelaxAICodeModelStamp(TransactionCase):
         self.assertEqual(result['data'][0]['__model'], 'res.partner')
 
     def test_stamp_from_what_the_turn_already_read(self):
-        """Filas rehechas desde un literal: el id conserva su modelo del turno.
+        """Rows rebuilt from a literal: the id keeps its model from the turn.
 
-        El paso de presentación no toca el ORM (ni recordset ni ``env['x']``),
-        así que sin la memoria del turno la fila llegaría a pantalla sin
-        registro detrás y no se podría señalar.
+        The presentation step does not touch the ORM (no recordset, no
+        ``env['x']``), so without the turn memory the row would reach the
+        screen with no record behind it and could not be pointed at.
         """
         partner = self.env['res.partner'].search([('name', '!=', False)], limit=1)
         if not partner:
@@ -228,7 +228,7 @@ class TestRelaxAICodeModelStamp(TransactionCase):
         self.assertEqual(result['data'][0].get('__model'), 'res.partner')
 
     def test_a_remembered_id_does_not_lend_its_link_to_another_row(self):
-        """Mismo número, otra cosa: sin el nombre del registro no hay enlace."""
+        """Same number, other thing: without the record's name there is no link."""
         partner = self.env['res.partner'].search([('name', '!=', False)], limit=1)
         if not partner:
             self.skipTest('no res.partner')
@@ -244,7 +244,7 @@ class TestRelaxAICodeModelStamp(TransactionCase):
         self.assertIsNone(result['data'][0].get('__model'))
 
     def test_stamp_from_xmlid_column(self):
-        """Celda XML=module.name → __model inequívoco (evita empates de id)."""
+        """Cell XML=module.name → unambiguous __model (avoids id ties)."""
         from odoo.addons.pns_ai_mcp.controllers.relaxaicode_rows import (
             _model_id_from_xmlid_row,
         )
@@ -252,7 +252,7 @@ class TestRelaxAICodeModelStamp(TransactionCase):
         group = self.env.ref('base.group_user')
         result = {
             'data': [{
-                'ID': 999999,  # id engañoso a propósito
+                'ID': 999999,  # misleading id on purpose
                 'XML': 'base.group_user',
                 'FN': group.display_name,
             }],
@@ -270,10 +270,10 @@ class TestRelaxAICodeModelStamp(TransactionCase):
         self.assertEqual(result['data'][0]['id'], group.id)
 
     def test_a_car_name_in_the_model_column_does_not_steal_the_picture(self):
-        """La columna model con el nombre del coche no es fleet.vehicle.
+        """The model column holding the car's name is not fleet.vehicle.
 
-        Si el campo pedido no existe (logo), la miniatura sale de una imagen
-        que el registro sí tiene, no de una URL con ese texto.
+        If the requested field does not exist (logo), the thumbnail comes from
+        a picture the record does have, not from a URL with that text.
         """
         from odoo.addons.pns_ai_mcp.controllers.relaxaicode_rows import (
             _postprocess_images,

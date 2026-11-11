@@ -12,3 +12,4 @@ from . import ir_groups_patch
 from . import operation_report_wizard
 from . import export_file_wizard
 from . import export_secrets_wizard
+from . import progress_job

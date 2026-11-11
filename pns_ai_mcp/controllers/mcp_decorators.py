@@ -24,15 +24,15 @@ except ImportError:
 
 _logger = logging.getLogger(__name__)
 
-# Registro global de tools
+# Global tool registry
 _MCP_TOOLS_REGISTRY: Dict[str, Dict[str, Any]] = {}
 
 def _python_type_to_json_schema_type(python_type: Type) -> Dict[str, Any]:
     """
-    Convierte un tipo de Python a un tipo de esquema JSON.
-    Soporta tipos básicos y algunos tipos avanzados.
+    Turn a Python type into a JSON schema type.
+    Supports basic types and some advanced ones.
     """
-    # Tipos básicos
+    # Basic types
     if python_type == str:
         return {'type': 'string'}
     elif python_type == int:
@@ -48,12 +48,12 @@ def _python_type_to_json_schema_type(python_type: Type) -> Dict[str, Any]:
     elif python_type == type(None) or python_type == None:
         return {'type': 'null'}
     
-    # Optional[T] -> T o null
+    # Optional[T] -> T or null
     origin = get_origin(python_type)
     if origin is Optional or (hasattr(python_type, '__origin__') and python_type.__origin__ is type(None)):
         args = get_args(python_type)
         if args:
-            # Optional[T] -> el tipo T
+            # Optional[T] -> the type T
             return _python_type_to_json_schema_type(args[0])
         return {'type': 'null'}
     
@@ -76,69 +76,69 @@ def _python_type_to_json_schema_type(python_type: Type) -> Dict[str, Any]:
             }
         return {'type': 'object'}
     
-    # Por defecto, tratar como string si no se reconoce
-    _logger.warning(f"MCP: Tipo Python no reconocido para esquema JSON: {python_type}, usando 'string' por defecto")
+    # By default, treat as string if not recognized
+    _logger.warning(f"MCP: Unrecognized Python type for JSON schema: {python_type}, defaulting to 'string'")
     return {'type': 'string'}
 
 
 def _extract_schema_from_function(func: Callable) -> Dict[str, Any]:
     """
-    Extrae el esquema JSON del inputSchema desde los type hints de una función.
-    Para funciones que usan el formato estándar (controller, arguments), busca
-    type hints en el cuerpo de la función o en el docstring.
+    Extract the inputSchema JSON schema from a function's type hints.
+    For functions using the standard form (controller, arguments), it looks
+    for type hints in the function body or in the docstring.
     """
     try:
-        # Obtener signature
+        # Get the signature
         sig = inspect.signature(func)
         
-        # Verificar si la función tiene parámetros además de controller y arguments
+        # Check whether the function has parameters besides controller and arguments
         has_explicit_params = False
         for param_name in sig.parameters:
             if param_name not in ('self', 'controller', 'arguments'):
                 has_explicit_params = True
                 break
         
-        # Si la función tiene parámetros explícitos, extraer de ellos
+        # If the function has explicit parameters, extract from them
         if has_explicit_params:
             hints = get_type_hints(func, include_extras=True)
             properties = {}
             required = []
             
             for param_name, param in sig.parameters.items():
-                # Saltar 'self', 'controller', 'arguments' que son parámetros internos
+                # Skip 'self', 'controller', 'arguments': they are internal parameters
                 if param_name in ('self', 'controller', 'arguments'):
                     continue
                 
-                # Obtener tipo del parámetro
+                # Get the parameter type
                 param_type = hints.get(param_name, Any)
                 
-                # Si es Any o no tiene tipo, usar 'object' por defecto
+                # If it is Any or has no type, use 'object' by default
                 if param_type == Any or param_type not in hints:
                     # FIX: Default to str instead of dict (Object) to avoid JSON parsing errors
                     # when the parameter is expected to be a code string.
                     param_type = str
                 
-                # Convertir a esquema JSON
+                # Convert to JSON schema
                 param_schema = _python_type_to_json_schema_type(param_type)
                 
-                # Obtener descripción del docstring si está disponible
+                # Get the description from the docstring if there is one
                 description = None
                 if func.__doc__:
-                    # Buscar descripción del parámetro en el docstring
+                    # Look for the parameter description in the docstring
                     doc_lines = func.__doc__.split('\n')
                     for i, line in enumerate(doc_lines):
                         if f':param {param_name}:' in line or f':param {param_name} ' in line:
                             description = line.split(':', 1)[1].strip() if ':' in line else None
                             break
                 
-                # Si no hay descripción, usar el nombre del parámetro
+                # If there is no description, use the parameter name
                 if not description:
-                    description = f"Parámetro {param_name}"
+                    description = f"Parameter {param_name}"
                 
                 param_schema['description'] = description
                 properties[param_name] = param_schema
                 
-                # Si no tiene default, es requerido
+                # If it has no default, it is required
                 if param.default == inspect.Parameter.empty:
                     required.append(param_name)
             
@@ -148,17 +148,17 @@ def _extract_schema_from_function(func: Callable) -> Dict[str, Any]:
                 'required': required
             }
         else:
-            # Función usa formato estándar (controller, arguments)
-            # Intentar extraer parámetros del docstring o código fuente
-            # Por ahora, devolver esquema vacío (se puede mejorar parseando el código)
+            # The function uses the standard form (controller, arguments)
+            # Try to extract parameters from the docstring or source code
+            # For now, return an empty schema (could improve by parsing the code)
             return {
                 'type': 'object',
                 'properties': {},
                 'required': []
             }
     except Exception as e:
-        _logger.warning(f"MCP: Error extrayendo esquema de {func.__name__}: {str(e)}")
-        # Devolver esquema vacío por defecto
+        _logger.warning(f"MCP: Error extracting schema from {func.__name__}: {str(e)}")
+        # Return an empty schema by default
         return {
             'type': 'object',
             'properties': {},
@@ -168,8 +168,8 @@ def _extract_schema_from_function(func: Callable) -> Dict[str, Any]:
 
 def _validate_arguments(schema: Dict[str, Any], arguments: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
     """
-    Valida los argumentos contra el esquema.
-    Retorna (es_valido, mensaje_error)
+    Validate the arguments against the schema.
+    Returns (is_valid, error_message)
     """
     if not isinstance(arguments, dict):
         return False, "Arguments must be a dictionary"
@@ -177,15 +177,15 @@ def _validate_arguments(schema: Dict[str, Any], arguments: Dict[str, Any]) -> Tu
     properties = schema.get('properties', {})
     required = schema.get('required', [])
     
-    # Verificar campos requeridos
+    # Check required fields
     for field in required:
         if field not in arguments:
             return False, f"Missing required parameter: {field}"
     
-    # Validar tipos básicos (validación simple)
+    # Validate basic types (simple validation)
     for field, value in arguments.items():
         if field not in properties:
-            # Permitir campos adicionales (podría ser más estricto)
+            # Allow extra fields (could be stricter)
             continue
         
         field_schema = properties[field]
@@ -217,25 +217,25 @@ def mcp_tool(
     groups: Optional[tuple] = None,
 ):
     """
-    Decorador para registrar una función como herramienta MCP.
+    Decorator that registers a function as an MCP tool.
     
     Args:
-        name: Nombre de la herramienta (por defecto: nombre de la función)
-        description: Descripción de la herramienta (por defecto: docstring de la función)
-        is_write: Si la herramienta requiere permisos de escritura
-        validate_schema: Si se debe validar el esquema automáticamente
-        input_schema: Esquema JSON explícito (opcional, si se omite se extrae de la función)
-        expose_mcp: Si False, la tool sigue en el saco (Chatboo / AgentEngine)
-            pero no se publica en tools/list de /mcp. tools/call sigue
-            ejecutándola si un host la pide.
-        groups: xmlids de grupo. Si hay alguno, el modelo solo ve la tool
-            cuando el usuario tiene al menos uno (``tool_visible_to``). La
-            tool sigue comprobando sus permisos al ejecutarse.
+        name: Tool name (default: the function name)
+        description: Tool description (default: the function docstring)
+        is_write: Whether the tool needs write permissions
+        validate_schema: Whether the schema is validated automatically
+        input_schema: Explicit JSON schema (optional; if left out, it is extracted from the function)
+        expose_mcp: If False, the tool stays in the sack (internal hosts / AgentEngine)
+            but is not published in /mcp tools/list. tools/call still
+            runs it if a host asks for it.
+        groups: group xmlids. If there are any, the model only sees the tool
+            when the user has at least one (``tool_visible_to``). The
+            tool still checks its permissions when it runs.
     
-    Ejemplo:
+    Example:
         @mcp_tool(
             name='relaxaicode',
-            description='Ejecuta código Python bajo entorno relaxaicode',
+            description='Runs Python code in the relaxaicode environment',
             is_write=True
         )
         def tool_relaxaicode(controller, arguments: dict) -> dict:
@@ -243,21 +243,21 @@ def mcp_tool(
             # ...
     """
     def decorator(func: Callable) -> Callable:
-        # Determinar nombre de la tool
+        # Work out the tool name
         tool_name = name or func.__name__
         
-        # Obtener descripción
+        # Get the description
         tool_description = description or (func.__doc__ or '').strip()
         if tool_description:
-            # Limpiar docstring (quitar espacios extra)
+            # Clean the docstring (drop extra spaces)
             tool_description = ' '.join(tool_description.split())
         
-        # Determinar esquema: usar el explícito si existe, sino extraerlo
+        # Work out the schema: use the explicit one if any, else extract it
         final_schema = input_schema
         if final_schema is None:
             final_schema = _extract_schema_from_function(func)
         
-        # Registrar la tool
+        # Register the tool
 
         
         _logger.info(
@@ -265,7 +265,7 @@ def mcp_tool(
             tool_name, is_write, expose_mcp,
         )
         
-        # Wrapper que valida esquema si está habilitado
+        # Wrapper that validates the schema when enabled
         @wraps(func)
         def wrapper(controller, arguments: Dict[str, Any]) -> Any:
             _logger.info(f"TRACE_MCP: Decorator Wrapper executed for {tool_name}")
@@ -279,35 +279,35 @@ def mcp_tool(
                         }
                     }
             
-            # Verificar si la función tiene parámetros explícitos además de controller
+            # Check whether the function has explicit parameters besides controller
             sig = inspect.signature(func)
             has_explicit_params = False
             explicit_params = {}
             for param_name, param in sig.parameters.items():
                 if param_name not in ('self', 'controller', 'arguments'):
                     has_explicit_params = True
-                    # Extraer el valor de arguments si existe
+                    # Take the value from arguments if it is there
                     if param_name in arguments:
                         explicit_params[param_name] = arguments[param_name]
                     elif param.default != inspect.Parameter.empty:
-                        # Usar valor por defecto si existe
+                        # Use the default value if there is one
                         explicit_params[param_name] = param.default
-                    # Si no tiene default y no está en arguments, se validó antes en validate_schema
+                    # If it has no default and is not in arguments, validate_schema already checked it
             
-            # Llamar a la función original
+            # Call the original function
             if has_explicit_params:
-                # Pasar parámetros explícitos como kwargs (sin arguments)
+                # Pass explicit parameters as kwargs (without arguments)
                 return func(controller, **explicit_params)
             else:
-                # Formato estándar (controller, arguments)
+                # Standard form (controller, arguments)
                 return func(controller, arguments)
         
-        # Guardar metadata en el wrapper
+        # Store metadata on the wrapper
         wrapper._mcp_tool_name = tool_name
         # wrapper._mcp_tool_metadata assignment removed as it depends on registry
         
-        # Registrar la tool (USANDO EL WRAPPER)
-        # Esto es CRUCIAL para que el logging y validación se ejecuten
+        # Register the tool (USING THE WRAPPER)
+        # This is CRUCIAL so logging and validation run
         _MCP_TOOLS_REGISTRY[tool_name] = {
             'name': tool_name,
             'description': tool_description,
@@ -326,8 +326,8 @@ def mcp_tool(
 
 def get_registered_tools() -> Dict[str, Dict[str, Any]]:
     """
-    Obtiene todas las tools registradas.
-    Retorna un diccionario con la metadata de cada tool (sin la función).
+    Get every registered tool.
+    Returns a dict with each tool's metadata (without the function).
     """
     result = {}
     for tool_name, tool_data in _MCP_TOOLS_REGISTRY.items():
@@ -349,7 +349,7 @@ def tool_visible_to(tool_data: Dict[str, Any], user) -> bool:
 
 
 def list_registered_tools_for_mcp() -> Dict[str, Dict[str, Any]]:
-    """Subset published on MCP ``tools/list``. Chatboo uses the full sack."""
+    """Subset published on MCP ``tools/list``. Internal hosts use the full sack."""
     return {
         name: data
         for name, data in get_registered_tools().items()
@@ -359,7 +359,7 @@ def list_registered_tools_for_mcp() -> Dict[str, Dict[str, Any]]:
 
 def get_tool_function(tool_name: str) -> Optional[Callable]:
     """
-    Obtiene la función de una tool registrada.
+    Get the function of a registered tool.
     """
     if tool_name in _MCP_TOOLS_REGISTRY:
         return _MCP_TOOLS_REGISTRY[tool_name]['function']
@@ -368,11 +368,11 @@ def get_tool_function(tool_name: str) -> Optional[Callable]:
 
 def get_tool_metadata(tool_name: str) -> Optional[Dict[str, Any]]:
     """
-    Obtiene la metadata de una tool registrada (sin la función).
+    Get the metadata of a registered tool (without the function).
     """
     if tool_name in _MCP_TOOLS_REGISTRY:
         tool_data = _MCP_TOOLS_REGISTRY[tool_name].copy()
-        tool_data.pop('function', None)  # No incluir la función
+        tool_data.pop('function', None)  # Do not include the function
         return tool_data
     return None
 

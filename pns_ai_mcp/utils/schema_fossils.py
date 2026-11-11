@@ -12,7 +12,11 @@ do run. Drop these names from ``ai.schema.fossil.init`` on every ``-u``.
 Do not add ``ai_safe_choice`` or ``ai_change_journal``.
 """
 
+import logging
+
 from .engine_params import PREVIOUS_KEYS
+
+_logger = logging.getLogger(__name__)
 
 FOSSIL_TABLES = (
     'ai_agent_pns_ai_mcp_artifact_bundle_export_wizard_rel',
@@ -27,7 +31,7 @@ FOSSIL_TABLES = (
     'pns_ai_mcp_relaxaicode_raw_result',
     'pns_ai_mcp_skill_capture_wizard',
     # Not 'ai_provider_usage_day': its daily totals are history. The table
-    # stays until a person moves or drops it (Seges PNS-87).
+    # stays until a person moves or drops it.
 )
 
 PROTECTED_TABLES = (
@@ -45,7 +49,7 @@ COMPOSE_VALUE_REMAP = (
 
 # ORM-removed columns that may linger when O14 skips migrations/3.1.*.
 # Not ('ai_log', 'agent_id'): the agent code is history on old rows and
-# stays in the column until a person drops it (Seges PNS-87).
+# stays in the column until a person drops it.
 LEFTOVER_COLUMNS = (
     ('ai_log', 'operation_code'),
     ('ai_agent', 'auto_link_mcp_nucleus'),
@@ -212,16 +216,21 @@ def promote_decision_provider(cr):
     """protocol decision → systemone + Decision tick; decision_model → model_id.
 
     The old text column won over ``model_id`` on the call, so its model is
-    kept as the selected one before the column goes. ``fit_decision`` may not
-    be created yet when this runs; the ORM keeps the column it finds.
+    kept as the selected one before the column goes. The ``fit_decision``
+    tick becomes the Decision role when the registry loads
+    (:func:`promote_fit_columns`).
     """
     if not _column_exists(cr, 'ai_provider', 'protocol'):
         return
-    cr.execute('ALTER TABLE ai_provider ADD COLUMN IF NOT EXISTS fit_decision boolean')
-    cr.execute(
-        "UPDATE ai_provider SET protocol = 'systemone', fit_decision = true "
-        "WHERE protocol = 'decision'"
-    )
+    cr.execute("SELECT 1 FROM ai_provider WHERE protocol = 'decision' LIMIT 1")
+    if cr.fetchone():
+        cr.execute(
+            'ALTER TABLE ai_provider ADD COLUMN IF NOT EXISTS fit_decision boolean'
+        )
+        cr.execute(
+            "UPDATE ai_provider SET protocol = 'systemone', fit_decision = true "
+            "WHERE protocol = 'decision'"
+        )
     if not _column_exists(cr, 'ai_provider', 'decision_model'):
         return
     cr.execute(
@@ -254,6 +263,83 @@ def promote_decision_provider(cr):
         )
     _drop_column_if_exists(cr, 'ai_provider', 'decision_model')
 
+
+# The ticks were Boolean columns until 3.1.887. A -u drops the column of a
+# removed field before the roles are seeded, so init keeps each tick in
+# FIT_STASH and the registry load hands it to the role with that code.
+FIT_COLUMNS = (
+    ('fit_conversation', 'conversation'),
+    ('fit_audio', 'audio'),
+    ('fit_vision', 'vision'),
+    ('fit_video', 'video'),
+    ('fit_decision', 'decision'),
+    ('fit_design', 'design'),
+    ('fit_parser', 'parser'),
+)
+FIT_STASH = 'ai_provider_fit_stash'
+
+
+def _table_exists(cr, table):
+    cr.execute(
+        'SELECT 1 FROM information_schema.tables WHERE table_name = %s',
+        (table,),
+    )
+    return bool(cr.fetchone())
+
+
+def stash_fit_columns(cr):
+    """Keep the old ``fit_*`` ticks as (provider, code) rows, drop the column.
+
+    Runs in ``init``, before the -u drops removed columns. Idempotent.
+    """
+    columns = [
+        (column, code) for column, code in FIT_COLUMNS
+        if _column_exists(cr, 'ai_provider', column)
+    ]
+    if not columns:
+        return
+    cr.execute(
+        'CREATE TABLE IF NOT EXISTS "%s" ('
+        'provider_id integer NOT NULL, code varchar NOT NULL, '
+        'PRIMARY KEY (provider_id, code))' % FIT_STASH
+    )
+    for column, code in columns:
+        cr.execute(
+            'INSERT INTO "%s" (provider_id, code) '
+            'SELECT id, %%s FROM ai_provider WHERE "%s" IS TRUE '
+            'ON CONFLICT DO NOTHING' % (FIT_STASH, column),
+            (code,),
+        )
+        _drop_column_if_exists(cr, 'ai_provider', column)
+
+
+def promote_fit_columns(cr):
+    """Stashed ticks onto ``ai_provider_role_rel``; the stash goes when empty.
+
+    Runs on registry load, once the roles are seeded. A tick whose role is
+    not there yet waits for the next load. Idempotent.
+    """
+    if not _table_exists(cr, FIT_STASH):
+        return
+    if not _table_exists(cr, 'ai_provider_role_rel'):
+        return
+    cr.execute(
+        'INSERT INTO ai_provider_role_rel (provider_id, role_id) '
+        'SELECT s.provider_id, r.id FROM "%s" s '
+        'JOIN ai_provider_role r ON r.code = s.code '
+        'JOIN ai_provider p ON p.id = s.provider_id '
+        'ON CONFLICT DO NOTHING' % FIT_STASH
+    )
+    cr.execute(
+        'DELETE FROM "%s" s WHERE EXISTS ('
+        'SELECT 1 FROM ai_provider_role r WHERE r.code = s.code) '
+        'OR NOT EXISTS (SELECT 1 FROM ai_provider p WHERE p.id = s.provider_id)'
+        % FIT_STASH
+    )
+    cr.execute('SELECT 1 FROM "%s" LIMIT 1' % FIT_STASH)
+    if not cr.fetchone():
+        cr.execute('DROP TABLE "%s"' % FIT_STASH)
+        _logger.info('pns_ai_mcp: provider ticks moved to roles')
 
 def drop_leftover_columns(cr):
     """Drop ORM-removed columns (O19 leftovers 3.1.291 / 3.1.370 / 3.1.642)."""

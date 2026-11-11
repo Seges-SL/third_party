@@ -90,7 +90,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 amount = n * r;
                 code = want;
             } else {
-                // Sin tasa no se inventa la conversión: se paga en USD y se avisa.
+                // No rate means no made-up conversion: charge in USD and warn.
                 failed = true;
             }
         }
@@ -152,7 +152,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
      *  6. CHAT + STREAMING         (_streamChat, _sendMessage, _runResultTurn)
      *  7. SLASH COMMANDS           (_onSlashInput, _updateSlashSuggestions, _applySlashSelection)
      *  8. INPUT HANDLING           (_onInputKeydown — keyboard shortcuts)
-     *  9. CONTENT FORMATTING       (_formatContent, _formatMarkdown, _formatCSV, _formatJsonAsTable)
+     *  9. CONTENT FORMATTING       (_formatContent, _safeHtml, _escapeHtml)
      * 10. CONTEXT CHART            (_showContextChart — token usage visualization)
      * 11. EXPORT (PDF/Excel/Copy)  (_copyToClipboard, _downloadAsPDF, _downloadAsExcel)
      *
@@ -287,8 +287,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 slashOpen: false,
                 slashItems: [],
                 slashIndex: 0,
-                slashMode: 'commands', // 'commands' (menú de /) | 'skills' (tras /skills)
-                inputPlaceholder: _t('Ask Chatboo... (/ for commands & skills, ↑↓ for history)'),
+                slashMode: 'commands', // 'commands' (/ menu) | 'skills' (after /skills)
+                inputPlaceholder: _t('Ask Chatboo AI... (/ for commands & skills, ↑↓ for history)'),
                 // AI Provider selector
                 providers: [],
                 selectedProviderId: null,
@@ -298,12 +298,12 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 screenFocusEnabled: true,
                 screenContextSnapshot: null,
                 showSeriesStats: false,
-                pendingImages: [],       // imágenes pegadas (data URLs) a enviar en el turno
-                pendingImageNames: [],   // nombres alineados por índice (null si es pegado del portapapeles)
-                pendingFiles: [],        // ficheros de texto/datos adjuntos con el clip
-                dragActive: false,       // overlay visual mientras se arrastran ficheros sobre el chat
-                ttsSupported: false,     // Web Speech API disponible
-                ttsEnabled: false,       // lectura en voz alta activada por el usuario
+                pendingImages: [],       // pasted images (data URLs) to send with the turn
+                pendingImageNames: [],   // names aligned by index (null if pasted from the clipboard)
+                pendingFiles: [],        // text/data files attached with the clip
+                dragActive: false,       // visual overlay while files are dragged over the chat
+                ttsSupported: false,     // Web Speech API available
+                ttsEnabled: false,       // read-aloud turned on by the user
                 promptMultiline: false,
                 promptCollapsed: false,
             });
@@ -356,6 +356,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             this.tipDeleteSession = _t('Delete session');
             this.tipThinking = _t('Thinking…');
             this.tipConnecting = _t('Connecting…');
+            this.tipSource = _t('Source:');
+            this.tipNoModelInfo = _t('No model information');
             this.tipCurrent = _t('Current');
             this.tipMessages = _t('messages');
             this._slashMenuEl = null;
@@ -556,6 +558,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             this.scrollToBottom();
             this._setupContextClickHandling();
             this._setupRefLinkHandler();
+            this._setupFormCardHandler();
             this._setupTtsClickAnchoring();
             this._drainPaintQueue();
             // Session loading (_initSession) is called from the systray after
@@ -580,19 +583,19 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             }
         }
 
-        // Abre en pestaña nueva CUALQUIER enlace de contenido del chat: imágenes y
-        // ficheros adjuntos (/web/image, /web/content), chips de registro
-        // (/web#id=...), enlaces de registro en línea del markdown y fuentes
-        // http(s). Handler ÚNICO delegado en fase de CAPTURA sobre el contenedor
-        // de mensajes: corre ANTES que el enrutado del web client, así los
-        // adjuntos del histórico (t-raw) SÍ abren pestaña/descargan. En O14 esto
-        // arregla que "no abrían nada".
+        // Opens ANY chat content link in a new tab: images and
+        // attached files (/web/image, /web/content), record chips
+        // (/web#id=...), inline markdown record links and http(s)
+        // sources. ONE delegated handler in the CAPTURE phase on the
+        // messages container: it runs BEFORE the web client routing, so
+        // history attachments (t-raw) DO open a tab/download. In O14 this
+        // fixes "nothing opened".
         _setupRefLinkHandler() {
-            // Anclamos a la RAÍZ del componente (this.el), no a messagesRef.el:
-            // en O14 el ref de mensajes puede no estar aún resuelto en mounted()
-            // (owl1 es poco fiable ahí) y el handler no se enganchaba nunca → los
-            // adjuntos del histórico "no abrían nada". this.el existe siempre al
-            // montar y contiene toda la zona de chat.
+            // We anchor to the component ROOT (this.el), not messagesRef.el:
+            // in O14 the messages ref may not be resolved yet in mounted()
+            // (owl1 is unreliable there) and the handler never got attached → the
+            // history attachments "opened nothing". this.el always exists on
+            // mount and holds the whole chat area.
             const el = this.el || this.messagesRef.el;
             if (!el || this._refLinkHandler) {
                 return;
@@ -617,9 +620,69 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             el.addEventListener('click', this._refLinkHandler, true);
         }
 
-        // Una imagen del chat se abre a pantalla completa con zoom (pns_base);
-        // un PDF (tarjeta o enlace), en el visor de Chatboo. Ctrl/Mayús/botón
-        // central siguen abriendo la pestaña.
+        // A ``kind=form`` card: the form opens in a dialog with the proposed
+        // values. Closing it discards; only the person's Save writes.
+        _setupFormCardHandler() {
+            const el = this.el || this.messagesRef.el;
+            if (!el || this._formCardHandler) {
+                return;
+            }
+            this._formCardHandler = (ev) => {
+                ev.stopPropagation();
+                this._openFormCard(ev.detail || {});
+            };
+            el.addEventListener('chatboo-open-form', this._formCardHandler);
+        }
+
+        async _openFormCard(card) {
+            const notify = (message, type) => {
+                if (this.props.notification) {
+                    this.props.notification({ message: message, type: type });
+                }
+            };
+            let res = null;
+            try {
+                res = await this._callJsonRoute('/chatboo/open-form', card);
+            } catch (e) {
+                res = null;
+            }
+            if (!res || res.status !== 'ok' || !res.action) {
+                notify((res && res.message) || _t('Could not open the form.'), 'danger');
+                return;
+            }
+            if (res.dropped && res.dropped.length) {
+                notify(_t('Left empty: %s').replace('%s', res.dropped.join(', ')), 'warning');
+            }
+            const overlay = document.getElementById('o_chatboo_persistent_overlay');
+            const prevZ = overlay ? overlay.style.zIndex : '';
+            if (overlay) {
+                overlay.style.zIndex = '1000';
+            }
+            const restore = () => this._restoreChatbooOverlayZ(overlay, prevZ);
+            const context = res.context || {};
+            const actionOpts = {
+                additional_context: context,
+                additionalContext: context,
+                on_close: restore,
+                onClose: restore,
+            };
+            try {
+                if (this.props.doAction) {
+                    await this.props.doAction(res.action, actionOpts);
+                } else if (this.env && this.env.services && this.env.services.action) {
+                    await this.env.services.action.doAction(res.action, actionOpts);
+                } else {
+                    restore();
+                }
+            } catch (e) {
+                restore();
+                throw e;
+            }
+        }
+
+        // A chat image opens full screen with zoom (pns_base);
+        // a PDF (card or link) opens in the Chatboo viewer. Ctrl/Shift/middle
+        // button still open the tab.
         _openViewer(ev) {
             if (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button) {
                 return false;
@@ -657,15 +720,15 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             await this._checkHealth();
             let sessionLoaded = false;
             try {
-                // FASE 0: Si el contexto pide una sesión nueva, crearla directamente
-                // y evitar cargar la sesión previa (esto elimina la condición de carrera
-                // que tenía ChatbooNewAction al llamar _createNewSession por fuera).
+                // PHASE 0: If the context asks for a new session, create it directly
+                // and skip loading the previous one (this removes the race condition
+                // ChatbooNewAction had when calling _createNewSession from outside).
                 if (this.props.context && this.props.context.new_chat) {
                     this.messages.splice(0, this.messages.length);
                     this.inputHistory = [];
                     this.historyIndex = -1;
                     this.currentInputBeforeHistory = '';
-                    // Crear la sesión en backend y establecerla como activa
+                    // Create the session in the backend and make it active
                     try {
                         const newResult = await this.props.rpc({
                             route: '/chatboo/sessions/create',
@@ -678,7 +741,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     } catch (e) {
                         console.error('Error creating new session in _initSession:', e);
                     }
-                    // Actualizar lista de sesiones sin cargar mensajes de la nueva (está vacía)
+                    // Update the session list without loading the new one's messages (it is empty)
                     try {
                         const listResult = await this.props.rpc({ route: '/chatboo/sessions/list', params: {} });
                         if (listResult && listResult.status === 'ok') {
@@ -691,7 +754,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                         }
                     } catch (e) { /* non-fatal */ }
                 } else {
-                    // FASE 1-3: Comportamiento normal — cargar sesión activa
+                    // PHASE 1-3: Normal behaviour — load the active session
                     const listResult = await this.props.rpc({ route: '/chatboo/sessions/list', params: {} });
 
                     if (listResult && listResult.status === 'ok') {
@@ -706,10 +769,10 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                             || (listResult.sessions && listResult.sessions.length > 0 ? listResult.sessions[0].id : null);
 
                         if (targetId) {
-                            // Un único cargador para todas las rutas (arranque,
-                            // histórico, reanudación): una copia a mano de esto
-                            // se dejó atrás la rehidratación de los chips y el
-                            // histórico aparecía sin tokens ni coste.
+                            // One loader for every path (startup,
+                            // history, resume): a hand-made copy of this
+                            // left out the chip rehydration and the
+                            // history showed no tokens or cost.
                             sessionLoaded = await this._loadSession(targetId);
                         }
                     }
@@ -718,18 +781,18 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 console.error('Error in session init:', e);
             }
 
-            // --- FASE 5: Multi-Tab Synchronization (Odoo Bus) ---
+            // --- PHASE 5: Multi-Tab Synchronization (Odoo Bus) ---
             this._setupBusListener();
 
-            // --- FASE 6: Open history modal if requested by action context ---
+            // --- PHASE 6: Open history modal if requested by action context ---
             if (this.props.context && this.props.context.show_history_modal) {
                 await this._showSessions();
             }
 
-            // Catch-up: turnos asíncronos que terminaron mientras no mirábamos
-            // (p.ej. tras un F5). La fuente de verdad es la BD; recargamos.
-            // Timeout: un poll/reclaim colgado NUNCA debe dejar el init a medias
-            // ni el spinner de Odoo (aunque ya usamos shadow:true).
+            // Catch-up: async turns that finished while we were not looking
+            // (e.g. after an F5). The DB is the source of truth; we reload.
+            // Timeout: a stuck poll/reclaim must NEVER leave init half done
+            // nor the Odoo spinner on (even though we already use shadow:true).
             try {
                 const _poll = await Promise.race([
                     this.props.rpc({ route: '/chatboo/async/poll', params: {} }),
@@ -742,16 +805,16 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     if (_poll.pending && _poll.pending.length && this.state.currentSessionId) {
                         await this._loadSession(this.state.currentSessionId);
                     }
-                    // Turno EN CURSO en esta sesión: el worker sigue en el servidor.
-                    // Mostramos "pensando…" y refrescamos al terminar (la página solo
-                    // se re-engancha, no ejecuta nada).
+                    // Turn IN PROGRESS in this session: the worker is still running on the server.
+                    // We show "thinking…" and refresh when it ends (the page only
+                    // re-attaches, it runs nothing).
                     const _run = (_poll.running || []).find(
                         j => j.session_id === this.state.currentSessionId);
                     if (_run) {
                         this._resumeRunningTurn(_run.request_id, this.state.currentSessionId);
                     }
                 }
-            } catch (_e) { /* no crítico */ }
+            } catch (_e) { /* not critical */ }
 
             this._mountedDone = true;
         }
@@ -794,7 +857,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 var _core = require('web.core');
                 if (_core && _core.bus) {
                     this._coreBusAsyncHandler = async (payload) => {
-                        // No pisar el turno que se acaba de ver en vivo en esta pestaña.
+                        // Do not overwrite the turn just seen live in this tab.
                         const _reqId = payload && payload.request_id;
                         if (_reqId && _reqId === this._lastLiveRequestId) {
                             return;
@@ -891,12 +954,12 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     }
 
                     if (action === 'thinking') {
-                        // El turno que ESTA pestaña atiende en vivo ya controla el
-                        // indicador vía SSE (_sendMessage lo pone/quita). El aviso de
-                        // bus 'thinking' puede llegar tarde (canal distinto) y, si es
-                        // de nuestro propio turno, reactivaría un "Thinking…" que ya
-                        // nadie limpia. Lo ignoramos para ese request_id — o si ya
-                        // hay un SSE local dueño del spinner.
+                        // The turn THIS tab is serving live already controls the
+                        // indicator via SSE (_sendMessage sets/clears it). The bus
+                        // 'thinking' notice may arrive late (different channel) and, if it
+                        // is from our own turn, would bring back a "Thinking…" that
+                        // nobody clears. We ignore it for that request_id — or if a
+                        // local SSE already owns the spinner.
                         var _rid = payload.request_id;
                         if (this._sseOwnsThinking) {
                             continue;
@@ -912,8 +975,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                             this.state.canCancel = true;
                         }
                     } else if (action === 'message_received') {
-                        // Nunca apagar el spinner de un turno SSE en curso (p. ej. al
-                        // continuar la conversación llega un sync del turno anterior).
+                        // Never turn off the spinner of a running SSE turn (e.g. when
+                        // continuing the conversation a sync of the previous turn arrives).
                         if (!this._sseOwnsThinking) {
                             this.state.thinking = false;
                             this.state.disabled = false;
@@ -947,13 +1010,13 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                             this.currentInputBeforeHistory = "";
                         }
                     } else if (action === 'async_done') {
-                        // No pisar el turno que se acaba de ver en vivo en esta pestaña
-                        // (evita que al cambiar de ventana se borre el contenido).
+                        // Do not overwrite the turn just seen live in this tab
+                        // (avoids wiping the content when switching windows).
                         var _renderedLiveAD = payload.request_id && payload.request_id === this._lastLiveRequestId;
                         var _ownInFlightAD = payload.request_id && payload.request_id === this._lastStreamRequestId;
-                        // SSE local en curso: el spinner lo apaga solo _sendMessage /
-                        // _runResultTurn. Un async_done del turno ANTERIOR no debe
-                        // tumbar el "Thinking…" del turno nuevo al continuar el chat.
+                        // Local SSE running: only _sendMessage /
+                        // _runResultTurn turn the spinner off. An async_done of the PREVIOUS turn must not
+                        // kill the "Thinking…" of the new turn when the chat continues.
                         if (this._sseOwnsThinking) {
                             if (_ownInFlightAD || _renderedLiveAD) {
                                 continue;
@@ -961,21 +1024,21 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                             continue;
                         }
                         if (_renderedLiveAD) {
-                            // Ya lo vimos en vivo: no recargar. Pero sí limpiar por si
-                            // un 'thinking' tardío de este mismo turno dejó la burbuja.
+                            // We already saw it live: do not reload. But do clean up in case
+                            // a late 'thinking' from this same turn left the bubble.
                             this.state.thinking = false;
                             this.state.disabled = false;
                             continue;
                         }
-                        // Fin de un turno que no vimos en vivo (p. ej. reanudado
-                        // tras F5): quitar el "pensando…" y parar el sondeo.
+                        // End of a turn we did not see live (e.g. resumed
+                        // after F5): remove the "thinking…" and stop polling.
                         if (payload.request_id && payload.request_id === this._resumeReqId) {
                             this._resumeReqId = null;
                         }
-                        // Recargar la sesion donde se guardó el resultado (siempre, aunque sea diferente a la actual)
+                        // Reload the session where the result was saved (always, even if it is not the current one)
                         if (session_id) {
                             if (this.state.currentSessionId !== session_id) {
-                                // Cambiamos a la sesión donde el worker guardó el resultado
+                                // Switch to the session where the worker saved the result
                                 this.state.currentSessionId = session_id;
                             }
                             await this._loadSession(session_id);
@@ -1029,8 +1092,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
          * Open session history modal and reload sessions
          */
         _focusChatInput() {
-            // Foco tras el repintado (cierre del modal de histórico o carga de
-            // sesión): si no, el foco se iría al body.
+            // Focus after repaint (closing the history modal or loading a
+            // session): otherwise focus would go to body.
             this._afterPaint(() => {
                 const overlay = document.getElementById('o_chatboo_persistent_overlay');
                 if (overlay && (
@@ -1084,7 +1147,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                         this.inputHistory = [];
                         this.historyIndex = -1;
                         this.currentInputBeforeHistory = "";
-                        // Nueva sesión iniciada por el usuario: foco a la caja de prompt.
+                        // New session started by the user: focus the prompt box.
                         this._focusChatInput();
                     }
 
@@ -1106,7 +1169,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
          */
         async _loadSession(sessionId) {
             try {
-                // Guardar la sesión actual antes de cambiar (si es diferente y existe)
+                // Save the current session before switching (if it is different and exists)
                 if (this.state.currentSessionId && this.state.currentSessionId !== sessionId && this.messages.length > 0) {
                     this._saveCurrentSession().catch(e => console.warn('Auto-save before switch failed:', e));
                 }
@@ -1124,11 +1187,11 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                         if (msg.context_info && typeof msg.context_info === 'string') {
                             msg.context_info = null;
                         }
-                        // Adjuntos: el worker guarda chips en msg.images / msg.files
-                        // (URLs /web/image|/web/content → ir.attachment). El template
-                        // los pinta aparte (como owl2). Aquí solo normalizamos el
-                        // texto plano para t-raw; NO mezclar miniaturas en content
-                        // (ese enfoque fallaba en O14 y además el save las perdía).
+                        // Attachments: the worker stores chips in msg.images / msg.files
+                        // (URLs /web/image|/web/content → ir.attachment). The template
+                        // paints them apart (like owl2). Here we only normalize the
+                        // plain text for t-raw; do NOT mix thumbnails into content
+                        // (that approach failed in O14 and the save also lost them).
                         if (msg.role === 'user') {
                             msg.images = Array.isArray(msg.images) ? msg.images : [];
                             msg.files = Array.isArray(msg.files) ? msg.files : [];
@@ -1142,9 +1205,9 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                                     ? `<div style="font-family:'Courier New',Courier,monospace;font-size:1.25em;line-height:1.4;">${_txt}</div>`
                                     : '';
                             } else if (msg.images.length || msg.files.length) {
-                                // Histórico antiguo: content ya traía <img>/chips
-                                // inyectados. Si también hay chips, limpiamos el
-                                // HTML de adjuntos del content para no duplicar.
+                                // Old history: content already had <img>/chips
+                                // injected. If there are chips too, we strip the
+                                // attachment HTML from content to avoid duplicates.
                                 let cleaned = rawContent
                                     .replace(/<div[^>]*>\s*(?:<span[^>]*>\s*<a[^>]*>\s*<img[\s\S]*?<\/a>[\s\S]*?<\/span>\s*)+<\/div>/gi, '')
                                     .replace(/<div[^>]*>\s*(?:<a[^>]*class="[^"]*o_chatboo_file_chip[\s\S]*?<\/a>\s*|<span[^>]*class="[^"]*o_chatboo_file_chip[\s\S]*?<\/span>\s*)+<\/div>/gi, '')
@@ -1152,11 +1215,11 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                                 msg.content = cleaned;
                             }
                         }
-                        // Asistente: el worker (y el autoguardado) persisten
-                        // Markdown/HTML crudo. El servidor no hace markdown→HTML;
-                        // hay que formatear SIEMPRE al pintar. Si solo se hace
-                        // cuando msg.raw, un save posterior (sin ese flag) deja
-                        // ##/** literales en la burbuja.
+                        // Assistant: the worker (and autosave) store raw
+                        // Markdown/HTML. The server does no markdown→HTML;
+                        // we must ALWAYS format when painting. If it is only done
+                        // when msg.raw, a later save (without that flag) leaves
+                        // literal ##/** in the bubble.
                         if (msg.role === 'assistant') {
                             const rawText = msg.original_content || msg.content || '';
                             msg.original_content = msg.original_content || rawText;
@@ -1192,10 +1255,10 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         }
 
         /**
-         * Reanuda un turno EN CURSO tras un F5: el worker sigue trabajando en el
-         * servidor. Mostramos "pensando…" y sondeamos suave hasta que termine,
-         * entonces refrescamos la sesión. El bus async_done hace lo mismo si llega
-         * antes; ambos son idempotentes. La página solo se re-engancha.
+         * Resumes a turn IN PROGRESS after an F5: the worker is still working on the
+         * server. We show "thinking…" and poll gently until it ends,
+         * then refresh the session. The async_done bus does the same if it arrives
+         * first; both are idempotent. The page only re-attaches.
          */
         _resumeRunningTurn(requestId, sessionId) {
             this.state.thinking = true;
@@ -1205,7 +1268,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             this._lastStreamRequestId = requestId;
             const poll = async () => {
                 if (this._resumeReqId !== requestId) {
-                    return;  // reemplazado o ya resuelto
+                    return;  // replaced or already resolved
                 }
                 let res = null;
                 try {
@@ -1261,7 +1324,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         }
 
         _plainUserContent(content) {
-            // Al persistir: texto plano, sin base64 ni HTML de miniaturas.
+            // When saving: plain text, no base64 or thumbnail HTML.
             if (!content || typeof content !== 'string') {
                 return content || '';
             }
@@ -1289,8 +1352,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     content: m.role === 'user' ? this._plainUserContent(m.content) : (m.original_content || m.content || ''),
                     timestamp: m.timestamp || m.ts || '',
                 };
-                // Fuente cruda para el siguiente load (ChatbooMarkdown). Sin esto el
-                // save pisa el raw:true del worker y el historial queda tocho.
+                // Raw source for the next load (ChatbooMarkdown). Without this the
+                // save overwrites the worker's raw:true and the history becomes a wall of text.
                 if (m.role === 'assistant') {
                     out.raw = true;
                     if (m.original_content) {
@@ -1351,6 +1414,9 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 }
                 if (m.offtopic) {
                     out.offtopic = true;
+                }
+                if (m.result_note) {
+                    out.result_note = true;
                 }
                 if (m.turn) {
                     out.turn = m.turn;
@@ -1422,7 +1488,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
          */
         async _deleteSession(sessionId) {
             if (sessionId && typeof sessionId === 'object' && sessionId.target) {
-                // OWL1 a veces pasa el evento si el binding del template falla.
+                // OWL1 sometimes passes the event if the template binding fails.
                 return;
             }
             if (!sessionId) {
@@ -1633,7 +1699,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     this.state.connected = false;
                 }
                 this.state.can_save_for_template = !!result.can_save_raw;
-                // Se guarda incluso sin rates: trae el motivo del fallo para el chip.
+                // Saved even without rates: it carries the failure reason for the chip.
                 this._fx = (result && result.fx) ? result.fx : null;
                 this._defaultDisplayCurrency = (result && result.display_currency) || 'USD';
                 this._applyCardWidthRatio(result && result.card_width_ratio);
@@ -1876,12 +1942,12 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         }
 
         /**
-         * Rehidrata los chips de consumo de un mensaje leído de la BD.
+         * Rehydrates the usage chips of a message read from the DB.
          *
-         * El histórico guarda usage / context_limit / velocidad, pero no el
-         * bloque pintable: hay que reconstruirlo en TODA ruta de carga. Si solo
-         * lo hace una, abrir Chatboo deja el turno sin tokens ni coste aunque el
-         * consumo esté facturado y guardado.
+         * History stores usage / context_limit / speed, but not the
+         * paintable block: it must be rebuilt on EVERY load path. If only
+         * one does it, opening Chatboo leaves the turn with no tokens or cost even if the
+         * usage was billed and saved.
          */
         _rebuildContextInfo(msg) {
             if (!msg || msg.role !== 'assistant') {
@@ -2050,13 +2116,13 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
          * Format timestamp with date and duration
          * @param {Date} startTime - Start time
          * @param {Date} endTime - End time (optional, defaults to now)
-         * @returns {string} - Formatted timestamp "yyyy-mm-dd hh:mm:ss (X segundos)"
+         * @returns {string} - Formatted timestamp "yyyy-mm-dd hh:mm:ss (X seconds)"
          */
         _formatTimestamp(startTime, endTime = null) {
             if (!endTime) endTime = new Date();
             const duration = Math.round((endTime - startTime) / 1000); // Duration in seconds
             const wall = formatters.formatWallclock(startTime);
-            return `${wall} (${duration} segundos)`;
+            return `${wall} (${duration} ${_t("seconds")})`;
         }
 
         /**
@@ -2073,9 +2139,9 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
          * @returns {Promise<Object>} Server response payload.
          */
         _callJsonRoute(route, params, options) {
-            // Llama a una ruta Odoo type='json' (envoltorio JSON-RPC). Devuelve result.
-            // options.timeoutMs: aborta el fetch (evita spinner infinito si el worker
-            // está bloqueado por un lock de otra sesión, p. ej. caja A MCP).
+            // Calls an Odoo type='json' route (JSON-RPC wrapper). Returns result.
+            // options.timeoutMs: aborts the fetch (avoids an endless spinner if the worker
+            // is blocked by another session's lock, e.g. MCP box A).
             options = options || {};
             var timeoutMs = options.timeoutMs;
             var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
@@ -2095,8 +2161,14 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
 
         _restorePendingVerifications() {
             // Same SoT as Security → Authorizations: live pending rows, not SSE memory.
+            // One at a time: two answers in flight would each sign the same card.
+            if (this._restoringCards) {
+                return this._restoringCards;
+            }
             var self = this;
-            return this._callJsonRoute('/pns_ai_mcp/verification/pending', {})
+            this._restoringCards = this._callJsonRoute('/pns_ai_mcp/verification/pending', {
+                held: this._heldCardIds(),
+            })
                 .then(function (res) {
                     var items = (res && res.items) || [];
                     for (var i = 0; i < items.length; i++) {
@@ -2108,7 +2180,23 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 })
                 .catch(function () {
                     return undefined;
+                })
+                .then(function () {
+                    self._restoringCards = null;
                 });
+            return this._restoringCards;
+        }
+
+        _heldCardIds(except) {
+            // Cards this screen paints with their token: the server leaves it alone.
+            var ids = [];
+            document.querySelectorAll('[id^="pns_verif_"]').forEach(function (el) {
+                var id = el.id.slice('pns_verif_'.length);
+                if (id && id !== except && el.dataset.confirmToken) {
+                    ids.push(id);
+                }
+            });
+            return ids;
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -2165,6 +2253,56 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             if (card) {
                 card.remove();
             }
+        }
+
+        _retryRefusedCard(evt, card, res, status, enable, again) {
+            // The card was refused, not the operation: nothing ran, so the AI is
+            // not told (it would propose the write again). The person already
+            // pressed Confirm: the card takes a fresh token and confirms once more.
+            const err = res && res.error;
+            if (err !== 'too_soon' && err !== 'bad_token' && err !== 'missing_token') {
+                return false;
+            }
+            const giveUp = function () {
+                status.style.color = '#c62828';
+                status.textContent = _t('Could not confirm the operation. Press Confirm again.');
+                enable();
+            };
+            if (!again) {
+                giveUp();
+                return true;
+            }
+            // A fresh token restarts the wait the server asks of a high-risk card.
+            const wait = evt.danger_level === 'high' ? 5500 : 0;
+            status.style.color = '#555';
+            status.textContent = _t('Confirming…');
+            if (err === 'too_soon') {
+                setTimeout(again, wait || 1000);
+                return true;
+            }
+            const self = this;
+            this._callJsonRoute('/pns_ai_mcp/verification/pending', {
+                held: this._heldCardIds(evt.verification_id),
+            })
+                .then(function (fresh) {
+                    const items = (fresh && fresh.items) || [];
+                    items.forEach(function (item) {
+                        if (item && item.verification_id) {
+                            self._showVerificationUI(item);
+                        }
+                    });
+                    const still = items.some(function (item) {
+                        return item && item.verification_id === evt.verification_id;
+                    });
+                    if (!still) {
+                        status.textContent = _t('This operation is no longer pending.');
+                        setTimeout(function () { card.remove(); }, 2500);
+                        return;
+                    }
+                    setTimeout(again, wait);
+                })
+                .catch(giveUp);
+            return true;
         }
 
         _showVerificationUI(evt) {
@@ -2259,12 +2397,16 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 confirmBtn.disabled = true; cancelBtn.disabled = true;
                 confirmBtn.style.opacity = '.6'; cancelBtn.style.opacity = '.6';
             };
+            const enable = function () {
+                confirmBtn.disabled = false; cancelBtn.disabled = false;
+                confirmBtn.style.opacity = '1'; cancelBtn.style.opacity = '1';
+            };
 
-            confirmBtn.addEventListener('click', function () {
+            const sendConfirm = function (retried) {
                 disable();
                 status.style.color = '#555';
                 status.textContent = _t('Confirming…');
-                // Fase A: solo confirm (rápido). Nunca execute en este HTTP.
+                // Phase A: confirm only (fast). Never execute in this HTTP call.
                 self._callJsonRoute(
                     '/pns_ai_mcp/verification/confirm',
                     {
@@ -2282,6 +2424,11 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                         self.state.thinking = false;
                         self.state.disabled = false;
                         if (self._updateSystrayBadge) { self._updateSystrayBadge(); }
+                        if (!ok && self._retryRefusedCard(
+                            evt, card, res, status, enable,
+                            retried ? null : function () { sendConfirm(true); })) {
+                            return;
+                        }
                         if (!ok) {
                             status.style.color = busy ? '#9a6b00' : '#c62828';
                             status.textContent = busy
@@ -2343,7 +2490,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                         self._finishVerificationOutcome(
                             evt, { success: false, error: String(e) }, 'confirm');
                     });
-            });
+            };
+            confirmBtn.addEventListener('click', function () { sendConfirm(false); });
 
             cancelBtn.addEventListener('click', function () {
                 disable();
@@ -2390,7 +2538,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         }
 
         // ══════════════════════════════════════════════════════════════════════
-        // 5b. SCREEN FOCUS — artefacto Odoo debajo del overlay
+        // 5b. SCREEN FOCUS — Odoo artifact under the overlay
         // ══════════════════════════════════════════════════════════════════════
 
         _refreshScreenFocus() {
@@ -2477,7 +2625,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
          * @returns {Promise<string>} Accumulated assistant response text
          * @throws {Error} On network failure or server error
          */
-        async _streamChat(text, historyForApi, images, files, imageNames) {
+        async _streamChat(text, historyForApi, images, files, imageNames, resultNote) {
             let acc = "";
             this._lastStreamMeta = null;
             this._lastStreamTiming = null;
@@ -2494,12 +2642,12 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 }
                 return formatters.formatMarkdown(src) || '';
             };
-            // Watchdog de inactividad + cancelación manual. El servidor manda un
-            // 'status' por turno y tokens según llegan, así que un silencio total
-            // de STREAM_IDLE_MS significa que el proveedor se colgó (o un reinicio
-            // dejó el socket a medias): abortamos el fetch para que el turno no se
-            // quede en "Thinking…" eterno. El botón de cancelar usa el mismo
-            // AbortController (razón 'user'). Ver docs/arquitectura_streaming_sse.md.
+            // Idle watchdog + manual cancel. The server sends one
+            // 'status' per turn and tokens as they arrive, so total silence
+            // for STREAM_IDLE_MS means the provider hung (or a restart
+            // left the socket half open): we abort the fetch so the turn does not
+            // stay on "Thinking…" forever. The cancel button uses the same
+            // AbortController (reason 'user'). See docs/arquitectura_streaming_sse.md.
             const STREAM_IDLE_MS = 120000;
             const controller = new AbortController();
             this._streamAbort = controller;
@@ -2523,13 +2671,14 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     images: images,
                     imageNames: imageNames,
                     files: files,
+                    resultNote: !!resultNote,
                 });
                 // The body is not a form: Odoo reads csrf_token from the query.
                 const resp = await fetch(ChatbooTurn.streamUrl(odoo.csrf_token), {
-                    // Odoo 14 enruta por Content-Type: 'application/json' fuerza un
-                    // JsonRequest que choca con la ruta type='http' (BadRequest, body
-                    // sin SSE). Con text/plain O14 lo trata como http; el controller
-                    // lee el body crudo con json.loads, así que el formato no cambia.
+                    // Odoo 14 routes by Content-Type: 'application/json' forces a
+                    // JsonRequest that clashes with the type='http' route (BadRequest, body
+                    // without SSE). With text/plain O14 treats it as http; the controller
+                    // reads the raw body with json.loads, so the format does not change.
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
                     credentials: 'same-origin',
@@ -2566,9 +2715,9 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     } else if (evt.event === 'status' && evt.message) {
                         this.state.statusLabel = evt.message;
                     } else if (evt.event === 'meta') {
-                        // Auto-promoción: el servidor nos dice qué sesión/job creó/usó
-                        // el worker para poder recargarla como fuente de verdad, y el
-                        // request_id para ignorar el aviso de bus de ESTE turno.
+                        // Auto-promotion: the server tells us which session/job the worker
+                        // created/used so we can reload it as the source of truth, and the
+                        // request_id to ignore the bus notice for THIS turn.
                         this._lastStreamSessionId = evt.session_id || this._lastStreamSessionId;
                         this._lastStreamRequestId = evt.request_id || null;
                     } else if (evt.event === 'done') {
@@ -2580,8 +2729,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     } else if (evt.event === 'choice' && evt.choice_id) {
                         this._showChoiceList(evt);
                     } else if (evt.event === 'verification' && evt.verification_id) {
-                        // Caja B: la IA ha propuesto una escritura. Mostrar la
-                        // confirmación inline (no depende del bus/toast).
+                        // Box B: the AI proposed a write. Show the
+                        // confirmation inline (does not depend on the bus/toast).
                         this._showVerificationUI(evt);
                     } else if (evt.event === 'error') {
                         // Server-side error pushed via SSE — mark as error
@@ -2608,9 +2757,9 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 };
                 return acc;
             } catch (err) {
-                // Abort (cancelación manual o watchdog de inactividad): devolvemos
-                // lo acumulado (si hay) y marcamos el motivo para que _sendMessage
-                // pinte un aviso limpio en vez de un error rojo de "comunicación".
+                // Abort (manual cancel or idle watchdog): we return
+                // what was gathered (if any) and mark the reason so _sendMessage
+                // paints a clean notice instead of a red "communication" error.
                 if (err && (err.name === 'AbortError' || this._streamAbortReason)) {
                     const reason = this._streamAbortReason || 'user';
                     const e = new Error(reason === 'idle'
@@ -2631,8 +2780,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         }
 
         /**
-         * Cancela el turno en curso (botón de la burbuja "Thinking…").
-         * Aborta el SSE local y pide al worker que pare el job en servidor.
+         * Cancels the running turn (button in the "Thinking…" bubble).
+         * Aborts the local SSE and asks the worker to stop the job on the server.
          */
         _cancelStream() {
             const rid = this._lastStreamRequestId || this._resumeReqId || null;
@@ -2730,29 +2879,29 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
          * @returns {string} HTML string for the result note.
          */
         _buildVerificationResultNote(evt, res, action) {
-            // Texto (turno de usuario, no visible) que recibe la IA para que informe del
-            // resultado de la escritura en el idioma del usuario.
-            // GUARD: este turno NO es una petición de escritura. Hay que impedir que el
-            // modelo "ejecute" ejemplos del prompt o re-proponga operaciones.
-            const guard = ' IMPORTANTE: este es solo un aviso de resultado, NO una petición. ' +
-                'NO llames a ninguna herramienta y NO propongas ni crees ninguna operación nueva ' +
-                '(ignora cualquier ejemplo del prompt); limítate a redactar el mensaje al usuario.';
+            // Text (user turn, not visible) the AI receives so it reports the
+            // result of the write in the user's language.
+            // GUARD: this turn is NOT a write request. The model must be stopped from
+            // "running" prompt examples or proposing operations again.
+            const guard = ' IMPORTANT: this is only a result notice, NOT a request. ' +
+                'Call no tool and do not propose or create any new operation ' +
+                '(ignore any example in the prompt); just write the message to the user.';
             const title = (evt && evt.title) || _t('the operation');
             if (action === 'cancel') {
-                return '[Resultado del sistema] El usuario ha CANCELADO la operación de escritura «' + title +
-                    '». No se ha ejecutado ningún cambio. Confírmaselo de forma breve y natural en su idioma.' + guard;
+                return '[System result] The user CANCELLED the write operation «' + title +
+                    '». No change was made. Confirm it briefly and naturally in their language.' + guard;
             }
             const ok = res && res.success !== false;
             if (ok) {
                 let det = '';
                 try { det = res && res.results ? JSON.stringify(res.results) : ''; } catch (e) { det = ''; }
-                return '[Resultado del sistema] El usuario ha CONFIRMADO la operación «' + title +
-                    '» y se ha ejecutado CORRECTAMENTE.' + (det ? (' Resultado: ' + det + '.') : '') +
-                    ' Informa al usuario del éxito de forma breve y natural en su idioma, mencionando lo que se ha creado o modificado.' + guard;
+                return '[System result] The user CONFIRMED the operation «' + title +
+                    '» and it ran SUCCESSFULLY.' + (det ? (' Result: ' + det + '.') : '') +
+                    ' Tell the user it worked, briefly and naturally in their language, naming what was created or changed.' + guard;
             }
-            return '[Resultado del sistema] El usuario ha CONFIRMADO la operación «' + title +
-                ' but it FAILED to run. Error: ' + ((res && res.error) || _t('unknown')) +
-                '. Discúlpate brevemente y explica el problema en el idioma del usuario.' + guard;
+            return '[System result] The user CONFIRMED the operation «' + title +
+                '» but it FAILED to run. Error: ' + ((res && res.error) || _t('unknown')) +
+                '. Apologise briefly and explain the problem in their language.' + guard;
         }
 
         /**
@@ -2823,8 +2972,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
          * @returns {Promise<void>}
          */
         async _runResultTurn(noteText) {
-            // Opción B: lanza un turno de la IA con el resultado de una escritura
-            // confirmada/cancelada. No añade burbuja de usuario; solo la respuesta.
+            // Option B: starts an AI turn with the result of a confirmed/cancelled
+            // write. It adds no user bubble; only the answer.
             if (this.state.thinking) { return; }
             const startTime = new Date();
 
@@ -2836,7 +2985,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 historyForApi = this._messagesForModel(this.messages);
             }
 
-            // Dueño local del spinner: el bus no debe apagarlo mientras dura el SSE.
+            // Local owner of the spinner: the bus must not turn it off while the SSE runs.
             this._sseOwnsThinking = true;
             this.state.thinking = true;
             this.state.canCancel = true;
@@ -2844,7 +2993,9 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             this.state.statusLabel = '';
             this.scrollToBottom();
             try {
-                const txt = await this._streamChat(noteText, historyForApi);
+                const txt = await this._streamChat(
+                    noteText, historyForApi, null, null, null, true,
+                );
                 this.messages.push(
                     this._buildAssistantPayloadFromStream(txt, startTime, new Date()),
                 );
@@ -2897,8 +3048,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             const files = (this.state.pendingFiles || []).slice();
             if (!text && !images.length && !files.length) return;
 
-            // Comandos built-in (/skills, /create-skill): se resuelven
-            // en el cliente, no se envían como turno al LLM. Solo aplican a texto puro.
+            // Built-in commands (/skills, /create-skill): they are resolved
+            // in the client, not sent to the LLM as a turn. Only for plain text.
             if (!images.length && !files.length) {
                 const builtin = this._matchBuiltinCommand(text);
                 if (builtin) {
@@ -2928,16 +3079,16 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             this.currentInputBeforeHistory = "";
 
             // 1. Add User Message (no duration for user messages, just timestamp).
-            // Las imágenes (si las hay) se muestran en la burbuja; viajan solo en
-            // este turno hacia el modelo de visión, no entran en el historial.
-            const userTimestamp = this._formatTimestamp(startTime, startTime); // Duration = 0 for user messages
+            // Images (if any) show in the bubble; they travel only in
+            // this turn to the vision model, they do not enter the history.
+            const userTimestamp = formatters.formatWallclock(startTime);
             const _textHtml = text
                 ? `<div style="font-family: 'Courier New', Courier, monospace; font-size: 1.25em; line-height: 1.4;">${text
                     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                     .replace(/\n/g, "<br/>")}</div>`
                 : '';
-            // images/files como campos (template owl1); el worker los sustituye
-            // por URLs de ir.attachment en meta.user_images / user_files.
+            // images/files as fields (owl1 template); the worker replaces them
+            // with ir.attachment URLs in meta.user_images / user_files.
             this.messages.push({
                 role: "user",
                 content: _textHtml,
@@ -2948,7 +3099,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     url: f.url || null,
                     size: f.size,
                 })),
-                timestamp: userTimestamp.replace(' (0 segundos)', ''), // Remove duration for user messages
+                timestamp: userTimestamp,
                 startTime: startTime, // Store for duration calculation in assistant response
                 usage: null // No usage for user messages
             });
@@ -2961,19 +3112,19 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 historyForApi = [...lastAssistantWithHistory.backend_history];
             } else {
                 // Fallback: extract plain text from HTML content.
-                // slice(0, -1): excluimos el turno actual (que acabamos de
-                // empujar a this.messages). El motor lo añade él mismo —como
-                // mensaje MULTIMODAL si hay imágenes—, así que si lo dejáramos
-                // aquí iría DUPLICADO y en texto plano (sin imagen). Con visión
-                // eso hace que el modelo vea primero una pregunta "sin imagen" y
-                // se niegue a analizarla. owl2 ya lo excluye (excludeTail:1).
+                // slice(0, -1): we leave out the current turn (which we just
+                // pushed to this.messages). The engine adds it itself —as a
+                // MULTIMODAL message if there are images—, so if we left it
+                // here it would be DUPLICATED and in plain text (no image). With vision
+                // that makes the model first see a question "without image" and
+                // refuse to analyse it. owl2 already leaves it out (excludeTail:1).
                 historyForApi = this._messagesForModel(this.messages, 1);
             }
-            // El turno actual NO se añade al history: el motor lo incorpora como
-            // mensaje de usuario (multimodal cuando hay imágenes). Duplicarlo aquí
-            // metía una copia en texto plano que "eclipsaba" la imagen y disparaba
-            // la negativa del modelo en O14 (backend_history llega hasta el turno
-            // anterior; el actual lo pone el motor).
+            // The current turn is NOT added to history: the engine adds it as a
+            // user message (multimodal when there are images). Duplicating it here
+            // added a plain-text copy that "hid" the image and triggered
+            // the model's refusal in O14 (backend_history goes up to the previous
+            // turn; the engine adds the current one).
 
             this.state.currentInput = "";
             this.state.promptMultiline = false;
@@ -2981,14 +3132,14 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             this.state.pendingImages = [];
             this.state.pendingImageNames = [];
             this.state.pendingFiles = [];
-            this._syncInputEl();  // vaciar el <textarea> en el DOM (no tiene binding de value)
+            this._syncInputEl();  // clear the <textarea> in the DOM (it has no value binding)
             this._syncPromptHeight();
             this._resetInputPlaceholder();
             this.state.slashOpen = false;
             this.state.slashItems = [];
             this._syncSlashMenu();
-            // Dueño local del spinner: el bus (async_done del turno anterior) NO
-            // debe apagar thinking mientras dura este SSE.
+            // Local owner of the spinner: the bus (async_done of the previous turn) must NOT
+            // turn off thinking while this SSE runs.
             this._sseOwnsThinking = true;
             this.state.thinking = true;
             this.state.canCancel = true;
@@ -3008,12 +3159,12 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     params.session_id = this.state.currentSessionId;
                 }
 
-                // F1: transporte SSE (sustituye al JSON-RPC /chatboo/send).
+                // F1: SSE transport (replaces the JSON-RPC /chatboo/send).
                 const __sseText = await this._streamChat(text, historyForApi, images.length ? images : null, files.length ? files : null, imageNames.length ? imageNames : null);
                 const __meta = this._lastStreamMeta || {};
                 const __timing = this._lastStreamTiming || {};
-                // Velocidad real medida en cliente: decode = completion_tokens / (fin − 1er token);
-                // prefill ≈ prompt_tokens / time-to-first-token. Si falta el usage, queda en 0.
+                // Real speed measured in the client: decode = completion_tokens / (end − 1st token);
+                // prefill ≈ prompt_tokens / time-to-first-token. If usage is missing, it stays 0.
                 let __speedTps = 0;
                 let __promptSpeedTps = 0;
                 if (__meta.usage) {
@@ -3051,12 +3202,12 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     history: null,
                 };
 
-                // Auto-promoción: si el worker ya persistió el turno en la sesión
-                // (fuente de verdad), recargamos desde BD en vez de autoensamblar
-                // aquí. Así la respuesta es idéntica se haya visto en vivo o no, y
-                // sobrevive a un F5 sin duplicar mensajes.
-                // Parche en vivo: sustituir base64 / chips sin URL por los del worker
-                // (aunque luego recarguemos por authored).
+                // Auto-promotion: if the worker already saved the turn in the session
+                // (source of truth), we reload from the DB instead of assembling it
+                // here. So the answer is the same whether seen live or not, and
+                // it survives an F5 without duplicate messages.
+                // Live patch: replace base64 / chips without URL with the worker's
+                // (even if we reload later by authored).
                 if ((__meta.user_images && __meta.user_images.length)
                         || (__meta.user_files && __meta.user_files.length)) {
                     for (let i = this.messages.length - 1; i >= 0; i--) {
@@ -3079,9 +3230,9 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 if (__meta.authored) {
                     const sid = __meta.session_id || this._lastStreamSessionId || this.state.currentSessionId;
                     if (sid) {
-                        // El worker ya persistió las imágenes del turno como
-                        // ir.attachment; al recargar, _loadSession las deja en
-                        // msg.images / msg.files (URLs). No hace falta recordarlas aquí.
+                        // The worker already saved the turn's images as
+                        // ir.attachment; on reload, _loadSession puts them in
+                        // msg.images / msg.files (URLs). No need to remember them here.
                         const kept = this.messages.slice();
                         this.state.currentSessionId = sid;
                         await this._loadSession(sid);
@@ -3123,14 +3274,14 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     // Store original content (plain text) for copy without formatting
                     let originalContent = result.content || '';
 
-                    // Si el contenido es JSON, formatearlo con saltos de línea entre elementos
+                    // If the content is JSON, format it with line breaks between items
                     try {
                         const parsed = JSON.parse(originalContent);
                         if (parsed && typeof parsed === 'object') {
                             originalContent = this._formatJsonWithLineBreaks(parsed);
                         }
                     } catch (e) {
-                        // No es JSON válido, mantener original
+                        // Not valid JSON, keep the original
                     }
 
                     const formattedHtml = this._formatContent(result.content || '');
@@ -3176,10 +3327,10 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     // conversation_id is managed automatically by backend (agnostic)
                     // Backend will save it to session if provider is Router
 
-                    // Crea la sesión si es el primer mensaje. El guardado de una
-                    // sesión EXISTENTE lo hace el bloque finally: así solo se lanza
-                    // UN save por turno y no dos escrituras concurrentes sobre la
-                    // misma fila chatboo.session (evita SERIALIZATION_FAILURE).
+                    // Create the session if this is the first message. Saving an
+                    // EXISTING session is done by the finally block: so only
+                    // ONE save runs per turn, not two concurrent writes on the
+                    // same chatboo.session row (avoids SERIALIZATION_FAILURE).
                     if (!this.state.currentSessionId) {
                         // Create new session automatically (first message), then save.
                         this._createNewSession(false).then(() => { // DO NOT clear UI
@@ -3198,7 +3349,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 console.error(error);
                 const errorTime = new Date();
                 if (error && error.__aborted) {
-                    // Cancelación manual o watchdog: aviso sobrio, no error rojo.
+                    // Manual cancel or watchdog: plain notice, not a red error.
                     const partial = (error.__partial || '').trim();
                     const icon = error.__aborted === 'user' ? '⏹' : '⏱';
                     const note = `<span class="text-muted">${icon} ${error.message}</span>`;
@@ -3225,8 +3376,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 this.scrollToBottom();
 
                 // Auto-save session after sending message.
-                // Si el worker asíncrono ya persistió el turno, NO re-guardamos
-                // (evita sobrescribir la sesión y duplicar mensajes).
+                // If the async worker already saved the turn, we do NOT save again
+                // (avoids overwriting the session and duplicating messages).
                 if (this.state.currentSessionId && !this._skipTurnSave) {
                     // Save asynchronously (don't block UI)
                     this._saveCurrentSession().catch(err => console.error('Error auto-saving session:', err));
@@ -3324,7 +3475,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
          * current input caret position. Renders the filtered suggestion list.
          */
         _syncSlashMenu() {
-            // OWL1: menú en document.body (evita clipping/recorte del layout absoluto).
+            // OWL1: menu on document.body (avoids clipping by the absolute layout).
             if (!this.state.slashOpen || !this.state.slashItems.length) {
                 this._removeSlashMenu();
                 return;
@@ -3417,7 +3568,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         }
 
         _syncInputEl() {
-            // OWL 1: t-att-value no siempre actualiza el DOM al cambiar state desde JS.
+            // OWL 1: t-att-value does not always update the DOM when state changes from JS.
             if (this.chatInputRef && this.chatInputRef.el) {
                 this.chatInputRef.el.value = this.state.currentInput || '';
             }
@@ -3580,9 +3731,9 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             this._syncPromptHeight();
         }
 
-        // Pegar una imagen (Ctrl+V) → se adjunta al turno y viaja al modelo de
-        // visión como un chat de IA normal. Si el portapapeles trae solo texto,
-        // dejamos el pegado nativo.
+        // Paste an image (Ctrl+V) → it is attached to the turn and goes to the
+        // vision model like a normal AI chat. If the clipboard has only text,
+        // we leave the native paste.
         onPaste(ev) {
             const items = (ev.clipboardData && ev.clipboardData.items) || [];
             const files = [];
@@ -3603,9 +3754,9 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             }
         }
 
-        // Clase FontAwesome (FA4, disponible en O14–O19) para el chip de un
-        // fichero según su mimetype/extensión. Devuelve la clase completa
-        // ("fa fa-file-pdf-o"). Fallback genérico "fa fa-file-o".
+        // FontAwesome class (FA4, available in O14–O19) for a file's
+        // chip by its mimetype/extension. Returns the full class
+        // ("fa fa-file-pdf-o"). Generic fallback "fa fa-file-o".
         _fileIconClass(name, mimetype) {
             const mt = (mimetype || '').toLowerCase();
             const ext = (name || '').toLowerCase().split('.').pop();
@@ -3669,7 +3820,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             });
         }
 
-        /** Canvas button only when a provider has the Design tick. */
+        /** Canvas button only when the engine finds someone for the Design role. */
         _applyCanvas(available) {
             const charts = window.ChatbooCharts;
             if (!charts || typeof charts.setCanvas !== 'function') {
@@ -3836,9 +3987,9 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             return (mfile && mfile.name) || false;
         }
 
-        // URL de formulario para un registro {model, id}. Deep-link clásico válido
-        // en O14–O19. Se abre en pestaña nueva (target=_blank), respetando los
-        // permisos Odoo del usuario.
+        // Form URL for a record {model, id}. Classic deep link valid
+        // in O14–O19. Opens in a new tab (target=_blank), respecting the
+        // user's Odoo permissions.
         _recordUrl(rec) {
             if (!rec || !rec.model || !rec.id) {
                 return '#';
@@ -3850,7 +4001,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             try {
                 const dataUrl = await this._readFileAsDataUrl(file);
                 this.state.pendingImages.push(dataUrl);
-                // Conserva el nombre si viene de fichero; null si es pegado (portapapeles).
+                // Keep the name if it comes from a file; null if pasted (clipboard).
                 this.state.pendingImageNames.push((file && file.name) || null);
             } catch (e) {
                 if (this.props.notification) {
@@ -3866,10 +4017,10 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             this._focusChatInput();
         }
 
-        // ── Clip: adjuntar ficheros (Fase 1: datos/texto · Fase 2: imágenes) ──
-        // Abre el selector (input file oculto en la plantilla). Las imágenes
-        // raster se enrutan a la vía multimodal (pendingImages, igual que el
-        // pegado); el SVG va como texto (XML); el resto como fichero de datos.
+        // ── Clip: attach files (Phase 1: data/text · Phase 2: images) ──
+        // Opens the picker (hidden file input in the template). Raster
+        // images go the multimodal way (pendingImages, same as
+        // paste); SVG goes as text (XML); the rest as a data file.
         onClipClick() {
             const input = this.el && this.el.querySelector('.o_chatboo_file_input');
             if (input) {
@@ -3877,7 +4028,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             }
         }
 
-        // Imagen apta para visión: cualquier image/* salvo SVG (XML → como texto).
+        // Image fit for vision: any image/* except SVG (XML → as text).
         _isVisionImage(file) {
             const t = (file.type || '').toLowerCase();
             if (t === 'image/svg+xml') {
@@ -3890,16 +4041,16 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             const files = Array.from((ev.target && ev.target.files) || []);
             await this._ingestFiles(files);
             if (ev.target) {
-                ev.target.value = '';  // permitir re-seleccionar el mismo fichero
+                ev.target.value = '';  // allow picking the same file again
             }
             this._focusChatInput();
         }
 
-        // Enruta una lista de ficheros (del selector o de drag&drop): imágenes de
-        // visión → vía multimodal (conservan nombre); el resto → fichero de datos.
+        // Routes a list of files (from the picker or drag&drop): vision
+        // images → multimodal way (keep their name); the rest → data file.
         async _ingestFiles(files) {
             for (const f of Array.from(files || [])) {
-                if (f.size > 10 * 1024 * 1024) {  // tope defensivo 10 MB
+                if (f.size > 10 * 1024 * 1024) {  // safety cap 10 MB
                     if (this.props.notification) {
                         this.props.notification({
                             message: _t('File too large (max 10 MB): ') + f.name, type: 'danger',
@@ -3915,9 +4066,9 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             }
         }
 
-        // ── Drag & drop de ficheros en CUALQUIER zona del chat ───────────────
-        // Solo reaccionamos a arrastres con ficheros (no a selección de texto).
-        // El overlay es solo visual (pointer-events:none): el 'drop' llega a la raíz.
+        // ── Drag & drop of files on ANY part of the chat ─────────────────
+        // We only react to drags with files (not text selection).
+        // The overlay is only visual (pointer-events:none): the 'drop' reaches the root.
         _dragHasFiles(ev) {
             const dt = ev && ev.dataTransfer;
             return !!(dt && Array.from(dt.types || []).indexOf('Files') !== -1);
@@ -3927,12 +4078,12 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             if (!this._dragHasFiles(ev)) {
                 return;
             }
-            ev.preventDefault();  // imprescindible para habilitar el 'drop'
+            ev.preventDefault();  // required to enable the 'drop'
             this.state.dragActive = true;
         }
 
         _onDragLeave(ev) {
-            // Evita parpadeo al pasar por hijos: solo desactivar al salir de la raíz.
+            // Avoids flicker when passing over children: only turn off when leaving the root.
             if (ev.relatedTarget && ev.currentTarget && ev.currentTarget.contains(ev.relatedTarget)) {
                 return;
             }
@@ -3951,7 +4102,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         }
 
         async _attachDataFile(file) {
-            if (file.size > 10 * 1024 * 1024) {  // tope defensivo 10 MB
+            if (file.size > 10 * 1024 * 1024) {  // safety cap 10 MB
                 if (this.props.notification) {
                     this.props.notification({
                         message: _t('File too large (max 10 MB): ') + file.name, type: 'danger',
@@ -4056,7 +4207,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             return 1;
         }
 
-        // Ítems de skill: míos, extras, inyectados, nativos; A–Z dentro de cada grupo.
+        // Skill items: mine, extras, injected, native; A–Z inside each group.
         /**
          * Map raw skill records to slash-menu item format.
          * @param {Array} skills - Skill records from the server.
@@ -4091,9 +4242,9 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             });
         }
 
-        // Placeholder por defecto del input (calculado en runtime, i18n-safe).
+        // Default input placeholder (computed at runtime, i18n-safe).
         _defaultInputPlaceholder() {
-            return _t('Ask Chatboo... (/ for commands & skills, ↑↓ for history)');
+            return _t('Ask Chatboo AI... (/ for commands & skills, ↑↓ for history)');
         }
 
         _resetInputPlaceholder() {
@@ -4103,7 +4254,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             }
         }
 
-        // Pista de argumentos (arg_hint) del skill cuyo "/<code>" se teclea.
+        // Argument hint (arg_hint) of the skill whose "/<code>" is being typed.
         _syncArgPlaceholder(text) {
             const m = /^\/(\S+)/.exec((text || '').trim());
             if (!m) {
@@ -4121,7 +4272,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             }
         }
 
-        // Comandos built-in + skills filtrados por fragmento (autocompletado al teclear).
+        // Built-in commands + skills filtered by fragment (autocomplete while typing).
         /**
          * Filter slash-menu items by a query string (prefix match on code/label).
          * @param {Array} skills - Full skill list.
@@ -4224,7 +4375,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             let items;
             await this._ensureSkills(!token || this.state.slashMode === 'skills');
             if (!token) {
-                // "/" a secas: menú de comandos; skills tras /skills; modes tras /mode.
+                // Bare "/": commands menu; skills after /skills; modes after /mode.
                 if (this.state.slashMode === 'skills') {
                     items = this._skillItems(this.skillsCache || []);
                 } else if (this.state.slashMode === 'mode') {
@@ -4511,7 +4662,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 role: 'assistant',
                 content: html,
                 timestamp: formatters.formatWallclock(new Date()),
-                // Ayuda local (sin inferencia): no chips de gasto ni aviso de modelo.
+                // Local help (no inference): no cost chips or model notice.
                 local_ack: true,
                 offtopic: true,
                 model_details: { model: 'Chatboo', provider: 'local' },
@@ -4521,7 +4672,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             }
         }
 
-        // Devuelve { code, arg } si el texto es un comando built-in reconocido.
+        // Returns { code, arg } if the text is a known built-in command.
         _matchBuiltinCommand(text) {
             const trimmed = (text || '').trim();
             const helpMatch = /^\/(\S+)\s+(\S+)\s*$/.exec(trimmed);
@@ -5131,7 +5282,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 }
             }
 
-            // Ctrl/Cmd+Enter: nueva línea (nunca envía). Enter solo: envía.
+            // Ctrl/Cmd+Enter: new line (never sends). Enter alone: sends.
             if (ev.which === 13 && (ev.ctrlKey || ev.metaKey)) {
                 ev.preventDefault();
                 this._insertPromptNewline(ev.target);
@@ -5197,16 +5348,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
         _formatContent(content) { return formatters.formatContent(content); }
         /** @see formatters.sanitizeHtml */
         _safeHtml(html) { return formatters.sanitizeHtml(html); }
-        /** @see formatters.formatMarkdown */
-        _formatMarkdown(content) { return formatters.formatMarkdown(content); }
-        /** @see formatters.formatCSV */
-        _formatCSV(lines) { return formatters.formatCSV(lines); }
         /** @see formatters.formatJsonWithLineBreaks */
         _formatJsonWithLineBreaks(obj, indent) { return formatters.formatJsonWithLineBreaks(obj, indent); }
-        /** @see formatters.formatNumber */
-        _formatNumber(value, locale) { return formatters.formatNumber(value, locale, formatters.DEFAULT_DECIMAL_PLACES); }
-        /** @see formatters.formatJsonAsTable */
-        _formatJsonAsTable(data) { return formatters.formatJsonAsTable(data); }
         /** @see formatters.escapeHtml */
         _escapeHtml(text) { return formatters.escapeHtml(text); }
 
@@ -5245,17 +5388,17 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 return;
             }
 
-            // Cabecera: LLM y proveedor que respondió (lo que el usuario quiere ver).
+            // Header: LLM and provider that answered (what the user wants to see).
             const latestAssistantMsg = assistantMessagesWithUsage[assistantMessagesWithUsage.length - 1];
             const modelDetails = latestAssistantMsg.model_details || {};
             const _model = modelDetails.model || "";
             const _provider = modelDetails.provider || "";
             const modelLabel = (_model || _provider)
                 ? [_model, _provider].filter(Boolean).join(" · ")
-                : "Unknown model";
+                : _t("Unknown model");
 
-            // Cada asistente con usage se empareja con SU prompt (guardado o
-            // usuario anterior), no con el enésimo user del array.
+            // Each assistant with usage is paired with ITS prompt (saved or
+            // previous user), not with the nth user in the array.
             const usageData = [];
             let totalUsed = 0;
             let maxLimit = 0;
@@ -5358,7 +5501,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                     <div class="modal-dialog modal-xl">
                         <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
                             <div class="modal-header bg-light">
-                                <h5 class="modal-title"><i class="fa fa-microchip mr-2"></i> ${_t('Conversation analysis:')} <span class="text-primary font-weight-bold">${modelLabel}</span></h5>
+                                <h5 class="modal-title"><i class="fa fa-microchip mr-2"></i> ${_t('Conversation analysis:')} <span class="text-primary font-weight-bold">${this._escapeHtml(modelLabel)}</span></h5>
                                 <button type="button" class="close" onclick="document.getElementById('contextChartModal').remove()">
                                     <span>×</span>
                                 </button>
@@ -5466,7 +5609,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                                 </div>
                             </div>
                             <div class="modal-footer bg-light">
-                                <span class="mr-auto text-muted small"><i class="fa fa-microchip"></i> ${modelLabel}</span>
+                                <span class="mr-auto text-muted small"><i class="fa fa-microchip"></i> ${this._escapeHtml(modelLabel)}</span>
                                 <button type="button" class="btn btn-secondary" onclick="document.getElementById('contextChartModal').remove()">Close</button>
                             </div>
                         </div>
@@ -5702,8 +5845,8 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
     ChatbooComponent.template = xml`
         <div class="o_content o_chatboo_container" style="position: absolute; top: 0; bottom: 0; left: 0; right: 0; background: #f8f9fa; display: flex; flex-direction: column;"
              t-on-dragenter="_onDragOver" t-on-dragover="_onDragOver" t-on-dragleave="_onDragLeave" t-on-drop="_onDrop">
-            <!-- Overlay al arrastrar ficheros sobre CUALQUIER zona del chat. Solo
-                 visual (pointer-events:none): el 'drop' llega a la raíz. -->
+            <!-- Overlay while files are dragged over ANY part of the chat. Visual
+                 only (pointer-events:none): the 'drop' reaches the root. -->
             <div t-if="state.dragActive" style="position:absolute;top:0;bottom:0;left:0;right:0;z-index:2000;pointer-events:none;background:rgba(13,110,253,0.08);border:2px dashed #0d6efd;border-radius:8px;display:flex;align-items:center;justify-content:center;">
                 <div style="background:#fff;padding:14px 22px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.15);color:#0d6efd;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px;">
                     <i class="fa fa-cloud-upload fa-2x"/>
@@ -5738,10 +5881,10 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
             <!-- Message list: flex fill so the last card stays above the prompt. -->
             <div class="o_chatboo_messages p-3 bg-100" t-ref="messages" style="flex: 1 1 auto; min-height: 0; overflow-y: auto;">
                 <t t-foreach="messages" t-as="msg" t-key="msg_index">
-                    <div t-attf-class="d-flex mb-2 {{ msg.role === 'user' ? 'justify-content-end' : 'justify-content-start' }}{{ msg.wideCanvas ? ' o_chatboo_message_row--chart' : '' }}"
+                    <div t-if="!msg.result_note" t-attf-class="d-flex mb-2 {{ msg.role === 'user' ? 'justify-content-end' : 'justify-content-start' }}{{ msg.wideCanvas ? ' o_chatboo_message_row--chart' : '' }}"
                          t-att-data-msg-index="msg_index"
                          t-att-data-turn="msg.context_info and msg.context_info.turn">
-                        <div t-attf-class="o_chatboo_message card border-0 shadow-sm p-2 {{ msg.role === 'user' ? 'bg-primary text-white' : 'bg-white' }}{{ msg.wideCanvas ? ' o_chatboo_message--chart' : '' }}" style="border-radius: 8px; position: relative;">
+                        <div t-attf-class="o_chatboo_message card border-0 shadow-sm p-2 {{ msg.role === 'user' ? 'bg-primary text-white' : 'bg-white' }}{{ msg.wideCanvas ? ' o_chatboo_message--chart' : '' }}" t-att-data-ai-generated="msg.role === 'assistant' ? 'true' : undefined" style="border-radius: 8px; position: relative;">
                             <div t-if="msg.wideCanvas"
                                  class="o_chatboo_card_resize"
                                  t-on-pointerdown="_onCardResizeStart"/>
@@ -5940,13 +6083,13 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                             <t t-elif="msg.role === 'assistant' and !msg.model_details and !msg.local_ack">
                                 <div style="font-size: 0.85em; color: #dc3545;">
                                     <i class="fa fa-exclamation fw-bold" style="margin-right: 4px;"></i>
-                                    <span>Sin información del modelo</span>
+                                    <span t-esc="tipNoModelInfo"/>
                                 </div>
                             </t>
                             <t t-if="msg.sources and msg.sources.length">
                                 <div class="text-muted" style="font-size: 0.85em;">
                                     <i class="fa fa-globe" style="margin-right: 4px;"></i>
-                                    Fuente: <t t-esc="msg.sources.join(', ')"/>
+                                    <t t-esc="tipSource"/> <t t-esc="msg.sources.join(', ')"/>
                                 </div>
                             </t>
                             <t t-if="msg.records and msg.records.length">
@@ -6116,7 +6259,7 @@ odoo.define('pns_ai_chatboo.Chatboo', function (require) {
                 </div>
             </div>
             
-            <!-- Session Modal (diseño portado de O19) -->
+            <!-- Session Modal (design ported from O19) -->
             <t t-if="state.showSessionModal">
                 <div class="o_chatboo_session_modal_backdrop" t-on-click.self="state.showSessionModal = false">
                     <div class="o_chatboo_session_modal" t-on-click.stop="">

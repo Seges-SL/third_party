@@ -4,18 +4,19 @@
 # Odoo reads this file with ast.literal_eval — no module docstring before `{`.
 
 {
-    'name': 'AI Engine',
-    'version': '3.1.879',
-    'category': 'Patanegra AI',
-    'summary': 'Agent engine for Odoo apps: PAAP roles, providers, skills, governed writes',
+    'name': 'PNS AI Engine',
+    'version': '14.0.3.1.973',
+    'images': ['static/description/banner_store.png'],
+    'category': 'Extra Tools',
+    'summary': 'Open-source AI engine and MCP server for Odoo Community 14 to 20: OpenAI, Claude, Ollama or any compatible model, read-only sandbox, every write approved by a person.',
     'description': """
         Patanegra AI Engine — core of the Patanegra AI stack for Odoo applications.
         Reference implementation of the Patanegra Application Agent Protocol (PAAP).
 
         Provides agents, provider chains, contexts, skills, audit log and the
         propose → authorize → execute write boundary (two-box model). Includes an
-        MCP server (Anthropic spec) as one inbound transport; Chatboo and domain
-        modules build on this engine.
+        MCP server (Anthropic spec) as one inbound transport; chat, voice and
+        domain modules build on this engine.
 
         Highlights:
         - Role → bundle → provider invocation (PAAP)
@@ -24,7 +25,8 @@
         - Extensible skills and domain knowledge per module
     """,
     'author': 'PATANEGRA Soft',
-    'website': '/pns_ai_mcp/static/description/index.html',
+    'website': 'https://www.patanegra.com/ai-engine.html',
+    # Apache License 2.0 — see LICENSE file
     'license': 'Other OSI approved licence',
     'depends': ['web', 'pns_base'],
     'external_dependencies': {
@@ -32,50 +34,12 @@
         # `requests`; the `openai` SDK is NOT used (there is no `import openai`).
         'python': ['openpyxl', 'reportlab', 'requests'],
     },
-    'assets': {
-        'web.assets_backend': [
-            # CSS
-            'pns_ai_mcp/static/src/css/mcp_log_tree.css',
-            'pns_ai_mcp/static/src/css/mcp_context.css',
-            'pns_ai_mcp/static/src/css/mcp_rtl.css',
-            'pns_ai_mcp/static/src/css/mcp_context_list.css',
-            'pns_ai_mcp/static/src/css/pns_list.css',
-            'pns_ai_mcp/static/src/css/skill_capture_wizard.css',
-            # Vendor libs
-            # Widgets (v14)
-            'pns_ai_mcp/static/src/js/mcp_api_key_widget_v14.js',
-            'pns_ai_mcp/static/src/js/pns_html_readonly_widget_v14.js',
-            'pns_ai_mcp/static/src/js/mcp_iso_datetime_widget_v14.js',
-            'pns_ai_mcp/static/src/js/mcp_json_compressed_widget_v14.js',
-            'pns_ai_mcp/static/src/js/context_window_combo_v14.js',
-            'pns_ai_mcp/static/src/js/mcp_log_form_v14.js',
-            'pns_ai_mcp/static/src/js/ai_usage_chip_v14.js',
-            'pns_ai_mcp/static/src/js/skill_capture_wizard_v14.js',
-            'pns_ai_mcp/static/src/js/openapi_spec_generate_wizard_v14.js',
-            'pns_ai_mcp/static/src/js/external_server_usage_v14.js',
-            'pns_ai_mcp/static/src/js/mcp_log_usage_summary_v14.js',
-            'pns_ai_mcp/static/src/js/ai_agent_origin_filter_v14.js',
-            # Tree views with Operations button (v14)
-            'pns_ai_mcp/static/src/js/ai_agent_tree_v14.js',
-            'pns_ai_mcp/static/src/js/ai_provider_tree_v14.js',
-            'pns_ai_mcp/static/src/js/model_picker_dialog_v14.js',
-            'pns_ai_mcp/static/src/js/mcp_user_tree_v14.js',
-            'pns_ai_mcp/static/src/js/key_pin_desk_v14.js',
-            'pns_ai_mcp/static/src/js/mcp_context_tree_v14.js',
-            'pns_ai_mcp/static/src/js/mcp_skill_tree_v14.js',
-            'pns_ai_mcp/static/src/js/mcp_log_tree_v14.js',
-            'pns_ai_mcp/static/src/js/whitelist_tree_v14.js',
-            'pns_ai_mcp/static/src/js/external_server_tree_v14.js',
-            'pns_ai_mcp/static/src/js/safe_operation_tree_v14.js',
-            # QWeb templates
-            'pns_ai_mcp/static/src/xml/mcp_field_widgets.xml',
-        ],
-    },
     'data': [
         'views/assets.xml',
         'security/security_groups.xml',
         'security/security.xml',
         'security/ir.model.access.csv',
+        'data/ai_provider_role_data.xml',
         'views/mcp_api_key_wizard_views.xml',
         'views/mcp_user_views.xml',
         'views/safe_operation_views.xml',
@@ -86,6 +50,8 @@
         'wizard/import_servers_wizard_views.xml',
         'wizard/import_agents_wizard_views.xml',
         'wizard/ai_provider_tools_wizard_views.xml',
+        'wizard/ai_provider_role_tools_wizard_views.xml',
+        'wizard/import_provider_roles_wizard_views.xml',
         'wizard/ai_provider_usage_wizard_views.xml',
         'wizard/import_users_wizard_views.xml',
         'wizard/import_whitelist_wizard_views.xml',
@@ -115,6 +81,7 @@
         'views/ai_log_views.xml',
         'views/mcp_log_delete_menu_views.xml',
         'views/ai_provider_views.xml',
+        'views/ai_provider_role_views.xml',
         'views/ai_agent_views.xml',
         'views/url_whitelist_views.xml',
         'views/ai_fx_source_views.xml',

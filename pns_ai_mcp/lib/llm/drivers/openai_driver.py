@@ -15,6 +15,12 @@ from ..utils.timeouts import LLM_HTTP_DEFAULT, LLM_HTTP_RETRY  # noqa: F401 (LLM
 
 _logger = logging.getLogger(__name__)
 
+try:
+    from odoo import _
+except ImportError:
+    def _(text):
+        return text
+
 _TRANSCRIBE_TIMEOUT = 60
 _SHAPE_STATUS = (400, 404, 415, 422)
 _REASONING_PART_TYPES = frozenset({'thinking', 'reasoning', 'thought'})
@@ -140,7 +146,10 @@ _TRANSCRIBE_INSTRUCTION = (
     'spoken. Reply with the transcript only: no answer, no commentary, no '
     'formatting. If there is no speech, reply with an empty message.'
 )
-_VOCABULARY_LEAD = 'Words likely to appear: '
+_VOCABULARY_LEAD = (
+    'Spelling of names that may be spoken. Write one only if you hear it; '
+    'never copy this list: '
+)
 
 
 def _silent_wav():
@@ -164,10 +173,43 @@ def _http_error_message(resp):
         return err_msg
     err = err_body.get('error', err_body)
     if isinstance(err, dict):
-        return err.get('message') or err_msg
+        message = err.get('message') or err_msg
+        upstream = _upstream_error(err.get('metadata'))
+        return '%s: %s' % (message, upstream) if upstream else message
     if isinstance(err, str) and err:
         return err
     return err_msg
+
+
+def _upstream_error(metadata):
+    """What the model behind a router said, when the router passes it on.
+
+    A router answers «Provider returned error» and leaves the real reason in
+    ``metadata.raw`` (often the upstream JSON) and who said it in
+    ``metadata.provider_name``.
+    """
+    if not isinstance(metadata, dict):
+        return ''
+    raw = metadata.get('raw')
+    said = ''
+    if isinstance(raw, str) and raw.strip():
+        said = raw.strip()
+        try:
+            inner = json.loads(said)
+        except ValueError:
+            inner = None
+        if isinstance(inner, dict):
+            inner = inner.get('error', inner)
+            if isinstance(inner, dict) and inner.get('message'):
+                said = str(inner['message'])
+    elif isinstance(raw, dict):
+        inner = raw.get('error', raw)
+        said = str(inner.get('message') or '') if isinstance(inner, dict) else ''
+    said = said[:300]
+    who = metadata.get('provider_name')
+    if said and isinstance(who, str) and who.strip():
+        return '%s (%s)' % (said, who.strip())
+    return said
 
 
 def _call_row(calls, tc, last):
@@ -606,18 +648,18 @@ class OpenAIDriver(LLMDriver):
             elif isinstance(err_body, str):
                 err_msg = err_body or response.text
 
-            # Diagnóstico específico: modelo inválido o deprecado
+            # Specific diagnosis: invalid or deprecated model
             if response.status_code == 400 and (
                 err_code in ("model_not_found", "invalid_model")
                 or "does not exist" in err_msg
                 or "deprecated" in err_msg.lower()
                 or (err_type == "invalid_request_error" and self.model_name in err_msg)
             ):
-                raise RuntimeError(
-                    f"Modelo '{self.model_name}' no válido o deprecado en OpenAI. "
-                    f"Actualiza la configuración del proveedor en Odoo (Settings → AI Providers). "
-                    f"Detalle: {err_msg}"
-                )
+                raise RuntimeError(_(
+                    "Model '%s' is not valid or is deprecated in OpenAI. "
+                    "Update the provider settings in Odoo (Settings → AI Providers). "
+                    "Detail: %s"
+                ) % (self.model_name, err_msg))
 
             _logger.error(
                 "OpenAIDriver HTTP %s from %s (model %s): %s",
@@ -654,11 +696,11 @@ class OpenAIDriver(LLMDriver):
             or 'deprecated' in err_msg.lower()
             or (err_type == 'invalid_request_error' and self.model_name in err_msg)
         ):
-            raise RuntimeError(
-                "Modelo '%s' no válido o deprecado en OpenAI. "
-                'Actualiza la configuración del proveedor en Odoo '
-                '(Settings → AI Providers). Detalle: %s' % (self.model_name, err_msg)
-            )
+            raise RuntimeError(_(
+                "Model '%s' is not valid or is deprecated in OpenAI. "
+                "Update the provider settings in Odoo (Settings → AI Providers). "
+                "Detail: %s"
+            ) % (self.model_name, err_msg))
         raise RuntimeError(
             'HTTP %s from %s: %s' % (response.status_code, self.endpoint, err_msg)
         )

@@ -7,7 +7,7 @@ import uuid
 from odoo.exceptions import UserError
 from odoo.tests import tagged, TransactionCase
 
-from odoo.addons.pns_ai_mcp.tests._helpers import ensure_test_agents
+from odoo.addons.pns_ai_mcp.tests._helpers import create_test_user, ensure_test_agents
 from odoo.addons.pns_ai_mcp.utils.compat import user_add_group, user_has_group_direct
 
 
@@ -21,13 +21,11 @@ class TestContextUnlink(TransactionCase):
         self.admin_user = self.env.ref('base.user_admin')
         if not user_has_group_direct(self.admin_user, self.admin_group):
             user_add_group(self.admin_user, self.admin_group)
-        demo = self.env.ref('base.user_demo', raise_if_not_found=False)
-        if not demo:
-            self.skipTest('base.user_demo no instalado')
-        self.user_a = demo
         writer = self.env.ref('pns_ai_mcp.group_ai_writer')
-        if not user_has_group_direct(self.user_a, writer):
-            user_add_group(self.user_a, writer)
+        self.user_a = create_test_user(
+            self.env, prefix='pns_ctx_unlink_a',
+            groups=[self.env.ref('base.group_user').id, writer.id],
+        )
         self._uid = uuid.uuid4().hex[:8]
 
     def _code(self, base):
@@ -40,13 +38,14 @@ class TestContextUnlink(TransactionCase):
         ) % (code, code)
 
     def test_core_context_cannot_be_unlinked(self):
+        """The superuser (install, ``-u``) may; a person, even an AI admin, may not."""
         core = self.env['ai.context'].search([
             ('context_type', '=', 'core'),
         ], limit=1)
         if not core:
             self.skipTest('no core context in this database')
         with self.assertRaises(UserError):
-            core.unlink()
+            core.with_user(self.admin_user).unlink()
 
     def test_factory_file_context_cannot_be_unlinked(self):
         Context = self.env['ai.context']
@@ -58,7 +57,7 @@ class TestContextUnlink(TransactionCase):
         locked = live.filtered(lambda rec: rec._is_shipped_factory_locked())
         if locked:
             with self.assertRaises(UserError):
-                locked[0].unlink()
+                locked[0].with_user(self.admin_user).unlink()
             return
         code = self._code('factory_lock')
         ctx = Context.sudo().create({
@@ -74,7 +73,7 @@ class TestContextUnlink(TransactionCase):
             ctx.with_context(skip_hardcoded_restrictions=True).unlink()
             self.skipTest('factory source files not on this addon path')
         with self.assertRaises(UserError):
-            ctx.unlink()
+            ctx.with_user(self.admin_user).unlink()
         ctx.with_context(skip_hardcoded_restrictions=True).unlink()
 
     def test_owned_context_can_be_unlinked(self):

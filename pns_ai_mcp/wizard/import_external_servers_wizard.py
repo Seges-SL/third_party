@@ -3,13 +3,13 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Import external API servers (MCP / OpenAPI) from JSON."""
 
-import base64
 import logging
 
 from odoo import models, fields, _
 from odoo.exceptions import UserError
 
 from ..utils import mcp_ui
+from ..utils.compat import binary_bytes
 from ..utils.portable_io import import_vals_from_dict
 
 _logger = logging.getLogger(__name__)
@@ -58,7 +58,7 @@ class ImportExternalServersWizard(models.TransientModel):
             raise UserError(_("Please upload a JSON file."))
 
         try:
-            raw = base64.b64decode(self.json_file)
+            raw = binary_bytes(self.json_file)
             data, extract_warnings = mcp_ui.extract_json_from_upload(raw)
         except (ValueError, Exception) as e:
             raise UserError(_("Error reading the file: %s") % e)

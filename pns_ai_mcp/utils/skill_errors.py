@@ -5,7 +5,7 @@
 
 Skills run with the chat user's privileges. When they hit AccessError or the
 classic ``Invalid field '…' on model '….public'`` (private fields on the
-public HR proxy), dumping the raw traceback into Chatboo is cryptic. This
+public HR proxy), dumping the raw traceback into the chat is cryptic. This
 helper turns those into user-facing English msgids for ``_()``.
 """
 from __future__ import annotations

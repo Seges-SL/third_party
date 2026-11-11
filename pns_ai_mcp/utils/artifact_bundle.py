@@ -18,6 +18,7 @@ from odoo import _
 from odoo.exceptions import UserError
 
 from .config_backup import (
+    _export_provider_roles,
     _export_settings,
     export_selected_agents,
     export_selected_providers,
@@ -28,13 +29,13 @@ from .config_backup import (
 )
 from .import_export_guard import ensure_ai_admin
 
-BUNDLE_SCHEMA_VERSION = '1.1'
-BUNDLE_TYPE = 'pns.ai.artifact.bundle'
+BUNDLE_WHAT = 'pns.ai.artifact.bundle'
 
 _BUNDLE_SECTION_FILES = frozenset({
     'skills.zip',
     'contexts.zip',
     'providers.json',
+    'provider_roles.json',
     'agents.json',
     'mcp_servers.json',
     'servers.json',  # legacy 1.0 name
@@ -103,6 +104,10 @@ def export_bundle(
                 'providers.json',
                 json.dumps(rows, indent=2, ensure_ascii=False),
             )
+            zf.writestr(
+                'provider_roles.json',
+                json.dumps(_export_provider_roles(env), indent=2, ensure_ascii=False),
+            )
         if agents:
             rows = export_selected_agents(agents)
             zf.writestr(
@@ -142,8 +147,7 @@ def export_bundle(
         )
 
         manifest = {
-            'type': BUNDLE_TYPE,
-            'schema_version': BUNDLE_SCHEMA_VERSION,
+            'what': BUNDLE_WHAT,
             'exported_at': _dt.datetime.utcnow().replace(microsecond=0).isoformat() + 'Z',
             'source_database': env.cr.dbname,
             'export_tag': tag,
@@ -207,10 +211,11 @@ def import_bundle(env, zip_bytes, replace_existing=True):
                         zf.read('bundle_manifest.json').decode('utf-8')
                     )
                     report['manifest'] = manifest
-                    if manifest.get('type') and manifest['type'] != BUNDLE_TYPE:
+                    what = manifest.get('what') or manifest.get('type')
+                    if what and what != BUNDLE_WHAT:
                         report['warnings'].append(_(
                             'Unexpected bundle type: %s'
-                        ) % manifest.get('type'))
+                        ) % what)
                 except Exception:
                     report['warnings'].append(_('Could not read bundle_manifest.json.'))
 
@@ -231,6 +236,10 @@ def import_bundle(env, zip_bytes, replace_existing=True):
             if 'providers.json' in names:
                 partial['providers'] = json.loads(
                     zf.read('providers.json').decode('utf-8')
+                )
+            if 'provider_roles.json' in names:
+                partial['provider_roles'] = json.loads(
+                    zf.read('provider_roles.json').decode('utf-8')
                 )
             if 'agents.json' in names:
                 partial['agents'] = json.loads(

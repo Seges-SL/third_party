@@ -49,14 +49,14 @@ class AIContextMetadata(models.Model):
     @api.model
     def _extract_metadata_from_content(self, content, filename):
         """
-        Extrae metadatos del contenido del archivo.
-        Para .py: busca comentarios estructurados en la cabecera.
-        Para .md: busca front matter YAML.
+        Extracts metadata from the file content.
+        For .py: looks for structured comments in the header.
+        For .md: looks for YAML front matter.
         
-        Retorna un diccionario con: description, author, version, date_created, date_modified, created_by, modified_by, active, is_core
+        Returns a dictionary with: description, author, version, date_created, date_modified, created_by, modified_by, active, is_core
         """
         metadata = {
-            'contexto': None,  # Código del contexto desde metadatos
+            'contexto': None,  # Context code from metadata
             'description': None,
             'author': None,
             'version': None,
@@ -66,35 +66,35 @@ class AIContextMetadata(models.Model):
             'modified_by': None,
             'active': None,
             'category': None,
-            'locale': None,   # Locale EXPLÍCITO (atributo del fichero, no del nombre)
+            'locale': None,   # EXPLICIT locale (file attribute, not from the name)
             'is_fallback': None,
             'product_name': None,
             'vendor': None,
         }
         
         if filename.endswith('.py'):
-            # Para Python: buscar comentarios estructurados en la cabecera
-            # Formato esperado:
+            # For Python: look for structured comments in the header
+            # Expected format:
             # # -*- coding: utf-8 -*-
-            # # Archivo: nombre.py
+            # # Archivo: name.py
             # # Creado: YYYY-MM-DD [HH:mm:ss]
             # # Modificado: YYYY-MM-DD [HH:mm:ss]
-            # # Descripción: texto descriptivo
-            # # Autor: nombre del autor
-            # # Versión: número de versión
+            # # Descripción: descriptive text
+            # # Autor: author name
+            # # Versión: version number
             lines = content.split('\n')
             
-            for line in lines[:30]:  # Primeras 30 líneas
+            for line in lines[:30]:  # First 30 lines
                 line = line.strip()
                 if not line.startswith('#'):
-                    # Si encontramos una línea que no es comentario, hemos terminado la cabecera
+                    # A line that is not a comment means the header is over
                     break
                 
                 comment = line[1:].strip()
                 if not comment:
                     continue
                 
-                # Buscar campos estructurados con formato "Campo: valor"
+                # Look for structured fields in "Field: value" format
                 if ':' in comment:
                     key, value = comment.split(':', 1)
                     key = key.strip().lower()
@@ -107,12 +107,12 @@ class AIContextMetadata(models.Model):
                     elif key == 'versión' or key == 'version':
                         metadata['version'] = value
                     elif key in ('creado', 'fecha de creación', 'date_created', 'created'):
-                        # Extraer solo la fecha (YYYY-MM-DD) si hay hora
+                        # Keep only the date (YYYY-MM-DD) if there is a time
                         date_str = value.split()[0] if value else None
                         if date_str:
                             metadata['date_created'] = date_str
                     elif key in ('modificado', 'fecha de modificación', 'date_modified', 'modified', 'actualizado', 'updated'):
-                        # Extraer solo la fecha (YYYY-MM-DD) si hay hora
+                        # Keep only the date (YYYY-MM-DD) if there is a time
                         date_str = value.split()[0] if value else None
                         if date_str:
                             metadata['date_modified'] = date_str
@@ -121,7 +121,7 @@ class AIContextMetadata(models.Model):
                     elif key in ('modificado por', 'modified_by', 'modified by', 'modificador'):
                         metadata['modified_by'] = value
                     elif key in ('activo', 'active'):
-                        # Convertir a booleano
+                        # Convert to boolean
                         metadata['active'] = value.lower() in ('true', '1', 'yes', 'sí', 'si', 'verdadero')
                     elif key == 'tipo':
                         metadata['tipo'] = value.lower()
@@ -135,27 +135,27 @@ class AIContextMetadata(models.Model):
                         metadata['vendor'] = value
         
         elif filename.endswith('.md'):
-            # Para Markdown: buscar front matter YAML
-            # Formato esperado:
+            # For Markdown: look for YAML front matter
+            # Expected format:
             # ---
-            # contexto: nombre_del_contexto
-            # descripción: texto descriptivo
-            # autor: nombre del autor
+            # contexto: context_name
+            # descripción: descriptive text
+            # autor: author name
             # fecha_creacion: YYYY-MM-DD
             # fecha_modificacion: YYYY-MM-DD
-            # version: número de versión
+            # version: version number
             # ---
             lines = content.split('\n')
             
             if lines and lines[0].strip() == '---':
-                # Hay front matter YAML
+                # There is YAML front matter
                 yaml_lines = []
                 i = 1
                 while i < len(lines) and lines[i].strip() != '---':
                     yaml_lines.append(lines[i])
                     i += 1
                 
-                # Parsear YAML simple (sin usar librería externa)
+                # Parse simple YAML (no external library)
                 for line in yaml_lines:
                     line = line.strip()
                     if ':' in line:
@@ -180,7 +180,7 @@ class AIContextMetadata(models.Model):
                         elif key in ('modificado_por', 'modificado por', 'modified_by', 'modified by', 'modificador'):
                             metadata['modified_by'] = value
                         elif key in ('activo', 'active'):
-                            # Convertir a booleano
+                            # Convert to boolean
                             metadata['active'] = value.lower() in ('true', '1', 'yes', 'sí', 'si', 'verdadero')
                         elif key == 'tipo':
                             metadata['tipo'] = value.lower()
@@ -197,7 +197,7 @@ class AIContextMetadata(models.Model):
                         elif key == 'vendor':
                             metadata['vendor'] = value
             
-            # Si no hay front matter, buscar primer título o párrafo como descripción
+            # No front matter: use the first heading or paragraph as description
             if not metadata['description']:
                 for line in lines[:30]:
                     line = line.strip()
@@ -212,15 +212,15 @@ class AIContextMetadata(models.Model):
                             break
         
         elif filename.endswith('.xml'):
-            # Para XML: buscar etiquetas dentro de <metadata>
+            # For XML: look for tags inside <metadata>
             import re
             
-            # Buscar el bloque <metadata>...</metadata> (flexible con atributos)
+            # Find the <metadata>...</metadata> block (flexible with attributes)
             metadata_match = re.search(r'<metadata[^>]*>(.*?)</metadata>', content, re.DOTALL)
             if metadata_match:
                 metadata_block = metadata_match.group(1)
                 
-                # Extraer etiquetas comunes (flexibles con atributos)
+                # Extract common tags (flexible with attributes)
                 patterns = {
                     'contexto': r'<code[^>]*>(.*?)</code>',
                     'description': r'<description[^>]*>(.*?)</description>',

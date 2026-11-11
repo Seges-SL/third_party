@@ -40,22 +40,23 @@ _logger = logging.getLogger(__name__)
 
 def _result_of(safe_context):
     """The ``result`` the code assigned: a list becomes ``data``, a bare string a hint."""
-    # Obtener resultado DESPUÉS de exec() exitoso
-    # exec() modifica safe_context directamente
-    # Verificar explícitamente si 'result' está en el contexto
-    # CRÍTICO: Verificar inmediatamente después de exec() para diagnóstico
+    # Get the result AFTER a successful exec()
+    # exec() changes safe_context directly
+    # Check explicitly whether 'result' is in the context
+    # CRITICAL: check right after exec() for diagnosis
     result = None
     if 'result' in safe_context:
         result = safe_context['result']
     elif 'output' in safe_context:
         result = safe_context['output']
 
-    # Normalizar lista de nivel superior (p. ej. el LLM hace result = [{...}, ...])
-    # a dict ANTES del procesado de fases. Hasta ahora esta normalización vivía
-    # DENTRO del bloque `if isinstance(result, dict)` y por eso NUNCA corría para
-    # listas: el listado se devolvía como JSON crudo, el LLM lo re-formateaba en
-    # markdown y se perdían imágenes (<img>), formato de moneda/fecha y coloreado
-    # por cuartiles. Con la lista envuelta entra al render server-side (Python).
+    # Normalize a top-level list (e.g. the LLM does result = [{...}, ...])
+    # into a dict BEFORE phase processing. This normalization used to live
+    # INSIDE the `if isinstance(result, dict)` block, so it NEVER ran for
+    # lists: the listing came back as raw JSON, the LLM re-formatted it as
+    # markdown and pictures (<img>), currency/date format and quartile
+    # coloring were lost. Once wrapped, the list goes to the server-side
+    # (Python) render.
     if isinstance(result, list):
         result = {"data": result}
     elif isinstance(result, str):
@@ -76,9 +77,9 @@ def _result_of(safe_context):
 def _too_large_response(controller, result, code, agent_llm, context_data,
                         phase, return_mode):
     """The reply when the output is over the caps, else None."""
-    # Tope anti-DoS de la SALIDA (H4): corta salidas patológicas antes de
-    # post-procesarlas/renderizarlas/loguearlas. El gasto de CPU/memoria
-    # DURANTE el exec lo acota el worker de Odoo (limit_time_*/limit_memory_*).
+    # Anti-DoS cap on the OUTPUT (H4): cuts pathological outputs before
+    # post-processing/rendering/logging them. CPU/memory spent DURING the
+    # exec is bounded by the Odoo worker (limit_time_*/limit_memory_*).
     _size_err = _enforce_result_size_cap(result)
     if _size_err:
         error_response = _format_error_response(
@@ -98,27 +99,30 @@ def _too_large_response(controller, result, code, agent_llm, context_data,
 
 
 def _link_and_picture_rows(controller, result, safe_context, code, agent_llm,
-                           context_data, phase, return_mode):
+                           context_data, phase, return_mode, env):
     """Stamp each row with its model, fill ids, collect record refs, turn base64 into URLs.
+
+    *env* is the run's real Environment, not ``safe_context['env']`` (the
+    sandbox wrapper, which the code may have rebound).
 
     Returns the reply when tabular rows lost their ids, else None.
     """
     # ============================================================
-    # POST-PROCESAR IMÁGENES: base64 → URL /web/image/
+    # POST-PROCESS PICTURES: base64 → URL /web/image/
     # ============================================================
     if isinstance(result, dict):
-        # Inferir el modelo de cada fila SIN depender de que el LLM ponga
-        # __model (frágil): (1) de los recordsets vivos en el namespace del
-        # sandbox (id→model real) y (2) como pista, del único modelo
-        # referenciado como env['x'] en el código. Así las fotos (URL
-        # /web/image) y los enlaces clicables salen de forma determinista.
+        # Infer each row's model WITHOUT relying on the LLM setting
+        # __model (fragile): (1) from the live recordsets in the sandbox
+        # namespace (id→real model) and (2) as a hint, from the only model
+        # referenced as env['x'] in the code. This way pictures (URL
+        # /web/image) and clickable links come out deterministically.
         _single_model = None
         _env = None
-        # Opt-out del usuario ("tabla limpia / sin enlaces"): el LLM pone
-        # __row_links__=False (o links=False). Desactiva SOLO los enlaces
-        # (columna-widget en la tabla + chips del pie); las miniaturas de
-        # imagen siguen porque _stamp_models y _postprocess_images se ejecutan
-        # igual (necesitan __model).
+        # User opt-out ("clean table / no links"): the LLM sets
+        # __row_links__=False (or links=False). It turns off ONLY the links
+        # (widget column in the table + footer chips); picture thumbnails
+        # stay because _stamp_models and _postprocess_images still run
+        # (they need __model).
         _links_off = (result.get('__row_links__') is False
                       or result.get('links') is False)
         try:
@@ -127,10 +131,10 @@ def _link_and_picture_rows(controller, result, safe_context, code, agent_llm,
             _single_model = (
                 next(iter(_code_models)) if len(_code_models) == 1 else None
             )
-            _env = safe_context.get('env')
+            _env = env
             _candidates = set(_code_models)
             _candidates |= _related_models_from_code(code, _env, _code_models)
-            # Antes del stamp: rellenar id omitido por el LLM (enlaces).
+            # Before the stamp: fill the id the LLM left out (links).
             try:
                 _backfill_missing_record_ids(
                     result,
@@ -149,10 +153,10 @@ def _link_and_picture_rows(controller, result, safe_context, code, agent_llm,
                 candidate_models=_candidates,
                 turn_models=_turn_memory_models(controller),
             )
-            # Solo si hay filas cuya etiqueta encaja con un recordset del
-            # sandbox (omisión clara de id). Un índice no vacío por sí solo
-            # NO basta: cualquier browse residual + lista de dicts meta
-            # (diagnóstico, logs) dispararía falsos positivos.
+            # Only if there are rows whose label matches a sandbox recordset
+            # (a clear missing id). A non-empty index alone is NOT enough:
+            # any leftover browse + a list of meta dicts (diagnosis, logs)
+            # would trigger false positives.
             if not _links_off:
                 try:
                     _idx = _build_label_to_record_index(safe_context)
@@ -203,10 +207,10 @@ def _link_and_picture_rows(controller, result, safe_context, code, agent_llm,
                 except Exception as mid_err:
                     _logger.debug('missing-id gate: %s (no-op)', mid_err)
         except Exception as im_err:
-            _logger.debug('inferencia de modelo: %s (no-op)', im_err)
-        # Refs de registros para enlaces clicables en Chatboo: ANTES de
-        # _postprocess_images (que consume __model de las filas). Se omiten en
-        # opt-out para no pintar chips del pie cuando el usuario no los quiere.
+            _logger.debug('model inference: %s (no-op)', im_err)
+        # Record refs for clickable links in the host: BEFORE
+        # _postprocess_images (which consumes the rows' __model). Skipped on
+        # opt-out so no footer chips are drawn when the user does not want them.
         if not _links_off:
             try:
                 _collect_record_refs(
@@ -221,55 +225,57 @@ def _link_and_picture_rows(controller, result, safe_context, code, agent_llm,
     return None
 
 
-def _present_result(result, safe_context, phase, return_mode, summary):
+def _present_result(result, safe_context, phase, return_mode, summary, env):
     """Phase flags, the server-side table, and where the result goes (user or model).
+
+    *env* is the run's real Environment, not ``safe_context['env']``.
 
     Returns the reply for formatted text in Phase 1 without a flag, else None.
     """
     # ============================================================
-    # PROCESAR FLAGS DE DOS FASES Y EJECUTAR FASE 2 AUTOMÁTICAMENTE
+    # PROCESS TWO-PHASE FLAGS AND RUN PHASE 2 AUTOMATICALLY
     # ============================================================
-    # Si el resultado es un dict, procesar flags de dos fases
+    # If the result is a dict, process the two-phase flags
     if isinstance(result, dict):
-        # Detectar si hay datos que necesitan presentación (Fase 2 automática)
+        # Detect whether there is data that needs presentation (automatic Phase 2)
         needs_presentation = False
         raw_data = None
 
-        # Detectar si es extracción o tiene datos que necesitan formateo
-        # MODIFICADO: También activar si return_mode es 'direct_to_user'
+        # Detect whether this is extraction or has data that needs formatting
+        # CHANGED: also turn on when return_mode is 'direct_to_user'
         if phase == 'extraction' or result.get('__ready_for_presentation__') or result.get('__extraction_complete__') or return_mode == 'direct_to_user':
             needs_presentation = True
             raw_data = result.get('data', result)
         elif phase == 'auto':
-            # Detectar automáticamente si hay datos estructurados que necesitan presentación
-            # Buscar listas grandes o estructuras de datos que deberían formatearse
-            # Primero buscar en 'data', luego en cualquier campo del resultado
+            # Detect automatically whether there is structured data that needs presentation
+            # Look for big lists or data structures that should be formatted
+            # Look in 'data' first, then in any field of the result
             if 'data' in result and isinstance(result.get('data'), (list, dict)):
                 data_content = result.get('data')
                 if isinstance(data_content, list) and len(data_content) > 10:
                     needs_presentation = True
                     raw_data = {'data': data_content}
                 elif isinstance(data_content, dict):
-                    # Buscar listas dentro del dict
+                    # Look for lists inside the dict
                     for key, value in data_content.items():
                         if isinstance(value, list) and len(value) > 10:
                             needs_presentation = True
                             raw_data = result.get('data', result)
                             break
             else:
-                # Buscar listas grandes directamente en el resultado (ej: 'customers', 'employees', etc.)
+                # Look for big lists directly in the result (e.g. 'customers', 'employees', etc.)
                 for key, value in result.items():
                     if isinstance(value, list) and len(value) > 10 and not key.startswith('__'):
                         needs_presentation = True
                         raw_data = result
                         break
 
-        # FASE 1 (EXTRACCIÓN): NO debe tener formatted_text - solo datos RAW
-        # EXCEPCIÓN: Si hay formatted_text, asumimos Fast Path (One-Shot) automáticamente.
-        # No exigimos flags explícitos, la presencia de texto formateado es suficiente intención.
+        # PHASE 1 (EXTRACTION): must NOT have formatted_text - RAW data only
+        # EXCEPTION: if there is formatted_text, we assume Fast Path (One-Shot) automatically.
+        # No explicit flags required; formatted text is intent enough.
         has_formatted_text_in_extraction = result.get('formatted_text') is not None
         is_one_shot_allowed = (
-            has_formatted_text_in_extraction or # IMPLÍCITO: Si hay texto, es válido
+            has_formatted_text_in_extraction or # IMPLICIT: if there is text, it is valid
             result.get('__ready_for_presentation__') or 
             result.get('ready_for_presentation') or
             result.get('__return_direct__') or 
@@ -278,7 +284,7 @@ def _present_result(result, safe_context, phase, return_mode, summary):
         )
 
         if has_formatted_text_in_extraction and (phase == 'extraction' or phase == 'auto') and not is_one_shot_allowed:
-            _logger.error(f"[{_log_where()}] FASE 1: formatted_text sin flag de finalización")
+            _logger.error(f"[{_log_where()}] PHASE 1: formatted_text without a completion flag")
             return _format_error_response(
                 -32602,
                 'PROTOCOL ERROR: formatted_text found in Phase 1. If you want to return the final answer immediately, you MUST also set "ready_for_presentation": True (or "extraction_complete": True) in your result dictionary. usage: result = {"formatted_text": "...", "ready_for_presentation": True}.',
@@ -286,15 +292,15 @@ def _present_result(result, safe_context, phase, return_mode, summary):
                 retryable=True,
             )
 
-        # Render server-side (Python) cuando hay datos tabulares.
-        # (la normalización lista→dict ya se hizo arriba, antes de este bloque)
+        # Server-side (Python) render when there is tabular data.
+        # (the list→dict normalization was already done above, before this block)
         from odoo.addons.pns_ai_mcp.utils.relaxaicode_render import (
             maybe_attach_formatted_text,
             render_context_from_env,
         )
 
-        # Locale de la sesión (res.lang), no defaults fijos US/ES.
-        render_env = safe_context.get('env')
+        # Session locale (res.lang), not fixed US/ES defaults.
+        render_env = env
         try:
             render_ctx = (
                 render_context_from_env(render_env, result=result)
@@ -327,19 +333,19 @@ def _present_result(result, safe_context, phase, return_mode, summary):
             ),
         )
 
-        # Si necesita presentación y no está ya completada, SOLICITAR código de formateo al LLM
-        # Similar al mecanismo de confirmación de escrituras: solicitar código SIN enviar datos
+        # If it needs presentation and it is not done yet, ASK the LLM for formatting code
+        # Like the write confirmation mechanism: ask for code WITHOUT sending data
         if needs_presentation and not result.get('__presentation_complete__') and not result.get('error'):
             if raw_data is None:
                 raw_data = result.get('data', result)
 
-            # Marcar como extracción completada
+            # Mark extraction as done
             result['__phase__'] = 'extraction'
             result['__ready_for_presentation__'] = True
             result['__extraction_complete__'] = True
-            # Tabla ya renderizada (maybe_attach) con summary → respuesta final.
-            # Sin esto el orquestador ocultaba el HTML mid-turn y el LLM
-            # describía la tabla en prosa sin mostrarla.
+            # Table already rendered (maybe_attach) with summary → final answer.
+            # Without this the orchestrator hid the HTML mid-turn and the LLM
+            # described the table in prose without showing it.
             if (
                 result.get('formatted_text')
                 and result.get('summary')
@@ -350,11 +356,11 @@ def _present_result(result, safe_context, phase, return_mode, summary):
                 result['__satisfied__'] = True
                 result['__return_direct__'] = True
 
-            # Log visible de extracción completada
+            # Visible log of the finished extraction
             data_size = len(str(raw_data))
             if isinstance(raw_data, dict):
                 data_keys = list(raw_data.keys())
-                # Detectar estructura para solicitar formateo apropiado
+                # Detect the structure to ask for the right formatting
                 data_structure = {}
                 for key, value in raw_data.items():
                     if isinstance(value, list) and len(value) > 0:
@@ -370,7 +376,7 @@ def _present_result(result, safe_context, phase, return_mode, summary):
                                 'count': len(value)
                             }
             elif isinstance(raw_data, list):
-                data_keys = [f"lista con {len(raw_data)} elementos"]
+                data_keys = [f"list with {len(raw_data)} items"]
                 if len(raw_data) > 0 and isinstance(raw_data[0], dict):
                     data_structure = {
                         'type': 'list_of_dicts',
@@ -380,44 +386,44 @@ def _present_result(result, safe_context, phase, return_mode, summary):
                 else:
                     data_structure = {'type': 'list_of_values', 'count': len(raw_data)}
             else:
-                data_keys = ["datos"]
+                data_keys = ["data"]
                 data_structure = {'type': 'unknown'}
 
-            _logger.info(f"📊 [FASE 1: EXTRACCIÓN] Completada - Datos extraídos: {len(data_keys)} campos, tamaño: {data_size} chars. Ejecutando Fase 2 (presentación) automáticamente...")
+            _logger.info(f"📊 [PHASE 1: EXTRACTION] Done - Data extracted: {len(data_keys)} fields, size: {data_size} chars. Running Phase 2 (presentation) automatically...")
 
         if phase == 'presentation':
-            # Marcar como presentación completada
+            # Mark presentation as done
             result['__phase__'] = 'presentation'
             result['__presentation_complete__'] = True
-            result['__satisfied__'] = True  # IA satisfecha, no necesita más procesamiento
-            # MODO RAW: Marcar explícitamente para direct return si tiene formatted_text
+            result['__satisfied__'] = True  # AI satisfied, needs no more processing
+            # RAW MODE: mark explicitly for direct return if it has formatted_text
             if result.get('formatted_text'):
                 result['__return_direct__'] = True
                 result['__raw_mode__'] = True
-            # Log visible de presentación completada con información del resultado
+            # Visible log of the finished presentation, with result info
             result_size = len(str(result))
             result_keys = list(result.keys())
-            # Contar elementos si es una lista o dict con listas
+            # Count items if it is a list or a dict with lists
             item_count = 0
             if 'data' in result and isinstance(result['data'], (list, dict)):
                 if isinstance(result['data'], list):
                     item_count = len(result['data'])
                 elif isinstance(result['data'], dict):
-                    # Contar elementos en el primer campo que sea lista
+                    # Count items in the first field that is a list
                     for key, value in result['data'].items():
                         if isinstance(value, list):
                             item_count = len(value)
                             break
-            _logger.info(f"✅ [FASE 2: PRESENTACIÓN] Completada - Resultado procesado: {len(result_keys)} campos, {item_count} elementos, tamaño: {result_size} chars. IA satisfecha, direct return activado.")
+            _logger.info(f"✅ [PHASE 2: PRESENTATION] Done - Result processed: {len(result_keys)} fields, {item_count} items, size: {result_size} chars. AI satisfied, direct return on.")
             result['__phase__'] = result.get('__phase__', 'extraction')
-            _logger.info(f"📋 [FASE AUTO-DETECTADA] Resultado marcado como listo para presentación (fase: {result.get('__phase__')})")
+            _logger.info(f"📋 [AUTO-DETECTED PHASE] Result marked ready for presentation (phase: {result.get('__phase__')})")
 
         # ============================================================
-        # APLICAR LOGICA FINAL DE ALERT MODE
+        # APPLY FINAL ALERT MODE LOGIC
         # ============================================================
         if return_mode == 'direct_to_user':
             result['__return_direct__'] = True
-            _logger.info("🚀 [RETURN_MODE] Forzando direct_return por solicitud explícita (direct_to_user)")
+            _logger.info("🚀 [RETURN_MODE] Forcing direct_return on explicit request (direct_to_user)")
         elif return_mode == 'inspect_result':
             # Model chose LLM-only delivery: strip every chat-dump flag the
             # auto-presentation path may have set. Keep formatted_text/data
@@ -484,8 +490,8 @@ def _present_result(result, safe_context, phase, return_mode, summary):
 
 def _success_response(controller, result, code, context_data, operation_type):
     """The result as MCP content, logged as a successful run."""
-    # Serializar resultado una sola vez
-    # El formato MCP requiere que 'text' sea una cadena JSON
+    # Serialize the result only once
+    # The MCP format needs 'text' to be a JSON string
 
     try:
         result_json = json.dumps(_sanitize_binary_for_llm(result), default=str, ensure_ascii=False, separators=(',', ':'))
@@ -501,7 +507,7 @@ def _success_response(controller, result, code, context_data, operation_type):
     else:
         _logger.debug(f"✅ Result JSON: {result_json_bytes} bytes - {result_json[:200] if len(result_json) > 200 else result_json}")
 
-    # Crear respuesta con el JSON serializado en 'text'
+    # Build the reply with the serialized JSON in 'text'
     response = {
         'content': [
             {
@@ -511,7 +517,7 @@ def _success_response(controller, result, code, context_data, operation_type):
         ]
     }
 
-    # Registrar log de operación exitosa
+    # Log the successful operation
     result_summary = f"Execution successful. Result: {str(result)[:200]}" if result else "Execution successful without result"
     controller._log_mcp_operation(
         operation_type=operation_type,

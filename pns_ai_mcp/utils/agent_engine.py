@@ -46,26 +46,26 @@ _logger = logging.getLogger(__name__)
 class TurnTimeExceeded(Exception):
     """The turn used its wall clock. The provider answered; do not fail over."""
 
-# Límites del bucle ReAct en Chatboo (evita colgues de 15–20 min con OVH/Ollama lentos)
-LLM_STREAM_READ_TIMEOUT = 45       # segundos sin datos entre chunks SSE
-LLM_ROUND_WALL_TIMEOUT = 120       # segundos máximos por ronda LLM
-LLM_AGENT_WALL_TIMEOUT = 300         # segundos máximos para toda la petición del usuario
+# ReAct loop limits for the turn (avoids 15–20 min hangs with slow OVH/Ollama)
+LLM_STREAM_READ_TIMEOUT = 45       # seconds without data between SSE chunks
+LLM_ROUND_WALL_TIMEOUT = 120       # max seconds per LLM round
+LLM_AGENT_WALL_TIMEOUT = 300         # max seconds for the whole user request
 # Hybrid param JSON only. 512 cut a live reply mid-stream (FWLD).
 HYBRID_PARAM_MAX_TOKENS = 4096
 
-# Tope POR DEFECTO (en BYTES serializados) del dataset que se cachea para
-# reutilización (Nivel 2). Configurable en caliente por parámetro de sistema
-# 'pns_ai_mcp.dataset_cache_max_bytes'; 0 (o negativo) = SIN límite.
-# No es un tope de ALMACENAMIENTO (Postgres aguanta de sobra) sino de COSTE POR
-# TURNO: el blob se serializa/deserializa y se copia en RAM en cada turno del
-# worker, así que un dataset gigante penaliza toda la sesión. El nº de filas no
-# se limita (es engañoso: 1000 filas anchas pesan más que 100000 estrechas); lo
-# que manda es el tamaño real. Si se supera, NO se cachea (se cae a reutilizar
-# solo el código, Nivel 1). Nunca viaja al LLM.
-AGENT_DATASET_CACHE_MAX_BYTES = 8 * 1024 * 1024  # 8 MB serializados
+# DEFAULT cap (in serialized BYTES) of the dataset cached for
+# reuse (Level 2). Hot-configurable through the system parameter
+# 'pns_ai_mcp.dataset_cache_max_bytes'; 0 (or negative) = NO limit.
+# Not a STORAGE cap (Postgres copes easily) but a COST PER
+# TURN: the blob is serialized/deserialized and copied into RAM on every turn of
+# the worker, so a huge dataset slows down the whole session. The row count is
+# not capped (misleading: 1000 wide rows weigh more than 100000 narrow ones); what
+# matters is the real size. If exceeded, it is NOT cached (falls back to reusing
+# only the code, Level 1). Never travels to the LLM.
+AGENT_DATASET_CACHE_MAX_BYTES = 8 * 1024 * 1024  # 8 MB serialized
 
 
-# Compat: nombres privados usados por tests / callers antiguos.
+# Compat: private names used by tests / old callers.
 _strip_think_blocks = strip_think_blocks
 _user_visible_round_text = user_visible_round_text
 _pretool_progress_status = pretool_progress_status
@@ -201,7 +201,7 @@ def resolve_providers_for_consumer(
         env, consumer_key='admin', agent_code=None, need=None):
     """Ordered ``ai.provider`` recordset for an inference feature key.
 
-    ``need`` is a ``provider_fit`` role (conversation, decision, …).
+    ``need`` is an ``ai.provider.role`` code (conversation, decision, …).
     None is a text turn.
     """
     code = env['ai.agent'].resolve_inference_agent_code(
@@ -221,7 +221,7 @@ def llm_json_completion_for_agent(
     Uses ``resolve_inference_agent_code`` + ``get_providers_for_agent``. On a
     retriable provider error, logs failover and tries the next provider.
     Context-window overflow aborts without failover by default (same rule as
-    ``ai.execution.engine.chat_completion``). Pass
+    ``ai.execution.engine._chat_completion``). Pass
     ``failover_on_overflow=True`` for large one-shot jobs (e.g. OpenAPI
     generation) so a small local model does not stop the cascade.
     ``max_providers`` caps how many failovers are attempted (keeps the
@@ -246,7 +246,7 @@ def llm_json_completion_for_agent(
     if not providers:
         # The caller turns this into a soft notice; the admin needs the row.
         try:
-            engine.log_role_without_provider(code, need)
+            engine._log_role_without_provider(code, need)
         except Exception:
             _logger.debug(
                 'llm_json_completion_for_agent: missing-role log failed',
@@ -271,7 +271,7 @@ def llm_json_completion_for_agent(
     for idx, provider in enumerate(providers):
         if idx > 0 and failed_provider:
             try:
-                engine.log_provider_failover(
+                engine._log_provider_failover(
                     code, failed_provider, provider, last_error,
                     source_channel='internal',
                 )
@@ -335,7 +335,7 @@ def llm_completion_for_agent(
 
 
 def _resolve_direct_return(tool_result, render_context=None):
-    """Texto/HTML para el chat cuando la tool marca retorno directo (__direct_return__)."""
+    """Text/HTML for the chat when the tool marks a direct return (__direct_return__)."""
     from .mcp_tool_payload import unwrap_tool_payload
 
     if not isinstance(tool_result, dict):
@@ -415,7 +415,7 @@ def _should_show_direct_to_chat(
 
 
 def _extract_direct_formatted_output(tool_result, render_context=None):
-    """HTML para retorno directo al chat: formatted_text o render bajo demanda."""
+    """HTML for a direct return to the chat: formatted_text or on-demand render."""
     if not isinstance(tool_result, dict):
         return None
 
@@ -448,9 +448,9 @@ def _extract_direct_formatted_output(tool_result, render_context=None):
         )
         if rendered:
             return rendered
-        # NO forzar (force=False): respetar la heurística de is_tabulable
-        # (mín 5 filas, claves homogéneas). Con force=True se tabulaban
-        # respuestas de texto como "¿quién eres?" → tabla ilegible.
+        # DO NOT force (force=False): respect the is_tabulable heuristic
+        # (min 5 rows, homogeneous keys). With force=True, text answers
+        # such as "¿quién eres?" were tabulated → unreadable table.
         if _result_items(payload) and is_tabulable(payload):
             return render_result_html(
                 payload, payload.get('summary') or '', render_context=render_context,
@@ -458,9 +458,9 @@ def _extract_direct_formatted_output(tool_result, render_context=None):
         return None
 
     def _from_payload(payload):
-        # Resultados tabulares "pelados" (lista de dicts en el nivel superior)
-        # se envuelven para que el render server-side los detecte como tabla
-        # en lugar de volcar el JSON crudo al chat.
+        # "Bare" tabular results (list of dicts at the top level)
+        # get wrapped so the server-side render detects them as a table
+        # instead of dumping the raw JSON into the chat.
         if isinstance(payload, list):
             payload = {'data': payload}
         if not isinstance(payload, dict):
@@ -470,16 +470,16 @@ def _extract_direct_formatted_output(tool_result, render_context=None):
             return direct
         return _render_if_needed(payload)
 
-    # Errores recuperables (validación/ejecución del código del LLM): NO renderizar.
-    # Deben volver al LLM como salida de tool para que se auto-corrija (bucle ReAct);
-    # si los tabuláramos, el usuario vería el error crudo y se cortaría el reintento.
+    # Recoverable errors (validation/execution of the LLM's code): DO NOT render.
+    # They must go back to the LLM as tool output so it self-corrects (ReAct loop);
+    # if we tabulated them, the user would see the raw error and the retry would stop.
     if tool_result.get('__force_retry__') or tool_result.get('isError'):
         return None
 
-    # El sobre MCP {content:[{type:'text', text:<json>}]} es transporte, no datos.
-    # Desenvolvemos SIEMPRE el payload interno antes de renderizar; nunca tabulamos
-    # el propio array 'content' (si no, sale una tabla "Type | Text" con el JSON
-    # crudo y, además, sombrea el formatted_text bueno de tablas/imágenes).
+    # The MCP envelope {content:[{type:'text', text:<json>}]} is transport, not data.
+    # We ALWAYS unwrap the inner payload before rendering; we never tabulate
+    # the 'content' array itself (otherwise a "Type | Text" table shows the raw
+    # JSON and, on top, it shadows the good formatted_text of tables/images).
     blocks = tool_result.get('content')
     if (
         isinstance(blocks, list) and blocks
@@ -491,7 +491,7 @@ def _extract_direct_formatted_output(tool_result, render_context=None):
             return None
         return _from_payload(inner)
 
-    # No es un sobre MCP: el propio dict ya es el payload.
+    # Not an MCP envelope: the dict itself is already the payload.
     return _from_payload(tool_result)
 
 
@@ -522,8 +522,8 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
                  turn_prefix=None, agent_code=None):
         ctx = (env.context if env is not None else {}) or {}
         # Door token (a value of ai.log.origin). Origin on the log
-        # is the agent name. The door is never assumed to be Chatboo: a host
-        # that wants that token must pass it (or stamp mcp_source_channel).
+        # is the agent name. The door is never assumed: a host that wants
+        # a token must pass it (or stamp mcp_source_channel).
         self._source_channel = (
             source_channel or ctx.get('mcp_source_channel') or 'internal'
         )
@@ -544,11 +544,11 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
         if self._turn_corr:
             stamp['mcp_turn'] = self._turn_corr
         self.env = env(context=stamp) if env is not None else env
-        # Estado de logging del turno: capturamos UNA correlación y el usuario
-        # real una sola vez por turno y los reutilizamos en cada línea del
-        # histórico. Durante el streaming SSE el `request` global puede quedar
-        # desligado, así que NO dependemos de él en cada log (antes provocaba
-        # entradas huérfanas como Administrator y un correlation_id por evento).
+        # Turn logging state: we capture ONE correlation and the real user
+        # once per turn and reuse them on every line of the
+        # history. During SSE streaming the global `request` may end up
+        # detached, so we do NOT rely on it for each log (it used to cause
+        # orphan entries such as Administrator and one correlation_id per event).
         self._turn_uid = env.uid if env is not None else None
         self._turn_step = 0
         self._turn_remote_ip = None
@@ -586,10 +586,10 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
             except TypeError:
                 turn = new_turn_id()
         self._turn_corr = turn
-        # Garantiza que TODO lector downstream (p. ej. create_verification del
-        # safe_plan, que se ejecuta en cursor propio) vea el MISMO turn id
-        # del turno. En el streaming SSE el request puede no traer chip y
-        # quedaría desincronizado con `self._turn_corr`.
+        # Makes sure EVERY downstream reader (e.g. create_verification of the
+        # safe_plan, which runs on its own cursor) sees the SAME turn id
+        # of the turn. During SSE streaming the request may carry no chip and
+        # would drift out of sync with `self._turn_corr`.
         try:
             if req is not None:
                 req.mcp_turn = self._turn_corr
@@ -625,15 +625,18 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
                 pass
         self._side_usage_token = bind_turn_side_usage()
         self._turn_side_usage = {}
+        self._turn_side_by_provider = {}
         from ..utils.mcp_logging import resolve_remote_ip
         self._turn_remote_ip = resolve_remote_ip()
 
-    def _accumulate_side_usage(self, usage):
-        """Fold a satellite LLM call into the parent Chatboo turn.
+    def _accumulate_side_usage(self, usage, provider=None):
+        """Fold a satellite LLM call into the parent turn.
 
         No extra ``ai.log`` row (keeps the history readable). The spend lands
         in ``orchestration_summary`` with the turn total. Own-shot headless
         calls use ``inference_audit`` instead — see ``docs/llm_usage_metering.md``.
+        ``provider`` says who spent it, so a turn of side calls only can
+        charge them to that provider.
         """
         piece = normalize_usage(usage) if usage else {}
         if not piece:
@@ -643,6 +646,27 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
         if not isinstance(acc, dict):
             acc = {}
         self._turn_side_usage = add_usage(acc, piece)
+        pid = getattr(provider, 'id', None)
+        if pid:
+            by = getattr(self, '_turn_side_by_provider', None)
+            if not isinstance(by, dict):
+                by = {}
+            seen = by.get(pid) or {'provider': provider, 'usage': {}}
+            seen['usage'] = add_usage(seen['usage'], piece)
+            by[pid] = seen
+            self._turn_side_by_provider = by
+
+    def _side_spender(self, side):
+        """The one provider behind all of ``side``, or None."""
+        by = getattr(self, '_turn_side_by_provider', None)
+        if not isinstance(by, dict) or len(by) != 1:
+            return None
+        seen = next(iter(by.values()))
+        mine = seen.get('usage') or {}
+        for key in ('prompt_tokens', 'completion_tokens'):
+            if (mine.get(key) or 0) != (side.get(key) or 0):
+                return None
+        return seen.get('provider')
 
     def _side_usage(self):
         bound = bound_turn_side_usage()
@@ -679,9 +703,9 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
     def _mcp_log(self, **kwargs):
         """Write one MCP log row for the current turn (shared corr + real user).
 
-        Centraliza el registro del histórico para que TODOS los eventos de un
-        turno (petición al LLM, respuesta, herramientas, failover y cierre)
-        compartan correlación, paso incremental y el usuario humano correcto.
+        Centralizes history logging so that ALL events of a
+        turn (LLM request, reply, tools, failover and close)
+        share the correlation, the incremental step and the right human user.
         """
         if 'ai.log' not in self.env:
             return
@@ -802,13 +826,13 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
                 'AgentEngine: domain_index runtime failed', exc_info=True,
             )
 
-        # Los DATOS de runtime van AL FINAL, no al principio. Así el prefijo
-        # grande y estable (system prompt + bundle del rol + reglas) queda
-        # byte-idéntico entre turnos (y entre días), lo que habilita el
-        # prefix-caching del prompt: reutilización del prefijo de la KV cache en
-        # llama.cpp y prefix-cache automático en OpenAI-compatible. Ponerlos
-        # delante (la fecha cambia a diario) invalidaría TODO el prefijo cacheado
-        # en el token ~5. Ver docs/decisions/cache_estrategia.md.
+        # Runtime DATA goes AT THE END, not at the start. That way the large,
+        # stable prefix (system prompt + role bundle + rules) stays
+        # byte-identical across turns (and across days), which enables
+        # prompt prefix-caching: reuse of the KV cache prefix in
+        # llama.cpp and automatic prefix-cache in OpenAI-compatible. Putting them
+        # first (the date changes daily) would invalidate the WHOLE cached prefix
+        # at token ~5. See docs/decisions/cache_estrategia.md.
         runtime_data = (
             f"\n\n---\n[Server date: {server_today}]"
             f"{whitelist_hint}{external_tools_hint}"
@@ -819,8 +843,8 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
 
     def get_tools_schema(self):
         """
-        Obtiene todas las herramientas registradas en Odoo MCP y las convierte
-        al formato de OpenAI/Anthropic Functions.
+        Gets all tools registered in Odoo MCP and converts them
+        to the OpenAI/Anthropic Functions format.
         """
         from ..controllers.mcp_decorators import (
             get_registered_tools,
@@ -858,9 +882,9 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
                 transform the SAME data server-side instead of re-querying
                 (Level 2, kernel-like reuse; never enters the LLM context).
             screen_context_block: Optional str. Compact [Active screen] block
-                from Chatboo UI focus enrichment (runtime data, not a rule).
+                from the host's UI focus enrichment (runtime data, not a rule).
             prior_domain_codes: Optional list. Domain pack codes injected on
-                the previous Chatboo turn. Kept when this sentence matches
+                the previous turn. Kept when this sentence matches
                 nothing or overlaps them. Dropped when this sentence names
                 other packs and shares none.
             held_domain_codes: Optional list. Domain pack codes the host keeps
@@ -869,7 +893,7 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
         """
         from ..models.ai_execution_engine import ProviderConnectionError
 
-        # Un único hilo de histórico por turno (correlación + usuario real).
+        # A single history thread per turn (correlation + real user).
         self._begin_turn()
         self._turn_history = list(history or [])
         self._turn_sent_tabular_to_model = False
@@ -922,15 +946,18 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
             )
             return
 
-        # --- Slash commands: /skills (lista) y /<code> [args] (invocación) ---
-        # Skills se invocan con `/code [args]`. Params: determinista primero;
-        # IA híbrida solo si hay ``param_schema`` + texto libre sin resolver.
-        # Continuidad mínima: tarjeta HTML sin filas + invocación sin args
-        # (o flag ``__await_skill_args__``) → el siguiente mensaje sin slash
-        # reanuda ese skill (args = texto). Help nunca espera.
-        # Al reanudar, el skill recupera su ``__skill_state__`` de la ronda
-        # anterior. Un slash explícito empieza de cero (sin estado heredado).
+        # --- Slash commands: /skills (list) and /<code> [args] (invocation) ---
+        # Skills are invoked with `/code [args]`. Params: deterministic first;
+        # hybrid AI only if there is a ``param_schema`` + unresolved free text.
+        # Minimal continuity: HTML card with no rows + invocation without args
+        # (or flag ``__await_skill_args__``) → the next message without a slash
+        # resumes that skill (args = text); if the text fills none of its
+        # parameters, the skill is released and the text is a normal turn.
+        # Help never waits.
+        # On resume, the skill gets back its ``__skill_state__`` from the previous
+        # round. An explicit slash starts from scratch (no inherited state).
         resumed_state = {}
+        resumed = False
         command = self._parse_slash_command(message)
         if command is None and prior_active_skill_code:
             reply = (message or '').strip()
@@ -939,6 +966,7 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
                 if pending:
                     from .skill_runtime import skill_state_from_params
                     command = (prior_active_skill_code, reply)
+                    resumed = True
                     resumed_state = skill_state_from_params(
                         prior_active_skill_params,
                     )
@@ -985,6 +1013,7 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
             provider_id=provider_id,
             resumed_state=resumed_state,
             session_id=session_id,
+            resumed=resumed,
         )
         if _stop:
             return
@@ -1044,7 +1073,7 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
         self._turn_untrusted = False
         for idx, current in enumerate(cascade_providers):
             if idx > 0 and failed_provider:
-                Engine.log_provider_failover(
+                Engine._log_provider_failover(
                     agent_code, failed_provider, current, last_error,
                     user_id=self._turn_uid,
                     turn=self._turn_corr,
@@ -1108,17 +1137,17 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
                         provider_id=current.id,
                     )
                     return
-                # Si este proveedor YA había emitido contenido visible antes de
-                # caer, el consumidor lo tiene acumulado; al reintentar con el
-                # siguiente proveedor se generaría de nuevo -> respuesta DUPLICADA.
-                # Emitimos un 'replace' vacío para que el consumidor descarte lo
-                # parcial antes del reintento (el worker lo interpreta como reset).
+                # If this provider HAD ALREADY emitted visible content before
+                # failing, the consumer has it accumulated; retrying with the
+                # next provider would generate it again -> DUPLICATED reply.
+                # We emit an empty 'replace' so the consumer drops the
+                # partial output before the retry (the worker reads it as a reset).
                 if _emitted_content:
                     yield {'event': 'replace', 'content': ''}
         err = _('All providers failed for agent "%s".') % agent_code
         if provider_errors:
-            # Mostrar el fallo de CADA proveedor (no solo el último): así se ve la
-            # causa raíz (p. ej. local caído) y no solo el error del fallback.
+            # Show the failure of EACH provider (not only the last one): that way you
+            # see the root cause (e.g. local down) and not only the fallback error.
             err += '\n' + '\n'.join(
                 '  • %s: %s' % (name, msg) for name, msg in provider_errors
             )
@@ -1136,7 +1165,7 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
             pass
         yield {
             'event': 'token',
-            'content': '\n\n🛑 **Servidor MCP:** %s\n' % err,
+            'content': '\n\n🛑 **%s:** %s\n' % (_('MCP server'), err),
         }
         yield self._done_event(
             session_id,
@@ -1154,11 +1183,17 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
             provider_id,
             resumed_state,
             session_id,
+            resumed=False,
     ):
-        """Slash command turn: help, axis commands, skill code or prompt. Returns (stop, message)."""
+        """Slash command turn: help, axis commands, skill code or prompt. Returns (stop, message).
+
+        ``resumed``: the user typed no slash; the text came in as the reply to a
+        skill that was waiting for arguments.
+        """
         if command is not None:
             cmd, args = command
-            if cmd.lower() in ('skills', 'skill', 'help', 'ayuda', '?'):
+            from .skill_help import is_skills_list_command
+            if is_skills_list_command(cmd):
                 from .skill_dates import skill_args_are_help as _cmd_help
                 from .skill_help import builtin_slash_help_meta
                 if (args or '').strip() and _cmd_help(args):
@@ -1243,7 +1278,7 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
             else:
                 skill = self._resolve_skill(agent_code, cmd)
                 if not skill:
-                    content = _('No existe el skill `/%s`.') % cmd
+                    content = _('There is no skill `/%s`.') % cmd
                     yield {'event': 'token', 'content': content}
                     yield self._done_event(
                         session_id,
@@ -1325,8 +1360,8 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
                 payload = skill.build_invocation_payload(user_locale=user_lang, arguments=args)
 
                 if (skill.code_body or '').strip():
-                    # Skill CON codigo: se resuelve server-side de forma determinista
-                    # o compose-model entrega datos al LLM (one-shot, no sticky).
+                    # Skill WITH code: resolved server-side deterministically
+                    # or compose-model hands the data to the LLM (one-shot, no sticky).
                     from .formatting_mode_policy import (
                         COMPOSE_AGENT,
                         COMPOSE_MODEL,
@@ -1384,6 +1419,26 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
                                 slash, exc,
                             )
                     if (
+                        resumed
+                        and isinstance(norm_params, dict)
+                        and norm_params.get('_skill_args_reject')
+                    ):
+                        # The reply fills none of the waiting skill's
+                        # parameters: it is a new question, not an answer.
+                        # Release the skill so it does not ask again forever.
+                        self._mcp_log(
+                            operation_type='read',
+                            tool_name='skill_args_release',
+                            prompt_data={'skill': slash, 'arguments': args},
+                            result_summary=(
+                                'Reply is not an argument of %s; skill released'
+                                % slash
+                            )[:480],
+                            request_type='tool',
+                        )
+                        yield {'event': 'active_skill', 'code': None, 'params': {}}
+                        return False, message
+                    if (
                         isinstance(norm_params, dict)
                         and norm_params.get('_skill_args_reject')
                     ):
@@ -1404,8 +1459,8 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
                             asking=bool(norm_params.get('_skill_args_missing')),
                         )
                         return True, None
-                    # Slots pegajosos: el skill lee ``skill_state`` (vacío en
-                    # una invocación nueva) y decide qué le falta todavía.
+                    # Sticky slots: the skill reads ``skill_state`` (empty on
+                    # a new invocation) and decides what it still lacks.
                     norm_params = dict(norm_params or {})
                     norm_params['skill_state'] = resumed_state
                     boot_diag = {}
@@ -1708,7 +1763,7 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
                             request_type='tool',
                         )
                         yield {'event': 'replace', 'content': fast['html']}
-                        # CRUD propose_steps: mismo toast que safe_plan_request
+                        # CRUD propose_steps: same toast as safe_plan_request
                         if fast.get('verification_id'):
                             event = {
                                 'event': 'verification',
@@ -1757,11 +1812,11 @@ class AgentEngine(DiscoveryMixin, SkillsMixin, PresentationMixin, ToolLoopMixin,
                         )
                         return True, None
                     else:
-                        # No se pudo resolver server-side -> ERROR CLARO, sin LLM.
+                        # Could not resolve server-side -> CLEAR ERROR, no LLM.
                         reason = (
                             boot_diag.get('bootstrap_error')
                             or fp_diag.get('reason')
-                            or 'desconocido'
+                            or _('unknown')
                         )
                         shown = friendly_skill_fast_path_reason(reason)
                         self._mcp_log(

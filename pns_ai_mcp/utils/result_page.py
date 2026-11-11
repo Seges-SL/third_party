@@ -40,16 +40,6 @@ def has_page_url(payload):
     """True when this payload carries a page the user can open."""
     return bool(page_url_on_result(payload))
 
-
-def rows_on_payload(payload):
-    """Row list on ``payload``, or []. Groups / tables are flattened."""
-    blocks = blocks_on_payload(payload)
-    out = []
-    for block in blocks:
-        out.extend(block.get('data') or [])
-    return out
-
-
 def blocks_on_payload(payload):
     """Titled tables as they came. Different tables stay apart."""
     if not isinstance(payload, dict):

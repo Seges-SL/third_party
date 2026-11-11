@@ -35,6 +35,6 @@ def slash_releases_domain_codes(
     """Slashes never drop conversation packs.
 
     ``command`` / ``skill_resolved`` stay on the signature for callers.
-    Only a new Chatboo session clears ``last_domain_codes``.
+    Only a new host session clears ``last_domain_codes``.
     """
     return False

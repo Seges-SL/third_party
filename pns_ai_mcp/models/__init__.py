@@ -21,6 +21,7 @@ from . import ai_view_policy
 from . import ai_system_action
 from . import ai_safe_choice
 from . import safe_operation
+from . import ai_provider_role
 from . import ai_provider
 from . import ai_fx_source
 from . import ai_agent
@@ -28,6 +29,10 @@ from . import ai_agent_consumer
 from . import res_config_settings
 from . import skill_param_token_legend
 from . import ai_skill
+from . import ai_skill_authoring
+from . import ai_skill_slash
+from . import ai_skill_zip
+from . import ai_skill_disk
 from . import ai_skill_param_line
 from . import ai_skill_param_cache
 from . import ai_execution_engine
@@ -41,5 +46,4 @@ from . import ir_http
 from . import ir_model_fields_selection
 from . import ai_schema_fossil
 from . import secret_native_export
-# Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
-from . import box_a_guard
+from . import sandbox_secret_read

@@ -5,25 +5,97 @@
 import re
 import uuid
 
-# Sufijo de locale en code (solo para fixtures de test; el modelo exige locale explícito).
+# Locale suffix in code (test fixtures only; the model requires an explicit locale).
 _LOCALE_CODE_RE = re.compile(r'_([a-z]{2}_[A-Z]{2})$')
 
 
 def locale_from_code(code):
-    """Extrae locale de un code tipo demo_terms_es_ES → es_ES (o False)."""
+    """Extract the locale from a code like demo_terms_es_ES → es_ES (or False)."""
     match = _LOCALE_CODE_RE.search(code or '')
     return match.group(1) if match else False
 
 
 def unique_login(prefix='pns_test'):
-    """Login único por ejecución (evita UniqueViolation si quedó basura en BD)."""
+    """Unique login per run (avoids UniqueViolation if junk was left in the DB)."""
     return '%s_%s@mcp.test' % (prefix, uuid.uuid4().hex[:10])
 
 
-def db_name_looks_like_safe_test(env):
-    """True si el nombre de BD sugiere instancia de test/prueba (no producción).
+# Instance add-ons may demand an origin on every contact; tests create bare ones.
+SKIP_CONTACT_ORIGIN = {'pns_skip_source_required': True}
 
-    Coincide con ``prueba`` (cubre ``pruebas``) o ``test`` en el nombre.
+
+def make_user(env, prefix, groups):
+    """``new_test_user`` with a login of its own run.
+
+    Safe Plan commits the caller's cursor, so a user a test created may stay
+    in the database; a fixed login would collide on the next run.
+    """
+    from odoo.tests.common import new_test_user
+    return new_test_user(
+        env, login=unique_login(prefix), groups=groups,
+        context={
+            **SKIP_CONTACT_ORIGIN,
+            'no_reset_password': True,
+            'mail_create_nosubscribe': True,
+            'mail_notrack': True,
+            'tracking_disable': True,
+        },
+    )
+
+
+def _test_cursor_view(cr):
+    """The test cursor seen as a fresh one: commit and close do nothing.
+
+    A subclass on the cursor's connection, because Odoo asserts the type.
+    """
+    class _View(type(cr)):
+        def commit(self):
+            pass
+
+        def rollback(self):
+            pass
+
+        def close(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def __del__(self):
+            pass
+
+    view = object.__new__(_View)
+    # Same connection and transaction objects. O16+ tests also forbid
+    # commit/rollback on the cursor instance itself: those stay behind.
+    state = dict(cr.__dict__)
+    for name in ('commit', 'rollback', 'close'):
+        state.pop(name, None)
+    view.__dict__ = state
+    return view
+
+
+def one_cursor(testcase):
+    """Code that opens its own cursor runs inside the test transaction.
+
+    Two transactions in one process can wait on each other forever (the
+    test holds a row the other cursor needs). Inside this block nothing is
+    committed and the test rollback undoes everything.
+    """
+    from unittest.mock import patch
+    registry = testcase.env.registry
+    return patch.object(
+        type(registry), 'cursor',
+        lambda self, *a, **kw: _test_cursor_view(testcase.env.cr),
+    )
+
+
+def db_name_looks_like_safe_test(env):
+    """True if the DB name suggests a test instance (not production).
+
+    Matches ``prueba`` (covers ``pruebas``) or ``test`` in the name.
     """
     db = ''
     try:
@@ -39,18 +111,18 @@ def db_name_looks_like_safe_test(env):
     return ('prueba' in low) or ('test' in low)
 
 
-# Alias histórico (mismo criterio).
+# Historical alias (same criterion).
 db_name_looks_like_pruebas = db_name_looks_like_safe_test
 
 
 def skip_unless_safe_test_db_for_intrusion(testcase):
-    """Salta tests de intrusión/caja A fuera de BD de prueba/test.
+    """Skip intrusion/box A tests outside a test DB.
 
-    Motivo: el pipeline real de relaxaicode abre un **cursor aislado** fuera del
-    savepoint del TransactionCase. Un bypass (o un commit colateral) puede
-    persistir en la BD real — inaceptable en producción.
+    Why: the real relaxaicode pipeline opens an **isolated cursor** outside the
+    TransactionCase savepoint. A bypass (or a side commit) can persist in the
+    real DB — not acceptable in production.
 
-    Opt-in consciente: env ``PNS_ALLOW_INTRUSION_TESTS=1``.
+    Deliberate opt-in: env ``PNS_ALLOW_INTRUSION_TESTS=1``.
     """
     import os
 
@@ -67,18 +139,19 @@ def skip_unless_safe_test_db_for_intrusion(testcase):
     )
 
 
-# Alias histórico.
+# Historical alias.
 skip_unless_pruebas_for_intrusion = skip_unless_safe_test_db_for_intrusion
 
 
 def create_test_user(env, prefix='pns_test', groups=None, **vals):
-    """Crea res.users con login único; groups por defecto = internal user.
+    """Create res.users with a unique login; default groups = internal user.
 
-    - Contextos mail: en O14 website_slides/digest rompen savepoints si no se
-      silencian.
-    - ``lock_timeout`` local: si el Odoo vivo sigue activo, falla en ~15s en
-      vez de colgar el suite indefinidamente.
+    - Mail contexts: on O14 website_slides/digest break savepoints if not
+      silenced.
+    - Local ``lock_timeout``: if the live Odoo is still running, it fails in
+      ~15s instead of hanging the suite forever.
     """
+    from odoo.addons.pns_base.utils.compat import USER_GROUPS_FIELD
     if groups is None:
         groups = [env.ref('base.group_user').id]
     login = vals.pop('login', None) or unique_login(prefix)
@@ -88,7 +161,7 @@ def create_test_user(env, prefix='pns_test', groups=None, **vals):
         'login': login,
         'email': vals.pop('email', login),
         'password': password,
-        'groups_id': [(6, 0, groups)],
+        USER_GROUPS_FIELD: [(6, 0, groups)],
     }
     payload.update(vals)
     try:
@@ -96,6 +169,7 @@ def create_test_user(env, prefix='pns_test', groups=None, **vals):
     except Exception:
         pass
     Users = env['res.users'].sudo().with_context(
+        **SKIP_CONTACT_ORIGIN,
         no_reset_password=True,
         mail_create_nolog=True,
         mail_create_nosubscribe=True,
@@ -145,38 +219,62 @@ _ADMIN_KEY_FIELDS = (
 )
 
 
+AI_PLAN_GROUPS = ('pns_ai_mcp.group_ai_writer', 'pns_ai_mcp.group_ai_admin')
+
+
+def grant_groups(user, xmlids):
+    """Give *user* the groups it lacks; return those, for ``revoke_groups``."""
+    from odoo.addons.pns_base.utils.compat import USER_GROUPS_FIELD
+    missing = [x for x in xmlids if not user.has_group(x)]
+    if missing:
+        user.write({USER_GROUPS_FIELD: [(4, user.env.ref(x).id) for x in missing]})
+    return missing
+
+
+def revoke_groups(user, xmlids):
+    from odoo.addons.pns_base.utils.compat import USER_GROUPS_FIELD
+    if xmlids:
+        user.write({USER_GROUPS_FIELD: [(3, user.env.ref(x).id) for x in xmlids]})
+
+
 def _write_mcp_http_fixtures(fix_env, api_key):
-    """Put ``api_key`` on admin's MCP row; return admin's previous key values."""
+    """Put ``api_key`` and the conversational group on admin.
+
+    Returns what admin had before, for ``_restore_admin_key``.
+    """
     from odoo.addons.pns_ai_mcp.utils.api_key import hash_api_key
+    from odoo.addons.pns_ai_mcp.utils.conversational import GROUP_AI_CONVERSATIONAL
     ensure_test_agents(fix_env)
     test_user = fix_env.ref('base.user_admin')
     test_user.write({'active': True})
     key_hash = hash_api_key(api_key)
     mcp_user_model = fix_env['ai.mcp.user'].sudo()
     mcp_user = mcp_user_model.search([('user_id', '=', test_user.id)], limit=1)
-    if mcp_user:
-        previous = {f: mcp_user[f] for f in _ADMIN_KEY_FIELDS}
-    else:
-        previous = None
+    previous = {
+        'key': {f: mcp_user[f] for f in _ADMIN_KEY_FIELDS} if mcp_user else None,
+    }
+    if not mcp_user:
         mcp_user = mcp_user_model.create({'user_id': test_user.id})
     mcp_user.write({
         'mcp_api_key_hash': key_hash,
         'mcp_api_key_state': 'generated',
     })
+    previous['groups_added'] = grant_groups(test_user, [GROUP_AI_CONVERSATIONAL])
     return previous
 
 
 def _restore_admin_key(fix_env, previous):
     test_user = fix_env.ref('base.user_admin')
+    revoke_groups(test_user, previous.get('groups_added'))
     mcp_user = fix_env['ai.mcp.user'].sudo().search(
         [('user_id', '=', test_user.id)], limit=1,
     )
     if not mcp_user:
         return
-    if previous is None:
+    if previous.get('key') is None:
         mcp_user.unlink()
     else:
-        mcp_user.write(previous)
+        mcp_user.write(previous['key'])
 
 
 def _count_active_mcp_key(env, api_key):
@@ -188,7 +286,7 @@ def _count_active_mcp_key(env, api_key):
 
 
 def setup_http_mcp_fixtures(cls, env):
-    """API key MCP para HttpCase: commit según versión Odoo.
+    """MCP API key for HttpCase: commit depending on the Odoo version.
 
     The key is committed (the HTTP worker reads it on another cursor), so it
     is random per class and ``teardown_http_mcp_fixtures`` gives admin back
@@ -196,19 +294,20 @@ def setup_http_mcp_fixtures(cls, env):
     """
     import secrets
     from odoo import api, SUPERUSER_ID
-    from odoo.addons.pns_ai_mcp.utils.compat import NEEDS_ROOT_GET_REQUEST_PATCH
+    from odoo.addons.pns_ai_mcp.utils.compat import ODOO_VERSION
 
     if not getattr(cls, 'test_api_key', None):
         cls.test_api_key = 'pns-http-test-%s' % secrets.token_urlsafe(24)
     api_key = cls.test_api_key
 
-    if NEEDS_ROOT_GET_REQUEST_PATCH:
-        # O14: mismo cursor que enter_test_mode / url_open.
+    if ODOO_VERSION <= 14:
+        # O14: each test owns its cursor (no savepoint); same one as url_open.
         fix_env = env(user=SUPERUSER_ID)
         previous = _write_mcp_http_fixtures(fix_env, api_key)
         env.cr.commit()
     else:
-        # O16+: commit en cursor de test prohibido — cursor aparte con commit.
+        # O15+: the tests of a class share one cursor with a savepoint each;
+        # a commit there drops the savepoints. Separate cursor with commit.
         with env.registry.cursor() as cr:
             fix_env = api.Environment(cr, SUPERUSER_ID, {})
             previous = _write_mcp_http_fixtures(fix_env, api_key)
@@ -243,7 +342,7 @@ def teardown_http_mcp_fixtures(cls):
 
 
 def http_status_code(response):
-    """Odoo 14 url_open → Werkzeug (.status); O19 suele exponer .status_code."""
+    """Odoo 14 url_open → Werkzeug (.status); O19 usually exposes .status_code."""
     code = getattr(response, 'status_code', None)
     if code is not None:
         return int(code)
@@ -252,7 +351,7 @@ def http_status_code(response):
 
 
 def http_response_text(response):
-    """Cuerpo HTTP: .content (requests) o .data (Werkzeug en O14)."""
+    """HTTP body: .content (requests) or .data (Werkzeug on O14)."""
     raw = getattr(response, 'content', None)
     if raw is None:
         raw = getattr(response, 'data', b'') or b''
@@ -262,12 +361,12 @@ def http_response_text(response):
 
 
 def mcp_test_url(path, api_key):
-    """URL MCP sin clave: la clave viaja solo en las cabeceras de mcp_test_headers."""
+    """MCP URL without the key: the key only travels in the mcp_test_headers headers."""
     return path
 
 
 def mcp_test_headers(api_key):
-    """Cabeceras MCP alineadas con smoke_mcp_http.sh y portabilidad O14."""
+    """MCP headers in line with smoke_mcp_http.sh and O14 portability."""
     from odoo.addons.pns_ai_mcp.utils.compat import NEEDS_ROOT_GET_REQUEST_PATCH
 
     content_type = 'text/plain' if NEEDS_ROOT_GET_REQUEST_PATCH else 'application/json'

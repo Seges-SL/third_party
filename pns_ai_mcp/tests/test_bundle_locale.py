@@ -28,7 +28,7 @@ class TestAgentLocale(TransactionCase):
         return self.env['ai.agent']
 
     def _create_context(self, code, context_type='domain', content=None, locale=None):
-        """Crea contexto de test; locale explícito (el modelo ya no lo infiere del code)."""
+        """Create a test context; explicit locale (the model no longer infers it from the code)."""
         if locale is None:
             locale = locale_from_code(code) or False
         ctx = self.Context.create({
@@ -230,7 +230,7 @@ class TestAgentLocale(TransactionCase):
         )
         if not ctx:
             self.skipTest('hr_payroll_accounting_present not imported')
-        # Match por nombre (AST inline); address_home_id solo como prohibido.
+        # Match by name (inline AST); address_home_id only as forbidden.
         self.assertIn('name_to_emp', ctx.content)
         self.assertIn('address_home_id', ctx.content)
         self.assertIn('has_breakdown', ctx.content)

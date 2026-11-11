@@ -229,10 +229,13 @@ class LLMDriver(ABC):
 
     ``chats`` and ``chooses`` say which turns this protocol can serve.
     A provider tick the driver cannot honour fails on save.
+    ``endpoint_path``: the path this protocol posts to, as typed. An
+    endpoint that ends otherwise fails on save. Empty: any.
     """
 
     chats = True
     chooses = False
+    endpoint_path = ''
 
     @property
     @abstractmethod

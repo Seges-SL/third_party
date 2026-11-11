@@ -1,4 +1,4 @@
-/* Estilos para tree view de logs MCP - evitar overflow horizontal */
+/* Styles for the MCP log tree view - avoid horizontal overflow */
 .o_mcp_log_tree,
 .o_mcp_log_tree .o_list_renderer,
 .o_mcp_log_tree .o_list_table,
@@ -10,7 +10,7 @@
     overflow-x: hidden !important;
 }
 
-/* Ancho de columna de selección (checkbox) - Ancho fijo para evitar superposición */
+/* Selection column width (checkbox) - fixed width to avoid overlap */
 .o_mcp_log_tree .o_list_table th:first-child,
 .o_mcp_log_tree .o_list_table td:first-child,
 .o_mcp_log_tree table.o_list_table th:first-child,
@@ -34,7 +34,7 @@
     vertical-align: middle;
 }
 
-/* Código + Nº: mono; fecha/hora = tipografía Odoo normal */
+/* Code + No.: mono; date/time = normal Odoo font */
 .o_mcp_log_tree .o_list_table th[data-name="user_id"],
 .o_mcp_log_tree .o_list_table td[data-name="user_id"],
 .o_mcp_log_tree .o_list_table th[data-field="user_id"],
@@ -98,7 +98,7 @@
     color: inherit;
 }
 
-/* flow_label: columna clave, no truncar — se muestra completa */
+/* flow_label: key column, do not truncate — shown in full */
 .o_mcp_log_tree .o_list_table th[data-name="flow_label"],
 .o_mcp_log_tree .o_list_table td[data-name="flow_label"] {
     width: 240px !important;
@@ -110,7 +110,7 @@
     font-weight: 500;
 }
 
-/* Widget JSON comprimido - evitar overflow */
+/* Compressed JSON widget - avoid overflow */
 .o_field_mcp_json_compressed {
     width: 100% !important;
     max-width: 100% !important;
@@ -140,7 +140,7 @@
     box-sizing: border-box !important;
 }
 
-/* Asegurar que el contenedor flex no exceda el ancho */
+/* Make sure the flex container does not exceed the width */
 .mcp_json_container > div[style*="display: flex"] {
     max-width: 100% !important;
     min-width: 0 !important;
@@ -149,7 +149,7 @@
     overflow: hidden !important;
 }
 
-/* Asegurar que el wrapper del texto comprimido no exceda */
+/* Make sure the compressed text wrapper does not overflow */
 .mcp_json_container > div[style*="display: flex"] > span {
     max-width: calc(100% - 30px) !important;
     min-width: 0 !important;
@@ -158,7 +158,7 @@
     flex: 1 1 auto !important;
 }
 
-/* Asegurar que el botón de copiar no cause overflow */
+/* Make sure the copy button does not cause overflow */
 .mcp_json_copy_btn {
     flex-shrink: 0 !important;
     flex-grow: 0 !important;
@@ -167,7 +167,7 @@
     max-width: 30px !important;
 }
 
-/* Botones de copiar en formulario */
+/* Copy buttons in the form */
 .o_field_text_copy_container {
     position: relative;
 }
@@ -197,16 +197,16 @@
 
 
 /* ============================================================
-   COLORES SEMANTICOS POR TIPO DE INTERACCION EN EL LOG MCP
-   Cada tipo de fila tiene fondo + texto contrastante:
+   SEMANTIC COLOURS BY INTERACTION TYPE IN THE MCP LOG
+   Each row type has a background + contrasting text:
 
-   in_llm  (ORCH→LLM)    decoration-info    : Azul Odoo     — peticion al modelo
-   out_llm (LLM→ORCH)    decoration-success : Verde oscuro  — respuesta del modelo
-   in_tool (ORCH→Tool)   decoration-warning : Naranja       — tool (ida y vuelta)
-   write op              decoration-danger  : Rojo suave    — escrituras
+   in_llm  (ORCH→LLM)    decoration-info    : Odoo blue     — request to the model
+   out_llm (LLM→ORCH)    decoration-success : Dark green    — reply from the model
+   in_tool (ORCH→Tool)   decoration-warning : Orange        — tool (round trip)
+   write op              decoration-danger  : Soft red      — writes
    ============================================================ */
 
-/* in_llm: Azul Odoo — llamada enviada al LLM */
+/* in_llm: Odoo blue — call sent to the LLM */
 .o_mcp_log_tree .o_list_table tr.text-info td,
 .o_mcp_log_tree table tr.text-info td {
     background-color: #00a09d !important;
@@ -216,7 +216,7 @@
 .o_mcp_log_tree .o_list_table tr.text-info td a,
 .o_mcp_log_tree .o_list_table tr.text-info td span { color: #ffffff !important; }
 
-/* out_llm: Verde oscuro — respuesta recibida del LLM */
+/* out_llm: Dark green — reply received from the LLM */
 .o_mcp_log_tree .o_list_table tr.text-success td,
 .o_mcp_log_tree table tr.text-success td {
     background-color: #1e7e34 !important;
@@ -226,7 +226,7 @@
 .o_mcp_log_tree .o_list_table tr.text-success td a,
 .o_mcp_log_tree .o_list_table tr.text-success td span { color: #e8f5e9 !important; }
 
-/* in_tool: Naranja — tool siendo ejecutado (ORCH→Tool) */
+/* in_tool: Orange — tool being run (ORCH→Tool) */
 .o_mcp_log_tree .o_list_table tr.text-warning td,
 .o_mcp_log_tree table tr.text-warning td {
     background-color: #e67e00 !important;
@@ -236,7 +236,7 @@
 .o_mcp_log_tree .o_list_table tr.text-warning td a,
 .o_mcp_log_tree .o_list_table tr.text-warning td span { color: #fff8e1 !important; }
 
-/* out_tool: Gris azulado — resultado del tool (Tool→ORCH) */
+/* out_tool: Blue grey — tool result (Tool→ORCH) */
 .o_mcp_log_tree .o_list_table tr.text-muted td,
 .o_mcp_log_tree table tr.text-muted td {
     background-color: #546e7a !important;
@@ -245,7 +245,7 @@
 .o_mcp_log_tree .o_list_table tr.text-muted td a,
 .o_mcp_log_tree .o_list_table tr.text-muted td span { color: #cfd8dc !important; }
 
-/* write op: Rojo — operaciones de escritura */
+/* write op: Red — write operations */
 .o_mcp_log_tree .o_list_table tr.text-danger td,
 .o_mcp_log_tree table tr.text-danger td {
     background-color: #c0392b !important;
@@ -255,14 +255,14 @@
 .o_mcp_log_tree .o_list_table tr.text-danger td a,
 .o_mcp_log_tree .o_list_table tr.text-danger td span { color: #ffebee !important; }
 
-/* Hover: oscurecer ligeramente el fondo */
+/* Hover: darken the background slightly */
 .o_mcp_log_tree .o_list_table tr.text-info:hover td    { background-color: #007f7d !important; }
 .o_mcp_log_tree .o_list_table tr.text-success:hover td { background-color: #155724 !important; }
 .o_mcp_log_tree .o_list_table tr.text-warning:hover td { background-color: #b56200 !important; }
 .o_mcp_log_tree .o_list_table tr.text-muted:hover td   { background-color: #3d4f58 !important; }
 .o_mcp_log_tree .o_list_table tr.text-danger:hover td  { background-color: #96281b !important; }
 
-/* Checkbox en filas coloreadas */
+/* Checkbox on coloured rows */
 .o_mcp_log_tree .o_list_table tr.text-info td .o_checkbox,
 .o_mcp_log_tree .o_list_table tr.text-success td .o_checkbox,
 .o_mcp_log_tree .o_list_table tr.text-warning td .o_checkbox,
@@ -282,11 +282,11 @@
 .o_mcp_log_tree .o_list_table tr.text-primary:hover td { background-color: #263238 !important; }
 
 /* failover: purple — intra-role provider switch (decoration-it alone).
-   OJO: la clase que genera decoration-it depende de la version de Odoo:
-     - Odoo 14 clasico  → 'text-it'
+   NOTE: the class decoration-it produces depends on the Odoo version:
+     - classic Odoo 14  → 'text-it'
      - Bootstrap 4      → 'font-italic'
      - Odoo 17+/19 (BS5)→ 'fst-italic'
-   Enganchamos las TRES. MCP client (external) also has decoration-it, but
+   We hook all THREE. MCP client (external) also has decoration-it, but
    stacked with decoration-warning — the combo rule below wins. */
 .o_mcp_log_tree .o_list_table tr.fst-italic td,
 .o_mcp_log_tree .o_list_table tr.font-italic td,
@@ -308,7 +308,7 @@
 .o_mcp_log_tree .o_list_table tr.font-italic:hover td,
 .o_mcp_log_tree .o_list_table tr.text-it:hover td { background-color: #6a1b9a !important; }
 
-/* MCP client → Odoo (external): warning + italic stacked → celeste, not orange.
+/* MCP client → Odoo (external): warning + italic stacked → light blue, not orange.
    Must come AFTER the warning (orange) and italic-only (purple) rules. */
 .o_mcp_log_tree .o_list_table tr.text-warning.fst-italic td,
 .o_mcp_log_tree .o_list_table tr.text-warning.font-italic td,
@@ -334,11 +334,11 @@
 .o_mcp_log_tree .o_list_table tr.text-warning.font-italic td .o_checkbox,
 .o_mcp_log_tree .o_list_table tr.text-warning.text-it td .o_checkbox { filter: brightness(2); }
 
-/* domain_index: azul — detección de dominios del índice (decoration-bf).
-   Clases según versión Odoo/Bootstrap:
+/* domain_index: blue — index domain detection (decoration-bf).
+   Classes by Odoo/Bootstrap version:
      - Odoo 14 → text-bf
      - BS5 / Odoo 17+ → fw-bold
-   Solo domain_index usa decoration-bf en este tree. */
+   Only domain_index uses decoration-bf in this tree. */
 .o_mcp_log_tree .o_list_table tr.text-bf td,
 .o_mcp_log_tree .o_list_table tr.fw-bold td,
 .o_mcp_log_tree table tr.text-bf td,

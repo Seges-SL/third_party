@@ -3,22 +3,23 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Build a safe execution context for relaxaicode code."""
 
+import _string
+import ast as _ast
 import builtins as _builtins
 import operator as _operator
+import string as _string_mod
 import types as _types
 
-# Denylist ÚNICA de atributos peligrosos, compartida con el AST (validators_base.py).
-# Un solo sitio para que la capa estática (AST) y la dinámica (guarded_getattr)
-# no se desincronicen. En runtime Odoo se importa por su ruta de addon; en los
-# unit tests (que cargan este .py por ruta, sin Odoo) se carga validators_base.py
-# hermano por fichero.
-try:  # pragma: no cover - camino de runtime Odoo
+# SINGLE denylist of dangerous attributes, shared with the AST (validators_base.py).
+# One place, so the static layer (AST) and the dynamic one (guarded_getattr)
+# never drift apart. At Odoo runtime it is imported by its addon path; in the
+# unit tests (which load this .py by path, without Odoo) the sibling
+# validators_base.py is loaded by file.
+try:  # pragma: no cover - Odoo runtime path
     from odoo.addons.pns_ai_mcp.controllers.validators_base import (
         DANGEROUS_ATTR_NAMES,
+        DANGEROUS_FORMAT_NAMES,
         RELAXAICODE_DANGEROUS_MODULES,
-        # Seges: parche 23 (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        RELAXAICODE_ENV_STATE_ATTRS,
-        RELAXAICODE_ENV_STATE_HINT,
         RELAXAICODE_FORBIDDEN_ORM_ATTRS,
         RELAXAICODE_ORM_WRITE_ATTRS,
         RELAXAICODE_PRIVILEGE_ATTRS,
@@ -29,10 +30,8 @@ try:  # pragma: no cover - camino de runtime Odoo
         _unsafe_import_error,
         blocked_private_attr,
         catalogue_inspect_error,
-        # Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        sandbox_forbidden_name,
     )
-except Exception:  # pragma: no cover - camino unit test / standalone
+except Exception:  # pragma: no cover - unit test / standalone path
     import importlib.util as _ilu
     import os as _os
     _vp = _os.path.join(_os.path.dirname(__file__), 'validators_base.py')
@@ -40,9 +39,7 @@ except Exception:  # pragma: no cover - camino unit test / standalone
     _vm = _ilu.module_from_spec(_sp)
     _sp.loader.exec_module(_vm)
     DANGEROUS_ATTR_NAMES = _vm.DANGEROUS_ATTR_NAMES
-    # Seges: parche 23 (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
-    RELAXAICODE_ENV_STATE_ATTRS = _vm.RELAXAICODE_ENV_STATE_ATTRS
-    RELAXAICODE_ENV_STATE_HINT = _vm.RELAXAICODE_ENV_STATE_HINT
+    DANGEROUS_FORMAT_NAMES = _vm.DANGEROUS_FORMAT_NAMES
     RELAXAICODE_FORBIDDEN_ORM_ATTRS = _vm.RELAXAICODE_FORBIDDEN_ORM_ATTRS
     RELAXAICODE_ORM_WRITE_ATTRS = _vm.RELAXAICODE_ORM_WRITE_ATTRS
     RELAXAICODE_PRIVILEGE_ATTRS = _vm.RELAXAICODE_PRIVILEGE_ATTRS
@@ -54,8 +51,6 @@ except Exception:  # pragma: no cover - camino unit test / standalone
     _unsafe_import_error = _vm._unsafe_import_error
     blocked_private_attr = _vm.blocked_private_attr
     catalogue_inspect_error = _vm.catalogue_inspect_error
-    # Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
-    sandbox_forbidden_name = _vm.sandbox_forbidden_name
 
 try:  # pragma: no cover - Odoo runtime
     from odoo.addons.pns_ai_mcp.utils.sandbox_helpers import (
@@ -73,52 +68,33 @@ except Exception:  # pragma: no cover - host unit test / standalone
     collect_sandbox_helpers = _shm.collect_sandbox_helpers
 
 
-# Seges: parche 24 (PNS-102, seguridad). Ver docs/pendiente/parches_pns_ai.md
-def _identity_no_su(env, name):
-    """``user`` / ``company`` / ``companies`` reconstruidos SIN su.
-
-    ``env.user`` / ``env.company`` / ``env.companies`` del ORM fuerzan su=True
-    (``api.py``: ``self(su=True)``). El sandbox corre como el usuario que pregunta,
-    así que se reconstruyen desde su ``uid`` sobre el mismo ``env`` (sin su) para
-    que ACL y record rules se apliquen al leer sus campos y relaciones.
-    """
-    if name == 'user':
-        return env['res.users'].browse(env.uid)
-    if name == 'company':
-        return env['res.company'].browse(env.company.id)
-    return env['res.company'].browse(env.companies.ids)
-
-
 class GuardedSandboxEnv(object):
-    """Sandbox ``env``: catalogue models stay off ORM (AST + runtime).
+    """Sandbox ``env``: ALLOWLIST of what the sandbox may touch.
+
+    Default-deny, not default-allow. A denylist always misses the next public
+    attribute Odoo adds to ``Environment``: ``env.args`` is the raw
+    ``(cr, uid, context, su)`` tuple and ``env.all`` is every live Environment
+    (both public, no leading ``_``), so either one hands out the real cursor
+    without ever writing ``cr``. Only the names below are exposed; everything
+    else — ``args``, ``all``, ``cache``, ``registry``, ``uid_origin`` and any
+    future addition — raises.
 
     ``ai.api.server`` / ``ai.context`` / ``ai.skill`` /
-    ``ai.trusted.action`` are catalogues.
-    List/load knowledge via ``get_context``; skills via ``/`` in Chatboo;
-    external calls via ``api_call``. Nothing here changes the identity:
-    ``sudo``, ``with_user``, ``with_env`` and ``env(user=…, su=…)`` raise.
+    ``ai.trusted.action`` are catalogues kept off the ORM (``__getitem__`` /
+    ``get``). List/load knowledge via ``get_context``; skills via ``/`` in the
+    chat; external calls via ``api_call``. ``with_context`` / ``with_company``
+    return another wrapper so the gate holds down the chain. Nothing here
+    changes the identity: ``sudo``, ``with_user``, ``with_env`` and
+    ``env(user=…, su=…)`` raise.
     """
 
-    # Seges: parche 23 ampliado / A1 (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
-    # with_context / with_company se retiran del wrapper: eran una vía de estado
-    # (y cambio de contexto) innecesaria para el sandbox; el código del modelo usa
-    # recordset.with_context(...), que no pasa por aquí.
-    _WRAP_METHODS = ()
-    # Seges: parche 23 (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
-    # What the wrapper hands out; anything else raises. uid/su/user/.../ref are for
-    # sandbox code. cr and registry are for the ENGINE, which gets this wrapper
-    # back after the run (render, error replies); sandbox code cannot name them
-    # (the AST and guarded_getattr refuse both).
-    _ATTRS = frozenset({
-        'uid', 'su', 'user', 'company', 'companies', 'context', 'lang', 'ref',
-        'is_superuser', 'is_admin', 'is_system',
-        'cr', 'registry',
+    _WRAP_METHODS = ('with_context', 'with_company')
+    # The whole public env surface the sandbox legitimately reads (as the
+    # asking user): identity, company set, locale and a record by XML id.
+    # ``__getitem__`` / ``get`` / ``__contains__`` are real methods below.
+    _ALLOWED_ENV_ATTRS = frozenset({
+        'user', 'company', 'companies', 'context', 'lang', 'uid', 'ref',
     })
-    # Seges: parche 24 (PNS-102, seguridad). Ver docs/pendiente/parches_pns_ai.md
-    # user/company/companies del ORM fuerzan su=True (api.py: self(su=True)). El
-    # sandbox corre como el usuario: se reconstruyen SIN su para que ACL y record
-    # rules se apliquen (p. ej. account.move ajeno, res.users.totp_secret).
-    _IDENTITY_NO_SU = ('user', 'company', 'companies')
 
     def __init__(self, env):
         object.__setattr__(self, '_env', env)
@@ -152,21 +128,21 @@ class GuardedSandboxEnv(object):
             )
         if name in RELAXAICODE_PRIVILEGE_ATTRS:
             raise AttributeError(RELAXAICODE_PRIVILEGE_HINT % (name,))
-        # Seges: parche 23 (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        if name not in self._ATTRS:
-            raise AttributeError(
-                f"env.{name} is not available in RelaxAICode (sandbox): env gives "
-                "models (env['model']), user, company, context, lang and ref.")
-        # Seges: parche 24 (PNS-102, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        # user/company/companies sin su (ver _IDENTITY_NO_SU).
-        if name in self._IDENTITY_NO_SU:
-            return _identity_no_su(self._env, name)
-        attr = getattr(self._env, name)
-        if name in self._WRAP_METHODS and callable(attr):
-            def _wrapped(*args, **kwargs):
-                return GuardedSandboxEnv(attr(*args, **kwargs))
-            return _wrapped
-        return attr
+        if name in self._WRAP_METHODS:
+            attr = getattr(self._env, name)
+            if callable(attr):
+                def _wrapped(*args, **kwargs):
+                    return GuardedSandboxEnv(attr(*args, **kwargs))
+                return _wrapped
+            return attr
+        if name in self._ALLOWED_ENV_ATTRS:
+            return getattr(self._env, name)
+        raise AttributeError(
+            "RelaxAICode exposes only env['model'] and env.user / company / "
+            "companies / context / lang / uid / ref / with_context / "
+            "with_company; %r is not available. Read records through "
+            "env['model'].search(...)." % (name,)
+        )
 
     def __call__(self, *args, **kwargs):
         if args or set(kwargs) - {'context'}:
@@ -180,86 +156,244 @@ class GuardedSandboxEnv(object):
         return '<GuardedSandboxEnv %r>' % (self._env,)
 
 
-def guarded_getattr(obj, name, *default):
-    """`getattr` endurecido para el sandbox (caja A).
+# Live database handles. Holding one is raw SQL and transaction control: a
+# ROLLBACK ends box A's READ ONLY transaction and the next one can write.
+# Matched by class over the MRO, so the attribute that led there does not
+# matter (``env.args[0]``, a psycopg2 error's ``.cursor``, the next one).
+# Module names cover Odoo 14 (``odoo.api``) and later series (``odoo.orm``).
+_DB_HANDLE_MODULES = frozenset({
+    'odoo.sql_db', 'odoo.api', 'odoo.modules.registry',
+    'odoo.orm.environments', 'odoo.orm.registry',
+    'psycopg2.extensions', 'psycopg2._psycopg',
+})
+_DB_HANDLE_CLASSES = frozenset({
+    'BaseCursor', 'Cursor', 'TestCursor', 'PsycoConnection', 'Connection',
+    'ConnectionPool', 'cursor', 'connection',
+    'Environment', 'Environments', 'Transaction', 'Cache', 'Registry',
+})
+_db_handle_by_class = {}
 
-    Cierra el hueco H1: el AST sólo ve nombres LITERALES, así que
-    `getattr(x, '__cla' + 'ss__')` esquivaba la denylist estática. Aquí el
-    nombre se evalúa en RUNTIME (ya resuelto) contra la MISMA denylist, más un
-    bloqueo genérico de dunders `__x__`. Se rechaza:
-      · cualquier nombre de DANGEROUS_ATTR_NAMES (incl. frames: f_back, tb_frame…)
-      · cualquier dunder `__x__` (introspección de tipos/código/globals)
-      · mutadores ORM (`create`/`write`/`unlink`/`copy`) vía getattr dinámico
-      · métodos que escriben con cursor propio (`resolve_execute`, `cleanup_*`…)
-    Se permiten los nombres públicos y unas pocas piezas de metadatos de
-    solo lectura (`_name`, `_fields`, `__last_update`…). Todo otro nombre
-    con `_` es maquinaria del motor: varios abren cursor propio y hacen
-    commit, fuera del alcance de esta caja de solo lectura.
+_DB_HANDLE_HINT = (
+    "RelaxAICode cannot reach %r: it leads to the database connection, "
+    "outside the ORM and the read-only run. Read with env['model'].search(...)."
+)
+
+
+def is_db_handle(value):
+    """True for a cursor, a connection, a raw Environment or a registry (or their class)."""
+    cls = value if isinstance(value, type) else type(value)
+    try:
+        return _db_handle_by_class[cls]
+    except KeyError:
+        pass
+    except TypeError:
+        return False
+    hit = any(
+        getattr(k, '__module__', None) in _DB_HANDLE_MODULES
+        and getattr(k, '__name__', None) in _DB_HANDLE_CLASSES
+        for k in getattr(cls, '__mro__', ())
+    )
+    if len(_db_handle_by_class) > 4096:
+        _db_handle_by_class.clear()
+    _db_handle_by_class[cls] = hit
+    return hit
+
+
+def _refuse_attr_name(name, dynamic):
+    """Raise if sandbox code may not read attribute *name*.
+
+    The literal reads follow the AST rules. A dynamic name (``getattr``,
+    ``attrgetter``, ``methodcaller``) also refuses the ORM mutators and the
+    methods that write with their own cursor: the AST flags those as writes
+    only when it can see the name.
     """
-    if isinstance(name, str):
-        if blocked_private_attr(name):
-            raise AttributeError(
-                "Access to private attribute %r is not allowed in "
-                "RelaxAICode (sandbox)." % (name,)
-            )
-        if name in RELAXAICODE_PRIVILEGE_ATTRS:
-            raise AttributeError(RELAXAICODE_PRIVILEGE_HINT % (name,))
-        # Seges: parche 23 (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        if name in RELAXAICODE_ENV_STATE_ATTRS:
-            raise AttributeError(RELAXAICODE_ENV_STATE_HINT % (name,))
-        if name in RELAXAICODE_FORBIDDEN_ORM_ATTRS:
-            raise AttributeError(
-                "Access to attribute %r is not allowed in RelaxAICode "
-                "(external API catalogue/secrets; use api_call)." % (name,)
-            )
-        if name in RELAXAICODE_ORM_WRITE_ATTRS:
-            raise AttributeError(
-                "Access to ORM mutator %r via getattr is not allowed in RelaxAICode "
-                "(use safe_plan_request for writes)." % (name,)
-            )
-        if name in RELAXAICODE_SIDE_EFFECT_METHODS:
-            raise AttributeError(
-                "Method %r writes outside RelaxAICode's rollback and is not "
-                "allowed here (use safe_plan_request for writes)." % (name,)
-            )
-        if name in DANGEROUS_ATTR_NAMES:
-            raise AttributeError(
-                "Access to attribute %r is not allowed in RelaxAICode (sandbox)." % (name,)
-            )
-        if len(name) >= 5 and name.startswith('__') and name.endswith('__'):
-            raise AttributeError(
-                "Access to dunder attribute %r is not allowed in RelaxAICode (sandbox)." % (name,)
-            )
-        # Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        # Catch-all por el predicado ÚNICO: cierra lo que no tiene mensaje propio
-        # arriba (Formatter/get_field/vformat… y format/format_map), de modo que
-        # ningún nombre que sandbox_forbidden_name rechace se resuelva por getattr.
-        if sandbox_forbidden_name(name):
-            raise AttributeError(
-                f"Access to attribute {name!r} is not allowed in RelaxAICode (sandbox)."
-            )
+    if blocked_private_attr(name):
+        raise AttributeError(
+            "Access to private attribute %r is not allowed in "
+            "RelaxAICode (sandbox)." % (name,)
+        )
+    if name in RELAXAICODE_PRIVILEGE_ATTRS:
+        raise AttributeError(RELAXAICODE_PRIVILEGE_HINT % (name,))
+    if name in RELAXAICODE_FORBIDDEN_ORM_ATTRS:
+        raise AttributeError(
+            "Access to attribute %r is not allowed in RelaxAICode "
+            "(external API catalogue/secrets; use api_call)." % (name,)
+        )
+    if dynamic and name in RELAXAICODE_ORM_WRITE_ATTRS:
+        raise AttributeError(
+            "Access to ORM mutator %r via getattr is not allowed in RelaxAICode "
+            "(use safe_plan_request for writes)." % (name,)
+        )
+    if dynamic and name in RELAXAICODE_SIDE_EFFECT_METHODS:
+        raise AttributeError(
+            "Method %r writes outside RelaxAICode's rollback and is not "
+            "allowed here (use safe_plan_request for writes)." % (name,)
+        )
+    if name in DANGEROUS_ATTR_NAMES:
+        raise AttributeError(
+            "Access to attribute %r is not allowed in RelaxAICode (sandbox)." % (name,)
+        )
+    if name in DANGEROUS_FORMAT_NAMES:
+        raise AttributeError(
+            "%r (string.Formatter) is not allowed in RelaxAICode: it reads "
+            "attributes outside the sandbox. Use f-strings or '{}'.format()." % (name,)
+        )
+    if len(name) >= 5 and name.startswith('__') and name.endswith('__'):
+        raise AttributeError(
+            "Access to dunder attribute %r is not allowed in RelaxAICode (sandbox)." % (name,)
+        )
+
+
+def _read_attr(obj, name, default):
+    if is_db_handle(obj):
+        raise AttributeError(_DB_HANDLE_HINT % (name,))
+    if name in _STR_FORMAT_METHODS and (
+            isinstance(obj, str)
+            or (isinstance(obj, type) and issubclass(obj, str))):
+        return _guarded_str_format(obj, name)
     value = getattr(obj, name, *default)
     if isinstance(value, _types.ModuleType):
         raise AttributeError(
             "Access to module %r is not allowed in RelaxAICode (sandbox)." % (name,)
         )
+    if is_db_handle(value):
+        raise AttributeError(_DB_HANDLE_HINT % (name,))
     return value
+
+
+def guarded_getattr(obj, name, *default):
+    """The sandbox ``getattr``: a name built at run time, checked once resolved.
+
+    Same rules as a literal read, plus the ORM mutators and the methods that
+    commit on their own cursor. Public names and a few read-only metadata
+    pieces (``_name``, ``_fields``, ``__last_update``…) pass. Neither the
+    object read from nor the value returned may be a database handle.
+    """
+    if isinstance(name, str):
+        _refuse_attr_name(name, dynamic=True)
+    return _read_attr(obj, name, default)
+
+
+def sandbox_attr(obj, name):
+    """Every literal ``obj.name`` read in sandbox code (``compile_sandbox``).
+
+    The AST only sees names; this sees the object. A public name that leads
+    to the database (``env.args``, an exception's ``.cursor``) is refused
+    here whatever it is called.
+    """
+    if name == '__name__' and isinstance(obj, type):
+        return obj.__name__
+    _refuse_attr_name(name, dynamic=False)
+    return _read_attr(obj, name, ())
+
+
+_STR_FORMAT_METHODS = frozenset({'format', 'format_map'})
+
+
+class _SandboxFormatter(_string_mod.Formatter):
+    """``str.format`` whose ``{0.a}`` / ``{0[k]}`` fields read like sandbox code.
+
+    The builtin walks the field's attributes in C, past ``sandbox_attr``.
+    """
+
+    def get_field(self, field_name, args, kwargs):
+        first, rest = _string.formatter_field_name_split(field_name)
+        obj = self.get_value(first, args, kwargs)
+        for is_attr, key in rest:
+            obj = sandbox_attr(obj, key) if is_attr else obj[key]
+        return obj, first
+
+
+_SANDBOX_FORMATTER = _SandboxFormatter()
+
+
+def _template_reads_fields(template):
+    for _text, field, spec, _conv in _SANDBOX_FORMATTER.parse(template):
+        if field and ('.' in field or '[' in field):
+            return True
+        if spec and _template_reads_fields(spec):
+            return True
+    return False
+
+
+def _guarded_str_format(obj, name):
+    """``format`` / ``format_map`` of a string (or of ``str`` itself) for the sandbox."""
+    if isinstance(obj, type):
+        def _unbound(template, *args, **kwargs):
+            if not isinstance(template, str):
+                raise TypeError('%s.%s needs a string' % (obj.__name__, name))
+            return _guarded_str_format(template, name)(*args, **kwargs)
+        return _unbound
+    if type(obj) is not str:
+        # A str subclass (Markup…) keeps its own escaping formatter, which
+        # also walks fields in C: plain positional / named fields only.
+        bound = getattr(obj, name)
+
+        def _plain_fields_only(*args, **kwargs):
+            if _template_reads_fields(obj):
+                raise AttributeError(
+                    "RelaxAICode: %s.%s cannot read attributes or items in "
+                    "its fields; pass the values as arguments."
+                    % (type(obj).__name__, name))
+            return bound(*args, **kwargs)
+        return _plain_fields_only
+    if name == 'format':
+        def _format(*args, **kwargs):
+            return _SANDBOX_FORMATTER.vformat(obj, args, kwargs)
+        return _format
+
+    def _format_map(mapping):
+        return _SANDBOX_FORMATTER.vformat(obj, (), mapping)
+    return _format_map
+
+
+SANDBOX_ATTR_BUILTIN = '__pns_sandbox_attr__'
+
+
+class _AttributeReadsThroughSandbox(_ast.NodeTransformer):
+    """``a.b`` (read) → ``__pns_sandbox_attr__(a, 'b')``. Stores and deletes stay."""
+
+    def visit_Attribute(self, node):
+        self.generic_visit(node)
+        if not isinstance(node.ctx, _ast.Load):
+            return node
+        call = _ast.Call(
+            func=_ast.Name(id=SANDBOX_ATTR_BUILTIN, ctx=_ast.Load()),
+            args=[node.value, _ast.Constant(value=node.attr)],
+            keywords=[],
+        )
+        return _ast.copy_location(call, node)
+
+
+def compile_sandbox(code, filename):
+    """Compile sandbox code so every attribute read goes through ``sandbox_attr``.
+
+    Run it only with a namespace from ``build_safe_context`` (it binds the
+    builtin). The reserved name may not appear in the code: whoever could
+    rebind it would read attributes unchecked.
+    """
+    if SANDBOX_ATTR_BUILTIN in code:
+        raise SyntaxError('%r is reserved by the sandbox' % (SANDBOX_ATTR_BUILTIN,))
+    tree = _ast.parse(code, filename, 'exec')
+    tree = _AttributeReadsThroughSandbox().visit(tree)
+    _ast.fix_missing_locations(tree)
+    return compile(tree, filename, 'exec')
 
 
 def guarded_import(name, *args, **kwargs):
     """
-    Guarda para bloquear imports peligrosos incluso si se llaman dinámicamente.
-    Esta función se añade como __import__ al contexto para bloquear imports dinámicos.
-    Listas compartidas con el AST (validators_base.py).
+    Guard that blocks dangerous imports even when they are called dynamically.
+    This function is added to the context as __import__ to block dynamic imports.
+    Lists shared with the AST (validators_base.py).
     """
-    # Obtener nombre del módulo (sin submódulos)
+    # Get the module name (without submodules)
     module_name = name.split('.')[0] if '.' in name else name
 
-    # urllib.parse: funciones puras de texto (quote, urlencode, urlparse, parse_qs,
-    # urljoin...), sin red ni FS. Se permite EXCLUSIVAMENTE la forma
-    # `from urllib.parse import <nombre>` (fromlist no vacío), que liga solo las
-    # funciones. `import urllib.parse` (fromlist vacío) queda bloqueado porque ligaría
-    # el paquete `urllib`, desde el que se podría alcanzar urllib.request (red).
+    # urllib.parse: pure text functions (quote, urlencode, urlparse, parse_qs,
+    # urljoin...), no network, no FS. ONLY the form
+    # `from urllib.parse import <name>` (non-empty fromlist) is allowed; it binds
+    # only the functions. `import urllib.parse` (empty fromlist) is blocked because
+    # it would bind the `urllib` package, from which urllib.request (network) is reachable.
     if name == 'urllib.parse':
         fromlist = kwargs.get('fromlist')
         if fromlist is None and len(args) >= 3:
@@ -274,7 +408,7 @@ def guarded_import(name, *args, **kwargs):
     if module_name in RELAXAICODE_DANGEROUS_MODULES:
         raise ImportError(_unsafe_import_error(module_name))
 
-    # Ayudantes internos de módulos seguros (imports perezosos de CPython).
+    # Internal helpers of safe modules (CPython lazy imports).
     if module_name in RELAXAICODE_SAFE_INTERNAL_MODULES:
         return safe_module(__import__(name, *args, **kwargs))
 
@@ -284,12 +418,12 @@ def guarded_import(name, *args, **kwargs):
     raise ImportError(_unsafe_import_error(module_name))
 
 
-# Un módulo "seguro" (datetime, platform, uuid, random, calendar, io…) NO puede
-# ser una puerta hacia otro módulo: casi todos llevan dentro `os` / `sys` como
-# ayudante de CPython, y `platform.os.system(...)` sería ejecución de comandos.
-# El facade siguiente nunca devuelve un módulo, ni una llamada de fichero/proceso
-# (`open`, `popen`, `system`…). La denylist de atributos y dunders es la misma
-# que la del getattr endurecido: un solo criterio para las dos capas.
+# A "safe" module (datetime, platform, uuid, random, calendar, io…) must NOT
+# be a door to another module: almost all of them carry `os` / `sys` inside as
+# a CPython helper, and `platform.os.system(...)` would be command execution.
+# The facade below never returns a module, nor a file/process call
+# (`open`, `popen`, `system`…). The attribute and dunder denylist is the same
+# as the hardened getattr one: a single criterion for both layers.
 _MODULE_FACADE_FORBIDDEN_CALLABLES = frozenset({
     'open', 'fdopen', 'popen', 'system', 'exec', 'execv', 'spawn',
     'FileIO', 'open_code', 'remove', 'unlink', 'rmdir', 'getenv', 'putenv',
@@ -298,13 +432,13 @@ _MODULE_FACADE_FORBIDDEN_CALLABLES = frozenset({
 
 def _module_facade_rejects(name, value):
     """Shared policy: True when a module attribute must not be exposed."""
-    # Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
-    # Predicado ÚNICO: cierra `from string import Formatter` (V1) y, en general,
-    # cualquier nombre de DANGEROUS_FORMAT_NAMES / dunder / privado expuesto por un
-    # módulo stdlib seguro. Mismo criterio que guarded_getattr y el formateador.
-    if sandbox_forbidden_name(name):
+    if blocked_private_attr(name):
+        return True
+    if name in DANGEROUS_ATTR_NAMES or name in DANGEROUS_FORMAT_NAMES:
         return True
     if name in _MODULE_FACADE_FORBIDDEN_CALLABLES:
+        return True
+    if len(name) >= 5 and name.startswith('__') and name.endswith('__'):
         return True
     return isinstance(value, _types.ModuleType)
 
@@ -335,8 +469,6 @@ class SafeModuleFacade(object):
             return guarded_attrgetter
         if value is _operator.methodcaller:
             return guarded_methodcaller
-        if value is _operator.itemgetter:
-            return guarded_itemgetter
         return value
 
     def __setattr__(self, name, value):
@@ -370,63 +502,37 @@ class _AttrProbe(object):
 _ATTR_PROBE = _AttrProbe()
 
 
-def _resolve_attr_path(obj, names):
-    """Follow ``names`` from ``obj``, one ``guarded_getattr`` per part."""
-    for name in names:
-        obj = guarded_getattr(obj, name)
+def _walk_attr_path(obj, path):
+    for part in path.split('.'):
+        obj = guarded_getattr(obj, part)
     return obj
 
 
-# Seges: parche 23 ampliado (PNS-101, seguridad). Ver docs/pendiente/parches_pns_ai.md
-# Las fachadas devuelven una función, no un operator.attrgetter/methodcaller:
-# con type() permitido, la clase nativa construiría un getter nuevo sin pasar
-# por _check_attr_path. type() sobre la función solo da 'function'.
 def guarded_attrgetter(*paths):
-    """``operator.attrgetter`` whose names pass the same policy as getattr."""
+    """``operator.attrgetter`` that reads through ``guarded_getattr`` on each call.
+
+    The real one reads in C: checking the name up front would still hand
+    back whatever object sits behind it.
+    """
     if not paths:
         raise TypeError('attrgetter expected 1 argument, got 0')
     for path in paths:
         _check_attr_path(path)
-    parts = [path.split('.') for path in paths]
-    if len(parts) == 1:
-        names = parts[0]
 
-        def attrgetter(obj):
-            return _resolve_attr_path(obj, names)
-    else:
-        def attrgetter(obj):
-            return tuple(_resolve_attr_path(obj, names) for names in parts)
-    return attrgetter
+    def _get(obj):
+        if len(paths) == 1:
+            return _walk_attr_path(obj, paths[0])
+        return tuple(_walk_attr_path(obj, path) for path in paths)
+    return _get
 
 
 def guarded_methodcaller(name, *args, **kwargs):
-    """``operator.methodcaller`` whose name passes the same policy as getattr."""
+    """``operator.methodcaller`` that looks the method up through ``guarded_getattr``."""
     _check_attr_path(name)
 
-    def methodcaller(obj):
+    def _call(obj):
         return guarded_getattr(obj, name)(*args, **kwargs)
-    return methodcaller
-
-
-def guarded_itemgetter(*items):
-    """``operator.itemgetter`` como función: ``type()`` sobre ella da 'function'.
-
-    itemgetter resuelve SUBÍNDICE (``obj[k]``), no atributos, así que no es una
-    vía hacia los dunders; se cierra por consistencia con attrgetter/methodcaller,
-    para que su clase nativa no se obtenga por ``type()``. Conserva el subíndice y
-    el uso como ``key=`` (varios índices → tupla, como el nativo).
-    """
-    if not items:
-        raise TypeError('itemgetter expected 1 argument, got 0')
-    if len(items) == 1:
-        item = items[0]
-
-        def itemgetter(obj):
-            return obj[item]
-    else:
-        def itemgetter(obj):
-            return tuple(obj[i] for i in items)
-    return itemgetter
+    return _call
 
 
 def safe_module(module):
@@ -437,29 +543,29 @@ def safe_module(module):
 
 
 def sandbox_print(*_args, **_kwargs):
-    """``print`` del modelo: se traga. No escribe en log ni en stdout.
+    """The model's ``print``: swallowed. Writes neither to the log nor to stdout.
 
-    El modelo lo mete para mirar un valor a mitad del script. Sin esto,
-    ``name 'print' is not defined`` tumba la consulta. La respuesta sigue
-    siendo ``result``; un ``print`` suelto al final ya se reescribe antes.
+    The model adds it to look at a value halfway through the script. Without
+    this, ``name 'print' is not defined`` kills the query. The answer is still
+    ``result``; a stray ``print`` at the end is already rewritten earlier.
     """
     return None
 
 
 def build_safe_context(controller, operation_type='read', previous_result=None, env_override=None):
     """
-    Construye el contexto seguro para ejecutar código Python nativo.
+    Build the safe context to run native Python code.
     
     Args:
-        controller: Instancia del controlador para acceder a _get_env_for_operation
-        operation_type: 'read' o 'write' según el tipo de operación
-        previous_result: Resultado de una ejecución previa (para Fase 2: presentación)
-        env_override: Si se proporciona, se usa este env en vez de derivarlo del
-            controlador. Sirve para inyectar la "caja A" (cursor READ ONLY) en la
-            ejecución de relaxaicode de lectura.
+        controller: Controller instance, to reach _get_env_for_operation
+        operation_type: 'read' or 'write', depending on the operation type
+        previous_result: Result of a previous run (for Phase 2: presentation)
+        env_override: If given, this env is used instead of deriving it from the
+            controller. Used to inject "box A" (READ ONLY cursor) into the
+            read-only relaxaicode run.
     
     Returns:
-        dict: Contexto seguro con builtins limitados y módulos seguros
+        dict: Safe context with limited builtins and safe modules
     """
     import datetime as _datetime
     import collections as _collections
@@ -499,11 +605,11 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
         except Exception:
             _ZoneInfo = None
 
-    # `string` RECORTADO: se expone sin Formatter/Template. string.Formatter()
-    # .get_field()/.vformat() devuelven el OBJETO real (no su repr), permitiendo
-    # recorrer clases hasta object.__subclasses__ sin usar '.' ni getattr (H3).
-    # El AST ya bloquea esos nombres; recortar el módulo expuesto es defensa en
-    # profundidad. Se conservan constantes/funciones útiles (ascii_letters,
+    # TRIMMED `string`: exposed without Formatter/Template. string.Formatter()
+    # .get_field()/.vformat() return the real OBJECT (not its repr), which lets
+    # you walk classes up to object.__subclasses__ without '.' or getattr (H3).
+    # The AST already blocks those names; trimming the exposed module is defence
+    # in depth. Useful constants/functions are kept (ascii_letters,
     # digits, punctuation, capwords, whitespace…).
     _safe_string = _types.SimpleNamespace(**{
         _k: getattr(_string, _k)
@@ -511,7 +617,7 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
         if not _k.startswith('_') and _k not in ('Formatter', 'Template')
     })
 
-    # Funciones built-in permitidas
+    # Allowed built-in functions
     ALLOWED_BUILTINS_NAMES = [
         'len', 'sum', 'max', 'min', 'sorted', 'range',
         'enumerate', 'zip', 'map', 'filter', 'reversed',
@@ -519,42 +625,41 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
         'bytes', 'bytearray', 'memoryview', 'frozenset',
         'bool', 'type', 'isinstance', 'issubclass', 'callable', 'abs', 'round', 'pow',
         'divmod', 'any', 'all', 'hasattr', 'getattr',
-        # 'setattr'/'delattr' eliminados: permitían escritura ORM encubierta
-        # (setattr(rec, 'campo', valor)) saltándose el detector y la caja B.
+        # 'setattr'/'delattr' removed: they allowed hidden ORM writes
+        # (setattr(rec, 'campo', valor)) that skipped the detector and box B.
         'iter', 'next', 'slice', 'hash', 'id',
         'ord', 'chr', 'bin', 'hex', 'oct',
         'repr', 'ascii', 'format',
     ]
     
-    # Crear diccionario con las funciones permitidas
+    # Build the dict of allowed functions
     ALLOWED_BUILTINS = {}
     for name in ALLOWED_BUILTINS_NAMES:
         if hasattr(_builtins, name):
             ALLOWED_BUILTINS[name] = getattr(_builtins, name)
     
-    # Añadir __import__ guardado
+    # Add the guarded __import__
     ALLOWED_BUILTINS['__import__'] = guarded_import
 
-    # print mudo: el modelo depura con print() a mitad del script. El builtin
-    # real no está en la lista (escribiría en el log del worker).
+    # Silent print: the model debugs with print() halfway through the script. The
+    # real builtin is not on the list (it would write to the worker log).
     ALLOWED_BUILTINS['print'] = sandbox_print
 
-    # getattr ENDURECIDO: reemplaza el builtin crudo por guarded_getattr para
-    # cerrar el acceso dinámico a atributos peligrosos con nombre construido en
-    # runtime (H1). El AST cubre los literales; esto cubre los dinámicos.
+    # HARDENED getattr: replaces the raw builtin with guarded_getattr to close
+    # dynamic access to dangerous attributes whose name is built at
+    # runtime (H1). The AST covers literals; this covers dynamic names.
     ALLOWED_BUILTINS['getattr'] = guarded_getattr
+    # Literal attribute reads, once compile_sandbox has rewritten them.
+    ALLOWED_BUILTINS[SANDBOX_ATTR_BUILTIN] = sandbox_attr
     
-    # Obtener entorno de Odoo (o el inyectado: caja A en READ ONLY)
+    # Get the Odoo env (or the injected one: box A in READ ONLY)
     env = env_override if env_override is not None else controller._get_env_for_operation(operation_type)
     
-    # Extraer variables de infraestructura (Protocolo Técnico)
-    # Seges: parche 24 (PNS-102, seguridad). Ver docs/pendiente/parches_pns_ai.md
-    # Globales user/company SIN su (env.user/env.company fuerzan su=True): el
-    # sandbox lee como el usuario. Mismo criterio que GuardedSandboxEnv.
-    user = _identity_no_su(env, 'user')
-    company = _identity_no_su(env, 'company')
-
-    # Información de versión de Odoo
+    # Extract infrastructure variables (Technical Protocol)
+    user = env.user
+    company = env.company
+    
+    # Odoo version info
     try:
         import odoo
         odoo_version = odoo.release.version
@@ -566,15 +671,15 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
     # The database name is not published to the sandbox (PNS-36): instance
     # facts the code may use are the version, the URL and the locale.
 
-    # Public URL of the instance: the sandbox cannot read ir.config_parameter
-    # (no sudo there), so the engine publishes this one non-secret fact.
+    # Public URL of the instance: only system admins read ir.config_parameter
+    # (no sudo in the sandbox), so the engine publishes this one fact to all.
     try:
         _web_base_url = env['ir.config_parameter'].sudo().get_param(
             'web.base.url') or ''
     except Exception:
         _web_base_url = ''
     
-    # Obtener información de locale del usuario/empresa
+    # Get user/company locale info
     user_lang = 'en_US'  # Base Default
     locale_info = {'thousands_sep': ',', 'decimal_sep': '.', 'date_format': '%Y-%m-%d', 'csv_sep': ','}
     
@@ -582,8 +687,8 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
     _logger = logging.getLogger(__name__)
     
     try:
-        # Locale de la sesión del usuario (res.lang) = fuente de verdad para
-        # separadores y fechas. corporate_terms solo rellena huecos, no pisa.
+        # The user's session locale (res.lang) = source of truth for
+        # separators and dates. corporate_terms only fills gaps, never overrides.
         user_lang = controller._get_user_locale()
         lang_record = env['res.lang'].with_context(active_test=False).search(
             [('code', '=', user_lang)], limit=1,
@@ -615,7 +720,7 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
             if value and key not in (
                 'thousands_sep', 'decimal_sep', 'date_format', 'csv_sep',
             ):
-                # No pisar convenciones de res.lang (evita locale errático).
+                # Do not override res.lang conventions (avoids an erratic locale).
                 locale_info[key] = value
 
         _logger.info(
@@ -625,7 +730,7 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
     except Exception as e:
         _logger.warning(f"MCP DEBUG [ContextBuilder]: Error resolving locale: {e}")
     
-    # Reloj del usuario (huso de sesión), no el UTC del proceso/contenedor.
+    # The user's clock (session time zone), not the process/container UTC.
     _user_tz = env.context.get('tz') or getattr(user, 'tz', None) or 'UTC'
     try:
         from odoo.addons.pns_ai_mcp.utils.user_time import user_local_now
@@ -645,12 +750,12 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
             _user_now = _datetime.datetime.now()
     _user_today = _user_now.date()
 
-    # Construir contexto seguro
+    # Build the safe context
     safe_context = {
         '__builtins__': ALLOWED_BUILTINS,
         '__import__': guarded_import,
         
-        # Entorno de Odoo (catálogos ai.api.server / ai.context fuera del ORM)
+        # Odoo env (ai.api.server / ai.context catalogues kept off the ORM)
         'env': GuardedSandboxEnv(env),
         
         'odoo_version': odoo_version,
@@ -660,7 +765,7 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
         'user': user,
         'company': company,
         
-        # Variables de locale (disponibles directamente en el código generado)
+        # Locale variables (available directly in the generated code)
         'user_lang': user_lang,
         'lang': user_lang,          # Standard Odoo alias
         'locale': user_lang,        # Generic alias
@@ -683,7 +788,7 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
         'now': _user_now,
         'server_today': _user_today.isoformat(),
         
-        # Excepciones estándar (necesarias para try/except)
+        # Standard exceptions (needed for try/except)
         'NameError': NameError,
         'ValueError': ValueError,
         'TypeError': TypeError,
@@ -693,11 +798,11 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
         'ImportError': ImportError,
         'Exception': Exception,
         
-        # Módulos seguros disponibles directamente (siempre tras su facade)
+        # Safe modules available directly (always behind their facade)
         'datetime': safe_module(_datetime),
-        # Alias de datetime que el LLM usa sin import (date.today(), timedelta(…)).
-        # Contextos/docs enseñan date.today(); sin estos nombres → NameError
-        # "name 'date' is not defined" en código fresco.
+        # datetime aliases the LLM uses without import (date.today(), timedelta(…)).
+        # Contexts/docs teach date.today(); without these names → NameError
+        # "name 'date' is not defined" in fresh code.
         'date': _datetime.date,
         'timedelta': _datetime.timedelta,
         'timezone': _datetime.timezone,
@@ -711,7 +816,7 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
         'base64': safe_module(_base64),
         'hashlib': safe_module(_hashlib),
         're': safe_module(_re),
-        'string': _safe_string,  # sin Formatter/Template (ver arriba)
+        'string': _safe_string,  # without Formatter/Template (see above)
         'operator': safe_module(_operator),
         'csv': safe_module(_csv),
         'io': safe_module(_io),
@@ -725,7 +830,7 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
     if _ZoneInfo is not None:
         safe_context['ZoneInfo'] = _ZoneInfo
 
-    # Presentación de grids (pijama / pasteles): misma paleta que el render HTML.
+    # Grid presentation (pyjama / pastels): same palette as the HTML render.
     try:
         from odoo.addons.pns_ai_mcp.utils.relaxaicode_render import (
             PASTEL_ROW_COLORS,
@@ -736,9 +841,9 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
     except Exception:
         pass
 
-    # Formateo numérico por locale (pk_*): disponible en todo skill/relaxaicode.
-    # Evita `{:,.2f}` (inglés) skill a skill. Tablas `data`/`groups` ya usan
-    # el mismo criterio vía relaxaicode_render; esto cubre HTML a mano.
+    # Locale number formatting (pk_*): available in every skill/relaxaicode.
+    # Avoids `{:,.2f}` (English) skill by skill. `data`/`groups` tables already use
+    # the same criterion via relaxaicode_render; this covers hand-made HTML.
     _d_sep = locale_info.get('decimal_sep', '.')
     _t_sep = locale_info.get('thousands_sep', ',')
     try:
@@ -819,8 +924,8 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
         except Exception:
             pass
 
-    # Siempre definidos (None si no hay dataset): evita `if 'x' in locals()/dir()`
-    # que el AST rechaza y provocaba rondas improductivas.
+    # Always defined (None if there is no dataset): avoids `if 'x' in locals()/dir()`,
+    # which the AST rejects and which caused wasted rounds.
     if previous_result is not None:
         safe_context['previous_result'] = previous_result
         if isinstance(previous_result, dict):
@@ -854,8 +959,8 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
         except Exception:
             pass
 
-    # Parámetros opcionales de skills/consultas: siempre presentes (None) para
-    # poder escribir `if lugar:` / `if anio:` sin introspection prohibida.
+    # Optional skill/query parameters: always present (None) so you
+    # can write `if lugar:` / `if anio:` without forbidden introspection.
     for _opt in (
         'lugar', 'fecha', 'start_date', 'end_date',
         'anio', 'year', 'mes', 'arguments',

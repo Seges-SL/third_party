@@ -1,0 +1,93 @@
+/* Progress dialog of pns.progress.job: Bootstrap 4 (O14) and 5 (O19). */
+
+.o_pns_progress {
+    min-height: 9rem;
+}
+
+.o_pns_progress_wait {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 0 1.25rem;
+}
+
+.o_pns_progress_spinner {
+    width: 3.25rem;
+    height: 3.25rem;
+    border: 0.3rem solid rgba(113, 75, 103, 0.15);
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: o_pns_progress_spin 0.9s linear infinite;
+}
+
+.o_pns_progress_step {
+    min-height: 1.5rem;
+    text-align: center;
+    color: #495057;
+}
+
+.o_pns_progress_bar {
+    height: 1.25rem;
+}
+
+.o_pns_progress_hint {
+    margin: 0.75rem 0 0;
+}
+
+.o_pns_progress_head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.o_pns_progress_head_text {
+    flex: 1;
+    min-width: 0;
+}
+
+.o_pns_progress_duration {
+    font-size: 0.85rem;
+    opacity: 0.8;
+}
+
+.o_pns_progress_tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    gap: 0.75rem;
+    margin: 1rem 0;
+}
+
+.o_pns_progress_tile {
+    margin: 0;
+    padding: 0.75rem 0.5rem;
+    text-align: center;
+}
+
+.o_pns_progress_tile_value {
+    font-size: 1.75rem;
+    font-weight: 600;
+    line-height: 1.1;
+}
+
+.o_pns_progress_tile_label {
+    font-size: 0.85rem;
+}
+
+.o_pns_progress_table td.o_pns_progress_num,
+.o_pns_progress_table th.o_pns_progress_num {
+    text-align: end;
+}
+
+.o_pns_progress_actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+@keyframes o_pns_progress_spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

@@ -7,7 +7,6 @@
 odoo.define('pns_ai_mcp.key_pin_desk', function (require) {
     "use strict";
 
-    var WebClient = require('web.WebClient');
     var ajax = require('web.ajax');
     var core = require('web.core');
     var session = require('web.session');
@@ -522,32 +521,29 @@ odoo.define('pns_ai_mcp.key_pin_desk', function (require) {
         });
     }
 
-    function bootDesk() {
-        if (!session.pns_is_ai_admin) {
-            return;
+    /**
+     * Called once the web client is up, with a caller of the bus service:
+     * key_pin_desk_boot_o14.js (Odoo 14 WebClient), key_pin_desk_boot_o15.js
+     * (Odoo 15 services).
+     */
+    function listen(owner, callBus) {
+        try {
+            callBus('on', 'notification', owner, onBus);
+            callBus('addChannel', 'partner');
+            callBus('startPolling');
+        } catch (e) { /* backend without bus */ }
+        paintHeld();
+        if (heldCount()) {
+            startDesk();
         }
+    }
+
+    var enabled = !!session.pns_is_ai_admin;
+    if (enabled) {
         bindDeskClicks();
         window.pnsKeyPinOpen = openLayer;
         window.pnsKeyPinHeldCount = heldCount;
-        WebClient.include({
-            start: function () {
-                var self = this;
-                return this._super.apply(this, arguments).then(function () {
-                    try {
-                        self.call('bus_service', 'on', 'notification', self, onBus);
-                        self.call('bus_service', 'addChannel', 'partner');
-                        self.call('bus_service', 'startPolling');
-                    } catch (e) { /* backend without bus */ }
-                    paintHeld();
-                    if (heldCount()) {
-                        startDesk();
-                    }
-                });
-            },
-        });
     }
 
-    bootDesk();
-
-    return {openLayer: openLayer, heldCount: heldCount};
+    return {openLayer: openLayer, heldCount: heldCount, enabled: enabled, listen: listen};
 });

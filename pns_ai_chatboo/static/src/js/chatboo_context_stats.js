@@ -8,7 +8,7 @@
  * turn vs its cap; the sparkline is sent/cap % across those turns.
  *
  * Loaded as a plain script (global ChatbooContextStats). Deploy copies
- * common/ into the stack addon via i.sh before Odoo loads assets.
+ * common/ into the stack addon by the installer before Odoo loads assets.
  */
 (function (global) {
     "use strict";
@@ -55,7 +55,7 @@
     }
 
     function isSystemUserNote(text) {
-        return /^\[Resultado del sistema\]/i.test(stripQuestion(text));
+        return /^\[System result\]/i.test(stripQuestion(text));
     }
 
     function isOfftopicUser(msg) {
@@ -93,7 +93,7 @@
      * Prefer the prompt stored on the assistant (worker / live turn). Fallback:
      * nearest preceding real user, without crossing another non-local assistant.
      * Do NOT FIFO-pair “every user with the next occupying assistant”: a stray
-     * “hola” without usage steals the next expensive turn’s label.
+     * “hi” without usage steals the next expensive turn’s label.
      */
     function questionForAssistant(messages, asstIndex) {
         var list = messages || [];

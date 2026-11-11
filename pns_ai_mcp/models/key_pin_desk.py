@@ -88,7 +88,7 @@ class KeyPinDesk(models.Model):
         self._broadcast(env, partners, channel, payload)
 
     @api.model
-    def touch(self, token, user):
+    def _touch(self, token, user):
         token = (token or '').strip()
         if not token or not user:
             return {'ok': False}
@@ -124,7 +124,7 @@ class KeyPinDesk(models.Model):
         }
 
     @api.model
-    def close(self, token):
+    def _close(self, token):
         token = (token or '').strip()
         if not token:
             return False
@@ -181,16 +181,6 @@ class KeyPinAsk(models.Model):
         )
         self.sudo().search([('create_date', '<', cutoff)]).unlink()
 
-    @api.model
-    def collect(self, mcp_user, email, login):
-        """Ask every open tab. Return the key, False if it does not match, or None."""
-        return self._collect({
-            'email': email or '',
-            'login': login or '',
-            'mcp_user_id': mcp_user.id,
-        })
-
-    # Seges: parche 10 (PNS-83, seguridad). Ver docs/pendiente/parches_pns_ai.md
     @api.model
     def _collect_pin(self, pin):
         """Ask every open tab whose PIN this is. Return the key it stands for.
@@ -252,7 +242,7 @@ class KeyPinAsk(models.Model):
         return None
 
     @api.model
-    def supply(self, ask_id, api_key, user):
+    def _supply(self, ask_id, api_key, user):
         from ..utils.api_key import hash_api_key
         api_key = (api_key or '').strip()
         if not ask_id:

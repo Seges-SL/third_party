@@ -21,28 +21,28 @@ from odoo.exceptions import AccessError
 
 _logger = logging.getLogger(__name__)
 
-# Intervalo del LATIDO (heartbeat) independiente (segundos). Un hilo aparte
-# refresca write_date a este ritmo mientras el job corre, PASE lo que pase con el
-# motor: así un modelo lento que tarda minutos en emitir tokens no se confunde
-# nunca con un worker muerto. Debe ser < HEARTBEAT_STALE_SECONDS con holgura.
+# Interval of the separate HEARTBEAT (seconds). Another thread refreshes
+# write_date at this rate while the job runs, WHATEVER the engine does: so a
+# slow model that takes minutes to emit tokens is never mistaken for a dead
+# worker. Must be well below HEARTBEAT_STALE_SECONDS.
 HEARTBEAT_INTERVAL = 10.0
-# Antigüedad para considerar un job "colgado" (min) → lo reclama el cron. Gracias
-# al latido, un valor bajo es seguro: solo los jobs realmente muertos (sin latido
-# reciente) superan el umbral.
+# Age at which a job is "stuck" (min) → the cron reclaims it. Thanks to the
+# heartbeat, a low value is safe: only truly dead jobs (no recent beat) pass
+# the threshold.
 STUCK_MINUTES = 3
-# Umbral de latido para el reclaim inmediato al abrir Chatboo (segundos). Un job
-# vivo late cada HEARTBEAT_INTERVAL; si lleva más de esto sin latir, está muerto.
+# Heartbeat threshold for the immediate reclaim when Chatboo opens (seconds). A
+# live job beats every HEARTBEAT_INTERVAL; past this without a beat, it is dead.
 HEARTBEAT_STALE_SECONDS = 60
-# Retención de jobs terminados (horas) antes de purgarlos.
+# How long finished jobs are kept (hours) before purging them.
 GC_HOURS = 72
 
 
 def _env_manage():
-    """Context manager de entornos thread-local.
+    """Context manager for thread-local environments.
 
-    Odoo 14 (owl1) exige ``Environment.manage()`` para crear un Environment con
-    cursor propio fuera del request. En Odoo 17+ (owl2) desapareció; devolvemos
-    un nullcontext para que el mismo código sirva en ambos stacks.
+    Odoo 14 (owl1) needs ``Environment.manage()`` to build an Environment with
+    its own cursor outside the request. Odoo 17+ (owl2) removed it; we return
+    a nullcontext so the same code works on both stacks.
     """
     manage = getattr(api.Environment, 'manage', None)
     if manage is not None:
@@ -53,10 +53,10 @@ def _env_manage():
 
 
 def _get_registry(dbname):
-    """Devuelve el Registry de la BD, compatible con Odoo 14 y 17+/19.
+    """Return the database Registry, on Odoo 14 and 17+/19.
 
-    En Odoo 14 existe el helper ``odoo.registry(db)``. En Odoo 17+/19 se eliminó
-    (``module 'odoo' has no attribute 'registry'``) y hay que usar la clase
+    Odoo 14 has the helper ``odoo.registry(db)``. Odoo 17+/19 removed it
+    (``module 'odoo' has no attribute 'registry'``), so we use the class
     ``odoo.modules.registry.Registry(db)``.
     """
     reg = getattr(odoo, 'registry', None)
@@ -82,7 +82,7 @@ def _is_pg_serialization_failure(exc):
 
 
 def _job_already_finished(dbname, table, rid):
-    """True si el job ya quedó en done/error (cursor fresco)."""
+    """True if the job is already done/error (fresh cursor)."""
     try:
         with _get_registry(dbname).cursor() as cr:
             cr.execute("SELECT state FROM %s WHERE id=%%s" % table, (rid,))
@@ -93,12 +93,11 @@ def _job_already_finished(dbname, table, rid):
 
 
 def _is_test_mode(env):
-    """True si estamos en modo test, compatible con Odoo 14 y 17+/19.
+    """True in test mode, on Odoo 14 and 17+/19.
 
-    En Odoo 14 el registry expone ``in_test_mode()``. En Odoo 19 ese método ya no
-    existe (``'Registry' object has no attribute 'in_test_mode'``), así que nos
-    apoyamos en el flag ``testing`` del hilo y solo llamamos a ``in_test_mode`` si
-    está disponible.
+    On Odoo 14 the registry has ``in_test_mode()``. On Odoo 19 that method is
+    gone (``'Registry' object has no attribute 'in_test_mode'``), so we rely on
+    the thread's ``testing`` flag and only call ``in_test_mode`` if it exists.
     """
     if getattr(threading.current_thread(), 'testing', False):
         return True
@@ -134,7 +133,7 @@ class ChatbooJobMixin(models.AbstractModel):
         string='State', default='pending', required=True, index=True,
     )
     error = fields.Text(string='Error')
-    # El cliente pidió cancelar: el worker lo comprueba y cierra.
+    # The client asked to cancel: the worker checks it and closes.
     cancel_requested = fields.Boolean(
         string='Cancel requested', default=False, index=True,
     )
@@ -167,17 +166,17 @@ class ChatbooJobMixin(models.AbstractModel):
             ))
         return super().write(vals)
 
-    # ──────────────────────────── Hilo ────────────────────────────
+    # ──────────────────────────── Thread ────────────────────────────
 
     def _process(self):
         """The work of the job. Runs in the thread, on its own cursor."""
         raise NotImplementedError
 
     def _spawn(self):
-        """Lanza el procesamiento en un hilo con cursor propio.
+        """Run the work in a thread with its own cursor.
 
-        En modo test se ejecuta en línea (los hilos con cursor propio y el
-        TestCursor no se llevan bien).
+        In test mode it runs inline (threads with their own cursor and the
+        TestCursor do not get along).
         """
         self.ensure_one()
         rid = self.id
@@ -192,9 +191,9 @@ class ChatbooJobMixin(models.AbstractModel):
             return
 
         def _runner():
-            # Patrón estándar de hilo de fondo Odoo: fijar dbname en el hilo (si
-            # no, sale "desnudo" -> el log muestra '?' y algunas rutas del ORM/log
-            # que lo esperan pueden fallar).
+            # Standard Odoo background-thread pattern: set dbname on the thread
+            # (otherwise it is "bare" -> the log shows '?' and some ORM/log paths
+            # that expect it may fail).
             try:
                 threading.current_thread().dbname = dbname
             except Exception:
@@ -207,10 +206,10 @@ class ChatbooJobMixin(models.AbstractModel):
                         env = api.Environment(cr, uid, context)
                         env[model].browse(rid)._process()
             except Exception as exc:
-                # Commit del cursor del worker al salir del ``with``: un
-                # SerializationFailure (PG 40001) aquí NO es un fallo del
-                # trabajo — el job ya persistió en un cursor fresco. Marcarlo
-                # como error pisaría un resultado bueno.
+                # The worker cursor commits when leaving the ``with``: a
+                # SerializationFailure (PG 40001) here is NOT a failure of the
+                # work — the job already saved on a fresh cursor. Marking it
+                # as error would overwrite a good result.
                 if _is_pg_serialization_failure(exc):
                     _logger.warning(
                         "Chatboo job cursor raced after finalize (%s %s): %s",
@@ -228,11 +227,11 @@ class ChatbooJobMixin(models.AbstractModel):
 
     @api.model
     def _record_crash(self, dbname, uid, context, rid, exc):
-        """Marca un job como error tras un crash de bootstrap del hilo.
+        """Mark a job as error after the thread crashed at startup.
 
-        Intenta primero la vía ORM (``_on_crash`` del modelo); si el propio
-        Environment es lo que falla, cae a SQL crudo para al menos dejar el
-        estado en 'error' con el mensaje.
+        Tries the ORM first (the model's ``_on_crash``); if the Environment
+        itself is what fails, falls back to raw SQL to at least leave the
+        state at 'error' with the message.
         """
         table = self._table
         if _job_already_finished(dbname, table, rid):
@@ -242,8 +241,8 @@ class ChatbooJobMixin(models.AbstractModel):
             return
         msg = '%s: %s' % (exc.__class__.__name__, exc) or 'worker crashed'
         try:
-            # _env_manage() es imprescindible en Odoo 14 para crear un Environment
-            # fuera del request (si no: 'tuple' object has no attribute 'cache').
+            # _env_manage() is required on Odoo 14 to build an Environment
+            # outside the request (otherwise: 'tuple' object has no attribute 'cache').
             with _env_manage():
                 with _get_registry(dbname).cursor() as cr:
                     env = api.Environment(cr, uid, context)
@@ -271,11 +270,11 @@ class ChatbooJobMixin(models.AbstractModel):
         })
 
     def _start_heartbeat(self):
-        """Lanza el hilo de latido y devuelve ``(Event, Thread)`` para pararlo.
+        """Start the heartbeat thread and return ``(Event, Thread)`` to stop it.
 
-        Refresca ``write_date`` cada ``HEARTBEAT_INTERVAL`` en un cursor propio,
-        sin tocar el contenido. En modo test no se lanza (el TestCursor y los
-        hilos con cursor propio no se llevan bien): devuelve ``None``.
+        Refreshes ``write_date`` every ``HEARTBEAT_INTERVAL`` on its own cursor,
+        without touching the content. Not started in test mode (the TestCursor
+        and threads with their own cursor do not get along): returns ``None``.
         """
         if _is_test_mode(self.env):
             return None
@@ -304,8 +303,8 @@ class ChatbooJobMixin(models.AbstractModel):
 
     @staticmethod
     def _stop_heartbeat(beat):
-        """Detiene el latido y ESPERA a que termine, para que no escriba la fila
-        mientras el job la persiste (evita colisión de update concurrente)."""
+        """Stop the heartbeat and WAIT for it, so it does not write the row
+        while the job saves it (avoids a concurrent update clash)."""
         if not beat:
             return
         stop_beat, thread = beat
@@ -315,13 +314,13 @@ class ChatbooJobMixin(models.AbstractModel):
         except Exception:
             pass
 
-    # ──────────────────────────── Cancelar ────────────────────────────
+    # ──────────────────────────── Cancel ────────────────────────────
 
     def request_cancel(self):
-        """Marca el job para cancelación cooperativa.
+        """Mark the job for cooperative cancel.
 
-        Si aún está ``pending``, se cierra al momento (``_cancel_pending``). Si
-        ``running``, el worker corta en cuanto lo ve (``_is_cancel_requested``).
+        If still ``pending``, it closes at once (``_cancel_pending``). If
+        ``running``, the worker stops as soon as it sees it (``_is_cancel_requested``).
         """
         self.ensure_one()
         if self.user_id.id != self.env.uid:
@@ -338,7 +337,7 @@ class ChatbooJobMixin(models.AbstractModel):
         self.sudo().write({'state': 'done', 'finished_at': fields.Datetime.now()})
 
     def _is_cancel_requested(self):
-        """Lee ``cancel_requested`` en cursor fresco (visible desde el worker)."""
+        """Read ``cancel_requested`` on a fresh cursor (visible from the worker)."""
         try:
             with _get_registry(self.env.cr.dbname).cursor() as cr:
                 cr.execute(
@@ -350,28 +349,28 @@ class ChatbooJobMixin(models.AbstractModel):
         except Exception:
             return False
 
-    # ──────────────────────────── Mantenimiento (cron) ────────────────────────────
+    # ──────────────────────────── Maintenance (cron) ────────────────────────────
 
     @api.model
     def _reclaim_stuck(self, minutes=None):
-        """Recupera los jobs colgados (worker muerto tras un reinicio).
+        """Recover stuck jobs (worker dead after a restart).
 
-        Gracias al latido (``write_date`` se refresca mientras corre), solo caen
-        aquí los jobs REALMENTE muertos. Qué se guarda de cada uno lo decide el
-        modelo (``_reclaim_one``).
+        Thanks to the heartbeat (``write_date`` is refreshed while it runs), only
+        TRULY dead jobs land here. What is kept of each one is up to the
+        model (``_reclaim_one``).
 
-        ``minutes`` permite un umbral más corto para el reclaim inmediato al abrir
-        Chatboo; por defecto usa ``STUCK_MINUTES`` (cron).
+        ``minutes`` allows a shorter threshold for the immediate reclaim when
+        Chatboo opens; by default it uses ``STUCK_MINUTES`` (cron).
 
-        NO BLOQUEANTE: ``FOR UPDATE SKIP LOCKED`` + savepoint por job. Un job
-        zombie NUNCA puede colgar la apertura de Chatboo ni el cron.
+        NON-BLOCKING: ``FOR UPDATE SKIP LOCKED`` + one savepoint per job. A zombie
+        job can NEVER hang the opening of Chatboo or the cron.
         """
         mins = STUCK_MINUTES if minutes is None else minutes
         cutoff = fields.Datetime.now() - timedelta(minutes=mins)
         timeout_ms = int(self.env.context.get('chatboo_reclaim_timeout_ms', 8000) or 8000)
         cutoff_s = fields.Datetime.to_string(cutoff)
         table = self._table
-        # Candidatos sin lock; cada uno se reclama con SKIP LOCKED (no esperar).
+        # Candidates without lock; each one is reclaimed with SKIP LOCKED (no wait).
         try:
             candidates = self.search([
                 ('state', 'in', ('pending', 'running')),
@@ -409,8 +408,8 @@ class ChatbooJobMixin(models.AbstractModel):
                     job._reclaim_one(timeout_ms)
             except Exception:
                 _logger.exception("Chatboo job: reclaim failed for %s %s", table, rid)
-                # Último recurso: SQL crudo en savepoint limpio para no dejar
-                # el zombie en running ni abortar la TX del caller (poll/cron).
+                # Last resort: raw SQL in a clean savepoint, so the zombie is not
+                # left running and the caller's transaction (poll/cron) is not aborted.
                 try:
                     with self.env.cr.savepoint():
                         self.env.cr.execute(
@@ -442,7 +441,7 @@ class ChatbooJobMixin(models.AbstractModel):
 
     @api.model
     def _gc_old(self):
-        """Purga jobs terminados antiguos."""
+        """Purge old finished jobs."""
         cutoff = fields.Datetime.now() - timedelta(hours=GC_HOURS)
         old = self.search([
             ('state', 'in', ('done', 'error')),

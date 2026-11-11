@@ -3,7 +3,6 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Import AI providers from JSON (legacy servers wizard)."""
 
-import base64
 import json
 import logging
 
@@ -11,6 +10,7 @@ from odoo import api, models, fields, _
 from odoo.exceptions import UserError
 
 from ..utils import mcp_ui
+from ..utils.compat import binary_bytes
 
 _logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class ImportServersWizard(models.TransientModel):
             raise UserError(_("Please upload a JSON file."))
 
         try:
-            json_content = base64.b64decode(self.json_file)
+            json_content = binary_bytes(self.json_file)
             json_data, extract_warnings = mcp_ui.extract_json_from_upload(json_content)
         except (ValueError, Exception) as e:
             raise UserError(_("Error reading the file: %s") % e)
@@ -68,7 +68,7 @@ class ImportServersWizard(models.TransientModel):
                 if existing and not self.replace_existing:
                     skipped_count += 1
                     skipped_names.append(name)
-                    _logger.info("MCP: Servidor existente omitido: %s", name)
+                    _logger.info("MCP: Existing server skipped: %s", name)
                     continue
 
                 vals = {'name': name}
@@ -101,6 +101,11 @@ class ImportServersWizard(models.TransientModel):
                             continue
                     vals[key] = value
 
+                roles, role_warns = server_model._roles_from_portable(server_data)
+                if roles is not None:
+                    vals['role_ids'] = roles
+                import_warnings.extend('%s: %s' % (name, w) for w in role_warns)
+
                 if existing:
                     existing.write(vals)
                     target_server = existing
@@ -127,9 +132,9 @@ class ImportServersWizard(models.TransientModel):
                     target_server.model_id = match[0].id
 
             except Exception as e:
-                error_msg = "%s: %s" % (name or 'Sin nombre', str(e))
+                error_msg = "%s: %s" % (name or _('(no name)'), str(e))
                 errors.append(error_msg)
-                _logger.error("MCP: Error importando servidor: %s", error_msg)
+                _logger.error("MCP: Error importing server: %s", error_msg)
 
         return self._apply_operation_result(
             view_xmlid='pns_ai_mcp.view_import_servers_result_form',

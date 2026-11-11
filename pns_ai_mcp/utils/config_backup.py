@@ -11,13 +11,15 @@ in one click (the "magic button"), and seed a fleet of instances from one file.
 
 Entities covered (business keys used for matching on import):
     - ai.provider            → key: name  (+ ai.provider.model by name, + selected)
+    - ai.provider.role       → key: code  (active / use_fallback / colours; roles
+                                are module-owned and never created here)
     - ai.agent               → key: code  (UPDATE only; agents are module-owned)
     - ai.context             → key: code  (non-core only; core is module-seeded)
     - ai.skill               → key: code  (non-system only; system is module-seeded)
     - ai.api.server          → key: code
     - ai.url.whitelist       → key: domain
-    - ai.mcp.user            → key: login (only the API key is restored; group
-                                membership stays manual by design)
+    - ai.mcp.user            → key: login (AI permissions, and the API key
+                                with secrets; the Odoo user must exist)
     - settings               → ir.config_parameter (URL policy, domain index,
                                 skill code/command prefixes, slash-hidden skill codes)
 
@@ -40,12 +42,17 @@ Design notes
 
 import logging
 
-from odoo import _, fields
+from odoo import _
 
 from odoo.addons.pns_base.utils import settings_io as sio
 
-from .api_key import normalize_to_hash
 from .display_currency import normalize_currency
+from .key_pin import (
+    DEFAULT_PIN_ATTEMPTS,
+    DEFAULT_PIN_BLOCK_HOURS,
+    clamp_pin_length,
+    clamp_positive,
+)
 from .portable_io import (
     export_record_dict,
     import_vals_from_dict,
@@ -58,7 +65,7 @@ from .skill_code_prefix import (
 
 _logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = '1.0'
+WHAT = 'pns.ai.config.backup'
 MODULE = 'pns_ai_mcp'
 ICP_PREFIX = 'pns_ai_mcp.'
 ICP_SKILLS_SLASH_HIDDEN = 'pns_ai_mcp.skills_slash_hidden'
@@ -119,15 +126,16 @@ def export_config(env, include_secrets=False):
         include_secrets: when True include api keys / tokens (default off).
 
     Returns:
-        dict ready for ``json.dumps`` (schema-versioned).
+        dict ready for ``json.dumps``.
     """
     import datetime as _dt
 
     data = {
-        'schema_version': SCHEMA_VERSION,
+        'what': WHAT,
         'exported_at': _dt.datetime.utcnow().replace(microsecond=0).isoformat() + 'Z',
         'include_secrets': bool(include_secrets),
         'providers': _export_providers(env, include_secrets),
+        'provider_roles': _export_provider_roles(env),
         'agents': _export_agents(env),
         'contexts': _export_contexts(env),
         'skills': _export_skills(env),
@@ -147,7 +155,35 @@ def _export_providers(env, include_secrets):
             p, skip_fields={'id', 'model_name'}, include_secrets=include_secrets,
         )
         d['selected_model'] = p.model_id.name or None
+        d['roles'] = p._portable_roles()
         out.append(d)
+    return out
+
+
+def _role_row(role):
+    return {
+        'code': role.code,
+        'active': role.active,
+        'use_fallback': role.use_fallback,
+        'bg_color': role.own_bg_color or False,
+        'fg_color': role.own_fg_color or False,
+    }
+
+
+def _export_provider_roles(env):
+    """The database's own choices on each role. The role is the module's."""
+    Role = env['ai.provider.role'].sudo().with_context(active_test=False)
+    return [_role_row(r) for r in Role.search([])]
+
+
+def export_roles_with_holders(roles):
+    """Role rows for the Roles list: the database's choices and, in
+    ``providers``, the names of the providers that hold each role."""
+    out = []
+    for role in roles.with_context(active_test=False):
+        row = _role_row(role)
+        row['providers'] = role.provider_ids.mapped('name')
+        out.append(row)
     return out
 
 
@@ -226,6 +262,16 @@ def _clamp_mcp_settings(values, fields_map=None):
         values['skill_command_prefix'] = normalize_skill_command_prefix(
             values.get('skill_command_prefix'),
         )
+    if 'key_pin_length' in values:
+        values['key_pin_length'] = clamp_pin_length(values.get('key_pin_length'))
+    if 'key_pin_attempts' in values:
+        values['key_pin_attempts'] = clamp_positive(
+            values.get('key_pin_attempts'), DEFAULT_PIN_ATTEMPTS,
+        )
+    if 'key_pin_block_hours' in values:
+        values['key_pin_block_hours'] = clamp_positive(
+            values.get('key_pin_block_hours'), DEFAULT_PIN_BLOCK_HOURS,
+        )
 
 
 def _export_settings(env, include_secrets=True):
@@ -272,6 +318,10 @@ def import_config(env, data, replace_existing=True, dry_run=False):
     dry = bool(dry_run)
     _import_providers(
         env, data.get('providers') or [], report,
+        replace_existing=replace, dry_run=dry,
+    )
+    _import_provider_roles(
+        env, data.get('provider_roles') or [], report,
         replace_existing=replace, dry_run=dry,
     )
     _import_contexts(
@@ -331,6 +381,11 @@ def import_partial(env, data, replace_existing=True):
         _import_providers(
             env, data['providers'] or [], report, replace_existing=replace_existing,
         )
+    if 'provider_roles' in data:
+        _import_provider_roles(
+            env, data['provider_roles'] or [], report,
+            replace_existing=replace_existing,
+        )
     if 'contexts' in data:
         _import_contexts(
             env, data['contexts'] or [], report, replace_existing=replace_existing,
@@ -375,6 +430,7 @@ def export_selected_providers(providers, include_secrets=False):
             p, skip_fields={'id', 'model_name'}, include_secrets=include_secrets,
         )
         d['selected_model'] = p.model_id.name or None
+        d['roles'] = p._portable_roles()
         out.append(d)
     return out
 
@@ -416,39 +472,13 @@ def export_selected_whitelist(entries):
 
 
 def export_selected_users(users, include_secrets=False):
-    """Portable rows for a subset of ``ai.mcp.user`` records.
+    """Portable rows for a subset of ``ai.mcp.user`` records: the same rows as
+    the Users list export, AI permissions included.
 
     The key hash moves the access (the same client key works on the target),
     so it only goes in with *include_secrets*.
     """
-    out = []
-    for u in users:
-        if not u.login or u.mcp_api_key_state != 'generated':
-            continue
-        row = {
-            'login': u.login,
-            'name': u.name or '',
-            'mcp_api_key_state': u.mcp_api_key_state,
-        }
-        try:
-            row['is_ai_admin'] = u.user_id.has_group('pns_ai_mcp.group_ai_admin')
-            row['is_ai_writer'] = u.user_id.has_group('pns_ai_mcp.group_ai_writer')
-            row['is_ai_external_url'] = u.user_id.has_group(
-                'pns_ai_mcp.group_ai_external_url')
-            row['is_ai_external_api'] = u.user_id.has_group(
-                'pns_ai_mcp.group_ai_external_api')
-            row['is_ai_conversational'] = u.user_id.has_group(
-                'pns_ai_mcp.group_ai_conversational')
-        except Exception:
-            pass
-        if include_secrets and u.mcp_api_key_hash:
-            row['mcp_api_key_hash'] = u.mcp_api_key_hash
-            row['mcp_api_key_generated_date'] = (
-                fields.Datetime.to_string(u.mcp_api_key_generated_date)
-                if u.mcp_api_key_generated_date else None
-            )
-        out.append(row)
-    return out
+    return [u._export_user_dict(include_secrets) for u in users if u.login]
 
 
 def _import_providers(env, rows, report, replace_existing=True, dry_run=False):
@@ -466,8 +496,12 @@ def _import_providers(env, rows, report, replace_existing=True, dry_run=False):
                 skip_fields={
                     'id', 'model_name', 'usage_days',
                     'models', 'selected_model', 'failovers',
-                },
+                } | Provider._portable_role_keys(row),
             )
+            roles, role_warns = Provider._roles_from_portable(row)
+            if roles is not None:
+                vals['role_ids'] = roles
+            warns = list(warns) + role_warns
             report['warnings'].extend('provider %s: %s' % (name, w) for w in warns)
             existing = Provider.search([('name', '=', name)], limit=1)
             if not _should_write(
@@ -579,6 +613,74 @@ def _import_servers(env, rows, report, replace_existing=True, dry_run=False):
             report['errors'].append("server %s: %s" % (code, e))
 
 
+def _import_provider_roles(env, rows, report, replace_existing=True, dry_run=False):
+    """Only the database's own choices (active, use_fallback, chip colours)
+    on roles it has. An empty colour is the module's.
+
+    A role comes from its module: a code this database does not have is
+    said and skipped, never created. A row with ``providers`` also leaves
+    the role held by exactly those providers (see ``_set_role_holders``).
+    """
+    Role = env['ai.provider.role'].sudo().with_context(active_test=False)
+    sec = report['sections'].setdefault('provider_roles', _section())
+    for row in rows:
+        code = str(row.get('code') or '').strip() if isinstance(row, dict) else ''
+        if not code:
+            report['errors'].append(_("Role without 'code' skipped."))
+            continue
+        try:
+            role = Role.search([('code', '=', code)], limit=1)
+            if not role:
+                report['warnings'].append(
+                    _("Role '%s' is not installed here; skipped.") % code
+                )
+                _mark(sec, 'skipped', code)
+                continue
+            vals = {
+                key: bool(row[key])
+                for key in ('active', 'use_fallback') if key in row
+            }
+            for key in ('bg_color', 'fg_color'):
+                if key in row:
+                    vals['own_' + key] = str(row[key] or '').strip() or False
+            if not _should_write(sec, True, replace_existing, code, dry_run):
+                continue
+            if vals:
+                role.write(vals)
+            if isinstance(row.get('providers'), list):
+                _set_role_holders(env, role, row['providers'], report)
+        except Exception as e:
+            report['errors'].append("role %s: %s" % (code, e))
+
+
+def _set_role_holders(env, role, names, report):
+    """The providers named hold *role*; the other providers here stop holding it.
+
+    Written from each provider, so its own checks (a protocol that cannot
+    hold the role) apply. A provider that refuses is an error of its own; a
+    name with no provider here is said.
+    """
+    Provider = env['ai.provider'].sudo().with_context(active_test=False)
+    names = [str(n).strip() for n in names if str(n or '').strip()]
+    wanted = Provider.search([('name', 'in', names)])
+    for name in sorted(set(names) - set(wanted.mapped('name'))):
+        report['warnings'].append(
+            _("Role '%(role)s': provider '%(provider)s' not found.")
+            % {'role': role.code, 'provider': name}
+        )
+    held = role.with_context(active_test=False).provider_ids
+    changes = [(p, (4, role.id)) for p in wanted - held]
+    changes += [(p, (3, role.id)) for p in held - wanted]
+    for provider, command in changes:
+        try:
+            with env.cr.savepoint():
+                provider.write({'role_ids': [command]})
+        except Exception as e:
+            report['errors'].append(
+                "role %s, provider %s: %s" % (role.code, provider.name, e)
+            )
+
+
 def _import_whitelist(env, rows, report, replace_existing=True, dry_run=False):
     W = env['ai.url.whitelist'].sudo().with_context(active_test=False)
     sec = report['sections'].setdefault('url_whitelists', _section())
@@ -608,39 +710,36 @@ def _import_whitelist(env, rows, report, replace_existing=True, dry_run=False):
 
 
 def _import_users(env, rows, report, replace_existing=True, dry_run=False):
-    McpUser = env['ai.mcp.user'].sudo()
+    """AI permissions and, when the file has it, the API key, matched by login.
+
+    The Odoo user must exist here; the import never creates one.
+    """
+    McpUser = env['ai.mcp.user'].sudo().with_context(mcp_skip_ensure_all_users=True)
     Users = env['res.users'].sudo()
     sec = report['sections'].setdefault('mcp_users', _section())
     for row in rows:
-        login = (row.get('login') or '').strip()
-        # Prefer the hash (new exports); accept a legacy plaintext key and hash
-        # it. We never persist plaintext.
-        raw = (row.get('mcp_api_key_hash') or row.get('mcp_api_key') or '').strip()
-        key_hash = normalize_to_hash(raw) if raw else ''
+        login = (row.get('login') or '').strip() if isinstance(row, dict) else ''
         if not login:
             report['errors'].append(_("MCP user without 'login' skipped."))
-            continue
-        if not key_hash:
-            _mark(sec, 'skipped', login)  # nothing restorable
             continue
         try:
             user = Users.search([('login', '=', login)], limit=1)
             if not user:
                 report['warnings'].append(
-                    _("Odoo user '%s' not found — API key not restored.") % login)
+                    _("Odoo user '%s' not found; skipped.") % login)
                 _mark(sec, 'skipped', login)
                 continue
-            vals = {
-                'mcp_api_key_hash': key_hash,
-                'mcp_api_key_state': 'generated',
-            }
+            vals, has_key, warns = McpUser._import_vals_from_json_row(row)
+            report['warnings'].extend('user %s: %s' % (login, w) for w in warns)
+            # McpUser is sudo: whether the caller may set this key is asked as the caller.
+            key_warning = env['ai.mcp.user']._drop_key_unless_allowed(vals, user)
+            if key_warning:
+                has_key = False
+                report['warnings'].append(key_warning)
             gen_date = _norm_dt(row.get('mcp_api_key_generated_date'))
-            if gen_date:
+            if has_key and gen_date:
                 vals['mcp_api_key_generated_date'] = gen_date
-            else:
-                vals['mcp_api_key_generated_date'] = fields.Datetime.now()
-            mcp = McpUser.with_context(mcp_skip_ensure_all_users=True).search(
-                [('user_id', '=', user.id)], limit=1)
+            mcp = McpUser.search([('user_id', '=', user.id)], limit=1)
             if not _should_write(
                 sec, bool(mcp), replace_existing, login, dry_run,
             ):
@@ -649,7 +748,7 @@ def _import_users(env, rows, report, replace_existing=True, dry_run=False):
                 mcp.write(vals)
             else:
                 vals['user_id'] = user.id
-                McpUser.with_context(mcp_skip_ensure_all_users=True).create(vals)
+                McpUser.create(vals)
         except Exception as e:
             report['errors'].append("user %s: %s" % (login, e))
 

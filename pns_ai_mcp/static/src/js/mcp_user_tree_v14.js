@@ -104,26 +104,6 @@ odoo.define('pns_ai_mcp.mcp_user_tree', function (require) {
             }
             paintToolbarChip(self);
         },
-
-        _onToggleBoolean: function (event) {
-            if (this.modelName !== 'ai.mcp.user') {
-                return this._super.apply(this, arguments);
-            }
-
-            var self = this;
-            var result = this._super.apply(this, arguments);
-
-            var fieldName = event.data && event.data.field && event.data.field.name;
-            if (fieldName === 'is_mcp_manager') {
-                if (result && typeof result.then === 'function') {
-                    result.then(function() {
-                        self.reload();
-                    });
-                }
-            }
-
-            return result;
-        },
     });
 
     return {};

@@ -26,17 +26,17 @@ _logger = logging.getLogger(__name__)
 
 
 def _detect_phase(code):
-    # Detecta automáticamente si el código es de extracción o presentación.
+    # Detects on its own whether the code is extraction or presentation.
     # Args:
-    #     code: Código Python a analizar
+    #     code: Python code to analyse
     # Returns:
-    #     str: 'extraction' o 'presentation'
+    #     str: 'extraction' or 'presentation'
     if not code or not isinstance(code, str):
         return 'auto'
     
     code_lower = code.lower()
     
-    # Indicadores de fase de presentación
+    # Presentation phase indicators
     presentation_indicators = [
         'previous_result',
         'raw_data',
@@ -51,7 +51,7 @@ def _detect_phase(code):
         'table',
     ]
     
-    # Indicadores de fase de extracción
+    # Extraction phase indicators
     extraction_indicators = [
         'search(',
         'browse(',
@@ -61,23 +61,23 @@ def _detect_phase(code):
         'search_count(',
     ]
     
-    # Contar indicadores
+    # Count indicators
     presentation_count = sum(1 for indicator in presentation_indicators if indicator in code_lower)
     extraction_count = sum(1 for indicator in extraction_indicators if indicator in code_lower)
     
-    # Si hay indicadores de presentación y no hay búsquedas, es presentación
+    # Presentation indicators and no searches: presentation
     if presentation_count > 0 and extraction_count == 0:
         return 'presentation'
     
-    # Si hay búsquedas y no hay indicadores de presentación, es extracción
+    # Searches and no presentation indicators: extraction
     if extraction_count > 0 and presentation_count == 0:
         return 'extraction'
     
-    # Por defecto, asumir extracción si hay búsquedas
+    # By default, assume extraction if there are searches
     if extraction_count > 0:
         return 'extraction'
     
-    # Si no hay indicadores claros, dejar que el sistema decida
+    # No clear indicators: let the system decide
     return 'auto'
 
 
@@ -215,15 +215,15 @@ def _normalize_code(code):
     code, _ensured = ensure_module_result_call(code)
     code, _coerced = ensure_date_param_coercion(code)
 
-    # Normalizar saltos escapados SOLO si el código llega como un blob
-    # de una sola línea (artefacto de transporte JSON). Si ya hay newlines
-    # reales, NO tocar \\n: destruiría literales válidos como
+    # Normalize escaped newlines ONLY if the code arrives as a
+    # single-line blob (JSON transport artefact). If there are real
+    # newlines already, do NOT touch \\n: it would break valid literals like
     # 'footer': '\\n'.join(footer_lines) → AST EOL.
     if code.count('\n') < 2 and '\\n' in code:
         code = code.replace('\\n', '\n')
         code = code.replace('\\t', '\t').replace('\\r', '\r')
 
-    # Reparar join partido en dos líneas (daño de replace ciego o LLM):
+    # Repair a join split over two lines (damage from a blind replace or the LLM):
     #   'footer': '<NL>'.join(  →  'footer': '\n'.join(
     code = re.sub(
         r"(['\"])(footer|footer_md|pie)\1\s*:\s*(['\"])\s*\n\s*\3\.join\s*\(",
@@ -239,10 +239,10 @@ def _validate_code(controller, code, context_data, phase, return_mode, agent_llm
     Returns ``(code, requires_write, error_response)``.
     """
     # ============================================================
-    # REPAIR SUAVE + VALIDACIÓN AST
+    # SOFT REPAIR + AST VALIDATION
     # ============================================================
-    # 0) Quitar `in dir()/locals()/globals()/vars()` (sandbox ya inyecta
-    #    previous_result/lugar/fecha). Evita rondas improductivas.
+    # 0) Drop `in dir()/locals()/globals()/vars()` (the sandbox already injects
+    #    previous_result/lugar/fecha). Avoids wasted rounds.
     from .validators_repair import (
         repair_cr_dbname, repair_locals_dir_checks, repair_percent_format_strings,
         repair_registry_models, strip_leaked_tool_markup,
@@ -275,12 +275,12 @@ def _validate_code(controller, code, context_data, phase, return_mode, agent_llm
             was_repaired or locals_fix or sk_fix or cr_fix or reg_fix or pct_fix
         )
         if was_repaired:
-            # Revalidar el código reparado
+            # Revalidate the repaired code
             is_valid, validation_error, requires_write = validate_relaxaicode_source_ast(repaired_code)
             if is_valid:
                 code = repaired_code
             else:
-                _logger.warning(f"[{_log_where()}] Reparación no fue suficiente - error persistente: {validation_error[:100]}")
+                _logger.warning(f"[{_log_where()}] Repair was not enough - error persists: {validation_error[:100]}")
 
     if not is_valid:
         # EOL HINT only for string/syntax issues — not for lambda/sort bans
@@ -323,7 +323,7 @@ def _validate_code(controller, code, context_data, phase, return_mode, agent_llm
             },
             retryable=True,
         )
-        # Registrar log de error de validación
+        # Log the validation error
         controller._log_mcp_operation(
             operation_type='read',
             tool_name='relaxaicode',
@@ -344,25 +344,26 @@ def _permission_denied_response(controller, operation_type, code, context_data):
     """The reply when the caller may not run this kind of operation, else None."""
     has_permission, permission_error = controller._check_mcp_permissions(operation_type)
     if not has_permission:
-        # Obtener nombre del usuario de forma segura
+        from odoo import _
+        # Get the user name safely
         env_read = controller._get_env_for_operation('read')
         user_id = env_read.uid
 
-        user_name = "desconocido"
+        user_name = _("unknown")
         try:
             user_record = env_read['res.users'].browse(user_id)
             if user_record.exists():
-                user_name = user_record.name or user_record.login or "desconocido"
+                user_name = user_record.name or user_record.login or _("unknown")
         except Exception:
             pass
 
-        # Mensaje simple igual que en endpoints estáticos
-        message = f'Usuario "{user_name}" no tiene permisos de escritura con el servidor MCP. Operación abortada.'
+        # Simple message, same as in the static endpoints
+        message = _('User "%s" has no write permission on the MCP server. Operation aborted.') % user_name
 
-        # Cancelar automáticamente todas las verificaciones pendientes de este usuario
-        cancelled_count = controller._cancel_pending_verifications_for_user(user_id, f"falta de permisos de escritura (not in group_ai_writer) para relaxaicode")
+        # Cancel all pending verifications of this user automatically
+        cancelled_count = controller._cancel_pending_verifications_for_user(user_id, "missing write permission (not in group_ai_writer) for relaxaicode")
 
-        # Usar formato content para que sea visible en la interfaz de la IA (igual que endpoints estáticos)
+        # Use the content format so it shows in the AI interface (same as the static endpoints)
         error_response = {
             'content': [
                 {
@@ -380,16 +381,16 @@ def _permission_denied_response(controller, operation_type, code, context_data):
             ]
         }
 
-        _logger.warning(f"[{_log_where()}] Usuario {user_name} (ID: {user_id}) sin permiso de escritura IA (group_ai_writer) - abortando")
+        _logger.warning(f"[{_log_where()}] User {user_name} (ID: {user_id}) without AI write permission (group_ai_writer) - aborting")
 
-        # Registrar log de error de permisos
+        # Log the permission error
         controller._log_mcp_operation(
             operation_type=operation_type,
             tool_name='relaxaicode',
             prompt_data={'code': code[:5000] if len(code) > 5000 else code, 'context': context_data},
             result_data=error_response,
             result_summary="Permission error: not in group_ai_writer for relaxaicode",
-            additional_info=f"Usuario {user_name} (ID: {user_id}) intentó ejecutar código que requiere escritura sin permisos. Operación abortada inmediatamente."
+            additional_info=f"User {user_name} (ID: {user_id}) tried to run code that requires write access without permission. Operation aborted immediately."
         )
 
         return error_response
@@ -398,9 +399,9 @@ def _permission_denied_response(controller, operation_type, code, context_data):
 
 def _read_only_response():
     """Box A only reads: writes go through safe_plan_request."""
-    # CAJA A: relaxaicode es SOLO LECTURA (se ejecuta sobre cursor READ ONLY).
-    # Cualquier escritura se redirige a la caja B declarativa
-    # (safe_plan_request): la IA NO escribe con código.
+    # BOX A: relaxaicode is READ ONLY (it runs on a READ ONLY cursor).
+    # Any write is redirected to the declarative box B
+    # (safe_plan_request): the AI does NOT write with code.
     return {
         'content': [{'type': 'text', 'text': json.dumps({
             'success': False,
@@ -417,18 +418,18 @@ def _read_only_response():
 
 def _fill_run_context(safe_context, context_data):
     """Caller variables and locale into the sandbox; env stays. An error reply, else None."""
-    # Añadir datos del contexto proporcionado por el cliente
-    # Según el estándar MCP, los prompts deben ser solicitados explícitamente
-    # mediante prompts/list y prompts/get, no inyectarse automáticamente
-    # CRÍTICO: Proteger solo variables de infraestructura (env, odoo_version, odoo_series).
-    # Las variables de locale (user_lang, pk_*) NO se protegen para permitir la "virtualización" desde context_data.
+    # Add the context data sent by the client
+    # Per the MCP standard, prompts must be requested explicitly
+    # through prompts/list and prompts/get, not injected automatically
+    # CRITICAL: protect only infrastructure variables (env, odoo_version, odoo_series).
+    # Locale variables (user_lang, pk_*) are NOT protected, to allow "virtualization" from context_data.
     protected_vars = {
         'env', 'odoo_version', 'odoo_series', '__builtins__', '__import__'
     }
 
-    # Verificar que env está presente ANTES de actualizar
+    # Check that env is present BEFORE updating
     if 'env' not in safe_context:
-        _logger.error(f"[{_log_where()}] CRÍTICO: env no está en safe_context después de build_safe_context")
+        _logger.error(f"[{_log_where()}] CRITICAL: env is not in safe_context after build_safe_context")
         return _format_error_response(
             -32603,
             'Internal error: env not available in execution context',
@@ -440,9 +441,9 @@ def _fill_run_context(safe_context, context_data):
         if key not in protected_vars:
             safe_context[key] = value
         else:
-            pass  # Variable protegida, ignorar sobrescritura
+            pass  # Protected variable, ignore the overwrite
 
-    # Garantizar variables de locale (cascada: default en_US)
+    # Ensure locale variables (cascade: default en_US)
     _user_lang = safe_context.get('user_lang') or 'en_US'
     if not isinstance(_user_lang, str):
         _user_lang = 'en_US'
@@ -451,9 +452,9 @@ def _fill_run_context(safe_context, context_data):
     safe_context['lang'] = _user_lang
     safe_context['locale'] = _user_lang
 
-    # Verificar que env sigue presente DESPUÉS de actualizar
+    # Check that env is still present AFTER updating
     if 'env' not in safe_context:
-        _logger.error(f"[{_log_where()}] CRÍTICO: env desapareció de safe_context después de update")
+        _logger.error(f"[{_log_where()}] CRITICAL: env disappeared from safe_context after update")
         return _format_error_response(
             -32603,
             'Internal error: env lost from execution context',
@@ -501,9 +502,9 @@ def _preventive_code_response(code):
     """The reply when the code only says env is missing instead of using it, else None."""
     if _is_preventive_code(code):
         reason = 'a fixed message or an empty result and no env query'
-        _logger.warning(f"[{_log_where()}] Código preventivo detectado ({reason}) - no usa env correctamente")
-        # NO ejecutar código preventivo - devolver error específico con mensaje MÁS AGRESIVO
-        # CRÍTICO: Marcar con __preventive_code_error__ para que el orchestrator lo maneje de forma especial
+        _logger.warning(f"[{_log_where()}] Preventive code detected ({reason}) - does not use env correctly")
+        # Do NOT run preventive code - return a specific error with a MORE AGGRESSIVE message
+        # CRITICAL: mark with __preventive_code_error__ so the orchestrator handles it specially
         error_response = _format_error_response(
             -32602,
             f'[CRITICAL ERROR] You generated preventive code with {reason} instead of using env. This is WRONG. env EXISTS and is ALWAYS available. You MUST use env directly. DO NOT generate error messages. DO NOT add comments suggesting env is unavailable. DO NOT use try/except for env. USE IT DIRECTLY: employees = env["hr.employee"].search([]). Your generated code was: {code[:200]}...',
@@ -514,12 +515,12 @@ def _preventive_code_response(code):
                 'forbidden': 'DO NOT generate: result = "error message..." OR comments suggesting env is unavailable OR try/except blocks for env',
                 'generated': code[:500],
                 'action_required': 'Regenerate code using env directly. env is guaranteed to exist. Remove all preventive comments and error handling.',
-                '__preventive_code_error__': True,  # Marca especial para el orchestrator
-                '__force_retry__': True  # Forzar retry automático
+                '__preventive_code_error__': True,  # Special mark for the orchestrator
+                '__force_retry__': True  # Force an automatic retry
             },
             retryable=True,
         )
-        # Añadir marca especial al nivel superior de la respuesta
+        # Add the special mark at the top level of the response
         error_response['__preventive_code_error__'] = True
         error_response['__force_retry__'] = True
         return error_response

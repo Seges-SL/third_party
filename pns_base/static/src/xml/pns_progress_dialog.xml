@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="pns_base.ProgressDialog">
+        <div class="o_pns_progress">
+            <div class="o_pns_progress_body"/>
+        </div>
+    </t>
+
+    <t t-name="pns_base.ProgressDialogBody">
+        <t t-if="running">
+            <div class="o_pns_progress_wait">
+                <div class="o_pns_progress_spinner text-primary" role="status"/>
+                <div class="o_pns_progress_step">
+                    <t t-if="data and data.step" t-esc="data.step"/>
+                    <t t-else="">Starting…</t>
+                </div>
+            </div>
+            <div class="progress o_pns_progress_bar">
+                <div class="progress-bar bg-primary progress-bar-striped progress-bar-animated"
+                     role="progressbar"
+                     t-att-style="'width: ' + (data ? data.progress : 0) + '%'"
+                     t-att-aria-valuenow="data ? data.progress : 0"
+                     aria-valuemin="0" aria-valuemax="100">
+                    <t t-esc="data ? data.progress : 0"/>%
+                </div>
+            </div>
+            <p class="text-muted small o_pns_progress_hint">
+                <i class="fa fa-info-circle" title="Info"/>
+                You can close this window: the work goes on.
+            </p>
+        </t>
+        <t t-elif="data.state === 'done'">
+            <div class="alert alert-success o_pns_progress_head" role="alert">
+                <i class="fa fa-check-circle" title="Done"/>
+                <strong class="o_pns_progress_head_text">
+                    <t t-if="data.summary.message" t-esc="data.summary.message"/>
+                    <t t-else="">Done.</t>
+                </strong>
+                <span t-if="data.duration" class="o_pns_progress_duration" t-esc="data.duration"/>
+            </div>
+            <div t-if="data.summary.tiles.length" class="o_pns_progress_tiles">
+                <t t-foreach="data.summary.tiles" t-as="tile">
+                    <div t-attf-class="alert alert-#{tile.tone} o_pns_progress_tile">
+                        <div class="o_pns_progress_tile_value" t-esc="tile.value"/>
+                        <div class="o_pns_progress_tile_label" t-esc="tile.label"/>
+                    </div>
+                </t>
+            </div>
+            <table t-if="data.summary.rows.length" class="table table-sm table-striped o_pns_progress_table">
+                <thead>
+                    <tr>
+                        <t t-foreach="data.summary.columns" t-as="col">
+                            <th t-att-class="col_index ? 'o_pns_progress_num' : ''" t-esc="col"/>
+                        </t>
+                    </tr>
+                </thead>
+                <tbody>
+                    <t t-foreach="data.summary.rows" t-as="row">
+                        <tr>
+                            <t t-foreach="row" t-as="cell">
+                                <td t-att-class="cell_index ? 'o_pns_progress_num' : ''" t-esc="cell"/>
+                            </t>
+                        </tr>
+                    </t>
+                </tbody>
+            </table>
+        </t>
+        <t t-else="">
+            <div class="alert alert-danger o_pns_progress_head" role="alert">
+                <i class="fa fa-exclamation-triangle" title="Error"/>
+                <span class="o_pns_progress_head_text" t-esc="data.error"/>
+            </div>
+        </t>
+        <div class="o_pns_progress_actions">
+            <button t-if="!running and data.state === 'done' and doneAction"
+                    type="button" class="btn btn-primary o_pns_progress_done">
+                <t t-esc="doneLabel"/>
+            </button>
+            <button type="button" class="btn btn-secondary o_pns_progress_close">Close</button>
+        </div>
+    </t>
+
+</templates>

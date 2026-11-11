@@ -87,23 +87,14 @@
                 <field name="primitive" string="Primitive" readonly="1" optional="hide"/>
                 <field name="category" string="Category" optional="hide"/>
                 <field name="access_mode" string="Access" readonly="1" optional="hide"/>
-                <!-- Clear-history button (tree header) -->
-                <header>
-                    <button name="%(pns_ai_mcp.action_ai_log_delete_menu_window)d"
-                            string="Clear History"
-                            type="action"
-                            class="btn-primary"
-                            groups="pns_ai_mcp.group_ai_admin,base.group_system"
-                            title="Deletes the oldest logs, keeping the most recent ones"/>
-                </header>
             </tree>
         </field>
     </record>
 
-    <!-- Operator actions: se definen ANTES de la vista formulario, cuyo botón
-         de cabecera referencia %(pns_ai_mcp.action_ai_log)d y debe resolverse
-         en tiempo de parseo (si no, falla en instalación desde cero). La vista
-         de búsqueda se auto-asocia por modelo, así que no hace falta ref. -->
+    <!-- Operator actions: defined BEFORE the form view, whose header
+         button references %(pns_ai_mcp.action_ai_log)d and must resolve
+         at parse time (otherwise a fresh install fails). The search
+         view auto-attaches by model, so no ref is needed. -->
     <record id="action_ai_log" model="ir.actions.act_window">
         <field name="name">My Activity</field>
         <field name="type">ir.actions.act_window</field>

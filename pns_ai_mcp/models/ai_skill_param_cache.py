@@ -9,6 +9,7 @@ import logging
 from odoo import SUPERUSER_ID, api, fields, models, _
 from odoo.exceptions import ValidationError
 from odoo.tools import config
+from odoo.addons.pns_base.utils.compat import ODOO_VERSION
 
 from ..utils.skill_runtime import (
     normalize_unresolved_key,
@@ -26,7 +27,7 @@ class AISkillParamCache(models.Model):
     Value = JSON object the hybrid LLM (or a human) produced for that phrase.
     Instance data — not factory seed, not skill ZIP export.
 
-    Writes use a dedicated cursor: Chatboo rolls back the turn cursor.
+    Writes use a dedicated cursor: the host may roll back the turn cursor.
     """
     _name = 'ai.skill.param.cache'
     _description = 'Skill param phrase cache'
@@ -61,13 +62,15 @@ class AISkillParamCache(models.Model):
     )
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        (
-            'skill_key_uniq',
+    if ODOO_VERSION >= 19:
+        _skill_key_uniq = models.Constraint(
             'unique(skill_id, key)',
             'This skill already has a row for that normalized phrase.',
-        ),
-    ]
+        )
+    else:
+        _sql_constraints = [
+            ('skill_key_uniq', 'unique(skill_id, key)', 'This skill already has a row for that normalized phrase.'),
+        ]
 
     @api.depends('unresolved')
     def _compute_key(self):
@@ -83,7 +86,7 @@ class AISkillParamCache(models.Model):
                 )
 
     def _own_cursor_env(self):
-        """True when writes must leave the Chatboo turn cursor."""
+        """True when writes must leave the host's turn cursor."""
         if config['test_enable'] and type(self.env.cr).__name__ == 'TestCursor':
             return False
         return True
@@ -126,7 +129,7 @@ class AISkillParamCache(models.Model):
     def _remember_for_skill(self, skill_id, leftover, norm):
         """Store leftover → IA params. Does not overwrite an existing row.
 
-        Commits on a new cursor so Chatboo's turn rollback does not drop it.
+        Commits on a new cursor so a host's turn rollback does not drop it.
         """
         payload = param_cache_payload(norm)
         key = normalize_unresolved_key(leftover)

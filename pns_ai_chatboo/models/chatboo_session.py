@@ -10,13 +10,9 @@ import time
 from datetime import timedelta
 
 from odoo import models, fields, api, _
-from odoo.exceptions import RedirectWarning, UserError
-# Seges: parche 25 (M1, seguridad). Ver docs/pendiente/parches_pns_ai.md
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, RedirectWarning, UserError
 
 from odoo.addons.pns_ai_mcp.utils import record_marks
-# Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
-from odoo.addons.pns_ai_mcp.models.box_a_guard import _box_a_trusted
 from odoo.addons.pns_ai_mcp.utils.markup_rename import rename_stored_markup
 
 from ..utils import turn_documents
@@ -24,13 +20,13 @@ from ..utils.chatboo_product_icp import ICP_HISTORY_RETENTION_DAYS
 
 _logger = logging.getLogger(__name__)
 
-# Parámetro de retención (días). Propio de Chatboo (antes vivía en pns_ai_mcp).
+# Retention parameter (days). Owned by Chatboo (it used to live in pns_ai_mcp).
 RETENTION_PARAM = ICP_HISTORY_RETENTION_DAYS
 
-# Frescura (horas) del dataset cacheado para reutilización (Nivel 2). Un dataset
-# solo es útil para reformateos INMEDIATOS del mismo listado; pasado este umbral
-# se descarta (y un cron lo purga) para que los blobs no se acumulen en sesiones
-# de larga vida, independientemente de la retención de la sesión.
+# Freshness (hours) of the cached dataset kept for reuse (Level 2). A dataset is
+# only useful to IMMEDIATELY reformat the same list; past this threshold it is
+# dropped (and a cron purges it) so blobs do not pile up in long-lived
+# sessions, apart from the session retention.
 QUERY_DATA_TTL_HOURS_PARAM = 'pns_ai_chatboo.query_data_ttl_hours'
 DEFAULT_QUERY_DATA_TTL_HOURS = 12
 
@@ -39,7 +35,7 @@ _ATTACHMENT_ID_IN_URL = re.compile(
 
 
 class ChatbooSession(models.Model):
-    """Sesión de Chatboo: historial de mensajes y de prompts (readline) por usuario."""
+    """Chatboo session: message history and prompt history (readline) per user."""
     _name = 'chatboo.session'
     _description = 'Chatboo Session'
     _order = 'last_used_date desc, create_date desc'
@@ -120,6 +116,11 @@ class ChatbooSession(models.Model):
         string='Dataset cache time',
         help="When last_query_data was cached; used to expire it (freshness "
              "TTL) so stale datasets are not reused nor kept forever.",
+    )
+    last_query_company_ids = fields.Char(
+        string='Dataset companies (JSON)',
+        help="Companies last_query_data was read in. A turn in other "
+             "companies queries again instead of reusing those rows.",
     )
     attached_documents = fields.Text(
         string='Attached documents (text)',
@@ -208,7 +209,7 @@ class ChatbooSession(models.Model):
         from ..utils.chatboo_display_time import format_env_wallclock
         return format_env_wallclock(self.env, utc_dt)
 
-    # -- Serialización --
+    # -- Serialization --
 
     def get_messages(self):
         self.ensure_one()
@@ -316,8 +317,8 @@ class ChatbooSession(models.Model):
             msg['meta'] = meta
         return messages
 
-    #: Datos del turno que escribe el worker y que un save del cliente no
-    #: puede borrar: adjuntos, métricas de consumo y trazas del turno.
+    #: Turn data the worker writes and a client save may not erase:
+    #: attachments, usage metrics and turn traces.
     _PRESERVED_ASSISTANT_KEYS = (
         'files',
         'usage',
@@ -336,14 +337,14 @@ class ChatbooSession(models.Model):
     )
 
     def _merge_attachment_chips(self, previous, incoming):
-        """No dejar que un save del cliente borre lo ya persistido.
+        """Do not let a client save erase what is already stored.
 
-        El worker guarda chips ``{url,name}`` ligados a ``ir.attachment`` y las
-        métricas del turno (usage, tope de contexto, velocidad). El cliente a
-        veces re-guarda el array de mensajes sin esas claves y pisaba el
-        histórico: tras F5 / History las fotos «desaparecían» aunque el
-        filestore siguiera intacto, y los chips de tokens y coste se quedaban
-        en blanco aunque el consumo estuviera facturado.
+        The worker saves ``{url,name}`` chips tied to ``ir.attachment`` and the
+        turn metrics (usage, context cap, speed). The client sometimes saves
+        the message array again without those keys and overwrote the
+        history: after F5 / History the pictures «vanished» though the
+        filestore was intact, and the token and cost chips went blank
+        though the usage was billed.
         """
         if not previous or not incoming:
             return incoming
@@ -369,8 +370,8 @@ class ChatbooSession(models.Model):
                         msg['files'] = prev['files']
                     if prev.get('offtopic') and not msg.get('offtopic'):
                         msg['offtopic'] = True
-                # Si ya hay chips persistidos, no guardar base64/HTML de burbuja en
-                # content (hincha el JSON y confunde al render del histórico).
+                # If chips are already stored, do not keep bubble base64/HTML in
+                # content (it bloats the JSON and confuses the history render).
                 chips = msg.get('images') or msg.get('files')
                 content = msg.get('content') or ''
                 if chips and isinstance(content, str) and (
@@ -397,7 +398,7 @@ class ChatbooSession(models.Model):
         return incoming
 
     def _merge_meta(self, prev_meta, new_meta):
-        """Completar el ``meta`` entrante con lo que ya había (sin pisarlo)."""
+        """Fill the incoming ``meta`` with what was already there (without overwriting it)."""
         if not isinstance(prev_meta, dict):
             return new_meta if isinstance(new_meta, dict) else new_meta or None
         if not isinstance(new_meta, dict):
@@ -542,7 +543,7 @@ class ChatbooSession(models.Model):
         'pdf': 'application/pdf',
     }
 
-    def fulfill_client_export(self, filename, mimetype, datas, kind=None):
+    def _fulfill_client_export(self, filename, mimetype, datas, kind=None):
         """Replace a pending Word/PDF/HTML chip with client-assembled bytes."""
         self.ensure_one()
         import base64
@@ -757,7 +758,7 @@ class ChatbooSession(models.Model):
         if self.env.cr.fetchone():
             self.last_used_date = fields.Datetime.now()
 
-    # -- Cache de dataset (Nivel 2: reutilización sin re-consultar) --
+    # -- Dataset cache (Level 2: reuse without a new query) --
 
     @api.model
     def _query_data_ttl_hours(self):
@@ -782,13 +783,21 @@ class ChatbooSession(models.Model):
         except Exception:
             return []
 
-    def get_fresh_query_data(self):
-        """Devuelve las filas cacheadas del último dataset SOLO si siguen frescas
-        (dentro del TTL); si no, None. Nunca lanza: ante cualquier problema
-        devuelve None y se cae con elegancia a "sin cache"."""
+    def get_fresh_query_data(self, company_ids=None):
+        """Return the cached rows of the last dataset ONLY if still fresh
+        (within the TTL) and, given ``company_ids``, read in those same
+        companies; else None. Never raises: on any problem it returns None
+        and falls back gently to "no cache"."""
         self.ensure_one()
         if not self.last_query_data or not self.last_query_data_date:
             return None
+        if company_ids is not None:
+            try:
+                cached = json.loads(self.last_query_company_ids or '[]')
+            except (TypeError, ValueError):
+                cached = []
+            if sorted(cached) != sorted(company_ids):
+                return None
         ttl = self._query_data_ttl_hours()
         if ttl > 0:
             age = fields.Datetime.now() - self.last_query_data_date
@@ -799,7 +808,7 @@ class ChatbooSession(models.Model):
         except (json.JSONDecodeError, TypeError):
             return None
 
-    # ── Documentos adjuntos (texto, como las filas de una tabla) ──────────
+    # ── Attached documents (text, like the rows of a table) ──────────
 
     def get_documents(self):
         self.ensure_one()
@@ -820,23 +829,27 @@ class ChatbooSession(models.Model):
 
     @api.model
     def sandbox_helpers(self):
-        """``read_document`` for the sandbox of a Chatboo turn."""
+        """``documents`` / ``read_document`` and the page helpers for a Chatboo turn."""
         self._claim_page_turn()
         sessions = self
 
-        def _wrap(method_name):
-            method = getattr(self, method_name)
+        def _wrap(name):
+            method = getattr(self, '_' + name)
 
             def _fn(*args, **kwargs):
                 return method(*args, **kwargs)
 
-            _fn.__name__ = method_name
+            _fn.__name__ = name
             return _fn
 
         def read_document(name, page=None, find=None):
             return sessions._read_document(name, page=page, find=find)
 
+        def documents():
+            return sessions._documents()
+
         return {
+            'documents': documents,
             'read_document': read_document,
             'page_url': _wrap('page_url'),
             'page_edit': _wrap('page_edit'),
@@ -875,7 +888,7 @@ class ChatbooSession(models.Model):
         from .chatboo_canvas import has_open_page
         return ['page_tab'] if has_open_page(self) else []
 
-    def page_url(self, rows=None, instruction='', new=False):
+    def _page_url(self, rows=None, instruction='', new=False):
         """Url of a page built from ``rows``, or '' when there is none.
 
         Soft fail, like a geocode miss: an empty string never aborts the
@@ -898,7 +911,7 @@ class ChatbooSession(models.Model):
                 _logger.warning('Chatboo canvas failed', exc_info=True)
                 return ''
 
-    def page_html(self, html, rows=None, title=''):
+    def _page_html(self, html, rows=None, title=''):
         """Open ``html`` as the page and fill ``rows``. No design call.
 
         A captured skill brings the page that already worked. This stores
@@ -921,8 +934,7 @@ class ChatbooSession(models.Model):
             if not session:
                 return ''
             blocks = _blocks_for_page(rows)
-            # Seges: parche 26 (M2, seguridad). Ver docs/pendiente/parches_pns_ai.md
-            blocks, images = pictures_as_tokens(session.env(su=False), blocks)
+            blocks, images = pictures_as_tokens(session.env, blocks)
             content = swap_pictures(
                 place_rows_on_page(
                     html, blocks, captured=True, title=title,
@@ -947,7 +959,7 @@ class ChatbooSession(models.Model):
                 _logger.warning('Chatboo canvas failed', exc_info=True)
                 return ''
 
-    def page_edit(self, instruction='', rows=None):
+    def _page_edit(self, instruction='', rows=None):
         """Url of the open page after this change, or '' when there is none.
 
         Without ``rows`` the figures already on the page stay: no query, and
@@ -1051,7 +1063,6 @@ class ChatbooSession(models.Model):
             except Exception:
                 pass
 
-    # Seges: parche 25 (M1, seguridad). Ver docs/pendiente/parches_pns_ai.md
     def _paint_canvas(self, instruction, new_page=False, rows=None, title='',
                       images=None):
         """One design call. Returns the page url, or '' when there is none.
@@ -1061,26 +1072,20 @@ class ChatbooSession(models.Model):
         as ``AttributeError`` while Design providers sat unused.
 
         The tab is the page address, so a refinement reuses it. ``new_page``
-        only decides whether the open design is the base of this one. No
-        provider carries the Design tick: no page, and no borrowing the one
-        that holds the dialogue. The reason is in ``ai.log``.
+        only decides whether the open design is the base of this one. Who
+        lays it out is the engine's Design role, with its fallback. Nobody
+        at all: no page, and the reason is in ``ai.log``.
 
         A change to the open page asks Design for the changes only: writing
         the whole document again is what takes minutes. Changes that do not
         fit the page exactly get the whole document laid out again.
         """
         self.ensure_one()
-        # Seges: parche 25 (M1, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        if self.sudo().user_id.id != self.env.uid:
-            raise AccessError(_('This canvas belongs to another user.'))
         from .chatboo_canvas import (
             DESIGN_SYSTEM, EDIT_SYSTEM, apply_edits, design_figure_leaks,
             design_figures_centralized, is_document, log_no_page, page_edits,
             pictures_out, place_rows_on_page, strip_fence, swap_pictures,
             sync_canvas_title_phrases,
-            # Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
-            _blocks_for_page, _const_data_value, _raw_value_left,
-            _rows_from_const_data, page_markup_texts, page_rows_texts,
         )
 
         instruction = (instruction or '').strip()
@@ -1090,27 +1095,6 @@ class ChatbooSession(models.Model):
         page = ''
         if not new_page and (self.canvas_design or '').strip():
             page = pictures_out(self.canvas_design, images)
-        # Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        # A change without rows keeps the open page's figures: the server
-        # writes them again, so Design cannot change or unescape them.
-        bind_rows, bind_title, kept_texts = rows, title, []
-        if page and not _blocks_for_page(rows):
-            bind_rows = _rows_from_const_data(_const_data_value(page))
-            bind_title = title or self.canvas_title or ''
-            if not _blocks_for_page(bind_rows):
-                # No DATA to write again: check the change against the
-                # values of the server's own tables, or do not change it.
-                kept_texts = page_rows_texts(page)
-                if not kept_texts:
-                    return log_no_page(
-                        self.env,
-                        'the open page has no figures to keep; '
-                        'change it with its rows',
-                        session_id=self.id,
-                    )
-                # Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
-                # An earlier change may have moved a value out of the table.
-                kept_texts += page_markup_texts(page)
         prompt = instruction or 'Open a canvas.'
         if page:
             prompt += '\n\nCurrent page:\n' + page
@@ -1191,22 +1175,12 @@ class ChatbooSession(models.Model):
                 )
         content = ''
         if raw:
-            # Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
             content = swap_pictures(place_rows_on_page(
                 sync_canvas_title_phrases(raw, title),
-                bind_rows,
+                rows,
                 captured=True,
-                title=bind_title,
+                title=title,
             ), images)
-            # Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
-            if kept_texts and _raw_value_left(
-                content, [{'title': '', 'data': kept_texts}],
-            ) is not None:
-                return log_no_page(
-                    self.env,
-                    'the change left a value of the page as markup',
-                    session_id=self.id,
-                )
         if err or not content:
             return log_no_page(
                 self.env, err or 'the design model returned nothing',
@@ -1226,21 +1200,7 @@ class ChatbooSession(models.Model):
             )
         return self.canvas_public_url(rev=rev)
 
-    # Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
     def _ask_design(self, system, prompt, what):
-        """The design call, inside box A too: it reads the provider there.
-
-        Plain strings go in; only the design (content and error) comes out.
-        """
-        system, prompt, what = str(system or ''), str(prompt or ''), str(what or '')
-        with _box_a_trusted(self.env):
-            result = self._ask_design_raw(system, prompt, what) or {}
-            return {
-                'content': str(result.get('content') or ''),
-                'error': str(result.get('error') or ''),
-            }
-
-    def _ask_design_raw(self, system, prompt, what):
         """One call to the Design chain, metered and logged on the turn."""
         from odoo.addons.pns_ai_mcp.utils.agent_engine import (
             llm_completion_for_agent,
@@ -1297,7 +1257,7 @@ class ChatbooSession(models.Model):
                 else 'Design %s in %.0f s (%d chars)'
                 % (what, seconds, len(content))
             )
-            engine.log_llm_inference(
+            engine._log_llm_inference(
                 getattr(audit, 'provider', None),
                 getattr(audit, 'usage_acc', None) or result.get('usage') or {},
                 endpoint='llm_response',
@@ -1324,7 +1284,7 @@ class ChatbooSession(models.Model):
 
     @api.model
     def canvas_available(self):
-        """True when some provider on this agent's chain has the Design tick."""
+        """True when the engine finds someone for the Design role on this agent."""
         try:
             return bool(self.env['ai.execution.engine'].get_providers_for_agent(
                 self._canvas_agent_code(), need='design',
@@ -1338,17 +1298,25 @@ class ChatbooSession(models.Model):
         return bool(job_id) and self.env['chatboo.canvas.job'].browse(job_id)._is_cancel_requested()
 
     @api.model
-    def _read_document(self, name, page=None, find=None):
+    def _documents_of_this_turn(self):
         session_id = self.env.context.get('ai_session_ref')
         session = self.sudo().browse(int(session_id)).exists() if session_id else None
         if not session or session.user_id.id != self.env.uid:
-            return turn_documents.read([], name)
-        return turn_documents.read(session.get_documents(), name, page=page, find=find)
+            return []
+        return session.get_documents()
 
-    # ── Registros marcados en la respuesta ────────────────────────────────
-    # Marcar una fila es nombrar un registro sin deletrearlo. El motor solo
-    # lee texto, así que la marca sale como frase junto al mensaje; estrechar
-    # el dataset por sí solo dejaba al modelo libre para buscar el nombre.
+    def _read_document(self, name, page=None, find=None):
+        return turn_documents.read(
+            self._documents_of_this_turn(), name, page=page, find=find,
+        )
+
+    def _documents(self):
+        return turn_documents.listing(self._documents_of_this_turn())
+
+    # ── Records marked in the answer ────────────────────────────────
+    # Ticking a row names a record without spelling it. The engine only
+    # reads text, so the mark goes out as a sentence with the message;
+    # narrowing the dataset alone left the model free to search the name.
 
     def get_marks(self):
         """Records the user ticked, as ``{model, id, label}``."""
@@ -1389,9 +1357,9 @@ class ChatbooSession(models.Model):
 
     @api.model
     def _gc_stale_query_data(self):
-        """Purga los datasets cacheados más antiguos que el TTL de frescura, para
-        que los blobs no se queden acumulados en sesiones de larga vida (aparte
-        de la retención de la sesión). Robusto: no falla el cron si algo va mal."""
+        """Purge cached datasets older than the freshness TTL, so blobs
+        do not pile up in long-lived sessions (apart from the session
+        retention). Robust: the cron does not fail if something goes wrong."""
         ttl = self._query_data_ttl_hours()
         if ttl <= 0:
             return
@@ -1997,26 +1965,31 @@ class ChatbooSession(models.Model):
         }
         return action, None
 
+    # A session belongs to whoever opened it. Handing it to someone else
+    # would put the giver's words into the other person's next turn.
+    def write(self, vals):
+        if (not self.env.su and 'user_id' in vals
+                and vals['user_id'] != self.env.uid):
+            raise AccessError(_('A Chatboo session stays with its owner.'))
+        return super().write(vals)
+
     def unlink(self):
-        """Borra en cascada los adjuntos del chat al eliminar la sesión.
+        """Cascade-delete the chat attachments when the session is deleted.
 
-        Las imágenes/ficheros del chat se guardan como ``ir.attachment`` con
-        ``res_model='chatboo.session'`` / ``res_id=<sesión>``. Odoo NO los borra
-        solo por esa relación (no es una FK), así que al eliminar el histórico
-        los borramos aquí para no dejar blobs huérfanos. Robusto: un fallo
-        borrando adjuntos no debe impedir eliminar la sesión.
+        Chat pictures/files are stored as ``ir.attachment`` with
+        ``res_model='chatboo.session'`` / ``res_id=<session>``. Odoo does NOT
+        delete them through that link alone (it is not an FK), so when the
+        history is deleted we delete them here to leave no orphan blobs.
+        Robust: a failure deleting attachments must not block deleting the session.
 
-        También pre-borra los ``chatboo.async.request`` ligados (el usuario no
-        tiene ACL unlink ahí) con ``lock_timeout`` corto: si un cron/reclaim
-        tiene un job zombie bloqueado, fallamos YA con mensaje claro en vez de
-        dejar el History colgado (el spinner va en shadow y parece que «no borra»).
+        It also deletes the linked ``chatboo.async.request`` first (the user has
+        no unlink ACL there) with a short ``lock_timeout``: if a cron/reclaim
+        holds a zombie job locked, we fail AT ONCE with a clear message instead
+        of leaving History hanging (the spinner is in shadow and it looks like «it won't delete»).
         """
-        # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        self.check_access_rights('unlink')
-        self.check_access_rule('unlink')
         if self.ids:
-            # 1) Jobs async primero (FK ON DELETE CASCADE también esperaría el
-            #    mismo lock; así controlamos timeout y mensaje).
+            # 1) Async jobs first (FK ON DELETE CASCADE would also wait on the
+            #    same lock; this way we control timeout and message).
             try:
                 self.env.cr.execute("SET LOCAL lock_timeout = '3s'")
             except Exception:
@@ -2036,10 +2009,10 @@ class ChatbooSession(models.Model):
                         "the Odoo service, then try again."
                     )) from exc
                 _logger.warning(
-                    "Chatboo: no se pudieron borrar async jobs de sesiones %s: %s",
+                    "Chatboo: could not delete async jobs of sessions %s: %s",
                     self.ids, exc, exc_info=True,
                 )
-                # Si no es lock, seguimos: el CASCADE de BD puede bastar.
+                # If it is not a lock, go on: the database CASCADE may be enough.
             finally:
                 try:
                     self.env.cr.execute("SET LOCAL lock_timeout = DEFAULT")
@@ -2052,15 +2025,10 @@ class ChatbooSession(models.Model):
                     ('res_id', 'in', self.ids),
                 ])
                 if atts:
-                    # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
-                    owner = {s.id: s.user_id.id for s in self.sudo()}
-                    own = atts.filtered(
-                        lambda a: a.create_uid.id in (False, owner.get(a.res_id)))
-                    (atts - own).write({'res_model': False, 'res_id': False})
-                    own.unlink()
+                    atts.unlink()
             except Exception:
                 _logger.warning(
-                    "Chatboo: no se pudieron borrar los adjuntos de las sesiones %s",
+                    "Chatboo: could not delete the attachments of sessions %s",
                     self.ids, exc_info=True,
                 )
         try:

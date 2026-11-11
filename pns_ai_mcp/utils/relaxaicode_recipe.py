@@ -11,12 +11,34 @@ from typing import Any, Dict, List, Optional, Tuple
 _MAX_MODULE_LITERAL_ELTS = 8
 
 
+def _reads_a_variable(node: ast.AST) -> bool:
+    """True when the expression reads a name other than the called function.
+
+    A pasted snapshot is pure data (``round(…)`` or ``date(…)`` at most).
+    ``('Users', env['res.users'].search_count([]))`` is computed live.
+    """
+    called = {
+        id(n.func) for n in ast.walk(node)
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+    }
+    return any(
+        isinstance(n, ast.Name) and id(n) not in called
+        for n in ast.walk(node)
+    )
+
+
 def _literal_collection_size(node: ast.AST) -> int:
+    """Pasted elements of a literal collection (computed ones do not count)."""
     if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
-        return len(node.elts)
-    if isinstance(node, ast.Dict):
-        return len(node.keys)
-    return 0
+        elts = node.elts
+    elif isinstance(node, ast.Dict):
+        elts = [
+            ast.Tuple(elts=[k, v], ctx=ast.Load()) if k is not None else v
+            for k, v in zip(node.keys, node.values)
+        ]
+    else:
+        return 0
+    return sum(1 for elt in elts if not _reads_a_variable(elt))
 
 
 def _is_none_literal(node: ast.AST) -> bool:
@@ -265,11 +287,8 @@ def _call_is_named(node: Optional[ast.AST], name: str) -> bool:
 
 def _function_body_without_docstring(node: ast.FunctionDef) -> List[ast.stmt]:
     body = list(node.body or [])
-    if (
-        body
-        and isinstance(body[0], ast.Expr)
-        and isinstance(getattr(body[0], 'value', None), (ast.Constant, ast.Str))
-    ):
+    # get_docstring reads Str (3.7) and Constant (3.8+) alike.
+    if ast.get_docstring(node, clean=False) is not None:
         return body[1:]
     return body
 
@@ -487,11 +506,7 @@ def ensure_date_param_coercion(code: str) -> Tuple[str, bool]:
     if not names:
         return src, False
     body = list(func.body or [])
-    if (
-        body
-        and isinstance(body[0], ast.Expr)
-        and isinstance(getattr(body[0], 'value', None), (ast.Constant, ast.Str))
-    ):
+    if ast.get_docstring(func, clean=False) is not None:
         first_real = body[1] if len(body) > 1 else None
     else:
         first_real = body[0] if body else None

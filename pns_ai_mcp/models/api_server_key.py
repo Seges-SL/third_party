@@ -20,6 +20,7 @@ Administrators see all.
 import logging
 
 from odoo import fields, models
+from odoo.addons.pns_base.utils.compat import ODOO_VERSION
 
 _logger = logging.getLogger(__name__)
 
@@ -61,7 +62,12 @@ class ExternalAPIServerKey(models.Model):
     )
     notes = fields.Char(string='Notes')
 
-    _sql_constraints = [
-        ('server_user_unique', 'UNIQUE(server_id, user_id)',
-         'This user already has a key for this server.'),
-    ]
+    if ODOO_VERSION >= 19:
+        _server_user_unique = models.Constraint(
+            'UNIQUE(server_id, user_id)',
+            'This user already has a key for this server.',
+        )
+    else:
+        _sql_constraints = [
+            ('server_user_unique', 'UNIQUE(server_id, user_id)', 'This user already has a key for this server.'),
+        ]

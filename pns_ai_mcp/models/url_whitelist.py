@@ -21,6 +21,7 @@ be proposed. This whitelist is the instance-level layer.
 
 import logging
 from odoo import api, fields, models, _
+from odoo.addons.pns_base.utils.compat import ODOO_VERSION
 
 from ..utils import mcp_ui
 from ..utils.import_export_guard import ensure_ai_admin
@@ -92,10 +93,15 @@ class URLWhitelist(models.Model):
         readonly=True,
     )
 
-    _sql_constraints = [
-        ('domain_kind_unique', 'UNIQUE(domain, kind)',
-         'This domain is already in the whitelist for that kind.'),
-    ]
+    if ODOO_VERSION >= 19:
+        _domain_kind_unique = models.Constraint(
+            'UNIQUE(domain, kind)',
+            'This domain is already in the whitelist for that kind.',
+        )
+    else:
+        _sql_constraints = [
+            ('domain_kind_unique', 'UNIQUE(domain, kind)', 'This domain is already in the whitelist for that kind.'),
+        ]
 
     @api.model
     def _match_whitelist_entry(self, hostname, kind='web'):

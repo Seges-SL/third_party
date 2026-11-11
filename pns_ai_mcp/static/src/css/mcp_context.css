@@ -1,10 +1,10 @@
-/* Archivo: static/src/css/mcp_context.css
-   Creado: 2025-11-22 22:23:42
-   Modificado: 2025-11-24 13:29:28
-   Descripción: Estilos para formularios y botones de contextos MCP */
+/* File: static/src/css/mcp_context.css
+   Created: 2025-11-22 22:23:42
+   Modified: 2025-11-24 13:29:28
+   Description: Styles for MCP context forms and buttons */
 
-/* Estilos para el campo content en contextos MCP */
-/* Selectores múltiples para asegurar que se aplique */
+/* Styles for the content field in MCP contexts */
+/* Several selectors to make sure it applies */
 .o_mcp_context_content textarea,
 .o_mcp_context_content .o_field_text textarea,
 .o_mcp_context_content .o_input textarea,
@@ -22,7 +22,7 @@ field[name="content"] textarea,
     padding: 8px !important;
 }
 
-/* Asegurar que el contenedor también tenga altura */
+/* Make sure the container also has a height */
 .o_mcp_context_content,
 .o_mcp_context_content .o_field_text,
 .o_mcp_context_content .o_input,
@@ -51,7 +51,7 @@ field[name="content"],
     display: block !important;
 }
 
-/* Botones de importación/exportación en la barra de herramientas */
+/* Import/export buttons in the toolbar */
 .o_control_panel .o_cp_buttons .o_mcp_context_toolbar_btn {
     margin-inline-end: 8px;
 }

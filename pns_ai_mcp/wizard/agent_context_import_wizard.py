@@ -3,11 +3,10 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Import agent contexts from a ZIP export."""
 
-import base64
-
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 
+from ..utils.compat import binary_bytes
 from .operation_result import context_zip_files_to_result
 
 
@@ -46,7 +45,7 @@ class AIAgentContextImportWizard(models.TransientModel):
         if not (self.filename or '').lower().endswith('.zip'):
             raise UserError(_('The file must be a .zip export from an AI agent.'))
 
-        zip_bytes = base64.b64decode(self.import_file)
+        zip_bytes = binary_bytes(self.import_file)
         result = self.env['ai.context'].import_agent_contexts_zip(
             self.agent_id, zip_bytes, replace_existing=self.replace_existing,
         )

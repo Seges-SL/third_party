@@ -8,199 +8,142 @@
 </head>
 <body>
 <style>
-  .pns-apps {
-    --apps-brand: #875A7B;
-    --apps-accent: #C4A35A;
-    --apps-ink: #2B2A29;
-    --apps-muted: #5c6570;
-    --apps-line: #d7deea;
-    --apps-paper: #f4f7fb;
-    max-width: 820px;
-    margin: 0 auto;
-    padding: 28px 20px 40px;
-    color: var(--apps-ink);
-    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-    line-height: 1.55;
-  }
-  .pns-apps * { box-sizing: border-box; }
-  .pns-apps-hero {
-    text-align: center;
-    padding: 8px 0 28px;
-    border-bottom: 4px solid var(--apps-accent);
-  }
-  .pns-apps-hero img {
-    width: 112px;
-    height: 112px;
-    border-radius: 26px;
-    border: 3px solid var(--apps-brand);
-    background: #fff;
-    display: block;
-    margin: 0 auto 16px;
-  }
-  .pns-apps-hero h1 {
-    margin: 0 0 8px;
-    color: var(--apps-brand);
-    font-size: 1.85rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-  }
-  .pns-apps-hero p {
-    margin: 0 auto;
-    max-width: 36em;
-    color: var(--apps-muted);
-    font-size: 1.05rem;
-  }
-  .pns-apps-card {
-    margin-top: 22px;
-    padding: 20px 22px 18px;
-    background: #fff;
-    border: 1px solid var(--apps-line);
-    border-radius: 14px;
-  }
-  .pns-apps-card.alt { background: var(--apps-paper); }
-  .pns-apps-card h2 {
-    margin: 0 0 12px;
-    color: var(--apps-brand);
-    font-size: 1.15rem;
-  }
-  .pns-apps-card p { margin: 0 0 10px; }
-  .pns-apps-card p:last-child { margin-bottom: 0; }
-  .pns-apps-grid { display: block; }
-  .pns-apps-grid ul { margin: 0; padding-left: 1.15em; }
-  .pns-apps-grid li { margin: 0 0 10px; }
-  .pns-apps-grid li:last-child { margin-bottom: 0; }
-  .pns-apps-steps { margin: 0; padding-left: 1.2em; }
-  .pns-apps-steps li { margin: 0 0 8px; }
-  .pns-apps table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.95rem;
-  }
-  .pns-apps th, .pns-apps td {
-    text-align: left;
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--apps-line);
-    vertical-align: top;
-  }
-  .pns-apps th { background: var(--apps-brand); color: #fff; font-weight: 600; }
-  .pns-apps tr:nth-child(even) td { background: #eef3f9; }
-  .pns-apps code {
-    font-family: Consolas, "Courier New", monospace;
-    font-size: 0.88em;
-    background: #e8eef6;
-    padding: 1px 5px;
-    border-radius: 4px;
-  }
-  .pns-apps-foot { margin-top: 18px; color: var(--apps-muted); font-size: 0.92rem; }
-  .pns-apps-foot a { color: var(--apps-brand); }
-  @media (min-width: 700px) {
-    .pns-apps-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; }
+.pns-apps * { box-sizing: border-box !important }
+.pns-apps-card p:last-child { margin-bottom: 0 !important }
+.pns-apps-grid li:last-child { margin-bottom: 0 !important }
+.pns-apps tr:nth-child(even) td { background: #eef3f9 !important }
+@media (min-width: 700px) {
+  .pns-apps-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 0 28px !important }
+
   }
 </style>
-<div class="pns-apps">
-  <header class="pns-apps-hero">
-    <img src="icon.png" alt="Base"/>
-    <h1>Base</h1>
-    <p>Shared foundation for every Patanegra Soft Suite module. Install this first. The other modules will not load without it.</p>
+<div class="pns-apps" style="--apps-brand: #875A7B; --apps-accent: #C4A35A; --apps-ink: #2B2A29; --apps-muted: #5c6570; --apps-line: #d7deea; --apps-paper: #f4f7fb; max-width: 820px; margin: 0 auto; padding: 28px 20px 40px; color: var(--apps-ink); font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; line-height: 1.55">
+  <header class="pns-apps-hero" style="text-align: center; padding: 8px 0 28px; border-bottom: 4px solid var(--apps-accent)">
+    <img src="icon.png" alt="Base" style="width: 112px; height: 112px; border-radius: 26px; border: 3px solid var(--apps-brand); background-color: #fff; display: block; margin: 0 auto 16px" />
+    <h1 style="margin: 0 0 8px; color: var(--apps-brand); font-size: 1.85rem; font-weight: 700; letter-spacing: -0.02em">Base</h1>
+    <p style="margin: 0 auto; max-width: 36em; color: var(--apps-muted); font-size: 1.05rem">Shared foundation for every Patanegra Soft Suite module. Install this first. The other modules will not load without it.</p>
   </header>
 
-  <section class="pns-apps-card">
-    <h2>Where to configure</h2>
-    <p>
+  <section class="pns-apps-card" style="margin-top: 22px; padding: 20px 22px 18px; background-color: #fff; border: 1px solid var(--apps-line); border-radius: 14px">
+    <h2 style="margin: 0 0 12px; color: var(--apps-brand); font-size: 1.15rem">Where to configure</h2>
+    <p style="margin: 0 0 10px">
       <strong>Nowhere.</strong> There is no page under Settings, no Technical
       menu and no module Settings. Base has nothing to paste and no
       company-level switch.
     </p>
-    <p>
+    <p style="margin: 0 0 10px">
       Install it first and leave it. If something looks like configuration,
       it belongs in the module that owns the feature (AI Engine, Geo, &hellip;).
     </p>
   </section>
 
-  <section class="pns-apps-card alt">
-    <h2>What it is</h2>
-    <p>
-      The shared foundation of every <code>pns_*</code> module. Install it
-      first. The others list <code>pns_base</code> in <code>depends</code>.
+  <section class="pns-apps-card alt" style="margin-top: 22px; padding: 20px 22px 18px; border: 1px solid var(--apps-line); border-radius: 14px; background: var(--apps-paper)">
+    <h2 style="margin: 0 0 12px; color: var(--apps-brand); font-size: 1.15rem">What it is</h2>
+    <p style="margin: 0 0 10px">
+      The shared foundation of every <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">pns_*</code> module. Install it
+      first. The others list <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">pns_base</code> in <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">depends</code>.
       This module never depends on them.
     </p>
-    <p>
+    <p style="margin: 0 0 10px">
       No customers, invoices or AI skills. Those stay in each product module.
       If another database needs the suite, it installs the same Base.
-      Customer packs live in <code>{client}_custom_*</code>, never here.
+      Customer packs live in <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">{client}_custom_*</code>, never here.
     </p>
   </section>
 
-  <section class="pns-apps-card">
-    <h2>What it does</h2>
-    <p>
+  <section class="pns-apps-card" style="margin-top: 22px; padding: 20px 22px 18px; background-color: #fff; border: 1px solid var(--apps-line); border-radius: 14px">
+    <h2 style="margin: 0 0 12px; color: var(--apps-brand); font-size: 1.15rem">What it does</h2>
+    <p style="margin: 0 0 10px">
       <strong>1. Old-style screens on Odoo 17, 18 and 19.</strong>
-      The <code>owl1</code> / <code>owl2</code> folders are for JavaScript
+      The <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">owl1</code> / <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">owl2</code> folders are for JavaScript
       (two different web toolkits). Screen XML is written the same in both,
-      in the old style (<code>attrs</code>, <code>&lt;tree&gt;</code>).
+      in the old style (<code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">attrs</code>, <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">&lt;tree&gt;</code>).
       Writing the new style in owl2 would break Odoo 15 and 16. Copying every
       screen would mean changing each form twice. Base translates the XML
       when Odoo 17+ loads it. You do not import anything; installing Base is
-      enough. On 13&ndash;16 it leaves the views alone.
+      enough. On 14&ndash;16 it leaves the views alone.
     </p>
-    <p>
+    <p style="margin: 0 0 10px">
       <strong>2. One name for jobs Odoo renamed.</strong>
       Same action, different function name or arguments per version
       (HTTP routes, user groups, cache). Call Base; Base talks to Odoo.
     </p>
-    <p>
+    <p style="margin: 0 0 10px">
       <strong>3. A small library.</strong>
       Toasts, the &ldquo;operation result&rdquo; screen, file paths inside
       the addon, and the Apps sheet that embeds each module&rsquo;s
-      <code>index.html</code>. Things every module would otherwise copy.
+      <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">index.html</code>. Things every module would otherwise copy.
     </p>
   </section>
 
-  <section class="pns-apps-card alt">
-    <h2>What it does not do</h2>
+  <section class="pns-apps-card alt" style="margin-top: 22px; padding: 20px 22px 18px; border: 1px solid var(--apps-line); border-radius: 14px; background: var(--apps-paper)">
+    <h2 style="margin: 0 0 12px; color: var(--apps-brand); font-size: 1.15rem">What it does not do</h2>
     <ul>
-      <li><strong>Not a business module</strong> &mdash; no CRM, partners, maps or AI engine. Those are other <code>pns_*</code> modules.</li>
+      <li><strong>Not a business module</strong> &mdash; no CRM, partners, maps or AI engine. Those are other <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">pns_*</code> modules.</li>
       <li><strong>Does not replace owl1 / owl2</strong> &mdash; those folders are still needed for JavaScript. Base only translates the shared screen XML on Odoo 17+.</li>
       <li><strong>No settings page</strong> &mdash; there is no API key and no company-level switch. If something looks like configuration, it belongs in the module that owns the feature.</li>
     </ul>
   </section>
 
-  <section class="pns-apps-card">
-    <h2>How to install</h2>
-    <ol class="pns-apps-steps">
-      <li>Install <code>pns_base</code> before any other Patanegra module on this database.</li>
-      <li>Leave it installed. Uninstalling it will break every <code>pns_*</code> module that depends on it.</li>
-      <li>Write new suite XML in old <code>attrs</code>/<code>&lt;tree&gt;</code> syntax. Do not hand-write Odoo 17+ view syntax in source.</li>
-      <li>For HTML reports and toasts, import <code>odoo.addons.pns_base.utils.ui_feedback</code> instead of inventing a new helper.</li>
+  <section class="pns-apps-card" style="margin-top: 22px; padding: 20px 22px 18px; background-color: #fff; border: 1px solid var(--apps-line); border-radius: 14px">
+    <h2 style="margin: 0 0 12px; color: var(--apps-brand); font-size: 1.15rem">How to install</h2>
+    <ol class="pns-apps-steps" style="margin: 0; padding-left: 1.2em">
+      <li style="margin: 0 0 8px">Install <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">pns_base</code> before any other Patanegra module on this database.</li>
+      <li style="margin: 0 0 8px">Leave it installed. Uninstalling it will break every <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">pns_*</code> module that depends on it.</li>
+      <li style="margin: 0 0 8px">Write new suite XML in old <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">attrs</code>/<code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">&lt;tree&gt;</code> syntax. Do not hand-write Odoo 17+ view syntax in source.</li>
+      <li style="margin: 0 0 8px">For HTML reports and toasts, import <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">odoo.addons.pns_base.utils.ui_feedback</code> instead of inventing a new helper.</li>
     </ol>
   </section>
 
-  <section class="pns-apps-card alt">
-    <h2>Family</h2>
-    <table>
+  <section class="pns-apps-card" style="margin-top: 22px; padding: 20px 22px 18px; background-color: #fff; border: 1px solid var(--apps-line); border-radius: 14px">
+    <h2 style="margin: 0 0 12px; color: var(--apps-brand); font-size: 1.15rem">Odoo versions</h2>
+    <p class="pns-apps-series" style="margin: 0 0 10px">
+      <span style="display: inline-block; margin: 0 6px 6px 0; padding: 3px 10px; border-radius: 12px; font-size: 0.9rem; font-weight: 600; background: var(--apps-brand); color: #fff">14.0</span><span style="display: inline-block; margin: 0 6px 6px 0; padding: 3px 10px; border-radius: 12px; font-size: 0.9rem; font-weight: 600; background: var(--apps-brand); color: #fff">15.0</span><span style="display: inline-block; margin: 0 6px 6px 0; padding: 3px 10px; border-radius: 12px; font-size: 0.9rem; font-weight: 600; background: var(--apps-brand); color: #fff">16.0</span><span style="display: inline-block; margin: 0 6px 6px 0; padding: 3px 10px; border-radius: 12px; font-size: 0.9rem; font-weight: 600; background: var(--apps-brand); color: #fff">17.0</span><span style="display: inline-block; margin: 0 6px 6px 0; padding: 3px 10px; border-radius: 12px; font-size: 0.9rem; font-weight: 600; background: var(--apps-brand); color: #fff">18.0</span><span style="display: inline-block; margin: 0 6px 6px 0; padding: 3px 10px; border-radius: 12px; font-size: 0.9rem; font-weight: 600; background: var(--apps-brand); color: #fff">19.0</span><span style="display: inline-block; margin: 0 6px 6px 0; padding: 3px 10px; border-radius: 12px; font-size: 0.9rem; font-weight: 600; background: var(--apps-brand); color: #fff">20.0</span>
+    </p>
+    <p style="margin: 0 0 10px">
+      Each one tested, with its flat branch.
+      Odoo 13 and older are not supported: Patanegra Soft Suite starts where
+      its AI can run (OWL for the chat, Python 3.7 for the engine).
+    </p>
+  </section>
+
+  <section class="pns-apps-card" style="margin-top: 22px; padding: 20px 22px 18px; background-color: #fff; border: 1px solid var(--apps-line); border-radius: 14px">
+    <h2 style="margin: 0 0 12px; color: var(--apps-brand); font-size: 1.15rem">Source code</h2>
+    <p style="margin: 0 0 10px">On GitHub: <a href="https://github.com/patanegra-soft/pns_base">patanegra-soft/pns_base</a>.</p>
+    <ul>
+      <li><code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">main</code> is one tree for every series: shared code in <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">common/</code> and one stack per OWL generation (<code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">owl1</code> for Odoo 14 and 15, <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">owl2</code> for 16 to 19, <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">owl3</code> for 20). Clone it to maintain several Odoo versions from one place.</li>
+      <li><code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">./install_flat.sh 19.0 &lt;dir&gt;</code> builds the flat module of a series. The branches <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">14.0</code> to <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">20.0</code> are that result, ready for the addons path.</li>
+      <li>Tests without a database (<code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">unit_tests/</code>, pytest) live in <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">main</code>. The Odoo test in <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">tests/</code> opens the web client in Chrome and fails on a JavaScript error.</li>
+    </ul>
+    <p style="margin: 0 0 10px">Bugs: an issue, with the bug form. Ideas and questions: Discussions.</p>
+  </section>
+
+  <section class="pns-apps-card alt" style="margin-top: 22px; padding: 20px 22px 18px; border: 1px solid var(--apps-line); border-radius: 14px; background: var(--apps-paper)">
+    <h2 style="margin: 0 0 12px; color: var(--apps-brand); font-size: 1.15rem">Family</h2>
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem">
       <thead>
-        <tr><th>Module</th><th>Where</th><th>Role</th></tr>
+        <tr><th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--apps-line); vertical-align: top; background: var(--apps-brand); color: #fff; font-weight: 600">Module</th><th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--apps-line); vertical-align: top; background: var(--apps-brand); color: #fff; font-weight: 600">Where</th><th style="text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--apps-line); vertical-align: top; background: var(--apps-brand); color: #fff; font-weight: 600">Role</th></tr>
       </thead>
       <tbody>
         <tr>
-          <td><code>pns_base</code></td>
-          <td>O13&ndash;O19+</td>
-          <td>This layer: old-style screens on 17+, one name for renamed Odoo APIs, small shared library</td>
+          <td style="text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--apps-line); vertical-align: top"><code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">pns_base</code></td>
+          <td style="text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--apps-line); vertical-align: top">O14 and O19</td>
+          <td style="text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--apps-line); vertical-align: top">This layer: old-style screens on 17+, one name for renamed Odoo APIs, small shared library</td>
         </tr>
         <tr>
-          <td>Other <code>pns_*</code></td>
-          <td>Same majors as each module</td>
-          <td>Must depend on Base; never the other way around</td>
+          <td style="text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--apps-line); vertical-align: top">Other <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">pns_*</code></td>
+          <td style="text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--apps-line); vertical-align: top">Same majors as each module</td>
+          <td style="text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--apps-line); vertical-align: top">Must depend on Base; never the other way around</td>
         </tr>
       </tbody>
     </table>
-    <p class="pns-apps-foot">
-      UI source in English. Layout: <code>common/</code> plus OWL1 (O13&ndash;14) and OWL2 (O15&ndash;19+) stacks.
+    <p class="pns-apps-foot" style="margin-top: 18px; color: var(--apps-muted); font-size: 0.92rem; margin: 0 0 10px">
+      UI source in English. Layout: <code style="font-family: Consolas, 'Courier New', monospace; font-size: 0.88em; background-color: #e8eef6; padding: 1px 5px; border-radius: 4px">common/</code> plus OWL1 (Odoo 14) and OWL2 (Odoo 15 and later) stacks.
     </p>
-    <p class="pns-apps-foot">
-      <a href="https://patanegra.com">PATANEGRA Soft</a>&trade;
-      &mdash; Apache License 2.0 (OSI approved). See <a href="LICENSE">LICENSE</a>
-      and <a href="NOTICE">NOTICE</a>.
+    <p class="pns-apps-foot" style="margin-top: 18px; color: var(--apps-muted); font-size: 0.92rem; margin: 0 0 10px">
+      <a href="https://patanegra.com" style="color: var(--apps-brand)">PATANEGRA Soft</a>&trade;
+      &mdash; Apache License 2.0 (OSI approved). See <a href="LICENSE" style="color: var(--apps-brand)">LICENSE</a>
+      and <a href="NOTICE" style="color: var(--apps-brand)">NOTICE</a>.
       PATANEGRA Soft, PATANEGRA Soft Suite and Chatboo are trademarks of
       PATANEGRA Soft SL. The Apache license does not grant trademark rights.
     </p>

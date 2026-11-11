@@ -7,8 +7,13 @@ import uuid
 from odoo.exceptions import UserError
 from odoo.tests import tagged, TransactionCase
 
-from odoo.addons.pns_ai_mcp.tests._helpers import ensure_test_agents
-from odoo.addons.pns_ai_mcp.utils.compat import user_add_group, user_has_group_direct
+from odoo.addons.pns_ai_mcp.tests._helpers import create_test_user, ensure_test_agents
+from odoo.addons.pns_ai_mcp.utils.skill_code_prefix import (
+    DEFAULT_SKILL_CODE_PREFIX,
+    DEFAULT_SKILL_COMMAND_PREFIX,
+    ICP_SKILL_CODE_PREFIX,
+    ICP_SKILL_COMMAND_PREFIX,
+)
 
 
 @tagged('post_install', '-at_install', 'pns_ai_mcp')
@@ -16,14 +21,16 @@ class TestSetSkillParameters(TransactionCase):
 
     def setUp(self):
         super().setUp()
+        # The instance may carry its own slash prefixes and language; the
+        # tests name skills and read messages as a clean database does.
+        self.env = self.env(context=dict(self.env.context, lang='en_US'))
+        ICP = self.env['ir.config_parameter'].sudo()
+        ICP.set_param(ICP_SKILL_CODE_PREFIX, DEFAULT_SKILL_CODE_PREFIX)
+        ICP.set_param(ICP_SKILL_COMMAND_PREFIX, DEFAULT_SKILL_COMMAND_PREFIX)
         ensure_test_agents(self.env)
         self.writer_group = self.env.ref('pns_ai_mcp.group_ai_writer')
-        demo = self.env.ref('base.user_demo', raise_if_not_found=False)
-        if not demo:
-            self.skipTest('base.user_demo no instalado — se evita create res.users')
-        self.user_a = demo
-        if not user_has_group_direct(self.user_a, self.writer_group):
-            user_add_group(self.user_a, self.writer_group)
+        writers = [self.env.ref('base.group_user').id, self.writer_group.id]
+        self.user_a = create_test_user(self.env, prefix='pns_set_params_a', groups=writers)
         self._uid = uuid.uuid4().hex[:8]
 
     def _slash(self, stem):
@@ -42,7 +49,7 @@ class TestSetSkillParameters(TransactionCase):
                 '    codes = codes\n'
                 'except NameError:\n'
                 '    codes = None\n'
-                'result = 1'
+                'result = {"formatted_text": "<p>ok</p>", "__return_direct__": True}'
             ),
         }
         vals.update(extra)

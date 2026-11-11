@@ -1,178 +1,79 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Monthly billing slash skill.
-
-Posted out_invoice untaxed totals by month (N months, year, range, or YTD).
-"""
+"""Posted customer invoices by month, drawn as a chart: last N months or one year."""
 from datetime import date
-import re
 
-result = {}
+try:
+    _months = int(months)
+except (NameError, TypeError, ValueError):
+    _months = 12
+_months = max(1, min(60, _months))
+try:
+    _year = int(year)
+except (NameError, TypeError, ValueError):
+    _year = None
+
 _today = date.today()
+if _year:
+    _start = date(_year, 1, 1)
+    _end = min(date(_year, 12, 31), _today)
+    _label = str(_year)
+else:
+    _y, _m = _today.year, _today.month - (_months - 1)
+    while _m <= 0:
+        _m += 12
+        _y -= 1
+    _start = date(_y, _m, 1)
+    _end = _today
+    _label = 'last %d months' % _months
 
-try:
-    _arguments = arguments
-except NameError:
-    _arguments = None
-try:
-    _periodo = periodo
-except NameError:
-    _periodo = None
-try:
-    _lugar = lugar
-except NameError:
-    _lugar = None
-try:
-    _fecha = fecha
-except NameError:
-    _fecha = None
-
-_parts = []
-for _x in (_arguments, _periodo, _lugar, _fecha):
-    if _x is None:
-        continue
-    if isinstance(_x, dict):
-        for _v in _x.values():
-            if _v is not None and str(_v).strip() and str(_v).strip().lower() not in ('none', 'null'):
-                _parts.append(str(_v).strip())
-    elif isinstance(_x, (list, tuple)):
-        for _v in _x:
-            if _v is not None and str(_v).strip():
-                _parts.append(str(_v).strip())
-    else:
-        _s = str(_x).strip()
-        if _s and _s.lower() not in ('none', 'null'):
-            _parts.append(_s)
-_blob = ' '.join(_parts).strip()
-_blob_l = _blob.lower()
-
-_help_words = (
-    '?', 'help', 'ayuda', 'options', 'opciones', 'params', 'usage', 'uso',
-    '/?', '/help', '/ayuda',
-)
-_is_help = False
-if _blob_l in _help_words:
-    _is_help = True
-elif _blob_l and re.match(r'^[?]+$', _blob_l):
-    _is_help = True
-elif _blob_l:
-    for _w in ('help', 'ayuda', 'options', 'opciones', 'params', 'usage'):
-        if re.search(r'(^|\s|/)' + _w + r'(\s|$|\?|!|\.)', _blob_l):
-            _is_help = True
-if _blob_l.find('?') >= 0 and len(_blob_l) <= 12:
-    _is_help = True
-
-if _is_help:
+if 'account.move' not in env:
     result = {
-        'formatted_text': (
-            '<div class="card border-0 shadow-sm" style="max-width:100%">'
-            '<div class="card-body">'
-            '<h5 class="card-title">/billing — options</h5>'
-            '<ul class="mb-2">'
-            '<li><code>/billing</code> — last <strong>12 months</strong></li>'
-            '<li><code>/billing 6</code> — last <strong>N months</strong> (1–12)</li>'
-            '<li><code>/billing 2025</code> — full <strong>year</strong></li>'
-            '<li><code>/billing 2024-2025</code> — year range</li>'
-            '<li><code>/billing ytd</code> — year to date</li>'
-            '</ul>'
-            '<p class="mb-0 text-muted small">Posted customer invoices '
-            '(out_invoice), untaxed amount by month.</p>'
-            '</div></div>'
-        ),
+        'formatted_text': '<p class="text-muted">Billing needs the Invoicing app.</p>',
         '__return_direct__': True,
         '__stop_after_direct__': True,
         '__no_footer__': True,
     }
 else:
-    _n_months = 12
-    _sd = None
-    _ed = str(_today)
-    _label = 'last 12 months'
-
-    if _blob_l in ('ytd', 'year to date', 'año en curso', 'ano en curso'):
-        _sd = '%04d-01-01' % _today.year
-        _label = 'YTD %s' % _today.year
-    else:
-        _m_range = re.search(
-            r'\b(19\d{2}|20\d{2})\s*[-–a]+\s*(19\d{2}|20\d{2})\b', _blob_l,
-        )
-        _m_year = re.search(r'\b(19\d{2}|20\d{2})\b', _blob)
-        _m_n = re.fullmatch(r'\s*([1-9]|1[0-2])\s*', _blob or '')
-        if _m_range:
-            y1, y2 = int(_m_range.group(1)), int(_m_range.group(2))
-            if y1 > y2:
-                y1, y2 = y2, y1
-            _sd = '%04d-01-01' % y1
-            _ed = '%04d-12-31' % y2
-            _label = '%s–%s' % (y1, y2)
-        elif _m_year and not re.search(r'\b([1-9]|1[0-2])\b', _blob or ''):
-            y = int(_m_year.group(1))
-            _sd = '%04d-01-01' % y
-            _ed = '%04d-12-31' % y
-            _label = str(y)
-        elif _m_n:
-            _n_months = int(_m_n.group(1))
-            _label = 'last %s months' % _n_months
-        if _sd is None:
-            y, m = _today.year, _today.month - (_n_months - 1)
-            while m <= 0:
-                m += 12
-                y -= 1
-            _sd = '%04d-%02d-01' % (y, m)
-
-    _bill_domain = [
+    _by_month = {}
+    _invoices = env['account.move'].search([
         ('move_type', '=', 'out_invoice'),
         ('state', '=', 'posted'),
-        ('invoice_date', '>=', _sd),
-        ('invoice_date', '<=', _ed),
-    ]
-    try:
-        _company_id = env.company.id
-    except Exception:
-        _company_id = False
-    if _company_id:
-        _bill_domain.append(('company_id', '=', _company_id))
-    invoices = env['account.move'].search(_bill_domain)
-    by_month = {}
-    for inv in invoices:
-        if not inv.invoice_date:
-            continue
-        key = inv.invoice_date.strftime('%Y-%m')
-        slot = by_month.setdefault(key, {'Amount': 0.0, 'Invoices': 0})
-        slot['Amount'] += inv.amount_untaxed
-        slot['Invoices'] += 1
-
+        ('invoice_date', '>=', str(_start)),
+        ('invoice_date', '<=', str(_end)),
+        ('company_id', '=', env.company.id),
+    ])
+    for _inv in _invoices:
+        _slot = _by_month.setdefault(
+            _inv.invoice_date.strftime('%Y-%m'), {'Amount': 0.0, 'Invoices': 0},
+        )
+        _slot['Amount'] += _inv.amount_untaxed
+        _slot['Invoices'] += 1
     rows = [
-        {
-            'Month': k,
-            'Amount': round(v['Amount'], 2),
-            'Invoices': v['Invoices'],
-        }
-        for k, v in sorted(by_month.items())
+        {'Month': key, 'Amount': round(val['Amount'], 2), 'Invoices': val['Invoices']}
+        for key, val in sorted(_by_month.items())
     ]
-    if not rows:
-        result = {
-            'formatted_text': (
-                '<div class="alert alert-info">No posted customer invoices '
-                'in period <strong>%s</strong> (%s — %s).</div>'
-                % (_label, _sd, _ed)
-            ),
-            '__return_direct__': True,
-            '__stop_after_direct__': True,
-            '__no_footer__': True,
-        }
-    else:
+    if rows:
         result = {
             'data': rows,
-            'summary': (
-                'Billing by month · %s (%s — %s). Untaxed amount; '
-                'posted out_invoice only.'
-                % (_label, _sd, _ed)
+            'summary': 'Billing · %s (%s to %s) · %s untaxed, %d invoices.' % (
+                _label, _start, _end,
+                format_amount(sum(r['Amount'] for r in rows), decimals=0),
+                len(_invoices),
             ),
-            # Chart-first: this skill returns a time-series chart (not sticky guess).
             'show_mode': 'show-chart',
             'chart_engine': 'echarts',
             '__return_direct__': True,
             '__stop_after_direct__': True,
+        }
+    else:
+        result = {
+            'formatted_text': (
+                '<p class="text-muted">No posted customer invoices from %s to %s.</p>'
+                % (_start, _end)
+            ),
+            '__return_direct__': True,
+            '__stop_after_direct__': True,
+            '__no_footer__': True,
         }

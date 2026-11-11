@@ -255,31 +255,6 @@ class AIContextDiscovery(models.Model):
             return True
 
     @api.model
-    def split_contexts_by_domain_index(self, contexts=None, user_locale=None):
-        """Split injectable contexts into always-on vs turn-scoped sets.
-
-        When domain-index inject is OFF, ``turn_scoped`` is empty and
-        ``always_on`` is the full injectable set (legacy monolithic cache).
-        """
-        contexts = contexts if contexts is not None else self._injectable_active_contexts()
-        contexts = contexts.filtered(
-            lambda c: c.active and context_roles.is_injectable(c.context_type),
-        )
-        inject = self._domain_index_inject_enabled()
-        indexed = set()
-        if inject:
-            indexed = self.get_discovery_indexed_codes(user_locale)
-        if not indexed:
-            return contexts, self.browse(), set(), inject
-
-        def _is_indexed(ctx):
-            return (ctx.base_code or ctx.code) in indexed or ctx.code in indexed
-
-        always_on = contexts.filtered(lambda c: not _is_indexed(c))
-        turn_scoped = contexts.filtered(_is_indexed)
-        return always_on, turn_scoped, indexed, inject
-
-    @api.model
     def build_bundle_payload(self, contexts, user_locale=None):
         """Assemble a discovery-shaped payload (header + parts + language rule)."""
         user_locale = self._normalize_user_locale(user_locale)

@@ -9,7 +9,7 @@
 
         <record id="module_category_ai" model="ir.module.category">
             <field name="name">Artificial Intelligence</field>
-            <field name="description">PNS AI ecosystem: providers, agents, skills, contexts, Chatboo.</field>
+            <field name="description">PNS AI ecosystem: providers, agents, skills, contexts.</field>
             <field name="sequence">90</field>
         </record>
 
@@ -47,7 +47,7 @@
             <field name="name">AI Administrator</field>
             <field name="comment">Full AI administration: providers, API keys, servers, users, logs, whitelist, system config.</field>
             <field name="category_id" ref="module_category_ai"/>
-            <field name="implied_ids" eval="[(4, ref('group_ai_writer')), (4, ref('group_ai_external_url')), (4, ref('group_ai_external_api'))]"/>
+            <field name="implied_ids" eval="[(4, ref('group_ai_writer')), (4, ref('group_ai_external_url')), (4, ref('group_ai_external_api')), (4, ref('group_ai_conversational'))]"/>
         </record>
 
     </data>

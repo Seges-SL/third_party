@@ -67,12 +67,6 @@
     background: transparent;
     border-color: #ced4da;
 }
-.o_pns_fit_chip--conversation { background: #17a2b8; }
-.o_pns_fit_chip--audio { background: #6f42c1; }
-.o_pns_fit_chip--vision { background: #28a745; }
-.o_pns_fit_chip--video { background: #fd7e14; }
-.o_pns_fit_chip--decision { background: #343a40; }
-.o_pns_fit_chip--design { background: #1565c0; }
 
 .o_pns_provider_list th[data-name="protocol"],
 .o_pns_provider_list td[data-name="protocol"] {
@@ -135,7 +129,7 @@
     max-width: none !important;
 }
 
-/* Only the model catalogue sits above the Chatboo overlay (1050).
+/* Only the model catalogue sits above a host's full-screen panel (1050).
    Every other dialog stays at Odoo's level, so many2one and date
    popups (about 1100, appended to body) remain visible. */
 body > .modal-backdrop:has(+ .modal.o_pns_model_picker_modal),

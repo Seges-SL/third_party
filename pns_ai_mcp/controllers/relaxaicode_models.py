@@ -14,12 +14,12 @@ from .relaxaicode_rows import (
 
 
 def _infer_id_model_map(namespace):
-    """Mapa {id: model} a partir de los recordsets vivos en el namespace del sandbox.
+    """Map {id: model} from the live recordsets in the sandbox namespace.
 
-    DETERMINISTA y AGNÓSTICO: no adivina ni hardcodea modelos; lee el modelo REAL
-    de los recordsets que el código creó (p.ej. ``emps = env['hr.employee'].search``).
-    Así el servidor sabe a qué modelo pertenece cada fila sin depender de que el
-    LLM añada ``__model``. Los ids ambiguos (mismo id en dos modelos) se descartan.
+    DETERMINISTIC and AGNOSTIC: it does not guess or hardcode models; it reads the REAL
+    model of the recordsets the code created (e.g. ``emps = env['hr.employee'].search``).
+    That way the server knows which model each row belongs to without relying on the
+    LLM adding ``__model``. Ambiguous ids (same id in two models) are dropped.
     """
     id_model = {}
     ambiguous = set()
@@ -28,7 +28,7 @@ def _infer_id_model_map(namespace):
             continue
         model = getattr(val, '_name', None)
         ids = getattr(val, 'ids', None)
-        # Recordset Odoo: _name (str) + ids (lista de int) + marcador _ids.
+        # Odoo recordset: _name (str) + ids (list of int) + _ids marker.
         if (not model or not isinstance(model, str)
                 or not isinstance(ids, (list, tuple))
                 or not hasattr(val, '_ids')):
@@ -50,18 +50,18 @@ _ENV_MODEL_RE = re.compile(r"""env\s*\[\s*['"]([a-zA-Z_][a-zA-Z0-9_.]*)['"]\s*\]
 
 
 def _models_from_code(code):
-    """Todos los modelos ``env['x']`` referenciados en el código."""
+    """Every ``env['x']`` model referenced in the code."""
     if not code or not isinstance(code, str):
         return set()
     return set(_ENV_MODEL_RE.findall(code))
 
 
 def _related_models_from_code(code, env, base_models):
-    """Comodelos de many2one citados en el código (p. ej. product_id → product.product).
+    """Many2one comodels cited in the code (e.g. product_id → product.product).
 
-    Sin hardcode de dominio: lee ``_fields`` del modelo base y el nombre del campo
-    en el propio fuente. Así un ranking por producto desde líneas de venta puede
-    enlazar a ``product.product`` aunque el recordset del namespace sea de líneas.
+    No domain hardcode: reads ``_fields`` of the base model and the field name
+    in the source itself. That way a ranking by product from sale lines can
+    link to ``product.product`` even if the namespace recordset holds lines.
     """
     extras = set()
     if not env or not code or not base_models:
@@ -90,7 +90,7 @@ def _norm_label(text):
 
 
 def _row_cell_values(row):
-    """Valores de celda comparables (sin meta): textos y números de la fila."""
+    """Comparable cell values (no meta): the row's texts and numbers."""
     texts = []
     nums = []
     if not isinstance(row, dict):
@@ -124,10 +124,10 @@ def _labels_match(a, b):
 
 
 def _technical_key_bonus(model, row):
-    """Bonus si el nombre técnico del modelo aparece en una clave de columna.
+    """Bonus if the technical model name appears in a column key.
 
-    Universal: usa solo tokens de ``model`` (p. ej. partner_id ↔ res.partner),
-    sin diccionarios de dominio ES/EN.
+    Universal: uses only tokens of ``model`` (e.g. partner_id ↔ res.partner),
+    no ES/EN domain dictionaries.
     """
     if not isinstance(row, dict) or not model:
         return 0
@@ -144,18 +144,18 @@ def _technical_key_bonus(model, row):
     return bonus
 
 
-# Puntuación mínima para creer a la memoria del turno: una celda tiene que
-# decir el nombre del registro (100 display_name / 80 name). El bonus por
-# nombre de columna solo no basta.
+# Minimum score to trust the turn memory: a cell has to
+# say the record name (100 display_name / 80 name). The column-name
+# bonus alone is not enough.
 _TURN_MEMORY_MIN_FIT = 80
 
 
 def _score_record_fit(env, model, rid, row):
-    """Puntuación de encaje registro↔fila (fórmula universal, sin hardcode de dominio).
+    """Record↔row match score (universal formula, no domain hardcode).
 
-    1) display_name / name coinciden con algún texto de la fila (fuerte).
-    2) Solape de valores: campos del registro vs celdas (medio).
-    3) Bonus si un token técnico del modelo está en el nombre de columna (débil).
+    1) display_name / name match some text of the row (strong).
+    2) Value overlap: record fields vs cells (medium).
+    3) Bonus if a technical model token is in the column name (weak).
     """
     if not env or not model or not rid:
         return -1
@@ -184,7 +184,7 @@ def _score_record_fit(env, model, rid, row):
         elif _labels_match(lab, name):
             score += 80
 
-    # Solape campo↔celda (acotado: no recorrer catálogos enormes).
+    # Field↔cell overlap (bounded: do not walk huge catalogs).
     fields_map = getattr(rec, '_fields', None) or {}
     checked = 0
     for fname, field in fields_map.items():
@@ -237,7 +237,7 @@ def _score_record_fit(env, model, rid, row):
 
 
 def _pick_best_model_fit(env, models, rid, row):
-    """Elige el candidato con mejor encaje; empate estricto → None (no adivinar)."""
+    """Pick the best-matching candidate; strict tie → None (do not guess)."""
     if not models:
         return None
     models = list(models)
@@ -270,14 +270,14 @@ def _resolve_row_model(
     rid, row, id_model_map, candidate_models, env, single_model=None,
     turn_models=None,
 ):
-    """Resuelve el modelo de una fila (fórmula universal).
+    """Resolve the model of a row (universal formula).
 
-    1. Un solo candidato con exists() → ese.
-    2. Varios → el de mayor encaje (display_name + solape de valores).
-    3. Si no hay env/candidatos: mapa id→model del namespace o single_model.
-    4. Último recurso: el modelo que este turno ya dio a ese id, y solo si la
-       fila sigue diciendo el nombre de ese registro.
-    Sin diccionarios de dominio (partner/product/cliente…).
+    1. A single candidate with exists() → that one.
+    2. Several → the best match (display_name + value overlap).
+    3. No env/candidates: the namespace id→model map or single_model.
+    4. Last resort: the model this turn already gave that id, and only if the
+       row still says that record's name.
+    No domain dictionaries (partner/product/cliente…).
     """
     mapped = (id_model_map or {}).get(rid) if rid else None
     matches = []
@@ -291,7 +291,7 @@ def _resolve_row_model(
         best = _pick_best_model_fit(env, matches, rid, row)
         if best:
             return best
-        # Empate o score 0: solo aceptar el mapa del namespace si también encaja.
+        # Tie or score 0: only accept the namespace map if it also matches.
         if mapped and mapped in matches:
             mapped_score = _score_record_fit(env, mapped, rid, row)
             if mapped_score > 0:
@@ -303,9 +303,9 @@ def _resolve_row_model(
         return single_model
     if single_model and not env:
         return single_model
-    # Memoria del turno: el id ya se leyó del ORM en un paso anterior. Se exige
-    # que la fila nombre a ese registro; un id repetido en otro modelo no
-    # hereda el enlace.
+    # Turn memory: the id was already read from the ORM in an earlier step. The
+    # row must name that record; an id repeated in another model does not
+    # inherit the link.
     remembered = (turn_models or {}).get(rid)
     if remembered:
         if not env:
@@ -316,7 +316,7 @@ def _resolve_row_model(
 
 
 def _turn_memory_models(controller):
-    """Ids que este turno ya colocó en un modelo, tal como los pasa el motor."""
+    """Ids this turn already placed in a model, as the engine passes them."""
     memory = getattr(controller, 'turn_record_models', None)
     if not isinstance(memory, dict):
         return {}
@@ -337,12 +337,12 @@ def _stamp_models(
     result, id_model_map, single_model=None, env=None, candidate_models=None,
     turn_models=None,
 ):
-    """Estampa ``__model`` en las filas de TODAS las listas tabulares.
+    """Stamp ``__model`` on the rows of ALL tabular lists.
 
-    Determinista y agnóstico: recordsets del namespace, modelos env['x'] del código,
-    comodeles many2one citados, y comprobación ``exists()`` cuando hay env.
-    No sobrescribe un modelo técnico ya presente. Una columna ``model`` con
-    texto libre (el nombre de un coche) no cuenta: no es ``fleet.vehicle``.
+    Deterministic and agnostic: namespace recordsets, env['x'] models in the code,
+    cited many2one comodels, and an ``exists()`` check when there is an env.
+    Does not overwrite a technical model already present. A ``model`` column with
+    free text (the name of a car) does not count: it is not ``fleet.vehicle``.
     """
     candidates = set(candidate_models or ())
     if single_model:
@@ -362,7 +362,7 @@ def _stamp_models(
                 if not _is_technical_model(item.get('__model'), env):
                     item['__model'] = declared
                 continue
-            # 0) XMLID en la fila → modelo+id inequívocos (p. ej. res.groups).
+            # 0) XMLID in the row → unambiguous model+id (e.g. res.groups).
             if env:
                 xm, xid = _model_id_from_xmlid_row(env, item)
                 if xm and xid:
@@ -381,7 +381,7 @@ def _stamp_models(
 
 
 def _iter_namespace_recordsets(namespace):
-    """Recordsets Odoo vivos en el namespace del sandbox (modelo, recordset)."""
+    """Live Odoo recordsets in the sandbox namespace (model, recordset)."""
     for key, val in (namespace or {}).items():
         if str(key).startswith('_'):
             continue
@@ -398,7 +398,7 @@ def _iter_namespace_recordsets(namespace):
 
 
 def _row_string_values(item):
-    """Valores textuales de una fila (etiqueta candidata), más largos primero."""
+    """Text values of a row (candidate label), longest first."""
     vals = []
     for key, val in (item or {}).items():
         kl = str(key).lower()
@@ -418,7 +418,7 @@ def _row_string_values(item):
 
 
 def _build_label_to_record_index(namespace):
-    """``label_norm → (model, id)`` solo si la etiqueta es única en el namespace."""
+    """``label_norm → (model, id)`` only if the label is unique in the namespace."""
     buckets = {}
     for model, rs in _iter_namespace_recordsets(namespace):
         for rec in rs:
@@ -457,7 +457,7 @@ def _build_label_to_record_index(namespace):
 
 
 def _count_tabular_id_coverage(result):
-    """(total_filas_dict, filas_sin_id)."""
+    """(total_dict_rows, rows_without_id)."""
     total = 0
     missing = 0
     for rows in _iter_all_tabular_row_lists(result):
@@ -473,14 +473,14 @@ def _count_tabular_id_coverage(result):
 def _backfill_missing_record_ids(
     result, namespace, env=None, candidate_models=None, single_model=None,
 ):
-    """Rellena ``id`` (y ``__model``) cuando el LLM olvidó el id en filas-registro.
+    """Fill in ``id`` (and ``__model``) when the LLM forgot the id in record rows.
 
-    Estructural / Principio 0:
-    1) Emparejar etiquetas de celda con display_name/name/_rec_name de recordsets
-       vivos en el sandbox (solo matches inequívocos).
-    2) Si queda hueco y hay un único modelo candidato: ``search`` exacto por
-       ``_rec_name`` del modelo.
-    Devuelve cuántas filas rellenó.
+    Structural / Principle 0:
+    1) Match cell labels with display_name/name/_rec_name of the recordsets
+       live in the sandbox (unambiguous matches only).
+    2) If a gap remains and there is a single candidate model: exact ``search`` on
+       the model's ``_rec_name``.
+    Returns how many rows it filled.
     """
     if not isinstance(result, dict):
         return 0
@@ -506,7 +506,7 @@ def _backfill_missing_record_ids(
                     break
             if _row_record_id(item):
                 continue
-            # Soft unique match (substring) solo si un único ref encaja.
+            # Soft unique match (substring) only if a single ref matches.
             hits = []
             for raw in _row_string_values(item):
                 lab = _norm_label(raw)
@@ -542,11 +542,11 @@ def _backfill_missing_record_ids(
 
 
 def _collect_record_refs(result, model_hint=None, env=None):
-    """Cita de ficha: un documento, no un mural de filas.
+    """Record citation: one document, not a wall of rows.
 
-    Si el resultado ya trae ``__records__``, se respeta (stamp de un header).
-    Si no, se cosechan ids tabulares y solo se publica cuando hay un único
-    registro. Los enlaces de celda no dependen de esta lista.
+    If the result already carries ``__records__``, it is kept (stamp of a header).
+    If not, tabular ids are harvested and only published when there is a single
+    record. Cell links do not depend on this list.
     """
     try:
         from odoo.addons.pns_ai_mcp.utils.record_cite import document_cite_refs

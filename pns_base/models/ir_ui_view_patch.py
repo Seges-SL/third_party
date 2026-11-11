@@ -28,14 +28,14 @@ from odoo import models, api
 
 _logger = logging.getLogger(__name__)
 
-# Prefijo de los módulos del ecosistema PNS (pns_ai_mcp, pns_environment_ribbon, ...).
+# Prefix of the PNS suite modules (pns_ai_mcp, pns_ribbon, ...).
 _PNS_MODULE_PREFIX = 'pns'
 
-# Pistas de respaldo para create()/write() sin xml_id (creación programática).
+# Fallback hints for create()/write() without xml_id (programmatic creation).
 _PNS_NAME_HINTS = ('pns', 'inherit.mcp')
 _PNS_MODEL_HINTS = ('pns', 'ai.', 'mcp.', 'relaxaicode')
 
-# Modificadores de vista soportados (Odoo 17+ los expresa como atributo con expresión).
+# Supported view modifiers (Odoo 17+ writes them as an attribute with an expression).
 _MODIFIER_KEYS = ('invisible', 'readonly', 'required', 'column_invisible')
 
 
@@ -80,7 +80,7 @@ def _hint(value, hints):
 
 
 def _record_is_pns(data):
-    """¿El <record> XML pertenece a un módulo PNS? (xml_id es la señal fiable)."""
+    """Does the XML <record> belong to a PNS module? (xml_id is the reliable signal)."""
     if _is_pns_module(_module_from_xmlid(data.get('xml_id'))):
         return True
     vals = data.get('values') or {}
@@ -92,12 +92,12 @@ def _record_is_pns(data):
 
 
 def _view_vals_look_pns(vals):
-    """Respaldo para ir.ui.view.create()/write() sin xml_id."""
+    """Fallback for ir.ui.view.create()/write() without xml_id."""
     return _hint(vals.get('name'), _PNS_NAME_HINTS) or _hint(vals.get('model'), _PNS_MODEL_HINTS)
 
 
 def _action_vals_look_pns(vals):
-    """Respaldo para ir.actions.act_window.create()/write() sin xml_id."""
+    """Fallback for ir.actions.act_window.create()/write() without xml_id."""
     return _hint(vals.get('name'), _PNS_NAME_HINTS) or _hint(vals.get('res_model'), _PNS_MODEL_HINTS)
 
 
@@ -133,7 +133,7 @@ def _normalize_act_window_view_modes(vals):
 
 
 def _leaf_to_expr(leaf):
-    """Una tupla de dominio ('campo', operador, valor) -> expresión Python (str)."""
+    """One domain leaf ('field', operator, value) -> Python expression (str)."""
     field, op, value = leaf[0], leaf[1], leaf[2]
     if op == '=':
         if value is False:
@@ -153,17 +153,17 @@ def _leaf_to_expr(leaf):
         return '%s not in %r' % (field, value)
     if op in ('>', '>=', '<', '<='):
         return '%s %s %r' % (field, op, value)
-    raise ValueError("operador de dominio no soportado: %r" % (op,))
+    raise ValueError("unsupported domain operator: %r" % (op,))
 
 
 def _domain_to_expr(domain):
     """
-    Dominio Odoo (notación prefija con '|','&','!' y AND implícito entre términos)
-    -> expresión Python para los modificadores invisible/readonly/required (O17+).
-    Conversor general: no depende de una tabla de cadenas conocidas.
+    Odoo domain (prefix notation with '|', '&', '!' and implicit AND between terms)
+    -> Python expression for the invisible/readonly/required modifiers (O17+).
+    A general converter: it does not depend on a table of known strings.
     """
     if not domain:
-        # Dominio vacío = siempre verdadero en Odoo.
+        # An empty domain is always true in Odoo.
         return 'True'
     tokens = list(domain)
     state = {'i': 0}
@@ -183,7 +183,7 @@ def _domain_to_expr(domain):
                 a = parse_one()
                 b = parse_one()
                 return '(%s and %s)' % (a, b)
-            raise ValueError("token de dominio no soportado: %r" % (tok,))
+            raise ValueError("unsupported domain token: %r" % (tok,))
         return _leaf_to_expr(tok)
 
     parts = []
@@ -191,12 +191,12 @@ def _domain_to_expr(domain):
         parts.append(parse_one())
     if len(parts) == 1:
         return parts[0]
-    # AND implícito entre términos de primer nivel.
+    # Implicit AND between top-level terms.
     return ' and '.join('(%s)' % p for p in parts)
 
 
 def _normalize_domain_tokens(domain):
-    """Corrige tokens '&amp;'/'|' etc. si el arch llegó con entidades XML."""
+    """Fix '&amp;'/'|' tokens when the arch arrived with XML entities."""
     if not isinstance(domain, (list, tuple)):
         return domain
     out = []
@@ -211,36 +211,37 @@ def _normalize_domain_tokens(domain):
 
 
 def _convert_attrs_match(match):
-    """Sustituye un attrs="{...}" por los modificadores con expresión equivalentes."""
+    """Replace an attrs="{...}" with the equivalent expression modifiers."""
     quote = match.group(1)
-    # etree puede dejar &amp; en el arch serializado; sin unescape '&' falla.
+    # etree may leave &amp; in the serialised arch; without unescape '&' fails.
     dict_str = html.unescape(match.group(2))
     try:
         attrs = ast.literal_eval(dict_str)
         if not isinstance(attrs, dict):
-            raise ValueError("attrs no es un dict")
+            raise ValueError("attrs is not a dict")
         for key in _MODIFIER_KEYS:
             if key in attrs:
                 attrs[key] = _normalize_domain_tokens(attrs[key])
     except Exception as e:
         _logger.error(
-            "PNS attrs: no se pudo parsear attrs=%s%s%s (%s); se deja sin convertir "
-            "y fallara de forma visible en O17+", quote, dict_str, quote, e)
+            "PNS attrs: cannot parse attrs=%s%s%s (%s); left unconverted, "
+            "it will fail visibly on O17+", quote, dict_str, quote, e)
         return match.group(0)
 
     parts = []
     for key in _MODIFIER_KEYS:
         if key in attrs:
             try:
-                parts.append('%s="%s"' % (key, _domain_to_expr(attrs[key])))
+                # The expression goes back into raw XML: '<', '&' or a quote must be escaped.
+                parts.append('%s="%s"' % (key, html.escape(_domain_to_expr(attrs[key]), quote=True)))
             except Exception as e:
                 _logger.error(
-                    "PNS attrs: no se pudo convertir %s=%r (%s); se deja sin convertir",
+                    "PNS attrs: cannot convert %s=%r (%s); left unconverted",
                     key, attrs[key], e)
                 return match.group(0)
     for key in attrs:
         if key not in _MODIFIER_KEYS:
-            _logger.warning("PNS attrs: modificador no soportado '%s' ignorado", key)
+            _logger.warning("PNS attrs: unsupported modifier '%s' ignored", key)
     return ' '.join(parts)
 
 
@@ -256,14 +257,14 @@ def _convert_attribute_attrs_tag(match):
     try:
         attrs = ast.literal_eval(dict_str)
         if not isinstance(attrs, dict):
-            raise ValueError("attrs no es un dict")
+            raise ValueError("attrs is not a dict")
         for key in _MODIFIER_KEYS:
             if key in attrs:
                 attrs[key] = _normalize_domain_tokens(attrs[key])
     except Exception as e:
         _logger.error(
-            "PNS attrs: no se pudo parsear <attribute name=attrs>%s (%s); "
-            "se deja sin convertir y fallara de forma visible en O17+",
+            "PNS attrs: cannot parse <attribute name=attrs>%s (%s); "
+            "left unconverted, it will fail visibly on O17+",
             dict_str, e)
         return match.group(0)
 
@@ -273,17 +274,17 @@ def _convert_attribute_attrs_tag(match):
             try:
                 parts.append(
                     '<attribute name="%s">%s</attribute>' % (
-                        key, _domain_to_expr(attrs[key]),
+                        key, html.escape(_domain_to_expr(attrs[key]), quote=False),
                     )
                 )
             except Exception as e:
                 _logger.error(
-                    "PNS attrs: no se pudo convertir <attribute> %s=%r (%s)",
+                    "PNS attrs: cannot convert <attribute> %s=%r (%s)",
                     key, attrs[key], e)
                 return match.group(0)
     for key in attrs:
         if key not in _MODIFIER_KEYS:
-            _logger.warning("PNS attrs: modificador no soportado '%s' ignorado", key)
+            _logger.warning("PNS attrs: unsupported modifier '%s' ignored", key)
     return ''.join(parts) if parts else match.group(0)
 
 

@@ -7,7 +7,6 @@
   "source_module": "pns_ai_chatboo",
   "triggers": [
     "canvas",
-    "dashboard",
     "in a tab",
     "new tab",
     "own tab",

@@ -18,57 +18,9 @@ class AIContextZip(models.Model):
 
     @api.model
     def action_import_from_zip(self):
-        """Abre el wizard de importación de contextos desde ZIP"""
+        """Open the wizard that imports contexts from a ZIP"""
         ensure_ai_admin(self.env)
         return self.env.ref('pns_ai_mcp.action_context_import_wizard').read()[0]
-
-    def _build_export_content(self, record, extension):
-        content = record.content or ''
-        filename = f"{record.code}{extension}"
-
-        if extension == '.py':
-            header_lines = ['# -*- coding: utf-8 -*-', f'# Archivo: {filename}']
-            if record.description:
-                header_lines.append(f'# Descripción: {record.description}')
-            if record.author:
-                header_lines.append(f'# Autor: {record.author}')
-            if record.version:
-                header_lines.append(f'# Versión: {record.version}')
-            if record.date_modified:
-                header_lines.append(f'# Modificado: {record.date_modified}')
-            header_lines.append(f'# Tipo: {record.context_type}')
-            if record.locale:
-                header_lines.append(f'# Locale: {record.locale}')
-            header_lines.append(f'# Activo: {str(record.active).lower()}')
-            header_lines.append('')
-            return '\n'.join(header_lines) + (content or '')
-
-        if extension == '.xml':
-            xml_lines = ['<!--', f'contexto: {record.code}']
-            if record.description:
-                xml_lines.append(f'descripción: {record.description}')
-            xml_lines.append(f'tipo: {record.context_type}')
-            xml_lines.append(f'activo: {str(record.active).lower()}')
-            xml_lines.append('-->')
-            xml_lines.append('')
-            return '\n'.join(xml_lines) + content
-
-        yaml_lines = ['---', f'contexto: {record.code}']
-        if record.description:
-            yaml_lines.append(f'descripción: {record.description}')
-        yaml_lines.append(f'tipo: {record.context_type}')
-        if record.locale:
-            yaml_lines.append(f'locale: {record.locale}')
-        if record.author:
-            yaml_lines.append(f'autor: {record.author}')
-        if record.version:
-            yaml_lines.append(f'versión: {record.version}')
-        if record.date_modified:
-            yaml_lines.append(f'fecha_modificacion: {record.date_modified}')
-        yaml_lines.append(f'activo: {str(record.active).lower()}')
-        yaml_lines.append('---')
-        yaml_lines.append('')
-        return '\n'.join(yaml_lines) + content
 
     @api.model
     def _contexts_zip_filename(self, scope_label):
@@ -379,49 +331,6 @@ class AIContextZip(models.Model):
             zip_bytes,
             replace_existing=replace_existing,
             force_agent=agent,
-        )
-
-    @api.model
-    def _build_context_zip_import_report_html(self, result, title=None):
-        files = result['files']
-        manifest = result.get('manifest') or {}
-        warnings = result.get('warnings') or []
-        errors = files.get('errors') or []
-        success_count = files['imported'] + files['updated']
-        status_class, status_icon, status_text, _ntype = pns_ui.derive_operation_status(
-            errors,
-            success_count,
-            failed_text=_('Import failed.'),
-            warnings_text=_('Import completed with warnings.'),
-            success_text=_('Import completed successfully.'),
-            extra_warnings=warnings,
-        )
-        sections = []
-        if manifest.get('scope'):
-            manifest_rows = [(_('Scope'), manifest['scope'])]
-            if manifest.get('context_count'):
-                manifest_rows.append(
-                    (_('Contexts in manifest'), manifest['context_count']),
-                )
-            sections.append({'title': _('Manifest'), 'rows': manifest_rows})
-        sections.append({
-            'title': _('Context files'),
-            'rows': [
-                (_('Created'), files['imported']),
-                (_('Updated'), files['updated']),
-                (_('Skipped (existing, not replaced)'), files['skipped']),
-                (_('Skipped (not in manifest)'), files.get('skipped_manifest', 0)),
-                (_('Protocol (protected)'), files['protocol_skipped']),
-            ],
-        })
-        return pns_ui.build_operation_report_html(
-            title,
-            status_text,
-            status_class,
-            status_icon,
-            sections=sections,
-            errors=errors,
-            warnings=warnings,
         )
 
     def action_open_import_zip_wizard(self):

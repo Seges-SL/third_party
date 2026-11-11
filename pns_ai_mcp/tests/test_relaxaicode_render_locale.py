@@ -8,10 +8,16 @@ the TransactionCase savepoint and poison the rest of the suite.
 """
 from odoo.tests import tagged, TransactionCase
 
+from odoo.addons.pns_ai_mcp.tests._helpers import SKIP_CONTACT_ORIGIN
+
 
 @tagged('post_install', '-at_install', 'pns_ai_mcp')
 class TestRelaxAICodeRenderLocale(TransactionCase):
-    """Contrato: locale activo del usuario → separadores + HTML alineado."""
+    """Contract: the user's active locale → separators + aligned HTML."""
+
+    def setUp(self):
+        super().setUp()
+        self.env = self.env(context=dict(self.env.context, **SKIP_CONTACT_ORIGIN))
 
     def _require_lang(self, code, decimal_point, thousands_sep, date_format):
         Lang = self.env['res.lang'].with_context(active_test=False)
@@ -27,7 +33,7 @@ class TestRelaxAICodeRenderLocale(TransactionCase):
         return lang
 
     def _env_for_lang(self, lang_code, decimal_point, thousands_sep, date_format):
-        """Usa el usuario del test con lang temporal (rollback del TransactionCase)."""
+        """Use the test user with a temporary lang (TransactionCase rollback)."""
         self._require_lang(lang_code, decimal_point, thousands_sep, date_format)
         self.env.user.write({'lang': lang_code})
         return self.env(user=self.env.user)
@@ -104,7 +110,7 @@ class TestRelaxAICodeRenderLocale(TransactionCase):
         )
 
     def test_multi_ranking_sibling_lists_render_both_tables(self):
-        """by_units + by_amount → dos tablas (no sobrescribir la primera)."""
+        """by_units + by_amount → two tables (do not overwrite the first one)."""
         from odoo.addons.pns_ai_mcp.utils.relaxaicode_render import (
             render_result_html,
             _result_groups,
@@ -182,7 +188,7 @@ class TestRelaxAICodeRenderLocale(TransactionCase):
         self.assertIn('/web#id=99', html)
 
     def test_fn_column_gets_name_link_not_icon_widget(self):
-        """FN (friendly name) enlaza el texto; no columna de icono externa."""
+        """FN (friendly name) links the text; no external icon column."""
         from odoo.addons.pns_ai_mcp.utils.relaxaicode_render import render_result_html
 
         html = render_result_html({
@@ -199,7 +205,7 @@ class TestRelaxAICodeRenderLocale(TransactionCase):
         self.assertNotIn('fa-external-link', html)
 
     def test_first_textual_column_gets_name_link_not_icon_widget(self):
-        """Con una sola fila (cardinalidad empatada), gana la primera textual."""
+        """With a single row (tied cardinality), the first textual column wins."""
         from odoo.addons.pns_ai_mcp.utils.relaxaicode_render import render_result_html
 
         html = render_result_html({
@@ -215,15 +221,15 @@ class TestRelaxAICodeRenderLocale(TransactionCase):
         self.assertIn('/web#id=33', html)
         self.assertIn('Ana Ejemplo', html)
         self.assertNotIn('fa-external-link', html)
-        # Solo la columna elegida es enlace; el resto queda texto plano.
+        # Only the chosen column is a link; the rest stays plain text.
         self.assertNotIn('>ana@example.com</a>', html)
         self.assertNotIn('>Oficina / Ciclo productivo</a>', html)
 
     def test_high_cardinality_textual_beats_bucket_column(self):
-        """Buckets repetidos no enlazan; la etiqueta casi única por fila sí.
+        """Repeated buckets do not link; the almost-unique label per row does.
 
-        Invariante genérico: preferir columna textual de mayor cardinalidad,
-        sin literales de dominio (ni 'Factura' ni 'Horizonte').
+        Generic invariant: prefer the textual column with the highest
+        cardinality, with no domain literals (no 'Factura', no 'Horizonte').
         """
         from odoo.addons.pns_ai_mcp.utils.relaxaicode_render import render_result_html
 
@@ -266,7 +272,7 @@ class TestRelaxAICodeRenderLocale(TransactionCase):
         self.assertNotIn('>2 meses</a>', html)
 
     def test_id_only_row_links_id_never_icon_widget(self):
-        """Sin columna label: el id enlaza; nunca columna-widget."""
+        """No label column: the id links; never a widget column."""
         from odoo.addons.pns_ai_mcp.utils.relaxaicode_render import render_result_html
 
         html = render_result_html({
@@ -282,13 +288,17 @@ class TestRelaxAICodeRenderLocale(TransactionCase):
         self.assertNotIn('o_chatboo_rowlink', html)
 
     def test_no_name_link_hint_allowlist_in_renderer(self):
-        """Ancla: no reintroducir allowlists de sinónimos de dominio."""
-        import inspect
+        """Anchor: do not bring back allowlists of domain synonyms."""
+        from pathlib import Path
         from odoo.addons.pns_ai_mcp.utils import relaxaicode_render as rr
 
-        src = inspect.getsource(rr)
+        folder = Path(rr.__file__).parent
+        src = '\n'.join(
+            p.read_text(encoding='utf-8')
+            for p in sorted(folder.glob('relaxaicode_render*.py'))
+        )
         self.assertNotIn('_NAME_LINK_HINTS', src)
-        # Sinónimos de negocio no deben volver como tuplas de matching.
+        # Business synonyms must not come back as matching tuples.
         self.assertNotIn("'usuario'", src)
         self.assertNotIn("'producto'", src)
         self.assertNotIn("'empleado'", src)

@@ -6,8 +6,7 @@ import json
 import logging
 
 from odoo import api, models, _
-# Seges: parche 30 (M11, seguridad). Ver docs/pendiente/parches_pns_ai.md
-from odoo.exceptions import AccessError, RedirectWarning, UserError
+from odoo.exceptions import RedirectWarning, UserError
 
 from ..utils.llm_usage import (
     advertise_cost,
@@ -26,8 +25,8 @@ class _LoggedProviderDriver:
     """Proxy: every successful ``chat_completion`` writes LLM log rows via the engine.
 
     Logging is a property of using a provider through the execution engine —
-    callers (ACL, OCR, Chatboo headless) do not opt in or out. Emits the same
-    ``llm_orchestration`` + ``llm_response`` pair as Chatboo streaming.
+    callers (ACL, OCR, headless hosts) do not opt in or out. Emits the same
+    ``llm_orchestration`` + ``llm_response`` pair as a streaming turn.
     """
 
     def __init__(self, driver, engine, provider, agent_code=None):
@@ -40,7 +39,7 @@ class _LoggedProviderDriver:
         response = self._driver.chat_completion(
             messages=messages, tools=tools, **kwargs,
         )
-        self._engine.log_provider_inference(
+        self._engine._log_provider_inference(
             self._provider,
             messages,
             response,
@@ -83,10 +82,10 @@ def _logged_tool_calls(tool_calls):
 
 
 def _is_context_overflow(error):
-    """True si el error indica que el prompt excede la ventana de contexto.
-    En ese caso el failover es inútil: cualquier proveedor con ventana similar
-    fallará igual (y se pierden segundos probándolos). Mejor abortar con un
-    mensaje claro orientado a la causa real (imágenes/base64 o historial)."""
+    """True if the error says the prompt exceeds the context window.
+    Then failover is useless: any provider with a similar window will fail
+    the same way (and seconds are lost trying them). Better to abort with a
+    clear message pointing at the real cause (images/base64 or history)."""
     text = str(error or '').lower()
     return any(marker in text for marker in _CTX_OVERFLOW_MARKERS)
 
@@ -101,7 +100,7 @@ class AIExecutionEngine(models.AbstractModel):
     Usage::
 
         engine = self.env['ai.execution.engine']
-        response = engine.chat_completion(
+        response = engine._chat_completion(
             agent_code='pns_ai_admin',
             messages=[{'role': 'user', 'content': 'Hello!'}],
             tools=[...],  # optional MCP tool definitions
@@ -119,12 +118,12 @@ class AIExecutionEngine(models.AbstractModel):
     failover, since any provider with a similar context window will fail too.
 
     Key methods:
-      - chat_completion(): Main entry point, tries providers in order
-      - resolve_provider(): Returns the primary provider without calling it
+      - _chat_completion(): Main entry point, tries providers in order
+      - _resolve_provider(): Returns the primary provider without calling it
       - _driver_for_provider(): Instantiates driver + universal inference log
-      - log_provider_llm_request / log_provider_llm_response: universal LLM log rows
-      - log_provider_inference(): headless pair (request+response) via same gate
-      - log_provider_failover(): Persists failover events to MCP logs
+      - _log_provider_llm_request / _log_provider_llm_response: universal LLM log rows
+      - _log_provider_inference(): headless pair (request+response) via same gate
+      - _log_provider_failover(): Persists failover events to MCP logs
     """
     _name = 'ai.execution.engine'
     _description = 'AI routing engine (agent → provider chain with failover)'
@@ -156,18 +155,6 @@ class AIExecutionEngine(models.AbstractModel):
             or stamp.get('client_label')
         )
         return code, door, label
-
-    # Seges: parche 30 (M11, seguridad). Ver docs/pendiente/parches_pns_ai.md
-    def _check_log_user(self, user_id=None):
-        """The public log_* write AI History rows on their own cursor. Outside
-        the system, only an internal user, and only for himself."""
-        if self.env.su:
-            return
-        if not self.env.user.has_group('base.group_user'):
-            raise AccessError(_('Only internal users can write AI History rows.'))
-        if user_id and user_id != self.env.uid:
-            raise AccessError(_(
-                'Only the system can write AI History rows for another user.'))
 
     def _get_agent(self, agent_code):
         """Resolve an agent code to an ai.agent record.
@@ -204,7 +191,7 @@ class AIExecutionEngine(models.AbstractModel):
         """
         agent = self._get_agent(agent_code)
         # Failover links are admin-managed infrastructure; inference clients
-        # (Chatboo, MCP) must resolve the chain without AI Administrator ACL.
+        # (chat, voice, MCP) must resolve the chain without AI Administrator ACL.
         return agent.sudo().provider_ids.filtered(
             lambda link: (
                 link.active
@@ -224,14 +211,18 @@ class AIExecutionEngine(models.AbstractModel):
                (id order). Same rule for every inference agent.
             4. If no active providers exist → clear error message
 
-        ``need`` (one of ``provider_fit.FITS``) drops providers that do not
-        admit it. No ``need`` is a text turn. No ticks: text only. A photo,
-        a clip, a video, a closed choice or a design needs its own tick. An
-        explicit ``provider_id`` obeys the same ticks.
+        ``need`` is an ``ai.provider.role`` code and drops providers that do
+        not hold it. No ``need`` is a text turn. No roles: text only. A
+        photo, a clip, a video, a closed choice or a design needs its own
+        role. An explicit ``provider_id`` obeys the same roles.
 
-        A dialogue chain that admits nobody for that role is not a chain for
-        it. The active providers that carry the tick are the door, in id
-        order. No new failover link is created.
+        A role is looked for in the agent's chain first, then among every
+        active provider; a provider that holds only that role goes first in
+        both. When nobody holds it, the role's fallback is asked the same
+        way (Parser → Conversation), unless this database turned it off. No
+        fallback: an empty chain and a line in the log naming the role and
+        the agent. No new failover
+        link is created.
 
         Runtime use only: never ``Link.create`` the catalogue. Each inference
         agent owns its own failover chain. No agent borrows another agent's
@@ -262,18 +253,37 @@ class AIExecutionEngine(models.AbstractModel):
                 'AI: using %s system provider(s) for agent "%s" (no chain)',
                 len(found), agent_code,
             )
-        fitted = found.filtered(lambda provider: provider._fits(need))
-        uncapped = self._without_capped(fitted)
-        chain = self._without_external_after_local(uncapped)
-        # Text stays on the dialogue chain. A role that chain does not cover
-        # uses every active provider that admits it. No new link.
-        if not chain and need and need != 'conversation' and failovers:
-            found = self.env['ai.provider'].sudo().search(
-                [('active', '=', True)], order='id',
-            )
+        Role = self.env['ai.provider.role']
+        asked = set()
+        while True:
             fitted = found.filtered(lambda provider: provider._fits(need))
             uncapped = self._without_capped(fitted)
             chain = self._without_external_after_local(uncapped)
+            # Text stays on the dialogue chain. A role that chain does not
+            # cover uses every active provider that holds it.
+            if not chain and need and need != 'conversation' and failovers:
+                every = self.env['ai.provider'].sudo().search(
+                    [('active', '=', True)], order='id',
+                )
+                fitted = every.filtered(lambda provider: provider._fits(need))
+                uncapped = self._without_capped(fitted)
+                chain = self._without_external_after_local(uncapped)
+            if chain or not need or need == 'conversation':
+                break
+            asked.add(need)
+            role = Role._by_code(need)
+            fallback = role.fallback_id.code if role.use_fallback else None
+            if not fallback or fallback in asked:
+                _logger.info(
+                    'AI: no provider holds role "%s" for agent "%s"',
+                    need, agent_code,
+                )
+                break
+            _logger.info(
+                'AI: no provider holds role "%s" for agent "%s"; asking "%s"',
+                need, agent_code, fallback,
+            )
+            need = fallback
         chain = self._specialists_first(chain, need)
         # 1. A UI pick only narrows the chain; an id off the chain is ignored.
         if provider_id:
@@ -392,9 +402,9 @@ class AIExecutionEngine(models.AbstractModel):
         if endpoint and not endpoint.startswith('http'):
             endpoint = 'https://' + endpoint
 
-        # Las tools se ejecutan in-process (ver AgentEngine); la LLM no reentra
-        # en /mcp, así que no se propaga X-Mcp-Token. La API key solo se guarda
-        # hasheada y no es recuperable para reenviarla.
+        # Tools run in-process (see AgentEngine); the LLM does not re-enter
+        # /mcp, so X-Mcp-Token is not passed on. The API key is only stored
+        # hashed and cannot be recovered to send it again.
         extra_headers = {}
 
         driver.initialize({
@@ -412,7 +422,7 @@ class AIExecutionEngine(models.AbstractModel):
             driver, self, provider, agent_code=agent_code,
         )
 
-    def log_role_without_provider(self, agent_code, need,
+    def _log_role_without_provider(self, agent_code, need,
                                   user_id=None, turn=None, turn_step=None,
                                   source_channel=None, client_label=None):
         """Persist that no provider carries the tick this call needed.
@@ -421,8 +431,6 @@ class AIExecutionEngine(models.AbstractModel):
         tick the box reads the log. The row lands on the same turn thread,
         so the Historial IA shows what was asked and what was missing.
         """
-        # Seges: parche 30 (M11, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        self._check_log_user(user_id)
         if 'ai.log' not in self.env:
             return
         from .ai_log import CAPABILITY_SKIPPED
@@ -451,18 +459,16 @@ class AIExecutionEngine(models.AbstractModel):
                 role, exc,
             )
 
-    def log_provider_failover(self, agent_code, failed_provider, next_provider, error,
+    def _log_provider_failover(self, agent_code, failed_provider, next_provider, error,
                               user_id=None, turn=None, turn_step=None,
                               source_channel=None, client_label=None):
         """Persist intra-agent provider failover to MCP logs.
 
-        El llamante (motor de chat) puede pasar el ``user_id`` real del turno y
-        su ``correlation_id``/``step_seq`` para que el failover caiga en el mismo
-        hilo del histórico y con el usuario humano (no Administrator). Si no se
-        pasan, se intenta resolver desde el request (compatibilidad).
+        The caller (chat engine) can pass the turn's real ``user_id`` and its
+        ``correlation_id``/``step_seq`` so the failover lands on the same
+        history thread and under the human user (not Administrator). If they
+        are not passed, it tries to resolve them from the request (compatibility).
         """
-        # Seges: parche 30 (M11, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        self._check_log_user(user_id)
         if 'ai.log' not in self.env:
             return
         Log = self.env['ai.log'].sudo()
@@ -506,7 +512,7 @@ class AIExecutionEngine(models.AbstractModel):
     def _resolve_log_threading(self, turn=None, turn_step=None):
         """Fill turn/step from context or HTTP request when omitted.
 
-        Chatboo turns store ``mcp_turn`` in the env context because
+        Streaming turns store ``mcp_turn`` in the env context because
         the SSE request object can be unbound mid-stream; prefer that over
         inventing a new id (which would orphan recipe-cache rows).
         A context turn takes its step from the same counter as the engine,
@@ -556,7 +562,7 @@ class AIExecutionEngine(models.AbstractModel):
             provider.model_id.name if provider.model_id else None
         ) or provider.model_name or provider.name or fallback
 
-    def log_provider_llm_request(
+    def _log_provider_llm_request(
         self, provider, *, agent_code=None, round_n=None,
         num_messages=0, num_tools=0, model_label=None, prompt_data=None,
         result_summary=None, user_id=None, turn=None, turn_step=None,
@@ -564,11 +570,9 @@ class AIExecutionEngine(models.AbstractModel):
     ):
         """Universal ORCH → LLM request row (endpoint ``llm_orchestration``).
 
-        Streaming (Chatboo) and headless callers use this — they do not write
+        Streaming and headless callers use this — they do not write
         ``ai.log`` themselves for provider traffic.
         """
-        # Seges: parche 30 (M11, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        self._check_log_user(user_id)
         if 'ai.log' not in self.env:
             return
         Log = self.env['ai.log'].sudo()
@@ -614,7 +618,7 @@ class AIExecutionEngine(models.AbstractModel):
         except Exception as exc:
             _logger.warning('AI engine: could not log LLM request: %s', exc)
 
-    def log_provider_llm_response(
+    def _log_provider_llm_response(
         self, provider, *, agent_code=None, content_preview='',
         tool_names=None, model_label=None, prompt_tokens=None,
         completion_tokens=None, total_tokens=None, cost_usd=None,
@@ -627,8 +631,6 @@ class AIExecutionEngine(models.AbstractModel):
         The row keeps the text and the tool calls (with their arguments)
         the model sent back.
         """
-        # Seges: parche 30 (M11, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        self._check_log_user(user_id)
         if 'ai.log' not in self.env:
             return
         Log = self.env['ai.log'].sudo()
@@ -682,7 +684,7 @@ class AIExecutionEngine(models.AbstractModel):
         except Exception as exc:
             _logger.warning('AI engine: could not log LLM response: %s', exc)
 
-    def log_llm_inference(
+    def _log_llm_inference(
         self,
         provider,
         usage,
@@ -709,8 +711,6 @@ class AIExecutionEngine(models.AbstractModel):
         A single row keeps what the model was sent (``prompt_data``) and what
         it answered (``result_data``) when the caller has them.
         """
-        # Seges: parche 30 (M11, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        self._check_log_user(user_id)
         if 'ai.log' not in self.env:
             return
         agent_code, source_channel, client_label = self._bind_log_identity(
@@ -718,7 +718,7 @@ class AIExecutionEngine(models.AbstractModel):
         )
         piece = advertise_cost(normalize_usage(usage or {}))
         if log_mode == 'pair':
-            self.log_provider_inference(
+            self._log_provider_inference(
                 provider,
                 [{'role': 'user', 'content': user_prompt or ''}],
                 {
@@ -778,24 +778,22 @@ class AIExecutionEngine(models.AbstractModel):
                 endpoint, exc,
             )
 
-    def log_provider_inference(self, provider, messages, response, tools=None,
+    def _log_provider_inference(self, provider, messages, response, tools=None,
                                agent_code=None, source_channel=None,
                                client_label=None, user_id=None, turn=None,
                                turn_step=None):
         """Universal trail for a completed non-stream provider call.
 
         Writes the same ORCH→LLM / LLM→ORCH pair as streaming, so headless
-        callers (OCR, ACL naming) and Chatboo share one logging gate.
+        callers (OCR, ACL naming) and streaming hosts share one logging gate.
         """
-        # Seges: parche 30 (M11, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        self._check_log_user(user_id)
         n_msgs = len(messages or [])
         n_tools = len(tools or [])
         model_label = self._provider_model_label(provider)
         agent_code, source_channel, client_label = self._bind_log_identity(
             agent_code, source_channel, client_label,
         )
-        self.log_provider_llm_request(
+        self._log_provider_llm_request(
             provider,
             agent_code=agent_code,
             num_messages=n_msgs,
@@ -837,7 +835,7 @@ class AIExecutionEngine(models.AbstractModel):
         content = (content or '').strip()
         piece = advertise_cost(normalize_usage(usage))
         ptok, ctok, ttok, cost_usd = usage_log_fields(piece)
-        self.log_provider_llm_response(
+        self._log_provider_llm_response(
             provider,
             agent_code=agent_code,
             content_preview=content,
@@ -871,7 +869,7 @@ class AIExecutionEngine(models.AbstractModel):
             },
         }
 
-    def chat_completion(self, agent_code, messages, tools=None, **kwargs):
+    def _chat_completion(self, agent_code, messages, tools=None, **kwargs):
         """Send a chat completion request, trying providers in priority order.
 
         Resolves the provider chain via ``get_providers_for_agent`` (explicit
@@ -892,9 +890,6 @@ class AIExecutionEngine(models.AbstractModel):
         :returns: OpenAI-shaped response dict
         :raises UserError: If all providers fail or context overflow detected
         """
-        # Seges: parche 31 (M12, seguridad). Ver docs/pendiente/parches_pns_ai.md
-        if not self.env.su:
-            raise AccessError(_('Only the system can call chat_completion.'))
         agent_code = self.env['ai.agent'].resolve_inference_agent_code(agent_code)
         provider_id = kwargs.pop('provider_id', None)
         need = kwargs.pop('need', None)
@@ -912,7 +907,7 @@ class AIExecutionEngine(models.AbstractModel):
         failed_provider = None
         for idx, provider in enumerate(providers):
             if idx > 0 and failed_provider:
-                self.log_provider_failover(
+                self._log_provider_failover(
                     agent_code, failed_provider, provider, last_error,
                 )
             try:
@@ -931,8 +926,8 @@ class AIExecutionEngine(models.AbstractModel):
                 failed_provider = provider
                 if _is_context_overflow(exc):
                     _logger.warning(
-                        'AI engine: agent=%s provider=%s rechazó por desbordamiento '
-                        'de contexto; se aborta SIN failover (inútil).',
+                        'AI engine: agent=%s provider=%s rejected for context '
+                        'overflow; aborting WITHOUT failover (pointless).',
                         agent_code, provider.name,
                     )
                     raise UserError(_(
@@ -950,7 +945,7 @@ class AIExecutionEngine(models.AbstractModel):
             'All providers failed for agent "%s". Last error: %s'
         ) % (agent_code, last_error))
 
-    def resolve_provider(self, agent_code):
+    def _resolve_provider(self, agent_code):
         """Return the first provider in the chain (for callers that resolve explicitly)."""
         agent_code = self.env['ai.agent'].resolve_inference_agent_code(agent_code)
         providers = self.get_providers_for_agent(agent_code)

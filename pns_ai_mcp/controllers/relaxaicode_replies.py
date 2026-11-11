@@ -10,19 +10,19 @@ import logging
 _logger = logging.getLogger(__name__)
 
 
-# ── Topes anti-DoS del resultado (H4). NO frenan la asignación en memoria
-# DURANTE el exec (eso lo acota el worker de Odoo vía limit_time_real /
-# limit_time_cpu / limit_memory_hard, ver docs/seguridad_dos_cajas.md), pero sí
-# evitan que una salida patológica inunde la respuesta SSE, el histórico y los
-# logs. Son comprobaciones O(1) (len de lista / len de str), sin serializar todo.
+# ── Anti-DoS caps on the result (H4). They do NOT stop memory allocation
+# DURING exec (the Odoo worker bounds that via limit_time_real /
+# limit_time_cpu / limit_memory_hard, see docs/seguridad_dos_cajas.md), but they
+# do keep a pathological output from flooding the SSE reply, the history and the
+# logs. They are O(1) checks (list len / str len), with no full serialization.
 # Fixed on purpose (PNS-18): a fuse, not a Settings knob and not an LLM
 # privacy cap. compose-model may still send a result that fits. ACL decides
 # what can be read; this does not hide fields.
-RELAXAICODE_MAX_RESULT_ROWS = 50000      # filas en data/groups
-RELAXAICODE_MAX_TEXT_CHARS = 2_000_000   # ~2 MB de texto/HTML por respuesta
+RELAXAICODE_MAX_RESULT_ROWS = 50000      # rows in data/groups
+RELAXAICODE_MAX_TEXT_CHARS = 2_000_000   # ~2 MB of text/HTML per reply
 
 
-# Only these __fmt_type__ values may paint formatted_text into Chatboo.
+# Only these __fmt_type__ values may paint formatted_text into the chat.
 # - server_side_python: set by maybe_attach_formatted_text (trusted renderer)
 # - author_html: set by skill_runtime / platform, never by free LLM sandbox
 # - local_*: client-side helpers in main.py
@@ -45,10 +45,10 @@ def _reject_untrusted_formatted_text(result, *, after_server_render=False):
 
 
 def _enforce_result_size_cap(result):
-    """Devuelve un mensaje de error si el resultado excede los topes; si no, None.
+    """Return an error message if the result goes over the caps; else None.
 
-    Sólo mira longitudes baratas (número de filas y tamaño de textos), nunca
-    serializa la estructura completa (evita amplificar el propio DoS).
+    Only looks at cheap lengths (row count and text size), never
+    serializes the whole structure (so it does not amplify the DoS itself).
     """
     if isinstance(result, dict):
         for _key in ('data', 'groups'):
@@ -75,11 +75,11 @@ def _enforce_result_size_cap(result):
 
 
 def _log_where():
-    """Devuelve 'modulo.funcion' del llamador para logs."""
+    """Return the caller's 'module.function' for logs."""
     frame = inspect.currentframe().f_back
     mod = frame.f_globals.get("__name__", "?")
     if "." in mod:
-        mod = mod.split(".")[-1]  # tools_relaxaicode en vez de ruta completa
+        mod = mod.split(".")[-1]  # tools_relaxaicode instead of the full path
     return f"{mod}.{frame.f_code.co_name}"
 
 
@@ -94,7 +94,7 @@ def _log_relaxaicode_execution(
     phase=None,
     return_mode=None,
 ):
-    """Registra ejecución relaxaicode (éxito o error) vía el controlador."""
+    """Log a relaxaicode run (success or error) through the controller."""
     try:
         additional_info = None
         if phase is not None or return_mode is not None:
@@ -113,11 +113,11 @@ def _log_relaxaicode_execution(
             agent_llm=agent_llm,
         )
     except Exception as log_err:
-        _logger.warning(f"[{_log_where()}] No se pudo registrar log MCP: {log_err}")
+        _logger.warning(f"[{_log_where()}] Could not record MCP log: {log_err}")
 
 
 def _format_user_facing_response(user_message, *, alert_class='alert-warning'):
-    """Terminal Chatboo message — plain human text, no JSON-RPC / error_type."""
+    """Terminal chat message — plain human text, no JSON-RPC / error_type."""
     import html
 
     text = (user_message or '').strip()
@@ -139,34 +139,34 @@ def _format_user_facing_response(user_message, *, alert_class='alert-warning'):
 
 
 def _format_error_response(error_code, error_message, additional_data=None, retryable=False):
-    # Formatea un error en el formato MCP estándar (content con text JSON).
+    # Format an error in the standard MCP format (content with JSON text).
     # Args:
-    #     error_code: Código de error JSON-RPC
-    #     error_message: Mensaje de error
-    #     additional_data: Diccionario con datos adicionales (opcional)
-    #     retryable: True si es un error del código generado por el LLM (validación
-    #         AST, error de ejecución, result no asignado...). En ese caso el error
-    #         se DEVUELVE al modelo como salida de tool para que se auto-corrija
-    #         (no lleva __direct_return__ ni formatted_text, así el motor lo reenvía
-    #         al LLM). El bucle ReAct está acotado por MAX_ROUNDS. retryable=False
-    #         (por defecto) = error terminal que se muestra directamente al usuario.
+    #     error_code: JSON-RPC error code
+    #     error_message: Error message
+    #     additional_data: Dict with extra data (optional)
+    #     retryable: True if it is an error in the LLM-generated code (AST
+    #         validation, run error, result not assigned...). Then the error
+    #         is RETURNED to the model as tool output so it fixes itself
+    #         (no __direct_return__ nor formatted_text, so the engine forwards it
+    #         to the LLM). The ReAct loop is bounded by MAX_ROUNDS. retryable=False
+    #         (default) = terminal error shown straight to the user.
     # Returns:
-    #     dict: Respuesta de error en formato MCP content
+    #     dict: error response in MCP content format
     msg = f"ERROR ({error_code}): {error_message}"
     if additional_data:
         msg += f"\nDetails: {json.dumps(additional_data, indent=2, default=str)}"
 
     if retryable:
-        # Error del código del LLM: volver al modelo para que regenere el código.
-        # Sin __direct_return__ ni formatted_text para que el motor NO lo vuelque al
-        # usuario y lo reenvíe como resultado de tool (auto-corrección ReAct).
+        # Error in the LLM code: go back to the model so it regenerates the code.
+        # No __direct_return__ nor formatted_text, so the engine does NOT dump it on
+        # the user and forwards it as a tool result (ReAct self-correction).
         return {
             'content': [{'type': 'text', 'text': msg}],
             'isError': True,
             '__force_retry__': True,
         }
 
-    # Error terminal: frase humana al chat (sin código JSON-RPC ni "Tipo: …").
+    # Terminal error: a human sentence to the chat (no JSON-RPC code nor "Tipo: …").
     return _format_user_facing_response(error_message)
 
 
@@ -178,7 +178,7 @@ def _relaxaicode_log_prompt(code, context_data):
 
 
 def _keyerror_missing_model_response(model_name, env=None, locale='en_US'):
-    """KeyError de modelo: sugerir vecinos del registry (sin contexto de dominio)."""
+    """Model KeyError: suggest registry neighbours (no domain context)."""
     from ..utils.model_name_suggest import (
         format_missing_model_hint,
         suggest_model_names,

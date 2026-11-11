@@ -20,10 +20,9 @@ or dangerous to express safely as raw CRUD (e.g. ACL least-privilege
 enforcement). The LLM only ever sees a closed vocabulary of ``code``
 values, exactly like it only sees a closed vocabulary of CRUD verbs.
 """
-# Seges: parche 32 (PNS-97, seguridad). Ver docs/pendiente/parches_pns_ai.md
-from odoo import _, api, fields, models
-from odoo.exceptions import AccessError, ValidationError
-from odoo.addons.pns_base.utils.compat import user_has_group
+from odoo import api, fields, models
+from odoo.exceptions import ValidationError
+from odoo.addons.pns_base.utils.compat import ODOO_VERSION, user_has_group
 
 
 class AiTrustedAction(models.Model):
@@ -75,41 +74,15 @@ class AiTrustedAction(models.Model):
     )
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        ('code_uniq', 'unique(code)',
-         'A trusted action with this code is already registered.'),
-    ]
-
-    # Seges: parche 32 (PNS-97, seguridad). Ver docs/pendiente/parches_pns_ai.md
-    def _check_settings_admin(self):
-        """A trusted action names a method that runs as whoever confirms the
-        plan: only Settings (or the system, as when loading data) defines it.
-        Inside a supervised plan, who proposed and confirmed it count too,
-        even in sudo()."""
-        from ..utils.privilege_cusp import settings_admin_error
-        ctx = self.env.context
-        in_plan = (ctx.get('ai_journal_user_id')
-                   or ctx.get('ai_journal_confirmed_by_uid'))
-        if not self.env.is_system() or (
-                in_plan and settings_admin_error(self.env)):
-            raise AccessError(_(
-                'Only a Settings administrator can change trusted actions.'))
-
-    # Seges: parche 32 (PNS-97, seguridad). Ver docs/pendiente/parches_pns_ai.md
-    @api.model_create_multi
-    def create(self, vals_list):
-        self._check_settings_admin()
-        return super().create(vals_list)
-
-    # Seges: parche 32 (PNS-97, seguridad). Ver docs/pendiente/parches_pns_ai.md
-    def write(self, vals):
-        self._check_settings_admin()
-        return super().write(vals)
-
-    # Seges: parche 32 (PNS-97, seguridad). Ver docs/pendiente/parches_pns_ai.md
-    def unlink(self):
-        self._check_settings_admin()
-        return super().unlink()
+    if ODOO_VERSION >= 19:
+        _code_uniq = models.Constraint(
+            'unique(code)',
+            'A trusted action with this code is already registered.',
+        )
+    else:
+        _sql_constraints = [
+            ('code_uniq', 'unique(code)', 'A trusted action with this code is already registered.'),
+        ]
 
     @api.model
     def _get(self, code):

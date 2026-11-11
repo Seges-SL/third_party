@@ -182,7 +182,7 @@ class OpenAPISpecGenerateWizard(models.TransientModel):
             provider = self.server_id._detection_llm_provider()
         except Exception:
             provider = None
-        self.env['ai.execution.engine'].log_llm_inference(
+        self.env['ai.execution.engine']._log_llm_inference(
             provider,
             usage or {},
             endpoint='openapi_spec_generate',

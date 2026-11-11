@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Auto-enlace de prosa con refs (model, id, name) ya resueltas en el turno.
+"""Auto-link prose with (model, id, name) refs already resolved in the turn.
 
-Agnóstico de dominio: no ramifica por modelo ni por sinónimos de cabecera.
-Solo enlaza etiquetas exactas presentes en ``collected_records``.
+Domain-agnostic: does not branch by model or by header synonyms.
+Only links exact labels present in ``collected_records``.
 """
 from __future__ import annotations
 
@@ -157,12 +157,12 @@ def _already_linked(text, label, rec_id):
 
 
 def linkify_prose(text, records, *, links_off=False):
-    """Envuelve etiquetas de ``records`` en Markdown ``[label](/web#…)``.
+    """Wrap labels from ``records`` in Markdown ``[label](/web#…)``.
 
-    - No inventa ids: solo usa refs del argumento.
-    - No vuelve a enlazar si la etiqueta ya apunta a ese id.
-    - Opt-out: ``links_off=True`` → texto intacto.
-    - Empates: etiquetas más largas primero.
+    - Does not invent ids: only uses refs from the argument.
+    - Does not link again if the label already points to that id.
+    - Opt-out: ``links_off=True`` → text untouched.
+    - Ties: longer labels first.
     """
     if links_off or not text or not isinstance(text, str):
         return text
@@ -199,7 +199,7 @@ def linkify_prose(text, records, *, links_off=False):
             continue
         url = _record_form_md_url(model, rec_id)
         md = '[%s](%s)' % (label, url)
-        # Word-boundary cuando el label es “palabra”; si no (códigos con /), find.
+        # Word-boundary when the label is a “word”; otherwise (codes with /), find.
         if re.search(r'\w', label) and not re.search(r'[/\\]', label):
             pattern = re.compile(r'(?<!\[)\b' + re.escape(label) + r'\b(?!\]\()')
             out, n = pattern.subn(md, out, count=1)
@@ -208,7 +208,7 @@ def linkify_prose(text, records, *, links_off=False):
         idx = out.find(label)
         while idx >= 0:
             before = out[max(0, idx - 1):idx]
-            # Ya dentro de [label](
+            # Already inside [label](
             if before == '[':
                 idx = out.find(label, idx + len(label))
                 continue

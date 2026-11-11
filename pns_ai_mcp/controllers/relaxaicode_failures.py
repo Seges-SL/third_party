@@ -18,8 +18,12 @@ _logger = logging.getLogger(__name__)
 
 
 def _exec_error_response(controller, exec_error, code, safe_context, agent_llm,
-                         context_data, phase, return_mode):
-    """The reply for an exception raised while the code ran, logged on the turn."""
+                         context_data, phase, return_mode, env):
+    """The reply for an exception raised while the code ran, logged on the turn.
+
+    *env* is the run's real Environment: ``safe_context['env']`` is the
+    sandbox wrapper (no ``cr``), and the code may have rebound it.
+    """
     from odoo.exceptions import (
         AccessError, MissingError, UserError, ValidationError,
     )
@@ -73,9 +77,9 @@ def _exec_error_response(controller, exec_error, code, safe_context, agent_llm,
         )
         return error_response
 
-    # Log adicional para NameError específicamente
+    # Extra log for NameError specifically
     if error_type == 'NameError' and 'env' in error_msg.lower():
-        _logger.warning(f"[{_log_where()}] NameError con 'env' - posible contexto corrupto")
+        _logger.warning(f"[{_log_where()}] NameError with 'env' - possibly corrupt context")
 
     # RecursionError leftover (e.g. intentional recursion that blew the
     # stack). Point the LLM at the common recipe-shadow mistake.
@@ -101,7 +105,7 @@ def _exec_error_response(controller, exec_error, code, safe_context, agent_llm,
         )
         return error_response
 
-    # TypeError: list/dict sobre field.selection callable (cualquier serie).
+    # TypeError: list/dict over a callable field.selection (any series).
     if error_type == 'TypeError':
         from ..utils.error_ux import (
             format_bool_membership_hint,
@@ -129,9 +133,9 @@ def _exec_error_response(controller, exec_error, code, safe_context, agent_llm,
             )
             return error_response
 
-    # KeyError: sugerir modelos del registry (el motor se conoce vía Odoo).
+    # KeyError: suggest models from the registry (the engine is known through Odoo).
     if error_type == 'KeyError':
-        # En Python 3, str(KeyError('x')) es 'x'. No tiene el prefijo "KeyError: "
+        # In Python 3, str(KeyError('x')) is 'x'. It has no "KeyError: " prefix
         model_name = error_msg.strip("'").strip('"')
         if model_name:
             _locale = safe_context.get(
@@ -139,7 +143,7 @@ def _exec_error_response(controller, exec_error, code, safe_context, agent_llm,
             )
             error_response = _keyerror_missing_model_response(
                 model_name,
-                env=safe_context.get('env'),
+                env=env,
                 locale=_locale,
             )
             _log_relaxaicode_execution(
@@ -151,14 +155,14 @@ def _exec_error_response(controller, exec_error, code, safe_context, agent_llm,
             )
             return error_response
 
-    # Si hay un error durante exec(), capturarlo y devolverlo
-    # CRÍTICO: Si es NameError con 'env', verificar si el código realmente intentó usar env
+    # If there is an error during exec(), catch it and return it
+    # CRITICAL: If it is a NameError with 'env', check whether the code really tried to use env
     if error_type == 'NameError' and 'env' in error_msg.lower():
-        # Verificar si el código generado realmente contiene 'env'
-        pass  # NameError con env - ya logueado arriba
+        # Check whether the generated code really contains 'env'
+        pass  # NameError with env - already logged above
 
-    # Error de ejecución del código del LLM: devolver al modelo para que
-    # lo corrija (retryable). El bucle ReAct está acotado por MAX_ROUNDS.
+    # Execution error in the LLM's code: return it to the model so it
+    # fixes it (retryable). The ReAct loop is bounded by MAX_ROUNDS.
     if (
         error_type == 'ValueError'
         and 'unsupported format character' in (error_msg or '')
@@ -214,10 +218,10 @@ def _missing_result_response(controller, code, safe_context, agent_llm,
         'code_type': str(type(code)),
         'has_result_key': 'result' in safe_context,
         'has_output_key': 'output' in safe_context,
-        'all_context_keys': list(safe_context.keys())[:30]  # Todas las claves para diagnóstico completo
+        'all_context_keys': list(safe_context.keys())[:30]  # All keys for a full diagnosis
     }
-    # El diagnóstico se devuelve en la respuesta JSON que el cliente MCP recibe
-    # Está en content[0].text como JSON serializado
+    # The diagnosis is returned in the JSON response the MCP client gets
+    # It is in content[0].text as serialized JSON
     error_response = _format_error_response(
         -32602,
         '[MANDATORY:RESULT] Code did not assign value to variable "result". [REQUIRED] Include line: result = {...} at end of code.',
@@ -278,7 +282,7 @@ def _tool_error_response(controller, e):
     error_type = type(e).__name__
     error_data = {'error_type': error_type}
 
-    # KeyError: sugerir modelos del registry instalado.
+    # KeyError: suggest models from the installed registry.
     if error_type == 'KeyError':
         model_name = error_msg.strip("'").strip('"')
         if model_name:
@@ -304,7 +308,7 @@ def _tool_error_response(controller, e):
         field_name = field_match.group(1) if field_match else "unknown"
         error_msg += f" [HINT] The field '{field_name}' in your domain filter is likely invalid for this model. Verify correct field names with get_context or ir.model.fields."
 
-    # Transacción READ ONLY (caja A): el ORM intentó escribir de forma colateral
+    # READ ONLY transaction (box A): the ORM tried a side-effect write
     if 'read-only' in error_msg.lower() or error_type == 'ReadOnlySqlTransaction':
         error_msg += (
             ' [HINT] The query caused a side-effect write (mail, tracking, '

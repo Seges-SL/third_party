@@ -97,7 +97,7 @@ class DirectDeliveryMixin:
                 turn, _final, content_buffer, remote_llm_format, session_id,
             )
 
-            # /compose-agent candado: local HTML when compose-model is off.
+            # /compose-agent lock: local HTML when compose-model is off.
             if (
                 not remote_llm_format
                 and should_force_turn_payload(
@@ -107,7 +107,7 @@ class DirectDeliveryMixin:
                 )
             ):
                 _forced_html = self._tool_loop_render_forced(turn.last_tabulable_payload)
-            # 1b desactivado: nunca forzar prior_query_data a la burbuja.
+            # 1b disabled: never force prior_query_data into the bubble.
 
             if _forced_html:
                 turn.table_already_delivered = True
@@ -344,9 +344,9 @@ class DirectDeliveryMixin:
                     "content": turn.direct_formatted,
                 }
         elif turn.stop_after_direct or skip_table_footer:
-            # Skill HTML / lacónico / stop explícito: sin 2.ª vuelta LLM.
-            # Si es skill y el proveedor no es lacónico, pie cálido LOCAL
-            # (servidor) — humanos lo echan de menos; Sonnet inventaba el año.
+            # Skill HTML / laconic / explicit stop: no 2nd LLM round.
+            # If it is a skill and the provider is not laconic, a warm LOCAL footer
+            # (server) — humans miss it; Sonnet made up the year.
             if turn.local_warm_footer and turn.direct_formatted:
                 from .mcp_tool_payload import append_local_warm_footer
                 turn.direct_formatted = append_local_warm_footer(
@@ -358,8 +358,8 @@ class DirectDeliveryMixin:
                 yield {"event": "replace", "content": turn.direct_formatted or ''}
             return True
         elif round_n >= MAX_ROUNDS:
-            # Última ronda permitida: entregar tabla sin exigir pie LLM extra.
-            # Un lookup sin marcar (catálogo + registros) no es la respuesta.
+            # Last allowed round: deliver the table without asking for an extra LLM footer.
+            # An unmarked lookup (catalog + records) is not the answer.
             if turn.last_tool_unmarked_probe and not turn.delivered_marked:
                 return True
             if turn.local_warm_footer and turn.direct_formatted:
@@ -434,7 +434,7 @@ class DirectDeliveryMixin:
         return _hide_table
 
     def _tool_loop_table_then_footer(self, turn, messages):
-        # Modelo capaz: tabla + pie conversacional breve (sin cifras).
+        # Capable model: table + short conversational footer (no figures).
         if turn.direct_formatted:
             turn.delivered_html = turn.direct_formatted
             yield {"event": "replace", "content": turn.direct_formatted}
@@ -550,8 +550,8 @@ class DirectDeliveryMixin:
             and isinstance(tool_args, dict)
             and tool_args.get('return_mode') == 'inspect_result'
         )
-        # compose-agent + tabla: stub al modelo y pintar aquí
-        # aunque el payload no traiga __return_direct__ (V0MJ).
+        # compose-agent + table: stub to the model and paint here
+        # even if the payload has no __return_direct__ (V0MJ).
         if not _unmarked_probe and local_owns_tabular_paint(
             remote_llm_format, turn._payload, force_retry=_force_retry,
             inspect_only=_inspect_only,
@@ -621,7 +621,7 @@ class DirectDeliveryMixin:
             turn.remote_tabular_handoff = (
                 turn._payload if isinstance(turn._payload, dict) else None
             )
-            # Handoff counts as delivery for candado 1a —
+            # Handoff counts as delivery for lock 1a —
             # otherwise a Markdown answer gets an HTML+chart
             # table re-injected at turn end.
             turn.table_already_delivered = True
@@ -631,16 +631,16 @@ class DirectDeliveryMixin:
             if is_chat_deliverable(turn._payload):
                 turn.delivered_marked = True
             self._basket_push(turn, turn._payload, _tool_code)
-            # HTML de skill/código (author_html): sin 2.ª vuelta de
-            # pie — el modelo inventaba años o cifras.
-            # Tablas server_side_python: pie solo si foot-verbose
-            # (se decide más abajo con skip_table_footer).
+            # Skill/code HTML (author_html): no 2nd footer
+            # round — the model made up years or figures.
+            # server_side_python tables: footer only if foot-verbose
+            # (decided further down with skip_table_footer).
             if is_author_html_payload(turn._payload):
                 turn.stop_after_direct = True
-                # Humanos quieren pie; el LLM inventaba el año →
-                # pie fijo del servidor (traducible), sin 2.ª vuelta.
-                # Pero cada skill decide: puede omitirlo (listados
-                # con su propio contador) o componer el suyo.
+                # Humans want a footer; the LLM made up the year →
+                # fixed server footer (translatable), no 2nd round.
+                # But each skill decides: it may skip it (listings
+                # with their own counter) or compose its own.
                 if not skip_table_footer:
                     from .mcp_tool_payload import (
                         resolve_author_footer,

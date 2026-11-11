@@ -43,6 +43,7 @@
      * @param {Array} [turn.images]
      * @param {Array} [turn.imageNames]
      * @param {Array} [turn.files]
+     * @param {boolean} [turn.resultNote] - the message is a write outcome for the AI
      * @returns {Object}
      */
     function buildPayload(turn) {
@@ -67,6 +68,9 @@
         }
         if (turn.files && turn.files.length) {
             payload.files = turn.files;
+        }
+        if (turn.resultNote) {
+            payload.result_note = true;
         }
         return payload;
     }

@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Resolver estructural de etiquetas Selection (cualquier modelo/campo/serie).
+"""Structural resolver of Selection labels (any model/field/series).
 
-``field.selection`` puede ser lista, callable o nombre de método en Odoo 14–19.
-Iterarlo a ciegas (``list(field.selection)``) levanta TypeError. Este helper
-usa el resolver oficial; no conoce modelos ni campos de negocio.
+``field.selection`` can be a list, a callable or a method name in Odoo 14–19.
+Iterating it blindly (``list(field.selection)``) raises TypeError. This helper
+uses the official resolver; it knows no business models or fields.
 """
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ _FUNCTION_NOT_ITERABLE_RE = re.compile(
 
 
 def _model_key(model):
-    """Nombre técnico desde string o recordset (``_name``)."""
+    """Technical name from a string or recordset (``_name``)."""
     if isinstance(model, str):
         key = model.strip()
         if key:
@@ -40,11 +40,11 @@ def _model_in_env(env, model_name):
 
 
 def resolve_field_selection(env, model, name):
-    """Lista ``[(value, label), …]`` de un campo Selection.
+    """List ``[(value, label), …]`` of a Selection field.
 
-    *model* es el nombre técnico o un recordset; *name* el campo. Sin literales
-    de dominio: el registry y ``_description_selection`` / ``fields_get``
-    resuelven lista vs callable.
+    *model* is the technical name or a recordset; *name* the field. No domain
+    literals: the registry and ``_description_selection`` / ``fields_get``
+    resolve list vs callable.
     """
     if not isinstance(name, str) or not name.strip():
         raise ValueError('field_selection(model, name) needs a field name')
@@ -88,7 +88,7 @@ def resolve_field_selection(env, model, name):
 
 
 def format_selection_iterable_hint(error_msg):
-    """Hint retryable si el LLM iteró un ``selection`` callable."""
+    """Retryable hint if the LLM iterated a callable ``selection``."""
     text = (error_msg or '').strip()
     if not text or not _FUNCTION_NOT_ITERABLE_RE.search(text):
         return None

@@ -7,9 +7,11 @@ import logging
 from odoo import api, fields, models, _
 from odoo.addons.base.models.ir_model import MODULE_UNINSTALL_FLAG
 from odoo.exceptions import UserError
+from odoo.addons.pns_base.utils.compat import ODOO_VERSION
 
 from ..utils import mcp_ui
 from ..utils import context_roles
+from ..utils.compat import test_is_running
 from ..utils.import_export_guard import ensure_ai_admin
 from ..utils.ai_agent_registry import MCP_BARE_AGENT_CODE_DEFAULT
 from ..utils.portable_io import export_record_dict
@@ -27,8 +29,8 @@ COMPOSITION_ORIGIN_RANK = {
 class AIAgent(models.Model):
     """AI Agent — unified orchestrator of the PNS AI framework.
 
-    An agent is any AI-powered feature in Odoo: a chatbot (Chatboo),
-    the Secretary voice host, an MCP protocol endpoint, etc.
+    An agent is any AI-powered feature in Odoo: a chat, a voice host,
+    an MCP protocol endpoint, etc.
 
     All agents share the same infrastructure (contexts, providers).
     The ``agent_type`` field captures the only meaningful difference:
@@ -66,7 +68,7 @@ class AIAgent(models.Model):
         string='Type',
         default='inference',
         required=True,
-        help="inference: the agent runs the LLM via an internal provider (chatboo, secretary).\n"
+        help="inference: the agent runs the LLM via an internal provider (chat, voice).\n"
              "endpoint: the agent serves contexts/tools to an external LLM client (MCP).",
     )
     is_agent_conversational = fields.Boolean(
@@ -198,7 +200,7 @@ class AIAgent(models.Model):
         help='Show extra rows (user / slash; not in the recipe).',
     )
 
-    # ── Cache del prompt compilado (delegado al perfil cuando existe) ──
+    # ── Compiled prompt cache (handed to the profile when there is one) ──
     cached_content = fields.Text(string='Cached content', readonly=True, copy=False)
     cache_locale = fields.Char(string='Cache locale', readonly=True, copy=False)
     cache_updated = fields.Datetime(string='Cache updated', readonly=True, copy=False)
@@ -208,9 +210,15 @@ class AIAgent(models.Model):
         help='Hash of context write_dates used to invalidate cache.',
     )
 
-    _sql_constraints = [
-        ('code_uniq', 'unique(code)', 'Agent code must be unique.'),
-    ]
+    if ODOO_VERSION >= 19:
+        _code_uniq = models.Constraint(
+            'unique(code)',
+            'Agent code must be unique.',
+        )
+    else:
+        _sql_constraints = [
+            ('code_uniq', 'unique(code)', 'Agent code must be unique.'),
+        ]
 
     def init(self):
         """Odoo 14 skips migrations/3.1.*; fossils and factory stamps run on -u."""
@@ -308,23 +316,17 @@ class AIAgent(models.Model):
 
     # ── Origin-based protections ──────────────────────────────────────
 
-    @api.model
-    def create(self, vals):
+    @api.model_create_multi
+    def create(self, vals_list):
         """Block dynamic agent creation.
 
         Only module-created agents (origin='module') are allowed.
         User-created agents are blocked because they would be orphan
         records with no technical coupling to the application.
         """
-        # Normalize: O19 passes a list, O14 passes a dict
-        if isinstance(vals, list):
-            for v in vals:
-                self._check_agent_create(v)
-            records = super().create(vals)
-            records._restore_required_context_links()
-            return records
-        self._check_agent_create(vals)
-        records = super().create(vals)
+        for vals in vals_list:
+            self._check_agent_create(vals)
+        records = super().create(vals_list)
         records._restore_required_context_links()
         return records
 
@@ -480,7 +482,7 @@ class AIAgent(models.Model):
     def _indexed_domain_codes_for_cache(self):
         """Codes excluded from always-on cache when inject is enabled.
 
-        Applies to every agent type. Inference (Chatboo) re-injects matched
+        Applies to every agent type. Inference re-injects matched
         packs each turn; endpoint (MCP) re-injects when ``query`` is passed to
         ``prompts/get`` / ``get_context(system_prompt)``, otherwise appends a
         compact index catalog so the client can ``get_context(code)``.
@@ -499,7 +501,7 @@ class AIAgent(models.Model):
     def domain_index_runtime_tail(self, user_message=None, user_locale=None):
         """Append turn-scoped packs (with query) or a compact catalog (no query).
 
-        Shared by Chatboo (via AgentEngine) and MCP ``system_prompt`` serving.
+        Shared by inference hosts (via AgentEngine) and MCP ``system_prompt`` serving.
         """
         self.ensure_one()
         if not self._domain_index_inject_enabled():
@@ -1216,6 +1218,9 @@ class AIAgent(models.Model):
         ``cached_content``.
         """
         self.ensure_one()
+        if force_rebuild and not (
+                self.env.su or self.env.user.has_group('pns_ai_mcp.group_ai_admin')):
+            force_rebuild = False
         user = active_user or self.env.user
         user_locale = self._resolve_locale(user_locale)
         signature = self._context_signature()
@@ -1253,7 +1258,7 @@ class AIAgent(models.Model):
         """``agent.code`` → display/vendor constants. Owning modules extend.
 
         The engine ships only the MCP endpoint entry. It does not list
-        Chatboo or third-party brands.
+        other hosts or third-party brands.
         """
         from ..utils.mcp_identity import mcp_host_identity_registry
         return dict(mcp_host_identity_registry())
@@ -1389,6 +1394,8 @@ class AIAgent(models.Model):
     def _persist_cache_isolated(self, content, user_locale, signature):
         """Write cache in an isolated cursor (short commit) to avoid
         serialization failures in long SSE transactions."""
+        if test_is_running(self.env):
+            return
         try:
             with self.env.registry.cursor() as ncr:
                 ncr.execute(
@@ -1444,15 +1451,8 @@ class AIAgent(models.Model):
             'target': 'new',
         }
 
-    def _format_cache_size(self, size_bytes):
-        if size_bytes == 0:
-            return '0 B'
-        kb = size_bytes / 1024.0
-        if kb < 1024:
-            return '%.2f KB' % kb
-        return '%.2f MB' % (kb / 1024.0)
-
     def action_rebuild_cache(self):
+        ensure_ai_admin(self.env)
         for agent in self:
             agent.get_content(force_rebuild=True)
         return True
@@ -1647,25 +1647,25 @@ class AIAgentProvider(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        """Alta idempotente del enlace agente↔proveedor.
+        """Idempotent creation of the agent↔provider link.
 
-        El par (agent_id, provider_id) es único, pero el hook semilla enlaza
-        TODOS los proveedores al agente de inferencia, así que desde la UI es
-        habitual acabar "añadiendo" un proveedor que ya está en la cadena (o uno
-        cuyo enlace quedó archivado y por tanto oculto). En vez de reventar con
-        el error crudo del UNIQUE, reutilizamos el enlace existente: lo
-        reactivamos si estaba archivado y le aplicamos el resto de valores
-        (prioridad, timeouts…). Añadir pasa a ser un no-op seguro.
+        The pair (agent_id, provider_id) is unique, but the seed hook links
+        ALL providers to the inference agent, so from the UI it is common to
+        end up "adding" a provider that is already in the chain (or one whose
+        link was archived and so is hidden). Instead of blowing up with the
+        raw UNIQUE error, we reuse the existing link: we reactivate it if it
+        was archived and apply the rest of the values (priority, timeouts…).
+        Adding becomes a safe no-op.
 
-        Se preserva el orden de entrada para no romper el mapeo de comandos
-        x2many (posición ↔ registro devuelto).
+        The input order is kept so the x2many command mapping does not break
+        (position ↔ returned record).
         """
         ctx = self.env.context
         result = self.browse()
         for vals in vals_list:
-            # Al crear líneas de un o2m desde el formulario del padre, el inverso
-            # (agent_id) puede venir en vals o inyectado como default en contexto,
-            # según la versión; contemplamos ambos para no saltarnos el dedup.
+            # When o2m lines are created from the parent form, the inverse
+            # (agent_id) may come in vals or be injected as a context default,
+            # depending on the version; we handle both so the dedup is not skipped.
             agent_id = vals.get('agent_id') or ctx.get('default_agent_id')
             provider_id = vals.get('provider_id')
             link = self.browse()
@@ -1686,10 +1686,12 @@ class AIAgentProvider(models.Model):
                 result |= super().create([vals])
         return result
 
-    _sql_constraints = [
-        (
-            'agent_provider_uniq',
+    if ODOO_VERSION >= 19:
+        _agent_provider_uniq = models.Constraint(
             'unique(agent_id, provider_id)',
             'A provider can only appear once per agent.',
-        ),
-    ]
+        )
+    else:
+        _sql_constraints = [
+            ('agent_provider_uniq', 'unique(agent_id, provider_id)', 'A provider can only appear once per agent.'),
+        ]

@@ -22,6 +22,7 @@ from markupsafe import Markup
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
+from odoo.addons.pns_base.utils.compat import ODOO_VERSION
 
 from ..utils import mcp_ui
 from ..utils.copy_code import next_copy_code
@@ -80,7 +81,7 @@ class ExternalAPIServer(models.Model):
     _order = 'name'
     _rec_name = 'name'
     # config_json repeats the token and env; the form fields rebuild it.
-    _pns_secret_fields = ('auth_token', 'env_vars', 'config_json')
+    _pns_secret_fields = ('auth_token', 'command_args', 'env_vars', 'config_json')
 
     # ── Identity ──────────────────────────────────────────────────────────
     name = fields.Char(
@@ -221,6 +222,7 @@ class ExternalAPIServer(models.Model):
     )
     command_args = fields.Text(
         string='Command Args (JSON)',
+        groups='pns_ai_mcp.group_ai_admin',
         default='[]',
         help='JSON array of arguments: ["-m", "my_server", "--port", "3000"].',
     )
@@ -355,9 +357,15 @@ class ExternalAPIServer(models.Model):
         ),
     )
 
-    _sql_constraints = [
-        ('code_unique', 'UNIQUE(code)', 'Server code must be unique.'),
-    ]
+    if ODOO_VERSION >= 19:
+        _code_unique = models.Constraint(
+            'UNIQUE(code)',
+            'Server code must be unique.',
+        )
+    else:
+        _sql_constraints = [
+            ('code_unique', 'UNIQUE(code)', 'Server code must be unique.'),
+        ]
 
     def copy(self, default=None):
         """Duplicate with a free ``code`` so UNIQUE(code) does not abort Action Duplicate."""
@@ -668,35 +676,6 @@ class ExternalAPIServer(models.Model):
         )
         return DEFAULT_OPENAPI_GEN_SYSTEM_PROMPT
 
-    @api.model
-    def _fill_empty_openapi_gen_prompts(self):
-        """Persist factory English prompt on OpenAPI rows that still have none
-        or still hold a prior factory text (unmodified).
-        """
-        from ..services.openapi_spec_generator import (
-            DEFAULT_OPENAPI_GEN_SYSTEM_PROMPT,
-            _LEGACY_OPENAPI_GEN_SYSTEM_PROMPTS,
-        )
-        Server = self.sudo()
-        empty = Server.search([
-            ('api_type', '=', 'openapi'),
-            '|',
-            ('openapi_gen_prompt', '=', False),
-            ('openapi_gen_prompt', '=', ''),
-        ])
-        legacy = Server.browse()
-        for old in _LEGACY_OPENAPI_GEN_SYSTEM_PROMPTS:
-            legacy |= Server.search([
-                ('api_type', '=', 'openapi'),
-                ('openapi_gen_prompt', '=', old),
-            ])
-        targets = empty | legacy
-        if targets:
-            targets.write({
-                'openapi_gen_prompt': DEFAULT_OPENAPI_GEN_SYSTEM_PROMPT,
-            })
-        return len(targets)
-
     def action_restore_openapi_gen_prompt(self):
         """Replace the Doc→OpenAPI prompt with the current factory English text."""
         from ..services.openapi_spec_generator import (
@@ -900,6 +879,7 @@ class ExternalAPIServer(models.Model):
 
     def action_suggest_detection(self):
         """Fill Detection rows: identity tokens + one short JSON LLM call."""
+        ensure_ai_admin(self.env)
         from ..utils.llm_usage import add_usage
         from ..utils.mcp_ui import client_notification
         from ..utils.usage_display import format_usage_chip
@@ -1202,7 +1182,7 @@ class ExternalAPIServer(models.Model):
         """Copy a unique OpenAPI apiKey header name onto the form fields.
 
         The LLM must not be the only writer of outbound headers: Discover
-        materialises what the spec already declares so the ficha shows it.
+        materialises what the spec already declares so the form shows it.
         Never touches ``auth_token``.
         """
         self.ensure_one()
@@ -1221,7 +1201,7 @@ class ExternalAPIServer(models.Model):
     def action_discover_auth(self):
         """Apply outbound auth from the OpenAPI spec (no LLM, no token write).
 
-        Homologous to Discover Tools: the spec is the source. Chatboo write
+        Homologous to Discover Tools: the spec is the source. Chat write
         proposals remain the path when the spec is silent or ambiguous.
         """
         self.ensure_one()

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo noupdate="1">
-    <!-- Borra los ficheros exportados más antiguos que
-         pns_base.export_retention_hours (24 por defecto; 0 = no borrar).
+    <!-- Deletes exported files older than
+         pns_base.export_retention_hours (24 by default; 0 = keep them).
          Stack owl1 (Odoo 14): numbercall=-1, and activity_user_type is
          NOT NULL on ir.act_server once mail is in. -->
     <record id="ir_cron_pns_export_purge" model="ir.cron">

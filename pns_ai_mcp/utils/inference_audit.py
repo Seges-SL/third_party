@@ -6,7 +6,7 @@
 Headless shots (wizards, server detection, skill author) open this context
 once; ``llm_json_completion_result`` records usage and flush writes one row.
 
-Satellite calls *inside* a Chatboo turn do **not** use this for a child row:
+Satellite calls *inside* a streaming turn do **not** use this for a child row:
 they fold into the parent via ``AgentEngine._accumulate_side_usage`` — see
 ``docs/llm_usage_metering.md``.
 """
@@ -97,7 +97,7 @@ class InferenceAudit:
         from .mcp_correlation import new_turn_id
         turn = self.turn or new_turn_id()
         try:
-            self.env['ai.execution.engine'].log_llm_inference(
+            self.env['ai.execution.engine']._log_llm_inference(
                 self.provider,
                 self.usage_acc,
                 endpoint=self.endpoint,

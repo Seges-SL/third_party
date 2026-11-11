@@ -44,6 +44,30 @@ def non_public_host_error(url):
     return ''
 
 
+def non_public_peer_error(resp, url):
+    """English reason when the socket that answered is not public, else ''.
+
+    The name is resolved again when connecting, so its answer can change
+    after ``non_public_host_error`` looked. Behind a configured proxy the
+    peer is the proxy, which resolves the name itself.
+    """
+    import requests
+    if requests.utils.get_environ_proxies(url):
+        return ''
+    try:
+        peer = resp.raw._connection.sock.getpeername()[0]
+        ip = ipaddress.ip_address(str(peer).split('%', 1)[0])
+    except Exception:
+        return ''
+    mapped = getattr(ip, 'ipv4_mapped', None)
+    if mapped is not None:
+        ip = mapped
+    if not ip.is_global:
+        host = urlsplit(url or '').hostname
+        return 'fetch_url does not reach internal addresses (%s answered from %s).' % (host, ip)
+    return ''
+
+
 def normalize_fetch_url_method(method=None):
     """Return the method in uppercase (default GET)."""
     return str(method if method is not None else 'GET').upper()
@@ -101,21 +125,12 @@ _AUTH_HEADER_NAMES = frozenset({
 })
 
 
-# Seges: parche 19 (PNS-17, seguridad). Ver docs/pendiente/parches_pns_ai.md
-# On another host only these go on: a custom auth header (apikey,
-# Ocp-Apim-Subscription-Key…) has no fixed name to strip.
-_CROSS_HOST_HEADER_NAMES = frozenset({
-    'accept', 'accept-language', 'content-type', 'user-agent',
-})
-
-
 def _strip_auth_headers(headers):
     if not headers:
         return {}
-    # Seges: parche 19 (PNS-17, seguridad). Ver docs/pendiente/parches_pns_ai.md
     return {
         key: value for key, value in headers.items()
-        if str(key).lower() in _CROSS_HOST_HEADER_NAMES
+        if str(key).lower() not in _AUTH_HEADER_NAMES
     }
 
 
@@ -158,6 +173,10 @@ def request_public_http(
             )
         except requests.RequestException as exc:
             raise ValueError('HTTP request failed: %s' % exc)
+        refused = non_public_peer_error(resp, url)
+        if refused:
+            resp.close()
+            raise ValueError(refused)
         location = resp.headers.get('Location') if resp.is_redirect else None
         if not location:
             break

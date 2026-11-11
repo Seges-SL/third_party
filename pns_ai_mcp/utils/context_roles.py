@@ -43,12 +43,6 @@ MCP_LISTABLE_TYPES = (CORE, DOMAIN)
 #: base and ``discovery`` is engine-consumed routing.
 AGENT_LINK_EXCLUDED_TYPES = (CORE, DISCOVERY)
 
-
-def is_injectable(context_type) -> bool:
-    """True when a role's content is assembled into the prompt."""
-    return context_type in INJECTABLE_TYPES
-
-
 def is_discovery(context_type) -> bool:
     """True for the routing-index role (never injected, never agent-linked)."""
     return context_type == DISCOVERY

@@ -3,7 +3,7 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Generate a draft OpenAPI 3 document from human-readable API documentation.
 
-Admin UI only (External Servers form). Not used from Chatboo turns or
+Admin UI only (External Servers form). Not used from chat turns or
 relaxaicode — the draft must be reviewed before ``spec_json`` is written.
 """
 
@@ -67,65 +67,6 @@ DEFAULT_OPENAPI_GEN_SYSTEM_PROMPT = (
     'same domain, not elsewhere.\n'
     '- Do not crawl, search, or open other URLs.'
 )
-
-# Prior factory texts — refreshed to DEFAULT on -u / migrate when still unmodified.
-_LEGACY_OPENAPI_GEN_SYSTEM_PROMPTS = (
-    (
-        'You analyze human-readable API documentation (HTML or markdown web pages). '
-        'There is no official openapi.json — infer the HTTP API and write a valid '
-        'OpenAPI 3.0 document from what the page describes.\n\n'
-        'Output rules:\n'
-        '- Reply with a single JSON object only (no markdown fences, no commentary).\n'
-        '- Include paths for every documented endpoint; use exact path strings from '
-        'the docs.\n'
-        '- Each operation needs a unique operationId (camelCase).\n'
-        '- Do not invent endpoints that are not described in the documentation.\n'
-        '- Set servers[] when the docs state a base URL; otherwise omit servers.\n\n'
-        'Fetch / browse scope (when you are allowed to retrieve pages):\n'
-        '- Stay on the same registrable domain (same eTLD+1 / public-suffix domain). '
-        'Subdomains of that domain are allowed (e.g. docs.example.com and '
-        'api.example.com); other companies or other base domains are not.\n'
-        '- Do not follow links more than one path level beyond the documentation '
-        'URL you were given (e.g. from /docs/a/b you may open /docs/a/b/c but not '
-        '/docs/other).\n'
-        '- Do not use search engines, web archives, or unrelated hosts to gather '
-        'API docs.\n'
-        '- Prefer the single documentation page; do not crawl the whole site.'
-    ),
-    (
-        'You analyze human-readable API documentation (HTML or markdown web pages). '
-        'There is no official openapi.json — infer the HTTP API and write a valid '
-        'OpenAPI 3.0 document from what the page describes.\n\n'
-        'Output rules:\n'
-        '- Reply with a single JSON object only (no markdown fences, no commentary).\n'
-        '- Include paths for every documented endpoint; use exact path strings from '
-        'the docs.\n'
-        '- Each operation needs a unique operationId (camelCase).\n'
-        '- Do not invent endpoints that are not described in the documentation.\n'
-        '- Set servers[] when the docs state a base URL; otherwise omit servers.\n\n'
-        'Fetch / browse scope (when you are allowed to retrieve pages):\n'
-        '- Start from the documentation URL you were given; stay on that same host.\n'
-        '- Do not follow links more than one path level beyond that URL '
-        '(same host only; e.g. from /docs/a/b you may open /docs/a/b/c but not '
-        '/docs/other or a different site).\n'
-        '- Do not use search engines, web archives, or unrelated hosts to gather '
-        'API docs.\n'
-        '- Prefer the single documentation page; do not crawl the whole site.'
-    ),
-    (
-        'You analyze human-readable API documentation (HTML or markdown web pages). '
-        'There is no official openapi.json — infer the HTTP API and write a valid '
-        'OpenAPI 3.0 document from what the page describes.\n\n'
-        'Output rules:\n'
-        '- Reply with a single JSON object only (no markdown fences, no commentary).\n'
-        '- Include paths for every documented endpoint; use exact path strings from '
-        'the docs.\n'
-        '- Each operation needs a unique operationId (camelCase).\n'
-        '- Do not invent endpoints that are not described in the documentation.\n'
-        '- Set servers[] when the docs state a base URL; otherwise omit servers.'
-    ),
-)
-
 
 class OpenAPISpecGeneratorError(Exception):
     """Raised when documentation fetch or spec synthesis fails."""

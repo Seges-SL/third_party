@@ -355,10 +355,33 @@ BUILTIN_SLASH_META = {
 }
 
 
+def _spoken():
+    try:
+        from . import spoken_words
+        return spoken_words
+    except ImportError:
+        import importlib.util
+        import os
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'spoken_words.py')
+        spec = importlib.util.spec_from_file_location('spoken_words', path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+
+def skills_list_commands():
+    """Slash names that list the skills: ``skill(s)``, ``?`` and each language's help word."""
+    return frozenset({'skill', 'skills', '?'}) | _spoken().words('help_command')
+
+
+def is_skills_list_command(cmd):
+    return (cmd or '').strip().lower() in skills_list_commands()
+
+
 def builtin_slash_help_meta(code):
     """Return help meta for a builtin / axis slash, or None."""
     key = (code or '').strip().lower().replace('_', '-')
-    if key in ('skill', 'help', 'ayuda', '?'):
+    if is_skills_list_command(key):
         key = 'skills'
     meta = BUILTIN_SLASH_META.get(key)
     return dict(meta) if meta else None

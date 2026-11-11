@@ -1,0 +1,36 @@
+{
+  "what": "spoken_words",
+  "language": "es",
+  "help": ["ayuda", "opciones", "parámetros", "uso"],
+  "help_command": ["ayuda"],
+  "today": ["hoy"],
+  "yesterday": ["ayer"],
+  "day_before_yesterday": ["anteayer"],
+  "tomorrow": ["mañana"],
+  "day_after_tomorrow": ["pasado mañana", "pasadomañana"],
+  "weekdays": [
+    ["lunes"],
+    ["martes"],
+    ["miércoles"],
+    ["jueves"],
+    ["viernes"],
+    ["sábado"],
+    ["domingo"]
+  ],
+  "next": ["que viene", "próximo", "siguiente"],
+  "this": ["este", "esta"],
+  "filler": [
+    "el", "la", "los", "las", "un", "una", "unos", "unas",
+    "de", "del", "al", "y", "o", "e", "u", "en", "con", "por", "para", "sin",
+    "mi", "me", "te", "se", "le", "les", "nos", "os", "tu", "su",
+    "que", "como", "cual", "porfa", "porfavor", "gracias", "favor",
+    "quiero", "quieres", "quisiera", "puedes", "puede", "podrías",
+    "haz", "hazme", "dame", "pásame", "mándame", "envía", "envíame",
+    "necesito", "pinta", "pintas", "píntame", "dibuja", "dibujas", "dibújame",
+    "escribe", "muestra", "ponme", "pon", "esto", "eso", "ahí", "aquí", "va"
+  ],
+  "file": [
+    "archivo", "fichero", "documento", "imagen", "dibujo",
+    "descarga", "descargar", "descárgame", "bájame"
+  ]
+}

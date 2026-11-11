@@ -30,6 +30,7 @@
             <!-- Chatboo: main component. -->
             <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_component_v2.js"/>
             <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_systray.js"/>
+            <script type="text/javascript" src="/pns_ai_chatboo/static/src/js/chatboo_open_o14.js"/>
         </xpath>
     </template>
 </odoo>

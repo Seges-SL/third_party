@@ -40,13 +40,13 @@
                 </convention>
                 <convention name="output_columns">
                     Required columns for unpaid invoice reports (unless user asks for less detail).
-                    Use EXACTLY these dictionary key names (translate to user_lang if not es_ES):
-                    - 'Cliente'         → customer name
-                    - 'NIF'             → partner.vat (empty string if None)
-                    - 'Facturas Pend.'  → count of pending invoices
-                    - 'Importe Pend.'   → sum(amount_residual)
-                    - 'Hist. Pagado'    → sum(amount_total) of paid invoices in last 24 calendar months
-                    - 'Ratio Pago %'    → paid_count / (paid_count + pending_count) * 100, rounded 2 decimals
+                    Use these columns, with the dictionary key names translated to user_lang:
+                    - 'Customer'        → customer name
+                    - 'Tax ID'          → partner.vat (empty string if None)
+                    - 'Pending Inv.'    → count of pending invoices
+                    - 'Pending Amount'  → sum(amount_residual)
+                    - 'Paid History'    → sum(amount_total) of paid invoices in last 24 calendar months
+                    - 'Payment Ratio %' → paid_count / (paid_count + pending_count) * 100, rounded 2 decimals
                     - Risk color: green (_row_color='#e6f4ea') if ratio>=70% AND paid_count>=3, else red (_row_color='#fdecea')
 
                     24 calendar months cutoff: date(today.year - 2, today.month, 1)

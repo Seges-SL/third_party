@@ -8,6 +8,7 @@ import re
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError, UserError
 from ..utils import context_roles
+from ..utils.compat import test_is_running
 from ..utils.knowledge_ownership import (
     apply_create_ownership,
     assert_writer_can_write_records,
@@ -21,6 +22,7 @@ from ..utils.orm_domain import (
     rewrite_my_locale_domain,
 )
 import logging
+from odoo.addons.pns_base.utils.compat import ODOO_VERSION
 
 _logger = logging.getLogger(__name__)
 
@@ -105,9 +107,15 @@ class AIContext(models.Model):
     _rec_name = 'code'
     _order = 'code'
     
-    _sql_constraints = [
-        ('code_uniq', 'unique (code)', 'Code must be unique!'),
-    ]
+    if ODOO_VERSION >= 19:
+        _code_uniq = models.Constraint(
+            'unique (code)',
+            'Code must be unique!',
+        )
+    else:
+        _sql_constraints = [
+            ('code_uniq', 'unique (code)', 'Code must be unique!'),
+        ]
 
     code = fields.Char(
         string='Code',
@@ -225,9 +233,9 @@ class AIContext(models.Model):
              'on a match (same turn budget).',
     )
 
-    # Localización: atributo EXPLÍCITO (no se infiere del code).
-    # Se puebla desde el metadato <locale_code> del fichero on-disk / front-matter.
-    # Así el locale viaja CON el contenido: mezclar ficheros no crea ambigüedad.
+    # Locale: EXPLICIT attribute (not inferred from the code).
+    # Filled from the <locale_code> metadata of the on-disk file / front-matter.
+    # That way the locale travels WITH the content: mixing files is not ambiguous.
     locale = fields.Char(
         string='Locale',
         index=True,
@@ -235,8 +243,8 @@ class AIContext(models.Model):
              'Sourced from the file metadata (<locale_code>), never inferred from the code.',
     )
 
-    # Base prístina sin locale (e.g. corporate_terms). Derivada de forma
-    # DETERMINISTA de code + locale explícito (no hay regex que "adivine" el locale).
+    # Pristine base without locale (e.g. corporate_terms). Derived
+    # DETERMINISTICALLY from code + explicit locale (no regex "guesses" the locale).
     base_code = fields.Char(
         string='Base code',
         compute='_compute_base_code',
@@ -358,7 +366,7 @@ class AIContext(models.Model):
     def _apply_detection_defaults(self, vals):
         """Fill discovery identity when a row targets an API server.
 
-        ``api_server_id`` may be omitted: a propose-create from Chatboo only
+        ``api_server_id`` may be omitted: a propose-create from the chat only
         has the catalogue ``code`` (``discovery_target``). Looking up the
         server here keeps RelaxAICode off ``ai.api.server``.
         """
@@ -497,7 +505,7 @@ class AIContext(models.Model):
              'live under the module ai/ umbrella (ai/contexts/...).'
     )
     
-    # Campos de estadísticas de uso (Fase 6: Monitoreo)
+    # Usage statistics fields (Phase 6: Monitoring)
     usage_count = fields.Integer(
         string='Times Consulted',
         default=0,
@@ -524,10 +532,10 @@ class AIContext(models.Model):
     def _record_context_usage(self, context_code):
         """Increment usage_count on a short cursor (best-effort).
 
-        Must not write on the Chatboo/ReAct REPEATABLE READ snapshot: other
+        Must not write on the turn's ReAct REPEATABLE READ snapshot: other
         MCP clients bump the same rows, and a late flush raises PG 40001.
         """
-        if not context_code:
+        if not context_code or test_is_running(self.env):
             return
         try:
             with self.env.registry.cursor() as cr:
@@ -545,7 +553,7 @@ class AIContext(models.Model):
                 cr.commit()
         except Exception as e:
             _logger.warning(
-                "MCP: Error registrando uso de contexto %s: %s",
+                "MCP: Error recording usage of context %s: %s",
                 context_code, str(e),
             )
     
@@ -562,13 +570,13 @@ class AIContext(models.Model):
     @api.model
     def _search(self, domain, *args, **kwargs):
         """
-        Sobrescribe _search para:
-        1. Respetar active_test del contexto.
-        2. Resolver el filtro 'My language' SOLO cuando el usuario lo tiene
-           activo en la barra de búsqueda (no por search_default_* en el
-           contexto de la acción, que persiste aunque se desactive el chip).
-        3. Alias estructural: leaf ``name`` → ``_rec_name`` (este modelo no
-           tiene campo name; el LLM / search box suelen usarlo igual).
+        Override _search to:
+        1. Honour active_test from the context.
+        2. Resolve the 'My language' filter ONLY when the user has it
+           active in the search bar (not via search_default_* in the
+           action context, which persists even if the chip is turned off).
+        3. Structural alias: leaf ``name`` → ``_rec_name`` (this model has
+           no name field; the LLM / search box often use it anyway).
         """
         # O19+ passes DomainBool/Domain during fields_get groupability probes.
         if not self._is_list_domain(domain):
@@ -582,9 +590,9 @@ class AIContext(models.Model):
 
         # Do not strip ('active', …) leaves here: removing a leaf and leaving
         # its ``|``/``&`` breaks prefix arity (Discovery + My language crash).
-        # Sustituir el dominio del XML (context.get('lang') no evalúa bien
-        # en todos los stacks) por el idioma real — solo si el chip sigue
-        # activo. Recovers when Active/No-locale chips leave a short OR-tree.
+        # Replace the XML domain (context.get('lang') does not evaluate well
+        # on every stack) with the real language — only if the chip is still
+        # active. Recovers when Active/No-locale chips leave a short OR-tree.
         if self._domain_has_my_locale_filter(domain):
             user_lang = self._normalize_user_locale(self.env.context.get('lang'))
             domain = rewrite_my_locale_domain(domain, user_lang)
@@ -593,29 +601,29 @@ class AIContext(models.Model):
 
     @api.model
     def action_open_stats_wizard(self):
-        """Lanza el wizard de estadísticas globales"""
+        """Open the global statistics wizard"""
         return self.env.ref('pns_ai_mcp.action_mcp_context_stats').read()[0]
 
     @api.constrains('code')
     def _check_code_snake_case(self):
-        """Valida que el código esté en formato snake_case con excepción para códigos de locale al final"""
-        # Snake_case estándar: solo minúsculas, números y guiones bajos
-        # Excepción: permite patrón _aa_AA al final para códigos de locale (ej: _es_ES, _en_US)
+        """Check the code is snake_case, allowing a locale code at the end"""
+        # Standard snake_case: only lowercase letters, digits and underscores
+        # Exception: allows an _aa_AA pattern at the end for locale codes (e.g. _es_ES, _en_US)
         snake_case_standard = re.compile(r'^[a-z][a-z0-9_]*$')
         snake_case_with_locale = re.compile(r'^[a-z][a-z0-9_]*_[a-z]{2}_[A-Z]{2}$')
         for record in self:
             if record.code:
                 if not (snake_case_standard.match(record.code) or snake_case_with_locale.match(record.code)):
-                    raise ValidationError(
-                        'El código debe estar en formato snake_case: '
-                        'solo letras minúsculas, números y guiones bajos, empezando con letra. '
-                        'Excepción: permite patrón _aa_AA al final para códigos de locale '
-                        '(ej: glosario_contabilidad o decimals_and_separators_es_ES)'
-                    )
+                    raise ValidationError(_(
+                        'The code must be in snake_case: '
+                        'only lowercase letters, digits and underscores, starting with a letter. '
+                        'Exception: an _aa_AA suffix is allowed for locale codes '
+                        '(e.g. glosario_contabilidad or decimals_and_separators_es_ES)'
+                    ))
 
     @api.constrains('code')
     def _check_code_unique(self):
-        """Valida que el código sea único"""
+        """Check the code is unique"""
         for record in self:
             if record.code:
                 duplicates = self.search([
@@ -623,15 +631,15 @@ class AIContext(models.Model):
                     ('id', '!=', record.id)
                 ])
                 if duplicates:
-                    raise ValidationError(
-                        f'El código "{record.code}" ya existe. '
-                        'Debe ser único.'
-                    )
+                    raise ValidationError(_(
+                        'The code "%s" already exists. '
+                        'It must be unique.'
+                    ) % record.code)
 
     def write(self, vals):
         """
-        Sobrescribe write para evitar modificar registros hardcodeados.
-        Muestra una notificación amigable en lugar de bloquear la acción.
+        Override write to avoid changing hardcoded records.
+        Shows a friendly notification instead of blocking the action.
         The seed flag counts only inside sudo() or as the superuser. A
         context key from RPC is not a grant.
         """
@@ -648,11 +656,11 @@ class AIContext(models.Model):
                     ))
             hardcoded_records = self.filtered(lambda c: c.context_type == 'core')
             if hardcoded_records:
-                raise UserError(
-                    '⚠️ Registro de solo lectura\n\n'
-                    'No se pueden modificar los contextos del sistema (hardcodeados). '
-                    'Estos contextos se sincronizan automáticamente desde el código del módulo.'
-                )
+                raise UserError(_(
+                    '⚠️ Read-only record\n\n'
+                    'System (hardcoded) contexts cannot be modified. '
+                    'These contexts are synchronised automatically from the module code.'
+                ))
         res = super(AIContext, self).write(vals)
         if (
             not self.env.context.get('_syncing_detection')
@@ -794,9 +802,12 @@ class AIContext(models.Model):
 
         Covers ``self``, ``self_es_ES``, ``self_en_US``, ``self_retired``, any
         row whose ``base_code`` is ``self``, and leftovers under
-        ``contexts/domain/self/``. Does not touch ``self_chatboo`` / ``self_mcp``.
+        ``contexts/domain/self/``. Each agent's own ``self_<token>`` pack stays.
         """
-        from ..utils.agent_identity import is_retired_self_pack_code
+        from ..utils.agent_identity import (
+            is_retired_self_pack_code,
+            own_self_pack_code,
+        )
         Context = self.with_context(
             skip_hardcoded_restrictions=True,
             active_test=False,
@@ -812,11 +823,15 @@ class AIContext(models.Model):
             or (r.base_code or '') == 'self'
             or (r.rel_path or '').startswith('contexts/domain/self/')
         )
-        keep = {'self_chatboo', 'self_mcp'}
+        Agent = self.env['ai.agent']
+        keep = {
+            own_self_pack_code(code)
+            for code in Agent.with_context(active_test=False).search([]).mapped('code')
+        }
+        keep.discard('')
         old = old.filtered(lambda r: (r.code or '') not in keep)
         if not old:
             return self.browse()
-        Agent = self.env['ai.agent']
         for agent in Agent.search([('context_ids', 'in', old.ids)]):
             agent.with_context(_skip_required_context_restore=True).write({
                 'context_ids': [(3, cid) for cid in old.ids],
@@ -844,17 +859,17 @@ class AIContext(models.Model):
         return old
     
     def toggle_active(self):
-        """Alterna el estado activo/inactivo"""
+        """Toggle the active/inactive state"""
         for record in self:
             if record.context_type == 'core':
-                continue  # No permitir cambiar estado de hardcodeados
+                continue  # Do not allow changing the state of hardcoded rows
             record.active = not record.active
         return True
 
     def read(self, fields=None, load='_classic_read'):
         """
-        Sobrescribe read para leer los prompts hardcodeados desde la BD.
-        Los prompts hardcodeados ahora están en la BD, así que se leen normalmente.
+        Override read to read the hardcoded prompts from the DB.
+        The hardcoded prompts now live in the DB, so they are read normally.
         """
         return super(AIContext, self).read(fields=fields, load=load)
     
@@ -863,11 +878,11 @@ class AIContext(models.Model):
     @api.model
     def normalize_code(self, code_candidate):
         """
-        Normaliza una cadena para convertirla en un código válido.
-        ALGORITMO CENTRALIZADO:
-        1. Detecta sufijos de locale (_es_ES).
-        2. Preserva casing del sufijo.
-        3. Convierte el resto a minúsculas y limpia caracteres inválidos.
+        Normalize a string into a valid code.
+        CENTRAL ALGORITHM:
+        1. Detects locale suffixes (_es_ES).
+        2. Keeps the suffix casing.
+        3. Lowercases the rest and cleans invalid characters.
         """
         import re
         
@@ -899,18 +914,18 @@ class AIContext(models.Model):
     @api.model
     def generate_code_from_name(self, filename_or_path):
         """
-        Genera el código único a partir de un nombre de archivo.
-        Usa normalize_code para garantizar consistencia.
+        Generate the unique code from a file name.
+        Uses normalize_code to stay consistent.
         """
         import os
         
-        # 1. Obtener solo el nombre de archivo sin ruta
+        # 1. Take only the file name, without the path
         filename = os.path.basename(filename_or_path)
         
-        # 2. Quitar extensión
+        # 2. Drop the extension
         name_no_ext = os.path.splitext(filename)[0]
         
-        # 3. Delegar en normalizador central
+        # 3. Delegate to the central normalizer
         return self.normalize_code(name_no_ext)
 
 

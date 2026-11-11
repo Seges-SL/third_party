@@ -10,19 +10,28 @@
   "source_module": "pns_ai_mcp",
   "triggers": [
     "presupuesto",
+    "presupuestos",
     "albarán",
+    "albaranes",
     "descuento",
+    "descuento global",
+    "ponle un descuento",
     "pedido de venta",
     "pedido de compra",
     "crear presupuesto",
-    "añadir línea",
-    "descuento global",
     "modificar presupuesto",
-    "presupuestos",
-    "albaranes",
+    "añadir línea",
     "líneas del albarán",
     "líneas del presupuesto",
     "factura proforma",
-    "ponle un descuento"
+    "factura de proveedor",
+    "factura adjunta",
+    "regístrala",
+    "ya está contabilizada",
+    "contabiliza esta factura",
+    "ticket",
+    "recibo",
+    "datáfono",
+    "factura simplificada"
   ]
 }

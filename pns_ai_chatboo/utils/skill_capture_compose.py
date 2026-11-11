@@ -317,12 +317,14 @@ _CATALOGUE_MODELS = frozenset({
 
 
 def _static_str(node):
-    if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        return node.value
-    value = getattr(node, 'value', None)
-    if isinstance(value, ast.Constant) and isinstance(value.value, str):
-        return value.value
-    return None
+    # Up to 3.8 a subscript comes wrapped in Index; 3.7 writes text as Str.
+    if type(node).__name__ == 'Index':
+        node = node.value
+    try:
+        value = ast.literal_eval(node)
+    except (ValueError, TypeError, SyntaxError):
+        return None
+    return value if isinstance(value, str) else None
 
 
 def _is_env(node):

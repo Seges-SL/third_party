@@ -24,7 +24,7 @@
                 <group string="Options">
                     <field name="include_secrets"/>
                     <field name="include_settings"/>
-                    <field name="export_tag" placeholder="piloto"/>
+                    <field name="export_tag" placeholder="staging"/>
                     <field name="export_artifact_name" placeholder="ai_artifact_bundle"/>
                 </group>
                 <footer>

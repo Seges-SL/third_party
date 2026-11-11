@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Archivo: views/mcp_api_key_wizard_views.xml
-    Creado: 2025-11-16 04:10:00
-    Modificado: 2025-11-26 07:01:12
-    Descripción: Vistas para wizard de regeneración de API keys MCP
+    File: views/mcp_api_key_wizard_views.xml
+    Created: 2025-11-16 04:10:00
+    Modified: 2025-11-26 07:01:12
+    Description: Views for the MCP API key regeneration wizard
 -->
 <odoo>
-    <!-- Acción para abrir wizard -->
+    <!-- Action to open the wizard -->
     <record id="action_mcp_api_key_wizard" model="ir.actions.act_window">
         <field name="name">Generate AI API Key</field>
         <field name="type">ir.actions.act_window</field>
@@ -15,7 +15,7 @@
         <field name="target">new</field>
     </record>
 
-    <!-- Vista del wizard -->
+    <!-- Wizard view -->
     <record id="view_mcp_api_key_wizard_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.api_key_wizard.form</field>
         <field name="model">ai.api.key.wizard</field>
@@ -25,7 +25,7 @@
                 <field name="is_clear" invisible="1"/>
                 <field name="is_import" invisible="1"/>
 
-                <!-- Panel "cópiala ahora": la clave se muestra UNA sola vez -->
+                <!-- "Copy it now" panel: the key is shown ONLY once -->
                 <div attrs="{'invisible': [('generated_key', '=', False)]}">
                     <div class="alert alert-success" role="alert">
                         <h5>✅ API Key generated</h5>
@@ -41,39 +41,39 @@
                     </group>
                 </div>
 
-                <!-- Flujo normal (generar / importar / borrar): oculto tras generar -->
+                <!-- Normal flow (generate / import / delete): hidden after generating -->
                 <div attrs="{'invisible': [('generated_key', '!=', False)]}">
-                    <!-- Alerta cuando se va a eliminar (rojo) -->
+                    <!-- Alert when the key is about to be deleted (red) -->
                     <div attrs="{'invisible': [('is_clear', '=', False)]}">
                         <div class="alert alert-danger" role="alert" style="background-color: #f8d7da; border-color: #f5c6cb; color: #721c24;">
-                            <h5 style="color: #721c24;">⚠️ Advertencia</h5>
+                            <h5 style="color: #721c24;">⚠️ Warning</h5>
                             <p><strong>The API key for this user will be deleted.</strong></p>
                             <p>The user will not be able to use the MCP server until a new key is generated.</p>
                         </div>
                     </div>
 
-                    <!-- Alerta cuando ya existe una key y se va a regenerar (naranja) -->
+                    <!-- Alert when a key already exists and is about to be regenerated (orange) -->
                     <div attrs="{'invisible': ['|', ('has_api_key', '=', False), ('is_clear', '=', True)]}">
                         <div class="alert alert-warning" role="alert" style="background-color: #fff3cd; border-color: #ffeaa7; color: #856404;">
-                            <h5 style="color: #856404;">⚠️ Advertencia</h5>
+                            <h5 style="color: #856404;">⚠️ Warning</h5>
                             <p><strong>This user already has an API key configured.</strong></p>
                             <p>Generating a new key will immediately invalidate the existing key.</p>
                             <p>The user will not be able to use the MCP server until they update the new key.</p>
                         </div>
                     </div>
 
-                    <!-- Mensaje informativo cuando no hay key (celeste) -->
+                    <!-- Info message when there is no key (light blue) -->
                     <div attrs="{'invisible': ['|', ('has_api_key', '=', True), ('is_clear', '=', True)]}">
                         <div class="alert alert-info" role="alert" style="background-color: #d1ecf1; border-color: #bee5eb; color: #0c5460;">
                             <h5 style="color: #0c5460;">ℹ️ Information</h5>
                             <p>No API key exists for this user.</p>
-                            <p>Genera una nueva clave o importa una existente de otra instancia.</p>
+                            <p>Generate a new key or import an existing one from another instance.</p>
                         </div>
                     </div>
 
                     <group>
                         <field name="mcp_user_id" readonly="1"/>
-                        <!-- Campo de importación manual: solo visible en modo importar -->
+                        <!-- Manual import field: only visible in import mode -->
                         <field name="manual_key"
                                attrs="{'invisible': [('is_import', '=', False)], 'required': [('is_import', '=', True)]}"
                                password="False"
@@ -82,7 +82,7 @@
                     </group>
                 </div>
 
-                <!-- Botones de acción -->
+                <!-- Action buttons -->
                 <footer>
                     <button string="Generate Key"
                             name="action_generate"

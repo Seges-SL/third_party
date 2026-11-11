@@ -3,9 +3,13 @@
 # Copyright (C) 2026 Patanegra Soft <https://patanegra.com>
 """PAAP I1 and I3 on a live registry: a proposal changes nothing, and a verb
 outside the closed vocabulary never runs."""
-from odoo import SUPERUSER_ID, api
+from odoo import api
 from odoo.tests import tagged, TransactionCase
-from odoo.tests.common import new_test_user
+from odoo.addons.pns_ai_mcp.tests._helpers import (
+    SKIP_CONTACT_ORIGIN,
+    make_user,
+    one_cursor,
+)
 
 from odoo.addons.pns_ai_mcp.controllers.safe_plan import (
     execute_safe_plan,
@@ -19,40 +23,26 @@ class TestPaapCore(TransactionCase):
 
     def setUp(self):
         super().setUp()
-        # Seges: parche de tests E0′ (datos de prueba). Ver docs/pendiente/parches_pns_ai.md
-        # request_safe_plan escribe en un cursor propio: en modo test comparte la
-        # transacción del test y ve al usuario creado aquí (como HttpCase en Odoo 14).
-        self.registry.enter_test_mode(self.cr)
-        self.addCleanup(self.registry.leave_test_mode)
-        self.writer = new_test_user(
-            self.env, login='pns_paap_core_writer',
+        self.env = self.env(context=dict(self.env.context, **SKIP_CONTACT_ORIGIN))
+        self.writer = make_user(
+            self.env, 'pns_paap_core_writer',
             groups='base.group_user,base.group_partner_manager,'
                    'pns_ai_mcp.group_ai_writer',
         )
         self.env_w = api.Environment(self.env.cr, self.writer.id, {})
         self.partner = self.env['res.partner'].create({
-            'name': 'PAAP core', 'comment': 'before',
+            'name': 'PAAP core', 'ref': 'before',
         })
-
-    def _unlink_verification(self, verification_id):
-        if not verification_id:
-            return
-        with self.env.registry.cursor() as cr:
-            env = api.Environment(cr, SUPERUSER_ID, {})
-            env['ai.safe.operation'].search([
-                ('verification_id', '=', verification_id),
-            ]).unlink()
-            cr.commit()
 
     def test_paap_i1_a_proposal_changes_nothing_and_hands_out_no_credential(self):
         """PAAP I1: propose stores a pending plan; the record stays as it was."""
-        result = request_safe_plan(self.env_w, [{
-            'op': 'write', 'model': 'res.partner',
-            'ids': [self.partner.id], 'values': {'comment': 'after'},
-        }], title='PAAP I1')
-        self.addCleanup(self._unlink_verification, result.get('verification_id'))
+        with one_cursor(self):
+            result = request_safe_plan(self.env_w, [{
+                'op': 'write', 'model': 'res.partner',
+                'ids': [self.partner.id], 'values': {'ref': 'after'},
+            }], title='PAAP I1')
         self.assertTrue(result.get('success'), result)
-        self.assertEqual(self.partner.comment, 'before')
+        self.assertEqual(self.partner.ref, 'before')
         self.assertEqual(
             set(result),
             {'success', 'verification_id', 'plan', 'danger_level', 'title', 'user_id'},

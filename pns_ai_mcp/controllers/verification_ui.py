@@ -14,10 +14,10 @@ _logger = logging.getLogger(__name__)
 class MCPVerificationUI(http.Controller):
 
     def _get_owned_verification(self, verification_id):
-        """Devuelve la verificación si la sesión puede resolverla, o (None, error).
+        """Return the verification if the session can resolve it, or (None, error).
 
-        Estas rutas son la tarjeta del chat: solo el usuario que la solicitó.
-        Un AI Administrator resuelve las de otros en Autorizaciones, no aquí.
+        These routes are the chat card: only the user who requested it.
+        An AI Administrator resolves other users' ones in Authorizations, not here.
         """
         if not verification_id:
             return None, 'missing_id'
@@ -28,7 +28,7 @@ class MCPVerificationUI(http.Controller):
             return None, 'not_found'
         if verification.user_id.id != request.env.user.id:
             _logger.warning(
-                "MCP: usuario %s intentó confirmar/cancelar verificación %s de otro usuario %s",
+                "MCP: user %s tried to confirm/cancel verification %s of another user %s",
                 request.env.user.id, verification_id, verification.user_id.id
             )
             return None, 'forbidden'
@@ -51,7 +51,7 @@ class MCPVerificationUI(http.Controller):
 
     @http.route('/pns_ai_mcp/verification/confirm', type=JSON_ROUTE_TYPE, auth='user')
     def confirm(self, verification_id=None, confirm_token=None, **kwargs):
-        """Solo marca confirmed. Nunca ejecuta el plan (ver /execute)."""
+        """Only marks confirmed. Never runs the plan (see /execute)."""
         verification, error = self._get_owned_verification(verification_id)
         if error:
             return {'success': False, 'error': error}
@@ -77,7 +77,7 @@ class MCPVerificationUI(http.Controller):
 
     @http.route('/pns_ai_mcp/verification/execute', type=JSON_ROUTE_TYPE, auth='user')
     def execute(self, verification_id=None, confirm_token=None, **kwargs):
-        """Aplica el plan de una op ya confirmed. Timeouts; no cancela el confirm."""
+        """Apply the plan of an op that is already confirmed. Timeouts; does not cancel the confirm."""
         verification, error = self._get_owned_verification(verification_id)
         if error:
             return {'success': False, 'error': error}
@@ -140,7 +140,15 @@ class MCPVerificationUI(http.Controller):
         )
 
     @http.route('/pns_ai_mcp/verification/pending', type=JSON_ROUTE_TYPE, auth='user')
-    def pending(self, **kwargs):
-        """Read-only list of this user's pending cards (Security menu SoT)."""
-        items = request.env['ai.safe.operation'].pending_card_payloads()
+    def pending(self, peek=False, held=None, **kwargs):
+        """Read-only list of this user's pending cards (Security menu SoT).
+
+        ``peek`` is for a badge that only counts: it must not rotate the token
+        of a card already painted in the chat. ``held`` lists the cards this
+        screen already paints; only the others get a token.
+        """
+        items = request.env['ai.safe.operation'].pending_card_payloads(
+            mint_token=not peek,
+            held=held if isinstance(held, list) else None,
+        )
         return {'success': True, 'items': items}

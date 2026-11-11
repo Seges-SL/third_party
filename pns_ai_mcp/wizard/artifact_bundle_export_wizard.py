@@ -74,7 +74,7 @@ class AIArtifactBundleExportWizard(models.TransientModel):
     )
     export_tag = fields.Char(
         string='File tag',
-        help='Optional label (e.g. piloto, occ) inserted into the download file name '
+        help='Optional label (e.g. staging, test) inserted into the download file name '
              'between the Odoo instance and the artifact type. '
              'Pattern: timestamp_instance_tag_artifact.zip',
     )

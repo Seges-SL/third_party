@@ -157,6 +157,38 @@
             <field name="perm_unlink" eval="True"/>
         </record>
 
+        <!-- Skill param cache follows its skill: shared/module/own to read, own to edit -->
+        <record id="ai_skill_param_cache_user_rule" model="ir.rule">
+            <field name="name">AI Skill Param Cache: read shared and own skills</field>
+            <field name="model_id" ref="model_ai_skill_param_cache"/>
+            <field name="domain_force">['|', ('skill_id.owner_id', '=', False), ('skill_id.owner_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="ai_skill_param_cache_writer_rule" model="ir.rule">
+            <field name="name">AI Skill Param Cache: Writer edit own skills</field>
+            <field name="model_id" ref="model_ai_skill_param_cache"/>
+            <field name="domain_force">[('skill_id.owner_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_ai_writer'))]"/>
+            <field name="perm_read" eval="False"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+        <record id="ai_skill_param_cache_admin_rule" model="ir.rule">
+            <field name="name">AI Skill Param Cache: Admin full access</field>
+            <field name="model_id" ref="model_ai_skill_param_cache"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_ai_admin'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
         <!-- Safe Plan choices: each user only sees their own draft -->
         <record id="ai_safe_choice_user_rule" model="ir.rule">
             <field name="name">AI Safe Choice: own rows</field>

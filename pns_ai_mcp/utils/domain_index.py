@@ -283,7 +283,7 @@ def format_codes_with_age(
     ages: Optional[Dict[str, int]],
     codes: Optional[Sequence[str]] = None,
 ) -> str:
-    """``invoice_concepts (1), custom_occ_crm_team (2)``."""
+    """``invoice_concepts (1), custom_acme_crm_team (2)``."""
     order = parse_domain_codes(codes if codes is not None else list(ages or []))
     parts = []
     age_map = parse_domain_ages(ages)
@@ -485,10 +485,16 @@ def identity_detection_triggers(code: str, name: str) -> List[str]:
 
 
 def merge_trigger_lists(*groups: Sequence[Any]) -> List[str]:
-    """Dedupe by accent-folded key; keep first spelling; cap length."""
+    """Dedupe by accent-folded key; keep first spelling; cap each list.
+
+    The cap is per group, not per result: a generic list and a locale list
+    each keep up to ``DETECTION_TRIGGER_CAP`` of their own words, so a long
+    generic list never pushes the locale words out.
+    """
     out: List[str] = []
     seen = set()
     for group in groups:
+        taken = 0
         for item in group or []:
             text = str(item).strip()
             if len(text) < 2:
@@ -498,8 +504,9 @@ def merge_trigger_lists(*groups: Sequence[Any]) -> List[str]:
                 continue
             seen.add(key)
             out.append(text)
-            if len(out) >= DETECTION_TRIGGER_CAP:
-                return out
+            taken += 1
+            if taken >= DETECTION_TRIGGER_CAP:
+                break
     return out
 
 

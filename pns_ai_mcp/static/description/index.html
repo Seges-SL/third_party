@@ -4,207 +4,340 @@
 <meta charset="utf-8"/>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 <meta name="tdm-reservation" content="0"/>
-<title>AI Engine</title>
+<title>PNS AI Engine</title>
 </head>
 <body>
 <style>
-  .pns-apps {
-    --apps-brand: #875A7B;
-    --apps-accent: #C4A35A;
-    --apps-ink: #2B2A29;
-    --apps-muted: #5c6570;
-    --apps-line: #d7deea;
-    --apps-paper: #f4f7fb;
-    max-width: 820px;
-    margin: 0 auto;
-    padding: 28px 20px 40px;
-    color: var(--apps-ink);
-    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-    line-height: 1.55;
-  }
-  .pns-apps * { box-sizing: border-box; }
-  .pns-apps-hero {
-    text-align: center;
-    padding: 8px 0 28px;
-    border-bottom: 4px solid var(--apps-accent);
-  }
-  .pns-apps-hero img {
-    width: 112px;
-    height: 112px;
-    border-radius: 26px;
-    border: 3px solid var(--apps-brand);
-    background: #fff;
-    display: block;
-    margin: 0 auto 16px;
-  }
-  .pns-apps-hero h1 {
-    margin: 0 0 8px;
-    color: var(--apps-brand);
-    font-size: 1.85rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-  }
-  .pns-apps-hero p {
-    margin: 0 auto;
-    max-width: 36em;
-    color: var(--apps-muted);
-    font-size: 1.05rem;
-  }
-  .pns-apps-card {
-    margin-top: 22px;
-    padding: 20px 22px 18px;
-    background: #fff;
-    border: 1px solid var(--apps-line);
-    border-radius: 14px;
-  }
-  .pns-apps-card.alt { background: var(--apps-paper); }
-  .pns-apps-card h2 {
-    margin: 0 0 12px;
-    color: var(--apps-brand);
-    font-size: 1.15rem;
-  }
-  .pns-apps-card p { margin: 0 0 10px; }
-  .pns-apps-card p:last-child { margin-bottom: 0; }
-  .pns-apps-grid { display: block; }
-  .pns-apps-grid ul { margin: 0; padding-left: 1.15em; }
-  .pns-apps-grid li { margin: 0 0 10px; }
-  .pns-apps-grid li:last-child { margin-bottom: 0; }
-  .pns-apps-steps { margin: 0; padding-left: 1.2em; }
-  .pns-apps-steps li { margin: 0 0 8px; }
-  .pns-apps table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.95rem;
-  }
-  .pns-apps th, .pns-apps td {
-    text-align: left;
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--apps-line);
-    vertical-align: top;
-  }
-  .pns-apps th { background: var(--apps-brand); color: #fff; font-weight: 600; }
-  .pns-apps tr:nth-child(even) td { background: #eef3f9; }
-  .pns-apps code {
-    font-family: Consolas, "Courier New", monospace;
-    font-size: 0.88em;
-    background: #e8eef6;
-    padding: 1px 5px;
-    border-radius: 4px;
-  }
-  .pns-apps-foot { margin-top: 18px; color: var(--apps-muted); font-size: 0.92rem; }
-  .pns-apps-foot a { color: var(--apps-brand); }
-  @media (min-width: 700px) {
-    .pns-apps-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; }
+.pb * { box-sizing: border-box !important }
+.pb:not(:has(#es:target)) .pb-es { display: none !important }
+.pb:has(#es:target) .pb-en { display: none !important }
+.pb:has(#es:target) .pb-t-en { background: transparent !important; color: #6f6a67 !important }
+.pb:has(#es:target) .pb-t-es { background: #1A1A1A !important; color: #fff !important }
+.pb-big p:last-child { margin: 0 !important; font-weight: 600 !important; color: #1A1A1A !important }
+.pb-feat li:last-child { margin-bottom: 0 !important }
+.pb-steps li:before { content: counter(pbstep) !important; position: absolute !important; left: 18px !important; top: 16px !important; width: 32px !important; height: 32px !important; border-radius: 9px !important; background: #1A1A1A !important; color: #F7E112 !important; font-weight: 700 !important; text-align: center !important; line-height: 32px !important }
+@media (min-width: 760px) {
+  .pb-hero { display: grid !important; grid-template-columns: 1.1fr 1fr !important; gap: 36px !important; align-items: center !important }
+  .pb-dark { margin-top: 0 !important }
+  .pb h1 { font-size: 46px !important }
+  .pb-pains { display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 14px !important }
+  .pb-pain { margin-bottom: 0 !important }
+  .pb-feats { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 14px !important }
+  .pb-feat { margin-bottom: 0 !important }
+
   }
 </style>
-<div class="pns-apps">
-  <header class="pns-apps-hero">
-    <img src="icon.png" alt="AI Engine"/>
-    <h1>AI Engine</h1>
-    <p>Patanegra AI engine and MCP server for Odoo. Reference host of PAAP &mdash; the Patanegra Application Agent Protocol.</p>
-  </header>
+<div class="pb" style="max-width: 960px; margin: 0 auto; padding: 0 0 32px; background-color: #f3f1f0; color: #1A1A1A; font-family: Inter, 'Segoe UI', system-ui, -apple-system, sans-serif; font-size: 15px; line-height: 1.55">
+  <span id="en" class="pb-target" style="display: block; height: 0; scroll-margin-top: 64px"></span>
 
-  <section class="pns-apps-card">
-    <h2>Where to configure</h2>
-    <p>
-      <strong>AI Engine</strong> app (not Settings &rarr; General Settings, not
-      Technical). Providers, agents, URL whitelist and MCP users live in that
-      app.
-    </p>
-    <p>
-      Paste the provider API key on the <strong>provider</strong> form. Set
-      failover order on the <strong>agent</strong> (the Chatboo agent, or the
-      one your MCP user uses). Secrets never travel in the addon.
-    </p>
-  </section>
+  <div class="pb-bar" style="display: flex; align-items: center; padding: 14px 24px; background-color: #fff; border-bottom: 1px solid #e6e2e0; position: sticky; top: 0; z-index: 1">
+    <div class="pb-brand" style="font-weight: 800; font-size: 14px; letter-spacing: 0.06em">PATANEGRA<small style="display: block; font-size: 10px; color: #8a8582; letter-spacing: 0.18em; font-weight: 600">SOFT</small></div>
+    <div class="pb-tabs" style="background-color: #f3f1f0; border-radius: 999px; padding: 4px; white-space: nowrap; margin-left: auto"><a class="pb-t-en" href="#en" style="display: inline-block; padding: 5px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; text-decoration: none; background-color: #1A1A1A; color: #fff">EN</a><a class="pb-t-es" href="#es" style="display: inline-block; padding: 5px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; text-decoration: none; color: #6f6a67">ES</a></div>
+  </div>
 
-  <section class="pns-apps-card alt">
-    <h2>What it is</h2>
-    <p>
-      The <strong>product</strong> AI layer. It owns providers, agents, contexts,
-      skills, Safe Plan writes and the MCP endpoint that Cursor (and other
-      clients) call. Chatboo is a separate module: it owns the conversation UI
-      and talks to this engine. This module does not depend on Chatboo.
-    </p>
-    <p>
-      Knowledge that is generic to the suite lives here (geo fabric, partners,
-      accounting, ACL&hellip;). Customer-only skills and connectors belong in
-      an optional domain module, not in this repo.
-    </p>
-  </section>
+  <!-- ============================== ENGLISH ============================== -->
+  <div class="pb-en" lang="en">
 
-  <section class="pns-apps-card">
-    <h2>What it ships</h2>
-    <div class="pns-apps-grid">
-      <ul>
-        <li><strong>MCP server</strong> &mdash; tools and prompts for Cursor and other MCP clients. The instance is the source of truth; clients do not keep a second copy of skills.</li>
-        <li><strong>Inference</strong> &mdash; LLM drivers (OpenAI-compatible, Anthropic, Ollama, &hellip;) and provider failover on the agent. A key is pasted per instance; it never travels in the module.</li>
-        <li><strong>Safe Plan</strong> &mdash; proposed writes wait for a human Confirm in Odoo. The engine does not apply ORM writes behind the operator&rsquo;s back.</li>
-      </ul>
-      <ul>
-        <li><strong>Knowledge</strong> &mdash; product contexts and skills (<code>pns_*</code>). Domain cheat-sheets regenerate; they are not versioned as customer dumps.</li>
-        <li><strong>External APIs</strong> &mdash; OpenAPI / MCP servers plus a typed URL whitelist. A whitelist row is a hostname, not a secret.</li>
-        <li><strong>PAAP</strong> &mdash; the open agent protocol this engine implements. Chatboo, OCR and future UIs are consumers, not a second engine.</li>
-      </ul>
-    </div>
-  </section>
+    <section class="pb-sec pb-hero" style="padding: 36px 24px 0; display: block">
+      <div>
+        <p class="pb-eyebrow" style="margin: 0 0 14px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #6f6a67"><span style="display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 2px; background-color: #F7E112"></span>Odoo 14 to 20</p>
+        <h1 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 16px; font-size: 40px; line-height: 1.06; font-weight: 700">AI inside your Odoo, for consultants.</h1>
+        <p class="pb-lead" style="margin: 0 0 22px; font-size: 17px; color: #565150; max-width: 34em">
+          The AI Engine runs in your client's Odoo. Providers, agents,
+          knowledge and approvals are Odoo records, and the agents live in
+          plain Odoo modules. Open source, nothing to license.
+        </p>
+      </div>
+      <div class="pb-dark" style="margin-top: 24px; padding: 24px; border-radius: 22px; background-color: #141414; color: #fff">
+        <p class="pb-dark-head" style="margin: 0 0 12px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #9a9591">Odoo series</p>
+        <p class="pb-series"><span style="display: inline-block; margin: 0 5px 7px 0; padding: 5px 11px; border-radius: 8px; font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 13px; font-weight: 600; background-color: #F7E112; color: #1A1A1A">14.0</span><span style="display: inline-block; margin: 0 5px 7px 0; padding: 5px 11px; border-radius: 8px; font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 13px; font-weight: 600; background-color: #F7E112; color: #1A1A1A">19.0</span></p>
+        <p class="pb-dark-note" style="margin: 6px 0 18px; font-size: 13px; color: #b4afab">Tested, with a branch ready to install.</p>
+        <div class="pb-app" style="display: flex; align-items: center; padding: 12px 14px; border-radius: 16px; background-color: #fff; color: #1A1A1A">
+          <img src="icon.png" alt="PNS AI Engine" style="width: 52px; height: 52px; flex: none; display: block" />
+          <div style="margin-left: 14px"><b style="display: block; font-size: 15px">PNS AI Engine</b><span style="font-size: 13px; color: #7a7570">MCP server with open providers</span></div>
+        </div>
+      </div>
+    </section>
 
-  <section class="pns-apps-card alt">
-    <h2>What it does not do</h2>
-    <ul>
-      <li><strong>No chat UI</strong> &mdash; that is <code>pns_ai_chatboo</code>. Install Chatboo if people will talk from the Odoo systray.</li>
-      <li><strong>No customer pack</strong> &mdash; tenant skills, connector tokens and a site-specific failover chain belong in an optional domain module.</li>
-      <li><strong>No map HTTP</strong> &mdash; geocoding and routes go through <code>pns_geo</code> / <code>geo.service</code>. The engine must not call Google or OSM itself.</li>
-      <li><strong>No secrets in the addon</strong> &mdash; provider keys, API tokens and <code>env</code> credentials stay in the database (or the instance env). The module only leaves the slot.</li>
-    </ul>
-  </section>
+    <section class="pb-sec" style="padding: 36px 24px 0">
+      <h2 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 18px; font-size: 28px; font-weight: 700">The pain</h2>
+      <div class="pb-big" style="padding: 28px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4; border-left-width: 8px; border-left-style: solid; border-left-color: #F7E112">
+        <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 12px; font-size: 24px; line-height: 1.25">AI for your clients <em style="font-style: normal; border-bottom: 3px solid #F7E112">as just another module</em>. Open source, no licences.</h3>
+        <p style="margin: 0 0 10px; color: #4a4643; font-size: 16px">
+          Not a service on the side that you connect client by client. An AI
+          that installs, updates and uninstalls like any other module, on the
+          Odoo the client already runs.
+        </p>
+        <p style="margin: 0 0 10px; color: #4a4643; font-size: 16px">Here the agents live in plain Odoo modules.</p>
+      </div>
+      <div class="pb-pains" style="margin-top: 18px">
+        <div class="pb-pain" style="margin-bottom: 14px; padding: 24px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4">
+          <span class="pb-n" style="display: block; margin-bottom: 10px; font-size: 40px; font-weight: 700; color: #e9e4e1; line-height: 1; font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em">01</span>
+          <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 8px; font-size: 19px; line-height: 1.3; font-weight: 600">Tied to <em style="font-style: normal; border-bottom: 3px solid #F7E112">one provider</em>?</h3>
+          <p style="margin: 0; font-style: italic; color: #6f6a67">Add several, each for its job: conversation, audio, vision, video. If one fails, the next one answers.</p>
+        </div>
+        <div class="pb-pain" style="margin-bottom: 14px; padding: 24px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4">
+          <span class="pb-n" style="display: block; margin-bottom: 10px; font-size: 40px; font-weight: 700; color: #e9e4e1; line-height: 1; font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em">02</span>
+          <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 8px; font-size: 19px; line-height: 1.3; font-weight: 600">What if the AI <em style="font-style: normal; border-bottom: 3px solid #F7E112">writes in production</em>?</h3>
+          <p style="margin: 0; font-style: italic; color: #6f6a67">Its code runs in a read-only sandbox. To change anything it proposes a plan, and a person approves it.</p>
+        </div>
+        <div class="pb-pain" style="margin-bottom: 14px; padding: 24px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4">
+          <span class="pb-n" style="display: block; margin-bottom: 10px; font-size: 40px; font-weight: 700; color: #e9e4e1; line-height: 1; font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em">03</span>
+          <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 8px; font-size: 19px; line-height: 1.3; font-weight: 600">A closed prompt that <em style="font-style: normal; border-bottom: 3px solid #F7E112">does not know your client</em>?</h3>
+          <p style="margin: 0; font-style: italic; color: #6f6a67">Contexts are edited and extended inside Odoo: their vocabulary, their rules, their habits.</p>
+        </div>
+      </div>
+    </section>
 
-  <section class="pns-apps-card">
-    <h2>How to configure</h2>
-    <ol class="pns-apps-steps">
-      <li>Before Apps: in the Odoo Python, on Odoo 14 install <code>openpyxl&gt;=3.1.2</code> (Odoo 19 needs no extra). Then install <code>pns_base</code> and this module. Install <code>pns_geo</code> if maps or geocoding will be used.</li>
-      <li>Open the <strong>AI Engine</strong> app. Create or open a provider, paste the API key, pick a model and save.</li>
-      <li>On the Chatboo agent (or the agent your MCP user uses), set the provider and the failover chain. Order is on the agent, not in Chatboo.</li>
-      <li>If Cursor will call this instance: in <strong>AI Engine &rarr; Security &rarr; Users</strong>, create an MCP user and copy its API key. Point the client at <code>https://&lt;this-instance&gt;/mcp</code> and send the key in the <code>X-MCP-API-Key</code> header (in Cursor, the <code>headers</code> field of the server entry in <code>mcp.json</code>). The key is not accepted in the URL. Whitelist any extra hostnames the tools need.</li>
-      <li>If a customer pack exists, install it after the engine so its skills and connectors seed on top. Paste those tokens there, not here.</li>
-    </ol>
-  </section>
+    <section class="pb-sec" style="padding: 36px 24px 0">
+      <h2 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 18px; font-size: 28px; font-weight: 700">What you get</h2>
+      <div class="pb-feats">
+        <div class="pb-feat" style="margin-bottom: 14px; padding: 24px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4">
+          <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 12px; font-size: 19px">Agents that are Odoo</h3>
+          <ul style="margin: 0; padding-left: 1.1em">
+            <li style="margin: 0 0 8px">An agent is a record that a module brings with it. Install the module and the agent is there; uninstall it and it goes.</li>
+            <li style="margin: 0 0 8px">Each agent has its own list of providers, in the order you set.</li>
+            <li style="margin: 0 0 8px">Everything is in the client's database: no second copy somewhere else.</li>
+          </ul>
+        </div>
+        <div class="pb-feat" style="margin-bottom: 14px; padding: 24px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4">
+          <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 12px; font-size: 19px">Providers for each task</h3>
+          <ul style="margin: 0; padding-left: 1.1em">
+            <li style="margin: 0 0 8px">OpenAI and any OpenAI-compatible endpoint, Anthropic, OpenRouter. A local model (Ollama, LM Studio) on the client's own server works too.</li>
+            <li style="margin: 0 0 8px">Roles per provider: conversation, audio, vision, video, page layout, turning a phrase into a skill's fields, yes-or-no decisions.</li>
+            <li style="margin: 0 0 8px">If one provider fails, the next one in the list answers.</li>
+            <li style="margin: 0 0 8px">The key stays in the client's database, never in the module.</li>
+          </ul>
+        </div>
+        <div class="pb-feat" style="margin-bottom: 14px; padding: 24px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4">
+          <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 12px; font-size: 19px">A sandbox and a person</h3>
+          <ul style="margin: 0; padding-left: 1.1em">
+            <li style="margin: 0 0 8px">The code the AI writes reads in a read-only transaction, with the rights of the person who asked.</li>
+            <li style="margin: 0 0 8px">A change to Odoo is a plan that waits for a person to approve it in Odoo.</li>
+            <li style="margin: 0 0 8px">Every call is logged: each user sees their own activity, the administrator sees all of it.</li>
+            <li style="margin: 0 0 8px">Outside addresses only from a whitelist you keep.</li>
+          </ul>
+        </div>
+        <div class="pb-feat" style="margin-bottom: 14px; padding: 24px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4">
+          <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 12px; font-size: 19px">Knowledge you own</h3>
+          <ul style="margin: 0; padding-left: 1.1em">
+            <li style="margin: 0 0 8px">Contexts: the client's words, rules and habits, edited in Odoo.</li>
+            <li style="margin: 0 0 8px">Skills: procedures written once and launched by name. Their tables and charts come from code, not from the AI.</li>
+            <li style="margin: 0 0 8px">Export the whole AI setup of one client to a file and import it at the next one.</li>
+          </ul>
+        </div>
+        <div class="pb-feat" style="margin-bottom: 14px; padding: 24px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4">
+          <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 12px; font-size: 19px">An MCP server in the client's Odoo</h3>
+          <ul style="margin: 0; padding-left: 1.1em">
+            <li style="margin: 0 0 8px">Cursor and other MCP clients connect to <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">/mcp</code> with a personal key.</li>
+            <li style="margin: 0 0 8px">No admin password goes anywhere. Each key reads with its user's rights.</li>
+            <li style="margin: 0 0 8px">The client's own model does the thinking; Odoo answers its tool calls. No provider needed for that.</li>
+          </ul>
+        </div>
+        <div class="pb-feat" style="margin-bottom: 14px; padding: 24px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4">
+          <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 12px; font-size: 19px">Nothing to license</h3>
+          <ul style="margin: 0; padding-left: 1.1em">
+            <li style="margin: 0 0 8px">Apache 2.0. No fee per user, per database or per year.</li>
+            <li style="margin: 0 0 8px">A plain Odoo module: no external server to run.</li>
+            <li style="margin: 0 0 8px">Same module at every client on a supported series.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
 
-  <section class="pns-apps-card alt">
-    <h2>Family</h2>
-    <table>
-      <thead>
-        <tr><th>Module</th><th>Where</th><th>Role</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><code>pns_ai_mcp</code></td>
-          <td>O14 and O19</td>
-          <td>This engine: providers, knowledge, MCP, Safe Plan</td>
-        </tr>
-        <tr>
-          <td><code>pns_ai_chatboo</code></td>
-          <td>O14 and O19</td>
-          <td>In-Odoo chat UI; depends on the engine</td>
-        </tr>
-        <tr>
-          <td>Optional domain module</td>
-          <td>Same majors as that pack</td>
-          <td>Customer skills and connectors. Product never depends on it.</td>
-        </tr>
-      </tbody>
-    </table>
-    <p class="pns-apps-foot">
-      UI source in English. Layout: <code>common/</code> plus OWL1 (O13&ndash;14) and OWL2 (O15&ndash;19+) stacks.
-    </p>
-    <p class="pns-apps-foot">
-      <a href="https://patanegra.com">PATANEGRA Soft</a>&trade;
-      &mdash; Apache License 2.0 (OSI approved). See <a href="LICENSE">LICENSE</a>
-      and <a href="NOTICE">NOTICE</a>.
-      PATANEGRA Soft, PATANEGRA Soft Suite, Chatboo and PAAP are trademarks of
-      PATANEGRA Soft SL. The Apache license does not grant trademark rights.
-    </p>
-  </section>
+    <section class="pb-sec" style="padding: 36px 24px 0">
+      <h2 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 18px; font-size: 28px; font-weight: 700">Getting started</h2>
+      <ol class="pb-steps" style="margin: 0; padding: 0; list-style: none; counter-reset: pbstep">
+        <li style="position: relative; margin-bottom: 12px; padding: 18px 20px 18px 66px; border-radius: 16px; background-color: #fff; border: 1px solid #ebe7e4; counter-increment: pbstep">
+          <b style="display: block; margin-bottom: 4px">Install.</b>
+          <p style="margin: 0; color: #4a4643">Clone the <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">14.0</code> or <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">19.0</code> branch of <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">pns_ai_mcp</code> and <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">pns_base</code> into the addons path and install <strong>PNS AI Engine</strong> from Apps. On Odoo 14, first run <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">pip install "openpyxl&gt;=3.1.2"</code>.</p>
+        </li>
+        <li style="position: relative; margin-bottom: 12px; padding: 18px 20px 18px 66px; border-radius: 16px; background-color: #fff; border: 1px solid #ebe7e4; counter-increment: pbstep">
+          <b style="display: block; margin-bottom: 4px">Become AI administrator.</b>
+          <p style="margin: 0; color: #4a4643"><strong>Settings &rarr; Users</strong>: give yourself <strong>AI Administrator</strong>. Log out and back in.</p>
+        </li>
+        <li style="position: relative; margin-bottom: 12px; padding: 18px 20px 18px 66px; border-radius: 16px; background-color: #fff; border: 1px solid #ebe7e4; counter-increment: pbstep">
+          <b style="display: block; margin-bottom: 4px">Get your API key.</b>
+          <p style="margin: 0; color: #4a4643"><strong>AI Engine &rarr; Security &rarr; Users</strong>: your row, tick <strong>AI Conversational</strong> and press <strong>Generate API Key</strong>.</p>
+        </li>
+        <li style="position: relative; margin-bottom: 12px; padding: 18px 20px 18px 66px; border-radius: 16px; background-color: #fff; border: 1px solid #ebe7e4; counter-increment: pbstep">
+          <b style="display: block; margin-bottom: 4px">Add a provider.</b>
+          <p style="margin: 0; color: #4a4643"><strong>AI Engine &rarr; Connections &rarr; Providers</strong>: protocol, endpoint, API key and model, with the <strong>Conversation</strong> role.</p>
+        </li>
+      </ol>
+      <p class="pb-tip" style="margin: 14px 0 0; padding: 14px 18px; border-radius: 14px; background-color: #1A1A1A; color: #e6e2e0"><b style="color: #F7E112">Done.</b> Point Cursor (or any MCP client) at <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">https://&lt;your-odoo&gt;/mcp</code> with the key in the <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">X-MCP-API-Key</code> header.</p>
+    </section>
+
+    <section class="pb-sec" style="padding: 36px 24px 0">
+      <div class="pb-src" style="padding: 24px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4">
+        <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 10px; font-size: 19px">Source code</h3>
+        <p style="margin: 0">On GitHub: <a href="https://github.com/patanegra-soft/pns_ai_mcp" style="color: #1A1A1A">patanegra-soft/pns_ai_mcp</a>.</p>
+        <ul style="margin: 0 0 10px; padding-left: 1.1em">
+          <li style="margin: 0 0 6px"><code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">main</code> is one tree for every series: shared code in <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">common/</code> and one stack per OWL generation (<code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">owl1</code> for Odoo 14 and 15, <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">owl2</code> for 16 to 19, <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">owl3</code> for 20).</li>
+          <li style="margin: 0 0 6px"><code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">./install_flat.sh 19.0 &lt;dir&gt;</code> builds the flat module of a series. The branches <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">14.0</code> to <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">20.0</code> are that result, ready for the addons path.</li>
+          <li style="margin: 0 0 6px">Tests without a database (<code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">unit_tests/</code>, pytest) live in <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">main</code>. The Odoo tests travel with the module.</li>
+        </ul>
+        <p style="margin: 0">Bugs: an issue, with the bug form. Ideas and questions: Discussions.</p>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ============================== ESPA&#209;OL ============================== -->
+  <span id="es" class="pb-target" style="display: block; height: 0; scroll-margin-top: 64px"></span>
+  <div class="pb-es" lang="es">
+
+    <section class="pb-sec pb-hero" style="padding: 36px 24px 0; display: block">
+      <div>
+        <p class="pb-eyebrow" style="margin: 0 0 14px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #6f6a67"><span style="display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 2px; background-color: #F7E112"></span>Odoo 14 a 20</p>
+        <h1 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 16px; font-size: 40px; line-height: 1.06; font-weight: 700">IA dentro de tu Odoo, para consultores.</h1>
+        <p class="pb-lead" style="margin: 0 0 22px; font-size: 17px; color: #565150; max-width: 34em">
+          El Motor de IA corre en el Odoo de tu cliente. Proveedores,
+          agentes, conocimiento y aprobaciones son registros de Odoo, y los
+          agentes viven en m&#243;dulos normales de Odoo. C&#243;digo abierto, nada que licenciar.
+        </p>
+      </div>
+      <div class="pb-dark" style="margin-top: 24px; padding: 24px; border-radius: 22px; background-color: #141414; color: #fff">
+        <p class="pb-dark-head" style="margin: 0 0 12px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #9a9591">Versiones de Odoo</p>
+        <p class="pb-series"><span style="display: inline-block; margin: 0 5px 7px 0; padding: 5px 11px; border-radius: 8px; font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 13px; font-weight: 600; background-color: #F7E112; color: #1A1A1A">14.0</span><span style="display: inline-block; margin: 0 5px 7px 0; padding: 5px 11px; border-radius: 8px; font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 13px; font-weight: 600; background-color: #F7E112; color: #1A1A1A">19.0</span></p>
+        <p class="pb-dark-note" style="margin: 6px 0 18px; font-size: 13px; color: #b4afab">Probadas, con una rama lista para instalar.</p>
+        <div class="pb-app" style="display: flex; align-items: center; padding: 12px 14px; border-radius: 16px; background-color: #fff; color: #1A1A1A">
+          <img src="icon.png" alt="PNS AI Engine" style="width: 52px; height: 52px; flex: none; display: block" />
+          <div style="margin-left: 14px"><b style="display: block; font-size: 15px">PNS AI Engine</b><span style="font-size: 13px; color: #7a7570">Servidor MCP con proveedores abiertos</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="pb-sec" style="padding: 36px 24px 0">
+      <h2 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 18px; font-size: 28px; font-weight: 700">El dolor</h2>
+      <div class="pb-big" style="padding: 28px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4; border-left-width: 8px; border-left-style: solid; border-left-color: #F7E112">
+        <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 12px; font-size: 24px; line-height: 1.25">IA para tus clientes <em style="font-style: normal; border-bottom: 3px solid #F7E112">como un m&#243;dulo m&#225;s</em>. C&#243;digo abierto, sin licencias.</h3>
+        <p style="margin: 0 0 10px; color: #4a4643; font-size: 16px">
+          No un servicio al lado que conectas cliente a cliente. Una IA que se
+          instala, se actualiza y se desinstala como cualquier otro m&#243;dulo, en
+          el Odoo que el cliente ya tiene.
+        </p>
+        <p style="margin: 0 0 10px; color: #4a4643; font-size: 16px">Aqu&#237; los agentes viven en m&#243;dulos normales de Odoo.</p>
+      </div>
+      <div class="pb-pains" style="margin-top: 18px">
+        <div class="pb-pain" style="margin-bottom: 14px; padding: 24px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4">
+          <span class="pb-n" style="display: block; margin-bottom: 10px; font-size: 40px; font-weight: 700; color: #e9e4e1; line-height: 1; font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em">01</span>
+          <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 8px; font-size: 19px; line-height: 1.3; font-weight: 600">&#191;Atado a <em style="font-style: normal; border-bottom: 3px solid #F7E112">un proveedor</em>?</h3>
+          <p style="margin: 0; font-style: italic; color: #6f6a67">Pon varios, cada uno para lo suyo: conversaci&#243;n, audio, imagen, v&#237;deo. Si uno cae, responde el siguiente.</p>
+        </div>
+        <div class="pb-pain" style="margin-bottom: 14px; padding: 24px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4">
+          <span class="pb-n" style="display: block; margin-bottom: 10px; font-size: 40px; font-weight: 700; color: #e9e4e1; line-height: 1; font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em">02</span>
+          <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 8px; font-size: 19px; line-height: 1.3; font-weight: 600">&#191;Y si la IA <em style="font-style: normal; border-bottom: 3px solid #F7E112">escribe en producci&#243;n</em>?</h3>
+          <p style="margin: 0; font-style: italic; color: #6f6a67">Su c&#243;digo corre en una caja de arena de solo lectura. Para cambiar algo propone un plan, y lo aprueba una persona.</p>
+        </div>
+        <div class="pb-pain" style="margin-bottom: 14px; padding: 24px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4">
+          <span class="pb-n" style="display: block; margin-bottom: 10px; font-size: 40px; font-weight: 700; color: #e9e4e1; line-height: 1; font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em">03</span>
+          <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 8px; font-size: 19px; line-height: 1.3; font-weight: 600">&#191;Un prompt cerrado que <em style="font-style: normal; border-bottom: 3px solid #F7E112">no conoce a tu cliente</em>?</h3>
+          <p style="margin: 0; font-style: italic; color: #6f6a67">Los contextos se editan y se ampl&#237;an en el propio Odoo: su vocabulario, sus reglas, sus costumbres.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="pb-sec" style="padding: 36px 24px 0">
+      <h2 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 18px; font-size: 28px; font-weight: 700">Qu&#233; te llevas</h2>
+      <div class="pb-feats">
+        <div class="pb-feat" style="margin-bottom: 14px; padding: 24px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4">
+          <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 12px; font-size: 19px">Agentes que son Odoo</h3>
+          <ul style="margin: 0; padding-left: 1.1em">
+            <li style="margin: 0 0 8px">Un agente es un registro que trae un m&#243;dulo. Instalas el m&#243;dulo y el agente est&#225;; lo desinstalas y se va.</li>
+            <li style="margin: 0 0 8px">Cada agente tiene su propia lista de proveedores, en el orden que t&#250; pongas.</li>
+            <li style="margin: 0 0 8px">Todo est&#225; en la base de datos del cliente: no hay una segunda copia en otro sitio.</li>
+          </ul>
+        </div>
+        <div class="pb-feat" style="margin-bottom: 14px; padding: 24px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4">
+          <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 12px; font-size: 19px">Proveedores para cada tarea</h3>
+          <ul style="margin: 0; padding-left: 1.1em">
+            <li style="margin: 0 0 8px">OpenAI y cualquier servicio compatible con OpenAI, Anthropic, OpenRouter. Tambi&#233;n un modelo local (Ollama, LM Studio) en el propio servidor del cliente.</li>
+            <li style="margin: 0 0 8px">Roles por proveedor: conversaci&#243;n, audio, imagen, v&#237;deo, maquetar una p&#225;gina, pasar una frase a los campos de un skill, decisiones de s&#237; o no.</li>
+            <li style="margin: 0 0 8px">Si un proveedor falla, responde el siguiente de la lista.</li>
+            <li style="margin: 0 0 8px">La clave se queda en la base de datos del cliente, nunca en el m&#243;dulo.</li>
+          </ul>
+        </div>
+        <div class="pb-feat" style="margin-bottom: 14px; padding: 24px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4">
+          <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 12px; font-size: 19px">Una caja de arena y una persona</h3>
+          <ul style="margin: 0; padding-left: 1.1em">
+            <li style="margin: 0 0 8px">El c&#243;digo que escribe la IA lee en una transacci&#243;n de solo lectura, con los permisos de quien pregunt&#243;.</li>
+            <li style="margin: 0 0 8px">Un cambio en Odoo es un plan que espera a que una persona lo apruebe en Odoo.</li>
+            <li style="margin: 0 0 8px">Cada llamada queda registrada: cada usuario ve su actividad, el administrador la de todos.</li>
+            <li style="margin: 0 0 8px">Direcciones de fuera, solo las de una lista blanca que t&#250; mantienes.</li>
+          </ul>
+        </div>
+        <div class="pb-feat" style="margin-bottom: 14px; padding: 24px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4">
+          <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 12px; font-size: 19px">Conocimiento tuyo</h3>
+          <ul style="margin: 0; padding-left: 1.1em">
+            <li style="margin: 0 0 8px">Contextos: las palabras, reglas y costumbres del cliente, editadas en Odoo.</li>
+            <li style="margin: 0 0 8px">Skills: procedimientos que se escriben una vez y se lanzan por su nombre. Sus tablas y gr&#225;ficos salen del c&#243;digo, no de la IA.</li>
+            <li style="margin: 0 0 8px">Exportas toda la configuraci&#243;n de IA de un cliente a un fichero y la importas en el siguiente.</li>
+          </ul>
+        </div>
+        <div class="pb-feat" style="margin-bottom: 14px; padding: 24px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4">
+          <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 12px; font-size: 19px">Un servidor MCP en el Odoo del cliente</h3>
+          <ul style="margin: 0; padding-left: 1.1em">
+            <li style="margin: 0 0 8px">Cursor y otros clientes MCP se conectan a <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">/mcp</code> con una clave personal.</li>
+            <li style="margin: 0 0 8px">Ninguna contrase&#241;a de administrador sale de Odoo. Cada clave lee con los permisos de su usuario.</li>
+            <li style="margin: 0 0 8px">Piensa el modelo del propio cliente MCP; Odoo responde a sus llamadas. Para eso no hace falta proveedor.</li>
+          </ul>
+        </div>
+        <div class="pb-feat" style="margin-bottom: 14px; padding: 24px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4">
+          <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 12px; font-size: 19px">Nada que licenciar</h3>
+          <ul style="margin: 0; padding-left: 1.1em">
+            <li style="margin: 0 0 8px">Apache 2.0. Sin cuota por usuario, por base de datos ni por a&#241;o.</li>
+            <li style="margin: 0 0 8px">Un m&#243;dulo de Odoo normal: sin servidor externo que mantener.</li>
+            <li style="margin: 0 0 8px">El mismo m&#243;dulo en todos los clientes de una versi&#243;n soportada.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="pb-sec" style="padding: 36px 24px 0">
+      <h2 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 18px; font-size: 28px; font-weight: 700">Puesta en marcha</h2>
+      <ol class="pb-steps" style="margin: 0; padding: 0; list-style: none; counter-reset: pbstep">
+        <li style="position: relative; margin-bottom: 12px; padding: 18px 20px 18px 66px; border-radius: 16px; background-color: #fff; border: 1px solid #ebe7e4; counter-increment: pbstep">
+          <b style="display: block; margin-bottom: 4px">Instala.</b>
+          <p style="margin: 0; color: #4a4643">Clona la rama <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">14.0</code> o <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">19.0</code> de <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">pns_ai_mcp</code> y de <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">pns_base</code> en el addons path e instala <strong>PNS AI Engine</strong> desde Aplicaciones. En Odoo 14, antes, <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">pip install "openpyxl&gt;=3.1.2"</code>.</p>
+        </li>
+        <li style="position: relative; margin-bottom: 12px; padding: 18px 20px 18px 66px; border-radius: 16px; background-color: #fff; border: 1px solid #ebe7e4; counter-increment: pbstep">
+          <b style="display: block; margin-bottom: 4px">Hazte administrador de IA.</b>
+          <p style="margin: 0; color: #4a4643"><strong>Ajustes &rarr; Usuarios</strong>: date <strong>IA Administrador</strong>. Sal y vuelve a entrar.</p>
+        </li>
+        <li style="position: relative; margin-bottom: 12px; padding: 18px 20px 18px 66px; border-radius: 16px; background-color: #fff; border: 1px solid #ebe7e4; counter-increment: pbstep">
+          <b style="display: block; margin-bottom: 4px">Saca tu clave API.</b>
+          <p style="margin: 0; color: #4a4643"><strong>Motor de IA &rarr; Seguridad &rarr; Usuarios</strong>: tu fila, marca <strong>IA Conversacional</strong> y pulsa <strong>Generar Clave API</strong>.</p>
+        </li>
+        <li style="position: relative; margin-bottom: 12px; padding: 18px 20px 18px 66px; border-radius: 16px; background-color: #fff; border: 1px solid #ebe7e4; counter-increment: pbstep">
+          <b style="display: block; margin-bottom: 4px">Pon un proveedor.</b>
+          <p style="margin: 0; color: #4a4643"><strong>Motor de IA &rarr; Conexiones &rarr; Proveedores</strong>: protocolo, direcci&#243;n, clave API y modelo, con el rol <strong>Conversaci&#243;n</strong>.</p>
+        </li>
+      </ol>
+      <p class="pb-tip" style="margin: 14px 0 0; padding: 14px 18px; border-radius: 14px; background-color: #1A1A1A; color: #e6e2e0"><b style="color: #F7E112">Listo.</b> Apunta Cursor (o cualquier cliente MCP) a <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">https://&lt;tu-odoo&gt;/mcp</code> con la clave en la cabecera <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">X-MCP-API-Key</code>.</p>
+    </section>
+
+    <section class="pb-sec" style="padding: 36px 24px 0">
+      <div class="pb-src" style="padding: 24px; border-radius: 20px; background-color: #fff; border: 1px solid #ebe7e4">
+        <h3 style="font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; margin: 0 0 10px; font-size: 19px">C&#243;digo fuente</h3>
+        <p style="margin: 0">En GitHub: <a href="https://github.com/patanegra-soft/pns_ai_mcp" style="color: #1A1A1A">patanegra-soft/pns_ai_mcp</a>.</p>
+        <ul style="margin: 0 0 10px; padding-left: 1.1em">
+          <li style="margin: 0 0 6px"><code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">main</code> es un solo &#225;rbol para todas las versiones: c&#243;digo com&#250;n en <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">common/</code> y una pila por generaci&#243;n de OWL (<code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">owl1</code> para Odoo 14 y 15, <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">owl2</code> de la 16 a la 19, <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">owl3</code> para la 20).</li>
+          <li style="margin: 0 0 6px"><code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">./install_flat.sh 19.0 &lt;dir&gt;</code> construye el m&#243;dulo plano de una versi&#243;n. Las ramas de la <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">14.0</code> a la <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">20.0</code> son ese resultado, listas para el addons path.</li>
+          <li style="margin: 0 0 6px">Los tests sin base de datos (<code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">unit_tests/</code>, pytest) viven en <code style="font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 0.88em; background-color: #ebe7e4; padding: 1px 6px; border-radius: 5px">main</code>. Los tests de Odoo viajan con el m&#243;dulo.</li>
+        </ul>
+        <p style="margin: 0">Errores: un issue, con el formulario de error. Ideas y preguntas: Discussions.</p>
+      </div>
+    </section>
+
+  </div>
+
+  <footer class="pb-foot" style="padding: 28px 24px 0; font-size: 13px; color: #8a8582">
+    <a href="https://patanegra.com" style="color: #6f6a67">PATANEGRA Soft</a>&trade; &mdash; Apache License 2.0.
+    <a href="LICENSE" style="color: #6f6a67">LICENSE</a> &middot; <a href="NOTICE" style="color: #6f6a67">NOTICE</a>.
+    PATANEGRA Soft and PAAP are trademarks of PATANEGRA Soft SL.
+    The Apache license does not grant trademark rights.
+  </footer>
 </div>
 </body>
 </html>

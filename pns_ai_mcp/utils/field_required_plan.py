@@ -177,7 +177,7 @@ def step_requested_view_ids(env, step):
     return out
 
 
-def chatboo_preselected_view_id(env, model):
+def screen_preselected_view_id(env, model):
     """Primary view under the chat, if the client put the screen in context."""
     ctx = getattr(env, 'context', None) or {}
     raw = ctx.get('screen_context') or ctx.get('last_screen_context')
@@ -209,7 +209,7 @@ def build_choice_items(env, step):
     views = list_primary_views_showing_field(env, model, field)
     wanted = set(step_requested_view_ids(env, step))
     if not wanted:
-        screen = chatboo_preselected_view_id(env, model)
+        screen = screen_preselected_view_id(env, model)
         if screen:
             wanted.add(screen)
     return [view_choice_item(v, selected=(v.id in wanted)) for v in views]

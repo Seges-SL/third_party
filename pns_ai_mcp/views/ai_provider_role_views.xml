@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ai_provider_role_tree" model="ir.ui.view">
+        <field name="name">ai.provider.role.tree</field>
+        <field name="model">ai.provider.role</field>
+        <field name="arch" type="xml">
+            <tree string="Roles" create="false" delete="false" class="o_pns_list">
+                <field name="chip_html" string="Name" widget="html"/>
+                <field name="code"/>
+                <field name="accepts"/>
+                <field name="fallback_id"/>
+                <field name="use_fallback" optional="show"/>
+                <field name="module" optional="show"/>
+                <field name="provider_count"/>
+                <field name="active" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_ai_provider_role_form" model="ir.ui.view">
+        <field name="name">ai.provider.role.form</field>
+        <field name="model">ai.provider.role</field>
+        <field name="arch" type="xml">
+            <form string="Role" create="false" delete="false">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <field name="active"/>
+                        <field name="code"/>
+                        <field name="accepts"/>
+                        <field name="fallback_id"/>
+                        <field name="use_fallback"
+                               attrs="{'invisible': [('fallback_id', '=', False)]}"/>
+                        <field name="module"/>
+                    </group>
+                    <field name="description"/>
+                    <group string="Chip">
+                        <field name="bg_color" widget="color"/>
+                        <field name="fg_color" widget="color"/>
+                        <field name="chip_html" string="Sample" widget="html"/>
+                    </group>
+                    <group string="Providers">
+                        <field name="provider_ids" widget="many2many_tags" nolabel="1" colspan="2"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_ai_provider_role_search" model="ir.ui.view">
+        <field name="name">ai.provider.role.search</field>
+        <field name="model">ai.provider.role</field>
+        <field name="arch" type="xml">
+            <search string="Roles">
+                <field name="name"/>
+                <field name="code"/>
+                <separator/>
+                <filter name="inactive" string="Archived" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_ai_provider_role" model="ir.actions.act_window">
+        <field name="name">Provider roles</field>
+        <field name="res_model">ai.provider.role</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p>Each role comes from the module that asks for it. A provider holds a role with a tick on its form.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_ai_provider_role"
+              name="Provider roles"
+              parent="pns_ai_mcp.menu_ai_connections"
+              action="action_ai_provider_role"
+              sequence="4"
+              groups="pns_ai_mcp.group_ai_admin"/>
+    <record id="menu_ai_provider_role" model="ir.ui.menu">
+        <field name="name">Provider roles</field>
+    </record>
+</odoo>

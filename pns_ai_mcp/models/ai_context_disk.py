@@ -25,10 +25,10 @@ class AIContextDisk(models.Model):
         Restore ALL contexts (system and custom defaults) from module. 
         Only accessible for group_ai_admin.
 
-        replace_existing=True: sobreescribe los contextos cuyo código coincide
-        (el ``active`` de la instancia se queda). replace_existing=False: solo
-        añade los que no existen. Una semilla cuyo fichero ya no está se retira
-        si el escaneo de esa carpeta encontró ficheros.
+        replace_existing=True: overwrites the contexts whose code matches
+        (the instance ``active`` stays). replace_existing=False: only
+        adds the missing ones. A seed whose file is gone is removed
+        if the scan of that folder found files.
         """
         # Check permissions
         if not self.env.user.has_group('pns_ai_mcp.group_ai_admin'):
@@ -107,12 +107,6 @@ class AIContextDisk(models.Model):
                 _logger.debug('Context source found: %s → %s', mod.name, ctx_dir)
         return result
 
-    @staticmethod
-    def _is_python_content(content):
-        python_markers = ('def ', 'class ', 'import ', 'from ')
-        content = content or ''
-        return any(marker in content for marker in python_markers)
-
     @api.model
     def import_system_from_files(self):
         """
@@ -125,16 +119,16 @@ class AIContextDisk(models.Model):
 
     @api.model
     def _invalidate_agent_caches_after_import(self):
-        """Tras restore/import de contextos, vaciar cachés compiladas de agentes.
+        """After a context restore/import, clear the compiled caches of the agents.
 
-        SQL inmediato con ``FOR UPDATE SKIP LOCKED``: si el Odoo vivo (workers/
-        crons) tiene filas de ``ai_agent`` bloqueadas —p. ej. durante ``t.sh -u``—
-        no esperamos lock_timeout ni tumba el registry. El ``write()`` ORM
-        difería el SQL al ``flush()`` de ``call_kw``, fuera de cualquier try.
+        Immediate SQL with ``FOR UPDATE SKIP LOCKED``: if the live Odoo (workers/
+        crons) holds locked ``ai_agent`` rows —e.g. during ``t.sh -u``—
+        we do not wait for lock_timeout nor bring down the registry. The ORM ``write()``
+        deferred the SQL to the ``flush()`` of ``call_kw``, outside any try.
 
-        Siempre en savepoint: un ``could not serialize access`` de Postgres
-        aborta la transacción actual; sin savepoint, el ``except`` solo traga
-        el error Python y el ``-u`` siguiente (cron XML, etc.) muere con
+        Always in a savepoint: a Postgres ``could not serialize access``
+        aborts the current transaction; without a savepoint, the ``except`` only swallows
+        the Python error and the next ``-u`` (cron XML, etc.) dies with
         ``current transaction is aborted``.
         """
         cr = self.env.cr
@@ -214,7 +208,6 @@ class AIContextDisk(models.Model):
             dict with keys: imported, updated, skipped, deleted, errors.
         """
         import os
-        import re
 
         sources = self._get_context_source_paths()
         if module_name:
@@ -330,12 +323,16 @@ class AIContextDisk(models.Model):
 
         ``agent_codes: none`` / ``catalog`` = catalog only (no push).
         Core contexts are never linked via context_ids.
+        The nucleus pushes only to the MCP endpoint: this addon's admin
+        agent runs engine jobs and carries no domain contexts.
         """
         exclusive = self._explicit_agent_codes_from_metadata(metadata)
         if exclusive is not None:
             return list(exclusive)
         if context_type == 'core':
             return []
+        if source_mod == 'pns_ai_mcp':
+            return ['pns_ai_mcp']
         codes = []
         # Own-module push: pack that ships the agent links its knowledge to it.
         if source_mod:
@@ -343,9 +340,6 @@ class AIContextDisk(models.Model):
                 ('module_name', '=', source_mod),
             ])
             codes.extend(own.mapped('code'))
-        if source_mod == 'pns_ai_mcp':
-            if 'pns_ai_mcp' not in codes:
-                codes.append('pns_ai_mcp')
         return codes
 
     def _pull_agent_codes_for_context(
@@ -529,7 +523,6 @@ class AIContextDisk(models.Model):
             dict with keys: imported, updated, skipped, deleted, errors.
         """
         import os
-        import re
 
         from ..utils.agent_identity import (
             is_retired_self_pack_code,
@@ -742,7 +735,6 @@ class AIContextDisk(models.Model):
             and not core_only
             and found_codes
         ):
-            # Seges: parche 14 (M13, seguridad). Ver docs/pendiente/parches_pns_ai.md
             deleted_count = self._unlink_retired_from_module(
                 source_mod, found_codes=found_codes,
             )
@@ -755,7 +747,6 @@ class AIContextDisk(models.Model):
             'errors': errors,
         }
 
-    # Seges: parche 14 (M13, seguridad). Ver docs/pendiente/parches_pns_ai.md
     @api.model
     def _unlink_retired_from_module(self, module_name, found_codes=None):
         """Unlink factory contexts of this addon whose file is gone.
@@ -800,21 +791,21 @@ class AIContextDisk(models.Model):
     @api.model
     def _import_system_from_files_internal(self):
         """
-        Método interno que importa contextos.
-        [REFACTOR CENTRALIZACIÓN]
-        Anteriormente tenía su propia lógica, lo que causaba inconsistencias (casing, locales).
-        Ahora delega DIRECTAMENTE en _import_all_from_module() para asegurar que
-        HAYA UNA ÚNICA FORMA DE IMPORTAR, sea manual o por código.
+        Internal method that imports contexts.
+        [CENTRALIZATION REFACTOR]
+        It used to have its own logic, which caused inconsistencies (casing, locales).
+        Now it delegates DIRECTLY to _import_all_from_module() to make sure there is
+        ONE SINGLE WAY TO IMPORT, whether manual or by code.
         """
-        _logger.info("MCP: _import_system_from_files_internal -> Delegando a lógica unificada _import_all_from_module")
+        _logger.info("MCP: _import_system_from_files_internal -> Delegating to unified logic _import_all_from_module")
         return self._import_all_from_module()
 
     @api.model
     def _import_from_files_internal(self):
         """
-        Método interno que importa contextos desde archivos.
-        [REFACTOR CENTRALIZACIÓN]
-        Delega en _import_all_from_module.
+        Internal method that imports contexts from files.
+        [CENTRALIZATION REFACTOR]
+        Delegates to _import_all_from_module.
         """
-        _logger.info("MCP: _import_from_files_internal -> Delegando a lógica unificada _import_all_from_module")
+        _logger.info("MCP: _import_from_files_internal -> Delegating to unified logic _import_all_from_module")
         return self._import_all_from_module()

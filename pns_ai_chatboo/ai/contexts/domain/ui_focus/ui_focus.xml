@@ -32,8 +32,8 @@ screen (list, form, kanban, etc.).
   the **visible list** or **selected rows** (`active_ids`), not a single form
   record. Say so briefly if ambiguous.
 - If `[Active screen]` includes a **List scope** line with a record count, use
-  that count directly for questions like "how many records?" / «¿cuántos
-  registros?» — do not ask which model.
+  that count directly for questions like "how many records?" — do not ask
+  which model.
 
 ## Data integrity
 - `[Active screen]` is a compact server-side summary for orientation only. For

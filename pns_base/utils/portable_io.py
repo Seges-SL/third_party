@@ -17,7 +17,6 @@ Settings (ICP) stay in ``settings_io`` — same policy, ICP-shaped keys.
 """
 from __future__ import annotations
 
-import base64
 import datetime
 import io
 import json
@@ -354,7 +353,7 @@ def write_export_attachment(
     vals = {
         'name': filename,
         'type': 'binary',
-        'datas': base64.b64encode(raw_bytes),
+        'raw': raw_bytes,
         'mimetype': mimetype,
         'description': EXPORT_MARK,
     }

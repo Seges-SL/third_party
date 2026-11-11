@@ -57,9 +57,9 @@ class _TurnState:
     )
 
     def __init__(self):
-        # Red de seguridad para auto-corrección: si el modelo agota las rondas
-        # reintentando código erróneo sin dar respuesta final, mostramos el último
-        # error técnico en vez de dejar el chat en blanco.
+        # Safety net for self-correction: if the model uses up the rounds
+        # retrying broken code without a final answer, we show the last
+        # technical error instead of leaving the chat blank.
         self.finished_with_answer = False
         self.inspect_probes = 0
         self.last_tool_unmarked_probe = False
@@ -72,27 +72,27 @@ class _TurnState:
         self.export_meta_nudged = False
         self.export_meta_nudge_round = 0
         self.last_retry_error = None
-        # Fuentes externas consultadas: dominios de fetch_url y servidores API.
-        # Sirve tanto para pasos PROPUESTOS (tool_args de safe_plan_request,
-        # auto-confirmados) como para pasos YA EJECUTADOS que se recuperan luego con
-        # safe_plan_status (confirmación manual). Ambos comparten la misma
-        # forma: dicts con 'op' + 'url' (fetch_url) o 'server'/'tool' (api_call).
+        # External sources consulted: fetch_url domains and API servers.
+        # Used both for PROPOSED steps (tool_args of safe_plan_request,
+        # auto-confirmed) and for ALREADY EXECUTED steps recovered later with
+        # safe_plan_status (manual confirmation). Both share the same
+        # shape: dicts with 'op' + 'url' (fetch_url) or 'server'/'tool' (api_call).
         self.external_sources = set()
-        # Registros Odoo referenciados en el turno (para pintarlos como enlaces
-        # clicables en Chatboo). DETERMINISTA: salen de resultados REALES de
-        # herramientas —filas de relaxaicode con id+__model y operaciones
-        # CRUD confirmadas del safe plan—, NO de que el modelo los cite bien.
+        # Odoo records referenced in the turn (to paint them as clickable
+        # links in the host). DETERMINISTIC: they come from REAL tool
+        # results —relaxaicode rows with id+__model and confirmed safe plan
+        # CRUD operations—, NOT from the model citing them correctly.
         self.collected_records = []
         self._records_seen = set()
-        # Qué modelo tenía cada id ya identificado en ESTE turno. Un paso de
-        # presentación suele rehacer las filas desde un literal: mismos ids,
-        # ningún recordset vivo que diga de dónde salieron.
+        # The model of each id already identified in THIS turn. A
+        # presentation step often rebuilds the rows from a literal: same ids,
+        # no live recordset saying where they came from.
         self.turn_record_models = {}
-        # Candado de entrega de registros (sin léxico): payload tabulable del
-        # turno y si ya se hizo replace con tabla.
-        # ``delivered_html`` es lo que el cliente tiene ya en la burbuja: un
-        # replace la fija entera, así que el cierre no puede mandar prosa a
-        # secas sin borrar la tabla que este turno pintó.
+        # Record delivery lock (no lexicon): tabulable payload of the
+        # turn and whether a replace with a table already happened.
+        # ``delivered_html`` is what the client already has in the bubble: a
+        # replace pins it whole, so the close cannot send bare prose
+        # without wiping the table this turn painted.
         self.delivered_html = ''
         self.last_tabulable_payload = None
         self.direct_formatted = None
@@ -110,9 +110,9 @@ class ToolLoopMixin:
     """Part of ``AgentEngine``; only used through it."""
 
     def _dataset_cache_max_bytes(self):
-        """Tope en BYTES serializados del cache de dataset (Nivel 2), configurable
-        por parámetro de sistema. 0 o negativo = sin límite. Ante cualquier fallo
-        cae al default del módulo."""
+        """Cap in serialized BYTES of the dataset cache (Level 2), configurable
+        through a system parameter. 0 or negative = no limit. On any failure it
+        falls back to the module default."""
         from .agent_engine import AGENT_DATASET_CACHE_MAX_BYTES
         try:
             return int(self.env['ir.config_parameter'].sudo().get_param(
@@ -148,9 +148,9 @@ class ToolLoopMixin:
             }
             yield self._done_event(session_id, local=True)
             return
-        # Dataset del turno: empieza con el cache de sesión y se actualiza tras
-        # cada RelaxAICode exitosa, para que la 2.ª llamada (pijama/estilo) pueda
-        # pedir raw_data/previous_result cuando el código lo referencia (AST).
+        # Turn dataset: starts with the session cache and is updated after
+        # each successful RelaxAICode, so the 2nd call (pyjama/style) can
+        # ask for raw_data/previous_result when the code references it (AST).
         turn.turn_query_data = list(prior_query_data) if prior_query_data else None
         try:
             from .session_download import file_labels_from_mapping
@@ -160,8 +160,8 @@ class ToolLoopMixin:
         except Exception:
             pass
         turn.turn_safe_plan_steps = None
-        # Anti-eco: huellas de tablas ya mostradas en historial assistant.
-        # Las regeneradas este turno (tools) se permiten aunque coincidan.
+        # Anti-echo: fingerprints of tables already shown in the assistant history.
+        # Those regenerated this turn (tools) are allowed even if they match.
         from .response_anti_echo import (
             fingerprints_from_history,
         )
@@ -176,13 +176,13 @@ class ToolLoopMixin:
             session_id=session_id,
         )
         
-        # Arquitectura (docs/dos_credenciales_api.md): Chatboo/internal infiere aquí
-        # in-process; NO reentra en /mcp ni usa ai.mcp.user.mcp_api_key_hash.
-        # Las tools van vía tool_func(DummyController(self.env), ...).
-        # ai.provider.api_key sí se usa (HTTP al LLM), leída en _api_key_for_inference().
-        # X-Mcp-Token del usuario no se propaga al LLM: secreto sin uso en este camino.
+        # Architecture (docs/dos_credenciales_api.md): the internal host infers here
+        # in-process; it does NOT re-enter /mcp nor use ai.mcp.user.mcp_api_key_hash.
+        # Tools go through tool_func(DummyController(self.env), ...).
+        # ai.provider.api_key IS used (HTTP to the LLM), read in _api_key_for_inference().
+        # The user's X-Mcp-Token is not passed to the LLM: an unused secret on this path.
 
-        # 2. Preparar Mensajes (Inyección del System Prompt)
+        # 2. Prepare Messages (System Prompt injection)
         system_msg = self.get_system_prompt(
             agent_code=agent_code,
             user_message=(
@@ -195,7 +195,7 @@ class ToolLoopMixin:
             turn.turn_query_data = None
         yield self._domain_codes_event()
 
-        # 3. Cargar Herramientas
+        # 3. Load Tools
         (
             _turn_shown_start, clean_history, kept_history, messages,
             prior_table_fps, tools,
@@ -218,30 +218,30 @@ class ToolLoopMixin:
         if len(kept_history) < len(clean_history):
             dropped = len(clean_history) - len(kept_history)
             _logger.info(
-                "AgentEngine: historial recortado para ajustar al contexto "
-                "(%s mensaje(s) antiguo(s) descartado(s); ventana=%s)",
+                "AgentEngine: history trimmed to fit the context "
+                "(%s old message(s) dropped; window=%s)",
                 dropped, provider.context_window or 0,
             )
             yield {"event": "status", "message": _('Fitting the history to the context (older turns are dropped)…')}
 
         yield {"event": "status", "message": _('Connecting to %s (active tools: %s)…') % (model_name, len(tools))}
 
-        # --- BUCLE REACT NATIVO ---
-        # Política del bucle ReAct: vive en el agente (resuelto arriba). Si no
-        # hay agente o el valor es <= 0, usa el default (10).
+        # --- NATIVE REACT LOOP ---
+        # ReAct loop policy: lives in the agent (resolved above). If there is
+        # no agent or the value is <= 0, use the default (10).
         MAX_ROUNDS = (agent.max_agent_rounds if (agent and (agent.max_agent_rounds or 0) > 0) else 10)
         round_n = 0
         agent_started = time.monotonic()
-        # Tokens de la ronda LLM en curso (se resetea cada vuelta).
+        # Tokens of the current LLM round (reset on every loop).
         usage_info = {}
-        # Suma de todas las rondas del turno (pie + histórico diario).
+        # Sum of all rounds of the turn (footer + daily history).
         turn_usage = {}
         side_at_start = dict(self._side_usage())
         add_usage(turn_usage, side_at_start)
         last_round_total = 0
-        # Las filas que el cliente reinyecta ya pasaron por una pantalla y
-        # dicen de qué modelo son: un turno que las rehaga sin tocar el ORM
-        # sigue sabiendo a qué registro apunta cada id.
+        # The rows the client re-injects already went through a screen and
+        # say which model they belong to: a turn that rebuilds them without the ORM
+        # still knows which record each id points to.
         if prior_query_data:
             from .turn_record_models import remember_rows
             remember_rows(turn.turn_record_models, prior_query_data)
@@ -303,8 +303,8 @@ class ToolLoopMixin:
                     continue
                 break
                 
-            # El modelo pidió herramientas. content → historial LLM (razonamiento).
-            # Chat bubble: nunca. Status bar: solo si es progreso corto (forma).
+            # The model asked for tools. content → LLM history (reasoning).
+            # Chat bubble: never. Status bar: only if it is short progress (shape).
             _progress = _pretool_progress_status(content_buffer)
             if _progress and _progress != live_status:
                 yield {"event": "status", "message": _progress}
@@ -314,13 +314,13 @@ class ToolLoopMixin:
                 "tool_calls": list(tool_calls_buffer.values())
             })
             
-            # Ejecutar herramientas nativamente en Odoo
+            # Run tools natively in Odoo
             turn.direct_formatted = None
             turn.stop_after_direct = False
-            # Pie local (servidor) tras HTML de skill: cálido, sin inventar año.
+            # Local (server) footer after skill HTML: warm, no invented year.
             turn.local_warm_footer = False
-            # Texto de pie compuesto por el AUTOR del skill (prioritario sobre
-            # el genérico). None = usar el pie cálido por defecto.
+            # Footer text written by the skill AUTHOR (takes priority over
+            # the generic one). None = use the default warm footer.
             turn.local_footer_text = None
             # Remote formatting: tabular payload to hand to the LLM (no local HTML).
             turn.remote_tabular_handoff = None
@@ -331,14 +331,14 @@ class ToolLoopMixin:
             )
 
             for tc in tool_calls_buffer.values():
-                # stop_after_direct corta la SIGUIENTE ronda LLM, no los
-                # tool_calls ya emitidos en esta (Relaxaicode hermano sigue).
+                # stop_after_direct cuts the NEXT LLM round, not the
+                # tool_calls already emitted in this one (a sibling Relaxaicode goes on).
                 tool_name = tc["function"]["name"]
                 tool_args_str = tc["function"]["arguments"]
                 tool_id = tc["id"]
                 
                 yield {"event": "status", "message": _('Running %s…') % tool_name}
-                _logger.info(f"AgentEngine ejecutando tool: {tool_name}")
+                _logger.info(f"AgentEngine running tool: {tool_name}")
                 _blocked = None
                 result = None
 
@@ -346,7 +346,7 @@ class ToolLoopMixin:
                     tool_args = json.loads(tool_args_str)
                 except Exception as e:
                     tool_args = {}
-                    _logger.warning(f"Error decodificando argumentos JSON para {tool_name}: {e}")
+                    _logger.warning(f"Error decoding JSON arguments for {tool_name}: {e}")
 
                 self._tool_loop_inject_previous_result(turn, tool_name, tool_args)
 
@@ -371,10 +371,10 @@ class ToolLoopMixin:
 
                 self._log_agent_tool_step(tool_name, tool_args, result_str, model_name)
 
-                # Caja B: si se ha propuesto una escritura, emitir un evento para que
-                # el frontend de chatboo muestre la confirmación INLINE (no depende del
-                # bus/toast). Sigue siendo seguro: el endpoint de confirmación es
-                # auth='user' y la IA no tiene la sesión del humano.
+                # Box B: if a write was proposed, emit an event so that
+                # the host frontend shows the confirmation INLINE (does not depend on
+                # bus/toast). Still safe: the confirmation endpoint is
+                # auth='user' and the AI does not have the human's session.
                 yield from self._tool_loop_after_tool(
                     _blocked=_blocked,
                     _try_session_export=_try_session_export,
@@ -395,8 +395,8 @@ class ToolLoopMixin:
                     self._tool_loop_remote_handoff(turn, messages)
 
             # ── Direct-formatted result (server-rendered HTML table) ──────────
-            # BODY = tabla HTML (replace). FOOTER = 2.ª vuelta LLM solo si el
-            # proveedor NO está en modo lacónico (pequeñitos → corte limpio).
+            # BODY = HTML table (replace). FOOTER = 2nd LLM round only if the
+            # provider is NOT in laconic mode (small ones → clean cut).
             if turn.direct_formatted:
                 if (yield from self._tool_loop_direct_close(
                     MAX_ROUNDS=MAX_ROUNDS,
@@ -412,7 +412,7 @@ class ToolLoopMixin:
             
             elif turn.export_attached and turn.stop_after_direct:
                 # Named export with hidden table: empty bubble + session chip.
-                # Chatboo must treat empty acc + assistant_files/clip_data as
+                # The host must treat empty acc + assistant_files/clip_data as
                 # success, not "the model returned no content". Partial refuse
                 # (PDF + Word) still paints a note in the bubble.
                 turn.finished_with_answer = True
@@ -424,16 +424,16 @@ class ToolLoopMixin:
                     }
                 break
 
-            # Si el turno finalizó habiendo ejecutado tools, el while continuará
-            # para enviar los resultados al LLM y obtener la respuesta final.
+            # If the turn ended having run tools, the while goes on
+            # to send the results to the LLM and get the final answer.
 
         yield from self._tool_loop_close_turn(
             turn, _orig, session_id, config, messages,
         )
 
-        # Fin de Stream: adjuntamos qué modelo/proveedor respondió y los tokens
-        # del TURNO (suma de rondas). context_tokens = ocupación de la última
-        # ronda (el % del buffer). NUNCA exponemos endpoint ni infra.
+        # End of Stream: we attach which model/provider answered and the tokens
+        # of the TURN (sum of rounds). context_tokens = usage of the last
+        # round (the buffer %). We NEVER expose endpoint or infra.
         _done = self._tool_loop_done_event(
             _turn_shown_start=_turn_shown_start,
             collected_records=turn.collected_records,
@@ -482,13 +482,13 @@ class ToolLoopMixin:
         content_buffer = ""
         unparsed_lines = []
         self._round_had_reasoning = False
-        # Con tools activos no soltamos el texto al chat hasta saber si la
-        # ronda trae tool_calls. El modelo conserva el content en messages.
+        # With tools active we do not release the text to the chat until we know if
+        # the round brings tool_calls. The model keeps the content in messages.
         _defer_user_tokens = bool(tools)
 
-        # Historico: peticion al modelo (ORCH a LLM) via gate del motor.
+        # History: request to the model (ORCH to LLM) via the engine gate.
         Engine = self.env['ai.execution.engine']
-        Engine.log_provider_llm_request(
+        Engine._log_provider_llm_request(
             provider,
             agent_code=agent_code,
             round_n=round_n,
@@ -508,26 +508,26 @@ class ToolLoopMixin:
             tool_calls_buffer, content_buffer, usage_info,
         )
 
-        # Quitar razonamiento inline (<think>...</think>) si el modelo lo metió
-        # dentro de content en vez de en reasoning_content.
+        # Strip inline reasoning (<think>...</think>) if the model put it
+        # inside content instead of reasoning_content.
         if content_buffer and '<think>' in content_buffer.lower():
             self._round_had_reasoning = True
         content_buffer = _strip_think_blocks(content_buffer)
 
-        # Fallback de tool-calling: algunos modelos no emiten tool_calls
-        # estructuradas, sino que escriben el JSON de la
-        # llamada dentro del content. Lo recuperamos y ejecutamos igual,
-        # reutilizando el parser del orquestador. Solo aceptamos llamadas a
-        # tools realmente disponibles, para no confundir prosa con tool-call.
+        # Tool-calling fallback: some models do not emit structured
+        # tool_calls, but write the JSON of the
+        # call inside the content. We recover it and run it anyway,
+        # reusing the orchestrator parser. We only accept calls to
+        # tools that really exist, so prose is not mistaken for a tool-call.
         content_buffer = self._tool_loop_recover_tool_calls(
             tool_calls_buffer, content_buffer, tools,
         )
 
-        # Analizar el resultado del stream
+        # Analyze the stream result
         sync_error = None
         if not tool_calls_buffer and not content_buffer.strip():
             _logger.warning(
-                "LLM stream sin texto (%s, model=%s, tools=%s). Muestra: %s",
+                "LLM stream without text (%s, model=%s, tools=%s). Sample: %s",
                 config['endpoint'], model_name, len(tools), unparsed_lines,
             )
         _ptok, _ctok = self._tool_loop_log_response(
@@ -642,8 +642,8 @@ class ToolLoopMixin:
                 ]
                 if _valid:
                     _logger.info(
-                        "AgentEngine: tool-call recuperada del content (modelo sin "
-                        "tool_calls nativas): %s",
+                        "AgentEngine: tool-call recovered from content (model without "
+                        "native tool_calls): %s",
                         [(c.get('function') or {}).get('name') for c in _valid],
                     )
                     for _i, _tc in enumerate(_valid):
@@ -656,7 +656,7 @@ class ToolLoopMixin:
             model_name, usage_info,
     ):
         Engine = self.env['ai.execution.engine']
-        # Histórico: respuesta del modelo (LLM → ORCH) vía gate del motor.
+        # History: model reply (LLM → ORCH) via the engine gate.
         _resp_tools = [
             (tc.get('function') or {}).get('name')
             for tc in tool_calls_buffer.values()
@@ -666,7 +666,7 @@ class ToolLoopMixin:
         _ttok = (usage_info.get('total_tokens') if usage_info else None) or (
             (_ptok or 0) + (_ctok or 0)
         ) or None
-        Engine.log_provider_llm_response(
+        Engine._log_provider_llm_response(
             provider,
             agent_code=agent_code,
             content_preview=(content_buffer or '').strip(),

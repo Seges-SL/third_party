@@ -1,49 +1,25 @@
 ---
 skill: forecast
 name: Weather forecast
-description: Company-city forecast for the next 7 days by default; optional other cities; sky column uses weather emojis.
+description: Daily weather for one or more places from Open-Meteo, a site on the URL whitelist; the company city and the next 7 days by default.
 agent_codes: pns_ai_chatboo
-version: 4.6
-param_schema: {"lugar": {"type": "string", "desc": "City or cities (comma / and). Empty = company city (or state). Never invent a city."}, "fecha": {"type": "string", "desc": "today, tomorrow, next N days, or ISO YYYY-MM-DD. Empty = next 7 days.", "default": "7 days"}}
-arg_hint: company city · 7 days
+version: 5.0
+param_schema: {"place": {"type": "string", "desc": "One or more places separated by commas, as the user wrote them. A country in brackets picks among homonyms. null for the company city."}, "start": {"type": "string", "desc": "First day as YYYY-MM-DD. null for today."}, "days": {"type": "integer", "desc": "How many days from the first day, 1 to 16.", "default": 7}}
+arg_hint: place=Paris, Rome days=3
 args_policy: default
-sequence: 40
+sequence: 60
 active: true
 context_codes:
 ---
 [FORECAST]
-Use when the user asks for the weather, forecast, climate or temperature for a
-place and/or date (/forecast).
+Use with /forecast, or when the user asks for the weather somewhere.
 
-PARAMETERS (sandbox; may be None)
-Empty slash runs with defaults (args_policy=default). Deterministic parse first.
-- Empty slash: company city (or state) and the next 7 days. Never invent a
-  city. If the company has no city, the skill asks for a place.
-- lugar / arguments: one or more cities separated by comma and/or «and»/«y»/«e»,
-  optionally with a date. Any city: the skill geocodes via Open-Meteo.
-- fecha: optional date text. If None / empty / null / default, next 7 days.
-- Sky column: emoji + weather label for each day.
+WHAT IT SHOWS
+One table per place: sky, temperatures, rain, wind, UV, sunrise and sunset.
+The data comes from Open-Meteo through fetch_url steps that the URL
+whitelist lets run without a confirmation. The code runs three rounds:
+geocode, forecast, table. With no place it uses the city of the current
+company, with its state (or country) to pick among homonyms.
 
-Do NOT use dir()/locals()/globals()/vars() to probe parameters — they always exist.
-
-FLOW (automatic — skill resolves without the LLM)
-Self-contained multi-round: the engine runs `propose_steps` (auto-confirmable
-fetch_url) and returns bodies in `previous_result` until the table is ready:
-1. Round 1: geocode each city (geocoding-api.open-meteo.com).
-2. Round 2: one forecast per city (api.open-meteo.com/v1/forecast) with real
-   lat/lon and `&city=<name>` embedded.
-3. Round 3: parse and present (data/groups + footer).
-
-LLM FALLBACK (rare)
-- Geocode each city with fetch_url to
-  `https://geocoding-api.open-meteo.com/v1/search?name=<city>&count=1&language=en`
-- ONE safe_plan_request with one forecast fetch_url per city (always
-  include `city=<name>`).
-
-FORBIDDEN
-- One propose per city: batch fetches in a single proposal.
-- Omitting `city=<name>` on forecast URLs.
-- `import requests`/`urllib`: HTTP only via fetch_url.
-- Inventing figures or card HTML.
-
-Source: Open-Meteo.
+HOW TO PRESENT THE RESULT
+- The code already returns the table. Do not invent places or figures.

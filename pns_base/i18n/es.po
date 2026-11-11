@@ -29,6 +29,7 @@ msgid "Result"
 msgstr "Resultado"
 
 #. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_export_file_wizard_form
 #: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
 msgid "Close"
 msgstr "Cerrar"
@@ -82,12 +83,14 @@ msgid "Manifest"
 msgstr "Manifiesto"
 
 #. module: pns_base
+#: code:addons/pns_base/utils/ui_feedback.py:0
 #: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_errors
 #: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
 msgid "Errors"
 msgstr "Errores"
 
 #. module: pns_base
+#: code:addons/pns_base/utils/ui_feedback.py:0
 #: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_warnings
 #: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
 msgid "Warnings"
@@ -182,14 +185,15 @@ msgid "Attachment"
 msgstr "Adjunto"
 
 #. module: pns_base
+#: code:addons/pns_base/utils/portable_io.py:0
 #: model:ir.model.fields,field_description:pns_base.field_pns_export_file_wizard__export_filename
 msgid "File name"
 msgstr "Nombre de archivo"
 
 #. module: pns_base
+#: code:addons/pns_base/models/export_secrets_wizard.py:0
 #: model_terms:ir.ui.view,arch_db:pns_base.view_export_file_wizard_form
 #: model_terms:ir.ui.view,arch_db:pns_base.view_export_secrets_wizard_form
-#: code:addons/pns_base/models/export_secrets_wizard.py:0
 msgid "Export"
 msgstr "Exportar"
 
@@ -314,14 +318,14 @@ msgid "%s duplicate translation rows were skipped so the language could load."
 msgstr "%s filas de traducción duplicadas se han saltado para que el idioma pueda cargarse."
 
 #. module: pns_base
-#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
 #: code:addons/pns_base/models/operation_report_wizard.py:0
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
 msgid "Review import"
 msgstr "Revisar importación"
 
 #. module: pns_base
-#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
 #: code:addons/pns_base/models/operation_report_wizard.py:0
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
 msgid "Review this import"
 msgstr "Revisar esta importación"
 
@@ -336,29 +340,29 @@ msgid "Confirm to apply the upload."
 msgstr "Confirma para aplicar la subida."
 
 #. module: pns_base
-#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
 #: code:addons/pns_base/models/operation_report_wizard.py:0
 #: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_created_names
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
 msgid "Will create"
 msgstr "Creará"
 
 #. module: pns_base
-#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
 #: code:addons/pns_base/models/operation_report_wizard.py:0
 #: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_updated_names
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
 msgid "Will replace"
 msgstr "Sustituirá"
 
 #. module: pns_base
-#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
 #: code:addons/pns_base/models/operation_report_wizard.py:0
 #: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_skipped_names
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
 msgid "Will leave"
 msgstr "Dejará"
 
 #. module: pns_base
-#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
 #: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_params
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
 msgid "Options"
 msgstr "Opciones"
 
@@ -472,3 +476,136 @@ msgstr "%s: sí"
 #: code:addons/pns_base/models/operation_report_wizard.py:0
 msgid "%s: no"
 msgstr "%s: no"
+
+#. module: pns_base
+#: code:addons/pns_base/models/progress_job.py:0
+msgid "%s s"
+msgstr "%s s"
+
+#. module: pns_base
+#: model:ir.model,name:pns_base.model_pns_progress_job
+msgid "Background job with progress"
+msgstr "Trabajo en segundo plano con progreso"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_progress_job__name
+msgid "Title"
+msgstr "Título"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_progress_job__key
+msgid "Key"
+msgstr "Clave"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_progress_job__user_id
+msgid "User"
+msgstr "Usuario"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_progress_job__state
+msgid "State"
+msgstr "Estado"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_progress_job__progress
+msgid "Progress"
+msgstr "Progreso"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_progress_job__step
+msgid "Step"
+msgstr "Paso"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_progress_job__summary
+msgid "Summary"
+msgstr "Resumen"
+
+#. module: pns_base
+#. openerp-web
+#: model:ir.model.fields,field_description:pns_base.field_pns_progress_job__error
+#: code:addons/pns_base/static/src/xml/pns_progress_dialog.xml:0
+msgid "Error"
+msgstr "Error"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_progress_job__started_at
+msgid "Started"
+msgstr "Inicio"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_progress_job__finished_at
+msgid "Finished"
+msgstr "Fin"
+
+#. module: pns_base
+#: model:ir.model.fields.selection,name:pns_base.selection__pns_progress_job__state__queued
+msgid "Queued"
+msgstr "En cola"
+
+#. module: pns_base
+#: model:ir.model.fields.selection,name:pns_base.selection__pns_progress_job__state__running
+msgid "Running"
+msgstr "En curso"
+
+#. module: pns_base
+#. openerp-web
+#: model:ir.model.fields.selection,name:pns_base.selection__pns_progress_job__state__done
+#: code:addons/pns_base/static/src/xml/pns_progress_dialog.xml:0
+msgid "Done"
+msgstr "Hecho"
+
+#. module: pns_base
+#: model:ir.model.fields.selection,name:pns_base.selection__pns_progress_job__state__failed
+msgid "Failed"
+msgstr "Fallido"
+
+#. module: pns_base
+#: code:addons/pns_base/models/progress_job.py:0
+msgid "The work stopped with an error. The server log has the details."
+msgstr "El trabajo se ha parado con un error. El log del servidor tiene el detalle."
+
+#. module: pns_base
+#: code:addons/pns_base/models/progress_job.py:0
+msgid "The work stopped answering. It may have been cut by a restart."
+msgstr "El trabajo ha dejado de responder. Puede que lo haya cortado un reinicio."
+
+#. module: pns_base
+#: code:addons/pns_base/models/progress_job.py:0
+msgid "%(minutes)s min %(seconds)s s"
+msgstr "%(minutes)s min %(seconds)s s"
+
+#. module: pns_base
+#. openerp-web
+#: code:addons/pns_base/static/src/xml/pns_progress_dialog.xml:0
+msgid "Starting…"
+msgstr "Empezando…"
+
+#. module: pns_base
+#. openerp-web
+#: code:addons/pns_base/static/src/xml/pns_progress_dialog.xml:0
+msgid "You can close this window: the work goes on."
+msgstr "Puedes cerrar esta ventana: el trabajo sigue."
+
+#. module: pns_base
+#. openerp-web
+#: code:addons/pns_base/static/src/xml/pns_progress_dialog.xml:0
+msgid "Done."
+msgstr "Hecho."
+
+#. module: pns_base
+#. openerp-web
+#: code:addons/pns_base/static/src/xml/pns_progress_dialog.xml:0
+msgid "Info"
+msgstr "Información"
+
+#. module: pns_base
+#: code:addons/pns_base/models/progress_job.py:0
+msgid "This work is already running for %s. Try again when it finishes."
+msgstr "Este trabajo ya está en curso para %s. Vuelve a intentarlo cuando termine."
+
+#. module: pns_base
+#: code:addons/pns_base/utils/ui_feedback.py:0
+msgid "Errors (%s):"
+msgstr "Errores (%s):"

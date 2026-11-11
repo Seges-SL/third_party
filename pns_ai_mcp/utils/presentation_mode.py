@@ -29,7 +29,7 @@ from . import engine_params
 SHOW_MODE_TABLE_CHART = 'show-table'
 SHOW_MODE_CHART_TABLE = 'show-chart'
 SHOW_MODE_DASHBOARD = 'dashboard'
-SHOW_MODE_TABLE = 'table'  # solo tabla, sin toolbar/gráfico
+SHOW_MODE_TABLE = 'table'  # table only, no toolbar/chart
 VALID_SHOW_MODES = frozenset({
     SHOW_MODE_TABLE_CHART, SHOW_MODE_CHART_TABLE, SHOW_MODE_DASHBOARD,
     SHOW_MODE_TABLE,
@@ -157,7 +157,7 @@ def resolve_show_mode_for_render(env, result=None):
 
 
 def resolve_chart_engine_for_render(env, result=None):
-    """Chart library for HTML (priority: result > Chatboo settings ICP)."""
+    """Chart library for HTML (priority: result > engine settings ICP)."""
     if isinstance(result, dict) and result.get('chart_engine'):
         return normalize_chart_engine(result.get('chart_engine'))
     return _icp_chart_engine(env)

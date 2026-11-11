@@ -9,16 +9,13 @@ truth is the database. The SSE at /chatboo/stream only tails this job.
 """
 
 import base64
-# Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
-import html
 import json
 import logging
 import time
 
 from odoo import models, fields, api, _
+from odoo.exceptions import AccessError
 
-# Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
-from .chatboo_canvas import _NO_PAGE_WATCH, page_refused_in_job, watch_no_page
 from .chatboo_job import _env_manage, _get_registry, _is_test_mode
 from ..utils import file_text, turn_documents
 from ..utils.chatboo_product_icp import CHATBOO_AGENT_CODE
@@ -26,15 +23,15 @@ from ..utils.turn_deliverable import done_meta_has_deliverable
 
 _logger = logging.getLogger(__name__)
 
-# Sentinela: "no tocar el estado del skill activo de la sesión" al finalizar
-# (distinto de code=None, que significa soltarlo).
+# Sentinel: "leave the session's active skill state alone" on finalize
+# (not the same as code=None, which means drop it).
 _SKILL_STATE_LEAVE = object()
 _DOMAIN_CODES_LEAVE = object()
 
-# Intervalo de flush del progreso a BD (segundos). Granularidad del preview.
+# How often progress is flushed to the database (seconds). Preview step.
 FLUSH_INTERVAL = 0.3
-# PDF adjunto: páginas de las que se lee el texto impreso, y páginas de un
-# escaneado que van como imágenes (cada una pesa en la llamada de visión).
+# Attached PDF: pages whose printed text is read, and pages of a scan that
+# go as pictures (each one adds weight to the vision call).
 PDF_TEXT_PAGES = 200
 PDF_VISION_PAGES = 10
 NO_TEXT = 'NONE'
@@ -51,7 +48,7 @@ def _waited_for_lock(exc):
 
 
 class ChatbooAsyncRequest(models.Model):
-    """Turno de Chatboo ejecutado en segundo plano (desacoplado del request)."""
+    """A Chatboo turn run in the background (apart from the HTTP request)."""
     _name = 'chatboo.async.request'
     _inherit = 'chatboo.job.mixin'
     _description = 'Chatboo Async Request'
@@ -59,46 +56,52 @@ class ChatbooAsyncRequest(models.Model):
     _rec_name = 'id'
 
     prompt = fields.Text(string='Prompt', required=True)
+    # The prompt is the outcome of a confirmed/cancelled write, written by the
+    # chat for the AI: it is kept in the history but never painted as the user's.
+    result_note = fields.Boolean(string='Result note')
     history = fields.Text(string='History (JSON)')
     agent_code = fields.Char(string='Agent code')
     provider_id = fields.Integer(string='Provider id')
-    # Descriptor ligero capturado en el cliente (modelo, id, vista) en JSON.
+    # Light descriptor taken on the client (model, id, view) as JSON.
     screen_context = fields.Text(string='Screen context (JSON)')
-    # Imágenes del turno (data URLs, JSON list). El base64 viaja al proveedor de
-    # visión SOLO en este turno y se purga con el job (GC 72h); NUNCA entra en el
-    # historial que va al LLM (doctrina anti-overflow). Para MOSTRAR, en cambio,
-    # sí se persisten una vez como ir.attachment ligado a la sesión y el mensaje
-    # de usuario guarda solo su URL (ver _persist_turn_images).
+    # Companies ticked in the web switcher when the question was sent (JSON
+    # list, active one first). Kept on the job: a reclaimed turn runs there too.
+    screen_company_ids = fields.Char(string='Screen companies (JSON)')
+    # Pictures of the turn (data URLs, JSON list). The base64 goes to the vision
+    # provider ONLY in this turn and is purged with the job (GC 72h); it NEVER
+    # enters the history sent to the LLM (anti-overflow rule). To SHOW them,
+    # though, they are saved once as ir.attachment linked to the session and the
+    # user message keeps only their URL (see _persist_turn_images).
     images = fields.Text(string='Images (JSON)')
-    # Nombres originales de las imágenes del turno, alineados por índice con
-    # `images` (JSON list). null para las pegadas del portapapeles (sin nombre)
-    # y el nombre real para las adjuntadas como fichero. Se usa para nombrar el
-    # ir.attachment y mostrar el nombre bajo la miniatura (ver _persist_turn_images).
+    # Original names of the turn's pictures, matched by index with
+    # `images` (JSON list). null for clipboard pastes (no name)
+    # and the real name for pictures attached as a file. Used to name the
+    # ir.attachment and show the name under the thumbnail (see _persist_turn_images).
     image_names = fields.Text(string='Image names (JSON)')
-    # Ficheros de texto/datos adjuntados con el clip (JSON list de
-    # {name, mimetype, data(dataURL base64)}). Su TEXTO extraído se inyecta en el
-    # mensaje de ESTE turno hacia el LLM (transitorio, no entra en el historial);
-    # el fichero se persiste como ir.attachment y el mensaje guarda un chip
-    # descargable (ver _persist_turn_files / utils.file_text).
+    # Text/data files attached with the clip (JSON list of
+    # {name, mimetype, data(dataURL base64)}). Their extracted TEXT is added to
+    # THIS turn's message to the LLM (one turn only, not in the history);
+    # the file is saved as ir.attachment and the message keeps a
+    # download chip (see _persist_turn_files / utils.file_text).
     files = fields.Text(string='Files (JSON)')
 
-    # Contenido visible acumulado (tokens/replace) para el preview y el guardado.
+    # Visible content so far (tokens/replace) for the preview and the save.
     partial = fields.Text(string='Partial content')
-    # Eventos estructurados no-token (status, verification, ...) que el tail
-    # reemite tal cual por SSE. JSON list.
+    # Structured non-token events (status, verification, ...) that the tail
+    # sends again as they are over SSE. JSON list.
     struct_events = fields.Text(string='Structured events (JSON)')
-    # Metadatos del evento 'done' del motor (usage, context_limit, speed, ...).
+    # Metadata of the engine's 'done' event (usage, context_limit, speed, ...).
     done_meta = fields.Text(string='Done meta (JSON)')
     response = fields.Text(string='Final response')
-    # True cuando un cliente ya recibió el resultado en vivo (SSE) o por poll.
+    # True when a client already got the result live (SSE) or by poll.
     seen = fields.Boolean(string='Seen by client', default=False, index=True)
-    # ──────────────────────────── Cola (solo el controlador) ────────────────────────────
+    # ──────────────────────────── Queue (controller only) ────────────────────────────
 
     @api.model
     def _enqueue(self, session_id, message, history=None, agent_code=None,
                  provider_id=None, screen_context=None, images=None, files=None,
-                 image_names=None):
-        """Crea el job en estado pending. No lanza el hilo (ver ``_spawn``)."""
+                 image_names=None, screen_company_ids=None, result_note=False):
+        """Create the job as pending. Does not start the thread (see ``_spawn``)."""
         sc_json = False
         if screen_context:
             if isinstance(screen_context, str):
@@ -111,10 +114,14 @@ class ChatbooAsyncRequest(models.Model):
             'session_id': int(session_id),
             'user_id': self.env.uid,
             'prompt': message or '',
+            'result_note': bool(result_note),
             'history': json.dumps(history or [], ensure_ascii=False),
             'agent_code': agent_code or False,
             'provider_id': int(provider_id) if provider_id else False,
             'screen_context': sc_json,
+            'screen_company_ids': (
+                json.dumps(list(screen_company_ids)) if screen_company_ids else False
+            ),
             'images': json.dumps(images, ensure_ascii=False) if images else False,
             'image_names': json.dumps(image_names, ensure_ascii=False) if image_names else False,
             'files': json.dumps(files, ensure_ascii=False) if files else False,
@@ -124,10 +131,23 @@ class ChatbooAsyncRequest(models.Model):
     def _on_crash(self, msg):
         self._finalize('', [], {}, error=msg)
 
-    # ──────────────────────────── Ejecución ────────────────────────────
+    def _screen_companies(self):
+        """What the switcher ticked when the question was sent (may be empty)."""
+        from odoo.addons.pns_ai_mcp.utils.one_company import screen_ids
+        try:
+            return screen_ids(json.loads(self.screen_company_ids or '[]'))
+        except (TypeError, ValueError):
+            return []
+
+    def _turn_company_ids(self):
+        """The companies this turn reads in, after the user's own are checked."""
+        from odoo.addons.pns_ai_mcp.utils.one_company import ai_companies
+        return ai_companies(self.env, self._screen_companies()).ids
+
+    # ──────────────────────────── Run ────────────────────────────
 
     def _process(self):
-        """Ejecuta el motor, va volcando progreso a BD, guarda en sesión y avisa."""
+        """Run the engine, flush progress to the database, save to the session and notify."""
         self.ensure_one()
         _logger.info(
             "Chatboo async job %s: _process start (agent=%s, provider=%s)",
@@ -140,33 +160,32 @@ class ChatbooAsyncRequest(models.Model):
         self.sudo().write({'state': 'running', 'started_at': fields.Datetime.now()})
         self.env.cr.commit()
         self._notify('thinking')
-        # Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
-        no_page_token = watch_no_page(
-            self.id, self.session_id.id, self.session_id.canvas_rev)
 
         acc = ''
         struct = []
         done_meta = {}
         last_flush = 0.0
-        # Ancla de reutilización de consulta (Nivel 1): recogemos el código de la
-        # última consulta exitosa que emita el motor (evento 'query_code') para
-        # guardarlo en la sesión, y leemos el del turno anterior para que el
-        # motor lo reinyecte como pista (evita que reescriba la query en cada
-        # reformateo → fuente principal de variabilidad).
+        # Query reuse anchor (Level 1): we pick up the code of the last
+        # successful query the engine emits (event 'query_code') to save it
+        # in the session, and we read the previous turn's one so the engine
+        # sends it again as a hint (keeps it from rewriting the query on each
+        # reformat → main source of drift).
         last_query_code = None
         last_query_data = None
         try:
             prior_query_code = self.session_id.last_query_code or None
         except Exception:
             prior_query_code = None
-        # Nivel 2: dataset del turno anterior SOLO si sigue fresco (TTL). Se
-        # reinyecta como previous_result para reformatear sin re-consultar.
+        # Level 2: previous turn's dataset ONLY if still fresh (TTL). It is
+        # sent again as previous_result to reformat without querying again.
+        # Rows read in other companies are not this screen's: query again.
         try:
-            prior_query_data = self.session_id.get_fresh_query_data()
+            prior_query_data = self.session_id.get_fresh_query_data(
+                self._turn_company_ids())
         except Exception:
             prior_query_data = None
-        # Skill pegajoso: código + params del skill activo de la sesión. El motor
-        # los usa para juzgar (vía IA) si este turno refina el skill activo.
+        # Sticky skill: code + params of the session's active skill. The engine
+        # uses them to judge (via AI) whether this turn refines the active skill.
         try:
             prior_active_skill_code = self.session_id.active_skill_code or None
             prior_active_skill_params = self.session_id.active_skill_params or None
@@ -198,8 +217,8 @@ class ChatbooAsyncRequest(models.Model):
                 'Chatboo async job %s: showmode sticky skipped',
                 self.id, exc_info=True,
             )
-        # Estado del skill activo emitido por el motor este turno (sentinela =
-        # no tocado → no reescribir la sesión).
+        # Active skill state the engine emitted this turn (sentinel =
+        # untouched → do not rewrite the session).
         active_skill_touched = False
         active_skill_evt = None
 
@@ -208,20 +227,25 @@ class ChatbooAsyncRequest(models.Model):
         except Exception:
             history = []
 
-        # Imágenes del turno (data URLs). Solo para el turno actual: van al
-        # proveedor de visión como content-parts; no entran en el historial.
+        # Pictures of the turn (data URLs). For the current turn only: they go
+        # to the vision provider as content-parts; they stay out of the history.
         try:
             images = json.loads(self.images) if self.images else []
         except Exception:
             images = []
 
-        # Ficheros de texto/datos adjuntos con el clip: extraemos su texto y lo
-        # inyectamos en el mensaje de ESTE turno (no en self.prompt ni en el
-        # historial). Así el LLM ve el contenido del fichero solo cuando se
-        # adjunta, igual que las imágenes (transitorio, anti-overflow).
+        # Text/data files attached with the clip: we extract their text and
+        # add it to THIS turn's message (not to self.prompt nor to the
+        # history). So the LLM sees the file's content only when it is
+        # attached, like the pictures (one turn only, anti-overflow).
         message_for_engine, inline_file_text, pdf_pages, turn_docs = (
             self._augment_prompt_with_files(self.prompt or '')
         )
+        # A skill slash keeps its words as its arguments; the file's text
+        # would land in them. The skill reads it with documents/read_document.
+        if turn_docs and self._prompt_runs_a_skill():
+            message_for_engine = self.prompt or ''
+            inline_file_text = False
         images = images + pdf_pages
 
         # Axis slashes: one-shot compose/footmode; showmode writes the session.
@@ -257,10 +281,10 @@ class ChatbooAsyncRequest(models.Model):
                 self.id, exc_info=True,
             )
 
-        # Filas que el usuario marcó en la respuesta anterior. Viajan CON la
-        # frase, no solo dentro del dataset: el motor solo lee texto, y un
-        # dataset estrechado en silencio lo dejaba libre para volver a buscar
-        # el nombre. Se gastan con este turno.
+        # Rows the user marked in the previous answer. They travel WITH the
+        # sentence, not only inside the dataset: the engine only reads text, and
+        # a dataset narrowed quietly left it free to search for the name
+        # again. They are used up by this turn.
         try:
             marked = self.session_id.marks_sentence()
             if marked:
@@ -274,9 +298,11 @@ class ChatbooAsyncRequest(models.Model):
                 'Chatboo async job %s: marked records skipped',
                 self.id, exc_info=True,
             )
-        # Documentos de turnos anteriores: como las filas de una tabla, el
-        # texto se queda en la sesión y el modelo lo lee con read_document.
-        # Los de este turno ya van enteros en el mensaje (o en sus fotos).
+        # Documents from earlier turns: like the rows of a table, the
+        # text stays in the session and the model reads it with read_document.
+        # This turn's ones already go whole in the message (or in their photos).
+        # A skill slash does not carry the note: its words are the skill's
+        # arguments, and the note would be scored as part of the sentence.
         try:
             turn_docs = turn_docs + self._image_documents()
             this_turn = {doc['name'] for doc in turn_docs}
@@ -285,7 +311,7 @@ class ChatbooAsyncRequest(models.Model):
                 if doc['name'] not in this_turn
             ]
             documents_note = turn_documents.note(earlier)
-            if documents_note:
+            if documents_note and not self._prompt_runs_a_skill():
                 message_for_engine = '%s\n\n%s' % (message_for_engine, documents_note)
             self.session_id.remember_documents(turn_docs)
         except Exception:
@@ -311,29 +337,29 @@ class ChatbooAsyncRequest(models.Model):
                     'The conversation could not be saved before the reply. Try again.'
                 ))
                 return
-        # Recuerdo acotado de imágenes previas (1c): reenviamos, con tope y
-        # reescaladas, las últimas imágenes ya vistas en la conversación para
-        # que el modelo pueda referirse a ellas (los LLM son sin estado: la
-        # imagen se "recuerda" solo si se REENVÍA). No entran en el historial
-        # persistido; se recomponen cada turno desde los ir.attachment.
+        # Limited recall of earlier pictures (1c): we send again, capped and
+        # downscaled, the last pictures already seen in the conversation so
+        # the model can refer to them (LLMs have no state: a picture
+        # is "remembered" only if it is SENT AGAIN). They stay out of the saved
+        # history; they are rebuilt each turn from the ir.attachment rows.
         #
-        # PERO: si ESTE turno YA trae imágenes, NO recordamos las anteriores.
-        # Cuando el usuario adjunta imágenes y pregunta "¿qué hay en estas?", se
-        # refiere a las del prompt ACTUAL; reenviar imágenes viejas hacía que el
-        # modelo mezclara/mencionara una imagen de hace varios turnos. El recuerdo
-        # queda para los turnos de SOLO texto que aludan a algo ya enviado.
+        # BUT: if THIS turn ALREADY brings pictures, we do NOT recall older ones.
+        # When the user attaches pictures and asks "what is in these?", they
+        # mean the ones in the CURRENT prompt; sending old pictures made the
+        # model mix in / mention a picture from several turns ago. Recall
+        # is for TEXT-only turns that point to something already sent.
         recall_images = [] if images else self._recall_prior_images()
 
-        # LATIDO independiente: un hilo aparte refresca write_date cada
-        # HEARTBEAT_INTERVAL mientras dura el turno, PASE lo que pase con el motor.
-        # Así un modelo lento (que puede tardar minutos en emitir el primer token)
-        # no se confunde nunca con un worker muerto y el reclaim no lo mata.
+        # Separate HEARTBEAT: another thread refreshes write_date every
+        # HEARTBEAT_INTERVAL while the turn lasts, WHATEVER happens to the engine.
+        # So a slow model (it may take minutes to emit the first token)
+        # is never mistaken for a dead worker, and reclaim does not kill it.
         beat = self._start_heartbeat()
 
-        # Diagnóstico: contamos qué emite el motor. Un turno que acaba en 0s y en
-        # blanco casi siempre significa que el motor no llegó a emitir tokens
-        # (proveedor no resuelto en el hilo, endpoint vacío, etc.). Este desglose
-        # en el log es lo que permite distinguir "sin contenido" de "crash".
+        # Diagnostics: we count what the engine emits. A turn that ends in 0s and
+        # blank almost always means the engine never emitted tokens
+        # (provider not resolved in the thread, empty endpoint, etc.). This count
+        # in the log is what tells "no content" apart from "crash".
         ev_counts = {}
         screen_context_block = ''
         try:
@@ -363,8 +389,10 @@ class ChatbooAsyncRequest(models.Model):
 
         try:
             from odoo.addons.pns_ai_mcp.utils.agent_engine import AgentEngine
+            from odoo.addons.pns_ai_mcp.utils.one_company import SCREEN_COMPANIES
             engine_env = self.env(context=dict(
                 self.env.context or {},
+                **{SCREEN_COMPANIES: self._screen_companies()},
                 ai_session_ref=self.session_id.id,
                 presentation_show_mode=(
                     self.session_id.presentation_show_mode or False
@@ -375,6 +403,7 @@ class ChatbooAsyncRequest(models.Model):
                     or False
                 ),
                 user_message=self.prompt or '',
+                turn_file_names=self._turn_file_names(),
                 inline_file_text=inline_file_text,
                 llm_remote_formatting_override=formatting_override,
                 turn_compose=turn_compose,
@@ -408,8 +437,8 @@ class ChatbooAsyncRequest(models.Model):
                 ev = (evt or {}).get('event', 'token')
                 ev_counts[ev] = ev_counts.get(ev, 0) + 1
                 if ev == 'active_skill':
-                    # Meta-evento interno: estado del skill pegajoso (code+params,
-                    # o code=None para soltarlo). Se persiste al finalizar.
+                    # Internal meta-event: sticky skill state (code+params,
+                    # or code=None to drop it). Saved on finalize.
                     active_skill_touched = True
                     active_skill_evt = evt
                     continue
@@ -421,24 +450,24 @@ class ChatbooAsyncRequest(models.Model):
                         last_domain_codes = list(evt.get('codes') or [])
                     continue
                 if ev == 'query_code':
-                    # Meta-evento interno: no es contenido ni un evento de tail;
-                    # solo memorizamos el último código exitoso del turno.
+                    # Internal meta-event: not content nor a tail event;
+                    # we only keep the turn's last successful code.
                     if evt.get('code'):
                         last_query_code = evt['code']
                     continue
                 if ev == 'query_data':
-                    # Meta-evento interno (Nivel 2): filas del último dataset
-                    # exitoso, para cachearlas y reutilizarlas el próximo turno.
+                    # Internal meta-event (Level 2): rows of the last successful
+                    # dataset, to cache them and reuse them next turn.
                     if evt.get('data') is not None:
                         last_query_data = evt['data']
                     continue
                 if ev == 'token' and evt.get('content'):
                     acc += evt['content']
                 elif ev == 'replace':
-                    # 'replace' fija el contenido acumulado. Un replace VACÍO es
-                    # una señal de reset: el motor lo emite al hacer failover tras
-                    # haber emitido parcialmente, para que no se DUPLIQUE la
-                    # respuesta al regenerarla el siguiente proveedor.
+                    # 'replace' sets the content so far. An EMPTY replace is
+                    # a reset signal: the engine emits it on failover after
+                    # a partial output, so the answer is not DUPLICATED
+                    # when the next provider writes it again.
                     acc = evt.get('content') or ''
                 elif ev == 'done':
                     done_meta = evt
@@ -447,7 +476,7 @@ class ChatbooAsyncRequest(models.Model):
                         acc += evt['content']
                     struct.append(evt)
                 else:
-                    # status, verification, ... → reemitir tal cual en el tail
+                    # status, verification, ... → send again as is in the tail
                     struct.append(evt)
 
                 now = time.time()
@@ -474,8 +503,8 @@ class ChatbooAsyncRequest(models.Model):
                 "Chatboo async job %s: engine done. events=%s acc_len=%s agent=%s provider_id=%s",
                 self.id, ev_counts, len(acc), self.agent_code or '(auto)', self.provider_id or '(auto)',
             )
-            # Parar y ESPERAR el latido ANTES de persistir: si sigue vivo, su
-            # update concurrente a la fila colisiona con _finalize.
+            # Stop and WAIT for the heartbeat BEFORE saving: if it is still alive,
+            # its concurrent update to the row collides with _finalize.
             self._stop_heartbeat(beat)
             beat = None
             domain_codes_out = last_domain_codes
@@ -490,7 +519,7 @@ class ChatbooAsyncRequest(models.Model):
                               else _SKILL_STATE_LEAVE),
                 domain_codes=domain_codes_out,
             )
-        except Exception as exc:  # noqa: BLE001 — el motor puede fallar de mil formas
+        except Exception as exc:  # noqa: BLE001 — the engine can fail in many ways
             _logger.exception(
                 "Chatboo async job %s failed (events so far=%s, acc_len=%s)",
                 self.id, ev_counts, len(acc),
@@ -500,16 +529,14 @@ class ChatbooAsyncRequest(models.Model):
             self._release_turn_cursor()
             self._finalize(acc, struct, done_meta, error=str(exc) or exc.__class__.__name__)
         finally:
-            # Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
-            _NO_PAGE_WATCH.reset(no_page_token)
-            # Parar el latido pase lo que pase (éxito o error).
+            # Stop the heartbeat whatever happens (success or error).
             self._stop_heartbeat(beat)
-            # Este cursor lleva un snapshot REPEATABLE READ de TODO el turno.
-            # Lo durable (sesión, job, logs, recetas, usage) ya se commitó en
-            # cursores propios. Un commit aquí choca con el latido/flush
-            # (PG 40001) y _spawn() pintaba "MCP engine error" sobre un turno
-            # bueno. En tests el TestCursor ES la transacción del caso: no
-            # rollback.
+            # This cursor holds a REPEATABLE READ snapshot of the WHOLE turn.
+            # What must last (session, job, logs, recipes, usage) was already
+            # committed on its own cursors. A commit here clashes with the
+            # heartbeat/flush (PG 40001) and _spawn() showed "MCP engine error"
+            # over a good turn. In tests the TestCursor IS the test's
+            # transaction: no rollback.
             if not _is_test_mode(self.env):
                 try:
                     self.env.cr.rollback()
@@ -517,10 +544,10 @@ class ChatbooAsyncRequest(models.Model):
                     pass
 
     def _flush_progress(self, acc, struct):
-        """Vuelca progreso parcial a BD en un cursor propio (visible para el tail).
+        """Flush partial progress to the database on its own cursor (seen by the tail).
 
-        Refresca también ``write_date`` (latido): un job que sigue vivo se
-        distingue así de uno muerto por un reinicio, que deja de latir.
+        Also refreshes ``write_date`` (heartbeat): that is how a live job
+        is told apart from one killed by a restart, which stops beating.
         """
         try:
             with _get_registry(self.env.cr.dbname).cursor() as cr:
@@ -585,6 +612,17 @@ class ChatbooAsyncRequest(models.Model):
         # Sticky skill resume is a skill invoke: keep conversation packs.
         return False
 
+    def _prompt_runs_a_skill(self):
+        """True when the prompt is a slash that names a skill."""
+        try:
+            from odoo.addons.pns_ai_mcp.utils.slash_domain_codes import (
+                parse_slash_command,
+            )
+        except Exception:
+            return False
+        parsed = parse_slash_command(self.prompt)
+        return bool(parsed) and self._command_resolves_skill(parsed[0])
+
     def _resolved_inference_agent_code(self):
         """Same agent the engine uses (empty job field → chatboo feature agent)."""
         code = self.agent_code or CHATBOO_AGENT_CODE
@@ -612,14 +650,14 @@ class ChatbooAsyncRequest(models.Model):
         return False
 
     def _finalize(self, acc, struct, done_meta, error, query_code=None, query_data=None, active_skill=_SKILL_STATE_LEAVE, domain_codes=_DOMAIN_CODES_LEAVE, drop_query_cache=False):
-        """Escribe estado final, persiste el turno en la sesión y avisa por bus."""
-        # Red de seguridad anti-blanco: si el motor terminó "bien" pero sin
-        # contenido, es un fallo real (proveedor no resuelto en el hilo, stream
-        # vacío, etc.). Nunca dejamos un turno en blanco silencioso: lo marcamos
-        # como error con un mensaje claro para que el usuario lo vea y se registre.
-        # Excepción: exportación nominada (PDF/Excel/…) con tabla oculta a
-        # propósito — el globo va vacío y la tarjeta/clip_data son el resultado
-        # (C8N1: pintar "MCP engine error" encima de un PDF bueno).
+        """Write the final state, save the turn to the session and notify over the bus."""
+        # Safety net against blanks: if the engine ended "fine" but with no
+        # content, it is a real failure (provider not resolved in the thread,
+        # empty stream, etc.). We never leave a silent blank turn: we mark it
+        # as an error with a clear message so the user sees it and it is logged.
+        # Exception: a named export (PDF/Excel/…) with the table hidden on
+        # purpose — the bubble is empty and the card/clip_data are the result
+        # (C8N1: showing "MCP engine error" over a good PDF).
         if not error and not (acc or '').strip():
             if done_meta_has_deliverable(done_meta):
                 _logger.info(
@@ -649,13 +687,13 @@ class ChatbooAsyncRequest(models.Model):
             vals['state'] = 'done'
             vals['error'] = False
 
-        # Persistencia en una transacción FRESCA (cursor propio), NO en el cursor
-        # principal del worker: ese cursor arrastra un snapshot viejo y las
-        # escrituras concurrentes a esta misma fila (flush cada 0.3s, latido)
-        # hacen que su commit final falle con "could not serialize access due to
-        # concurrent update" (REPEATABLE READ), abortando la transacción y dejando
-        # el turno en rojo pese a haberse generado. Un cursor nuevo ve los últimos
-        # commits y escribe sin colisión.
+        # Save in a FRESH transaction (own cursor), NOT on the worker's main
+        # cursor: that cursor carries an old snapshot, and the concurrent
+        # writes to this same row (flush every 0.3s, heartbeat) make its
+        # final commit fail with "could not serialize access due to
+        # concurrent update" (REPEATABLE READ), aborting the transaction and leaving
+        # the turn red even though it was generated. A new cursor sees the latest
+        # commits and writes without a collision.
         dbname = self.env.cr.dbname
         uid = self.env.uid
         context = dict(self.env.context)
@@ -678,10 +716,10 @@ class ChatbooAsyncRequest(models.Model):
                             # bubbles being in the row.
                             _merged = dict(done_meta or {})
                             _merged['session_saved'] = True
-                            # Propagar los chips persistidos del turno de usuario al
-                            # done_meta (ya escrito en vals): el controlador vuelca
-                            # done_meta en el evento 'done' y el cliente parchea la
-                            # burbuja en vivo (base64 → /web/image, ficheros clicables).
+                            # Copy the saved chips of the user turn into
+                            # done_meta (already written in vals): the controller puts
+                            # done_meta in the 'done' event and the client patches the
+                            # bubble live (base64 → /web/image, clickable files).
                             if _chips and (
                                 _chips.get('user_images')
                                 or _chips.get('user_files')
@@ -709,8 +747,8 @@ class ChatbooAsyncRequest(models.Model):
                 vals['state'] = 'error'
                 error = self._session_busy_error()
 
-        # Último recurso: dejar el estado final por SQL crudo para no colgar el job
-        # (el tail SSE reemite el estado/error al cliente aunque no haya sesión).
+        # Last resort: write the final state with raw SQL so the job does not hang
+        # (the SSE tail still sends the state/error to the client without a session).
         try:
             with _get_registry(dbname).cursor() as cr:
                 cr.execute("SET LOCAL lock_timeout = '10s'")
@@ -723,7 +761,7 @@ class ChatbooAsyncRequest(models.Model):
         except Exception:
             _logger.exception("Chatboo async: _finalize raw fallback failed (job %s)", rid)
 
-    # ── Persistencia de imágenes del turno (para MOSTRAR, no para el LLM) ──────
+    # ── Saving the turn's pictures (to SHOW them, not for the LLM) ──────
     _IMG_EXT_BY_MIME = {
         'image/png': '.png', 'image/jpeg': '.jpg', 'image/jpg': '.jpg',
         'image/gif': '.gif', 'image/webp': '.webp', 'image/bmp': '.bmp',
@@ -732,16 +770,16 @@ class ChatbooAsyncRequest(models.Model):
     }
 
     def _persist_turn_images(self):
-        """Persiste las imágenes del turno como ir.attachment y devuelve chips.
+        """Save the turn's pictures as ir.attachment and return chips.
 
-        Doctrina revisada: el base64 NUNCA entra en el blob JSON de la sesión ni
-        en el historial que viaja al LLM. Pero SÍ persistimos cada imagen una vez
-        como adjunto ligado a la sesión, y el mensaje de usuario guarda un chip
-        ``{url, name}`` (/web/image sin token: lo abre quien puede leer la sesión). Así el
-        histórico conserva las capturas (multi-dispositivo), se abren en pestaña y
-        conservan su NOMBRE cuando se adjuntaron como fichero (las pegadas del
-        portapapeles no tienen nombre → name=None). Al borrar la sesión, su unlink
-        arrastra los ir.attachment ligados (res_model/res_id), así que no se acumulan.
+        Revised rule: the base64 NEVER enters the session's JSON blob nor
+        the history sent to the LLM. But we DO save each picture once
+        as an attachment linked to the session, and the user message keeps a chip
+        ``{url, name}`` (/web/image with no token: whoever can read the session opens it). So the
+        history keeps the screenshots (multi-device), they open in a tab and
+        keep their NAME when attached as a file (clipboard pastes
+        have no name → name=None). Deleting the session also unlinks
+        the linked ir.attachment rows (res_model/res_id), so they do not pile up.
         """
         try:
             imgs = json.loads(self.images) if self.images else []
@@ -767,53 +805,53 @@ class ChatbooAsyncRequest(models.Model):
             try:
                 att = Attachment.create({
                     'name': att_name,
-                    'datas': b64,
+                    'raw': base64.b64decode(b64),
                     'mimetype': mimetype or 'image/png',
                     'res_model': 'chatboo.session',
                     'res_id': self.session_id.id,
                 })
                 out.append({
                     'url': '/web/image/%s' % att.id,
-                    'name': orig,  # None para pegadas del portapapeles
+                    'name': orig,  # None for clipboard pastes
                 })
             except Exception:
                 _logger.warning(
-                    'Chatboo async job %s: no se pudo persistir la imagen %s del turno',
+                    'Chatboo async job %s: could not persist turn image %s',
                     self.id, idx, exc_info=True,
                 )
         return out
 
-    # ── Recuerdo acotado de imágenes previas (1c) ─────────────────────────────
-    # Cuántas imágenes previas de la sesión se reenvían como contexto y a qué
-    # lado máximo se reescalan (para acotar tokens, como hacen ChatGPT/Claude).
+    # ── Limited recall of earlier pictures (1c) ─────────────────────────────
+    # How many earlier session pictures are sent again as context, and the
+    # max side they are scaled to (to cap tokens, as ChatGPT/Claude do).
     _RECALL_MAX_IMAGES = 3
     _RECALL_MAX_SIDE = 768
-    # Formatos RÁSTER que los modelos de visión saben decodificar. Se EXCLUYE
-    # image/svg+xml (y otros vectoriales/iconos): un SVG en el recall hacía que
-    # TODOS los proveedores rechazaran el turno ("cannot identify image file" /
-    # "does not contain a valid JPG, PNG, WebP, or ICO image") y disparaba el
-    # failover en cascada hasta agotarlos. Además, la sesión acumula adjuntos que
-    # no son fotos del usuario (iconos de skills como pin.svg, thumbnails de
-    # registros…); filtrar por estos MIME evita reenviar basura vectorial.
+    # RASTER formats that vision models can decode. image/svg+xml is
+    # LEFT OUT (and other vector/icon formats): an SVG in the recall made
+    # ALL providers reject the turn ("cannot identify image file" /
+    # "does not contain a valid JPG, PNG, WebP, or ICO image") and set off
+    # failover down the chain until none was left. Also, the session gathers
+    # attachments that are not user photos (skill icons like pin.svg, record
+    # thumbnails…); filtering by these MIME types avoids sending vector junk.
     _RECALL_VISION_MIMETYPES = (
         'image/jpeg', 'image/jpg', 'image/png',
         'image/gif', 'image/webp', 'image/bmp',
     )
 
     def _recall_prior_images(self):
-        """Data URLs (reescaladas) de las últimas imágenes ya vistas en la sesión.
+        """Data URLs (downscaled) of the last pictures already seen in the session.
 
-        Reenvía, ACOTADO, las imágenes de turnos anteriores para que el modelo
-        pueda referirse a ellas (los LLM son sin estado: solo "recuerdan" lo que
-        se reenvía). Las del turno ACTUAL aún no están persistidas aquí, así que
-        no se duplican. Devuelve orden cronológico.
+        Sends again, CAPPED, the pictures of earlier turns so the model
+        can refer to them (LLMs have no state: they only "remember" what
+        is sent again). The CURRENT turn's ones are not saved here yet, so
+        they are not duplicated. Returns them oldest first.
         """
         if not self.session_id:
             return []
         try:
-            # Pedimos más de la cuenta para poder DEDUPLICAR por checksum: la misma
-            # foto adjuntada en varios turnos crea varios ir.attachment idénticos;
-            # reenviarla repetida gasta contexto y confunde al modelo.
+            # We ask for more than needed so we can DEDUPLICATE by checksum: the same
+            # photo attached in several turns makes several identical ir.attachment;
+            # sending it again and again wastes context and confuses the model.
             atts = self.env['ir.attachment'].search([
                 ('res_model', '=', 'chatboo.session'),
                 ('res_id', '=', self.session_id.id),
@@ -830,7 +868,7 @@ class ChatbooAsyncRequest(models.Model):
                 if key in seen:
                     continue
                 seen.add(key)
-                raw = base64.b64decode(att.datas or b'')
+                raw = bytes(att.raw or b'')
                 if not raw:
                     continue
                 data_url = self._downscale_image_to_data_url(raw, att.mimetype)
@@ -840,16 +878,16 @@ class ChatbooAsyncRequest(models.Model):
                     break
             except Exception:
                 continue
-        urls.reverse()  # de más antigua a más reciente
+        urls.reverse()  # oldest to newest
         return urls
 
     @classmethod
     def _downscale_image_to_data_url(cls, raw, mimetype):
-        """Reescala una imagen al lado máx. y la devuelve como data URL base64.
+        """Scale a picture down to the max side and return it as a base64 data URL.
 
-        La prepara pns_base (derecha, JPEG sigue JPEG, lo demás PNG). Si no
-        puede (formato raro, sin Pillow), devuelve la imagen original en
-        base64: el tope de NÚMERO ya acota el coste.
+        pns_base prepares it (upright, JPEG stays JPEG, the rest PNG). If it
+        cannot (odd format, no Pillow), it returns the original picture in
+        base64: the cap on COUNT already limits the cost.
         """
         from odoo.addons.pns_base.utils.pdf_io import shrink_picture
 
@@ -857,10 +895,10 @@ class ChatbooAsyncRequest(models.Model):
         if shrunk:
             payload, mt = shrunk
             return 'data:%s;base64,%s' % (mt, base64.b64encode(payload).decode('ascii'))
-        # Fallback SIN Pillow (o formato que no abre): reenviamos el original
-        # SOLO si es un ráster que la visión acepta. NUNCA emitir SVG u otros
-        # vectoriales/desconocidos: los proveedores los rechazan y tumban el
-        # turno con failover en cascada.
+        # Fallback WITHOUT Pillow (or a format it cannot open): we send the original
+        # ONLY if it is a raster that vision accepts. NEVER emit SVG or other
+        # vector/unknown formats: providers reject them and bring the
+        # turn down with failover down the chain.
         if (mimetype or '').lower() not in cls._RECALL_VISION_MIMETYPES:
             return ''
         try:
@@ -924,7 +962,7 @@ class ChatbooAsyncRequest(models.Model):
             code = self.env['ai.agent'].resolve_inference_agent_code(
                 self.agent_code or CHATBOO_AGENT_CODE,
             )
-            response = self.env['ai.execution.engine'].sudo().chat_completion(
+            response = self.env['ai.execution.engine'].sudo()._chat_completion(
                 code,
                 [{'role': 'user', 'content': prompt}],
                 images=pictures,
@@ -996,6 +1034,17 @@ class ChatbooAsyncRequest(models.Model):
             for index, text in enumerate(pages)
         )
 
+    def _turn_file_names(self):
+        """Names of the files attached to this turn (not the pictures)."""
+        try:
+            files = json.loads(self.files) if self.files else []
+        except Exception:
+            files = []
+        return tuple(
+            f['name'] for f in files
+            if isinstance(f, dict) and isinstance(f.get('name'), str) and f['name']
+        )
+
     def _augment_prompt_with_files(self, base_message):
         """Return ``(message, inline_file_text, pictures, documents)``.
 
@@ -1057,12 +1106,12 @@ class ChatbooAsyncRequest(models.Model):
         )
 
     def _persist_turn_files(self):
-        """Persiste los ficheros del turno como ir.attachment y devuelve chips.
+        """Save the turn's files as ir.attachment and return chips.
 
-        Como las imágenes: el fichero se guarda una vez (ligado a la sesión) y el
-        mensaje de usuario guarda un chip {name, url, mimetype} para mostrar un
-        enlace descargable en la burbuja. El texto extraído lo guarda la
-        sesión aparte (remember_documents).
+        Like the pictures: the file is saved once (linked to the session) and the
+        user message keeps a chip {name, url, mimetype} to show a
+        download link in the bubble. The session keeps the extracted text
+        on its own (remember_documents).
         """
         import base64
         from odoo.addons.pns_ai_mcp.utils.session_download import (
@@ -1096,16 +1145,16 @@ class ChatbooAsyncRequest(models.Model):
                     })
             except Exception:
                 _logger.warning(
-                    'Chatboo async job %s: no se pudo persistir el fichero %s',
+                    'Chatboo async job %s: could not persist file %s',
                     self.id, name, exc_info=True,
                 )
         return chips
 
     def _llm_history_for_session(self, done_meta, visible):
-        """Historial compacto para el siguiente turno (stubs, no HTML de burbuja).
+        """Compact history for the next turn (stubs, not bubble HTML).
 
-        El motor lo emite en ``done.history``. Si falta (turno viejo / error),
-        se reconstruye aquí para que el cliente no reenvíe tablas enormes.
+        The engine emits it in ``done.history``. If missing (old turn / error),
+        it is rebuilt here so the client does not send huge tables again.
         """
         meta = done_meta if isinstance(done_meta, dict) else {}
         hist = meta.get('history')
@@ -1133,25 +1182,25 @@ class ChatbooAsyncRequest(models.Model):
             return None
 
     def _save_to_session(self, acc, done_meta, error, incomplete=False, not_started=False, query_code=None, query_data=None, active_skill=_SKILL_STATE_LEAVE, domain_codes=_DOMAIN_CODES_LEAVE, reclaim=False, drop_query_cache=False):
-        """Añade el turno (usuario + asistente) al historial de la sesión.
+        """Add the turn (user + assistant) to the session history.
 
-        El contenido del asistente se guarda en crudo (markdown) con el flag
-        ``raw``; el cliente lo formatea al recargar (reutiliza su formateador).
+        The assistant content is saved raw (markdown) with the flag
+        ``raw``; the client formats it on reload (reuses its formatter).
 
-        ``incomplete=True`` marca una respuesta recuperada tras un reinicio: se
-        guarda lo que se alcanzó a generar con una nota discreta y SIN estilo de
-        error rojo (un reinicio no es un fallo del usuario). ``not_started=True``
-        distingue el caso de un job que nunca llegó a arrancar (mensaje distinto).
+        ``incomplete=True`` marks an answer recovered after a restart: what
+        was generated is saved with a quiet note and WITHOUT the red
+        error style (a restart is not the user's fault). ``not_started=True``
+        marks a job that never got to start (a different message).
 
-        ``reclaim=True``: ruta ligera al cerrar un job zombie (reinicio Docker /
-        worker muerto). No re-persiste base64 de imágenes/ficheros ni busca
-        huérfanos: un prompt fallido no puede bloquear la apertura de Chatboo.
+        ``reclaim=True``: light path when closing a zombie job (Docker restart /
+        dead worker). It does not save image/file base64 again nor look for
+        orphans: a failed prompt must not block opening Chatboo.
         """
         session = self.session_id
         if not session or not session.exists():
             return
-        # Lectura fresca: el worker lleva su propia transacción abierta durante
-        # toda la inferencia; invalidamos para no partir de un snapshot viejo.
+        # Fresh read: the worker keeps its own transaction open during
+        # the whole inference; we invalidate so we do not start from an old snapshot.
         try:
             session.invalidate_recordset(['messages', 'staged_assistant_files'])
         except AttributeError:
@@ -1171,15 +1220,17 @@ class ChatbooAsyncRequest(models.Model):
         if elapsed is not None:
             stamp = '%s (%ds)' % (wall, int(round(elapsed)))
 
-        # Turno de usuario (para que quede persistido aunque el cliente no lo guarde).
-        # Las imágenes pegadas se persisten como adjuntos y se referencian por URL
-        # (NO se guarda base64 en el blob de la sesión: lo inflaría y se recarga
-        # entero cada turno). Así el histórico conserva las capturas y son clicables.
+        # User turn (so it is saved even if the client does not save it).
+        # Pasted pictures are saved as attachments and pointed to by URL
+        # (NO base64 in the session blob: it would bloat it, and it is reloaded
+        # whole each turn). So the history keeps the screenshots and they are clickable.
         _user_msg = {
             'role': 'user',
             'content': self.prompt or '',
             'timestamp': wall,
         }
+        if self.result_note:
+            _user_msg['result_note'] = True
         _user_images = []
         _user_files = []
         if not reclaim:
@@ -1233,7 +1284,7 @@ class ChatbooAsyncRequest(models.Model):
                     svg_chips = svg_chips or []
                 except Exception:
                     _logger.warning(
-                        'Chatboo async job %s: no se pudieron persistir SVG inline',
+                        'Chatboo async job %s: could not persist inline SVG',
                         self.id, exc_info=True,
                     )
             if svg_chips:
@@ -1248,11 +1299,11 @@ class ChatbooAsyncRequest(models.Model):
                 except Exception:
                     pass
 
-        # Historial readline (flechas ↑/↓): persistir el prompt enviado para que
-        # sobreviva al recargar la página. Con auto-promoción el cliente ya no
-        # re-guarda la sesión (el worker autora el turno), así que si no lo
-        # anotamos aquí el input_history se perdería. Dedup del último; el tope
-        # (50) lo aplica set_input_history.
+        # Readline history (↑/↓ arrows): save the sent prompt so it
+        # survives a page reload. With auto-promotion the client no longer
+        # saves the session again (the worker writes the turn), so if we do not
+        # note it here input_history would be lost. Skip a repeat of the last; the cap
+        # (50) is applied by set_input_history.
         if (self.prompt or '').strip():
             try:
                 hist = session.get_input_history()
@@ -1261,12 +1312,12 @@ class ChatbooAsyncRequest(models.Model):
                     session.set_input_history(hist)
             except Exception:
                 _logger.debug(
-                    "Chatboo async: no se pudo actualizar input_history (sesión %s)",
+                    "Chatboo async: could not update input_history (session %s)",
                     session.id, exc_info=True,
                 )
 
         if incomplete:
-            # Recuperación tras reinicio: lo generado (si hay) + nota discreta.
+            # Recovery after a restart: what was generated (if any) + a quiet note.
             if (acc or '').strip():
                 _note = _('(incomplete response: interrupted by a server restart)')
                 _content = u"%s\n\n_%s_" % (acc, _note)
@@ -1298,29 +1349,13 @@ class ChatbooAsyncRequest(models.Model):
                 **({'clip_data': _clip_data} if _clip_data else {}),
             })
         else:
-            # Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
-            _content = acc or ''
-            if page_refused_in_job(self.id, session.id, session.canvas_rev):
-                _note = _('No page was built. The reason is in the AI History.')
-                # When the answer is already HTML (a server-built table), the
-                # client paints it as HTML and markdown emphasis would render
-                # literally, so append the notice as HTML to keep it in its own
-                # paragraph. Same HTML test as the client's isLikelyHtml
-                # (chatboo_formatters.js:88-97); plain text keeps markdown.
-                if (acc or '').lstrip().startswith('<'):
-                    _content = acc + '<p><em>' + html.escape(_note) + '</em></p>'
-                elif (acc or '').strip():
-                    _content = f"{acc}\n\n_{_note}_"
-                else:
-                    _content = f"_{_note}_"
-                _assistant_content = _content
-            # Pie de respuesta: cada stack consume una forma distinta y hay que
-            # reproducir AMBAS para que el pie sobreviva al recargar la sesión
-            # (antes lo escribía el cliente en vivo; ahora lo autora el worker):
-            #   · owl1 -> campos planos + model_details:{model,provider} + sources[]
-            #   · owl2 -> objeto meta:{model,provider,context_limit,usage,sources,...}
-            # Todo sale del evento 'done' del motor (done_meta), que ya trae
-            # model, provider, protocol, context_limit, usage y sources.
+            # Answer footer: each stack reads a different shape and we must
+            # write BOTH so the footer survives a session reload
+            # (the client used to write it live; now the worker writes it):
+            #   · owl1 -> flat fields + model_details:{model,provider} + sources[]
+            #   · owl2 -> meta object:{model,provider,context_limit,usage,sources,...}
+            # It all comes from the engine's 'done' event (done_meta), which already has
+            # model, provider, protocol, context_limit, usage and sources.
             _dm = done_meta or {}
             _model = _dm.get('model') or ''
             _provider = _dm.get('provider') or ''
@@ -1371,13 +1406,10 @@ class ChatbooAsyncRequest(models.Model):
             }
             messages.append({
                 'role': 'assistant',
-                'content': _content,  # Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
-                # Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
-                # Opción A (Sergio, 05/11/2026): con aviso, original_content lleva
-                # el mismo texto que content; sin aviso, el valor de hoy (acc or '').
-                'original_content': _content,
+                'content': acc or '',
+                'original_content': acc or '',
                 'raw': True,
-                # ── owl1 (campos planos que lee chatboo_component_v2.js) ──
+                # ── owl1 (flat fields read by chatboo_component_v2.js) ──
                 'usage': _usage,
                 'context_limit': _ctx_limit,
                 'speed_tps': _speed,
@@ -1392,7 +1424,7 @@ class ChatbooAsyncRequest(models.Model):
                 'backend_history': self._llm_history_for_session(
                     _dm, acc,
                 ),
-                # ── owl2 (objeto meta que lee chatboo_app.js) ──
+                # ── owl2 (meta object read by chatboo_app.js) ──
                 'meta': _meta,
                 'timestamp': stamp,
                 **({'files': _assistant_files} if _assistant_files else {}),
@@ -1400,31 +1432,32 @@ class ChatbooAsyncRequest(models.Model):
             })
 
         session.set_messages(messages)
-        # Persistir el ancla de reutilización solo cuando hay un código nuevo
-        # exitoso (turno normal). En recuperaciones/errores llega None y se
-        # conserva el de la última consulta buena.
+        # Save the reuse anchor only when there is a new successful
+        # code (normal turn). On recovery/errors it comes as None and the
+        # last good query's one is kept.
         if query_code:
             try:
                 session.write({'last_query_code': query_code})
             except Exception:
                 _logger.debug(
-                    "Chatboo async: no se pudo guardar last_query_code (sesión %s)",
+                    "Chatboo async: could not save last_query_code (session %s)",
                     session.id, exc_info=True,
                 )
-        # Nivel 2: cachear el dataset (filas) con su marca de tiempo para expirarlo
-        # por antigüedad. query_data es None salvo en un turno normal con datos.
-        # Un turno que respondió sin filas (informe, prosa) retira la caché:
-        # si no, el siguiente «reformatea» reinyecta la tabla de un tema anterior.
-        # Error, cancelación y reclaim no pasan drop_query_cache: se conserva.
+        # Level 2: cache the dataset (rows) with its timestamp so it expires
+        # by age. query_data is None except in a normal turn with data.
+        # A turn that answered with no rows (report, prose) drops the cache:
+        # otherwise the next "reformat" brings back the table of an older topic.
+        # Error, cancel and reclaim do not pass drop_query_cache: it is kept.
         if query_data is not None:
             try:
                 session.write({
                     'last_query_data': json.dumps(query_data, default=str, ensure_ascii=False),
                     'last_query_data_date': fields.Datetime.now(),
+                    'last_query_company_ids': json.dumps(self._turn_company_ids()),
                 })
             except Exception:
                 _logger.debug(
-                    "Chatboo async: no se pudo guardar last_query_data (sesión %s)",
+                    "Chatboo async: could not save last_query_data (session %s)",
                     session.id, exc_info=True,
                 )
         elif (
@@ -1442,11 +1475,11 @@ class ChatbooAsyncRequest(models.Model):
                 })
             except Exception:
                 _logger.debug(
-                    "Chatboo async: no se pudo retirar last_query_data (sesión %s)",
+                    "Chatboo async: could not drop last_query_data (session %s)",
                     session.id, exc_info=True,
                 )
-        # Skill pegajoso: persistir el estado emitido por el motor. code con
-        # valor → fijar/actualizar; code=None → soltar; sentinela → no tocar.
+        # Sticky skill: save the state the engine emitted. code with a
+        # value → set/update; code=None → drop; sentinel → leave alone.
         if active_skill is not _SKILL_STATE_LEAVE:
             try:
                 code = (active_skill or {}).get('code')
@@ -1465,7 +1498,7 @@ class ChatbooAsyncRequest(models.Model):
                     })
             except Exception:
                 _logger.debug(
-                    "Chatboo async: no se pudo guardar active_skill (sesión %s)",
+                    "Chatboo async: could not save active_skill (session %s)",
                     session.id, exc_info=True,
                 )
         if not error and domain_codes is not _DOMAIN_CODES_LEAVE:
@@ -1478,16 +1511,16 @@ class ChatbooAsyncRequest(models.Model):
                 })
             except Exception:
                 _logger.debug(
-                    "Chatboo async: no se pudo guardar last_domain_codes "
-                    "(sesión %s)",
+                    "Chatboo async: could not save last_domain_codes "
+                    "(session %s)",
                     session.id, exc_info=True,
                 )
         session.update_last_used()
-        # Devuelve los chips persistidos del turno de usuario (imágenes con URL
-        # /web/image y ficheros con URL /web/content). El cliente los usa para
-        # PARCHEAR en su sitio la burbuja recién enviada, que aún mostraba el
-        # base64 (imágenes) y los ficheros sin URL (no clicables). Así se abren en
-        # pestaña sin esperar a recargar la sesión.
+        # Return the saved chips of the user turn (pictures with a /web/image
+        # URL and files with a /web/content URL). The client uses them to
+        # PATCH in place the bubble just sent, which still showed the
+        # base64 (pictures) and the files with no URL (not clickable). So they
+        # open in a tab without waiting for a session reload.
         result = {
             'user_images': _user_images or [],
             'user_files': _user_files or [],
@@ -1497,10 +1530,10 @@ class ChatbooAsyncRequest(models.Model):
             result['assistant_content'] = _assistant_content
         return result
 
-    # ──────────────────────────── Lectura (tail / poll) ────────────────────────────
+    # ──────────────────────────── Read (tail / poll) ────────────────────────────
 
     def mark_seen(self):
-        """Marca el job como entregado a un cliente (evita re-entrega por poll)."""
+        """Mark the job as delivered to a client (avoids delivering it again by poll)."""
         own = self if self.env.su else self.search([
             ('id', 'in', self.ids), ('user_id', '=', self.env.uid),
         ])
@@ -1514,7 +1547,7 @@ class ChatbooAsyncRequest(models.Model):
                 _logger.debug("Chatboo async mark_seen failed (request %s)", rec.id, exc_info=True)
 
     def _cancel_pending(self):
-        """Cerrado antes de arrancar: el aviso queda como respuesta del turno."""
+        """Closed before it started: the notice stays as the turn's answer."""
         msg = '⏹ ' + _('Generation cancelled.')
         self.sudo().write({
             'state': 'done',
@@ -1535,14 +1568,14 @@ class ChatbooAsyncRequest(models.Model):
         except Exception:
             pass
 
-    # ──────────────────────────── Mantenimiento (cron) ────────────────────────────
+    # ──────────────────────────── Maintenance (cron) ────────────────────────────
 
     def _reclaim_one(self, timeout_ms):
-        """En vez de marcarlo como error rojo, RECUPERAMOS lo que se alcanzó a
-        generar (``partial``) y lo guardamos en la sesión como respuesta
-        incompleta, cerrando el job como 'done' y avisando como info. Así la
-        respuesta sobrevive al reinicio. Ruta ``reclaim=True``: sin re-persistir
-        base64.
+        """Instead of marking it as a red error, we RECOVER what was
+        generated (``partial``) and save it in the session as an incomplete
+        answer, closing the job as 'done' and notifying as info. So the
+        answer survives the restart. Path ``reclaim=True``: no saving of
+        base64 again.
         """
         partial = self.partial or ''
         never_started = self.state == 'pending' and not partial
@@ -1550,8 +1583,8 @@ class ChatbooAsyncRequest(models.Model):
             "Chatboo async: reclaiming stuck job %s (%s), recovering %s chars",
             self.id, self.state, len(partial),
         )
-        # Cerrar YA el estado dentro del savepoint; si el save a
-        # sesión falla/timeout, el fallback SQL deja el job done.
+        # Close the state RIGHT NOW inside the savepoint; if the save to
+        # the session fails/times out, the SQL fallback leaves the job done.
         self.sudo().write({
             'state': 'done',
             'response': partial,
@@ -1586,15 +1619,21 @@ class ChatbooAsyncRequest(models.Model):
 
     @api.model
     def cron_maintenance(self):
-        """Punto de entrada del cron: reclama colgados y purga viejos."""
+        """Cron entry point: reclaims stuck jobs and purges old ones.
+
+        Public because the cron calls it by name; it deletes everyone's old
+        sessions, so only the system runs it.
+        """
+        if not (self.env.su or self.env.user._is_system()):
+            raise AccessError(_('Only the system runs Chatboo maintenance.'))
         jobs = (self, self.env['chatboo.canvas.job'])
         for model in jobs:
             try:
                 model._reclaim_stuck()
             except Exception:
                 _logger.exception("Chatboo jobs: cron reclaim failed (%s)", model._name)
-        # Liberar locks antes del GC: un reclaim lento no debe retener el
-        # ir.cron "busy" mientras purga (otros workers lo saltaban eternamente).
+        # Release locks before the GC: a slow reclaim must not hold the
+        # ir.cron "busy" while it purges (other workers skipped it forever).
         if not _is_test_mode(self.env):
             try:
                 self.env.cr.commit()
@@ -1605,20 +1644,20 @@ class ChatbooAsyncRequest(models.Model):
                 model._gc_old()
             except Exception:
                 _logger.exception("Chatboo jobs: cron GC failed (%s)", model._name)
-        # Nivel 2: purgar datasets cacheados obsoletos (por antigüedad) para que
-        # no se acumulen en sesiones de larga vida. No debe tumbar el cron.
+        # Level 2: purge stale cached datasets (by age) so they
+        # do not pile up in long-lived sessions. Must not bring the cron down.
         try:
             self.env['chatboo.session']._gc_stale_query_data()
         except Exception:
-            _logger.debug("Chatboo async: _gc_stale_query_data falló", exc_info=True)
+            _logger.debug("Chatboo async: _gc_stale_query_data failed", exc_info=True)
         self.env['chatboo.session']._cleanup_old_sessions()
 
     # ──────────────────────────── Bus ────────────────────────────
 
     def _notify(self, action):
-        """Avisa al usuario por el bus. Compatible Odoo 14 y 17+.
+        """Notify the user over the bus. Works on Odoo 14 and 17+.
 
-        El front (componente + systray) ya entiende ``pns_chatboo_sync`` con
+        The front end (component + systray) already understands ``pns_chatboo_sync`` with
         ``action`` in {thinking, async_done, error}.
         """
         self.ensure_one()

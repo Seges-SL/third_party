@@ -23,7 +23,7 @@ _TABLE_MARKERS = (
 
 
 def content_has_delivery(text):
-    """True si el contenido ya entrega tabla o deep-link (sin import cruzado)."""
+    """True if the content already delivers a table or a deep-link (no cross import)."""
     if not text or not isinstance(text, str):
         return False
     if _WEB_ID_RE.search(text):
@@ -31,10 +31,10 @@ def content_has_delivery(text):
     return any(m in text for m in _TABLE_MARKERS)
 
 
-# Umbral de forma (Unicode chars), no diccionario de palabras.
+# Shape threshold (Unicode chars), not a word dictionary.
 SHORT_USER_MSG_CHARS = 64
-# Cierre LLM sin entrega tabular: si es largo, es otra respuesta (no reinyectar
-# el dataset). Estructural, no léxico.
+# LLM close without tabular delivery: if it is long, it is another answer (do not
+# re-inject the dataset). Structural, not lexical.
 THIN_FINAL_CHARS = 280
 
 
@@ -68,10 +68,10 @@ def should_force_turn_payload(
     last_tabulable_payload,
     table_already_delivered,
 ):
-    """1a: hubo payload tabulable este turno y la burbuja no entregó registros.
+    """1a: there was a tabular payload this turn and the bubble did not deliver records.
 
-    No fuerza si el cierre ya es sustancial: la IA eligió narrar (inspect /
-    prosa). Solo reinyecta cuando el cierre es thin (olvidó pintar el listing).
+    Does not force it if the close is already substantial: the AI chose to narrate (inspect /
+    prose). Only re-injects when the close is thin (it forgot to paint the listing).
     """
     if table_already_delivered:
         return False
@@ -85,7 +85,7 @@ def should_force_turn_payload(
 
 
 def first_tabular_rows(result):
-    """Primera lista de dicts tabulable de un resultado RelaxAICode (para cache)."""
+    """First tabular list of dicts of a RelaxAICode result (for the cache)."""
     if isinstance(result, list) and result and isinstance(result[0], dict):
         return list(result)
     if not isinstance(result, dict):
@@ -113,6 +113,68 @@ def first_tabular_rows(result):
         if isinstance(val, list) and val and isinstance(val[0], dict):
             return list(val)
     return None
+
+
+TABLE_KEY = '__table__'
+
+
+def _block_rows(block):
+    for key in ('data', 'items', 'rows'):
+        rows = block.get(key)
+        if isinstance(rows, list) and rows and isinstance(rows[0], dict):
+            return rows
+    return None
+
+
+def all_tabular_rows(result):
+    """Rows of every table in the result, for the next turn's ``previous_result``.
+
+    With several tables each row carries ``__table__`` (its table title, or its
+    position) so ``previous_result_envelope`` can rebuild the same tables.
+    One table: the same rows as ``first_tabular_rows``.
+    """
+    if isinstance(result, dict):
+        for envelope in ('groups', 'sections', 'tables'):
+            blocks = result.get(envelope)
+            if not isinstance(blocks, list):
+                continue
+            filled = [
+                (b, _block_rows(b)) for b in blocks if isinstance(b, dict)
+            ]
+            filled = [(b, rows) for b, rows in filled if rows]
+            if len(filled) < 2:
+                break
+            out = []
+            for index, (block, rows) in enumerate(filled):
+                label = block.get('title') or block.get('name') or str(index + 1)
+                for row in rows:
+                    tagged = dict(row)
+                    tagged[TABLE_KEY] = str(label)
+                    out.append(tagged)
+            return out
+    return first_tabular_rows(result)
+
+
+def previous_result_envelope(rows):
+    """``{'data': rows}``, plus ``tables`` when the rows came from several tables."""
+    envelope = {'data': rows}
+    if not isinstance(rows, list):
+        return envelope
+    tables = []
+    by_label = {}
+    for row in rows:
+        if not isinstance(row, dict) or TABLE_KEY not in row:
+            return envelope
+        label = row[TABLE_KEY]
+        if label not in by_label:
+            by_label[label] = {'title': label, 'data': []}
+            tables.append(by_label[label])
+        clean = dict(row)
+        clean.pop(TABLE_KEY, None)
+        by_label[label]['data'].append(clean)
+    if len(tables) > 1:
+        envelope['tables'] = tables
+    return envelope
 
 
 def rows_from_safe_plan_steps(steps):

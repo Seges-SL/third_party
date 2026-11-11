@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Resultado de operación: textos en XML (i18n Odoo); Python solo escribe contadores. -->
+<!-- Operation result: texts live in XML (Odoo i18n); Python only writes counters. -->
 <odoo>
 
     <!-- ai.context.import.wizard -->
@@ -275,6 +275,43 @@
                     <field name="result_created" string="Created"/>
                     <field name="result_updated" string="Updated"/>
                     <field name="result_skipped" string="Skipped (already existed)"
+                           attrs="{'invisible': [('result_skipped', '=', 0)]}"/>
+                </group>
+                <group name="result_messages">
+                    <field name="result_warnings" attrs="{'invisible': [('result_warnings', '=', False)]}"/>
+                    <field name="result_errors" attrs="{'invisible': [('result_errors', '=', False)]}"/>
+                </group>
+                <footer>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_import_provider_roles_result_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.import_provider_roles.wizard.result</field>
+        <field name="model">ai.import.provider.roles.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import result">
+                <field name="show_result" invisible="1"/>
+                <field name="result_status" invisible="1"/>
+                <group name="result_alerts">
+                    <div class="alert alert-success mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'success')]}">
+                        <i class="fa fa-check-circle" title="Success" role="img" aria-hidden="true"/> <strong>Import completed successfully.</strong>
+                    </div>
+                    <div class="alert alert-warning mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'warning')]}">
+                        <i class="fa fa-exclamation-triangle" title="Warning" role="img" aria-hidden="true"/> <strong>Import completed with warnings.</strong>
+                    </div>
+                    <div class="alert alert-danger mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'danger')]}">
+                        <i class="fa fa-times-circle" title="Error" role="img" aria-hidden="true"/> <strong>Import failed.</strong>
+                    </div>
+                </group>
+                <group name="result_counts">
+                    <field name="result_updated" string="Updated"/>
+                    <field name="result_skipped" string="Skipped"
                            attrs="{'invisible': [('result_skipped', '=', 0)]}"/>
                 </group>
                 <group name="result_messages">

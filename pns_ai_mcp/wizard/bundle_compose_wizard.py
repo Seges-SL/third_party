@@ -139,9 +139,9 @@ class AIAgentComposeLine(models.TransientModel):
     """
     _name = 'ai.agent.compose.line'
     _description = 'Agent composition line'
-    # Ordenamos por 'code' (almacenado abajo). El antiguo 'category' ya no existe
-    # y en Odoo 19 un _order con un campo inexistente rompe cualquier search
-    # (incluido el autovacuum): "Invalid field 'category'".
+    # We order by 'code' (stored below). The old 'category' no longer exists
+    # and in Odoo 19 an _order with a missing field breaks any search
+    # (autovacuum included): "Invalid field 'category'".
     _order = 'code'
 
     wizard_id = fields.Many2one(

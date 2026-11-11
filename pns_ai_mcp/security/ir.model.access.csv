@@ -9,6 +9,7 @@ access_api_server_key_user,External API Server Key User,model_ai_api_server_key,
 access_ai_api_result_cache_user,AI API Result Cache User,model_ai_api_result_cache,base.group_user,1,0,0,0
 access_ai_provider_user,AI Provider User,model_ai_provider,base.group_user,1,0,0,0
 access_ai_provider_model_user,AI Provider Model User,model_ai_provider_model,base.group_user,1,0,0,0
+access_ai_provider_role_user,AI Provider Role User,model_ai_provider_role,base.group_user,1,0,0,0
 access_ai_fx_source_user,AI FX Source User,model_ai_fx_source,base.group_user,1,0,0,0
 access_ai_context_agent_user,AI Agent User,model_ai_agent,base.group_user,1,0,0,0
 access_ai_agent_provider_user,AI Agent Provider User,model_ai_agent_provider,base.group_user,1,0,0,0
@@ -51,13 +52,16 @@ access_ai_fetch_cache_admin,AI Fetch Cache Admin,model_ai_fetch_cache,group_ai_a
 access_ai_api_result_cache_admin,AI API Result Cache Admin,model_ai_api_result_cache,group_ai_admin,1,1,1,1
 access_ai_provider_admin,AI Provider Admin,model_ai_provider,group_ai_admin,1,1,1,1
 access_ai_provider_model_admin,AI Provider Model Admin,model_ai_provider_model,group_ai_admin,1,1,1,1
+access_ai_provider_role_admin,AI Provider Role Admin,model_ai_provider_role,group_ai_admin,1,1,0,0
 access_ai_fx_source_admin,AI FX Source Admin,model_ai_fx_source,group_ai_admin,1,1,1,1
 access_ai_provider_tools_wizard_admin,AI Provider Tools Wizard Admin,model_ai_provider_tools_wizard,group_ai_admin,1,1,1,1
+access_ai_provider_role_tools_wizard_admin,AI Provider Role Tools Wizard Admin,model_ai_provider_role_tools_wizard,group_ai_admin,1,1,1,1
 access_ai_provider_usage_wizard_admin,AI Provider Usage Wizard Admin,model_ai_provider_usage_wizard,group_ai_admin,1,1,1,1
 access_ai_provider_catalogue_copy_admin,Model catalogue copy,model_ai_provider_catalogue_copy,group_ai_admin,1,1,1,1
 access_ai_agent_provider_admin,AI Agent Provider Admin,model_ai_agent_provider,group_ai_admin,1,1,1,1
 access_ai_context_agent_admin,AI Agent Admin,model_ai_agent,group_ai_admin,1,1,1,1
 access_import_servers_wizard_admin,Import Servers Wizard Admin,model_ai_import_servers_wizard,group_ai_admin,1,1,1,1
+access_import_provider_roles_wizard_admin,Import Provider Roles Wizard Admin,model_ai_import_provider_roles_wizard,group_ai_admin,1,1,1,1
 access_import_users_wizard_admin,Import Users Wizard Admin,model_ai_import_users_wizard,group_ai_admin,1,1,1,1
 access_import_whitelist_wizard_admin,Import Whitelist Wizard Admin,model_ai_import_whitelist_wizard,group_ai_admin,1,1,1,1
 access_import_external_servers_wizard_admin,Import External Servers Wizard Admin,model_ai_import_external_servers_wizard,group_ai_admin,1,1,1,1
@@ -74,7 +78,7 @@ access_artifact_bundle_import_wizard_admin,Artifact Bundle Import Wizard Admin,m
 access_ai_trusted_action_admin,AI Trusted Action Admin,model_ai_trusted_action,group_ai_admin,1,1,1,1
 access_ai_system_action_admin,AI System Action Admin,model_ai_system_action,group_ai_admin,1,1,1,1
 access_ai_view_policy_admin,AI View Policy Admin,model_ai_view_policy,group_ai_admin,1,1,1,1
-access_ai_safe_choice_user,AI Safe Choice User,model_ai_safe_choice,base.group_user,1,1,1,1
+access_ai_safe_choice_user,AI Safe Choice User,model_ai_safe_choice,base.group_user,1,0,0,0
 access_ai_schema_fossil_admin,AI Schema Fossil Admin,model_ai_schema_fossil,group_ai_admin,1,1,1,1
 access_ai_key_pin_block_admin,Temporary key PIN block,model_ai_key_pin_block,group_ai_admin,1,1,1,1
 access_ai_key_pin_desk_admin,Temporary key PIN desk,model_ai_key_pin_desk,group_ai_admin,1,1,1,1

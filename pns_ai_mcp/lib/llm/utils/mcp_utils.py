@@ -101,42 +101,42 @@ def extract_user_token_from_request(
     server_key: Optional[str] = None
 ) -> Optional[str]:
     """
-    Extrae el user_token de una petición HTTP de forma determinista.
+    Extract the user_token from an HTTP request, deterministically.
     
-    SOLO busca el header 'X-Mcp-Token' - sin fallbacks ni alternativas.
+    ONLY looks at the 'X-Mcp-Token' header - no fallbacks, no alternatives.
     
     Args:
-        request: Objeto de petición (FastAPI Request, Odoo request, o dict con headers)
-        server_key: No usado (mantenido por compatibilidad de firma, ignorado)
+        request: Request object (FastAPI Request, Odoo request, or dict of headers)
+        server_key: Unused (kept for signature compatibility, ignored)
         
     Returns:
-        user_token si se encuentra en X-Mcp-Token, None si no
+        user_token if found in X-Mcp-Token, None otherwise
     """
     headers = None
     
-    # Extraer headers según el tipo de request
+    # Extract headers depending on the request type
     if hasattr(request, 'headers'):
-        # FastAPI Request o similar
+        # FastAPI Request or similar
         headers = request.headers
     elif hasattr(request, 'httprequest') and hasattr(request.httprequest, 'headers'):
         # Odoo request
         headers = request.httprequest.headers
     elif isinstance(request, dict):
-        # Dict con headers directamente
+        # Dict of headers directly
         headers = request
     
     if not headers:
         return None
     
-    # ÚNICO método: X-Mcp-Token (determinista, sin fallbacks)
+    # ONLY method: X-Mcp-Token (deterministic, no fallbacks)
     user_token = headers.get('X-Mcp-Token')
     return user_token if user_token else None
 
 
 def get_locale_settings(request: Any) -> Dict[str, str]:
     """
-    Extrae configuraciones de locale y formateo de la petición de forma determinista.
-    Prioriza headers X-Pns-* y luego Accept-Language.
+    Extract locale and formatting settings from the request, deterministically.
+    X-Pns-* headers come first, then Accept-Language.
     """
     headers = {}
     if hasattr(request, 'headers'):
@@ -146,7 +146,7 @@ def get_locale_settings(request: Any) -> Dict[str, str]:
     elif isinstance(request, dict):
         headers = request
 
-    # Valores por defecto (Standard del proyecto)
+    # Default values (project standard)
     settings = {
         'pk_decimal_sep': ',',
         'pk_thousands_sep': '.',
@@ -157,18 +157,18 @@ def get_locale_settings(request: Any) -> Dict[str, str]:
     if not headers:
         return settings
 
-    # 1. Detectar idioma/locale
+    # 1. Detect language/locale
     lang = headers.get('X-Pns-Lang') or headers.get('X-Pns-Language') or headers.get('X-User-Lang')
     if not lang:
         accept_lang = headers.get('Accept-Language', '')
         if accept_lang:
-            # Simplificado: tomar el primero (ej: es-ES)
+            # Simplified: take the first one (e.g. es-ES)
             lang = accept_lang.split(',')[0].strip().replace('-', '_')
     
     if lang:
         settings['user_lang'] = lang
 
-    # 2. Detectar separadores explícitos
+    # 2. Detect explicit separators
     d_sep = headers.get('X-Pns-Decimal-Sep') or headers.get('X-Decimal-Sep')
     if d_sep: settings['pk_decimal_sep'] = d_sep
 
@@ -183,8 +183,8 @@ def get_locale_settings(request: Any) -> Dict[str, str]:
 
 def build_mcp_extra_headers(user_token: Optional[str], request: Any = None) -> Dict[str, str]:
     """
-    Construye el diccionario de extra_headers para llamadas MCP a partir de un mcp_api_key.
-    Propaga automáticamente el locale si está presente en la request.
+    Build the extra_headers dict for MCP calls from an mcp_api_key.
+    Passes the locale along automatically if the request has one.
     """
     headers = {}
     
@@ -192,7 +192,7 @@ def build_mcp_extra_headers(user_token: Optional[str], request: Any = None) -> D
         headers["X-Mcp-Token"] = user_token
     
     if request:
-        # 1. Propagar Agente/LLM
+        # 1. Pass on Agent/LLM
         headers_obj = None
         if hasattr(request, 'headers'):
             headers_obj = request.headers
@@ -204,10 +204,10 @@ def build_mcp_extra_headers(user_token: Optional[str], request: Any = None) -> D
             if agent_llm:
                 headers["X-MCP-LLM"] = agent_llm
         
-        # 2. Propagar Locale Settings de forma transparente
+        # 2. Pass on Locale Settings transparently
         locale_settings = get_locale_settings(request)
         for key, val in locale_settings.items():
-            # Convertir pk_decimal_sep -> X-Pns-Decimal-Sep, etc. para transporte
+            # Turn pk_decimal_sep -> X-Pns-Decimal-Sep, etc. for transport
             header_name = "X-Pns-" + key.replace('pk_', '').replace('_', '-').title()
             if key == 'user_lang': header_name = "X-Pns-Lang"
             headers[header_name] = val

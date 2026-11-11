@@ -26,7 +26,7 @@ class ResConfigSettings(models.TransientModel):
         default=True,
     )
 
-    # ── Reutilización de datos entre turnos (Nivel 2) ──
+    # ── Data reuse between turns (Level 2) ──
     chatboo_dataset_cache_max_mb = fields.Integer(
         string='Hidden list copy (MB)',
         help="Copy of the last table, kept aside so the next message can "

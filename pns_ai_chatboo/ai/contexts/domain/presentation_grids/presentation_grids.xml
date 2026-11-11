@@ -76,7 +76,7 @@ optional result `show_mode` show-chart / table / dashboard). Do not use
 chart-table.
 
 **DATA PLOTS:** structured `data` rows; Chatboo hydrates ECharts (user clicks
-"Gráfico") under compose-agent. Do not hand-draw bar/line/pie geometry. Do
+"Chart") under compose-agent. Do not hand-draw bar/line/pie geometry. Do
 not emit SVG paths for those plots. A drawing the user asked for is not a
 data plot: emit the SVG; Chatboo stores it as a session file. SINGLE-FACT
 CARD: `fact` / `link` via `result = {'card': {…}}`. SVG is eyes-only; asked
@@ -250,17 +250,17 @@ then `yyyy-mm-dd hh:mm:ss ±HH:MM`. The offset is numeric — never an IANA
 name (`+09:00`, not `Asia/Tokyo`). Do not name the ISO column `fecha` /
 `date` (the server would locale-format it).
 
-- **One** place: `Place — domingo 2026-08-16 02:33:00 +02:00`
+- **One** place: `Place — Sunday 2026-08-16 02:33:00 +02:00`
 - **Two or more** places: structured rows (aligned table, still text):
 
 ```python
 result = {'data': [
-    {'lugar': '…', 'dia': 'domingo', 'instante': '2026-08-16 09:33:00 +09:00'},
-    {'lugar': '…', 'dia': 'sábado', 'instante': '2026-08-15 17:33:00 -07:00'},
+    {'place': '…', 'day': 'Sunday', 'instant': '2026-08-16 09:33:00 +09:00'},
+    {'place': '…', 'day': 'Saturday', 'instant': '2026-08-15 17:33:00 -07:00'},
 ]}
 ```
 
-Do **not** emit `kind: clock` for “qué hora / qué día / en estos sitios”.
+Do **not** emit `kind: clock` for “what time / what day / in these places”.
 Do **not** hand-build a Markdown list of the same three columns (it will
 not align). Do **not** claim a card already showed the day. A clock face
 is only if the user explicitly asks for the analog widget.
@@ -286,12 +286,12 @@ Use the sandbox helpers from `pns_geo` when present (server-side PNG + link):
 ```python
 enrich_map_thumbnails(
     rows, lat='Lat', lon='Lon',
-    coords='Coords', osm='Mapa OSM', google='Mapa GM',
+    coords='Coords', osm='OSM map', google='GM map',
 )
 result = {'data': rows, 'summary': '...'}
 ```
 
-Or per cell: `row['Mapa OSM'] = map_thumbnail(lat, lon, provider='osm')`.
+Or per cell: `row['OSM map'] = map_thumbnail(lat, lon, provider='osm')`.
 Coords use universal `lat,lon` decimals plus a copy button.
 Google with **Geo** Settings (GM key) → GM thumbnail; without key → OSM
 thumbnail that still opens Google Maps (hybrid badge).
@@ -303,7 +303,7 @@ not installed — do not invent coordinates or distances.
 change axes. Do **not** claim “same scale / one Y axis” unless you actually
 control it:
 
-1. **Same-unit comparison** (Facturación + Salarios in €) — return only those
+1. **Same-unit comparison** (Revenue + Salaries in €) — return only those
    absolute columns. The client keeps **one Y axis** for comparable amounts.
    Optional: `result = {'data': rows, 'dual_axis': False}`.
 2. **€ + % in the same table** — the % column uses a **secondary** axis (correct).
@@ -313,7 +313,7 @@ control it:
 3. **The user asked for one axis or the same scale** — set `'dual_axis': False` (or omit
    ratio columns). Never invent two separate tables as a workaround unless they
    ask for that.
-4. Toolbar also has **“1 eje Y” / “2 ejes Y”** — the user can flip without a
+4. Toolbar also has **“1 Y axis” / “2 Y axes”** — the user can flip without a
    new query.
 
 **Presentation layout** is sticky server-side (table-first vs chart-first; see
@@ -326,21 +326,21 @@ When the user asks for a **grouped histogram**, **bars by business area**, or
 **N bars per category** (e.g. 4 quarters, 12 months on X = areas/products/…):
 
 1. **Wide table** — one row per X category; one **numeric column per bucket**
-   (e.g. `T1`, `T2`, `T3`, `T4` or month names). Example row:
-   `{'Área': 'INC', 'T1 2026': 1200, 'T2 2026': 980, 'T3 2025': 1100, 'T4 2025': 900}`.
+   (e.g. `Q1`, `Q2`, `Q3`, `Q4` or month names). Example row:
+   `{'Area': 'North', 'Q1 2026': 1200, 'Q2 2026': 980, 'Q3 2025': 1100, 'Q4 2025': 900}`.
 2. **Forbidden for charts** — long/tidy rows like
-   `{'Área': 'INC', 'Trimestre': 'T1', 'Importe': 1200}` (the client cannot pivot).
+   `{'Area': 'North', 'Quarter': 'Q1', 'Amount': 1200}` (the client cannot pivot).
 3. **Include every bucket** the user asked for (4 quarters ⇒ 4 numeric columns;
    12 months ⇒ 12 columns). Missing columns ⇒ wrong chart.
 4. **Separate metrics** ⇒ separate tables/groups (`tables` / `groups` with titles
-   like “Importe €” and “Nº facturas”) — each table stays wide.
+   like “Amount €” and “Invoice count”) — each table stays wide.
 5. **Do not confuse words** — **quartiles / terciles** here = soft row banding on
-   a sorted column (see above). **Trimestres / quarters / months** = time buckets
+   a sorted column (see above). **Quarters / months** = time buckets
    as **column headers**, not quartile coloring.
 6. **relaxaicode sort keys** — prefer `sorted(rows, key=operator.itemgetter('field'))`
    or `key=lambda x: x['field']`. Also OK: `def sort_key(x): return x['field']` then
-   `key=sort_key`. To order trimestres use a list constant and
-   `key=lambda t: TRIM_ORDER.index(t['Trimestre'])` (`.index` / `.casefold` /
+   `key=sort_key`. To order quarters use a list constant and
+   `key=lambda t: QUARTER_ORDER.index(t['Quarter'])` (`.index` / `.casefold` /
    `.strptime` on safe accessors are allowed). If you need `.split()` or multi-step
    logic, **precompute** `_ord` on each row then `itemgetter('_ord')`. Forbidden in
    lambdas: nested defs, arbitrary helpers, or `key=str` on dict rows.
@@ -349,8 +349,8 @@ When the user asks for a **grouped histogram**, **bars by business area**, or
 Return `result = {'data': rows, 'summary': '...'}`. One short spoken sign-off;
 do not re-list amounts in prose when `data_rendered` is true.
 
-The server **rejects fabricated amounts** on restyle: if you hardcode debe/haber
-/saldo instead of transforming `raw_data`, prior figures are restored. Prefer
+The server **rejects fabricated amounts** on restyle: if you hardcode debit/credit
+/balance instead of transforming `raw_data`, prior figures are restored. Prefer
 one shot (query + style) over a second execute that re-types numbers.
     </domain_knowledge>
 </context>

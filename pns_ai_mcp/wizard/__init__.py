@@ -7,6 +7,7 @@ from . import tools_wizard_mixin
 from . import config_backup_wizard
 from . import ai_agent_tools_wizard
 from . import ai_provider_tools_wizard
+from . import ai_provider_role_tools_wizard
 from . import ai_provider_usage_wizard
 from . import ai_provider_catalogue_copy
 from . import bundle_cache_rebuild_wizard
@@ -19,6 +20,7 @@ from . import openapi_spec_generate_wizard
 from . import import_external_servers_wizard
 from . import import_agents_wizard
 from . import import_servers_wizard
+from . import import_provider_roles_wizard
 from . import import_users_wizard
 from . import import_whitelist_wizard
 from . import json_export_wizard

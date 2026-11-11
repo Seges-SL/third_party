@@ -3,7 +3,7 @@
      neighbor packs (Occ disk identity must not be overwritten). Apply path
      is the module update, not a confirmation toast.
      Files gone from this pack drop their factory rows in import_from_module
-     (unlink_retired_from_module). No named kill list: a new install never
+     (_unlink_retired_from_module). No named kill list: a new install never
      had those rows, and a name someone plants later is not a leftover. -->
 <odoo>
     <data noupdate="0">

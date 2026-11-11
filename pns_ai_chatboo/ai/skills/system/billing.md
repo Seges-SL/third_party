@@ -1,36 +1,22 @@
 ---
 skill: billing
-name: Billing by period
-description: Posted customer invoice totals for a period (last N months, year, YTD or range); chart-ready table without business-area coupling.
+name: Billing by month
+description: Posted customer invoices by month as a chart, for the last N months or one calendar year.
 agent_codes: pns_ai_chatboo
-version: 1.3
-param_schema: {"periodo": {"type": "string", "desc": "Period hint: empty=last 12 months, 1-12=N months, YYYY=year, YYYY-YYYY=range, ytd=year to date. null if absent."}}
-arg_hint: ytd
+version: 2.0
+param_schema: {"months": {"type": "integer", "desc": "Last N months up to today, from 1 to 60.", "default": 12}, "year": {"type": "integer", "desc": "One calendar year as four digits. null unless the user names a year."}}
+arg_hint: months=6 · year=2025
 args_policy: default
-sequence: 48
+sequence: 30
 active: true
 context_codes:
 ---
 [BILLING]
-Use when the user types /billing or asks for customer invoicing totals by period.
+Use with /billing, or when the user asks how much was invoiced per month.
 
-PARAMETERS
-Slash text is parsed deterministically first (`parse_skill_arguments` + date enrich).
-`param_schema` enables a light LLM fallback only when free text leaves unresolved keys.
+WHAT IT SHOWS
+Untaxed amount and number of posted customer invoices per month, for the
+active company, drawn as a chart. A year wins over a number of months.
 
-IMPORTANT ARGS
-Pass slash text into `periodo` and/or `arguments` unchanged. Help/? must arrive
-as-is (never rewrite help into a default 12-month period).
-
-PERIOD
-- (empty) → last 12 months
-- 1–12 → last N months
-- YYYY → full year
-- YYYY-YYYY → range
-- ytd → current year to date
-- ? | help → help text (no query)
-
-PRESENTATION
-Returns Month|Amount|Invoice count (time series). code_body forces chart-first
-(`show_mode=show-chart`) because this skill answer is a chart — not an LLM
-layout pick. Execute code_body as-is. Do not invent figures.
+HOW TO PRESENT THE RESULT
+- The code already returns the chart. Do not invent figures.

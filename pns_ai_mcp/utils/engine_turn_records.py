@@ -144,7 +144,7 @@ class TurnRecordsMixin:
             turn.export_clip_data = data
 
     def _collect_sources(self, turn, steps):
-        """Añade a external_sources las fuentes de una lista de pasos/resultados."""
+        """Add to external_sources the sources of a list of steps/results."""
         from .skill_runtime import collect_external_sources
         for _src in collect_external_sources(steps):
             turn.external_sources.add(_src)
@@ -154,8 +154,8 @@ class TurnRecordsMixin:
             rec_id = int(rec_id)
         except (TypeError, ValueError):
             return
-        # Validar contra el registro: descarta columnas espurias llamadas
-        # 'model' que no son un modelo técnico real (p.ej. modelo de vehículo).
+        # Check against the registry: drops spurious columns named
+        # 'model' that are not a real technical model (e.g. a vehicle model).
         if not model or not isinstance(model, str) or model not in self.env:
             return
         from .turn_record_models import remember_record

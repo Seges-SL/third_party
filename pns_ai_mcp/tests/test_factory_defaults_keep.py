@@ -3,6 +3,7 @@
 # Copyright (C) 2026 Patanegra Soft <https://patanegra.com>
 """Defaults re-adds the seed and keeps links other modules added."""
 
+import re
 import uuid
 
 from odoo.tests import tagged, TransactionCase
@@ -77,21 +78,11 @@ class TestFactoryDefaultsKeepOthers(TransactionCase):
             self.skipTest('MCP agent missing')
         blob = (mcp._module_factory_seed() or {}).get('default_context_codes') or ''
         self.assertIn('@pns_ai_mcp', blob)
+        own = self.env['ir.module.module'].search([('name', '=', 'pns_ai_mcp')], limit=1)
+        allowed = {'pns_ai_mcp'} | set(own.dependencies_id.mapped('name'))
+        named = set(re.findall(r'@([a-z0-9_]+)', blob))
+        self.assertFalse(named - allowed, 'Seed names modules it does not depend on')
         self.assertNotIn('@pns_geo', blob)
-        self.assertNotIn('@occ_custom', blob)
-        self.assertNotIn('@occ_custom_ai', blob)
         self.assertNotIn('@pns_ocr', blob)
         self.assertNotIn('acl_security', blob)
         self.assertNotIn('@pns_acl_manager', blob)
-        chatboo = Agent.search([('code', '=', 'pns_ai_chatboo')], limit=1)
-        if not chatboo:
-            return
-        chat_blob = (
-            chatboo._module_factory_seed() or {}
-        ).get('default_context_codes') or ''
-        if chat_blob:
-            self.assertNotIn('@pns_geo', chat_blob)
-            self.assertNotIn('@occ_custom', chat_blob)
-            self.assertNotIn('@occ_custom_ai', chat_blob)
-            self.assertNotIn('acl_security', chat_blob)
-            self.assertNotIn('@pns_acl_manager', chat_blob)
