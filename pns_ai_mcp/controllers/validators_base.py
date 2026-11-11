@@ -263,6 +263,44 @@ RELAXAICODE_SIDE_EFFECT_METHODS = frozenset({
     'process_email_queue',
     'run',
     'method_direct_trigger',
+    # Seges: parche 15 (PNS-07, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    # Public methods that reach a cursor of their own (registry.cursor()),
+    # which box A's READ ONLY transaction and blocked commit do not hold.
+    # 3.1.973 made the other names of this list private.
+    'mark_seen',
+    'sandbox_helpers',
+    'action_suggest_detection',
+    'action_author_params',
+    'action_author_help',
+    'action_adapt_code',
+    'action_generate_openapi',
+    'action_generate',
+    'action_log_generation_usage',
+    # Seges: parche 22 (PNS-100, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    # Public methods that send mail, open a connection or run other code
+    # without writing first, so box A's READ ONLY does not stop them.
+    'connect',
+    'test_smtp_connection',
+    'load_remote_url',
+    'fetch_mail',
+    'button_confirm_login',
+    'get_credits',
+    'autocomplete',
+    'enrich_company',
+    'read_by_vat',
+    'start_sync',
+    'send_letter',
+    'snailmail_print',
+    'update_notification',
+    'install_from_urls',
+    'action_process_edi_web_services',
+    'get_usd_fx',
+    'execute_callback',
+    'upgrade_module',
+    'action_start_automatic_process',
+    'parent_migration_process_cb',
+    'message_process',
+    'message_route',
 })
 
 # RelaxAICode always runs as the asking user. These names hand out another

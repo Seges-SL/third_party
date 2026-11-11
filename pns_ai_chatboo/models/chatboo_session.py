@@ -934,7 +934,8 @@ class ChatbooSession(models.Model):
             if not session:
                 return ''
             blocks = _blocks_for_page(rows)
-            blocks, images = pictures_as_tokens(session.env, blocks)
+            # Seges: parche 26 (M2, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            blocks, images = pictures_as_tokens(session.env(su=False), blocks)
             content = swap_pictures(
                 place_rows_on_page(
                     html, blocks, captured=True, title=title,
@@ -1081,6 +1082,9 @@ class ChatbooSession(models.Model):
         fit the page exactly get the whole document laid out again.
         """
         self.ensure_one()
+        # Seges: parche 25 (M1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        if self.sudo().user_id.id != self.env.uid:
+            raise AccessError(_('This canvas belongs to another user.'))
         from .chatboo_canvas import (
             DESIGN_SYSTEM, EDIT_SYSTEM, apply_edits, design_figure_leaks,
             design_figures_centralized, is_document, log_no_page, page_edits,
@@ -1987,6 +1991,9 @@ class ChatbooSession(models.Model):
         holds a zombie job locked, we fail AT ONCE with a clear message instead
         of leaving History hanging (the spinner is in shadow and it looks like «it won't delete»).
         """
+        # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self.check_access_rights('unlink')
+        self.check_access_rule('unlink')
         if self.ids:
             # 1) Async jobs first (FK ON DELETE CASCADE would also wait on the
             #    same lock; this way we control timeout and message).
@@ -2025,7 +2032,12 @@ class ChatbooSession(models.Model):
                     ('res_id', 'in', self.ids),
                 ])
                 if atts:
-                    atts.unlink()
+                    # Seges: parche 11 (PNS-82, seguridad). Ver docs/pendiente/parches_pns_ai.md
+                    owner = {s.id: s.user_id.id for s in self.sudo()}
+                    own = atts.filtered(
+                        lambda a: a.create_uid.id in (False, owner.get(a.res_id)))
+                    (atts - own).write({'res_model': False, 'res_id': False})
+                    own.unlink()
             except Exception:
                 _logger.warning(
                     "Chatboo: could not delete the attachments of sessions %s",

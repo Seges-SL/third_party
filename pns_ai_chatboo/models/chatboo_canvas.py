@@ -907,7 +907,8 @@ def open_page(sessions, rows, instruction='', new=False, title=''):
         _logger.info('Chatboo canvas: page waits for rows')
         return ''
     name = page_title(rows, material, title)
-    material, images = pictures_as_tokens(sessions.env, material)
+    # Seges: parche 26 (M2, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    material, images = pictures_as_tokens(sessions.env(su=False), material)
     text = (instruction or '').strip()
     if name:
         text += '\nPage title: ' + name

@@ -100,12 +100,20 @@ class MCPClient:
         if not self._session:
             self._session = requests.Session()
         try:
+            # Seges: parche 19 (PNS-17, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            # A redirect would carry the auth header to another host.
             resp = self._session.post(
                 url,
                 json=payload,
                 headers=self._build_headers(),
                 timeout=self.timeout,
+                allow_redirects=False,
             )
+            if resp.is_redirect:
+                location = resp.headers.get('Location') or '?'
+                raise MCPClientError(
+                    f"MCP server '{self.server.code}' answered with a redirect "
+                    f"to {location}. Set the final URL in the server.")
             resp.raise_for_status()
         except requests.RequestException as e:
             raise MCPClientError("HTTP request to '%s' failed: %s" % (url, e))
