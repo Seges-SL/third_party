@@ -4064,3 +4064,85 @@ cambia frente a la entrada de la rama 3879 sigue en esa entrada.
   - una página con imágenes de registros que el usuario ve (26);
   - borrar una sesión de Chatboo con adjuntos (11).
 - P-7 queda hecha con N19f y N19m.
+
+### Pruebas manuales de la fase 2 en `lab_pns_ai_3973` (11/11/2026)
+
+BD `lab_pns_ai_3973_14`, tras el `-u` de los tres módulos (0 ERROR) y la instalación de `sale_management`. Usuarios
+y datos de la siembra: `seges_sys` 8 (Ajustes y AI Administrator), `seges_aiadm` 9 (AI Administrator sin Ajustes),
+`seges_access` 10 (AI Administrator con Permisos de acceso), `seges_target` 11, `seges_int` 12 (AI Conversational,
+AI Writer y Ventas), `demo` 6, `portal` 7; sesión «Seges P-11» 1, página «Seges P-28» 1. Guía, ya corregida con lo
+que sigue: [lab_fase2_3973.md](lab_fase2_3973.md).
+
+- **P-5 con el 12 y el 16:** OK.
+  - Casos (a) `seges_aiadm` y (b) `seges_access`: rechazados al proponer, con el mensaje del 12. La herramienta
+    responde `isError` false con `success` false.
+  - Una propuesta idéntica del mismo usuario reutiliza la operación pendiente (SAFE00000001) en lugar de crear
+    otra.
+  - SAFE00000001, confirmada por `seges_aiadm`: pide la contraseña (16) y la rechaza el 12 («Execution result
+    {"error": "Only a Settings administrator can add or remove user groups."}»). Operación `cancelled` y diario
+    `failed`.
+  - SAFE00000002, propuesta y confirmada por `seges_sys`: pide la contraseña, `executed`, diario `applied` y
+    `seges_target` con el grupo.
+- **Parche 32:** OK. `seges_aiadm`, rechazado al editar la acción de confianza; la fila 8 sin cambios.
+- **Parche 33:** OK.
+  - `seges_aiadm` ve el asistente (0 tokens, Cap «None»).
+  - `seges_int`: error de acceso al pulsar «This month» con el proveedor abierto por URL.
+  - `demo` por RPC: `AccessError` (create) en `default_get` y `AttributeError` en `month_usage`.
+- **Parche 21, con `seges_sys`:** OK. «Review» de proveedores y de usuarios MCP (`is_ai_writer` true y etiqueta
+  cambiada) muestra «No data has been written». Sin cambios en la BD con la revisión abierta ni tras descartar;
+  `demo` sigue sin AI Writer.
+- **Parche 21, con `seges_aiadm`: defecto del fabricante.** «Review» no abre.
+  - Causa: `_inject_import_preview_arch` y `_inject_operation_result_arch`
+    (`pns_base/models/operation_report_wizard.py:369-379`) leen la vista con `env.ref(...).arch` sin `sudo`, y
+    `ir.ui.view` solo lo lee `group_system` (ACL de `base`, líneas 34-35). Error: `AccessError` «You are not
+    allowed to access 'View' (ir.ui.view) records.», reproducido en el shell con `repro_review.py` (usuario 9,
+    con `rollback`).
+  - Igual en `_fabricante/3.1.973`: no lo introduce ningún parche de Seges (el 21 solo toca `action_preview` y
+    `_invalidate_after_preview_rollback`).
+  - Afecta a la importación de proveedores y de usuarios MCP para cualquier AI Administrator sin Ajustes; con
+    Permisos de acceso, también (por el ACL; no probado). Como «Apply the import» solo está en la revisión, ese
+    usuario no puede importar.
+  - **Decisión de Sergio (11/11/2026):** se corrige con un parche de Seges (número propuesto: **36**), en una
+    fase 2c, después de las pruebas manuales. La propuesta, aparte.
+- **Parche 11:** OK. `unlink` de la sesión 1 como `seges_int`, por RPC (el mismo método que usa el Historial).
+  Borra el adjunto propio (402); el de `demo` (403) queda con `create_uid` 6, sin `res_model` y con `res_id` 0.
+- **Parche 28:** OK.
+  - `seges_int` comparte la página con `demo`.
+  - `write` con un usuario portal (id 7): `ValidationError` «A page can only be shared with internal users.».
+  - `seges_aiadm`: cambiar el título y Stop sharing dan error de acceso (regla «Chatboo shared page: owner
+    writes»; la del AI Administrator ya no da escritura). Eliminar, OK (0 filas en `chatboo_canvas_page`).
+- **Parche 20 (P-70):** OK.
+  - 2.7, sin proveedor: `[undefined, false, undefined]` → `[undefined, false, "4.4.8"]` al abrir Chatboo.
+  - 3.3, con Gemini lab (`gemini-3.6-flash`), en la vista gráfico de `sale.order` (Ventas → Pedidos; el menú
+    Informes es solo del responsable de ventas): `[undefined, true, undefined]` → gráfico en el chat →
+    `[undefined, true, "4.4.8"]`. Cambio a líneas y a circular sin errores `xAxes`/`yAxes`.
+- **Parche 25:** OK. Botón Canvas como dueño: página `/chatboo/canvas/3` generada; log sin errores ni «belongs to
+  another user».
+- **Parche 26:** sin positivo desde la interfaz; cubierto por `repro_26.py` y `TestSegesCanvasPictures`.
+  - El botón Canvas no lleva imágenes a Design. El cliente (`canvasTablesOf`, `chatboo_charts.js:2931-2953`)
+    manda el `data-ai-dataset` de la tabla, y `_chart_dataset_rows`
+    (`pns_ai_mcp/utils/relaxaicode_render_table.py:326-336`) quita de él las columnas de imagen. Igual en
+    `_fabricante/3.1.973`. La página 3 sale con iniciales y no prueba el 26: el job 1 llevó solo `name` y
+    `country_id`, y la página guardada tiene 0 `data:image`, 0 `/web/image` y 0 `<img`.
+  - En el shell (`repro_26.py`, sin commit): con las filas reales de la respuesta (`clip_data`, con `image_128`
+    como `/web/image/res.partner/<id>/image_128`), `pictures_as_tokens` con el entorno de `seges_int`
+    (`su=False`) convierte las 5 fotos (5 `data:image`), igual que en `sudo`. Con las filas del job, 0.
+  - Página 4 («Hazme una página con 5 contactos, su país y su foto»): también salió del **botón Canvas**, no del
+    turno.
+    - El turno solo ejecutó `relaxaicode` con una tabla: 0 llamadas a `page_url` en el código y ninguna URL de
+      canvas en la respuesta. El índice de dominios dio «Domains: (none)».
+    - Después, el job 2 (creado unos 5 s después del fin del turno; el cliente solo lo lanza al pulsar el botón,
+      `chatboo_charts.js:3224-3226`) llevó solo `name` y `country_id` (5 filas, 0 imágenes). La página guardada
+      tiene 0 `data:image` y 0 `/web/image`; sus 2 `<img` y su `pns-img:` son código de la plantilla que pinta
+      iniciales si no hay foto.
+    - Causa de que el turno no pidiera la página: `seges_int` está en inglés (`en_US`), y para ese idioma
+      `page_tab` solo tiene las palabras genéricas (`canvas`, `page`, `a page`…;
+      `pns_ai_mcp/models/ai_context_discovery.py:59-66`). «Página» solo está en `discovery_page_tab_es_ES.json`.
+      Un positivo desde la interfaz necesita pedirlo en inglés o poner a `seges_int` en español.
+  - **Limitación del Canvas** (el botón no lleva imágenes): al informe al fabricante, sin parche (decisión de
+    Sergio, 11/11/2026).
+- **Siembra:** los `seges_*` necesitan correo. Compartir una página publica un aviso con el dueño como autor y,
+  sin correo, da `UserError`. Se puso a mano en `seges_int`; la siembra ya lo pone (`<login>@example.com`).
+- **Preparación de la sección 3** (shell, con aprobación de Sergio): proveedor ficticio 1 archivado (2.8) y rol
+  Design (id 6) con `use_fallback` false (3.1). Comprobado con una consulta de solo lectura.
+- **Pendiente:** parche 36 (fase 2c), con su propuesta aparte.

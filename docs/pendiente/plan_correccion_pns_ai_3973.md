@@ -166,6 +166,16 @@ y 28. Detalle en el [registro](parches_pns_ai.md), «Parches de la rama 14.0-pns
   rama 3879 que lo ejecutan. Detalle en el registro. No cuenta como F ni E.
 - Camino del job del botón Canvas (25): queda como prueba manual, sin test nuevo (Sergio, 11/11/2026).
 
+## Fase 2c — Parche 36 (decisión de Sergio, 11/11/2026)
+
+- **Problema** (defecto del fabricante, visto en las pruebas manuales de la fase 2): «Review this import» no abre
+  para un AI Administrator sin Ajustes. `_inject_import_preview_arch` y `_inject_operation_result_arch`
+  (`pns_base/models/operation_report_wizard.py:369-379`) leen la vista sin `sudo`, e `ir.ui.view` solo lo lee
+  `group_system`. Afecta a la importación de proveedores y de usuarios MCP. Detalle en el
+  [registro](parches_pns_ai.md), «Pruebas manuales de la fase 2 en `lab_pns_ai_3973` (11/11/2026)».
+- **Cuándo:** después de las pruebas manuales de la fase 2 (hechas) y antes de la fase 3.
+- **Propuesta** (cambio, test y neutralización): aparte, pendiente de aprobación de Sergio.
+
 ## Fase 3 — Parches 24 y 18; tests del 23
 
 - `_StubController` pasa a un archivo común de tests (p. ej. `pns_ai_mcp/tests/seges_common.py`): los cinco
@@ -250,6 +260,9 @@ y 28. Detalle en el [registro](parches_pns_ai.md), «Parches de la rama 14.0-pns
 
 1. Fase 2, al terminar 2a y 2b (juntas): P-5 con el 12, P-7 y las comprobaciones manuales de la 2a
    (registro de parches, «Pendiente de la fase 2a»; P-70 caso 1 del parche 20 incluido).
+   **Hechas el 11/11/2026:** registro de parches, «Pruebas manuales de la fase 2 en `lab_pns_ai_3973`
+   (11/11/2026)», y guía [lab_fase2_3973.md](lab_fase2_3973.md). Sin positivo del 26 desde la interfaz; de ellas
+   sale la fase 2c (parche 36).
 2. Fase 3: P-22 y, si Sergio pasa a la opción A, P-20.
 3. Fase 4: P-13.
 4. Con toda la rama:
