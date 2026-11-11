@@ -26,12 +26,18 @@
   `README.rst` y `static/description/index.html` se generan con `odoo-readme <modulo>`.
   En módulos existentes no se crea esa estructura salvo que se pida.
 - Módulos de terceros `pns_base`, `pns_ai_mcp` y `pns_ai_chatboo` (PATANEGRA Soft, Apache-2.0):
-  Seges mantiene la versión 3.1.782 como base propia (decisiones N11 y N12 en
+  Seges mantiene la versión 3.1.973 como base propia (decisiones N11, N12 y N15 en
   `docs/pendiente/pns_ai_decisiones.md`). Solo se modifican con un parche registrado en
   `docs/pendiente/parches_pns_ai.md`, con el marcador `# Seges: parche N (PNS-XX, <tipo>)` junto a
   cada cambio y su test. Cambio mínimo, compatible con Python 3.7.3, sin dependencias nuevas y sin
   tocar `version`, `depends`, `external_dependencies` ni `i18n`. No se tocan `LICENSE` ni `NOTICE`.
-  Plan de trabajo: `docs/pendiente/plan_correccion_pns_ai.md`.
+  Los parches no añaden `migrations/` propios. Única excepción: el parche 35 (crons de NUEVO-2), con la
+  carpeta `pns_ai_mcp/migrations/14.0.3.1.973/`, que solo se ejecuta en un `-u` que cruce esa versión
+  (desde 3.1.879 o 3.1.782); una BD actualizada a 3.1.973 sin el parche no lo ejecuta y se corrige a mano
+  (una instalación nueva no lo necesita).
+  Plan de trabajo vigente: `docs/pendiente/plan_correccion_pns_ai_3973.md`. Quedan como históricos
+  `plan_correccion_pns_ai.md` (rama `14.0-pns-ai-correcciones`, base 3.1.782) y
+  `plan_correccion_pns_ai_3879.md` (rama `14.0-pns-ai-3879`).
 - No hagas `git commit` ni `git push`.
 - IMPORTANTE: `/opt/odoo-src/14.0/third_party` es una copia de referencia de ESTE repo (la versión publicada). No la consultes: trabaja siempre con los archivos locales del repo.
 

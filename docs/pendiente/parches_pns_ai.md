@@ -4,7 +4,8 @@
   [plan de corrección](plan_correccion_pns_ai.md)) · desde el 23/10/2026, `14.0-pns-ai-3879` (base
   3.1.879: parches 10 y 12 adaptados y 13 en adelante,
   [plan sobre 3.1.879](plan_correccion_pns_ai_3879.md)); `14.0-pns-ai-correcciones` queda como
-  referencia
+  referencia · desde el 11/11/2026, `14.0-pns-ai-3973` (base 3.1.973, decisión B, N15:
+  [plan sobre 3.1.973](plan_correccion_pns_ai_3973.md))
 - **Fecha:** 2026-10-13 (parches 1 a 3) · actualizado el 2026-10-20 (N11 y N12), el 2026-10-21
   (staging de E2), el 2026-10-23 (cambio de base a 3.1.879 y E1′), el 2026-10-26 (staging de E1′), el
   2026-10-27 (repetición de R8; E2′: parches 11 adaptado y 17 a 22), el 2026-10-29 (E3′: parches 25 a 28),
@@ -12,11 +13,15 @@
   parches 25 a 29) y el 2026-11-05 (E4′.a: parches 30 a 33; E4′.b: parche 34)
   · actualizado el 2026-11-06 (E4′.b2 y E4′.b3: parche 34 ampliado)
   · actualizado el 2026-11-09 (staging de E4′: parches 30 a 34)
+  · actualizado el 2026-11-11 (cambio de base a 3.1.973, decisión B del 10/11/2026)
 - **Versión del fabricante, base propia de Seges desde el 20/10/2026 (N12):** `pns_base` 14.0.1.2.32 ·
   `pns_ai_mcp` 14.0.3.1.782 · `pns_ai_chatboo` 14.0.2.1.453
 - **Desde el 23/10/2026 (N12, b′), en `14.0-pns-ai-3879`:** `pns_base` 14.0.1.2.47 · `pns_ai_mcp`
   14.0.3.1.879 · `pns_ai_chatboo` 14.0.2.1.538. El staging `pns_demo` está en esta base desde el
   26/10/2026; LIYBEN sigue con 3.1.782 y los parches 1 a 6 hasta recibirlo todo de una vez
+- **Desde el 11/11/2026 (decisión B, N15), en `14.0-pns-ai-3973`:** `pns_base` 14.0.1.2.69 · `pns_ai_mcp`
+  14.0.3.1.973 · `pns_ai_chatboo` 14.0.2.1.587 (`_fabricante/3.1.973/ORIGEN.txt`). El staging `pns_demo`
+  sigue en 3.1.879 con los parches 10 a 34 hasta validar la rama nueva
 - **Licencia:** Apache-2.0 (`LICENSE` y `NOTICE` de cada módulo, que se conservan sin cambios).
 - **Entorno objetivo:** imagen oficial de Odoo 14 (Debian Buster): Python 3.7.3 y Pillow 5.4.1
   (`requirements.txt:34` de Odoo 14 fija `Pillow==5.4.1` con Python ≤ 3.7).
@@ -48,6 +53,12 @@
 > adaptan con el mismo número ([decisiones](pns_ai_decisiones.md), N12). A partir de ahí la regla de
 > arriba sigue igual, con 3.1.879 como base propia: vigilancia de versiones, sin incorporar versiones
 > nuevas.
+
+> **Cambio de base a 3.1.973 (decisión B, N15; Sergio, 10/11/2026):** sustituye al «una sola vez» del
+> bloque anterior. Seges pasa a 3.1.973 entera en la rama `14.0-pns-ai-3973` y vuelve a portar los
+> parches que siguen haciendo falta, con el mismo número; se retiran los que cubre el fabricante (10,
+> 13, 14, 23, 30 y 31). A partir de ahí la regla sigue igual, con 3.1.973 como base propia. Plan:
+> [plan sobre 3.1.973](plan_correccion_pns_ai_3973.md). Sección «Cambio de base a 3.1.973».
 
 ## Marcadores
 
@@ -191,6 +202,67 @@ Parches 10, 12 y 13 a 16 (E1′): validados en laboratorio el 23/10/2026 y en el
 
 Propuesta, comprobaciones previas y decisiones de E1′: [e1_propuesta_3879.md](e1_propuesta_3879.md).
 Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai-3879 (E1′)».
+
+## Cambio de base a 3.1.973 (decisión B, 10/11/2026)
+
+- **Decisión:** camino B de la [comparación con 3.1.973](../specs/comparacion_pns_ai_3-1-973.md), §8: pasar a
+  3.1.973 entera y volver a portar los parches ([decisiones](pns_ai_decisiones.md), N15; Sergio, 10/11/2026).
+- **Rama `14.0-pns-ai-3973`:** creada por Sergio desde `14.0-pns-ai-3879` en `3feb224` (11/11/2026). Primer
+  commit: los tres módulos de `_fabricante/3.1.973` sin cambios, sin `ORIGEN.txt` ni `__pycache__`, con
+  permisos `u=rwX,go=rX` («[IMP] pns_ai: base 3.1.973 del fabricante, sin cambios»).
+- **Qué se quita con ese commit:** los marcadores y archivos de Seges de 3.1.879 (parches 10 a 34,
+  `box_a_guard.py`, `relaxaicode_format_guard.py`, los 20 `test_seges_*` y los cambios de E0′). Copia
+  y diff de cada archivo, fuera del repo, en `~/pns_ai_3973/fase0/` ([plan](plan_correccion_pns_ai_3973.md),
+  «Datos de partida»).
+- **Parches retirados** (los cubre el fabricante, comparación §4 y §7.4): 10, 13, 14, 23, 30 y 31. Sus
+  entradas de más abajo no se cambian. Sus tests se conservan como no regresión de la corrección del
+  fabricante, salvo los del 23 que decidió quitar Sergio (plan, decisión 5).
+- **Restos conocidos del parche 23 en 3.1.973** (sin vía de ataque conocida, comparación §4 y §9 P-6):
+  `operator.itemgetter` se da nativo (la fachada solo sustituye `attrgetter` y `methodcaller`); un `Markup`
+  admite campos simples en `format`. Se anotan sin más (decisión 5).
+- **E0′ retirado:** 3.1.973 corrige los dos tests con otros nombres (`test_paap_core.py:27-39`,
+  `test_change_journal.py:28-34, 156-190`; comparación §6.5). La sección «Cambios en tests del fabricante»
+  queda como registro de 3.1.879. `test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin`, sin el parche 12,
+  debería pasar: se confirma con la línea base de la fase 1d, y vuelve a F por diseño al portar el 12.
+- **Marcador que faltaba en la rama 3879** (encontrado en la fase 0, 10/11/2026): en
+  `pns_ai_mcp/utils/skill_runtime.py`, el import de `run_sandbox_code` (parche 23 ampliado) no llevaba
+  marcador; lo llevaba el bloque siguiente (`run_sandbox_code(...)`). Desaparece con el parche 23 retirado;
+  sigue así en `14.0-pns-ai-3879`.
+- **Marcadores:** los mismos de la sección «Marcadores»; cada parche portado conserva su número.
+
+### Índice de la rama `14.0-pns-ai-3973`
+
+| N.º | PNS / id | Tipo | Archivos en 3.1.973 (previstos) | Fase del plan | Estado |
+|---|---|---|---|---|---|
+| 10 | PNS-83 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
+| 11 | PNS-82 | seguridad | `pns_ai_chatboo/models/chatboo_session.py` | 2 | Pendiente de portar |
+| 12 | PNS-01, PNS-02 | seguridad | `pns_ai_mcp/models/ai_system_action.py`, `pns_ai_mcp/utils/privilege_cusp.py` | 2 | Pendiente de portar |
+| 13 | M10 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
+| 14 | M13 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
+| 15 | PNS-07 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | 2 | Pendiente de portar |
+| 16 | PNS-54 | seguridad | `pns_ai_mcp/models/safe_operation.py` | 2 | Pendiente de portar |
+| 17 | PNS-37 | seguridad | `pns_ai_mcp/models/ai_change_journal.py`, `pns_ai_mcp/controllers/safe_plan_execute.py` | 2 | Pendiente de portar |
+| 18 | PNS-19 | seguridad | `pns_ai_mcp/controllers/controller_helpers.py` (opción B: vaciado de columnas secretas en `open_readonly_env`) | 3 | Pendiente de portar |
+| 19 | PNS-17 | seguridad | `pns_ai_mcp/utils/fetch_url_safe.py`, `pns_ai_mcp/utils/mcp_client.py` | 2 | Pendiente de portar |
+| 20 | PNS-70 | compatibilidad | `pns_ai_chatboo/static/src/js/chart.umd.min.js`, `pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js` | 2 | Pendiente de portar |
+| 21 | PNS-20 | seguridad | `pns_base/models/operation_report_wizard.py` | 2 | Pendiente de portar |
+| 22 | PNS-100 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | 2 | Pendiente de portar |
+| 23 | PNS-101 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
+| 24 | PNS-102 | seguridad | `pns_ai_mcp/controllers/context_builder.py` | 3 | Pendiente de portar |
+| 25 | M1 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | 2 | Pendiente de portar |
+| 26 | M2 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | 2 | Pendiente de portar |
+| 27 | F1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/controllers/chatboo.py` | 4 | Pendiente de portar |
+| 28 | D1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas_page.py`, `pns_ai_chatboo/security/security.xml` | 2 | Pendiente de portar |
+| 29 | F1 (P-8e a) | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_session.py` | 4 | Pendiente de portar |
+| 30 | M11 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
+| 31 | M12 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
+| 32 | PNS-97 | seguridad | `pns_ai_mcp/models/ai_trusted_action.py` | 2 | Pendiente de portar |
+| 33 | PNS-29 | seguridad | `pns_ai_mcp/models/ai_provider.py`, `pns_ai_mcp/wizard/ai_provider_usage_wizard.py` | 2 | Pendiente de portar |
+| 34 | PNS-96 | funcional | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_async_request.py` | 4 | Pendiente de portar |
+| 35 | NUEVO-2 | robustez | `pns_ai_mcp/migrations/14.0.3.1.973/post-migrate.py` | plan, «Parche 35» | Pendiente (decisión 4 del plan). Única excepción a «sin `migrations/` propios»: solo se ejecuta en un `-u` que cruce 3.1.973; una BD actualizada a 3.1.973 sin el parche no lo ejecuta y se corrige a mano (una instalación nueva no lo necesita) |
+
+Las entradas de cada parche portado se añaden debajo, en «Parches de la rama 14.0-pns-ai-3973», con sus
+archivos y líneas, los ajustes, el test y la neutralización.
 
 ## Cambios en tests del fabricante
 

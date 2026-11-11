@@ -109,7 +109,8 @@ con la tabla 1.1 del informe:
 | N9 | Copias de `pns_demo` | No se guardan (15/10/2026) |
 | N10 | Montaje del staging | Servicio, PostgreSQL y despliegue propios (15/10/2026) |
 | N11 | ¿Quién corrige los PNS? | a) Seges, con parches numerados y tests (19-20/10/2026) |
-| N12 | Versiones futuras del fabricante | b′) cambiar una vez de base a 3.1.879 (22/10/2026; se mantiene el 23/10/2026) |
+| N12 | Versiones futuras del fabricante | b′) cambiar una vez de base a 3.1.879 (22/10/2026; se mantiene el 23/10/2026). Sustituida por N15 (10/11/2026) |
+| N15 | Base ante la versión 3.1.973 del fabricante | B) pasar a 3.1.973 entera y volver a portar los parches (10/11/2026; [sección 13](#13-cambio-de-base-a-31973-n15)) |
 
 **Tras la versión 3.1.879 (22/10/2026).** N12 se revisa con la
 [comparación con 3.1.879](../specs/comparacion_pns_ai_3-1-879.md) (verificada por `odoo-reviewer`) y la
@@ -1989,3 +1990,47 @@ Origen: [decisiones_pendientes_hallazgos_3879.md](decisiones_pendientes_hallazgo
   `owl1`).
 - **3.9:** en el informe se aclara que el «Resuelto» de PNS-96 cubre solo los enlaces.
 - **Retiradas:** 2.13 y 3.5, por estar fuera del alcance.
+
+## 13. Cambio de base a 3.1.973 (N15)
+
+### N15 — ¿Qué se hace con la versión 3.1.973 del fabricante?
+
+**Contexto:** N12 (b′) fijó 3.1.879 como base propia tras cambiar de base «una sola vez». El fabricante
+publicó 3.1.973 (`pns_base` 1.2.69, `pns_ai_mcp` 3.1.973, `pns_ai_chatboo` 2.1.587; descargada el
+09/11/2026). La [comparación con 3.1.973](../specs/comparacion_pns_ai_3-1-973.md) (§8) da los datos de
+tres caminos:
+
+1. **A) Quedarse en 3.1.879** con los parches 10 a 34. — *Impacto:* sin trabajo nuevo; siguen abiertos,
+   entre otros, NUEVO-3 y NUEVO-4 (Altas, corregidos en 3.1.973), PNS-81 resto, el *rebinding* de
+   `fetch_url`, el código de skills fuera de la caja A y el alcance multicompañía.
+2. **B) Pasar a 3.1.973 entera y volver a portar los parches.** — *Impacto:* portar 19 parches (15
+   bajos, 3 medios y 1 alto) y retirar 6 (10, 13, 14, 23, 30 y 31); adaptar 20 archivos de tests; `-u`
+   con transformación de datos (§7.3) y comportamientos nuevos (plan como solicitante, multicompañía,
+   alternativa del rol Diseño, AI Administrator con acceso conversacional). Llegan todas las funciones
+   nuevas (§5) y quedan portados al Python que el fabricante comparte con 17.0 (§8.2).
+3. **C) Quedarse y traer cambios concretos como parches** (§8.1). — *Impacto:* un parche nuevo por
+   cambio; la copia se aleja del fabricante en cada pieza.
+
+Decisión: **B) pasar a 3.1.973 entera y volver a portar los parches** (Sergio, 10/11/2026) / Fecha:
+10/11/2026
+
+**Consecuencias:**
+- Sustituye a N12 (b′): deja sin efecto el «una sola vez» y la base congelada en 3.1.879. A partir de
+  ahí, la regla de N11 y N12 sigue igual con 3.1.973 como base propia: parches permanentes, vigilancia de
+  versiones y sin incorporar versiones nuevas sin una decisión.
+- Rama `14.0-pns-ai-3973`, desde `14.0-pns-ai-3879` en `3feb224` (creada el 11/11/2026). Primer commit: los
+  tres módulos del fabricante sin cambios.
+- Se retiran los parches 10, 13, 14, 23, 30 y 31 (los cubre el fabricante) y se portan los otros 19 con el
+  mismo número. Registro en [parches_pns_ai.md](parches_pns_ai.md), «Cambio de base a 3.1.973».
+- Plan, por fases y con aprobación de cada una:
+  [plan_correccion_pns_ai_3973.md](plan_correccion_pns_ai_3973.md), con las seis decisiones del
+  10/11/2026:
+  1. rama;
+  2. laboratorio nuevo `lab_pns_ai_3973`;
+  3. parche 18, opción B, con P-22;
+  4. crons de NUEVO-2 con un script de migración de Seges;
+  5. tests del parche 23;
+  6. CSP del parche 27.
+- `14.0-pns-ai-3879` queda como referencia; el staging `pns_demo` sigue en 3.1.879 con los parches 10 a 34
+  hasta validar la rama nueva. LIYBEN pasará de 3.1.782 a 3.1.973 (comparación §8, `-u` de LIYBEN).
+- Se rehace el informe al fabricante sobre 3.1.973 (comparación §8, fila «Informe al fabricante»).
