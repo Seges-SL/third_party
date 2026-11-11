@@ -14,6 +14,7 @@
   · actualizado el 2026-11-06 (E4′.b2 y E4′.b3: parche 34 ampliado)
   · actualizado el 2026-11-09 (staging de E4′: parches 30 a 34)
   · actualizado el 2026-11-11 (cambio de base a 3.1.973, decisión B del 10/11/2026)
+  · actualizado el 2026-11-11 (fase 2a sobre 3.1.973: parches 21, 20, 17, 33, 12, 32 y 16)
 - **Versión del fabricante, base propia de Seges desde el 20/10/2026 (N12):** `pns_base` 14.0.1.2.32 ·
   `pns_ai_mcp` 14.0.3.1.782 · `pns_ai_chatboo` 14.0.2.1.453
 - **Desde el 23/10/2026 (N12, b′), en `14.0-pns-ai-3879`:** `pns_base` 14.0.1.2.47 · `pns_ai_mcp`
@@ -236,16 +237,16 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
 |---|---|---|---|---|---|
 | 10 | PNS-83 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
 | 11 | PNS-82 | seguridad | `pns_ai_chatboo/models/chatboo_session.py` | 2 | Pendiente de portar |
-| 12 | PNS-01, PNS-02 | seguridad | `pns_ai_mcp/models/ai_system_action.py`, `pns_ai_mcp/utils/privilege_cusp.py` | 2 | Pendiente de portar |
+| 12 | PNS-01, PNS-02 | seguridad | `pns_ai_mcp/models/ai_system_action.py`, `pns_ai_mcp/utils/privilege_cusp.py` | 2a | Aplicado (11/11/2026) |
 | 13 | M10 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
 | 14 | M13 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
 | 15 | PNS-07 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | 2 | Pendiente de portar |
-| 16 | PNS-54 | seguridad | `pns_ai_mcp/models/safe_operation.py` | 2 | Pendiente de portar |
-| 17 | PNS-37 | seguridad | `pns_ai_mcp/models/ai_change_journal.py`, `pns_ai_mcp/controllers/safe_plan_execute.py` | 2 | Pendiente de portar |
+| 16 | PNS-54 | seguridad | `pns_ai_mcp/models/safe_operation.py` | 2a | Aplicado (11/11/2026) |
+| 17 | PNS-37 | seguridad | `pns_ai_mcp/models/ai_change_journal.py`, `pns_ai_mcp/controllers/safe_plan_execute.py` | 2a | Aplicado (11/11/2026) |
 | 18 | PNS-19 | seguridad | `pns_ai_mcp/controllers/controller_helpers.py` (opción B: vaciado de columnas secretas en `open_readonly_env`) | 3 | Pendiente de portar |
 | 19 | PNS-17 | seguridad | `pns_ai_mcp/utils/fetch_url_safe.py`, `pns_ai_mcp/utils/mcp_client.py` | 2 | Pendiente de portar |
-| 20 | PNS-70 | compatibilidad | `pns_ai_chatboo/static/src/js/chart.umd.min.js`, `pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js` | 2 | Pendiente de portar |
-| 21 | PNS-20 | seguridad | `pns_base/models/operation_report_wizard.py` | 2 | Pendiente de portar |
+| 20 | PNS-70 | compatibilidad | `pns_ai_chatboo/static/src/js/chart.umd.min.js`, `pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js` | 2a | Aplicado (11/11/2026); prueba manual pendiente |
+| 21 | PNS-20 | seguridad | `pns_base/models/operation_report_wizard.py` | 2a | Aplicado (11/11/2026) |
 | 22 | PNS-100 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | 2 | Pendiente de portar |
 | 23 | PNS-101 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
 | 24 | PNS-102 | seguridad | `pns_ai_mcp/controllers/context_builder.py` | 3 | Pendiente de portar |
@@ -256,8 +257,8 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
 | 29 | F1 (P-8e a) | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_session.py` | 4 | Pendiente de portar |
 | 30 | M11 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
 | 31 | M12 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
-| 32 | PNS-97 | seguridad | `pns_ai_mcp/models/ai_trusted_action.py` | 2 | Pendiente de portar |
-| 33 | PNS-29 | seguridad | `pns_ai_mcp/models/ai_provider.py`, `pns_ai_mcp/wizard/ai_provider_usage_wizard.py` | 2 | Pendiente de portar |
+| 32 | PNS-97 | seguridad | `pns_ai_mcp/models/ai_trusted_action.py` | 2a | Aplicado (11/11/2026) |
+| 33 | PNS-29 | seguridad | `pns_ai_mcp/models/ai_provider.py`, `pns_ai_mcp/wizard/ai_provider_usage_wizard.py` | 2a | Aplicado (11/11/2026) |
 | 34 | PNS-96 | funcional | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_async_request.py` | 4 | Pendiente de portar |
 | 35 | NUEVO-2 | robustez | `pns_ai_mcp/migrations/14.0.3.1.973/post-migrate.py` | plan, «Parche 35» | Pendiente (decisión 4 del plan). Única excepción a «sin `migrations/` propios»: solo se ejecuta en un `-u` que cruce 3.1.973; una BD actualizada a 3.1.973 sin el parche no lo ejecuta y se corrige a mano (una instalación nueva no lo necesita) |
 
@@ -3601,3 +3602,201 @@ Commit `8d218ea`; detalle en [staging_e4_3879.md](staging_e4_3879.md), apartado 
   (como confirma el lint `--base 421a838`).
 - **Estado del parche 34 (ampliado):** aplicado con la opción A y F1, tests en verde, neutralizado y aprobado
   en revisión (05 y 06/11/2026). Siguiente: E4′.h; después, una sola subida de E4′ al staging.
+
+## Parches de la rama 14.0-pns-ai-3973 (fase 2a, 11/11/2026)
+
+Parches 21, 20, 17, 33, 12, 32 y 16, en ese orden ([plan](plan_correccion_pns_ai_3973.md), «Fase 2a»). Cada
+uno conserva su número y su marcador. Lo que no cambia frente a la entrada de la rama 3879 (qué falla sin él,
+qué se degrada y cómo comprobar si el fabricante ya lo ha corregido) sigue en esa entrada; aquí van los
+archivos y líneas en 3.1.973, los ajustes, los tests y la neutralización.
+
+**Comprobaciones previas (solo lectura, 11/11/2026):**
+- **16:** `action_confirm_and_execute` solo lo llaman los dos botones de `views/safe_operation_views.xml`
+  (`:40`, lista, y `:71`, formulario) y `action_execute_plan` (`safe_operation.py:1865-1867`, que pasa por
+  el método decorado). No hay llamadores en JS ni en los tests del fabricante. Figura en la lista de efectos
+  del sandbox (`validators_base.py:241-242`), que lo bloquea. `controllers/safe_plan.py:401` es un comentario
+  («NEVER use action_confirm_and_execute here»). Fuera de una petición HTTP, `check_identity` da `UserError`
+  («This method can only be accessed over HTTP»): ningún cron ni proceso lo llama.
+- **33:** `month_usage` no aparece en vistas XML ni en JS; solo en `ai_provider.py` y en el asistente.
+- **32:** 3.1.973 solo crea filas de `ai.trusted.action` con `data/trusted_actions_system.xml` (9 registros,
+  sin `noupdate`), que se carga con `convert_file` en `su` y sin las claves del plan: `is_system()` es
+  verdadero en `su` (`odoo/api.py:538-541`) y `in_plan` es falso. No hay `migrations/`, hooks ni código que
+  cree o escriba filas, y los tests del fabricante solo usan `_get` y `_apply`.
+- **17:** `execute_plan_now` ejecuta ahora el plan con el `user_id` de la operación (`safe_operation.py:1437`;
+  en 3.1.879, con el `env` de quien confirmaba). `recs` sale de `env[model]` con ese `env`
+  (`safe_plan_execute.py:157`), así que `check_access_rights('unlink')` comprueba al **solicitante**.
+  `test_plan_unlink_requires_unlink_right` llama a `execute_safe_plan` con el `env` del usuario sin permiso de
+  borrado: sigue midiendo lo mismo («el usuario del plan necesita permiso de borrado») y no cambia.
+
+### Parche 21 en 3.1.973
+
+- **Archivo:** `pns_base/models/operation_report_wizard.py`; marcadores en `:7, 293, 298, 320, 326, 332`
+  (`_invalidate_after_preview_rollback`, `:292`; `action_preview`, `:314`).
+- **Ajuste:** ninguno. El `.diff` de la fase 0 entra limpio; frente a la rama 3879 solo difiere un comentario
+  del fabricante (`:49`).
+- **Tests:** `test_seges_import_preview.py` (4), sin cambios.
+- **Neutralización N21** (sin el parche; log `tests-20261111-114110.log`): 3 F. Fallan
+  `test_users_preview_keeps_value`, `test_providers_preview_no_update` y **también
+  `test_users_preview_keeps_groups`**, que en N1 de la rama 3879 pasaba sin el parche: en 3.1.973, sin él, la
+  vista previa de la importación de usuarios deja dado el grupo AI Writer (`True is not false`, `:98`).
+  **En 3.1.973 el defecto alcanza también a los grupos**, y ese test pasa a depender del parche.
+
+### Parche 20 en 3.1.973
+
+- **Archivos:** `pns_ai_chatboo/static/src/js/chart.umd.min.js` (marcadores en `:1-2`; la global `Chart` pasa
+  a `PnsChatbooChart`) y `chatboo_heavy_libs.js` (`:16, 31`).
+- **Ajuste:** ninguno. Los dos archivos de 3.1.973 son idénticos a los de 3.1.879; el resultado es idéntico
+  byte a byte al de la rama 3879 (`cmp` con `modulos_3879`). En 3.1.973 ningún otro JS usa la global: la
+  librería llega a `chatboo_charts.js` solo por `bindEngines` (`:40-47`).
+- **Tests:** manual (gráfico en el chat). **Pendiente:** P-70 caso 1 en `lab_pns_ai_3973`, al final de la
+  fase 2 (2a y 2b juntas).
+
+### Parche 17 en 3.1.973
+
+- **Archivos:**
+  - `pns_ai_mcp/models/ai_change_journal.py`: `sudo().write` en `:498` y `:571`; `create` (`:639`) y `write`
+    (`:647`) solo en `su`, con marcadores en `:637` y `:646`. Archivo idéntico a 3.1.879; queda igual que en
+    la rama 3879.
+  - `pns_ai_mcp/controllers/safe_plan_execute.py:225-227`: `check_access_rights('unlink')` y
+    `check_access_rule('unlink')` antes de archivar en el paso `unlink`.
+- **Ajuste:** el paso `unlink`, a mano en su archivo nuevo (antes `controllers/safe_plan.py:947`). Con 3.1.973,
+  comprueba al solicitante (ver «Comprobaciones previas»).
+- **Tests:** `test_seges_change_journal.py` (11), sin cambios.
+- **Neutralización:**
+  - N17j (diario sin el parche; log `tests-20261111-115142.log`): 2 F, `test_ai_admin_write_refused` y
+    `test_ai_admin_create_refused`;
+  - N17u (paso `unlink` sin la comprobación; log `tests-20261111-115452.log`): 2 F,
+    `test_plan_unlink_requires_unlink_right` y `test_rejected_plan_journals_failed_row`.
+
+  Coinciden con N1 de la rama 3879.
+
+### Parche 33 en 3.1.973
+
+- **Archivos:** `pns_ai_mcp/models/ai_provider.py`: `_month_usage` (`:1097`, marcador `:1096`) y su llamada en
+  `spend_cap_reached` (`:1132-1134`); `pns_ai_mcp/wizard/ai_provider_usage_wizard.py:37-39`.
+- **Ajuste:** ninguno; desplazado +80 en `ai_provider.py`. El asistente es idéntico a 3.1.879.
+- **Tests:** los 7 de `test_seges_e4p.py` del parche 33, sin cambios.
+- **Neutralización:**
+  - N33n (vuelve el nombre público como alias; log `tests-20261111-121359.log`): `test_month_usage_rpc_refused`
+    (interno y portal) y `test_month_usage_public_name_gone`;
+  - N33w (sin `check_access_rights('create')`; log `tests-20261111-121743.log`):
+    `test_usage_wizard_default_get_rpc_refused` y `test_usage_wizard_onchange_rpc_refused` (interno), y
+    `test_default_get_refused_for_internal`.
+
+  En las dos fallaban además los 13 del 32, que aún no estaba aplicado.
+
+### Parche 12 en 3.1.973
+
+- **Archivos:**
+  - `pns_ai_mcp/utils/privilege_cusp.py`: `SETTINGS_ADMIN_ONLY` y `settings_admin_error` (`:101-121`), y los
+    dos `return` de `crud_cusp_error` (`:142, 163`). Archivo idéntico a 3.1.879; queda igual que en la rama
+    3879.
+  - `pns_ai_mcp/models/ai_system_action.py`: import (`:16-17`), `_check_may_change_user_groups` (`:724`) y la
+    llamada en los cuatro métodos de grupos (`:746, 757, 780, 792`).
+- **Ajuste:** en los dos `_apply_*`, la comprobación va justo antes de `user_add_group(user.with_user(...))` /
+  `user_remove_group(...)` del fabricante, que ahora escribe como el usuario real. Combinados, gana el más
+  estricto (comparación, §6.3). Las líneas añadidas son las mismas que en la rama 3879. Los llamadores de
+  `crud_cusp_error` son los mismos, solo movidos (`safe_plan_validate.py:245`, `safe_plan_execute.py:156-215`).
+- **Tests:** `test_seges_user_groups.py` (11). Un cambio, aprobado por Sergio el 11/11/2026:
+  `test_view_actions_unchanged_for_ai_admin` daba E (`AccessError` del nuevo `_require_settings` del
+  fabricante, `ai_system_action.py:121-127`). Ahora comprueba dos cosas:
+  - el AI Administrator sin Ajustes recibe el `AccessError` del fabricante, no el `UserError` del 12;
+  - un administrador de Ajustes real (`env.su` falso, `uid` comprobado), con `ai_journal_user_id` del AI
+    Administrator sin Ajustes en el contexto, aplica la acción de vistas: resultado `ok` y una vista heredada
+    de la vista de prueba con `readonly`. El 12 no se extiende a las vistas.
+
+  Segundo cambio (decisión de Sergio, opción (a), 11/11/2026): `test_confirmed_add_group_rejected_without_settings`,
+  `test_confirmed_remove_group_rejected_without_settings` y `test_registry_edit_does_not_lift_check` usan un
+  usuario nuevo, `access_adm` (AI Administrator con «Permisos de acceso», `base.group_erp_manager`, sin
+  Ajustes), con su entorno en `_env_access()`. El fabricante lo deja escribir grupos y solo lo para el 12. Los
+  tres esperan además el mensaje del 12 (`assertRaisesRegex(UserError, SETTINGS_ONLY)`). Los demás tests de la
+  clase siguen con `adm`.
+- **F por diseño:** `test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin` vuelve a F (decisión del
+  23/10/2026).
+- **Neutralización N12** (`settings_admin_error` devuelve `None`; log `tests-20261111-123348.log`, ya con el
+  32 aplicado): 7 F.
+  - `test_paap_i7` vuelve a pasar.
+  - Fallan `test_propose_rejected_without_settings`, `test_direct_methods_rejected_without_settings`,
+    `test_context_identities_checked`, `test_view_actions_unchanged_for_ai_admin` (su comprobación de
+    `settings_admin_error`) y `test_crud_res_groups_refused_without_settings`.
+  - Fallan también, como se esperaba, los dos negativos del 32 que dependen de `settings_admin_error`:
+    `test_plan_confirmed_for_ai_admin_refused` y `test_sudo_in_plan_context_refused`.
+  - En esa ejecución, `test_confirmed_add_group_rejected_without_settings`,
+    `test_confirmed_remove_group_rejected_without_settings` y `test_registry_edit_does_not_lift_check`
+    **pasaban sin el 12**. Su usuario (AI Administrator sin «Permisos de acceso») ya lo rechazaba el
+    fabricante al escribir los grupos como el usuario real; su `AccessError` es un `UserError` en Odoo 14.
+    Se corrigió con el segundo cambio de «Tests».
+- **N12 repetida** tras el segundo cambio (log `tests-20261111-125859.log`; batería previa
+  `tests-20261111-125618.log`: 306 tests, 1 F, la de `test_paap_i7`): **10 F**. Son las 7 anteriores más los
+  tres tests con `access_adm`, que fallan con «UserError not raised» porque sin el 12 el plan aplica el cambio.
+  `test_paap_i7` vuelve a pasar. SHA-256 igual al restaurar.
+
+### Parche 32 en 3.1.973
+
+- **Archivo:** `pns_ai_mcp/models/ai_trusted_action.py`: imports (`:23-25`), `_check_settings_admin` (`:89`) y
+  `create`, `write` y `unlink` (`:105, 110, 115`).
+- **Ajuste:** a mano. La línea de `compat` cambió (`ODOO_VERSION, user_has_group`), y el bloque va después del
+  `if ODOO_VERSION >= 19 … else _sql_constraints` (`:77-85`), delante de `_get`; `patch` lo habría colocado
+  dentro del `else` (fuzz 2). Las líneas añadidas son las mismas que en la rama 3879. Va después del 12,
+  porque importa `settings_admin_error`.
+- **Lint:** los dos avisos que Sergio aceptó en E4′.a, I001 (el bloque de imports ya estaba desordenado en el
+  original de 3.1.973) y C0415.
+- **Tests:** los 12 de `TestSegesE4pTrustedAction`, sin cambios.
+- **Neutralización:**
+  - N32 (`_check_settings_admin` no comprueba nada; log `tests-20261111-123558.log`): los 8 negativos
+    (13 F con los subtests de `test_ai_admin_cannot_write`);
+  - N32j (solo `is_system()`; log `tests-20261111-123810.log`): `test_plan_confirmed_for_ai_admin_refused` y
+    `test_sudo_in_plan_context_refused`.
+
+  Coinciden con E4′.a.
+
+### Parche 16 en 3.1.973
+
+- **Archivo:** `pns_ai_mcp/models/safe_operation.py`: import de `check_identity` (`:13-14`), `@check_identity`
+  en `action_confirm_and_execute` (`:1798-1800`) y el token solo para el dueño en `card_payload` (`:2065-2066`).
+- **Ajuste:** a mano; desplazado +31. `patch` habría colocado el decorador en otro sitio (fuzz 2). Los bloques 2
+  y 3 del `.diff` son del parche 13 (retirado) y no se aplican. El reintento automático de la tarjeta usa la
+  ruta `pending`, que ya filtra por dueño (comparación, §6.1).
+- **Tests:** `test_seges_verification.py` (2), sin cambios.
+- **Neutralización:**
+  - N16i (sin `@check_identity`; log `tests-20261111-124344.log`): `test_confirm_and_execute_requires_identity`;
+  - N16t (token para cualquiera; log `tests-20261111-124558.log`): `test_card_payload_mint_only_owner`.
+
+### Tests de la fase 2a
+
+- **`pns_ai_mcp/tests/__init__.py`:** el del fabricante sin cambios y, debajo, el bloque de Seges con su
+  marcador: `test_seges_user_groups`, `test_seges_safe_operation`, `test_seges_verification`,
+  `test_seges_change_journal`, `test_seges_import_preview` y `test_seges_e4p`.
+- **Parches retirados, como no regresión:**
+  - `test_seges_safe_operation.py` (13, M10 del fabricante): `REFUSED` acepta el mensaje del fabricante
+    («Only the system can **open** a supervised operation»).
+  - `test_seges_e4p.py` (30 y 31): los negativos aceptan `AccessError` o `AttributeError` (nombre privado).
+    `test_log_own_rpc_allowed` pasa a `test_log_own_rpc_refused` y espera `AttributeError`: el fabricante
+    cierra también la escritura a nombre propio por RPC. `test_sudo_call_works` llama a `_chat_completion`.
+  - `TestSegesE4pLogRows`: en 3.1.973 `_create_log_entry` no escribe mientras corre un test
+    (`test_is_running`, `utils/compat.py:42`). Por decisión de Sergio (11/11/2026), se simula
+    `_create_log_entry` (`patch.object` con `autospec`, dentro de `with`):
+    - `test_own_row_written` llama a `_log_llm_inference` y comprueba una llamada con el `user_id` del admin,
+      leído con `inspect.signature(...).bind` (por nombre o por posición);
+    - los dos negativos comprueban que no se llama.
+- **Resultado** (log `tests-20261111-124112.log`; repetida tras el segundo cambio del 12,
+  `tests-20261111-125618.log`): **306 tests, 1 F, 0 E y 4 saltados**. La F es
+  `test_paap_i7_…` (por diseño); los 4 saltados, los de la línea base. Son 60 tests nuevos frente a la línea
+  base (246): 11 + 4 + 2 + 11 + 4 + 28.
+- **Origen de los módulos** (regla del plan): en todas las baterías, `addons paths` con
+  `/mnt/compartidos/third_party` y ningún `pns_*` en las demás rutas del contenedor.
+- **Neutralización:** con el método de E3′ (copia, cambio, batería completa, restauración y SHA-256), una
+  cada vez. Todas las restauraciones, con SHA-256 igual. Scripts `bateria.sh` y `neutralizar.sh` en el
+  scratchpad de la sesión.
+
+### Pendiente de la fase 2a
+
+- **Comprobaciones manuales, al final de la fase 2 (2a y 2b juntas), en `lab_pns_ai_3973`:**
+  - P-70 caso 1 (parche 20): un gráfico en el chat;
+  - P-5 con el 12;
+  - en Autorizaciones, Confirmar pide la contraseña (16);
+  - un AI Administrator sin Ajustes no da grupos con un plan (12) ni edita acciones de confianza (32);
+  - «This month» del proveedor, solo para el AI Administrator (33);
+  - «Review» de una importación no deja nada escrito (21).
+
+  El staging se hace al final de la rama (plan, «Pruebas posteriores»).

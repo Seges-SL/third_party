@@ -1,6 +1,6 @@
 # Plan de portado de los parches de Seges a pns_ai 3.1.973
 
-- **Fecha:** 10/11/2026 (propuesta y decisiones) · 11/11/2026 (fases 0 y 1).
+- **Fecha:** 10/11/2026 (propuesta y decisiones) · 11/11/2026 (fases 0 y 1; fase 2a).
 - **Decisión:** camino B de la [comparación con 3.1.973](../specs/comparacion_pns_ai_3-1-973.md), §8: pasar a
   3.1.973 entera y volver a portar los parches de Seges ([decisiones](pns_ai_decisiones.md), N15; Sergio,
   10/11/2026).
@@ -18,6 +18,9 @@
   - `lab_pns_ai_973` queda como referencia de 3.1.973 sin cambios.
   - `lab_pns_ai_3879` monta la misma copia de trabajo (`COMPARTIDOS="third_party"`): mientras el repo esté
     en `14.0-pns-ai-3973`, **no se arranca, ni se reinicia, ni se actualiza** (cargaría 3.1.973).
+  - **`_fabricante/`, trasladado (11/11/2026, hecho):** las versiones del fabricante están en
+    `/home/soporte/pns_fabricante`; en el repo queda el enlace `_fabricante` → esa carpeta, excluido con una
+    regla en `.git/info/exclude`. La opción del kit para esto no se aplicó. `_fabricante/` no se modifica.
 
 ## Decisiones de Sergio (10/11/2026)
 
@@ -95,17 +98,37 @@
 3. **1c:** este plan, el registro de parches («Cambio de base a 3.1.973»), la decisión N15 y la frase de la
    base en el CLAUDE.md del repo. Commit de Sergio: «[DOC] pns_ai: plan y registro del cambio de base a
    3.1.973».
-4. **1d:**
+4. **1d (11/11/2026, hecho):**
    - `lab_pns_ai_3973` según el MANUAL (6.7); los comandos se presentan a Sergio antes de ejecutarlos;
-   - `paridad` e instalación limpia de `pns_ai_chatboo`;
+   - `paridad` e instalación limpia de `pns_ai_chatboo` (log `instalar-20261111-110830.log`);
    - tests de los tres módulos: es la **línea base del fabricante en 3.1.973** (F y E por nombre;
      `test_web_client` necesita Chrome). Sin el parche 12, `test_paap_i7_…` debería pasar.
+   - **Resultado** (log `tests-20261111-111101.log`): **246 tests, 0 F, 0 E y 4 saltados**
+     (`TestWebClientStarts.test_backend_starts_without_errors`, sin Chrome;
+     `TestRequiredFieldsLive.test_a_pending_field_is_left_on_the_record_itself`; y
+     `TestSandboxSecretRead.test_typed_readers_keep_secret_keys_out` y
+     `test_typed_setters_do_not_return_a_secret`). `test_paap_i7_…` pasa.
+   - **Falso «FALLO» del analizador:** el resumen de `odoo-dev` marca «FALLO» por la línea
+     `ERROR … ai_change_journal: AI change journal: snapshot read failed on res.partner`, que es un log
+     esperado de `TestOneCompanyLive.test_plan_cannot_touch_the_other_company` (la regla multicompañía
+     niega la lectura y el diario lo anota), no un test fallido. Manda la línea del runner
+     (`0 failed, 0 error(s) of 246 tests`). Se repetirá en cada batería: no cuenta como F ni E.
 
 ## Fase 2 — Parches que aplican igual o con desplazamientos
 
 Método:
 - el `.diff` de la fase 0 con `patch --dry-run`; lo que no entra, a mano;
 - después, lint, tests y neutralización.
+
+**Fase 2a (aprobada por Sergio el 11/11/2026):** parches 21, 20, 17, 33, **12, 32** y 16, en ese orden. El
+12 va antes que el 32 porque `_check_settings_admin` (32) importa `settings_admin_error` (12): sin el 12,
+cualquier `create` de `ai.trusted.action`, también la carga de datos al instalar, daría `ImportError`. En la
+neutralización del 12 fallan también, como es esperado, los negativos del 32 que dependen de
+`settings_admin_error`. Tests: los de Seges de estos parches, más `test_seges_safe_operation` como no
+regresión del 13 (M10 del fabricante, regex con su mensaje). En `test_seges_e4p`, los casos del 30 y del 31
+se adaptan a los nombres privados: `test_log_own_rpc_allowed` pasa a negativo (`AttributeError`: el
+fabricante cierra también la escritura a nombre propio por RPC) y los controles en Python
+(`test_own_row_written`, `test_sudo_call_works`) llaman al método privado equivalente.
 
 | Parche | Archivos en 3.1.973 | Ajuste | Test |
 |---|---|---|---|
@@ -200,10 +223,14 @@ Método:
   Seges debajo y sus marcadores.
 - E0′ sobra (el fabricante lo corrige con otros nombres); queda retirado en el registro.
 - Cada fase se mide como «línea base del fabricante + tests de Seges», con F y E por nombre.
+- **Regla (11/11/2026):** en cada entrega de tests se confirma que los tres módulos se cargan desde
+  `/mnt/compartidos/third_party/pns_*`: `addons paths` del log de tests, y ningún `pns_*` en las demás rutas
+  del contenedor (`/usr/lib/python3/dist-packages/odoo/addons`, `/var/lib/odoo/addons/14.0`, `/mnt/oca/*`).
 
 ## Pruebas posteriores (en `lab_pns_ai_3973` salvo indicación)
 
-1. Fase 2: P-5 con el 12 y P-7.
+1. Fase 2, al terminar 2a y 2b (juntas): P-5 con el 12, P-7 y las comprobaciones manuales de la 2a
+   (registro de parches, «Pendiente de la fase 2a»; P-70 caso 1 del parche 20 incluido).
 2. Fase 3: P-22 y, si Sergio pasa a la opción A, P-20.
 3. Fase 4: P-13.
 4. Con toda la rama:
