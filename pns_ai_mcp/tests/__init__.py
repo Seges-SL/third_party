@@ -38,3 +38,10 @@ from . import test_server_identity_detection
 from . import test_sandbox_secret_read
 from . import test_one_company_live
 from . import test_key_of_settings_admin
+# Seges: tests de la fase 2a sobre 3.1.973 (parches 12, 16, 17, 21, 32 y 33; 13, 30 y 31 retirados, como no regresión). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_user_groups
+from . import test_seges_safe_operation
+from . import test_seges_verification
+from . import test_seges_change_journal
+from . import test_seges_import_preview
+from . import test_seges_e4p
