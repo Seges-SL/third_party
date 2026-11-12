@@ -4485,3 +4485,37 @@ comprobar nada (`odoo/fields.py:992-993`). La caja A abre su cursor en el mismo 
 - No lo introduce ningún parche de Seges y estaba igual en la rama 3879 (el parche 18 de entonces solo vaciaba los
   campos no permitidos de 11 modelos).
 
+
+### Prueba en el laboratorio de la fase 3a (12/11/2026)
+
+- **Laboratorio:** `lab_pns_ai_3973`, BD `lab_pns_ai_3973_14`, Odoo 14.0-20231106, con los commits de la 3a.
+- **Reinicio sin `-u`:** `odoo-dev 14 parar` y `arrancar` desde `~/GitHub/lab_pns_ai_3973`. `INICIO` = 2026-11-12
+  11:27:33 UTC (12:27:33 hora local). Desde `INICIO`: 47 módulos cargados y **0 ERROR**, 0 CRITICAL y 0 Traceback en el
+  log. El único WARNING es un `DeprecationWarning` de jinja2 al arrancar.
+- **Script `p24_lab.py`** (`odoo-dev 14 shell`, solo lectura, `rollback` al final; queda en el scratchpad de la sesión,
+  fuera del repo).
+  - Ejecuta la herramienta `relaxaicode` real (caja A real) como el usuario 12 (`seges_int@example.com`); `admin` es
+    `base.user_admin` (id 2).
+  - Solo imprime OK/FALLO y el tipo de rechazo, nunca valores.
+
+  | Caso | Resultado | Rechazo |
+  |---|---|---|
+  | a) `user.lang`, `user.name`, `company.name`, `env.companies.ids` (y `env.user.lang`, `env.company.name`) | OK, sin error | — |
+  | b) `user`, `company`, `env.user`, `env.company` y `env.companies` sin `su`: contexto real del sandbox (`build_safe_context`) sobre una caja A real, con `rollback` y `close` | OK | — |
+  | b′) `user.env.su` desde el sandbox | OK (rechazado) | `ERROR (-32602): AST Validation Error: [PROHIBITED:PRIVILEGE] RelaxAICode runs as the asking user: 'env' is not available.` |
+  | c) `user.browse(admin).totp_secret` | OK (rechazado; no se llega a la línea siguiente) | guardián de columnas secretas del fabricante («holds a credential») |
+  | d) `env['res.users'].browse(admin).totp_secret` | OK (rechazado; no se llega a la línea siguiente) | guardián de columnas secretas del fabricante («holds a credential») |
+
+  - b) no puede comprobarse desde el sandbox: `.env` es un atributo de privilegio (`RELAXAICODE_PRIVILEGE_ATTRS`,
+    `controllers/validators_base.py:311-313`) y se rechaza en el AST con el parche o sin él, como muestra b′.
+  - El texto de b′ se obtuvo con un fragmento aparte, de solo lectura (`p24_bprima.py`, mismo método).
+  - Sin `ERROR` en la salida del shell.
+- **Turno de Chatboo** (Sergio, 12:29:48 hora local, conversación nueva, como `seges_int@example.com`, con
+  `gemini-3.6-flash` de Gemini lab):
+  - «What is my language and my company?» → «Your language is English (en_US) and your company is YourCompany.».
+  - En el log, el job 8 ejecutó `relaxaicode` como el usuario 12 (11:29:28 UTC) y terminó sin errores (11:29:47 UTC).
+  - 0 ERROR y 0 Traceback desde `INICIO`.
+- **Turnos anteriores, que no cuentan:** los dos de las 12:24 y 12:25 (hora local) fueron antes del reinicio y fallaron
+  por el proveedor («All providers failed for agent "pns_ai_chatboo". Gemini lab: The AI provider could not be
+  reached»), no por el parche.
+- **Resultado:** el parche 24 queda validado en el laboratorio.
