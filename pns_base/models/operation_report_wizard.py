@@ -367,13 +367,17 @@ class PnsOperationReportWizard(models.AbstractModel):
         return etree.tostring(node, encoding='unicode')
 
     def _inject_import_preview_arch(self, result):
-        src = self.env.ref('pns_base.view_pns_import_preview_form')
+        # Seges: parche 36 (PNS-103, funcional). Ver docs/pendiente/parches_pns_ai.md
+        # ir.ui.view is readable only by Settings. This is the module's own fixed
+        # form, and super().fields_view_get already checked read on the wizard.
+        src = self.env.ref('pns_base.view_pns_import_preview_form').sudo()
         result = dict(result)
         result['arch'] = self._prepare_import_preview_arch(src.arch)
         return result
 
     def _inject_operation_result_arch(self, result):
-        src = self.env.ref('pns_base.view_pns_operation_result_form')
+        # Seges: parche 36 (PNS-103, funcional). Ver docs/pendiente/parches_pns_ai.md
+        src = self.env.ref('pns_base.view_pns_operation_result_form').sudo()
         result = dict(result)
         result['arch'] = self._prepare_import_preview_arch(src.arch)
         return result
