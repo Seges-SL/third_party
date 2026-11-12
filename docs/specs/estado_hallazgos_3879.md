@@ -8,6 +8,9 @@
   ([hoja de decisiones](../pendiente/decisiones_pendientes_hallazgos_3879.md)). Cambian el estado en §3 de
   las filas de §2 y §2 bis, los recuentos de §1 y «A confirmar» (bloques «Decidido»). §4, §5 y §6 siguen
   como en la segunda pasada.
+- **Alta de PNS-103 (12/11/2026):** hallazgo nuevo de la rama `14.0-pns-ai-3973` (fase 2c, parche 36), con
+  el mismo código en 3.1.879. Se añade su fila al final de §3.1 y a §6 (C). El alcance (PNS-01 a PNS-102) y
+  los recuentos de §1 no se reescriben: la nota fechada de §1 da los nuevos.
 - **Rama y HEAD:** `14.0-pns-ai-3879`, `be934bc` (copia de trabajo limpia).
 - **Código comprobado:** `pns_base`, `pns_ai_mcp` y `pns_ai_chatboo` de `8d218ea` (validado en el staging
   `pns_demo` el 09/11/2026; ningún commit posterior toca los módulos).
@@ -115,6 +118,10 @@ Por gravedad (la de los documentos; si cambia, la última) y estado:
   PNS-102 pierden el SE documental: sus recuentos (23 y 4) se registran en `parches_pns_ai.md` (hoja de
   decisiones, §4). La revisión de los CF782 queda acotada a las 13 Medias y Bajas («A confirmar»).
   PNS-83 (Alta) suma AC por el resto de la mesa del PIN (decisión 3.2).
+
+> **12/11/2026, alta de PNS-103** (Baja, decidida por Sergio el 12/11; AI). Las tablas de arriba no lo
+> incluyen. Con él: **filas 187**; AI 57; Baja 34 (AI 11); el resto de estados y gravedades, sin cambio. En
+> 3.1.879 queda sin corregir (el parche 36 es solo de `14.0-pns-ai-3973`), así que aquí no suma CS.
 
 ## 2. SIN TRATAR / SIN ESTADO CLARO
 
@@ -358,6 +365,7 @@ Abreviaturas de origen: **inf.** informes de Seges (PNS-01 a 80, 08/10/2026; 81 
 | PNS-100 | seg (nuevo, E2′) | Alta | Efectos fuera de la BD desde la caja A | CS (p22; tests lab 27/10; stg 29/10 sin prueba propia); AI | reg «Parche 22»; prop E2′ tercera ronda, decisión 3; plan §3.2 | Gravedad Alta decidida el 27/10 |
 | PNS-101 | seg (nuevo, E2′) | Crítica | Entornos reales del hilo desde la caja A | CS (p23 ampliado; lab 28/10 P-101 y P-101′; stg 29/10 P-101); AI | reg «Parche 23»; prop E2′ «Revisión del parche 18», «Enfoque de raíz»; plan §3.2 | §2, fila 1 |
 | PNS-102 | seg (nuevo, E2′) | Crítica | `user`/`company` con `su` | CS (p24; lab 28/10 P-102; stg 29/10 sin prueba propia); AI | reg «Parche 24»; plan §3.2 | §2, fila 2. Claves MCP de LIYBEN: regenerar tras el despliegue (plan §3.1) |
+| PNS-103 | seg (nuevo, lab 3973, 11/11) | Baja | AI Administrator sin Ajustes: `AccessError` en la revisión y el resultado de las importaciones | AI (12/11) | seg PNS-103; reg «Parche 36» | Alta del 12/11 (§1, nota). Mismo código en 3.1.879 (`_inject_*_arch` sin `sudo`); no se corrige en `14.0-pns-ai-3879` (`pns_demo` lo tiene; se validó con usuarios con Ajustes). Corregido en `14.0-pns-ai-3973` por el p36 |
 
 ### 3.2 Observaciones comunicadas, petición de §5 y compatibilidad sin número
 
@@ -585,6 +593,12 @@ lista.
   (PNS-96, hoja 30; Seges añade el aviso del parche 34); varias llamadas a Design (hoja 31); el
   orquestador reinterpreta peticiones (hoja 32); `relaxaicode` sin pedir datos (hoja 35); detalle del
   error en el failover (hoja 36).
+
+**Alta del 12/11/2026**
+
+- C, asistentes de importación: PNS-103 (Baja), un AI Administrator sin Ajustes no puede abrir la revisión ni
+  el resultado de las importaciones (17 asistentes heredan los dos métodos). Seges lo corrige en 3.1.973
+  (p36); en 3.1.879, sin parche. Fuentes: seg PNS-103; reg «Parche 36».
 
 ## Cambios respecto a la primera pasada
 

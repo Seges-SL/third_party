@@ -175,6 +175,23 @@ y 28. Detalle en el [registro](parches_pns_ai.md), «Parches de la rama 14.0-pns
   [registro](parches_pns_ai.md), «Pruebas manuales de la fase 2 en `lab_pns_ai_3973` (11/11/2026)».
 - **Cuándo:** después de las pruebas manuales de la fase 2 (hechas) y antes de la fase 3.
 - **Propuesta** (cambio, test y neutralización): aparte, pendiente de aprobación de Sergio.
+- **Aprobada y aplicada (11/11/2026)**, como PNS-103, tipo `funcional`:
+  - `.sudo()` sobre las dos vistas (`operation_report_wizard.py:373` y `:380`, marcadores en `:370` y `:379`);
+  - tests: `pns_ai_mcp/tests/test_seges_review_views.py` (6, etiqueta `seges_e2p`);
+  - batería de los tres módulos: 388 tests, 1 F (`test_paap_i7`), 0 E y 4 saltados;
+  - N36p y N36r: 8 E cada una, SHA-256 igual al restaurar;
+  - alta de PNS-103 en el seguimiento.
+
+  Afecta a 17 asistentes (no 16; ver el registro, parche 36). La rama 3879 y `pns_demo` tienen el mismo defecto,
+  sin parche. Queda la prueba manual: [guía de la fase 2c](lab_fase2c_3973.md).
+- **Validado en el laboratorio (12/11/2026):**
+  - manual con `seges_aiadm`;
+  - por RPC (`load_views`, el camino del navegador) con `seges_access` y `seges_aiadm`, más el negativo con
+    `seges_int@example.com`: 32 OK y 0 FALLO.
+
+  Por el camino salió un defecto del fabricante que solo se ve por RPC: `fields_view_get` sin `@api.model` en
+  `pns.operation.report.wizard`. No se corrige. Detalle en el [registro](parches_pns_ai.md), «Prueba en el
+  laboratorio del parche 36 (12/11/2026)». Fase 2c cerrada.
 
 ## Fase 3 — Parches 24 y 18; tests del 23
 

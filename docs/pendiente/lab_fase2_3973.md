@@ -45,6 +45,10 @@ los ids que imprime: se usan en 2.1, 2.5 y 2.6.
 > **Correo:** los `seges_*` necesitan correo. Al compartir una página (2.6) se publica un aviso con el dueño
 > como autor y, sin correo, sale un `UserError`. La siembra pone `<login>@example.com` a los que no lo tienen
 > (en las pruebas del 11/11/2026 se puso a mano en `seges_int`).
+>
+> **12/11/2026:** al poner el correo a mano en el formulario, el login de `seges_int` (usuario 12) pasó a
+> ser `seges_int@example.com` (consulta de solo lectura de Sergio). No se cambia en la BD: para entrar, por la
+> interfaz o por RPC, se usa `seges_int@example.com`. En esta guía, «`seges_int`» sigue nombrando a ese usuario.
 
 | Usuario | Grupos exactos | Para |
 |---|---|---|

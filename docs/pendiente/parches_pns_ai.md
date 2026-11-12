@@ -15,6 +15,8 @@
   · actualizado el 2026-11-09 (staging de E4′: parches 30 a 34)
   · actualizado el 2026-11-11 (cambio de base a 3.1.973, decisión B del 10/11/2026)
   · actualizado el 2026-11-11 (fase 2a sobre 3.1.973: parches 21, 20, 17, 33, 12, 32 y 16)
+  · actualizado el 2026-11-11 (fase 2c sobre 3.1.973: parche 36, PNS-103)
+  · actualizado el 2026-11-12 (fase 2c: parche 36 validado en el laboratorio)
 - **Versión del fabricante, base propia de Seges desde el 20/10/2026 (N12):** `pns_base` 14.0.1.2.32 ·
   `pns_ai_mcp` 14.0.3.1.782 · `pns_ai_chatboo` 14.0.2.1.453
 - **Desde el 23/10/2026 (N12, b′), en `14.0-pns-ai-3879`:** `pns_base` 14.0.1.2.47 · `pns_ai_mcp`
@@ -260,6 +262,7 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
 | 32 | PNS-97 | seguridad | `pns_ai_mcp/models/ai_trusted_action.py` | 2a | Aplicado (11/11/2026) |
 | 33 | PNS-29 | seguridad | `pns_ai_mcp/models/ai_provider.py`, `pns_ai_mcp/wizard/ai_provider_usage_wizard.py` | 2a | Aplicado (11/11/2026) |
 | 34 | PNS-96 | funcional | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_async_request.py` | 4 | Pendiente de portar |
+| 36 | PNS-103 | funcional | `pns_base/models/operation_report_wizard.py` | 2c | Aplicado (11/11/2026); validado en el laboratorio (12/11/2026) |
 | 35 | NUEVO-2 | robustez | `pns_ai_mcp/migrations/14.0.3.1.973/post-migrate.py` | plan, «Parche 35» | Pendiente (decisión 4 del plan). Única excepción a «sin `migrations/` propios»: solo se ejecuta en un `-u` que cruce 3.1.973; una BD actualizada a 3.1.973 sin el parche no lo ejecuta y se corrige a mano (una instalación nueva no lo necesita) |
 
 Las entradas de cada parche portado se añaden debajo, en «Parches de la rama 14.0-pns-ai-3973», con sus
@@ -4146,3 +4149,231 @@ que sigue: [lab_fase2_3973.md](lab_fase2_3973.md).
 - **Preparación de la sección 3** (shell, con aprobación de Sergio): proveedor ficticio 1 archivado (2.8) y rol
   Design (id 6) con `use_fallback` false (3.1). Comprobado con una consulta de solo lectura.
 - **Pendiente:** parche 36 (fase 2c), con su propuesta aparte.
+
+## Parches de la rama 14.0-pns-ai-3973 (fase 2c, 11/11/2026)
+
+Parche 36 ([plan](plan_correccion_pns_ai_3973.md), «Fase 2c — Parche 36»). Propuesta aprobada por Sergio el
+11/11/2026, con PNS-103 y tipo `funcional`, y con condiciones (comprobación previa de `action_import`, tabla de
+neutralización por test y subtest, batería completa de los tres módulos, etiqueta de la convención, lista de
+asistentes, alta en el seguimiento y guía del laboratorio).
+
+### Parche 36: vistas de revisión y de resultado para el AI Administrator sin Ajustes (PNS-103)
+
+- **Qué falla sin él** (defecto del fabricante, en 3.1.879 y 3.1.973; no en 3.1.782):
+  - `_inject_import_preview_arch` y `_inject_operation_result_arch` leen la `arch` de
+    `pns_base.view_pns_import_preview_form` y `pns_base.view_pns_operation_result_form` con `env.ref(...).arch`,
+    sin `sudo`.
+  - `ir.ui.view` solo lo lee `base.group_system` (ACL de `base`, `ir.model.access.csv:34-35`). El resto de
+    `fields_view_get` ya lee las vistas en `sudo` (`odoo/models.py:1553`). `env.ref` no comprueba permisos
+    (`browse` y `exists`); el `AccessError` sale al leer `.arch`.
+  - Un AI Administrator sin Ajustes, con Permisos de acceso o sin ellos, recibe `AccessError` («You are not
+    allowed to access 'View' (ir.ui.view) records.») al abrir «Review this import» y la vista del resultado.
+    Como «Apply the import» solo está en la revisión, no puede importar.
+  - 3.1.782 no lo tiene: no hay `fields_view_get` ni `_inject_*`, y `_reopen_result_view` abre la vista por su
+    id (`env.ref(view_xmlid).id`), sin leer la `arch`.
+- **Rama `14.0-pns-ai-3879`** (solo lectura, 11/11/2026): mismo defecto. Los dos métodos son idénticos en
+  `_fabricante/3.1.879` (`:349-359`) y en la copia de la rama (`~/pns_ai_3973/fase0/modulos_3879`, `:369-379`), sin
+  `sudo`; ningún parche de Seges los tocó. El staging `pns_demo` lo tiene: se validó con usuarios con Ajustes. No
+  se corrige allí.
+- **Archivo:** `pns_base/models/operation_report_wizard.py`.
+  - `_inject_import_preview_arch`: marcador `:370`, `.sudo()` en `:373`.
+  - `_inject_operation_result_arch`: marcador `:379`, `.sudo()` en `:380`.
+- **Por qué `sudo` es seguro aquí:** solo se lee la `arch` de dos formularios fijos de `pns_base`, sin datos de
+  usuario. La comprobación de lectura del asistente (`check_access_rights('read')`, `odoo/models.py:1618`) la hace
+  `super().fields_view_get`, que se llama antes. `src` es local y `self` no cambia.
+- **Asistentes afectados** (modelos que heredan `pns.operation.report.wizard`). En la propuesta se dijo 16; son
+  **17**: los 16 de `pns_ai_mcp/wizard/` y `pns.export.file.wizard` de `pns_base`.
+
+  | Modelo | Archivo |
+  |---|---|
+  | `ai.agent.cache.rebuild.wizard` | `pns_ai_mcp/wizard/bundle_cache_rebuild_wizard.py:22` |
+  | `ai.agent.context.import.wizard` | `pns_ai_mcp/wizard/agent_context_import_wizard.py:15` |
+  | `ai.agent.import.wizard` | `pns_ai_mcp/wizard/bundle_import_wizard.py:28` |
+  | `ai.agent.skill.import.wizard` | `pns_ai_mcp/wizard/agent_skill_import_wizard.py:15` |
+  | `ai.artifact.bundle.import.wizard` | `pns_ai_mcp/wizard/artifact_bundle_import_wizard.py:28` |
+  | `ai.config.backup.wizard` | `pns_ai_mcp/wizard/config_backup_wizard.py:40` |
+  | `ai.context.import.wizard` | `pns_ai_mcp/wizard/context_import_wizard.py:20` |
+  | `ai.context.tools.wizard` | `pns_ai_mcp/wizard/mcp_context_tools_wizard.py:14` |
+  | `ai.import.agents.wizard` | `pns_ai_mcp/wizard/import_agents_wizard.py:20` |
+  | `ai.import.external.servers.wizard` | `pns_ai_mcp/wizard/import_external_servers_wizard.py:43` |
+  | `ai.import.provider.roles.wizard` | `pns_ai_mcp/wizard/import_provider_roles_wizard.py:17` |
+  | `ai.import.servers.wizard` | `pns_ai_mcp/wizard/import_servers_wizard.py:20` |
+  | `ai.import.users.wizard` | `pns_ai_mcp/wizard/import_users_wizard.py:20` |
+  | `ai.import.whitelist.wizard` | `pns_ai_mcp/wizard/import_whitelist_wizard.py:32` |
+  | `ai.skill.import.wizard` | `pns_ai_mcp/wizard/skill_import_wizard.py:13` |
+  | `ai.skill.tools.wizard` | `pns_ai_mcp/wizard/skill_tools_wizard.py:13` |
+  | `pns.export.file.wizard` | `pns_base/models/export_file_wizard.py:13` (lo amplía `pns_ai_mcp/wizard/json_export_wizard.py:11`) |
+
+  `pns.export.file.wizard` hereda el método, pero no abre ninguna de las dos vistas (no usa
+  `pns_import_preview`, `pns_operation_result` ni `_apply_*`): en la práctica no le afecta. Los tests cubren
+  `ai.import.servers.wizard` y `ai.import.users.wizard`; los demás pasan por los mismos dos métodos.
+- **Comprobación previa (condición 1, solo lectura):** `action_import` de los dos asistentes funciona como AI
+  Administrator sin Ajustes en la base.
+  - **Usuarios MCP** (`import_users_wizard.py:31-163`): lee `res.users` y `ai.mcp.user` (ACL de
+    `group_ai_admin`, `1,1,1,1`) y escribe con `sudo()` (`:101, 107, 120, 131, 138`). `_drop_key_unless_allowed`
+    solo quita la clave de un usuario con Ajustes.
+  - **Proveedores** (`import_servers_wizard.py:30-149`): `ai.provider` y `ai.provider.model` con el `env` del
+    usuario (ACL de `group_ai_admin`, `1,1,1,1`); `_roles_from_portable` lee los roles en `sudo`. Sin un rol de
+    audio no hay prueba de voz al guardar (`_gate_audio_tick_on_save`).
+  - Ninguna regla de registro sobre esos modelos.
+  - **Sin `cr.commit()` ni cursor propio** en el camino: los dos asistentes, `operation_report_wizard.py`,
+    `mcp_user.py`, `ai_provider_role.py`, `utils/mcp_ui.py`, `utils/compat.py`, `utils/formatting_mode_policy.py`
+    y `pns_base/utils/portable_io.py`. El único cursor propio de `ai_provider.py` (`:1300`,
+    `_mark_usage_support_yes`) solo lo llama `utils/agent_engine.py:690`.
+  - Los errores por fila se recogen en `result_errors` sin excepción: los tests comprueban `result_errors` vacío
+    y el dato escrito antes de abrir la vista. En N36r pasan esas comprobaciones y solo falla la vista: sin el 36,
+    lo único que falla es la vista.
+- **Tests:** `pns_ai_mcp/tests/test_seges_review_views.py` (6), en el bloque nuevo de Seges de
+  `tests/__init__.py` (fase 2c). Etiqueta `seges_e2p`: la convención de los `test_seges_*` es
+  `('post_install', '-at_install', '<módulo>', 'seges_<entrega>')`, las fases de 3.1.973 no han creado ninguna
+  etiqueta nueva y es la del test del flujo de revisión (`test_seges_import_preview.py`, parche 21).
+  - Usuarios: `seges_36_aiadm` (AI Administrator), `seges_36_access` (y Permisos de acceso), `seges_36_int` (AI
+    Conversational, sin AI Administrator) y `seges_36_target`.
+  - Antes de cada lectura se vacía la caché de las dos vistas: con la `arch` en caché (leída en `sudo`), leerla
+    como otro usuario no pasa por el ACL y el test no mediría el parche.
+
+  | Test | Subtests | Qué comprueba |
+  |---|---|---|
+  | `test_precondition_view_not_readable` | 4 (2 usuarios × 2 vistas) | `aiadm` y `access` no leen la `arch` de las vistas directamente (`AccessError`); ninguno tiene Ajustes y solo `access` tiene Permisos de acceso |
+  | `test_aiadm_gets_review_view` | 4 (2 usuarios × 2 modelos) | `fields_view_get` con `pns_import_preview` da la revisión («No data has been written.») |
+  | `test_aiadm_gets_result_view` | 4 (2 usuarios × 2 modelos) | con `pns_operation_result`, la vista de resultado (`o_pns_op_result`) |
+  | `test_aiadm_users_review_and_result` | 4 (2 usuarios × `review`/`result`) | flujo real: `action_preview` → vista con su `context`; `action_import` → sin errores, 1 actualizado, etiqueta escrita → vista de resultado |
+  | `test_aiadm_servers_review_and_result` | 4 (2 usuarios × `review`/`result`) | lo mismo con un proveedor ficticio: 1 creado, `temperature` 0.42 |
+  | `test_non_admin_still_refused` | 6 (2 modelos × revisión, resultado y `create`) | sin AI Administrator, `fields_view_get` y `create` dan `AccessError` |
+
+- **Resultado** (batería completa de los tres módulos, log `tests-20261111-202402.log`): **388 tests, 1 F, 0 E y 4
+  saltados**. La F es `test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin` (por diseño). 6 tests nuevos frente a
+  la 2b (382). Logs que no son F ni E: los mismos de la 2b (`snapshot read failed`, 27 `odoo.http` de los
+  negativos por RPC y el `ir_attachment_create_uid_fkey` de `claims_own`); ninguno en el tramo de
+  `test_seges_review_views`.
+- **Origen de los módulos:** en las tres baterías, `addons paths` con `/mnt/compartidos/third_party` y ningún
+  `pns_*` en `/usr/lib/python3/dist-packages/odoo/addons`, `/var/lib/odoo/addons/14.0` ni `/mnt/oca/*`.
+- **Neutralización** (método de la 2a: copia, cambio comprobado con una coincidencia exacta, batería completa,
+  restauración y SHA-256). SHA-256 del archivo con el parche:
+  `662379769e6df0aefeedc539636793012acabf339493dff89a739091005dc133`, igual tras las dos restauraciones.
+
+  | Prueba | Cambio | Log | Resultado |
+  |---|---|---|---|
+  | N36p | sin el `.sudo()` de `:373` (revisión) | `tests-20261111-202705.log` | 388, 1 F (`test_paap_i7`), **8 E** |
+  | N36r | sin el `.sudo()` de `:380` (resultado) | `tests-20261111-202952.log` | 388, 1 F (`test_paap_i7`), **8 E** |
+
+  Los 16 E son `AccessError: You are not allowed to access 'View' (ir.ui.view) records.` (E, no F: es una
+  excepción no esperada).
+
+  | Test (subtest) | N36p | N36r |
+  |---|---|---|
+  | `test_aiadm_gets_review_view` (aiadm, servers) | E | ok |
+  | `test_aiadm_gets_review_view` (aiadm, users) | E | ok |
+  | `test_aiadm_gets_review_view` (access, servers) | E | ok |
+  | `test_aiadm_gets_review_view` (access, users) | E | ok |
+  | `test_aiadm_gets_result_view` (aiadm, servers) | ok | E |
+  | `test_aiadm_gets_result_view` (aiadm, users) | ok | E |
+  | `test_aiadm_gets_result_view` (access, servers) | ok | E |
+  | `test_aiadm_gets_result_view` (access, users) | ok | E |
+  | `test_aiadm_users_review_and_result` (aiadm, review) | E | ok |
+  | `test_aiadm_users_review_and_result` (access, review) | E | ok |
+  | `test_aiadm_users_review_and_result` (aiadm, result) | ok | E |
+  | `test_aiadm_users_review_and_result` (access, result) | ok | E |
+  | `test_aiadm_servers_review_and_result` (aiadm, review) | E | ok |
+  | `test_aiadm_servers_review_and_result` (access, review) | E | ok |
+  | `test_aiadm_servers_review_and_result` (aiadm, result) | ok | E |
+  | `test_aiadm_servers_review_and_result` (access, result) | ok | E |
+  | `test_precondition_view_not_readable` (4) | ok | ok |
+  | `test_non_admin_still_refused` (6) | ok | ok |
+
+- **Lint** (`odoo_lint.py --revisar`): 0 incidencias nuevas en `operation_report_wizard.py`,
+  `tests/__init__.py` y `test_seges_review_views.py`.
+- **Cómo comprobar si el fabricante lo ha corregido:**
+  `grep -n "view_pns_.*_form')" pns_base/models/operation_report_wizard.py` muestra `.sudo()`, o la `arch` se lee
+  por otro camino; y `test_seges_review_views` pasa sin el parche.
+- **Seguimiento:** PNS-103 dado de alta en `seguimiento_informe_pns_ai.md` (tabla, nota bajo el recuento y ficha),
+  pendiente del informe al fabricante.
+
+### Pendiente de la fase 2c
+
+- Prueba manual en `lab_pns_ai_3973` con `seges_aiadm`, `seges_access` y `seges_int`:
+  [guía de la fase 2c](lab_fase2c_3973.md). Requiere actualizar `pns_base` en el laboratorio (decisión de Sergio).
+
+> **12/11/2026, decisiones de Sergio:** quedan los 17 asistentes de la tabla, la etiqueta `seges_e2p` y la
+> gravedad Baja de PNS-103, que también se da de alta en `docs/specs/estado_hallazgos_3879.md` (AI). Para la
+> prueba manual basta con reiniciar el servidor del laboratorio (`odoo-dev 14 parar` y `arrancar`), sin `-u`:
+> el parche cambia solo el cuerpo de dos métodos (sin campos, vistas, datos ni manifest). Pendiente de la
+> aprobación de Sergio y del resultado de la guía.
+
+### Prueba en el laboratorio del parche 36 (12/11/2026)
+
+- **Laboratorio:** `lab_pns_ai_3973`, BD `lab_pns_ai_3973_14`. Servidor reiniciado con `odoo-dev 14 parar` y
+  `arrancar`, sin `-u`, sin `ERROR` en el log.
+- **Usuarios:** `seges_aiadm`, `seges_access` y el usuario 12, cuyo login real es `seges_int@example.com` (cambió al
+  ponerle el correo a mano el 11/11; no se cambia en la BD; ver las dos guías).
+- **Resultado:** validado. Las vistas de revisión y de resultado abren para el AI Administrator sin Ajustes
+  (con Permisos de acceso o sin ellos), y un usuario sin AI Administrator sigue sin poder crear el asistente ni
+  cargar sus vistas.
+
+**1. Manual, con `seges_aiadm`** ([guía de la fase 2c](lab_fase2c_3973.md), secciones 1 y 2):
+
+- **Estado antes:** ningún proveedor «Seges P-36»; la etiqueta MCP de `demo` (`ai_mcp_user` 1), vacía.
+- **Proveedores:**
+  - «Review this import» abre, con «No data has been written» y «Will create: Seges P-36 aiadm».
+  - Con la revisión abierta, 0 filas en la BD.
+  - «Apply the import» abre el resultado y crea el proveedor 4 (activo, `temperature` 0.36).
+- **Usuarios MCP:**
+  - «Review» abre, con «Will replace: demo».
+  - Con la revisión abierta, la etiqueta no cambia.
+  - «Apply» abre «Operation completed successfully.» (Created 0, Updated 1) y la etiqueta pasa a «P-36 aiadm».
+
+**2. `p36_rpc.py` (XML-RPC): 22 OK y 5 FALLO, exit 1.** Ninguno de los FALLO es del parche.
+
+- **Lo que pasa:**
+  - `seges_access`, flujo completo de los dos asistentes:
+    - `action_preview` abre la revisión, sin escribir;
+    - `action_import` abre el resultado, sin errores;
+    - crea el proveedor 6 «Seges P-36 access» (activo, 0.36);
+    - la etiqueta de `demo` pasa de «P-36 aiadm» a «P-36 access».
+  - Como `seges_aiadm`, se archivan los proveedores 4 y 6.
+- **4 FALLO: `fields_view_get` por XML-RPC da `IndexError: tuple index out of range`.** Es un defecto del
+  fabricante que solo se ve por RPC:
+  - La sobrescritura de `fields_view_get` de `pns.operation.report.wizard`
+    (`pns_base/models/operation_report_wizard.py:395`) no lleva `@api.model`. El original sí lo lleva
+    (`odoo/models.py:1601-1602`).
+  - Odoo 14 solo hereda `_returns` (`odoo/api.py:48`, `INHERITED_ATTRS`, aplicado en `:73-82` y `:93-100`).
+  - Por eso `call_kw` lo trata como método de registros (`odoo/api.py:400-407`), y `_call_kw_multi` hace
+    `args[0]` con `args` vacío (`odoo/api.py:387`).
+  - Es igual en `_fabricante/3.1.879` y `_fabricante/3.1.973` (`operation_report_wizard.py:371`, sin decorador en
+    `:370`); 3.1.782 no tiene este método.
+  - El navegador no lo ve: pide la vista con `load_views` (`web/static/src/js/services/data_manager.js:76-91`), que
+    es `@api.model` (`odoo/models.py:1523-1524`) y llama a `fields_view_get` desde Python (`:1536`).
+  - No se corrige: no afecta a la interfaz, y el parche 36 no lo toca.
+- **1 FALLO: autenticación de `seges_int`.** El login real es `seges_int@example.com`, y el negativo no se
+  ejecutó.
+
+**3. `p36_rpc_vistas.py`, primera ejecución (XML-RPC): 24 OK y 8 FALLO, exit 1.**
+
+- Mismo camino que el navegador (`load_views` con `views=[[False, 'form']]`), sin `action_import` ni escrituras.
+- **Pasan:**
+  - el negativo con `seges_int@example.com`: `create` y `load_views` con los dos contextos dan `AccessError`
+    (Fault 4) en los dos asistentes;
+  - los dos «sin cambios» de `ai.provider` y `ai.mcp.user`.
+- **Los 8 FALLO**, en los `load_views` de `seges_access` y `seges_aiadm`: «`TypeError: cannot marshal None unless
+  allow_none is enabled`». El XML-RPC del servidor no serializa `None` en la respuesta de `load_views`; el
+  `allow_none` del cliente no basta. Es del transporte, no del parche.
+
+**4. `p36_rpc_vistas.py` por JSON-RPC (`/jsonrpc`): 32 OK y 0 FALLO, exit 0.**
+
+- **`seges_access` y `seges_aiadm`, en `ai.import.servers.wizard` y `ai.import.users.wizard`:**
+  - `create`;
+  - `action_preview` abre la revisión;
+  - `load_views` con el contexto devuelto contiene `o_pns_import_preview` y «No data has been written»;
+  - con `pns_operation_result`, contiene `o_pns_op_result`.
+- **`seges_int@example.com`:** `create` y `load_views` (revisión y resultado) dan
+  `odoo.exceptions.AccessError` en los dos asistentes (6).
+- **Sin cambios** en los proveedores «Seges P-36…» ni en la fila de `demo`, incluido `write_date`.
+
+**Estado final de `lab_pns_ai_3973_14`:**
+
+- Proveedores 4 «Seges P-36 aiadm» y 6 «Seges P-36 access», archivados (`active` falso).
+- Etiqueta MCP de `demo`: «P-36 access» (antes, vacía). Es inofensiva: la sobrescribe la siguiente conexión
+  MCP de `demo`.
+- Asistentes de importación transitorios: los vacía Odoo.
+
+Los scripts (`p36_rpc.py` y `p36_rpc_vistas.py`) quedaron en el scratchpad de la sesión, fuera del repo.

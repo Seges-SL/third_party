@@ -175,6 +175,7 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-100 | Alta | NUEVO | VULNERABLE (tests de E2′ con el parche 22 neutralizado, 27/10/2026, sobre 3.1.879) | · **Parche 22 (E2′, `14.0-pns-ai-3879`): aplicado; tests en verde y neutralización hechos (27/10/2026)** |
 | PNS-101 | Crítica | NUEVO | VULNERABLE (caja A real en el shell de `lab_pns_ai_3879_14`, solo lectura, 27/10/2026, sobre 3.1.879) | · **Parche 23 (E2′, `14.0-pns-ai-3879`): aplicado; tests en verde y neutralización hechos (27/10/2026)** · **ampliado (28/10/2026)**: formateador propio de `str.format`/`format_map`, predicado único y blindaje de nombres internos (NEU-A/B/D); segunda vuelta tras revisión: fachadas de `operator` (attrgetter/methodcaller/itemgetter) como funciones y helper único `run_sandbox_code` en las dos vías de `exec`, cerrando `type()` sobre la clase nativa (CRÍTICO 1) y la vía de skills (CRÍTICO 2); tests `test_seges_format_guard.py`, `test_seges_facade_class.py` y NEU-E/F/G en verde |
 | PNS-102 | Crítica | NUEVO | VULNERABLE (herramienta real, segundo rechazo de E2′, 27/10/2026, sobre 3.1.782 y en LIYBEN) | · **Parche 24 (E2′, `14.0-pns-ai-3879`): validación local y neutralización hechas (28/10/2026)**; tests `test_seges_identity_su.py` · LIYBEN: claves MCP revocadas el 27/10/2026; regenerarlas tras el despliegue final |
+| PNS-103 | Baja | NUEVO | CONFIRMADO (laboratorio `lab_pns_ai_3973`, 11/11/2026, sobre 3.1.973; mismo código en 3.1.879) | · **Parche 36 (fase 2c, `14.0-pns-ai-3973`)**: ver su ficha · pendiente del informe al fabricante |
 
 **Recuento:** CORREGIDO 31 · PARCIAL 33 · SIN CAMBIOS 13 · YA NO APLICA 2 · DUDOSO 1 (80 del
 informe) · NUEVO 22 (total 102). Por gravedad:
@@ -186,6 +187,12 @@ informe) · NUEVO 22 (total 102). Por gravedad:
 | Media | 4 | 12 | 9 | 0 | 0 | 8 | 33 |
 | Baja | 9 | 6 | 3 | 1 | 1 | 6 | 26 |
 | **Total** | **31** | **33** | **13** | **2** | **1** | **22** | **102** |
+
+> **11/11/2026:** alta de PNS-103 (NUEVO, Baja propuesta), de las pruebas manuales de la fase 2 en
+> `lab_pns_ai_3973`. El recuento de arriba es el del 28/10/2026 y no lo incluye (con él: NUEVO 23, total 103).
+>
+> **12/11/2026:** gravedad Baja de PNS-103 decidida por Sergio. Alta también en
+> `docs/specs/estado_hallazgos_3879.md` (§3.1, AI).
 
 Restos que se repiten en varios parciales:
 1. **El sandbox (caja A) bloquea por lista de nombres y no impide llamar a métodos privados**
@@ -2248,6 +2255,27 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
   `user`/`company`/`companies` sin su en `GuardedSandboxEnv` y en `build_safe_context`
   ([parches](parches_pns_ai.md)). Tests `test_seges_identity_su.py`. **LIYBEN: claves MCP revocadas el
   27/10/2026 hasta el despliegue; regenerarlas después.** Validación local y neutralización, 28/10/2026.
+
+### PNS-103 — Un AI Administrator sin Ajustes no puede abrir la revisión ni el resultado de una importación
+
+- **Gravedad propuesta:** Baja (funcional, sin efecto de seguridad) · **Estado:** NUEVO (pruebas manuales de la
+  fase 2 en `lab_pns_ai_3973`, 11/11/2026, sobre 3.1.973). Antes de numerarlo se comprobó con Grep que PNS-103
+  no figuraba en `docs/` (ni en este seguimiento ni en `estado_hallazgos_3879.md`).
+- **Descripción:** `_inject_import_preview_arch` y `_inject_operation_result_arch`
+  (`pns_base/models/operation_report_wizard.py`; `:349-359` en 3.1.879 y 3.1.973) leen la `arch` de
+  `pns_base.view_pns_import_preview_form` y `pns_base.view_pns_operation_result_form` con
+  `env.ref(...).arch`, sin `sudo`. El ACL de `base` solo deja leer `ir.ui.view` a `base.group_system`
+  (`base/security/ir.model.access.csv:34-35`). El resto de `fields_view_get` ya lee las vistas en `sudo`.
+- **Quién:** cualquier AI Administrator sin Ajustes, con Permisos de acceso o sin ellos.
+- **Impacto:** «Review this import» da `AccessError` («You are not allowed to access 'View' (ir.ui.view)
+  records.»), y también la vista del resultado. Como «Apply the import» solo está en la revisión, ese usuario no
+  puede importar proveedores, usuarios MCP ni nada de lo que pasa por `pns.operation.report.wizard`. No está en
+  3.1.782: allí la vista de resultado se abre por su id, sin leer la `arch`.
+- **Corrección sugerida:** leer esas dos vistas en `sudo`, porque son formularios fijos del módulo. La
+  comprobación de lectura del asistente ya la hace `super().fields_view_get` antes.
+- **Rama Seges:** parche 36 (fase 2c, `14.0-pns-ai-3973`; [parches](parches_pns_ai.md)). Tests
+  `test_seges_review_views.py`. La rama `14.0-pns-ai-3879` y el staging `pns_demo` tienen el mismo defecto, sin
+  parche. **Pendiente del informe al fabricante.**
 
 ### Observaciones sin ficha (para valorar en E4′)
 
