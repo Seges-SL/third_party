@@ -176,6 +176,8 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-101 | Crítica | NUEVO | VULNERABLE (caja A real en el shell de `lab_pns_ai_3879_14`, solo lectura, 27/10/2026, sobre 3.1.879) | · **Parche 23 (E2′, `14.0-pns-ai-3879`): aplicado; tests en verde y neutralización hechos (27/10/2026)** · **ampliado (28/10/2026)**: formateador propio de `str.format`/`format_map`, predicado único y blindaje de nombres internos (NEU-A/B/D); segunda vuelta tras revisión: fachadas de `operator` (attrgetter/methodcaller/itemgetter) como funciones y helper único `run_sandbox_code` en las dos vías de `exec`, cerrando `type()` sobre la clase nativa (CRÍTICO 1) y la vía de skills (CRÍTICO 2); tests `test_seges_format_guard.py`, `test_seges_facade_class.py` y NEU-E/F/G en verde |
 | PNS-102 | Crítica | NUEVO | VULNERABLE (herramienta real, segundo rechazo de E2′, 27/10/2026, sobre 3.1.782 y en LIYBEN) | · **Parche 24 (E2′, `14.0-pns-ai-3879`): validación local y neutralización hechas (28/10/2026)**; tests `test_seges_identity_su.py` · LIYBEN: claves MCP revocadas el 27/10/2026; regenerarlas tras el despliegue final |
 | PNS-103 | Baja | NUEVO | CONFIRMADO (laboratorio `lab_pns_ai_3973`, 11/11/2026, sobre 3.1.973; mismo código en 3.1.879) | · **Parche 36 (fase 2c, `14.0-pns-ai-3973`)**: ver su ficha · pendiente del informe al fabricante |
+| PNS-104 | Baja (propuesta) | NUEVO | CONFIRMADO (`test_pending_write_survives_box_a_close`, batería de `lab_pns_ai_3973`, 12/11/2026, sobre 3.1.973; mismo código en 3.1.879); latente: ningún llamador real pierde datos hoy | · Propuesta de parche de `flush` (defensa, en la 3b), sin número ni implementar: ver su ficha · pendiente del informe al fabricante |
+| PNS-105 | Alta (propuesta) | NUEVO | Por lectura de código (12/11/2026, sobre 3.1.973; mismo patrón en 3.1.879); test de confirmación pendiente, después de la 3b | · Sin parche: ver su ficha · pendiente del informe al fabricante |
 
 **Recuento:** CORREGIDO 31 · PARCIAL 33 · SIN CAMBIOS 13 · YA NO APLICA 2 · DUDOSO 1 (80 del
 informe) · NUEVO 22 (total 102). Por gravedad:
@@ -193,6 +195,16 @@ informe) · NUEVO 22 (total 102). Por gravedad:
 >
 > **12/11/2026:** gravedad Baja de PNS-103 decidida por Sergio. Alta también en
 > `docs/specs/estado_hallazgos_3879.md` (§3.1, AI).
+>
+> **12/11/2026:** alta de PNS-104 (NUEVO, Alta propuesta; la decide Sergio), de la confirmación de la fase 3b en
+> `lab_pns_ai_3973`. El recuento de arriba no lo incluye (con PNS-103 y PNS-104: NUEVO 24, total 104). Alta también
+> en `docs/specs/estado_hallazgos_3879.md` (§3.1).
+>
+> **12/11/2026 (decisiones de Sergio):** PNS-104 pasa a **Baja (propuesta)**, por ser latente: ningún llamador real
+> pierde datos hoy. Alta de **PNS-105** (NUEVO, Alta propuesta, sin estado ni parche), por lectura de código: los
+> cursores propios con `commit` confirman y descartan las escrituras pendientes de quien los llama. El recuento de
+> arriba no los incluye (con PNS-103 a PNS-105: NUEVO 25, total 105). Alta también en
+> `docs/specs/estado_hallazgos_3879.md` (§3.1).
 
 Restos que se repiten en varios parciales:
 1. **El sandbox (caja A) bloquea por lista de nombres y no impide llamar a métodos privados**
@@ -2276,6 +2288,67 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
 - **Rama Seges:** parche 36 (fase 2c, `14.0-pns-ai-3973`; [parches](parches_pns_ai.md)). Tests
   `test_seges_review_views.py`. La rama `14.0-pns-ai-3879` y el staging `pns_demo` tienen el mismo defecto, sin
   parche. **Pendiente del informe al fabricante.**
+
+### PNS-104 — Cerrar la caja A descarta las escrituras pendientes del llamador
+
+- **Gravedad:** Baja (propuesta; latente; decisión de Sergio del 12/11/2026, que sustituye a la Alta propuesta al
+  darlo de alta) · **Estado:** NUEVO (fase 3b,
+  `14.0-pns-ai-3973`, 12/11/2026, sobre 3.1.973; mismo código en 3.1.879). Antes de numerarlo se comprobó con Grep que
+  PNS-104 no figuraba en `docs/`.
+- **Descripción:**
+  - la caja A se cierra con `ro_cr.rollback()` (`controllers/tools_relaxaicode.py:275`; `utils/skill_runtime.py:262`);
+  - en Odoo 14, `Cursor.rollback` llama a `clear_env` (`odoo/sql_db.py:307`), que hace `env.clear()` del entorno de
+    ese cursor (`sql_db.py:82-87`);
+  - `env.clear()` vacía la caché, `tocompute` y `towrite` (`odoo/api.py:620-627`), que son de todo el hilo y no del
+    cursor (`api.py:760-765`);
+  - `open_readonly_env` (`controllers/controller_helpers.py:179-238`) no hace `flush` antes de abrir la caja A. Por ahí
+    pasan los tres sitios que la abren: `/mcp` (`controllers/main.py:1648-1650`), el turno de Chatboo
+    (`utils/engine_tool_run.py:28-30`) y las skills (`utils/skill_runtime.py:250`).
+- **Impacto:**
+  - las escrituras del llamador que aún no se hayan volcado a la BD, de cualquier modelo, se pierden al terminar la
+    herramienta, sin error;
+  - lo mismo los cálculos guardados pendientes y los valores de los registros `new()` del llamador;
+  - además, si la caja A lee una columna con una escritura pendiente del llamador, el `flush` de esa lectura intenta
+    escribirla en el cursor `READ ONLY` y falla;
+  - confirmado por `test_pending_write_survives_box_a_close` (log `tests-20261112-131534.log`). Falta comprobar si los
+    llamadores reales llegan con escrituras pendientes.
+- **Corrección sugerida:** `flush()` del entorno del llamador antes de abrir el cursor de la caja A.
+- **Rama Seges:** propuesta de parche, sin número ni implementar ([propuesta de la fase 3](propuesta_fase3_3973.md),
+  «Propuesta: parche de `flush` antes de abrir la caja A»). **Pendiente del informe al fabricante.**
+- **Llamadores reales (12/11/2026, lecturas de la propuesta):** ninguno llega hoy a la caja A con escrituras que fueran
+  a durar:
+  - el turno de Chatboo deshace su cursor al terminar (`pns_ai_chatboo/models/chatboo_async_request.py:530-541`);
+  - `/mcp` y las skills no tienen escrituras pendientes antes de la caja A.
+
+  Por eso la gravedad es Baja: latente. El parche de `flush` se mantiene en la 3b como defensa (pérdida latente y
+  escritura en `READ ONLY` si la caja A lee una columna con escrituras pendientes del llamador).
+- **Relacionado:** PNS-105 (los cursores propios con `commit` vuelcan lo pendiente del llamador).
+
+### PNS-105 — Los cursores propios con `commit` confirman y descartan las escrituras pendientes de quien los llama
+
+- **Gravedad:** Alta (propuesta; la decide Sergio) · **Estado:** NUEVO, sin estado decidido (fase 3b,
+  `14.0-pns-ai-3973`, 12/11/2026, por lectura de código sobre 3.1.973; mismo patrón en 3.1.879). Antes de numerarlo se
+  comprobó con Grep que PNS-105 no figuraba en `docs/`. **Sin confirmar en ejecución:** su test va después de la 3b.
+- **Descripción** (Odoo 14 del contenedor):
+  - `Cursor.commit` llama a `flush_env(self)` antes del `COMMIT` (`odoo/sql_db.py:294-302`, en `:296`);
+  - `flush_env` hace `flush()` y `clear()` con el entorno de ese cursor (`sql_db.py:65-80`);
+  - `flush()` vacía todo `towrite`, que es del hilo (`odoo/models.py:5462` y siguientes; `odoo/api.py:760-765`);
+  - por tanto, un cursor propio con `Environment` que hace `commit` escribe y confirma en su transacción lo pendiente
+    del llamador, y después vacía la caché y lo pendiente del hilo;
+  - `ai.log._create_log_entry` (`pns_ai_mcp/models/ai_log.py`) lo hace en cada `_mcp_log` del motor
+    (`utils/agent_engine.py:703-730`) y en cada `_log_mcp_operation` de `/mcp` (`controllers/main.py:111-182`). Otros
+    cursores propios del fabricante siguen el mismo patrón (inventario pendiente).
+- **Impacto:**
+  - lo pendiente del llamador queda confirmado aunque después deshaga su transacción: el `rollback` de `/mcp` al fallar
+    una herramienta, el `ROLLBACK TO SAVEPOINT` del motor por herramienta (`utils/engine_tool_run.py:324-358`) y el
+    `rollback` del turno de Chatboo. En la caja B podría confirmar pasos que el plan después deshace (sin comprobar);
+  - las escrituras pendientes sobre registros creados en la transacción del llamador se pierden sin error: el cursor
+    propio no ve la fila (`models.py:5471-5480`);
+  - los tests no lo ven: `_create_log_entry` no se ejecuta con tests en marcha (`utils/compat.py:42-54`).
+- **Pendiente (después de la 3b y antes del staging):** test de confirmación (`test_seges_side_cursor_commit.py`),
+  caso de la caja B e inventario completo de cursores propios
+  ([propuesta de la fase 3](propuesta_fase3_3973.md), «Resultado de X1 a X4»).
+- **Rama Seges:** sin parche. **Pendiente del informe al fabricante.**
 
 ### Observaciones sin ficha (para valorar en E4′)
 

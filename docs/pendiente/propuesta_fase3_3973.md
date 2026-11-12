@@ -280,3 +280,448 @@ Comprueba en el momento de leer, antes de llegar a `Field.__get__`. Así da igua
   - V3 en la variante del contenedor: `totp_enabled` y después `browse(id).totp_secret`, `rec['totp_secret']` y
     `mapped('totp_secret')`;
   - la variante posterior no se puede probar aquí; queda cubierta por el mismo punto de control.
+
+## Datos de LIYBEN (12/11/2026, comprobados por Sergio con consultas de solo lectura)
+
+LIYBEN es el entorno de la prueba final. Responde al aviso «Antes del staging y de LIYBEN» de la sección anterior.
+
+- **Core de Odoo que corre:** el del commit `cc0060e889603eb2e47fa44a8a22a70d7d784185` (22/10/2024), montado sobre
+  `/usr/lib/python3/dist-packages/odoo`. El `dpkg-query` de su imagen dice 14.0.20231106, pero no es lo que corre.
+  **La versión se comprueba en el código montado, no con `dpkg`.**
+- **`totp_secret`:** calculado por SQL (`auth_totp/models/res_users.py:28`). LIYBEN tiene la **variante posterior**:
+  V3 es allí una lectura directa por id, sin pasar por la caché (ver «Variante 14.0 posterior»).
+- **Datos expuestos hoy:**
+  - 0 usuarios con TOTP: V3 no tiene hoy ninguna semilla que dar en LIYBEN, pero la tendrá en cuanto alguien active
+    TOTP;
+  - 7 tokens de registro vigentes sin caducidad (V4): 6 de usuarios de portal archivados y 1 de un contacto sin
+    usuario; ninguno de un usuario interno.
+- **Consecuencia para las pruebas:** la batería del laboratorio corre en la variante del contenedor (`totp_secret`
+  guardado). Lo que se pruebe allí no demuestra el comportamiento de LIYBEN para V3; ver la preparación de la 3b.
+- **Referencia = LIYBEN (comprobado por Sergio, 12/11/2026):** `/opt/odoo-src/14.0/odoo` está en el mismo commit
+  `cc0060e889603eb2e47fa44a8a22a70d7d784185` que el core montado de LIYBEN (`/opt/odoo/odoo-core`). Coinciden los
+  SHA-256 (16 primeros caracteres) de los cuatro archivos que importan aquí, en la referencia y en LIYBEN:
+
+  | Archivo | SHA-256 (16) |
+  |---|---|
+  | `addons/auth_totp/models/res_users.py` | `a8bb617ffd88f3b8` |
+  | `addons/auth_signup/models/res_partner.py` | `c848abd85790cadd` |
+  | `odoo/fields.py` | `f915e7114ceb705d` |
+  | `odoo/models.py` | `aae6b5a0c3027136` |
+
+  Para estas citas, la referencia `/opt/odoo-src/14.0` **es** el Odoo de LIYBEN. Las citas de la «variante posterior»
+  valen para LIYBEN.
+
+## `signup_url` y `signup_get_auth_param`: comportamiento del core, sin parche (12/11/2026)
+
+Junto a la ficha 16, «Tokens de portal», de la [hoja de E4′](e4_hoja_3879.md) (`:90` y `:415-422`; decidido el
+09/11/2026: sin acción, no va al informe).
+
+- **`res.partner.signup_url`** (`auth_signup`, campo calculado no guardado y sin grupos): la URL lleva el token
+  (contenedor: `addons/auth_signup/models/res_partner.py:96-99`; la construye `_get_signup_url_for_action` en `sudo`).
+  La comprobación de escritura de `_compute_signup_url` solo mira los usuarios activos del contacto. Por eso un usuario
+  interno la lee para un contacto sin usuario o con usuarios archivados, siempre que el token tenga `signup_type`.
+- **`res.partner.signup_get_auth_param`** (método público, contenedor `:106-123`): devuelve `auth_signup_token` a un
+  usuario interno si el alcance de registro es `b2c`.
+- **Decisión de Sergio (12/11/2026):** las dos son comportamiento del core. El mismo usuario interno las alcanza por
+  RPC: el sandbox no da más acceso. Quedan **sin parche y fuera de O1/O1b**. Solo entrarían si se demuestra que desde el
+  sandbox se llega más lejos que por RPC con el mismo usuario.
+- **V4 sigue siendo `signup_token`**: grupo `base.group_erp_manager`; en LIYBEN, calculado por SQL. Por RPC no se lee.
+  Desde el sandbox se lee por la caché que deja `signup_valid` (contenedor) o directamente (LIYBEN).
+- **LIYBEN hoy:** sus 7 tokens (6 de usuarios de portal archivados y 1 de un contacto sin usuario) son alcanzables por
+  `signup_url` para cualquier interno si tienen `signup_type`. Es una observación del core, no un hallazgo del sandbox.
+
+## Decisiones de Sergio sobre V1 a V5 y la 3b (12/11/2026)
+
+1. Lecturas P1, P2 y P3 aprobadas.
+2. **Confirmación de V1 a V4:** `pns_ai_mcp/tests/test_seges_box_a_vias.py` (22 tests), en un bloque nuevo de Seges de
+   `tests/__init__.py`, con la batería de los tres módulos en una BD de tests desechable. Si F y E no coinciden con lo
+   esperado, se informa sin cambiar el test.
+3. **Pérdida de escrituras al cerrar la caja A** (`sql_db.py:307` → `clear_env`, `:82-87` → `env.clear()`,
+   `api.py:620-627`): con el resultado del test se prepara la propuesta de un parche propio (número de Sergio):
+   `flush()` del `env` del llamador antes de abrir la caja A, en `open_readonly_env`. Por ahí pasan los tres sitios que
+   la abren (`controllers/main.py:1648-1650` y `utils/engine_tool_run.py:28-30` por `get_readonly_env`;
+   `utils/skill_runtime.py:250` directamente). Se anota también como hallazgo para el seguimiento del informe al
+   fabricante. Sin implementar.
+4. **Diseño, aprobado en principio:**
+   - O1 con el cuarto enganche (`mapped`, `compute_value` y `determine_value` sobre objetos `Field`, en `_read_attr`);
+   - criterio del fabricante (`_pns_hidden_column`/`_pns_deny_column`) más `check_access_rights('read')` del modelo;
+   - **sin** `check_field_access_rights`;
+   - B y B2 como defensa.
+
+   O1b queda como salida si aparecen métodos que lean sin `su` y devuelvan el valor. Los que hoy no lo hacen quedan como
+   resto conocido. Se prepara la propuesta de implementación de la 3b (parche 18 con O1, B y B2), sin implementar.
+5. **Laboratorio con el core de LIYBEN** (`DOCKERFILE` propio): aplazado a «Con toda la rama», antes de la prueba en
+   LIYBEN.
+6. Estas decisiones, aquí.
+
+**Hallazgos de P1 a P3 (12/11/2026, solo lectura):**
+- P1: los tres sitios que abren la caja A pasan por `open_readonly_env` (`controller_helpers.py:179`). Ninguno hace
+  `flush` antes.
+- P2: `iap.account.get` (`iap/models/iap_account.py:33-74`, contenedor) no devuelve un recordset en `sudo`. Pero, si
+  hay cuentas sin token, las borra en `sudo` en un cursor propio (`:44-54`); si no hay cuenta, crea una y la
+  **confirma en un cursor propio** (`:55-71`), y deja `account_token` en la caché (`:72-73`). Desde la caja A es una escritura que se escapa (familia de los parches 15 y 22). El token nuevo en caché lo
+  cierra O1. El nombre `get` no puede ir a la lista de efectos (rompería `dict.get`). Pendiente de decisión aparte.
+- P3: módulos de la BD de tests: `auth_signup`, `auth_totp`, `base`, `base_import`, `base_setup`, `bus`, `fetchmail`,
+  `iap`, `mail`, `mail_bot`, `partner_autocomplete`, `phone_validation`, `sms`, `snailmail`, `web`, `web_editor`,
+  `web_tour`, `web_unsplash` y los tres `pns_*`. Ni `website` (V5) ni `payment`, `google_*` o `microsoft_*`.
+- P2, decisión de Sergio (12/11/2026): pendiente de decisión, **fuera de la 3b**.
+
+## Confirmación de V1 a V4 (12/11/2026)
+
+- **Tests:** `pns_ai_mcp/tests/test_seges_box_a_vias.py`, 22, en el bloque nuevo de Seges de `tests/__init__.py`.
+  Secretos con prefijo (`seges-3b-totp-`, `seges-3b-st-`, `seges-3b-tok-` y `seges-3b-h-`) más 32 hexadecimales
+  aleatorios. Lint: 0 incidencias nuevas.
+- **Batería de los tres módulos** (log `tests-20261112-131534.log`): **456 tests, 14 F, 0 E y 4 saltados** (los de la
+  línea base). Coincide por nombre con lo esperado. Las 14 F son 13 tests: `test_computed_secret_column_refused` cuenta
+  2, uno por subtest (`password` y `new_password`).
+
+  | Esperado | Resultado |
+  |---|---|
+  | `test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin` (por diseño) | F |
+  | `test_decision2_v3_browse`, `test_v3_getitem`, `test_v3_mapped` | F («filtra»): **V3 confirmada** |
+  | `test_decision2_v4_browse`, `test_v4_getitem`, `test_v4_mapped` | F («filtra»): **V4 confirmada** |
+  | `test_v1_getitem`, `test_v1_mapped` | F («filtra»): **V1 confirmada** |
+  | `test_v2_getitem`, `test_v2_mapped` | F («filtra»): **V2 confirmada** |
+  | `test_computed_secret_column_refused` (2 subtests) | F («no se rechaza»): el camino del cálculo no pasa por el guardián |
+  | `test_pending_write_survives_box_a_close` | F: **la escritura pendiente del llamador se pierde al cerrar la caja A** |
+  | 4 controles, 4 positivos, `test_v1_literal_attr_refused`, `test_v3_recordset_as_result` | pasan |
+
+- **Secretos en el log:** `grep -c "seges-3b-[a-z]*-\?[0-9a-f]\{32\}"` = **0**.
+- **Limpieza:** ninguna línea de `tearDownClass` ni «limpieza incompleta».
+- **Origen:** `addons paths` con `/mnt/compartidos/third_party`. Falta comprobar en el contenedor que no hay `pns_*` en
+  las demás rutas (regla del 11/11/2026).
+- Logs que no son F ni E: los conocidos (`odoo.http` de los negativos por RPC, `ir_attachment_create_uid_fkey` de
+  `claims_own`, `snapshot read failed`).
+
+## Propuesta: parche de `flush` antes de abrir la caja A (sin implementar; número de Sergio)
+
+**Problema** (del fabricante, igual en 3.1.879 y 3.1.973; confirmado por `test_pending_write_survives_box_a_close`):
+- al cerrar la caja A se hace `ro_cr.rollback()` (`tools_relaxaicode.py:275`, `skill_runtime.py:262`);
+- en Odoo 14, `Cursor.rollback` llama a `clear_env(self)` (`sql_db.py:307`), que hace `env.clear()` del entorno de ese
+  cursor (`sql_db.py:82-87`);
+- `env.clear()` vacía la caché, `tocompute` y `towrite` (`api.py:620-627`), que son de todo el hilo (`api.py:760-765`);
+- se pierden las escrituras pendientes del llamador (de cualquier modelo) y los cálculos guardados pendientes, sin
+  error;
+- `open_readonly_env` (`controller_helpers.py:179-238`) no hace `flush` antes de abrir, y los tres sitios que abren la
+  caja A pasan por ella: `/mcp` (`controllers/main.py:1648-1650`), turno de Chatboo
+  (`utils/engine_tool_run.py:28-30`) y skills (`utils/skill_runtime.py:250`).
+
+**Cambio:** en `open_readonly_env`, antes de `base_env.registry.cursor()` (`controller_helpers.py:189`),
+`base_env['base'].flush()`, con su marcador. Va antes de abrir el cursor: si el `flush` falla, no queda ningún cursor
+abierto.
+
+**Qué cubre:**
+- `towrite`: lo pendiente se escribe en el cursor del llamador antes de abrir la caja A; al cerrar no queda nada que
+  perder;
+- `tocompute`: `flush()` sin campos hace `recompute()` (`models.py:5483-5486`), así que los cálculos guardados
+  pendientes tampoco se pierden;
+- condición a: la caja A ya no encuentra escrituras pendientes del llamador. Su `_read` → `flush(fields)`
+  (`models.py:3101-3103`) no intenta escribir en el cursor `READ ONLY`. Sustituye al «flush previo» de solo columnas
+  secretas, que no cubría la pérdida.
+
+**Qué no cubre:**
+- la caché del llamador sigue vaciándose al cerrar (`api.py:624`): solo cuesta volver a leer;
+- **los registros `new()` del llamador pierden sus valores al cerrar**: viven solo en la caché. El
+  `test_new_records_survive_box_a` previsto para la 3b no puede pasar sin cambiar el cierre. Queda como resto
+  conocido del fabricante.
+
+**Qué se degrada:**
+- las escrituras pendientes, y sus errores (restricciones, SQL), se adelantan a la apertura de la caja A: un error que
+  antes salía más tarde sale al llamar a la herramienta;
+- un `flush` por apertura, normalmente vacío;
+- si una caja A se abriera con un `base_env` que ya es de otra caja A (anidada) y tuviera pendientes, el `flush`
+  fallaría en `READ ONLY`. No hay ningún caso hoy (P1).
+
+**¿Llegan los llamadores reales con escrituras pendientes?** Por determinar con lecturas. El turno de Chatboo envuelve
+cada herramienta en un `SAVEPOINT` crudo, sin `flush` (`engine_tool_run.py:324-358`, `_run_tool_in_savepoint`), sobre el
+cursor del turno, que guarda sesión y trabajo. Cualquier escritura del motor aún sin `flush` antes de la herramienta se
+perdería. En `/mcp` y en las skills hay que leer qué se escribe antes.
+
+**Tests** (archivo propio del parche; `TestSegesBoxACallerWrites` pasa ahí):
+- `test_pending_write_survives_box_a_close` (ya existe; hoy F);
+- `test_pending_compute_survives_box_a_close`: el `name` de un contacto pendiente; tras la caja A, el `display_name`
+  guardado en la BD es el nuevo (hoy se pierde la recomputación);
+- `test_pending_write_box_a_reads_column` (condición a): con `comment` pendiente, la caja A lee `comment` del mismo
+  contacto sin error, y tras cerrar la BD del llamador tiene el valor nuevo;
+- `test_box_a_open_flush_error_no_cursor`: si el `flush` falla, no queda ningún cursor de caja A abierto.
+
+**Neutralización:** N-flush (sin la línea): F en los tres primeros; el cuarto, F o E según el error.
+
+**Hallazgo para el seguimiento del informe:** ficha nueva (número por comprobar con `grep` antes de darlo, como
+PNS-103): «Cerrar la caja A descarta las escrituras pendientes del llamador», gravedad propuesta Media (pérdida
+silenciosa de datos del turno). Pendiente de que Sergio apruebe la búsqueda y el alta.
+
+## Propuesta de implementación de la 3b: parche 18 con O1, B y B2 (sin implementar)
+
+Marcador: `# Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md`. Citas de 3.1.973 con la 3a
+aplicada.
+
+**Comprobación común** (archivo propio, `pns_ai_mcp/models/seges_box_a_read.py`, importado con marcador en
+`models/__init__.py`), en `base`:
+- `_seges_box_a_check_read(name)`: si el cursor es el de la caja A y no hay `su`, rechaza con `_pns_deny_column` cuando
+  `_pns_hidden_column(name)` es verdadero (criterio del fabricante, fila a fila en `ir.config_parameter`). Después,
+  `check_access_rights('read')` del modelo.
+- La marca se mira con `cr.__dict__.get(SANDBOX_CURSOR_FLAG)`, no con `getattr`. Fuera de la caja A, `getattr` pasaría
+  por `Cursor.__getattr__` (`sql_db.py:315-317`) y por una excepción en cada `__getitem__` de todo Odoo. El valor es el
+  mismo, porque la marca se pone en la instancia (`controller_helpers.py:194`).
+
+**Enganches:**
+
+| N.º | Dónde | Qué |
+|---|---|---|
+| 1 | `controllers/context_builder.py`, `_read_attr` (`:271-285`), antes de `getattr` (`:278`) | si `obj` es un recordset y `name` es un campo: `obj._seges_box_a_check_read(name)`. Cubre `rec.x`, `getattr`, `attrgetter`, `methodcaller` y los campos de `str.format` |
+| 2 | `seges_box_a_read.py`, `__getitem__` de `base` con clave de texto (Odoo `models.py:5702-5716`) | la comprobación en el registro y después `super()`. Cubre `rec['x']`, `itemgetter` nativo, `sorted('x')` (`:5452`), `name_get` y lecturas del motor (`_score_record_fit`) |
+| 3 | `seges_box_a_read.py`, `mapped` de `base` con ruta de texto (Odoo `:5285-5293`) | en la caja A, el bucle de Odoo tramo a tramo con la comprobación sobre los registros de cada tramo (fila a fila). Fuera, `super()`. Cubre `filtered('x')` (`:5328`) |
+| 4 | `_read_attr`, objetos `Field` | rechaza `mapped`, `compute_value` y `determine_value` (decisión 4; el último, si existe en Odoo 14, a comprobar). `rec._fields` está permitido y `Field.mapped` lee la caché sin `__get__` (`fields.py:1085-1112`) |
+
+**B** (`controllers/controller_helpers.py`, `open_readonly_env`, después de crear el `env` (`:211-217`) y antes de
+anular el `commit` (`:220`)):
+- `_seges_forget_secret_columns(env)`, en un archivo propio `utils/seges_box_a_cache.py`;
+- los pares `(modelo, campo)` con `_pns_hidden_column` verdadero sobre el recordset vacío se guardan por registro, por
+  nombre;
+- `env.cache.invalidate([(campo, None), …])` (`api.py:896-916`);
+- si falla, la caja A no se abre (`rollback`, `close` y `UserError`, como `:195-209`).
+
+**B2** (`controllers/context_builder.py`, `:998-1003`): si el cursor es el de la caja A, cada helper de módulo se envuelve
+en una función propia con `try/finally` que vacía lo mismo al terminar (sin `functools.wraps`, para no dejar
+`__wrapped__`).
+
+**Tests:**
+- **Confirmación** (`test_seges_box_a_vias.py`, 22): con O1 deben pasar los 12 de vía (14 F de hoy).
+  `test_pending_write_survives_box_a_close` sigue en F hasta el parche de `flush`.
+- **Diseño, en `test_seges_box_a_vias.py`** (12 nuevos):
+  - negativos: `itemgetter('totp_secret')`, `sorted('totp_secret')`, `filtered('totp_secret')`,
+    `u._fields['totp_secret'].mapped(u)` y `'{0.totp_secret}'.format(u)`, tras el cálculo;
+  - ACL del modelo: el motor lee en `sudo` un campo no secreto de `ai.mcp.user` antes de la caja A, y desde el sandbox
+    `m['user_id']` se rechaza (el usuario no tiene ACL de `ai.mcp.user`);
+  - positivos del motor en `sudo` dentro de la caja A real: `_api_key_for_inference` de un proveedor confirmado (prefijo
+    `seges-3b-pk-`) y `get_param('web.base.url')`;
+  - positivos fuera de la caja A: `_api_key_for_inference` y `_resolve_auth_token` siguen dando el valor;
+  - `ir.config_parameter` fila a fila (como `base.user_admin`): `.value` y `mapped('value')` de `web.base.url`
+    funcionan;
+  - `sorted('name')`, `filtered('name')`, `itemgetter('name')` y `mapped('partner_id.name')` funcionan;
+  - B al abrir: un secreto en caché del llamador no está en la caché tras `open_readonly_env`;
+  - B selectivo: un valor no secreto en caché del llamador sigue en caché tras abrir (antes de cerrar).
+- **`test_seges_sandbox_credentials.py`** (rama 3879: 32 → **33**):
+  - reescrito al criterio del fabricante;
+  - sin `test_marker_cleared_after_box_a`;
+  - `test_sudo_does_not_lift` → `test_sandbox_cannot_reach_sudo` (condición b);
+  - nuevos `test_box_a_icp_cache_before_run` (B, `value`) y `test_helper_sudo_read_forgotten` (B2, unidad del
+    envoltorio);
+  - sin `test_pending_writes_survive_box_a` (pasa al parche de `flush`), sin `test_new_records_survive_box_a` (no puede
+    pasar: el cierre vacía la caché, resto conocido) y sin el de la decisión 2 (ya está en `test_seges_box_a_vias`).
+
+**Neutralización por enganche** (una cada vez, batería completa, SHA-256 al restaurar):
+
+| Prueba | Cambio | Deben fallar (F) |
+|---|---|---|
+| N18a | sin el enganche 1 | `test_decision2_v3_browse`, `test_decision2_v4_browse`, `test_computed_secret_column_refused` (2), el de `str.format` |
+| N18g | sin el enganche 2 | `test_v1/v2/v3/v4_getitem`, `itemgetter`, `sorted` |
+| N18m | sin el enganche 3 | `test_v1/v2/v3/v4_mapped`, `filtered` |
+| N18f | sin el enganche 4 | `_fields[...].mapped` |
+| N18acl | sin `check_access_rights` | ACL del modelo (`m['user_id']`) |
+| N18b | sin B | B al abrir, `test_box_a_icp_cache_before_run` |
+| N18i | B sin `value` de `ir.config_parameter` | `test_box_a_icp_cache_before_run` |
+| N18w | B con la caché entera | B selectivo |
+| N18h | sin B2 | `test_helper_sudo_read_forgotten` |
+
+**Recuento:**
+
+| Tras | Batería | Esperado |
+|---|---|---|
+| Hoy (confirmación) | 456 | 14 F (13 tests), 0 E, 4 saltados |
+| 3b (O1, B, B2) | 456 + 12 + 33 = **501** | 2 F: `test_paap_i7` y `test_pending_write_survives_box_a_close` |
+| 3b + parche de `flush` | 501 + 3 = **504** | 1 F: `test_paap_i7` |
+
+**Restos conocidos (registro):**
+- métodos que hoy no leen sin `su` ni devuelven el valor (O1b, como salida si aparecen);
+- otros métodos de `Field` fuera de los tres nombres;
+- `iap.account.get` (P2, aparte);
+- V5 sin test (no hay `website` en la BD de tests);
+- registros `new()` del llamador al cerrar la caja A.
+
+P-22 sigue justo después de la 3b, con su script presentado antes.
+
+## Ajustes del 12/11/2026 (decisiones de Sergio, tras la confirmación)
+
+- **Comprobaciones:**
+  - ningún `pns_*` fuera de `/mnt/compartidos/third_party` en el contenedor (0 en
+    `/usr/lib/python3/dist-packages/odoo/addons`, `/var/lib/odoo/addons/14.0` y `/mnt/oca/*`);
+  - PNS-104 estaba libre;
+  - `determine_value` no existe en Odoo 14: solo hay `compute_value` (`fields.py:1180` y `:2045`). El enganche 4 queda
+    con `mapped` y `compute_value`.
+- **PNS-104** dado de alta en el [seguimiento](seguimiento_informe_pns_ai.md) (pérdida de escrituras pendientes del
+  llamador al cerrar la caja A). Gravedad propuesta Alta, que decide Sergio. Sin número de parche todavía.
+- **`test_new_records_survive_box_a`, fuera del plan de la 3b:** los `new()` del llamador quedan como resto conocido
+  del fabricante (PNS-104). Sustituye a lo dicho en «Tests (condición d)», que se conserva como registro.
+  `test_seges_sandbox_credentials` pasa de 32 a **33**: −1 (`test_marker_cleared_after_box_a`), +2
+  (`test_box_a_icp_cache_before_run` y `test_helper_sudo_read_forgotten`). `test_pending_writes_survive_box_a` pasa al
+  parche de `flush`, y el test de la decisión 2 ya está en `test_seges_box_a_vias.py`.
+- **Recuento**, igual que en la tabla de la propuesta de implementación: 456 hoy · **501** tras la 3b (2 F:
+  `test_paap_i7` y `test_pending_write_survives_box_a_close`) · **504** con el parche de `flush` (1 F: `test_paap_i7`).
+- `test_seges_box_a_vias.py` y su bloque de `tests/__init__.py` quedan sin commit hasta los tests de la 3b.
+
+## Parche de `flush`: ¿llegan los llamadores reales con escrituras pendientes? (12/11/2026, lecturas L1-L4 y S1-S7)
+
+Completa el apartado del mismo nombre de la propuesta del parche, que se conserva. Solo lectura; sin valores.
+
+**Turno de Chatboo** (`pns_ai_chatboo/models/chatboo_async_request.py`, `_process`, `:149` y siguientes):
+- `:160-161`: `state`/`started_at` del trabajo y `commit` antes de nada: hasta ahí no queda nada pendiente.
+- **Candidato descartado:** los eventos `query_code` y `query_data` del motor solo guardan variables locales
+  (`:452-462`). La sesión se escribe después del motor, en `_finalize` → `_save_to_session` (`:516`, `:713`,
+  `:1438-1506`), cuando ya no hay caja A abierta.
+- **Candidato nuevo:** `chatboo.session.presentation_show_mode`, escrito **después** del `commit` y antes del motor si el
+  mensaje empieza por `/show-table` o `/show-chart` (`:209-214`). El motor se crea en `:391-419` y corre en `:420`. Si
+  la primera caja A del turno se abre antes de cualquier `flush` o `commit`, esa escritura se pierde. El turno no lo
+  nota, porque el motor recibe el valor en el contexto (`:396-398`), pero no queda guardado para los turnos siguientes.
+  **Por confirmar** (X1 a X3).
+- **Lo que lo taparía en producción:** cada `_mcp_log` del motor (`utils/agent_engine.py:703-730`) llama a
+  `ai.log._create_log_entry` (`models/ai_log.py`), que crea la fila en un **cursor propio** y hace `commit`. Si
+  `Cursor.commit` vuelca los pendientes del hilo (`flush_env`, como `TestCursor.commit`, `sql_db.py`; por confirmar en
+  X1), ese `commit` escribe y confirma las escrituras pendientes del llamador **en el cursor del registro, fuera de su
+  transacción**. En los tests no pasa: `_create_log_entry` no hace nada si hay tests en marcha (`test_is_running`). Por
+  eso el test ve la pérdida y producción quizá no.
+
+**`/mcp`** (`pns_ai_mcp/controllers/main.py`):
+- `mcp_endpoint` (`:760-900`) valida la clave con `search` en `sudo` (solo lectura) y guarda el usuario en `request`.
+- `_mcp_tools_call` (`:1237-1397`) llama a la herramienta (`tool_function(self, arguments)`) sin escribir antes en el
+  camino de lectura.
+- `_log_mcp_operation` (`:111-182`) también usa `_create_log_entry` (cursor propio).
+- **No se pierde nada** en lo leído: no hay escrituras pendientes antes de la caja A.
+
+**Skills** (`pns_ai_mcp/utils/agent_engine.py:1300-1390`; `skill_runtime.py:171`, `:250`, `:514`):
+- antes de `bootstrap_skill_code_body` solo hay `_mcp_log` (cursor propio) y lecturas (`build_invocation_payload`);
+- en un turno de Chatboo, heredan lo pendiente del turno (el candidato de arriba).
+- **Nada propio pendiente** en lo leído.
+
+**Hallazgo secundario, por confirmar (X1):** si `Cursor.commit` vuelca los pendientes del hilo, cada `_create_log_entry`
+confirma, en su propio cursor, las escrituras pendientes de quien llama:
+- quedan aunque después la transacción del llamador se deshaga (por ejemplo, el `rollback` de `/mcp` al fallar una
+  herramienta, en el `except` de `_mcp_tools_call`, `main.py:1237-1397`);
+- las de registros creados en esa misma transacción, que el cursor del registro no ve, se pierden: `flush` →
+  `_write` → `MissingError` → `exists()` vacío (`models.py:5471-5480`).
+
+Se presentaría a Sergio como ampliación de PNS-104 o como ficha aparte.
+
+## Resultado de X1 a X4 (12/11/2026, solo lectura)
+
+Odoo del contenedor (`/usr/lib/python3/dist-packages/odoo`).
+
+**Mecanismo, confirmado por lectura:**
+- `Cursor.commit` llama a `flush_env(self)` antes del `COMMIT` (`sql_db.py:294-302`, en `:296`).
+- `flush_env(cr)` busca un entorno de ese cursor con `uid` entero y le hace `['base'].flush()` y después `clear()`
+  (`sql_db.py:65-80`).
+- `flush()` sin campos hace `recompute()` y vacía **todo** `towrite` con ese entorno (`models.py:5462` y siguientes).
+  `towrite`, `tocompute` y la caché son del hilo, no del cursor (`api.py:760-765`).
+- Por tanto, **cualquier cursor propio con un `Environment` que haga `commit` en el mismo hilo escribe y confirma, en
+  su transacción, las escrituras pendientes de quien lo llama**, y luego vacía la caché y lo pendiente del hilo.
+- Un cursor propio sin `Environment` no lo hace: `_flush_progress` (`chatboo_async_request.py:546-561`) usa SQL a
+  pelo y `flush_env` no encuentra entorno.
+- `_create_log_entry` (`models/ai_log.py`) abre un cursor propio, crea `env_log = api.Environment(new_cr, SUPERUSER_ID,
+  {})` y hace `new_cr.commit()`: es este caso. Sale de cada `_mcp_log` del motor (`agent_engine.py:703-730`; primer
+  uso en `run_stream`, `:983`) y de cada `_log_mcp_operation` de `/mcp` (`controllers/main.py:111-182`). **No se ejecuta
+  en los tests** (`test_is_running`, `utils/compat.py:42-54`): la batería no puede verlo.
+
+**`presentation_show_mode` (Chatboo): descartado como pérdida por la caja A**, con una condición.
+- Se escribe en el cursor del turno (`chatboo_async_request.py:209-214`), y ese cursor **se deshace siempre al terminar
+  el turno** (`finally`, `:530-541`: «What must last … was already committed on its own cursors»). Lo que dura se
+  escribe en cursores propios, en `_finalize` → `_save_to_session`. `presentation_show_mode` vuelve a escribirse allí
+  cuando el turno trae el modo (`:1298`).
+- En producción, el `_mcp_log` de `run_stream` (`agent_engine.py:983`) vuelca y confirma esa escritura en el cursor
+  del registro antes de la primera herramienta. Si siempre se ejecuta antes de la primera caja A (no lo he leído:
+  lectura X5), la caja A no encuentra nada pendiente.
+- **Consecuencia para PNS-104:** en Chatboo, lo escrito en el cursor del turno no dura de todas formas. En `/mcp` y en
+  las skills no hay escrituras pendientes antes de la caja A (lecturas S6 y S7). **Ningún llamador real pierde datos
+  hoy por la caja A**; el defecto queda latente: cualquier llamador que llegue con escrituras pendientes, más la
+  condición a.
+- Sin test con el flujo real de eventos: no hay pérdida que medir. Si X5 mostrara que la primera caja A puede ir
+  antes del primer `_mcp_log`, se propondría.
+
+**Hallazgo aparte, confirmado por lectura (sin parche; Sergio decide si amplía PNS-104 o va en ficha aparte):
+«Los cursores propios con `commit` confirman y descartan las escrituras pendientes de quien los llama».**
+- **Qué se confirma fuera de la transacción del llamador:** todas las escrituras pendientes del hilo (`towrite`) y los
+  cálculos guardados pendientes (`recompute`), en el momento del `commit` del cursor propio. Quedan confirmadas aunque
+  después el llamador deshaga su transacción:
+  - el `rollback` de `/mcp` al fallar una herramienta (`except` de `_mcp_tools_call`, `main.py:1237-1397`);
+  - el `ROLLBACK TO SAVEPOINT` del motor por herramienta (`engine_tool_run.py:324-358`);
+  - el `rollback` del cursor del turno de Chatboo (`:530-541`).
+
+  En la caja B, un `_mcp_log` o un registro en cursor propio entre pasos confirmaría pasos que el plan después
+  deshace. **Sin comprobar.**
+- **Qué se pierde con registros nuevos:** las escrituras pendientes sobre registros creados en la transacción del
+  llamador, que el cursor propio no ve. El `UPDATE` no encuentra la fila, `process` reintenta con `exists()`, que da
+  vacío (`models.py:5471-5480`), y el `clear()` posterior vacía la caché del hilo: se pierden sin error. Si el
+  `recompute` falla en el cursor propio, `_create_log_entry` se traga la excepción (`except Exception` → `return None`),
+  y lo ya sacado de `towrite` también se pierde.
+- **Desde qué caminos:**
+  - todo `_mcp_log` del motor (Chatboo y skills) y `_log_mcp_operation` de `/mcp`;
+  - y, con el mismo mecanismo, cualquier cursor propio del fabricante con `Environment` y `commit` en el hilo del
+    llamador: `_mint_card_token` (`engine_tool_run.py:539-562`), `_run_on_committed_cursor` (`session_download.py`),
+    `iap.account.get` (P2), `_finalize` de Chatboo, entre otros.
+
+  Inventario completo pendiente (grep de `registry.cursor()` + `Environment` + `commit`, a presentar).
+- **Test propuesto** (`pns_ai_mcp/tests/test_seges_side_cursor_commit.py`, `TransactionCase`, sin implementar):
+  1. `test_log_commits_caller_pending_write`:
+     - parchear `odoo.addons.pns_ai_mcp.models.ai_log.test_is_running` a `False` (`self.patch`);
+     - escribir `comment` (marcador sin secreto) en un contacto **confirmado**, comprobar que está en `towrite`, y
+       llamar a `env['ai.log'].sudo()._create_log_entry(user_id=…, operation_type='read', tool_name='seges_3b_probe')`;
+     - con un cursor aparte, `SELECT comment` da el marcador (confirmado fuera de la transacción del test);
+     - `self.env.cr.rollback()` no lo deshace: otro `SELECT` desde un cursor aparte sigue dando el marcador.
+  2. `test_log_drops_pending_write_on_new_record`:
+     - crear un contacto en la transacción del test y escribirle `comment` (pendiente);
+     - llamar a `_create_log_entry`;
+     - `flush()` y `SELECT comment` en el cursor del test: no está el marcador (se perdió).
+  3. **Limpieza:** `addCleanup` con un cursor nuevo que restaura `comment` del contacto confirmado y borra la fila de
+     `ai.log` con `endpoint = 'seges_3b_probe'`, con `commit` (`# pylint: disable=invalid-commit`). BD de tests
+     desechable.
+  4. Hoy los dos dan F si el hallazgo es cierto. Son la prueba de la ficha, no de un parche.
+
+**Gravedad propuesta (la decide Sergio):**
+- **PNS-104: Baja.** Pérdida silenciosa, pero latente. Ningún llamador real llega hoy a la caja A con escrituras que
+  fueran a durar:
+  - Chatboo deshace el cursor del turno, y el primer `_mcp_log` vuelca lo pendiente;
+  - `/mcp` y las skills no tienen pendientes.
+
+  Subiría si aparece un llamador con pendientes, o si se cuenta la condición a como fallo visible.
+- **Hallazgo aparte: Alta, por confirmar con el test.** Rompe la atomicidad que el código del fabricante da por hecha:
+  - los `rollback` de `/mcp`, del motor por herramienta y del turno no deshacen lo ya volcado por un registro;
+  - pierde sin error escrituras sobre registros nuevos;
+  - los tests no lo ven, porque el registro está apagado en ellos (`test_is_running`);
+  - si se confirma en la caja B, afecta a la garantía de «confirmar antes de escribir».
+
+## Cierre de los llamadores reales y decisiones de Sergio (12/11/2026, tras X5)
+
+**X5** (`pns_ai_mcp/utils/agent_engine.py:960-1000`): el `_mcp_log` de `:983` **solo se ejecuta si una frase dispara
+una skill** (`_triggered_skill_command`, `:980-995`). No va siempre antes de la primera herramienta. La condición del
+bloque anterior no se cumple. El descarte de `presentation_show_mode` se mantiene por el otro motivo:
+- el cursor del turno se deshace siempre al terminar (`chatboo_async_request.py:530-541`);
+- lo que tiene que durar se escribe en cursores propios (`_save_to_session`; el modo, en `:1298`).
+
+Que la caja A lo pierda antes no cambia el resultado final.
+
+**Llamadores reales: cerrado.**
+
+| Llamador | Abre la caja A en | ¿Escrituras pendientes antes? | ¿Se pierde algo que fuera a durar? |
+|---|---|---|---|
+| Turno de Chatboo | `utils/engine_tool_run.py:28-30` → `get_readonly_env` | Solo `chatboo.session.presentation_show_mode` con `/show-table` o `/show-chart` (`chatboo_async_request.py:209-214`) | No: el cursor del turno se deshace al terminar (`:530-541`) |
+| `/mcp` | `controllers/main.py:1648-1650` → `get_readonly_env` | No (`:760-900`, `:1237-1397`) | No |
+| Skills | `utils/skill_runtime.py:250` → `open_readonly_env` | No propias (`agent_engine.py:1300-1390`); en un turno de Chatboo, las del turno | No |
+
+**Decisiones de Sergio:**
+1. **PNS-104:** gravedad **Baja (propuesta)**, latente. Actualizadas la fila, la nota y la ficha del seguimiento y
+   `docs/specs/estado_hallazgos_3879.md`.
+2. **Parche de `flush`:** se mantiene en la 3b, **como defensa** (pérdida latente y condición a). Número de Sergio.
+   Sin test del flujo real de Chatboo: no hay pérdida que medir.
+3. **PNS-105** (PNS-105 libre, comprobado con Grep): «Los cursores propios con `commit` confirman y descartan las
+   escrituras pendientes de quien los llama», **Alta (propuesta)**, sin estado y sin parche. Dado de alta en los mismos
+   sitios que PNS-104. **Fuera de la 3b.**
+4. Llamadores reales, cerrado (tabla de arriba).
+
+**Pendiente de PNS-105 (después de la 3b y antes del staging):**
+- **Test de confirmación:** `pns_ai_mcp/tests/test_seges_side_cursor_commit.py`, con los dos tests del bloque «Resultado
+  de X1 a X4» (escritura confirmada fuera de la transacción y que sobrevive a su `rollback`; escritura perdida sobre un
+  registro nuevo), y su limpieza.
+- **Caso de la caja B:** un registro con cursor propio entre pasos de un plan que después se deshace. Comprobar si los
+  pasos anteriores quedan confirmados.
+- **Inventario completo** de cursores propios del fabricante con `Environment` y `commit` en el hilo del llamador
+  (`registry.cursor()`, `pool.cursor()`), con archivo:línea. El `grep` se presenta antes de ejecutarlo.
