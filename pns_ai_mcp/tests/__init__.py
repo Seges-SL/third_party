@@ -51,3 +51,8 @@ from . import test_seges_sandbox_side_effects
 from . import test_seges_fetch_redirect
 # Seges: tests de la fase 2c sobre 3.1.973 (parche 36). Ver docs/pendiente/parches_pns_ai.md
 from . import test_seges_review_views
+# Seges: tests de la fase 3a sobre 3.1.973 (parche 24; 23 retirado, como no regresión). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_identity_su
+from . import test_seges_sandbox_env
+from . import test_seges_format_guard
+from . import test_seges_facade_class

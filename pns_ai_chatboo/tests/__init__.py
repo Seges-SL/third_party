@@ -10,3 +10,5 @@ from . import test_seges_chatboo_smoke
 from . import test_seges_chatboo_access
 from . import test_seges_chatboo_export
 from . import test_seges_chatboo_canvas
+# Seges: tests de la fase 3a sobre 3.1.973 (parche 23 retirado, como no regresión). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_skill_env
