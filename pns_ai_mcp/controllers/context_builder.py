@@ -68,6 +68,24 @@ except Exception:  # pragma: no cover - host unit test / standalone
     collect_sandbox_helpers = _shm.collect_sandbox_helpers
 
 
+# Seges: parche 24 (PNS-102, seguridad). Ver docs/pendiente/parches_pns_ai.md
+def _identity_no_su(env, name):
+    """``user`` / ``company`` / ``companies`` reconstruidos SIN su.
+
+    ``env.user`` del ORM fuerza su=True (``api.py``: ``self(su=True)``), y
+    ``env.company`` / ``env.companies`` también cuando no hay
+    ``allowed_company_ids`` (salen de ``env.user``). El sandbox corre como el usuario que pregunta,
+    así que se reconstruyen desde su ``uid`` sobre el mismo ``env`` (sin su) para
+    que ACL, record rules, grupos de campo y el guardián de columnas secretas
+    (``models/sandbox_secret_read.py``, que no mira en su) se apliquen.
+    """
+    if name == 'user':
+        return env['res.users'].browse(env.uid)
+    if name == 'company':
+        return env['res.company'].browse(env.company.id)
+    return env['res.company'].browse(env.companies.ids)
+
+
 class GuardedSandboxEnv(object):
     """Sandbox ``env``: ALLOWLIST of what the sandbox may touch.
 
@@ -95,6 +113,9 @@ class GuardedSandboxEnv(object):
     _ALLOWED_ENV_ATTRS = frozenset({
         'user', 'company', 'companies', 'context', 'lang', 'uid', 'ref',
     })
+    # Seges: parche 24 (PNS-102, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    # user/company/companies del ORM fuerzan su=True: se dan SIN su (_identity_no_su).
+    _IDENTITY_NO_SU = ('user', 'company', 'companies')
 
     def __init__(self, env):
         object.__setattr__(self, '_env', env)
@@ -135,6 +156,9 @@ class GuardedSandboxEnv(object):
                     return GuardedSandboxEnv(attr(*args, **kwargs))
                 return _wrapped
             return attr
+        # Seges: parche 24 (PNS-102, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        if name in self._IDENTITY_NO_SU:
+            return _identity_no_su(self._env, name)
         if name in self._ALLOWED_ENV_ATTRS:
             return getattr(self._env, name)
         raise AttributeError(
@@ -656,8 +680,10 @@ def build_safe_context(controller, operation_type='read', previous_result=None, 
     env = env_override if env_override is not None else controller._get_env_for_operation(operation_type)
     
     # Extract infrastructure variables (Technical Protocol)
-    user = env.user
-    company = env.company
+    # Seges: parche 24 (PNS-102, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    # Globales user/company SIN su, con el mismo criterio que GuardedSandboxEnv.
+    user = _identity_no_su(env, 'user')
+    company = _identity_no_su(env, 'company')
     
     # Odoo version info
     try:
