@@ -17,6 +17,15 @@
 - **Alta de PNS-105 (12/11/2026):** hallazgo nuevo de la rama `14.0-pns-ai-3973` (por lectura de código, fase 3b), con
   el mismo patrón en 3.1.879. Fila al final de §3.1 y entrada en §6, con el mismo criterio. PNS-104 pasa a Baja
   (propuesta) el mismo día (nota de §1).
+- **Fase 3b (12/11/2026):**
+  - PNS-104 queda en Baja (decidida) y pasa a AI, como PNS-103 (corregido en `14.0-pns-ai-3973` por el p37);
+  - PNS-19 tiene el p18 rehecho sobre 3.1.973 (O1, B y B2);
+  - se añade la errata de citas de PNS-104 y PNS-105 (nota de §1).
+- **Fase 3b, P-22 (12/11/2026):**
+  - el p18 se amplía en `14.0-pns-ai-3973` con `_pns_secret_fields` en `ai.key.pin.ask`, `ai.api.key.wizard` y
+    `ai.key.pin.desk`;
+  - observación nueva para el informe, sin número: un `Reference` salta la puerta de los modelos de credenciales (§6,
+    «Alta del 12/11/2026»).
 - **Rama y HEAD:** `14.0-pns-ai-3879`, `be934bc` (copia de trabajo limpia).
 - **Código comprobado:** `pns_base`, `pns_ai_mcp` y `pns_ai_chatboo` de `8d218ea` (validado en el staging
   `pns_demo` el 09/11/2026; ningún commit posterior toca los módulos).
@@ -136,6 +145,18 @@ Por gravedad (la de los documentos; si cambia, la última) y estado:
 > **12/11/2026, decisiones de Sergio:** PNS-104 pasa a **Baja (propuesta)**, por ser latente. Alta de **PNS-105** (Alta
 > propuesta, sin estado ni parche). Las tablas de arriba no los incluyen. Con PNS-103 a PNS-105: **filas 189**; Alta +1
 > (PNS-105) y Baja +1 (PNS-104), los dos sin estado hasta que Sergio decida.
+
+> **12/11/2026, fase 3b:** PNS-104 pasa a gravedad **Baja** (decidida) y a estado **AI**, el que tiene PNS-103: un
+> hallazgo del fabricante con un parche de Seges aplicado en `14.0-pns-ai-3973` (p37) y sin corregir en 3.1.879.
+> - Las tablas de arriba no lo incluyen. Con PNS-103 a PNS-105: **filas 189**; AI 58; Baja 35 (AI 12).
+> - PNS-105 sigue sin estado.
+> - PNS-19 no cambia de estado: el p18 se rehízo en `14.0-pns-ai-3973` (nota en su fila).
+>
+> **Errata de citas (12/11/2026):** las fichas de PNS-104 y PNS-105 del seguimiento citaban `odoo/sql_db.py:307`
+> (`Cursor.rollback`) y `sql_db.py:294-302`, en `:296` (`Cursor.commit`). En el contenedor (`odoo` 14.0.20231106) son
+> `:462` (en `:459-468`) y `:448-457`, en `:451`. Están corregidas con nota en cada ficha y en
+> `pendiente/propuesta_fase3_3973.md` («Errata de citas»). Este documento no cita líneas de Odoo para PNS-104 ni
+> PNS-105: aquí no hay nada que corregir.
 
 ## 2. SIN TRATAR / SIN ESTADO CLARO
 
@@ -295,7 +316,7 @@ Abreviaturas de origen: **inf.** informes de Seges (PNS-01 a 80, 08/10/2026; 81 
 | PNS-16 | inf.; aud. §4 | Alta | Prompt injection y autoconfirmación | CF | comp §2.1 | — |
 | PNS-17 | inf.; aud. §4 | Alta | Cabeceras en redirecciones (SSRF) | CS (p19; lab 28/10 P-17; stg 29/10 sin prueba propia); CF (parcial) | comp §3; reg «Parche 19»; plan §5; prop E2′ decisiones 5 y 6 | Resto «params/data» en hoja 17. No figura en plan §3.2 |
 | PNS-18 | inf.; aud. §6 y §7 | Alta (seg); sin gravedad (comp) | «Sin failover externo» no corta en todos los caminos | AC (D10); AI (09/11) | comp §6.1, §7; hoja ficha 9; dec D10 (ACEPTADA, 19/10/2026) | §2 bis, fila 2. Gravedad distinta entre documentos (§5) |
-| PNS-19 | inf.; aud. §4 | Alta | Credenciales alcanzables por relaciones | CS (p18; lab 28/10 P-19; stg 29/10 P-19); CF (parcial) | comp §3; reg «Parche 18»; plan §5; prop E2′ (tres rondas) | Ventana del lienzo mantenida (prop E3′, decisión 5). No figura en plan §3.2 |
+| PNS-19 | inf.; aud. §4 | Alta | Credenciales alcanzables por relaciones | CS (p18; lab 28/10 P-19; stg 29/10 P-19); CF (parcial) | comp §3; reg «Parche 18»; plan §5; prop E2′ (tres rondas) | Ventana del lienzo mantenida (prop E3′, decisión 5). No figura en plan §3.2. En `14.0-pns-ai-3973`, p18 rehecho sobre 3.1.973: O1, B y B2 (fase 3b, 12/11; reg «Parches de la rama 14.0-pns-ai-3973 (fase 3b)») |
 | PNS-20 | inf.; aud. §4 y §6 | Alta | Importación que sobrescribe; «Review» escribe | CS (p21; lab 28/10 P-20; stg 29/10 P-20); CF (resto) | comp §2.1, §6.1; reg «Parche 21»; prop E2′ «Resultado de P-20» | Caché del agente durante «Review»: hoja 18. No figura en plan §3.2 |
 | PNS-21 | inf. | Alta | Exportaciones sin sesión | CF782 | seg tabla (CORREGIDO; 3c) | Resto comunicado como obs. 6 (§3.2) |
 | PNS-22 | inf.; aud. §4 | Media | `is_write` no centralizado | CF | comp §2.1 | Su check no es reproducible |
@@ -380,7 +401,7 @@ Abreviaturas de origen: **inf.** informes de Seges (PNS-01 a 80, 08/10/2026; 81 
 | PNS-101 | seg (nuevo, E2′) | Crítica | Entornos reales del hilo desde la caja A | CS (p23 ampliado; lab 28/10 P-101 y P-101′; stg 29/10 P-101); AI | reg «Parche 23»; prop E2′ «Revisión del parche 18», «Enfoque de raíz»; plan §3.2 | §2, fila 1 |
 | PNS-102 | seg (nuevo, E2′) | Crítica | `user`/`company` con `su` | CS (p24; lab 28/10 P-102; stg 29/10 sin prueba propia); AI | reg «Parche 24»; plan §3.2 | §2, fila 2. Claves MCP de LIYBEN: regenerar tras el despliegue (plan §3.1) |
 | PNS-103 | seg (nuevo, lab 3973, 11/11) | Baja | AI Administrator sin Ajustes: `AccessError` en la revisión y el resultado de las importaciones | AI (12/11) | seg PNS-103; reg «Parche 36» | Alta del 12/11 (§1, nota). Mismo código en 3.1.879 (`_inject_*_arch` sin `sudo`); no se corrige en `14.0-pns-ai-3879` (`pns_demo` lo tiene; se validó con usuarios con Ajustes). Corregido en `14.0-pns-ai-3973` por el p36 |
-| PNS-104 | seg (nuevo, batería 3973, 12/11) | Baja (propuesta) | Cerrar la caja A descarta las escrituras pendientes del llamador (`rollback` → `clear_env` → `env.clear()`) | Sin estado (pendiente de decisión) | seg PNS-104; prop fase 3, «Propuesta: parche de `flush`» | Alta del 12/11 (§1, notas). Latente: ningún llamador real pierde datos hoy. Mismo código en 3.1.879; sin corregir en ninguna rama (parche de `flush` previsto en la 3b, como defensa) |
+| PNS-104 | seg (nuevo, batería 3973, 12/11) | Baja | Cerrar la caja A descarta las escrituras pendientes del llamador (`rollback` → `clear_env` → `env.clear()`) | AI (12/11) | seg PNS-104; prop fase 3, «Propuesta: parche de `flush`» e «Implementación de la 3b»; reg «Parche 37» | Alta del 12/11 (§1, notas). Latente: ningún llamador real pierde datos hoy. Mismo código en 3.1.879; no se corrige en `14.0-pns-ai-3879`. Corregido en `14.0-pns-ai-3973` por el p37, como defensa (los `new()` del llamador siguen perdiéndose) |
 | PNS-105 | seg (nuevo, lectura de código 3973, 12/11) | Alta (propuesta) | Los cursores propios con `commit` (p. ej. `ai.log._create_log_entry`) confirman y descartan las escrituras pendientes de quien los llama (`Cursor.commit` → `flush_env`) | Sin estado (pendiente de decisión) | seg PNS-105; prop fase 3, «Resultado de X1 a X4» | Alta del 12/11 (§1, nota). Sin confirmar en ejecución (test después de la 3b). Mismo patrón en 3.1.879; sin parche |
 
 ### 3.2 Observaciones comunicadas, petición de §5 y compatibilidad sin número
@@ -618,6 +639,17 @@ lista.
 - Caja A: PNS-104 (Baja, propuesta, latente), cerrar la caja A descarta las escrituras pendientes del llamador (de
   cualquier modelo), sus cálculos pendientes y los registros `new()`. Mismo código en 3.1.879 y 3.1.973; sin parche
   (propuesta de `flush` en la 3b, como defensa). Fuentes: seg PNS-104; prop fase 3.
+  - Fase 3b (12/11/2026): Baja, decidida. Seges lo corrige en 3.1.973 con el p37 (`flush` del llamador antes de abrir
+    la caja A), como defensa; en 3.1.879, sin parche. Fuentes: reg «Parche 37»; prop fase 3, «Implementación de la 3b».
+- Puerta de credenciales (fase 3b, P-22, 12/11/2026; observación sin número):
+  - un campo `Reference` (`mail.template.preview.resource_ref`) salta la puerta de `RELAXAICODE_CREDENTIAL_MODELS`, que
+    solo mira `env[...]`;
+  - con el código del fabricante, un AI Administrator lee en la caja A lo que no sea columna secreta de esos modelos:
+    `pin` y `supplied_key` del PIN temporal, `generated_key` y `manual_key` del asistente de claves (en claro), y el
+    `display_name` del desk, que es su token;
+  - Seges lo cierra para esas credenciales en 3.1.973 (p18 ampliado); en 3.1.879, la caja A de la 3879 cerraba los modelos
+    enteros;
+  - Fuentes: reg «Parche 18 ampliado por P-22» y «Para el informe al fabricante (fase 3b)»; prop fase 3, «P-22».
 - Transacciones: PNS-105 (Alta, propuesta), los cursores propios con `commit` confirman, fuera de la transacción del
   llamador, sus escrituras pendientes, y pierden las de registros nuevos. Sin confirmar en ejecución; sin parche.
   Fuentes: seg PNS-105; prop fase 3.

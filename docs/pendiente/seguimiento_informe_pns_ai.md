@@ -93,7 +93,7 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-16 | Alta | PARCIAL | CORREGIDO (parte probada: tarjeta sin auto-confirmación ni salida, con las dos políticas; staging, prueba 3); resto (reinyección como `system`), NO CONCLUYENTE | — |
 | PNS-17 | Alta | PARCIAL | — | — · **Parche 19 (E2′, `14.0-pns-ai-3879`): aplicado; tests en verde y neutralización hechos (27/10/2026)** |
 | PNS-18 | Alta | PARCIAL | CORREGIDO (parte probada: `no_external_failover`, 3b-2) | — |
-| PNS-19 | Alta | PARCIAL | — | Previsto en E3 · **Parche 18 (E2′, `14.0-pns-ai-3879`): aplicado; tests en verde y neutralización hechos (27/10/2026)**; ventana del lienzo en `_ask_design`, a revisar en E3′ · rechazado en la revisión y corregido el 27/10/2026 (alias en `read_group`, ids que no son enteros, caché del hilo); el acceso a `env.all`/`env.cache` es PNS-101 (parche 23) · ventana revisada en E3′ (29/10/2026): se mantiene (decisión 5 de la [propuesta de E3′](e3_propuesta_3879.md), I5 y «Propuesta final»; [parches](parches_pns_ai.md), parche 18) |
+| PNS-19 | Alta | PARCIAL | — | Previsto en E3 · **Parche 18 (E2′, `14.0-pns-ai-3879`): aplicado; tests en verde y neutralización hechos (27/10/2026)**; ventana del lienzo en `_ask_design`, a revisar en E3′ · rechazado en la revisión y corregido el 27/10/2026 (alias en `read_group`, ids que no son enteros, caché del hilo); el acceso a `env.all`/`env.cache` es PNS-101 (parche 23) · ventana revisada en E3′ (29/10/2026): se mantiene (decisión 5 de la [propuesta de E3′](e3_propuesta_3879.md), I5 y «Propuesta final»; [parches](parches_pns_ai.md), parche 18) · **Parche 18 sobre 3.1.973 (fase 3b, `14.0-pns-ai-3973`): O1 (comprobar al leer, también desde la caché o un cálculo), B y B2; tests y neutralización hechos (12/11/2026)** |
 | PNS-20 | Alta | PARCIAL | VULNERABLE en «Review» (P-20 en `lab_pns_ai_3879_14`, 27/10/2026, sobre 3.1.879) | — · **Parche 21 (E2′, `14.0-pns-ai-3879`): aplicado; tests en verde y neutralización hechos (27/10/2026)** |
 | PNS-21 | Alta | CORREGIDO | CORREGIDO (3c) | — |
 | PNS-23 | Alta | SIN CAMBIOS | — | — |
@@ -176,7 +176,7 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-101 | Crítica | NUEVO | VULNERABLE (caja A real en el shell de `lab_pns_ai_3879_14`, solo lectura, 27/10/2026, sobre 3.1.879) | · **Parche 23 (E2′, `14.0-pns-ai-3879`): aplicado; tests en verde y neutralización hechos (27/10/2026)** · **ampliado (28/10/2026)**: formateador propio de `str.format`/`format_map`, predicado único y blindaje de nombres internos (NEU-A/B/D); segunda vuelta tras revisión: fachadas de `operator` (attrgetter/methodcaller/itemgetter) como funciones y helper único `run_sandbox_code` en las dos vías de `exec`, cerrando `type()` sobre la clase nativa (CRÍTICO 1) y la vía de skills (CRÍTICO 2); tests `test_seges_format_guard.py`, `test_seges_facade_class.py` y NEU-E/F/G en verde |
 | PNS-102 | Crítica | NUEVO | VULNERABLE (herramienta real, segundo rechazo de E2′, 27/10/2026, sobre 3.1.782 y en LIYBEN) | · **Parche 24 (E2′, `14.0-pns-ai-3879`): validación local y neutralización hechas (28/10/2026)**; tests `test_seges_identity_su.py` · LIYBEN: claves MCP revocadas el 27/10/2026; regenerarlas tras el despliegue final |
 | PNS-103 | Baja | NUEVO | CONFIRMADO (laboratorio `lab_pns_ai_3973`, 11/11/2026, sobre 3.1.973; mismo código en 3.1.879) | · **Parche 36 (fase 2c, `14.0-pns-ai-3973`)**: ver su ficha · pendiente del informe al fabricante |
-| PNS-104 | Baja (propuesta) | NUEVO | CONFIRMADO (`test_pending_write_survives_box_a_close`, batería de `lab_pns_ai_3973`, 12/11/2026, sobre 3.1.973; mismo código en 3.1.879); latente: ningún llamador real pierde datos hoy | · Propuesta de parche de `flush` (defensa, en la 3b), sin número ni implementar: ver su ficha · pendiente del informe al fabricante |
+| PNS-104 | Baja | NUEVO | CONFIRMADO (`test_pending_write_survives_box_a_close`, batería de `lab_pns_ai_3973`, 12/11/2026, sobre 3.1.973; mismo código en 3.1.879); latente: ningún llamador real pierde datos hoy | · **Parche 37 (fase 3b, `14.0-pns-ai-3973`)**, como defensa: ver su ficha · pendiente del informe al fabricante |
 | PNS-105 | Alta (propuesta) | NUEVO | Por lectura de código (12/11/2026, sobre 3.1.973; mismo patrón en 3.1.879); test de confirmación pendiente, después de la 3b | · Sin parche: ver su ficha · pendiente del informe al fabricante |
 
 **Recuento:** CORREGIDO 31 · PARCIAL 33 · SIN CAMBIOS 13 · YA NO APLICA 2 · DUDOSO 1 (80 del
@@ -205,6 +205,20 @@ informe) · NUEVO 22 (total 102). Por gravedad:
 > cursores propios con `commit` confirman y descartan las escrituras pendientes de quien los llama. El recuento de
 > arriba no los incluye (con PNS-103 a PNS-105: NUEVO 25, total 105). Alta también en
 > `docs/specs/estado_hallazgos_3879.md` (§3.1).
+>
+> **12/11/2026 (fase 3b):**
+> - PNS-104: gravedad **Baja** (decidida por Sergio) y **parche 37** aplicado en `14.0-pns-ai-3973`. Como en PNS-103,
+>   «Estado» sigue en NUEVO, porque describe el código del fabricante, y el parche va en «Rama Seges».
+> - PNS-19: parche 18 rehecho sobre 3.1.973 (O1, B y B2).
+> - Errata de citas en las fichas de PNS-104 y PNS-105 (en cada ficha).
+> - El recuento de arriba no cambia.
+>
+> **12/11/2026 (fase 3b, P-22):**
+> - PNS-19: el parche 18 se amplía en `14.0-pns-ai-3973` con `_pns_secret_fields` en `ai.key.pin.ask`,
+>   `ai.api.key.wizard` y `ai.key.pin.desk` (el `display_name` del desk es su token).
+> - Observación para el informe, sin número: un campo `Reference` salta la puerta de los modelos de credenciales del
+>   fabricante (camino de V2 y de P-22). Detalle en `docs/specs/estado_hallazgos_3879.md` (§6) y en el
+>   [registro](parches_pns_ai.md), «Para el informe al fabricante (fase 3b)».
 
 Restos que se repiten en varios parciales:
 1. **El sandbox (caja A) bloquea por lista de nombres y no impide llamar a métodos privados**
@@ -2323,6 +2337,15 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
   Por eso la gravedad es Baja: latente. El parche de `flush` se mantiene en la 3b como defensa (pérdida latente y
   escritura en `READ ONLY` si la caja A lee una columna con escrituras pendientes del llamador).
 - **Relacionado:** PNS-105 (los cursores propios con `commit` vuelcan lo pendiente del llamador).
+- **Fase 3b (12/11/2026):**
+  - gravedad **Baja**, decidida por Sergio;
+  - **Rama Seges:** parche 37 aplicado en `14.0-pns-ai-3973`, como defensa (`base_env['base'].flush()` en
+    `open_readonly_env`, antes de abrir el cursor de la caja A). Tests: `test_seges_box_a_flush.py` (4), neutralización
+    hecha ([registro](parches_pns_ai.md), «Parche 37»). Los registros `new()` del llamador siguen perdiendo sus
+    valores (resto del fabricante). **Pendiente del informe al fabricante.**
+- **Errata de citas (12/11/2026):** comprobadas contra el contenedor (`odoo` 14.0.20231106); el texto de arriba no se
+  reescribe. `odoo/sql_db.py:307` es `sql_db.py:462` (`Cursor.rollback`, en `:459-468`). Las demás citas de Odoo de esta
+  ficha coinciden con el contenedor.
 
 ### PNS-105 — Los cursores propios con `commit` confirman y descartan las escrituras pendientes de quien los llama
 
@@ -2349,6 +2372,9 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
   caso de la caja B e inventario completo de cursores propios
   ([propuesta de la fase 3](propuesta_fase3_3973.md), «Resultado de X1 a X4»).
 - **Rama Seges:** sin parche. **Pendiente del informe al fabricante.**
+- **Errata de citas (12/11/2026):** comprobadas contra el contenedor (`odoo` 14.0.20231106); el texto de arriba no se
+  reescribe. `odoo/sql_db.py:294-302`, en `:296`, es `sql_db.py:448-457`, en `:451` (`Cursor.commit` → `flush_env`).
+  Las demás citas de Odoo de esta ficha coinciden con el contenedor.
 
 ### Observaciones sin ficha (para valorar en E4′)
 

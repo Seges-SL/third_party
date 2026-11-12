@@ -18,6 +18,8 @@
   · actualizado el 2026-11-11 (fase 2c sobre 3.1.973: parche 36, PNS-103)
   · actualizado el 2026-11-12 (fase 2c: parche 36 validado en el laboratorio)
   · actualizado el 2026-11-12 (fase 3a sobre 3.1.973: parche 24; tests del 23 como no regresión)
+  · actualizado el 2026-11-12 (fase 3b sobre 3.1.973: parche 18 con O1, B y B2; parche 37, PNS-104)
+  · actualizado el 2026-11-12 (fase 3b: laboratorio y P-22; parche 18 ampliado)
 - **Versión del fabricante, base propia de Seges desde el 20/10/2026 (N12):** `pns_base` 14.0.1.2.32 ·
   `pns_ai_mcp` 14.0.3.1.782 · `pns_ai_chatboo` 14.0.2.1.453
 - **Desde el 23/10/2026 (N12, b′), en `14.0-pns-ai-3879`:** `pns_base` 14.0.1.2.47 · `pns_ai_mcp`
@@ -246,7 +248,7 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
 | 15 | PNS-07 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | 2b | Aplicado (11/11/2026): 9 nombres |
 | 16 | PNS-54 | seguridad | `pns_ai_mcp/models/safe_operation.py` | 2a | Aplicado (11/11/2026) |
 | 17 | PNS-37 | seguridad | `pns_ai_mcp/models/ai_change_journal.py`, `pns_ai_mcp/controllers/safe_plan_execute.py` | 2a | Aplicado (11/11/2026) |
-| 18 | PNS-19 | seguridad | `pns_ai_mcp/controllers/controller_helpers.py` (opción B: vaciado de columnas secretas en `open_readonly_env`) | 3 | Pendiente de portar |
+| 18 | PNS-19 | seguridad | `pns_ai_mcp/models/seges_box_a_read.py`, `pns_ai_mcp/controllers/context_builder.py`, `pns_ai_mcp/controllers/controller_helpers.py`, `pns_ai_mcp/utils/seges_box_a_cache.py`, `pns_ai_mcp/utils/sandbox_helpers.py` (O1, B y B2); ampliado por P-22: `pns_ai_mcp/models/key_pin_desk.py`, `pns_ai_mcp/models/mcp_api_key_wizard.py` | 3b | Aplicado (12/11/2026); validado en el laboratorio (12/11/2026) |
 | 19 | PNS-17 | seguridad | `pns_ai_mcp/utils/fetch_url_safe.py`, `pns_ai_mcp/utils/mcp_client.py` | 2b | Aplicado (11/11/2026) |
 | 20 | PNS-70 | compatibilidad | `pns_ai_chatboo/static/src/js/chart.umd.min.js`, `pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js` | 2a | Aplicado (11/11/2026); prueba manual pendiente |
 | 21 | PNS-20 | seguridad | `pns_base/models/operation_report_wizard.py` | 2a | Aplicado (11/11/2026) |
@@ -264,6 +266,7 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
 | 33 | PNS-29 | seguridad | `pns_ai_mcp/models/ai_provider.py`, `pns_ai_mcp/wizard/ai_provider_usage_wizard.py` | 2a | Aplicado (11/11/2026) |
 | 34 | PNS-96 | funcional | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_async_request.py` | 4 | Pendiente de portar |
 | 36 | PNS-103 | funcional | `pns_base/models/operation_report_wizard.py` | 2c | Aplicado (11/11/2026); validado en el laboratorio (12/11/2026) |
+| 37 | PNS-104 | datos | `pns_ai_mcp/controllers/controller_helpers.py` | 3b | Aplicado (12/11/2026) |
 | 35 | NUEVO-2 | robustez | `pns_ai_mcp/migrations/14.0.3.1.973/post-migrate.py` | plan, «Parche 35» | Pendiente (decisión 4 del plan). Única excepción a «sin `migrations/` propios»: solo se ejecuta en un `-u` que cruce 3.1.973; una BD actualizada a 3.1.973 sin el parche no lo ejecuta y se corrige a mano (una instalación nueva no lo necesita) |
 
 Las entradas de cada parche portado se añaden debajo, en «Parches de la rama 14.0-pns-ai-3973», con sus
@@ -4519,3 +4522,257 @@ comprobar nada (`odoo/fields.py:992-993`). La caja A abre su cursor en el mismo 
   por el proveedor («All providers failed for agent "pns_ai_chatboo". Gemini lab: The AI provider could not be
   reached»), no por el parche.
 - **Resultado:** el parche 24 queda validado en el laboratorio.
+
+## Parches de la rama 14.0-pns-ai-3973 (fase 3b, 12/11/2026)
+
+Parche 18 rehecho sobre 3.1.973 (O1, B y B2) y parche 37 nuevo (PNS-104). Propuesta, decisiones de Sergio, baterías y
+neutralización: [propuesta de la fase 3](propuesta_fase3_3973.md), desde «Confirmación de V1 a V4» hasta
+«Implementación de la 3b (12/11/2026)». Plan: decisión 3 revisada y «Fase 3b». Citas de Odoo: contenedor (`odoo`
+14.0.20231106).
+
+### Parche 18 en 3.1.973: comprobar al leer (O1), con B y B2 como defensa (PNS-19)
+
+- **Qué falla sin él** (confirmado en ejecución, log `tests-20261112-131534.log`):
+  - Odoo 14 solo comprueba un campo cuando va a la BD (`_fetch_field` → `check_field_access_rights`), y ahí está el
+    guardián del fabricante (`models/sandbox_secret_read.py:111-127`);
+  - un valor que ya está en la caché del hilo, o que se calcula en el momento, lo devuelve `Field.__get__` sin
+    comprobar nada (`odoo/fields.py:992-993`, `:1036-1047`);
+  - código del motor o del core que lee una credencial en `sudo` durante la ejecución la deja en esa caché, y el sandbox
+    la lee después por id. Confirmado V1 (`auth_call_preview`), V2 (`user_has_mcp_api_key`), V3 (`totp_enabled` →
+    `totp_secret`) y V4 (`signup_valid` → `signup_token`). En la variante de LIYBEN (`totp_secret` y `signup_token`
+    calculados por SQL), el cálculo tampoco pasa por el guardián (`test_computed_secret_column_refused`, con
+    `password`/`new_password` del contenedor).
+- **Criterio:**
+  - primero, el del fabricante: `_pns_hidden_column` / `_pns_deny_column`, fila a fila en `ir.config_parameter`;
+  - después, `check_access_rights('read')` del modelo, salvo para `id`;
+  - sin `check_field_access_rights`;
+  - solo en la caja A y sin `su`. El filtro previo es `cr.__dict__.get(SANDBOX_CURSOR_FLAG)`, para no pasar en cada
+    lectura de Odoo por `Cursor.__getattr__`, que además lanza `OperationalError` con el cursor cerrado
+    (`odoo/sql_db.py:97-101, 470-472`). Si pasa, decide `_pns_sandbox_reads()` del fabricante.
+- **Archivos y marcadores** (`# Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md`; 10
+  marcadores):
+  - `pns_ai_mcp/models/seges_box_a_read.py` (nuevo):
+    - `seges_box_a_reads` (`:30-39`) y `_seges_box_a_check_read` (`:45-52`), la comprobación común;
+    - **enganche 2**, `__getitem__` de `base` con clave de texto (`:54-57`). Cubre `rec['x']`, `itemgetter`,
+      `sorted('x')`, `name_get`, `export_data`, `copy_data`, `onchange` y `Field.traverse_related`;
+    - **enganche 3**, `mapped` de `base` con ruta de texto, tramo a tramo (`:59-67`). Cubre `filtered('x')` y
+      `filtered_domain`;
+  - `pns_ai_mcp/models/__init__.py:50-51`: el import;
+  - `pns_ai_mcp/controllers/context_builder.py`:
+    - funciones de los enganches 1 y 4 (`:271-301`);
+    - en `_read_attr`, el **enganche 1** antes de `getattr` (`:311-312`), para los campos de un recordset. Cubre
+      `rec.x`, `getattr`, `attrgetter`, `methodcaller` y los campos de `str.format`;
+    - el **enganche 4** después (`:314-315`), para un objeto `Field`;
+  - `pns_ai_mcp/utils/seges_box_a_cache.py` (nuevo):
+    - `_secret_pairs` y `_seges_forget_secret_columns` (B): pares `(modelo, campo)` con `_pns_hidden_column` verdadero
+      sobre el recordset vacío, guardados por registro y por nombre, y `env.cache.invalidate([(campo, None), …])`;
+    - `box_a_cursor` y `forget_after_helper` (B2): envoltorio propio con `try/finally`, sin `functools.wraps`;
+  - `pns_ai_mcp/controllers/controller_helpers.py`, `open_readonly_env`: **B** después de crear el `env` y antes de
+    anular el `commit` (`:224-246`). Si falla: `rollback`, `close`, `UserError` y la caja A no se abre;
+  - `pns_ai_mcp/utils/sandbox_helpers.py`: **B2** al publicar cada helper (`:95-96`), con el import (`:14-18`) y
+    `_seges_box_a_helper` (`:100-109`). Solo en el cursor de la caja A.
+- **Desviaciones frente a la propuesta** (decisiones de Sergio del 12/11/2026):
+  - **enganche 4, siempre en el sandbox y en lista cerrada:** de un objeto `Field` se rechaza cualquier atributo cuyo
+    valor sea invocable, salvo `get_description`. Siempre, no solo en la caja A, porque un `Field` no tiene `env`.
+    Cierra `mapped`, `compute_value`, `read`, `recompute` y `convert_to_*` (incluido `Many2one.convert_to_read`, que da
+    `value.sudo().display_name`, `odoo/fields.py:2688-2695`). `determine_value` no existe en Odoo 14;
+  - **B2 en `utils/sandbox_helpers.py`**, en `collect_sandbox_helpers`, no en `context_builder.py`;
+  - **imports de B dentro de `open_readonly_env`**, junto a los que la función ya tiene. Arriba, ruff (`I001`) los
+    juntaba con el bloque de imports del fabricante, ya desordenado; no se tocan las líneas del fabricante.
+- **Qué se degrada:**
+  - en la caja A y sin `su`, una lectura por los enganches comprueba también la ACL del modelo aunque el valor esté en
+    caché. Código del motor que leyera así un modelo sin permiso daría `AccessError`; la batería no ha encontrado
+    ninguno. `filtered_domain` sobre un modelo sin permiso, también;
+  - una búsqueda en `cr.__dict__` en cada `rec['x']` de todo Odoo (el filtro previo);
+  - en el sandbox, ningún método de un `Field` salvo `get_description`; una `selection` invocable se rechaza (se puede
+    usar `field_selection` o `fields_get`);
+  - B y B2: el motor vuelve a leer de la BD las columnas secretas, con una `SELECT`. B invalida la columna entera (todos
+    los `value` de `ir.config_parameter`, por el criterio sobre el recordset vacío). Los registros `new()` del llamador
+    pierden el valor secreto en caché;
+  - los campos no secretos de los 11 modelos que cerraba la rama 3879 se leen (P-22, pendiente).
+- **Tests** (detalle abajo): `test_seges_box_a_vias.py` (37 tras la fase 2) y `test_seges_sandbox_credentials.py`
+  (33).
+- **Neutralización:** N18a, N18g, N18m, N18f, N18acl, N18b, N18i, N18w y N18h. Todas F como estaba previsto, SHA-256
+  igual al restaurar. Logs y tests por nombre en la propuesta, «Implementación de la 3b».
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  ```sh
+  grep -rn "def __getitem__\|def mapped" pns_ai_mcp/models/
+  grep -n "def _read_attr" -A15 pns_ai_mcp/controllers/context_builder.py
+  ```
+  Corregido si, en la caja A y sin `su`, la lectura de una columna secreta se rechaza aunque esté en la caché o se
+  calcule en el momento: `test_seges_box_a_vias` pasa sin el parche 18.
+
+### Parche 37: `flush` del llamador antes de abrir la caja A (PNS-104)
+
+- **Qué falla sin él** (del fabricante, igual en 3.1.879 y 3.1.973; confirmado por
+  `test_pending_write_survives_box_a_close`):
+  - al cerrar la caja A se hace `ro_cr.rollback()` (`controllers/tools_relaxaicode.py:275`, `utils/skill_runtime.py:262`);
+  - en Odoo 14, `Cursor.rollback` llama a `clear_env` (`odoo/sql_db.py:462`), que hace `env.clear()` del entorno de ese
+    cursor (`sql_db.py:82-87`);
+  - `env.clear()` vacía la caché, `tocompute` y `towrite` (`odoo/api.py:620-627`), que son del hilo
+    (`api.py:760-765`): las escrituras y los cálculos pendientes del llamador se pierden sin error;
+  - además, si la caja A lee una columna con una escritura pendiente del llamador, `_read` → `flush`
+    (`odoo/models.py:3096`) intenta escribirla en el cursor `READ ONLY` y falla (condición a).
+- **Archivo:** `pns_ai_mcp/controllers/controller_helpers.py`, `open_readonly_env`. Marcador
+  `# Seges: parche 37 (PNS-104, datos). Ver docs/pendiente/parches_pns_ai.md` en `:189` y `base_env['base'].flush()` en
+  `:194`, justo antes de `base_env.registry.cursor()` (`:195`).
+  - Si el `flush` falla, la excepción original llega al llamador sin convertir y no se abre ningún cursor.
+  - Pasan por ahí los tres sitios que abren la caja A: `/mcp` (`controllers/main.py:1648-1650`), el turno de Chatboo
+    (`utils/engine_tool_run.py:28-30`) y las skills (`utils/skill_runtime.py:250`).
+  - Sustituye al «flush previo» de columnas secretas de la propuesta del 18, que no se implementa.
+- **Qué cubre:** `towrite` y `tocompute` del llamador (`flush()` sin campos hace `recompute()`, `odoo/models.py:5484-5489`)
+  y la condición a.
+- **Qué no cubre:** la caché del llamador se sigue vaciando al cerrar (solo cuesta volver a leer), y los registros
+  `new()` del llamador pierden sus valores (resto conocido del fabricante, PNS-104).
+- **Qué se degrada:**
+  - las escrituras pendientes, y sus errores, se adelantan a la apertura de la caja A;
+  - un `flush` por apertura, normalmente vacío;
+  - una caja A anidada con pendientes fallaría en `READ ONLY` (no hay ningún caso hoy).
+- **Llamadores reales:** ninguno llega hoy con escrituras que fueran a durar (propuesta, «Cierre de los llamadores
+  reales»). Es una defensa: gravedad Baja, latente.
+- **Tests:** `pns_ai_mcp/tests/test_seges_box_a_flush.py` (4, `TestSegesBoxACallerWrites`):
+  - `test_pending_write_survives_box_a_close`, que sale de `test_seges_box_a_vias`;
+  - `test_pending_compute_survives_box_a_close`: `UPDATE` directo de `name`, `add_to_compute` de `display_name`,
+    precondición con `records_to_compute` y comprobación solo con SQL;
+  - `test_pending_write_box_a_reads_column` (condición a; `invalidate_cache` no hace `flush` en Odoo 14,
+    `odoo/models.py:5762-5779`);
+  - `test_box_a_open_flush_error_no_cursor`: el `flush` completo, parcheado, lanza una excepción propia que llega sin
+    convertir. Un espía sobre `Registry.cursor` comprueba que no se abre ningún cursor.
+- **Neutralización:** N-flush (sin la línea), log `tests-20261112-160458.log`: los 4 en F y SHA-256 igual al restaurar.
+- **Cómo comprobar si el fabricante ya lo ha corregido:**
+  `grep -n "flush()" pns_ai_mcp/controllers/controller_helpers.py` muestra un `flush` en `open_readonly_env` antes de
+  `registry.cursor()`, y `test_seges_box_a_flush` pasa sin el parche 37.
+- **Seguimiento:** PNS-104, gravedad Baja (decidida el 12/11/2026), parche 37 aplicado en `14.0-pns-ai-3973`. Pendiente
+  del informe al fabricante.
+
+### Tests de la fase 3b
+
+- **`test_seges_box_a_vias.py`**: 22 de la confirmación, 16 nuevos y sale `TestSegesBoxACallerWrites`, así que quedan
+  37.
+  - Confirmación: 10 tests de vía más `test_computed_secret_column_refused` (2 subtests), que pasan con O1; además, 4
+    controles, 4 positivos, `test_v1_literal_attr_refused` y `test_v3_recordset_as_result`.
+  - El `asker` tiene `base.group_allow_export` (sin él, `export_data` se rechaza antes de leer,
+    `odoo/models.py:958-959`), y `setUpClass` confirma también un `ai.provider` con clave `seges-3b-pk-…`.
+  - Nuevos:
+    - O1, negativos: `test_o1_itemgetter_refused`, `test_o1_sorted_refused`, `test_o1_filtered_refused`,
+      `test_o1_field_mapped_refused`, `test_o1_str_format_refused`, `test_o1_field_compute_value_refused`,
+      `test_o1_field_callable_refused` (subtests `read`, `recompute` y `convert_to_read`),
+      `test_o1_export_data_refused` y `test_o1_acl_cached_field_refused`;
+    - O1, positivos: `test_o1_engine_sudo_in_box_a`, `test_o1_engine_outside_box_a`, `test_o1_icp_row_by_row`,
+      `test_o1_plain_names_ok` y `test_o1_score_fit_after_secret_cached`;
+    - B, con medida directa de la caché: `test_b_open_forgets_secret` y `test_b_open_keeps_non_secret`.
+- **`test_seges_sandbox_credentials.py`** (33; rama 3879: 32). Reescrito al criterio del fabricante, con marca
+  `_pns_ai_sandbox` y B en `_mark()`, secretos `seges-3b-…` y comparaciones que no los imprimen.
+  - Quitado: `test_marker_cleared_after_box_a`.
+  - `test_sudo_does_not_lift` sustituido por `test_sandbox_cannot_reach_sudo`.
+  - Invertido o adaptado por P-22: `test_related_field` y `test_provider_read_no_fields`.
+  - `test_gate_env_getitem` usa `ai.mcp.user` y `ai.api.server`, porque `ai.provider` ya no está cerrado.
+  - `test_icp_cached_get_param`: sin `su`, el rechazo de `get_param`; en `su`, que el valor no queda en la caché.
+  - `test_icp_str_id` acepta solo «holds a credential» o «Database fetch misses ids … extra ids».
+  - `test_read_group_alias_icp`: `value:max(key)` como positivo agrupado por `key`, sin el valor de ningún parámetro
+    secreto.
+  - `test_box_a_cannot_lift_mark`, con la marca del fabricante.
+  - Nuevos: `test_box_a_icp_cache_before_run` (B con `value`, medida directa) y `test_helper_sudo_read_forgotten`
+    (B2, por `collect_sandbox_helpers`).
+- **`test_seges_box_a_flush.py`** (4): ver el parche 37.
+- **`tests/__init__.py`:** bloque de Seges de la 3b (parche 18) y una línea para el 37.
+- **Resultado:** 505 tests tras el 18 (2 F: `test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin` y
+  `test_pending_write_survives_box_a_close`) y **508 tras el 37 (1 F: `test_paap_i7`)**, 0 E y 4 saltados. Logs
+  `tests-20261112-144029.log` y `tests-20261112-152957.log`. Lint: 0 incidencias nuevas. Secretos `seges-3b-` y
+  cadenas UUID4 (por `database.secret`) en los 14 logs de la fase: 0. Marcadores fuera de tests: 66.
+
+### Restos conocidos de la fase 3b
+
+- **Métodos que leen sin `su` y devuelven el valor:** O1 comprueba la lectura del sandbox, no lo que un método público
+  devuelve. Si aparece uno que lea una credencial y la devuelva, la salida es O1b (decisión del 12/11/2026). Hoy no
+  hay ninguno conocido; V2 devuelve un booleano.
+- **Atributos de `Field`:** con la lista cerrada se rechaza todo atributo invocable salvo `get_description`. Quedan
+  los atributos de metadatos, que no dan valores de registros. Una `selection` invocable se rechaza.
+- **Caché de otros modelos** (ya registrado, «Resto conocido: caché de otros modelos»): O1 añade la ACL del modelo,
+  pero un valor no secreto en caché de un registro que las reglas de registro no dejarían leer sigue saliendo.
+- **V5 sin test:** no hay `website` en la BD de tests.
+- **Registros `new()` del llamador:** pierden sus valores al cerrar la caja A (PNS-104, del fabricante; el 37 no lo
+  cubre).
+- **`iap.account.get` (P2):** fuera de la 3b, pendiente de decisión aparte.
+- **Variante de LIYBEN** (`totp_secret` y `signup_token` calculados por SQL): O1 la cubre por diseño, porque comprueba
+  antes de `Field.__get__`. Aquí solo se prueba con `password`/`new_password`; la prueba con su core va en el
+  laboratorio aplazado («Con toda la rama»).
+
+### Pendiente de la fase 3b
+
+- Prueba en `lab_pns_ai_3973` (reinicio sin `-u` y script de solo lectura por la herramienta real), presentada antes.
+- P-22, con su script presentado antes.
+
+### Parche 18 ampliado por P-22 (12/11/2026)
+
+Resultado de P-22, decisión de Sergio (opción 3(b), con el desk) y pruebas: [propuesta](propuesta_fase3_3973.md), «P-22
+(12/11/2026)» e «Implementación de P-22». La salida completa de `p22_lab.py` quedó en el scratchpad de la sesión; aquí
+solo como referencia.
+
+- **Motivo:**
+  - credenciales en claro que el criterio del fabricante no oculta: `ai.key.pin.ask.pin` y `.supplied_key`, y
+    `ai.api.key.wizard.generated_key` y `.manual_key`;
+  - en el desk, `_rec_name` es el token: el `display_name` es el token entero y permite tomar o cerrar el desk de otro
+    AI Administrator;
+  - el fabricante cierra esos modelos en su puerta (`RELAXAICODE_CREDENTIAL_MODELS`), pero un `Reference` la salta.
+    Con O1 solo quedaba la ACL del modelo, que tiene el AI Administrator.
+- **Cambio** (marcador del 18, `# Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md`):
+  - `pns_ai_mcp/models/key_pin_desk.py:28-30`: `_pns_secret_fields = ('display_name',)` en `ai.key.pin.desk`;
+  - `:170-171`: `_pns_secret_fields = ('pin', 'supplied_key')` en `ai.key.pin.ask`;
+  - `pns_ai_mcp/models/mcp_api_key_wizard.py:19-20`: `_pns_secret_fields = ('generated_key', 'manual_key')`.
+- **Criterio:** `field_is_secret` da verdadero para cualquier nombre de `_pns_secret_fields`, antes de mirar el tipo
+  (`utils/sandbox_secrets.py:61-62`). Con ello, O1, B y B2 los tratan como cualquier columna secreta.
+- **Doble barrera en el desk:**
+  - el criterio de `token` en el cálculo (`name_get` lee `record['token']`; contenedor `odoo/models.py:1736`, `:1746` y
+    `:1750`, confirmado contra el contenedor);
+  - la entrada `display_name`, para el valor ya en la caché, que mide el quinto subtest.
+- **Efecto del 18 fuera de la caja A** (aceptado por Sergio el 12/11/2026): `_pns_secret_fields` también lo leen la
+  exportación nativa (`models/secret_native_export.py:14-42`, columnas vacías, también por relación) y la portable
+  (`pns_base/utils/portable_io.py:91-94` y `:211-238`, omitidas sin secretos). Esos cinco campos salen vacíos en las
+  dos. Además, `_register_hook` les quita `prefetch` (`models/sandbox_secret_read.py:58-63`). El flujo del PIN y el
+  asistente de claves no cambian.
+- **Tests** (`test_seges_box_a_vias.py`, 39):
+  - `test_o1_p22_credential_models_refused`: 5 subtests como AI Administrator por `Reference`, que esperan «holds a
+    credential». El del desk carga el valor en la caché dentro de la caja A, después de B, con un stub;
+  - `test_o1_p22_wizard_shows_key_outside_box_a`: positivo.
+- **Batería** (log `tests-20261112-165632.log`): 510 tests, 1 F (`test_paap_i7`), 0 E y 4 saltados.
+- **Neutralización N18p** (sin las tres entradas; log `tests-20261112-170001.log`): F en los 5 subtests y SHA-256 igual
+  al restaurar. La primera N18p (log `tests-20261112-165002.log`) dio 4 F: el subtest del desk aún no cargaba la caché.
+- **Lint:** 0 incidencias nuevas. **Marcadores fuera de tests:** 69.
+- **Patrón de secretos de los logs**, ampliado a `seges-3b-[a-z0-9-]*[0-9a-f]{32}`: el anterior no detectaba
+  `seges-3b-p22-…`. 0 en los 28 logs del 12/11/2026.
+
+### Para el informe al fabricante (fase 3b)
+
+- **Un `Reference` salta la puerta de `RELAXAICODE_CREDENTIAL_MODELS`** (`controllers/validators_base.py:183-206`,
+  `catalogue_inspect_error`).
+  - La puerta solo mira `env[...]` y `env.get(...)`. `mail.template.preview.new({'resource_ref': '<modelo>,<id>'})`
+    da un registro de cualquiera de esos modelos.
+  - Es el camino de V2 (`ai.mcp.user`) y de P-22 (`ai.key.pin.ask`, `ai.key.pin.desk`, `ai.api.key.wizard`).
+  - Con el código del fabricante, lo que no sea columna secreta se lee con la ACL del modelo (en la práctica, un AI
+    Administrator).
+  - Seges lo cierra para las credenciales con O1 y la ampliación de P-22; los demás campos de esos modelos siguen
+    legibles.
+  - **Resto conocido**, sin número de PNS.
+
+### Laboratorio de la fase 3b (12/11/2026)
+
+- **Reinicio sin `-u`**, 15:22:59 UTC: 47 módulos, 0 ERROR, 0 CRITICAL y 0 Traceback.
+- **`p18_lab.py`:** V3 rechazado por las cuatro vías; lecturas normales OK; 0 usuarios con TOTP; `ai_log` 61 → 61.
+- **Dos turnos de Chatboo como `seges_int@example.com`** (jobs 9 y 10): sin errores, `relaxaicode` como el usuario 12,
+  `ai_log` 62 a 74 sin errores. La página `/chatboo/canvas/8?rev=1` la comprobó Sergio, con los 5 contactos, su correo y
+  sus fotos.
+- Detalle en la propuesta, «Laboratorio de la 3b (12/11/2026)».
+
+### Pendientes fuera de la 3b (12/11/2026)
+
+- **Fuente de la lista permitida de la 3879:** la elipsis de este registro («Parche 18», rama 3879, `:1437-1443`) no basta
+  como fuente. La literal es `box_a_guard.py:21-35` de la copia de la 3879 (`~/pns_ai_3973/fase0/modulos_3879`).
+- **Servidor del laboratorio sin `dbfilter` ni `db_name`:**
+  - ejecuta los crons de todas las BD de Odoo 14. El 12/11/2026 cargó `lab_pns_ai_3879_14` con el código de 3.1.973 (sin
+    `-u`) y ejecutó «Post process payment transactions» (core) y, dos veces cada uno, «AI: expire pending supervised
+    operations» (`pns_ai_mcp`) y «Chatboo: async queue maintenance» (`pns_ai_chatboo`). Tabla en la propuesta;
+  - pendiente de decidir si se limita el servidor;
+  - y si `lab_pns_ai_3879_14` sigue siendo fiable antes de volver a usarla.
+- **`csrf_token` impreso por error** en la salida del agente al filtrar el log (sesión del laboratorio, sin
+  consecuencias).

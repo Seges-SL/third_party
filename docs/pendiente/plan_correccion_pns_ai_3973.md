@@ -31,6 +31,12 @@
 3. **Parche 18, opción B:** vaciar solo las columnas secretas al abrir la caja A, en `open_readonly_env`, con
    el mismo criterio que `secret_column` del fabricante. P-22 se ejecuta justo después (fase 3), con el
    criterio fijado antes: ver la fase 3.
+
+   **Parche 18 (12/11/2026):** la opción B sola no basta (V1 a V4 confirmadas). Se aplica O1: en la caja A y sin su,
+   se rechaza la lectura de una columna con `_pns_hidden_column` verdadero o, salvo `id`, de un modelo sin permiso de
+   lectura, venga de la caché o de un cálculo, en `_read_attr`, `__getitem__` y `mapped` de `base`, más el cuarto
+   enganche sobre objetos `Field` (`mapped`, `compute_value`). B (vaciado al abrir) y B2 (tras cada helper) quedan como
+   defensa.
 4. **Crons de NUEVO-2, opción (b):** script `migrations/14.0.3.1.973/post-migrate.py` como parche de Seges,
    el **35** (número asignado por Sergio el 11/11/2026). Ver «Parche 35: crons de NUEVO-2».
 5. **Tests del parche 23:** se quitan unos y se adaptan otros. Ver la fase 3.
@@ -234,6 +240,39 @@ y 28. Detalle en el [registro](parches_pns_ai.md), «Parches de la rama 14.0-pns
 - **Antes de la 3b:** el inventario de la decisión 2 encontró cinco vías posibles (V1 a V5, sin comprobar en
   ejecución): cálculos que leen una credencial en `sudo` durante la ejecución y la dejan en la caché del hilo. Se
   presentan a Sergio con las opciones O1 a O3 antes de decidir la 3b.
+
+**Fase 3b (decisiones de Sergio del 12/11/2026; hecha el 12/11/2026):**
+- Propuesta, confirmación de V1 a V4, decisiones y resultados: [propuesta_fase3_3973.md](propuesta_fase3_3973.md), desde
+  «Confirmación de V1 a V4» hasta «Implementación de la 3b (12/11/2026)». Registro: «Parches de la rama
+  14.0-pns-ai-3973 (fase 3b)».
+- Hecho:
+  - **parche 18** con O1 (decisión 3 revisada), B y B2. El cuarto enganche quedó en lista cerrada: en el sandbox, de
+    un objeto `Field` se rechaza cualquier atributo invocable salvo `get_description`;
+  - **parche 37** (PNS-104, Baja): `flush` del llamador antes de abrir la caja A;
+  - tests: `test_seges_box_a_vias.py` (37), `test_seges_sandbox_credentials.py` (33) y `test_seges_box_a_flush.py`
+    (4).
+- Resultado: **505 tests tras el 18 (2 F) y 508 tras el 37 (1 F, `test_paap_i7`), 0 E y 4 saltados** (logs
+  `tests-20261112-144029.log` y `tests-20261112-152957.log`). Neutralizaciones N18a a N18h y N-flush: todas F y con
+  SHA-256 igual al restaurar.
+- Pendiente: la prueba en `lab_pns_ai_3973` y P-22, con sus scripts presentados antes. Fuera de la 3b: PNS-105,
+  `iap.account.get` (P2), los `new()` del llamador y el laboratorio con el core de LIYBEN.
+
+**Fase 3b, laboratorio y P-22 (12/11/2026, hechos):**
+- **Laboratorio:** reinicio sin `-u`, `p18_lab.py` (V3 rechazado; lecturas normales OK; `ai_log` 61 → 61) y dos turnos
+  de Chatboo como `seges_int@example.com`, sin errores. La página `/chatboo/canvas/8` la comprobó Sergio.
+- **P-22:** credenciales en claro en `ai.key.pin.ask` (`pin`, `supplied_key`) y `ai.api.key.wizard` (`generated_key`,
+  `manual_key`), y el `display_name` del desk, que es su token. El fabricante cierra esos modelos en su puerta, pero un
+  `Reference` la salta.
+  - Decisión de Sergio: opción 3(b) como ampliación del parche 18 (`_pns_secret_fields`, con el desk).
+  - Se acepta que esos campos salgan vacíos en las exportaciones nativa y portable.
+- **Resultado:** 510 tests, 1 F (`test_paap_i7`), 0 E y 4 saltados (log `tests-20261112-165632.log`); N18p con F en los
+  5 subtests.
+- Detalle en la [propuesta](propuesta_fase3_3973.md), «Laboratorio de la 3b», «P-22» e «Implementación de P-22», y en
+  el [registro](parches_pns_ai.md), «Parche 18 ampliado por P-22».
+- **Fuera de la 3b, pendiente de decidir:**
+  - limitar el servidor del laboratorio (sin `dbfilter` ni `db_name`, ejecuta los crons de todas las BD);
+  - la fiabilidad de `lab_pns_ai_3879_14`, sobre la que corrieron dos crons de `pns_*` con código de 3.1.973 el
+    12/11/2026.
 
 ## Fase 4 — Zonas que cambian: 27, 29 y 34 (en este orden)
 

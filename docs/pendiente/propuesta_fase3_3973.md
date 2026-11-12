@@ -725,3 +725,311 @@ Que la caja A lo pierda antes no cambia el resultado final.
   pasos anteriores quedan confirmados.
 - **Inventario completo** de cursores propios del fabricante con `Environment` y `commit` en el hilo del llamador
   (`registry.cursor()`, `pool.cursor()`), con archivo:línea. El `grep` se presenta antes de ejecutarlo.
+
+## Decisiones de Sergio (12/11/2026, revisión de las dos propuestas)
+
+Sobre «Propuesta: parche de `flush` antes de abrir la caja A» y «Propuesta de implementación de la 3b».
+
+1. **Parche de `flush`:** número **37** (PNS-104, tipo `datos`). Va en `open_readonly_env`, antes de
+   `base_env.registry.cursor()`. Sustituye al «flush previo» de columnas secretas de «Parche 18, opción B + B2», que no
+   se implementa.
+2. **PNS-104:** gravedad **Baja** (decidida). Estado: el mismo término que el seguimiento usa para un hallazgo del
+   fabricante con un parche de Seges aplicado en la rama, como PNS-103. Detalle en «Implementación de la 3b».
+3. **Excepción del `flush`:** llega al llamador sin convertir. Si falla, no se abre ningún cursor.
+4. **`id`** queda fuera de la comprobación de ACL de O1.
+5. **Negativos nuevos:** `compute_value` (sobre `totp_enabled`) y `export_data(['totp_secret'])`.
+6. **Batería en dos puntos de control:** tras el 18 y tras el 37.
+7. **Laboratorio de la 3b:** script presentado antes de ejecutarlo.
+8. **Fuera de la 3b:** PNS-105, `iap.account.get` (P2), los registros `new()` del llamador (resto conocido) y el
+   laboratorio con el core de LIYBEN.
+
+## Decisiones de Sergio sobre la fase 0 de la 3b (12/11/2026)
+
+1. **Positivo de la lectura genérica del motor:** `test_o1_score_fit_after_secret_cached` (`_score_record_fit`,
+   `controllers/relaxaicode_models.py:153-232`, lee `rec[fname]` en `:205` en la caja A sin `su`).
+2. **`export_data`** exige `base.group_allow_export` (`odoo/models.py:958-959`): el `asker` de
+   `test_seges_box_a_vias` lo recibe en `setUpClass`. El `setUp` comprueba que lo tiene y que no tiene Ajustes, Access
+   Rights ni AI Administrator.
+3. **B2** en `utils/sandbox_helpers.py`, dentro de `collect_sandbox_helpers` (`:89` de 3.1.973). La propuesta citaba
+   `controllers/context_builder.py:998-1003`, que es la llamada.
+4. **Enganche 4, siempre en el sandbox** (no solo en la caja A): un objeto `Field` no tiene `env`. Desviación anotada en
+   el registro.
+5. **Errata de citas:** se corrigen contra el contenedor (abajo, «Errata de citas»).
+6. **`test_read_group_alias_icp`:** `value:max(key)` pasa a positivo. Se comprueba con `assertTrue`/`assertFalse` que el
+   resultado no contiene el valor de ningún parámetro secreto.
+7. **Enganche 4 en lista cerrada** (cambio de diseño):
+   - en el sandbox, de un objeto `Field` se rechaza cualquier atributo cuyo valor sea invocable, salvo
+     `get_description`. Los atributos de metadatos siguen permitidos;
+   - cierra `mapped`, `compute_value`, `read`, `recompute` y `convert_to_*` (incluido `Many2one.convert_to_read`, que
+     da `value.sudo().display_name` de cualquier registro, `odoo/fields.py:2688-2695`);
+   - test nuevo `test_o1_field_callable_refused`, con subtests `read` (Binary con adjunto), `recompute` y
+     `convert_to_read` (Many2one). Entra en N18f;
+   - restos en el registro: valores de otros registros en caché fuera de las reglas de registro («caché de otros
+     modelos», ya registrado) y `selection` invocable rechazada.
+8. **`database.secret`:** en la fase 3 se cuentan sus apariciones en los logs sin imprimirlo.
+
+Recuento fijado: **505** tras el 18 (2 F: `test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin` y
+`test_pending_write_survives_box_a_close`) y **508** tras el 37 (1 F: `test_paap_i7`); 0 E y 4 saltados en los dos.
+
+## Decisiones de Sergio sobre las fases 1 a 3 de la 3b (12/11/2026)
+
+- **Fase 1:**
+  - `test_icp_str_id` acepta solo dos `AccessError`: el del fabricante («holds a credential») y el de Odoo («Database
+    fetch misses ids … extra ids»). Sigue comprobando que el valor no llega;
+  - el positivo `value:max(key)` de `test_read_group_alias_icp` se agrupa por `key`, no por `id`;
+  - los imports de B van dentro de `open_readonly_env` (desviación anotada en el registro).
+- **Fase 2:** `test_pending_compute_survives_box_a_close` deja pendiente solo el cálculo:
+  - `UPDATE` directo de `name` en el cursor del test, invalidación de `name` y `env.add_to_compute(display_name, …)`;
+  - precondición con `env.records_to_compute`;
+  - comprobación final solo con SQL (`SELECT display_name`), sin `flush` ni lectura del ORM.
+- **Fase 3:** el recuento de UUID4 sustituye al de `database.secret` (detalle abajo).
+- **Redacción:** lo que la propuesta llamaba «los 12 de vía» son **10 tests de vía más
+  `test_computed_secret_column_refused` (2 subtests)**. Las 14 F de la confirmación (log `tests-20261112-131534.log`)
+  son esas 12 más `test_paap_i7` y `test_pending_write_survives_box_a_close`.
+
+## Errata de citas (12/11/2026)
+
+Citas de Odoo comprobadas contra el contenedor (`odoo` 14.0.20231106, `/usr/lib/python3/dist-packages/odoo`). El texto
+de arriba no se reescribe; las citas correctas son estas:
+
+| Cita en este documento | Dónde | Correcta |
+|---|---|---|
+| `sql_db.py:307` (`Cursor.rollback` → `clear_env`) | «Decisiones de Sergio sobre V1 a V5», punto 3; «Propuesta: parche de `flush`» | `sql_db.py:462` (`rollback` en `:459-468`) |
+| `sql_db.py:294-302`, en `:296` (`Cursor.commit` → `flush_env`) | «Resultado de X1 a X4» | `sql_db.py:448-457`, en `:451` |
+| `sql_db.py:315-317` (`Cursor.__getattr__`) | «Propuesta de implementación de la 3b» | `sql_db.py:470-472` (con `@check`, `:97-101`) |
+| `models.py:3101-3103` (`_read` → `flush(fields, self)`) | «Parche 18, opción B + B2»; «Propuesta: parche de `flush`» | `models.py:3096` (`_read` en `:3080`) |
+
+Las demás citas de esos pasajes coinciden con el contenedor: `sql_db.py:65-80` y `:82-87`, `api.py:620-627` y
+`:760-765`, `models.py:5462` y `:5471-5480`. La misma errata se anota en las fichas de PNS-104 y PNS-105 del
+[seguimiento](seguimiento_informe_pns_ai.md) y en [estado_hallazgos_3879.md](../specs/estado_hallazgos_3879.md).
+
+## Implementación de la 3b (12/11/2026)
+
+Detalle de cada parche en el [registro](parches_pns_ai.md), «Parches de la rama 14.0-pns-ai-3973 (fase 3b)».
+
+**Código:**
+- **Parche 18** (O1, B y B2): `models/seges_box_a_read.py` (nuevo; comprobación común y enganches 2 y 3),
+  `models/__init__.py`, `controllers/context_builder.py` (enganches 1 y 4 en `_read_attr`), `utils/seges_box_a_cache.py`
+  (nuevo; B y el envoltorio de B2), `controllers/controller_helpers.py` (B en `open_readonly_env`) y
+  `utils/sandbox_helpers.py` (B2).
+- **Parche 37:** `controllers/controller_helpers.py`, `base_env['base'].flush()` antes de `registry.cursor()`.
+
+**Tests:**
+- `test_seges_box_a_vias.py`: 22 → 38 en la fase 1 (16 nuevos) y 37 en la fase 2 (sale `TestSegesBoxACallerWrites`).
+- `test_seges_sandbox_credentials.py` (33).
+- `test_seges_box_a_flush.py` (4).
+
+**Baterías** (tres módulos; BD de tests desechable `test_lab_pns_ai_3973_14`, en el contexto de `lab_pns_ai_3973`, que
+monta esta copia de trabajo):
+
+| Punto | Log | Tests | F | E | Saltados |
+|---|---|---|---|---|---|
+| Tras el 18, primera | `tests-20261112-143204.log` | 505 | 3: las dos esperadas y `test_icp_str_id` | 1: `test_read_group_alias_icp` | 4 |
+| Tras el 18 | `tests-20261112-144029.log` | **505** | **2**: `test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin` y `test_pending_write_survives_box_a_close` | **0** | **4** |
+| Tras el 37, primera | `tests-20261112-144518.log` | 508 | 2: `test_paap_i7` y `test_pending_compute_survives_box_a_close` (precondición) | 0 | 4 |
+| Tras el 37 | `tests-20261112-152957.log` | **508** | **1**: `test_paap_i7` | **0** | **4** |
+
+- Las dos primeras de cada punto se informaron sin cambiar los tests y se corrigieron con las decisiones de arriba.
+  Ninguna era una fuga:
+  - `test_icp_str_id`: la lectura con id de texto la corta la comprobación de tipos de id de Odoo dentro del guardián
+    del fabricante;
+  - `test_read_group_alias_icp`: agrupar por `id` con el alias da `ORDER BY "id" is ambiguous` en Odoo 14
+    (`odoo/models.py:2385`);
+  - `test_pending_compute_survives_box_a_close`: `write` y `flush(['name'])` ya recalculaban `display_name`.
+- `auth_totp` está en la BD de tests (log `tests-20261112-143204.log:107`) y `test_c2_no_access_field_via_user` se
+  ejecuta en todas.
+- Saltados: los 4 de la línea base.
+- Origen: `addons paths` con `/mnt/compartidos/third_party`.
+
+**Neutralización** (una cada vez; copia, cambio con coincidencia única, batería completa, restauración y SHA-256). En
+todas: 508 tests, 0 E, 4 saltados, `test_paap_i7` en F y SHA-256 igual al restaurar. Todas coinciden con lo previsto.
+
+| Prueba | Cambio | Log | F, además de `test_paap_i7` |
+|---|---|---|---|
+| N18a | sin el enganche 1 | `tests-20261112-153358.log` | `test_decision2_v3_browse`, `test_decision2_v4_browse`, `test_computed_secret_column_refused` (`password`, `new_password`), `test_o1_str_format_refused` |
+| N18g | sin el enganche 2 | `tests-20261112-153729.log` | `test_v1_getitem`, `test_v2_getitem`, `test_v3_getitem`, `test_v4_getitem`, `test_o1_itemgetter_refused`, `test_o1_sorted_refused`, `test_o1_export_data_refused`, `test_o1_acl_cached_field_refused` |
+| N18m | sin el enganche 3 | `tests-20261112-154048.log` | `test_v1_mapped`, `test_v2_mapped`, `test_v3_mapped`, `test_v4_mapped`, `test_o1_filtered_refused` |
+| N18f | sin el enganche 4 | `tests-20261112-154415.log` | `test_o1_field_mapped_refused`, `test_o1_field_compute_value_refused`, `test_o1_field_callable_refused` (`read`, `recompute`, `convert_to_read`) |
+| N18acl | sin `check_access_rights` | `tests-20261112-154741.log` | `test_o1_acl_cached_field_refused` |
+| N18b | sin B | `tests-20261112-155107.log` | `test_b_open_forgets_secret`, `test_box_a_icp_cache_before_run` |
+| N18i | B sin `value` de `ir.config_parameter` | `tests-20261112-155432.log` | `test_box_a_icp_cache_before_run` |
+| N18w | B con la caché entera | `tests-20261112-155757.log` | `test_b_open_keeps_non_secret` |
+| N18h | sin B2 | `tests-20261112-160133.log` | `test_helper_sudo_read_forgotten` |
+| N-flush | sin la línea del 37 | `tests-20261112-160458.log` | `test_pending_write_survives_box_a_close`, `test_pending_compute_survives_box_a_close`, `test_pending_write_box_a_reads_column`, `test_box_a_open_flush_error_no_cursor` |
+
+Ninguna dio E en lugar de F, y ningún fallo de la línea base desapareció.
+
+**Comprobaciones finales** (sobre el código final):
+- **Lint del kit** (`odoo_lint.py --revisar pns_ai_mcp/`): 0 incidencias nuevas (178 preexistentes).
+- **Compilación con Python 3.7.3** (contenedor): los 10 archivos cambiados.
+- **Secretos con prefijo `seges-3b-`** en los 14 logs de la 3b (de `tests-20261112-143204.log` a
+  `tests-20261112-160458.log`): **0**.
+- **`database.secret`:** no se pudo contar con su valor:
+  - cada batería crea su propia BD de tests, con un `database.secret` nuevo, y `odoo-dev 14 tests` la borra al acabar;
+    ninguno de los 14 valores se podía leer ya;
+  - sustituto aprobado por Sergio: contar en los logs las cadenas con formato UUID4
+    (`[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}`, `grep -c -E`, sin imprimir nada). Odoo 14
+    genera `database.secret` con `uuid.uuid4()` (`base/models/ir_config_parameter.py:20`);
+  - resultado: **0 en los 14 logs**.
+- **Marcadores fuera de tests:** 66 en los tres módulos (55 tras la 3a; +10 del 18 y +1 del 37).
+
+**Recuento por archivo** (tras el 37): 434 de la 3a sin cambios, `test_seges_box_a_vias` 37,
+`test_seges_sandbox_credentials` 33, `test_seges_box_a_flush` 4: **508**.
+
+**Desviaciones frente a la propuesta de implementación:**
+- enganche 4 siempre en el sandbox y en lista cerrada, con `test_o1_field_callable_refused`;
+- B2 en `utils/sandbox_helpers.py`;
+- imports de B dentro de `open_readonly_env`;
+- `test_o1_score_fit_after_secret_cached` (positivo de la fase 0);
+- `test_box_a_cannot_lift_mark` sin el intento con `_box_a_trusted` y sin los dos asserts de mensaje del parche 23
+  (no existen en 3.1.973);
+- tests de la 3b con 16 nuevos en vías, no 12: los 12 de la propuesta, los dos negativos de la revisión, el de la lista
+  cerrada y el positivo de `_score_record_fit`.
+
+## Laboratorio de la 3b (12/11/2026)
+
+`lab_pns_ai_3973` (BD `lab_pns_ai_3973_14`) con los commits de la 3b. Scripts de solo lectura en el scratchpad de la
+sesión, fuera del repo. Solo imprimen «rechazado/OK» o metadatos, nunca valores.
+
+- **Reinicio sin `-u`:** `odoo-dev 14 parar` y `arrancar` desde `~/GitHub/lab_pns_ai_3973`. Inicio: 15:22:59 UTC (16:22:59
+  hora local). En el log desde esa hora: 47 módulos cargados en `lab_pns_ai_3973_14`, 0 ERROR, 0 CRITICAL y 0 Traceback.
+  Solo el `DeprecationWarning` de jinja2 al arrancar.
+- **`p18_lab.py`** (`odoo-dev 14 shell`, herramienta `relaxaicode` real como `seges_int@example.com`, usuario 12;
+  `rollback` al final):
+
+  | Caso | Resultado |
+  |---|---|
+  | V3, variante del contenedor: tras `totp_enabled` del admin, `browse(id).totp_secret` | rechazado: credencial (fabricante) |
+  | `rec['totp_secret']` | rechazado: credencial (fabricante) |
+  | `mapped('totp_secret')` | rechazado: credencial (fabricante) |
+  | `_fields['totp_secret'].mapped(u)` | rechazado: objeto `Field` (enganche 4) |
+  | contactos (`search` y `name`), usuarios (`name` y `login`), `sorted`/`filtered`/`mapped` por nombre, `read()` de un contacto | OK |
+
+  - Usuarios con TOTP: 0. El rechazo no depende de que haya una semilla.
+  - `ai_log`: 61 filas antes y 61 después. El camino de la herramienta solo registra por
+    `controller._log_mcp_operation`, que el stub de los tests no implementa (`tests/seges_common.py:42-43`). Sin
+    `_create_log_entry` ni cursores propios: no hay escrituras PNS-105.
+- **Dos turnos de Chatboo** (Sergio, como `seges_int@example.com`, `gemini-3.6-flash`):
+
+  | Turno | Job | Resultado |
+  |---|---|---|
+  | «List 5 of my contacts with their email» | 9 (15:28:29–15:28:42 UTC) | `relaxaicode` como usuario 12; respuesta renderizada en el servidor; sin errores |
+  | «Make a page with 5 of my contacts and their email» | 10 (15:29:24–15:31:32 UTC) | dominio `page_tab`; la llamada de diseño sale del helper de página dentro de `relaxaicode` (B2) y tarda unos 2 minutos; sin errores. Sergio comprobó que la página `/chatboo/canvas/8?rev=1` («Contacts Overview») se abre con los 5 contactos, su correo y sus fotos |
+
+  - En el tramo: 0 Traceback, 0 ERROR, ningún 503 ni 429 del proveedor.
+  - `ai_log` 62 a 74: las 13 del usuario 12, sin «error» en el resumen ni «Traceback» en el resultado. Comprobado con un
+    `SELECT` de booleanos en una transacción de solo lectura.
+- **Resultado:** O1, B y B2 validados en el laboratorio con la herramienta real y con Chatboo.
+
+## P-22 (12/11/2026)
+
+**Script** `p22_lab.py` (`odoo-dev 14 shell`; solo metadatos de `_fields` y `SELECT` de `ir_model_access`; no lee ninguna
+fila de los modelos; `rollback` al final).
+- Lista permitida de la 3879: `BOX_A_FIELD_ALLOW`, copiado tal cual de
+  `~/pns_ai_3973/fase0/modulos_3879/pns_ai_mcp/models/box_a_guard.py:21-35`.
+- **Fuente:** la elipsis «`…`» de [parches_pns_ai.md](parches_pns_ai.md):1437-1443 no basta como fuente. Mi primera
+  versión del script la interpretó como `id, display_name, name` y no coincidía en `ai.api.server.key`, `ai.mcp.user`,
+  `iap.account` e `ir.config_parameter`. La fuente literal es `box_a_guard.py:21-35` de la copia de la 3879.
+
+**Resultado** (resumen; la salida completa, campo a campo, quedó en el scratchpad de la sesión):
+
+| Modelo | Puerta `env[...]` | Lista de credenciales del fabricante | Grupos con lectura | Ocultos por el fabricante | Fuera de la lista de la 3879 y legibles en 3.1.973 |
+|---|---|---|---|---|---|
+| `ai.provider` | abierta | no | `base.group_user`, `group_ai_admin` | `api_key` | 25 (`endpoint`, `alias`, `model_id`, `temperature`, `spend_cap_*`…) |
+| `ai.api.server` | cerrada | no | `base.group_user`, `group_ai_admin` | `auth_token`, `command_args`, `config_json`, `env_vars` | 32 (`base_url`, `url`, `auth_header_name`, `spec_json`, `tools_json`…) |
+| `ai.api.server.key` | abierta | no | `base.group_user`, `group_ai_admin` | `token` | `active`, `notes`, `server_id` |
+| `ai.mcp.user` | cerrada | sí | `group_ai_admin` | `mcp_api_key_hash` | 13 (`email`, `login`, `name`, `last_mcp_client_*`, `mcp_api_key_state`…) |
+| `ai.key.pin.ask` | cerrada | sí | `group_ai_admin` | ninguno | **`pin`, `supplied_key`**, `email`, `login`, `mcp_user_id`, `failed`, `refused`, `desks` |
+| `ai.key.pin.desk` | cerrada | sí | `group_ai_admin` | `token` | **`display_name`** (sale del token), `last_seen`, `user_id` |
+| `ai.api.key.wizard` | cerrada | sí | `group_ai_admin` | ninguno | **`generated_key`, `manual_key`**, `mcp_user_id`, `confirmed`, `is_clear`, `is_import`, `has_api_key` |
+| `ir.mail_server` | abierta | no | `base.group_system` | `smtp_pass` | `smtp_host`, `smtp_port`, `smtp_user`, `smtp_encryption`… |
+| `fetchmail.server` | abierta | no | `base.group_system` | `password` | `server`, `port`, `user`, `configuration`, `script`… |
+| `iap.account` | abierta | no | `base.group_system`, `base.group_user` | `account_token` | `company_ids` |
+| `ir.config_parameter` | abierta | no | `base.group_system` | `value` (en la 3879, condicional por fila) | — |
+
+**Hallazgo:** credenciales en claro que el criterio del fabricante no oculta.
+- `ai.key.pin.ask.pin` y `.supplied_key`: filas confirmadas en cursor propio. Viven como mucho unos 20 segundos o
+  2 minutos (`key_pin_desk.py`).
+- `ai.api.key.wizard.generated_key` y `.manual_key`: transitorio, escritas en claro (`mcp_api_key_wizard.py:116`), nunca
+  vaciadas. Duran hasta el limpiado de transitorios, 1 hora por defecto.
+- El `display_name` de `ai.key.pin.desk`: su `_rec_name` es el token, así que el `display_name` es el token entero
+  (`name_get`, contenedor `odoo/models.py:1736`, `:1746` y `:1750`). Con él, otro AI Administrator puede tomar el desk
+  (`/pns_ai_mcp/key_pin/desk` → `_touch`) o cerrarlo (`/pns_ai_mcp/key_pin/stop` → `_close`). No da claves: `_supply`
+  busca el desk por usuario.
+- El fabricante cierra esos modelos en su puerta (`env[...]`, `RELAXAICODE_CREDENTIAL_MODELS`), pero un campo `Reference`
+  la salta (`mail.template.preview.resource_ref`, el mismo camino de V2). Con O1 solo quedaba la ACL del modelo, que
+  tiene el AI Administrator. No hay reglas de registro (Odoo 14 no tiene regla implícita para transitorios).
+
+**Decisión de Sergio (12/11/2026): opción 3(b), como ampliación del parche 18** (mismo marcador):
+- `_pns_secret_fields` en `ai.key.pin.ask` (`pin`, `supplied_key`) y `ai.api.key.wizard` (`generated_key`,
+  `manual_key`);
+- y, para el desk, `display_name` (opción 2 de la pregunta sobre el desk);
+- se aceptan sus efectos fuera de la caja A: la exportación nativa y la portable dejan vacíos esos cinco campos.
+
+**Comprobaciones previas por lectura:**
+- `field_is_secret` da verdadero para cualquier nombre de `_pns_secret_fields` antes de mirar el tipo
+  (`utils/sandbox_secrets.py:61-62`), también para un calculado no guardado como `display_name`. Así,
+  `_pns_hidden_column('display_name')` es verdadero en el desk.
+- El flujo del PIN (`_collect`, `_take`, `_supply`, en `sudo` y con cursores propios) y el asistente de claves (lectura
+  del cliente web) no pasan por la caja A.
+
+**Doble barrera en el desk:**
+- el criterio de `token` en el cálculo: `name_get` lee `record['token']`, que O1 rechaza;
+- la entrada `display_name`, para el valor ya en la caché, que no pasa por `name_get`.
+
+La primera N18p (log `tests-20261112-165002.log`) dio 4 F y no 5: el subtest del desk leía `display_name` sin caché y lo
+rechazaba el criterio de `token`. Por decisión de Sergio, el subtest pasa a medir el valor en caché.
+
+## Implementación de P-22 (12/11/2026)
+
+- **Código** (marcador del 18):
+  - `pns_ai_mcp/models/key_pin_desk.py:28-30` (desk, `display_name`) y `:170-171` (`ai.key.pin.ask`);
+  - `pns_ai_mcp/models/mcp_api_key_wizard.py:19-20`.
+- **Tests** (`test_seges_box_a_vias.py`, 37 → 39):
+  - `setUpClass` confirma, con prefijo `seges-3b-p22-`, un AI Administrator (sin Ajustes), una fila de
+    `ai.key.pin.ask`, un desk y un `ai.api.key.wizard`, con su limpieza;
+  - `test_o1_p22_credential_models_refused`, como AI Administrator (con ACL, comprobada) y por `Reference`. Cinco
+    subtests (`pin`, `supplied_key`, `generated_key`, `manual_key` y `desk display_name`) que esperan «holds a
+    credential». En el del desk, un stub (`_WarmDeskStub`) carga el `display_name` en la caché con una lectura en `sudo`
+    sobre el `env` de la caja A, después de B. La precondición `env.cache.contains` se comprueba sin imprimir. Entre ese
+    punto y la lectura solo corren `build_safe_context`, `_fill_run_context` y la compilación
+    (`tools_relaxaicode.py:178-200`): mide O1, no B;
+  - `test_o1_p22_wizard_shows_key_outside_box_a` (positivo aparte): fuera de la caja A, el asistente sigue mostrando la
+    clave generada a quien la genera.
+- **Batería** (log `tests-20261112-165632.log`): **510 tests, 1 F** (`test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin`),
+  **0 E y 4 saltados**. Traceback en el log: 56, los mismos que en `tests-20261112-152957.log`.
+- **N18p** (sin las tres entradas de `_pns_secret_fields`; log `tests-20261112-170001.log`): F en los 5 subtests de
+  `test_o1_p22_credential_models_refused` (el del desk, por «filtra») y SHA-256 igual al restaurar en los dos archivos.
+- **Comprobaciones finales:**
+  - lint (`--revisar pns_ai_mcp/`): 0 incidencias nuevas (185 preexistentes; entran los dos modelos del fabricante
+    tocados);
+  - Python 3.7.3: 12 de 12 archivos;
+  - secretos y UUID4: 0 en los 28 logs de tests del 12/11/2026;
+  - marcadores fuera de tests: 69.
+- **Patrón de secretos ampliado:** desde aquí, `seges-3b-[a-z0-9-]*[0-9a-f]{32}`. El anterior
+  (`seges-3b-[a-z]*-\?[0-9a-f]\{32\}`) no detectaba `seges-3b-p22-…` (dígitos en el prefijo). Con el patrón ampliado se
+  repasaron también los logs anteriores del día: 0.
+- **Contenedores:** P-22 se probó sin el servidor web. Solo se levantaron PostgreSQL y los contenedores de un solo uso de
+  los tests, y se pararon al acabar. `name_get` se confirmó con un contenedor de un solo uso de la imagen
+  (`docker run --rm`).
+- **Recuento por archivo:** 434 de la 3a, `test_seges_box_a_vias` 39, `test_seges_sandbox_credentials` 33,
+  `test_seges_box_a_flush` 4: **510**.
+
+## Pendientes fuera de la 3b (12/11/2026)
+
+- **Servidor del laboratorio sin `dbfilter` ni `db_name`:** ejecuta los crons de todas las BD de Odoo 14. El 12/11/2026,
+  al reiniciar, cargó `lab_pns_ai_3879_14` con el código de 3.1.973 (sin `-u`; la carga la provocó una pestaña abierta en
+  esa BD) y ejecutó sus crons:
+
+  | Hora (UTC) | Cron | Módulo | Resultado |
+  |---|---|---|---|
+  | 15:24:13 | Post process payment transactions | `payment` (core) | done |
+  | 15:26:13 y 15:31:13 | AI: expire pending supervised operations (`model.cleanup_expired()`) | `pns_ai_mcp` | done |
+  | 15:26:13 y 15:31:13 | Chatboo: async queue maintenance (`model.cron_maintenance()`) | `pns_ai_chatboo` | done |
+
+  Pendiente de decidir:
+  - si se limita el servidor a la BD del laboratorio;
+  - si `lab_pns_ai_3879_14` sigue siendo fiable antes de volver a usarla: dos crons de `pns_*` corrieron con código de
+    3.1.973 sobre ella y pudieron escribir.
+- **`csrf_token` impreso por error** en la salida del agente al filtrar el log de los turnos de Chatboo (dos líneas de
+  `werkzeug`). Es de la sesión del laboratorio y no tiene consecuencias. Desde entonces se filtra antes de imprimir.
