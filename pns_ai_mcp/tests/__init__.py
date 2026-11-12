@@ -56,3 +56,8 @@ from . import test_seges_identity_su
 from . import test_seges_sandbox_env
 from . import test_seges_format_guard
 from . import test_seges_facade_class
+# Seges: tests de la fase 3b sobre 3.1.973 (parche 18: confirmación de V1 a V4, O1, B y B2). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_box_a_vias
+from . import test_seges_sandbox_credentials
+# Seges: tests de la fase 3b sobre 3.1.973 (parche 37: flush antes de abrir la caja A). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_box_a_flush
