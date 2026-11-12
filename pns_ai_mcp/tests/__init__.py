@@ -49,3 +49,5 @@ from . import test_seges_e4p
 from . import test_seges_rpc_access
 from . import test_seges_sandbox_side_effects
 from . import test_seges_fetch_redirect
+# Seges: tests de la fase 2c sobre 3.1.973 (parche 36). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_review_views
