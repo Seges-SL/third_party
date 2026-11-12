@@ -186,6 +186,12 @@ def open_readonly_env(base_env):
     from ..utils.sandbox_secrets import SANDBOX_CURSOR_FLAG
     from ..utils.one_company import one_company_context
     context = one_company_context(base_env)
+    # Seges: parche 37 (PNS-104, datos). Ver docs/pendiente/parches_pns_ai.md
+    # Closing box A rolls its cursor back, and in Odoo 14 that clears the
+    # thread's cache and pending writes (Cursor.rollback → clear_env), the
+    # caller's included. They are written on the caller's cursor first. If
+    # that fails, the error reaches the caller and no cursor is opened.
+    base_env['base'].flush()
     cr = base_env.registry.cursor()
     try:
         # Must be the first real statement of the transaction.
@@ -215,6 +221,29 @@ def open_readonly_env(base_env):
         'mail_create_nosubscribe': True,
         'mail_auto_subscribe_no_notify': True,
     })
+    # Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    # The thread cache is shared with the caller: its secret columns are
+    # forgotten before box A runs. If that fails, box A does not open.
+    from odoo import _  # pylint: disable=import-outside-toplevel
+
+    from ..utils.seges_box_a_cache import (  # pylint: disable=import-outside-toplevel
+        _seges_forget_secret_columns,
+    )
+    try:
+        _seges_forget_secret_columns(env)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        for close in (cr.rollback, cr.close):
+            try:
+                close()
+            except Exception:  # pylint: disable=broad-exception-caught
+                _logger.debug('MCP: box A cleanup failed', exc_info=True)
+        _logger.error(
+            'MCP: box A aborted — could not forget the secret columns: %s', exc,
+        )
+        raise UserError(_(
+            'Relaxaicode sandbox unavailable: cannot prepare the read-only run. '
+            'Retry later or contact an administrator.'
+        )) from exc
     # Defence in depth: if the ORM calls cr.commit() halfway through an obfuscated
     # write, the final rollback can no longer undo it. Neutralize commit.
     _real_commit = cr.commit

@@ -16,6 +16,8 @@ _logger = logging.getLogger(__name__)
 class MCPApiKeyWizard(models.TransientModel):
     _name = 'ai.api.key.wizard'
     _description = 'MCP API Key Regeneration Wizard'
+    # Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    _pns_secret_fields = ('generated_key', 'manual_key')
 
     mcp_user_id = fields.Many2one(
         'ai.mcp.user',

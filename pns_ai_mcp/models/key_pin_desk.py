@@ -25,6 +25,9 @@ class KeyPinDesk(models.Model):
     _name = 'ai.key.pin.desk'
     _description = 'Temporary key PIN desk'
     _rec_name = 'token'
+    # Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    # _rec_name is the token: display_name is the whole token.
+    _pns_secret_fields = ('display_name',)
 
     token = fields.Char(required=True, index=True)
     user_id = fields.Many2one('res.users', required=True, index=True)
@@ -164,6 +167,8 @@ class KeyPinDesk(models.Model):
 class KeyPinAsk(models.Model):
     _name = 'ai.key.pin.ask'
     _description = 'Temporary key PIN ask'
+    # Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    _pns_secret_fields = ('pin', 'supplied_key')
 
     email = fields.Char()
     login = fields.Char()

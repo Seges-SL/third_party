@@ -268,6 +268,39 @@ def _refuse_attr_name(name, dynamic):
         )
 
 
+# Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
+try:  # pragma: no cover - Odoo runtime path
+    from odoo.fields import Field as _SegesField
+    from odoo.models import BaseModel as _SegesBaseModel
+except ImportError:  # pragma: no cover - unit test / standalone path, without Odoo
+    _SegesField = _SegesBaseModel = None
+
+_SEGES_FIELD_CALLABLES_ALLOWED = frozenset({'get_description'})
+_SEGES_FIELD_CALLABLE_HINT = (
+    "RelaxAICode cannot call %r on a field definition: it reads or computes "
+    "values outside the access checks. Read the field on the record instead "
+    "(record.field_name or record['field_name'])."
+)
+
+
+def _seges_check_record_field(obj, name):
+    """A field of a recordset: the box A read check (models/seges_box_a_read.py)."""
+    if (_SegesBaseModel is not None and isinstance(obj, _SegesBaseModel)
+            and isinstance(name, str) and name in obj._fields):
+        obj._seges_box_a_check_read(name)
+
+
+def _seges_check_field_attr(obj, name, value):
+    """A ``Field`` object (``rec._fields[...]``) gives metadata, not methods.
+
+    ``mapped``, ``compute_value``, ``read``, ``recompute`` and ``convert_to_*``
+    return or cache values without the record's checks.
+    """
+    if (_SegesField is not None and isinstance(obj, _SegesField)
+            and callable(value) and name not in _SEGES_FIELD_CALLABLES_ALLOWED):
+        raise AttributeError(_SEGES_FIELD_CALLABLE_HINT % (name,))
+
+
 def _read_attr(obj, name, default):
     if is_db_handle(obj):
         raise AttributeError(_DB_HANDLE_HINT % (name,))
@@ -275,7 +308,11 @@ def _read_attr(obj, name, default):
             isinstance(obj, str)
             or (isinstance(obj, type) and issubclass(obj, str))):
         return _guarded_str_format(obj, name)
+    # Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    _seges_check_record_field(obj, name)
     value = getattr(obj, name, *default)
+    # Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    _seges_check_field_attr(obj, name, value)
     if isinstance(value, _types.ModuleType):
         raise AttributeError(
             "Access to module %r is not allowed in RelaxAICode (sandbox)." % (name,)
