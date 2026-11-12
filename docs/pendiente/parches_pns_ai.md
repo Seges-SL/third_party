@@ -17,6 +17,7 @@
   · actualizado el 2026-11-11 (fase 2a sobre 3.1.973: parches 21, 20, 17, 33, 12, 32 y 16)
   · actualizado el 2026-11-11 (fase 2c sobre 3.1.973: parche 36, PNS-103)
   · actualizado el 2026-11-12 (fase 2c: parche 36 validado en el laboratorio)
+  · actualizado el 2026-11-12 (fase 3a sobre 3.1.973: parche 24; tests del 23 como no regresión)
 - **Versión del fabricante, base propia de Seges desde el 20/10/2026 (N12):** `pns_base` 14.0.1.2.32 ·
   `pns_ai_mcp` 14.0.3.1.782 · `pns_ai_chatboo` 14.0.2.1.453
 - **Desde el 23/10/2026 (N12, b′), en `14.0-pns-ai-3879`:** `pns_base` 14.0.1.2.47 · `pns_ai_mcp`
@@ -251,7 +252,7 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
 | 21 | PNS-20 | seguridad | `pns_base/models/operation_report_wizard.py` | 2a | Aplicado (11/11/2026) |
 | 22 | PNS-100 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | 2b | Aplicado (11/11/2026): 22 nombres |
 | 23 | PNS-101 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
-| 24 | PNS-102 | seguridad | `pns_ai_mcp/controllers/context_builder.py` | 3 | Pendiente de portar |
+| 24 | PNS-102 | seguridad | `pns_ai_mcp/controllers/context_builder.py` | 3a | Aplicado (12/11/2026) |
 | 25 | M1 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | 2b | Aplicado (11/11/2026): solo la comprobación del dueño, en `chatboo_session.py` |
 | 26 | M2 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | 2b | Aplicado (11/11/2026) |
 | 27 | F1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/controllers/chatboo.py` | 4 | Pendiente de portar |
@@ -1982,6 +1983,13 @@ el filtro ampliado es defensa adicional, no la única capa.
   wrapper, el helper y los globales; positivo de lectura propia; C2: `totp_secret`
   por `user` y por `env[...]` da `AccessError`, con `skipTest` si `auth_totp` no
   está).
+- **Errata del 12/11/2026 (fase 3a sobre 3.1.973):** en Odoo 14 solo `env.user` fuerza `su`
+  (`odoo/api.py:548`). `env.company` y `env.companies` no lo fuerzan: con `allowed_company_ids` en el contexto
+  devuelven `self['res.company']` sin `su` y comprueban esas compañías contra `user.company_ids`
+  (`odoo/api.py:571-577` y `:601-607`); sin ellos devuelven `self.user.company_id` / `self.user.company_ids`
+  (`:578` y `:618`), que llevan el `su` de `env.user`. El 24 hace falta por `user`; para `company` y `companies`
+  solo cuenta en ese caso por defecto, que la caja A de 3.1.973 no usa (siempre pone `allowed_company_ids`,
+  `utils/one_company.py:66-79`). Detalle en «Parches de la rama 14.0-pns-ai-3973 (fase 3a)».
 
 #### A1/S1 (dentro del parche 23 ampliado)
 
@@ -4377,3 +4385,103 @@ asistentes, alta en el seguimiento y guía del laboratorio).
 - Asistentes de importación transitorios: los vacía Odoo.
 
 Los scripts (`p36_rpc.py` y `p36_rpc_vistas.py`) quedaron en el scratchpad de la sesión, fuera del repo.
+
+## Parches de la rama 14.0-pns-ai-3973 (fase 3a, 12/11/2026)
+
+Parche 24 y tests del 23 (retirado) como no regresión
+([propuesta y decisiones de Sergio del 12/11/2026](propuesta_fase3_3973.md); plan, «Fase 3»). El parche 18 y P-22
+van en la 3b. Lo que no cambia frente a la entrada de la rama 3879 sigue en esa entrada.
+
+### Parche 24 en 3.1.973
+
+- **Archivo:** `pns_ai_mcp/controllers/context_builder.py`, 4 marcadores:
+  - `_identity_no_su` (`:71-86`), igual que en la rama 3879, salvo el docstring;
+  - `_IDENTITY_NO_SU` en `GuardedSandboxEnv` (`:116-118`);
+  - la rama de `__getattr__` antes de devolver un nombre de `_ALLOWED_ENV_ATTRS` (`:159-161`). Vale también para lo que
+    devuelven `with_context`, `with_company` y `env(context=…)`, que vuelven a pasar por el envoltorio;
+  - los globales `user` y `company` de `build_safe_context` (`:683-686`).
+- **Ajuste:** a mano. `GuardedSandboxEnv` es la lista cerrada del fabricante (no la del 23, retirado). Las líneas
+  añadidas son las de la rama 3879.
+- **Qué cubre en 3.1.973:** en Odoo 14 solo `env.user` lleva `su` siempre (`odoo/api.py:548`). `env.company` y
+  `env.companies` lo llevan cuando no hay `allowed_company_ids` (salen de `env.user`); con ellos, que la caja A de
+  3.1.973 siempre pone (`one_company_context`, `utils/one_company.py:66-79`), ya van sin `su`, y Odoo comprueba esas
+  compañías contra `user.company_ids` (`odoo/api.py:571-577`). Lo que importa del 24 en 3.1.973 es `user`: con `su`, el
+  guardián de columnas secretas del fabricante no mira (`models/sandbox_secret_read.py:65-66`), ni tampoco los
+  permisos, las reglas de registro y los grupos de campo, en toda la cadena de relaciones.
+- **Primera batería (log `tests-20261112-110728.log`): 434 tests, 4 F.** Además de `test_paap_i7`:
+  - `test_c2_no_access_field_via_user` y `test_positive_reads_own_user_company`: «Access to unauthorized or invalid
+    companies». La herramienta corría como un usuario creado en el test, que el cursor de la caja A no ve, y
+    `env.company` sin `su` compara `allowed_company_ids` con su `company_ids` (vacío). Es un artefacto del test: el
+    código del fabricante hace la misma comprobación (en N24a y N24c, con su código, salía igual);
+  - `test_allowed_attrs`: el test invertido usaba `env.with_context`, que no existe en el `Environment` de Odoo 14
+    (error mío al invertirlo).
+- **Corrección descartada:** tomar los ids de compañía de `env(su=True)`. Quitaba una comprobación que el fabricante
+  hace; se deshizo y el código quedó como en la rama 3879.
+- **Tests:** `test_seges_identity_su.py` (5), adaptado:
+  - `_tool` ejecuta la herramienta como `base.user_admin` (confirmado), como `TestSegesBoxAReal`;
+  - `test_c2_no_access_field_via_user` acepta «holds a credential» (el guardián del fabricante salta antes que
+    `NO_ACCESS`) o «enough rights»;
+  - `test_c2_no_access_field_via_user` se ejecuta: `auth_totp` está en la BD de tests (se instala solo; log
+    `tests-20261111-202402.log:107`) y no se salta en ninguna batería de la 3a.
+- **Neutralización** (método de la 2a; las tres restauraciones, con SHA-256 igual). Todas dan F, ninguna E:
+
+  | Prueba | Cambio | Log | Fallan, además de `test_paap_i7` |
+  |---|---|---|---|
+  | N24a | `_identity_no_su` devuelve `env.user`/`env.company`/`env.companies` | `tests-20261112-112840.log` | `test_identity_helper_not_su` (3 subtests), `test_wrapper_user_not_su`, `test_wrapper_company_not_su`, `test_c2_no_access_field_via_user` |
+  | N24b | sin la rama de `__getattr__` | `tests-20261112-113143.log` | `test_wrapper_user_not_su`, `test_wrapper_company_not_su` |
+  | N24c | globales `env.user`/`env.company` | `tests-20261112-113441.log` | `test_c2_no_access_field_via_user` |
+
+  `test_wrapper_company_not_su` mide el caso por defecto de Odoo: el envoltorio va sobre un `env` sin
+  `allowed_company_ids`, donde `env.company` sale de `self.user.company_id` y lleva el `su` de `env.user`
+  (`odoo/api.py:578`). No mide la caja A de 3.1.973, que siempre pone `allowed_company_ids`. Detecta la
+  neutralización (F en N24a y N24b), pero el test que mide el riesgo en la caja A es
+  `test_c2_no_access_field_via_user`, por `user`.
+
+  Una primera ronda (logs `tests-20261112-111515.log`, `-111820.log` y `-112124.log`), con el test todavía como el
+  usuario sin confirmar, dio además `test_positive_reads_own_user_company`, por la comprobación de compañías (F en
+  N24a y N24c; **E** en N24b, `JSONDecodeError` al leer la respuesta). No mide el parche y no se repite tras el cambio
+  del test.
+
+### Tests de la fase 3a
+
+- **`pns_ai_mcp/tests/seges_common.py`** (nuevo, no se registra en `tests/__init__.py`): `_StubController`, igual que en
+  `test_seges_sandbox_credentials.py` de la rama 3879. Lo importan `test_seges_identity_su`, `test_seges_sandbox_env`,
+  `test_seges_format_guard`, `test_seges_facade_class` y `test_seges_skill_env`.
+- **`pns_ai_mcp/tests/__init__.py`** y **`pns_ai_chatboo/tests/__init__.py`:** un bloque nuevo de Seges con su marcador,
+  debajo de los anteriores.
+- **Parche 23 retirado (decisión 5), como no regresión del fabricante:**
+  - `test_seges_sandbox_env.py` (12): los 9 negativos comprueban que se rechaza (`ERROR (` o `isError`) y que no salen
+    el secreto ni los objetos del ORM, sin el mensaje; `test_wrapper_allowlist`, solo `AttributeError`.
+    `test_allowed_attrs`, invertido: funcionan `uid`, `user`, `company`, `companies`, `lang`, `context`, `ref` y
+    `env(context=…)`, y se rechazan `su`, `is_admin` e `is_system`. `test_engine_attrs_on_wrapper` pasa a
+    `test_engine_attrs_refused_on_wrapper`: el envoltorio no da `cr` ni `registry`.
+  - `test_seges_format_guard.py` (19): sin `test_markup_rejected_unit` ni `TestSegesEngineNames` (11), ni sus imports.
+  - `test_seges_facade_class.py` (9): sin `test_type_itemgetter_class`.
+  - `test_seges_skill_env.py` (1): sin cambios, salvo el import.
+  - Restos conocidos del 23 (anotados al cambiar de base): `operator.itemgetter` nativo y `Markup` con campos simples.
+- **Resultado** (log `tests-20261112-112537.log`): **434 tests, 1 F, 0 E y 4 saltados**. La F es `test_paap_i7`, por
+  diseño; los saltados, los de la línea base. Son 46 nuevos frente a la 2c (388): 5 + 12 + 19 + 9 + 1.
+- **Origen de los módulos:** `addons paths` con `/mnt/compartidos/third_party` y ningún `pns_*` en las demás rutas del
+  contenedor.
+- **Lint** (`odoo_lint.py --revisar`): 0 incidencias nuevas.
+- **Marcadores fuera de tests:** 55 en los tres módulos (`grep -rn "Seges: parche"`, `.py`, `.js` y `.xml`).
+
+### Resto conocido: caché de otros modelos (decisión 4 de la fase 3, 12/11/2026)
+
+En Odoo 14 la caché es una por hilo (`odoo/api.py:472, 769`), y `Field.__get__` devuelve lo que haya en ella sin
+comprobar nada (`odoo/fields.py:992-993`). La caja A abre su cursor en el mismo hilo.
+
+- **Qué entra:**
+  - los valores de columnas **no secretas** que ya estén en la caché del hilo, leídos por el llamador antes de la caja A
+    o por los helpers del motor en `sudo` durante la ejecución;
+  - el sandbox los lee por id sin permisos de acceso, reglas de registro ni grupos de campo;
+  - también los de filas que el cursor de la caja A no ve (sin confirmar en el cursor del llamador).
+- **Qué no entra:** las credenciales (columnas con `_pns_hidden_column` del fabricante, incluido `value` de
+  `ir.config_parameter`). Las vacía el parche 18 al abrir la caja A (opción B) y al terminar cada helper de módulo (B2),
+  en la fase 3b.
+- **Pendiente de decisión (inventario de la fase 3, [propuesta](propuesta_fase3_3973.md)):** cálculos que leen una
+  credencial en `sudo` durante la ejecución fuera de los helpers (V1 a V5). Hasta que se decidan, no se pueden dar por
+  cubiertos.
+- No lo introduce ningún parche de Seges y estaba igual en la rama 3879 (el parche 18 de entonces solo vaciaba los
+  campos no permitidos de 11 modelos).
+

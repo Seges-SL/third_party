@@ -1,6 +1,6 @@
 # Plan de portado de los parches de Seges a pns_ai 3.1.973
 
-- **Fecha:** 10/11/2026 (propuesta y decisiones) · 11/11/2026 (fases 0 y 1; fases 2a y 2b).
+- **Fecha:** 10/11/2026 (propuesta y decisiones) · 11/11/2026 (fases 0 y 1; fases 2a y 2b) · 12/11/2026 (fase 3a).
 - **Decisión:** camino B de la [comparación con 3.1.973](../specs/comparacion_pns_ai_3-1-973.md), §8: pasar a
   3.1.973 entera y volver a portar los parches de Seges ([decisiones](pns_ai_decisiones.md), N15; Sergio,
   10/11/2026).
@@ -221,6 +221,19 @@ y 28. Detalle en el [registro](parches_pns_ai.md), «Parches de la rama 14.0-pns
     conocidos, sin más;
   - los 9 negativos de `test_seges_sandbox_env` pasan a comprobar que se rechaza y que no sale el secreto;
   - `test_allowed_attrs` y `test_engine_attrs_on_wrapper` se invierten al criterio del fabricante.
+
+**Fase 3a (decisiones de Sergio del 12/11/2026; hecha el 12/11/2026):**
+- Propuesta, decisiones y condiciones: [propuesta_fase3_3973.md](propuesta_fase3_3973.md). La fase 3 se parte en 3a
+  (archivo común, parche 24 y tests del 23) y 3b (parche 18 con B y B2, `test_seges_sandbox_credentials` y P-22).
+- Hecho: `pns_ai_mcp/tests/seges_common.py`, parche 24 y los tests de la 3a. Detalle en el
+  [registro](parches_pns_ai.md), «Parches de la rama 14.0-pns-ai-3973 (fase 3a)».
+- Resultado (log `tests-20261112-112537.log`): **434 tests, 1 F (`test_paap_i7`, por diseño), 0 E y 4 saltados**.
+  N24a, N24b y N24c, todas F y con SHA-256 igual al restaurar.
+- Correcciones a la propuesta del 12/11/2026: `test_seges_sandbox_env` tiene 12 tests (no 13) y el recuento es 434
+  tras la 3a (no 435) y 470 tras la 3b (no 468/469).
+- **Antes de la 3b:** el inventario de la decisión 2 encontró cinco vías posibles (V1 a V5, sin comprobar en
+  ejecución): cálculos que leen una credencial en `sudo` durante la ejecución y la dejan en la caché del hilo. Se
+  presentan a Sergio con las opciones O1 a O3 antes de decidir la 3b.
 
 ## Fase 4 — Zonas que cambian: 27, 29 y 34 (en este orden)
 
