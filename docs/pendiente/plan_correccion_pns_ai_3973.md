@@ -1,6 +1,6 @@
 # Plan de portado de los parches de Seges a pns_ai 3.1.973
 
-- **Fecha:** 10/11/2026 (propuesta y decisiones) · 11/11/2026 (fases 0 y 1; fases 2a y 2b) · 12/11/2026 (fase 3a).
+- **Fecha:** 10/11/2026 (propuesta y decisiones) · 11/11/2026 (fases 0 y 1; fases 2a y 2b) · 12/11/2026 (fase 3a) · 13/11/2026 (planificación hasta el staging).
 - **Decisión:** camino B de la [comparación con 3.1.973](../specs/comparacion_pns_ai_3-1-973.md), §8: pasar a
   3.1.973 entera y volver a portar los parches de Seges ([decisiones](pns_ai_decisiones.md), N15; Sergio,
   10/11/2026).
@@ -18,6 +18,8 @@
   - `lab_pns_ai_973` queda como referencia de 3.1.973 sin cambios.
   - `lab_pns_ai_3879` monta la misma copia de trabajo (`COMPARTIDOS="third_party"`): mientras el repo esté
     en `14.0-pns-ai-3973`, **no se arranca, ni se reinicia, ni se actualiza** (cargaría 3.1.973).
+    - Su BD `lab_pns_ai_3879_14` **no es fiable** desde el 12/11/2026 y no se vuelve a usar como referencia
+      (decisión de Sergio, 13/11/2026; ver «Planificación hasta el staging»).
   - **`_fabricante/`, trasladado (11/11/2026, hecho):** las versiones del fabricante están en
     `/home/soporte/pns_fabricante`; en el repo queda el enlace `_fabricante` → esa carpeta, excluido con una
     regla en `.git/info/exclude`. La opción del kit para esto no se aplicó. `_fabricante/` no se modifica.
@@ -273,6 +275,31 @@ y 28. Detalle en el [registro](parches_pns_ai.md), «Parches de la rama 14.0-pns
   - limitar el servidor del laboratorio (sin `dbfilter` ni `db_name`, ejecuta los crons de todas las BD);
   - la fiabilidad de `lab_pns_ai_3879_14`, sobre la que corrieron dos crons de `pns_*` con código de 3.1.973 el
     12/11/2026.
+  - **Decidido el 13/11/2026:** procedimiento fijo del laboratorio, sin limitar el servidor, y `lab_pns_ai_3879_14`
+    no fiable. Ver «Planificación hasta el staging», punto 2.
+
+## Planificación hasta el staging (decisiones de Sergio, 13/11/2026)
+
+Orden:
+1. **Cierre del parche 38 (PNS-105):** hecho el 13/11/2026 (parche, laboratorio con la salvedad de la apertura 24
+   aceptada, y seguimiento). Detalle en la [propuesta](propuesta_fase3_3973.md),
+   «Implementación del parche 38 (13/11/2026)»
+   y «Laboratorio del parche 38 (13/11/2026)», y en el [registro](parches_pns_ai.md), «Parche 38 (PNS-105, datos)».
+2. **Procedimiento del laboratorio:** el servidor de Odoo 14 del kit arranca sin `dbfilter` ni `db_name` y ejecuta los
+   crons de toda BD cuyo registro se cargue. No se limita el servidor ni se cambia el kit: la mitigación del laboratorio
+   del parche 38 pasa a ser el **procedimiento fijo** de todo laboratorio de esta rama. Procedimiento:
+   [lab_procedimiento_3973.md](lab_procedimiento_3973.md).
+   - **`lab_pns_ai_3879_14` no es fiable:** el 12/11/2026 corrieron sobre ella dos crons de `pns_*` con código de
+     3.1.973. No se vuelve a usar como referencia. P-2 (a) y (b) y P-14 se hacen en BD nuevas instaladas con
+     `~/pns_ai_3973/fase0/modulos_3879`, nunca sobre ella.
+3. **Fase 4** (abajo).
+4. **Pruebas con toda la rama** («Pruebas posteriores», punto 4), con la **versión del core del staging** comprobada en
+   el código montado y no con `dpkg`, como en LIYBEN (propuesta, «Datos de LIYBEN»). **`iap.account.get` (P2) se
+   decide antes** de estas pruebas (propuesta, «Hallazgos de P1 a P3»).
+5. **Staging** de la rama (`pns_demo`).
+
+**Laboratorio con el core de LIYBEN** (`DOCKERFILE` propio): antes de LIYBEN. Ya se aplazó así el 12/11/2026 (propuesta,
+«Decisiones de Sergio sobre V1 a V5 y la 3b», punto 5).
 
 ## Fase 4 — Zonas que cambian: 27, 29 y 34 (en este orden)
 
@@ -335,6 +362,8 @@ y 28. Detalle en el [registro](parches_pns_ai.md), «Parches de la rama 14.0-pns
 2. Fase 3: P-22 y, si Sergio pasa a la opción A, P-20.
 3. Fase 4: P-13.
 4. Con toda la rama:
+   - **Antes:** decisión sobre `iap.account.get` (P2) y comprobación de la versión del core del staging (ver
+     «Planificación hasta el staging», punto 4);
    - P-14, en una BD instalada con `~/pns_ai_3973/fase0/modulos_3879` y después actualizada;
    - P-2, con tres casos:
      - (a) `-u` desde 3.1.879 con el parche 35: corrige los dos crons;
