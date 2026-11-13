@@ -158,6 +158,11 @@ Por gravedad (la de los documentos; si cambia, la última) y estado:
 > `pendiente/propuesta_fase3_3973.md` («Errata de citas»). Este documento no cita líneas de Odoo para PNS-104 ni
 > PNS-105: aquí no hay nada que corregir.
 
+> **13/11/2026, PNS-105:** pasa a estado **AI** (decisión de Sergio). Gravedad Alta (propuesta), sin cambios. Confirmado
+> por test el 12/11/2026, también el efecto 3 (espera de bloqueo del worker en la caja B). Sin parche en ninguna rama.
+> - Las tablas de arriba no lo incluyen. Con PNS-103 a PNS-105: **filas 189**; **AI 59** (antes 58); Alta 35 (AI 9).
+> - Ya no queda ninguno de PNS-103 a PNS-105 sin estado.
+
 ## 2. SIN TRATAR / SIN ESTADO CLARO
 
 Lo que falta para cerrar cada uno:
@@ -402,7 +407,7 @@ Abreviaturas de origen: **inf.** informes de Seges (PNS-01 a 80, 08/10/2026; 81 
 | PNS-102 | seg (nuevo, E2′) | Crítica | `user`/`company` con `su` | CS (p24; lab 28/10 P-102; stg 29/10 sin prueba propia); AI | reg «Parche 24»; plan §3.2 | §2, fila 2. Claves MCP de LIYBEN: regenerar tras el despliegue (plan §3.1) |
 | PNS-103 | seg (nuevo, lab 3973, 11/11) | Baja | AI Administrator sin Ajustes: `AccessError` en la revisión y el resultado de las importaciones | AI (12/11) | seg PNS-103; reg «Parche 36» | Alta del 12/11 (§1, nota). Mismo código en 3.1.879 (`_inject_*_arch` sin `sudo`); no se corrige en `14.0-pns-ai-3879` (`pns_demo` lo tiene; se validó con usuarios con Ajustes). Corregido en `14.0-pns-ai-3973` por el p36 |
 | PNS-104 | seg (nuevo, batería 3973, 12/11) | Baja | Cerrar la caja A descarta las escrituras pendientes del llamador (`rollback` → `clear_env` → `env.clear()`) | AI (12/11) | seg PNS-104; prop fase 3, «Propuesta: parche de `flush`» e «Implementación de la 3b»; reg «Parche 37» | Alta del 12/11 (§1, notas). Latente: ningún llamador real pierde datos hoy. Mismo código en 3.1.879; no se corrige en `14.0-pns-ai-3879`. Corregido en `14.0-pns-ai-3973` por el p37, como defensa (los `new()` del llamador siguen perdiéndose) |
-| PNS-105 | seg (nuevo, lectura de código 3973, 12/11) | Alta (propuesta) | Los cursores propios con `commit` (p. ej. `ai.log._create_log_entry`) confirman y descartan las escrituras pendientes de quien los llama (`Cursor.commit` → `flush_env`) | Sin estado (pendiente de decisión) | seg PNS-105; prop fase 3, «Resultado de X1 a X4» | Alta del 12/11 (§1, nota). Sin confirmar en ejecución (test después de la 3b). Mismo patrón en 3.1.879; sin parche |
+| PNS-105 | seg (nuevo, lectura de código 3973, 12/11) | Alta (propuesta) | Los cursores propios con `commit` (p. ej. `ai.log._create_log_entry`) confirman y descartan las escrituras pendientes de quien los llama (`Cursor.commit` → `flush_env`) | AI (13/11) | seg PNS-105; prop fase 3, «Resultado de X1 a X4» | Alta del 12/11 (§1, nota). Mismo patrón en 3.1.879; sin parche. Confirmado por test (12/11/2026), también el efecto 3 (espera de bloqueo del worker en la caja B); ver seguimiento_informe_pns_ai.md |
 
 ### 3.2 Observaciones comunicadas, petición de §5 y compatibilidad sin número
 
@@ -651,7 +656,7 @@ lista.
     enteros;
   - Fuentes: reg «Parche 18 ampliado por P-22» y «Para el informe al fabricante (fase 3b)»; prop fase 3, «P-22».
 - Transacciones: PNS-105 (Alta, propuesta), los cursores propios con `commit` confirman, fuera de la transacción del
-  llamador, sus escrituras pendientes, y pierden las de registros nuevos. Sin confirmar en ejecución; sin parche.
+  llamador, sus escrituras pendientes, y pierden las de registros nuevos. Confirmado por test (12/11/2026), también el efecto 3; sin parche.
   Fuentes: seg PNS-105; prop fase 3.
 
 ## Cambios respecto a la primera pasada

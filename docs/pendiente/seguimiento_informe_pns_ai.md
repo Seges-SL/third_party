@@ -177,7 +177,7 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-102 | Crítica | NUEVO | VULNERABLE (herramienta real, segundo rechazo de E2′, 27/10/2026, sobre 3.1.782 y en LIYBEN) | · **Parche 24 (E2′, `14.0-pns-ai-3879`): validación local y neutralización hechas (28/10/2026)**; tests `test_seges_identity_su.py` · LIYBEN: claves MCP revocadas el 27/10/2026; regenerarlas tras el despliegue final |
 | PNS-103 | Baja | NUEVO | CONFIRMADO (laboratorio `lab_pns_ai_3973`, 11/11/2026, sobre 3.1.973; mismo código en 3.1.879) | · **Parche 36 (fase 2c, `14.0-pns-ai-3973`)**: ver su ficha · pendiente del informe al fabricante |
 | PNS-104 | Baja | NUEVO | CONFIRMADO (`test_pending_write_survives_box_a_close`, batería de `lab_pns_ai_3973`, 12/11/2026, sobre 3.1.973; mismo código en 3.1.879); latente: ningún llamador real pierde datos hoy | · **Parche 37 (fase 3b, `14.0-pns-ai-3973`)**, como defensa: ver su ficha · pendiente del informe al fabricante |
-| PNS-105 | Alta (propuesta) | NUEVO | Por lectura de código (12/11/2026, sobre 3.1.973; mismo patrón en 3.1.879); confirmado por test (12/11/2026); inventario hecho (12/11/2026); caja B: confirmado por test (12/11/2026, espera de bloqueo del worker) | · Sin parche: ver su ficha · pendiente del informe al fabricante |
+| PNS-105 | Alta (propuesta) | NUEVO | CONFIRMADO (test, 12/11/2026; efecto 3 incluido) | — |
 
 **Recuento:** CORREGIDO 31 · PARCIAL 33 · SIN CAMBIOS 13 · YA NO APLICA 2 · DUDOSO 1 (80 del
 informe) · NUEVO 22 (total 102). Por gravedad:
@@ -2349,9 +2349,9 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
 
 ### PNS-105 — Los cursores propios con `commit` confirman y descartan las escrituras pendientes de quien los llama
 
-- **Gravedad:** Alta (propuesta; la decide Sergio) · **Estado:** NUEVO, sin estado decidido (fase 3b,
+- **Gravedad:** Alta (propuesta; la decide Sergio) · **Estado:** NUEVO; laboratorio y staging CONFIRMADO (13/11/2026) (fase 3b,
   `14.0-pns-ai-3973`, 12/11/2026, por lectura de código sobre 3.1.973; mismo patrón en 3.1.879). Antes de numerarlo se
-  comprobó con Grep que PNS-105 no figuraba en `docs/`. **Sin confirmar en ejecución:** su test va después de la 3b.
+  comprobó con Grep que PNS-105 no figuraba en `docs/`. Confirmado en ejecución: atomicidad (log `tests-20261112-175130.log`) y caja B, efecto 3 (log `tests-20261112-190050.log`), los dos del 12/11/2026.
 - **Descripción** (Odoo 14 del contenedor):
   - `Cursor.commit` llama a `flush_env(self)` antes del `COMMIT` (`odoo/sql_db.py:294-302`, en `:296`);
   - `flush_env` hace `flush()` y `clear()` con el entorno de ese cursor (`sql_db.py:65-80`);
@@ -2368,9 +2368,9 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
   - las escrituras pendientes sobre registros creados en la transacción del llamador se pierden sin error: el cursor
     propio no ve la fila (`models.py:5471-5480`);
   - los tests no lo ven: `_create_log_entry` no se ejecuta con tests en marcha (`utils/compat.py:42-54`).
-- **Pendiente (después de la 3b y antes del staging):** test de confirmación (`test_seges_side_cursor_commit.py`),
-  caso de la caja B e inventario completo de cursores propios
-  ([propuesta de la fase 3](propuesta_fase3_3973.md), «Resultado de X1 a X4»).
+- **Hecho (12/11/2026):** test de confirmación (`test_seges_side_cursor_commit.py`), caso de la caja B e inventario de
+  cursores propios. **Pendiente:** el parche (opción A, decidida el 13/11/2026; ver `propuesta_fase3_3973.md`,
+  «Decisiones de PNS-105 y lecturas L/T (13/11/2026)»).
 - **Rama Seges:** sin parche. **Pendiente del informe al fabricante.**
 - **Errata de citas (12/11/2026):** comprobadas contra el contenedor (`odoo` 14.0.20231106); el texto de arriba no se
   reescribe. `odoo/sql_db.py:294-302`, en `:296`, es `sql_db.py:448-457`, en `:451` (`Cursor.commit` → `flush_env`).
@@ -2380,7 +2380,7 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
   PNS-105 (12/11/2026)».
 - **Inventario y caja B (12/11/2026):** 24 cursores propios con `Environment`, todos del fabricante; en la caja B,
   `api_call` (`api_result_cache._store`) y las descargas binarias (`_run_on_committed_cursor`) hacen `commit` a mitad
-  del plan. Variante más probable: espera de bloqueo del worker (sin confirmar). Ver
+  del plan. Variante más probable: espera de bloqueo del worker (sin confirmar el 12/11; confirmada después por test, ver «Evidencia, caja B» y «Efecto 3»). Ver
   [propuesta de la fase 3](propuesta_fase3_3973.md), «Inventario de cursores propios y caja B» y «Citas del core para
   la caja B».
 - **Evidencia, caja B (12/11/2026):** confirmado por test (`test_seges_side_cursor_commit.py`,
@@ -2389,6 +2389,40 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
     actualizó en el paso 1;
   - en el test lo corta un `lock_timeout` de 3 s; `_store` no pone ninguno.
   - Ver [propuesta de la fase 3](propuesta_fase3_3973.md), «Test de la caja B (12/11/2026)».
+- **Efecto 3: espera de bloqueo del worker en la caja B** (confirmado por test el 12/11/2026,
+  test_box_b_side_cursor_waits_for_plan_row, log tests-20261112-190050.log).
+  - **Cómo se produce:**
+    - en un plan confirmado, un paso que escribe deja cálculos guardados pendientes (por ejemplo, un write de email
+      en res.partner deja email_normalized);
+    - un paso api_call posterior guarda la respuesta con Cache._store, en un cursor propio con Environment
+      (models/api_result_cache.py:132-133);
+    - el commit de ese cursor recalcula lo pendiente y hace el UPDATE de la fila en su conexión, pero la fila ya la
+      tiene bloqueada el cursor del plan, en el mismo hilo;
+    - el UPDATE espera a una transacción que no puede avanzar mientras él espera. PostgreSQL no lo detecta como
+      interbloqueo, porque el ciclo pasa por el hilo de Python.
+    - Por lectura, sin test, lo mismo puede ocurrir con las respuestas binarias de fetch_url y api_call
+      (_run_on_committed_cursor, utils/session_download.py:382-386).
+  - **Sin límite en la base de datos:**
+    - _store no fija lock_timeout ni statement_timeout;
+    - los SET LOCAL del cursor del plan (models/safe_operation.py:969-970, :1467-1468) no actúan mientras su
+      transacción está parada;
+    - en staging y en LIYBEN (comprobado el 13/11/2026), statement_timeout, lock_timeout e
+      idle_in_transaction_session_timeout valen 0 (por defecto), sin ajustes por rol ni por BD y sin PGOPTIONS.
+  - **Lo único que corta la espera es Odoo** (prefork, 2 workers en los dos servidores):
+    - desde «Ejecutar» de la ficha (/pns_ai_mcp/verification/execute, controllers/verification_ui.py:78-97, hilo de
+      la petición HTTP): limit_time_real mata el worker (900 s en staging, 2400 s en LIYBEN);
+    - desde la autoconfirmación de safe_plan_request o desde safe_plan_status en un turno de Chatboo (hilo daemon de
+      pns_ai_chatboo/models/chatboo_job.py:193-226): por lectura, ningún límite. La vigilancia del proceso padre
+      depende del bucle del worker, no del hilo. La espera dura hasta reiniciar el servicio;
+    - limit_time_cpu no cuenta: esperar un bloqueo no consume CPU.
+  - **Mientras dura:**
+    - las filas escritas por el plan siguen bloqueadas, y cualquier otra transacción que las toque también espera;
+    - quedan dos conexiones retenidas y, en el caso HTTP, uno de los dos workers ocupado;
+    - la reserva de ejecución ya está confirmada;
+    - volver a pedir el plan con safe_plan_status repite la espera.
+  - **Condición general:** con idle_in_transaction_session_timeout activo, PostgreSQL cortaría la conexión del plan.
+    Entonces el UPDATE lateral seguiría adelante y se confirmaría fuera del plan, y el efecto 3 pasaría a ser el
+    efecto 1.
 
 ### Observaciones sin ficha (para valorar en E4′)
 

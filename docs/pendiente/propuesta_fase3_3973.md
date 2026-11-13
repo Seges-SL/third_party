@@ -1178,6 +1178,102 @@ sesión). Completan las «Citas que aún faltan» del diseño revisado:
   - en producción `_store` no pone ningún límite: el worker se queda esperando hasta el `statement_timeout` de su
     propio cursor, si lo tiene. Esto no se ha comprobado.
 
+## Decisiones de PNS-105 y lecturas L/T (13/11/2026)
+
+Lecturas de solo lectura del 13/11/2026 (dos informes), sin cambiar código. Citas de Odoo: contenedor `odoo-dev:14`
+(`odoo` 14.0.20231106), salidas `core14_pns105_A.txt` y `core14_pns105_A2.txt` en el scratchpad de la sesión.
+
+**Decisiones de Sergio (13/11/2026):**
+1. **Parche: opción A.** Un helper pone un `api.Environments` nuevo en el hilo mientras dura el `with` de cada cursor
+   propio con `Environment` del mismo hilo, y restaura el anterior al salir. Protección de `request.env`: forzarlo antes
+   del cambio si hay petición en curso; al salir, comprobar que el conjunto temporal solo tiene entornos del cursor
+   propio (F en tests, WARNING en producción). **Sin H4-i.**
+2. La variante (c) amplía PNS-105 como **«Efecto 3»**. Gravedad Alta (propuesta), sin cambios.
+3. Seguimiento: «Estado» NUEVO, «Laboratorio y staging» CONFIRMADO, «Rama Seges» —, como PNS-95, 96 y 99.
+4. **H4 descartada:** ningún flujo pasa `replace_verification_id` (G6a), así que `controllers/safe_plan.py:198` no se
+   alcanza. Además, `:210` (`_notify_safe_plan_hosts` → `savepoint`, `models/safe_operation.py:1739`;
+   `sql_db.py:115-134`) ya vuelca esa escritura en el cursor de quien llama.
+5. **Errata del inventario:** la apertura 14 (`_retry_confirmed_not_executed`) no la llama ningún cron.
+   `_cleanup_stuck_state` no tiene llamadores (G6b); el cron real ejecuta `cleanup_expired`
+   (`data/safe_operation_cron.xml:10`).
+
+**T1–T6 (13/11/2026, consultas de solo lectura de Sergio):**
+
+| | Staging (odoo14_pns / pns_demo) | LIYBEN (odoo14_server / LIYBEN) |
+|---|---|---|
+| `statement_timeout`, `lock_timeout`, `idle_in_transaction_session_timeout` | 0 (default) | 0 (default) |
+| Ajustes por rol o BD | ninguno | ninguno |
+| `PGOPTIONS` | no definido | no definido |
+| `workers` | 2 (prefork) | 2 (prefork) |
+| `limit_time_real` / `limit_time_cpu` | 900 / 600 | 2400 / 1200 |
+| `limit_time_real_cron` | sin definir | sin definir |
+| `max_cron_threads` | 1 | 1 |
+| Opciones en la línea de arranque | ninguna | ninguna |
+
+**Resumen de las lecturas:**
+- **L1 a)** `:198` escribe 8 campos de la fila de `ai.safe.operation` hallada en `:173-178` (`operation_type`,
+  `model_name`, `records_count`, `changes_info`, `operation_data`, `danger_level`, `tool_name`, `expires_at`), con el
+  `env` de quien llama, en `sudo` y en su cursor. `:210` → `savepoint` (`safe_operation.py:1739`) vuelca el `UPDATE` en
+  ese cursor, que se queda con el bloqueo de la fila.
+- **L1 b)** Rama de sustitución: `:173` → `:198` → `:210` → `return` (`:270-271`); ni `:310`, ni `:409`, ni
+  `_mint_card_token`. Rama nueva: `:276` → apertura `:310` (`create_verification`, `commit` `:341`) → si es
+  autoconfirmable, apertura `:409` (`:417`, `commit` `:422`, `execute_plan_now`) → si no, `_mint_card_token`
+  (`utils/engine_tool_run.py:547-556`) sobre una fila ya confirmada.
+- **L1 c)** Actualizan la misma fila en cursor propio: `:417` (apertura 11), `_mint_confirm_token`
+  (`safe_operation.py:570-573`, apertura 7), `_resolve_confirm` (`:767`, apertura 12), `_claim_execute` y
+  `_release_execute_claim` (SQL, `:1257-1275`, `:1316-1331`). Como `:210` ya bloquea la fila, chocarían hoy, no solo
+  con A.
+- **L1 d)** H4-i habría necesitado mover entero `:173-210` (búsqueda, `operation_data` anterior, escritura y aviso) a un
+  cursor propio. Descartado (decisión 1).
+- **L2** Turno de Chatboo (`pns_ai_chatboo/models/chatboo_async_request.py:149-541`): lo escrito antes del motor lo
+  confirma el propio turno (`:161`, `:329`); `_store_last_screen` usa su cursor SQL (`:569-574`); `safe_plan_status`
+  ejecuta en el cursor del turno con sus propios `commit` (`safe_plan.py:586-588`). Ningún caso dura solo por un
+  `commit` lateral.
+- **L2b** `fulfill` (`chatboo_canvas.py:898-904`) y `retitle` (`:967-971`) escriben solo en sus cursores
+  (`_store_design`, `chatboo_session.py:1008-1023`; `_store_title`, `:1045-1052`; `log_no_page` →
+  `_create_log_entry`, `chatboo_canvas.py:602`). `enrich_screen_context` (`utils/screen_context.py:99-161`) solo lee;
+  `apply_turn_axis` (`utils/formatting_mode_policy.py:86-99`) no escribe (`:95`). Las siete funciones de
+  `AgentEngine` no están en `agent_engine.py` (lo heredan los mixins, `:33-41`): ver L2c.
+- **L3 a)** `Environment.__new__` (`odoo/api.py:447-469`) toma `envs.cache` y guarda `self.all = envs`; `flush_env` y
+  `clear_env` (`sql_db.py:65-80`, `:82-87`) solo recorren `Environment.envs`. Cambiar `_local.environments` antes de
+  crear el entorno del cursor propio aísla los dos; los entornos ya creados conservan su `.all`.
+- **L3 b)** `ConnectionPool.borrow` (`sql_db.py:594-650`) hace `cnx.reset()` al reutilizar (`:614-615`);
+  `give_back` (`:652-666`) no resetea. Un `SET` de sesión se quedaría en la conexión libre hasta el siguiente préstamo.
+- **L3 c)** `process_timeout` (`odoo/service/server.py:779-788`) mata con `SIGKILL` el proceso del worker;
+  `limit_time_cpu` es `RLIMIT_CPU` del proceso (`check_limits`, `:939-960`): esperar un bloqueo no gasta CPU.
+  `cron_thread` (`:402-416`) no tiene vigilancia.
+- **L4** Cursores del plan (aperturas 11, 13 y 14): ninguna dependencia de valores pendientes o en caché del llamador.
+  Solo reciben ids, `uid` y copia del `context` (`safe_plan.py:412`, `safe_operation.py:971`, `:1090`);
+  `execute_plan_now` invalida los campos que lee (`:1397-1398`).
+- **T5** Todas las líneas con instrucción del grep G5 son `SET LOCAL`; ningún `SET` de sesión.
+- **T7** «Ejecutar» de la ficha: `/pns_ai_mcp/verification/execute` (`controllers/verification_ui.py:78-97`), en el
+  hilo de la petición HTTP; la llama `chatboo_component_v2.js:2455`. La autoconfirmación (apertura 11) y
+  `safe_plan_status` corren en el hilo `daemon` de `pns_ai_chatboo/models/chatboo_job.py:193-226` (en tests, en línea,
+  `:189-191`).
+- **T8** Con el plan parado en la espera de `_store`: el cursor del plan retiene sus filas, «idle in transaction» y sin
+  límite (sus `SET LOCAL` no actúan parado); la fila de la operación no la bloquea nadie y la reserva ya está
+  confirmada. El cron real solo la marca `expired` al vencer (`safe_operation.py:1958-1977`). Un reintento repite el
+  mismo plan y puede colgarse igual.
+- **G6 a)** `replace_verification_id` solo aparece en `safe_plan.py:224`, `:231` y `:267`: nadie lo pasa.
+- **G6 b)** `_cleanup_stuck_state` solo aparece en `safe_operation.py:1033` y `:1063`: sin llamadores.
+- **G6 c)** `/verification/execute`: `verification_ui.py:78` y `chatboo_component_v2.js:2455` (más el comentario de
+  `safe_operation_cron.xml:19`).
+- **C1** `Environment.envs` devuelve `getattr(cls._local, 'environments', ())` (`odoo/api.py:423-425`; `_local` en
+  `:421`).
+- **C2** `request.env` se crea al primer acceso con `odoo.api.Environment(self.cr, self.uid, self.context)`
+  (`odoo/http.py:256-261`); vuelve a `None` al cambiar `uid` o `context` (`:242`, `:254`).
+- **C3** El padre refresca `watchdog_time` al leer la tubería del worker (`server.py:807-809`; inicial `:898`).
+  `watchdog_timeout` = `multi.timeout` (`:903`) en `WorkerHTTP` y `multi.cron_timeout` (`:1077`) en `WorkerCron`. Un
+  hilo `daemon` no está vigilado por sí mismo; solo muere con su proceso.
+
+**Pendiente para el paso 7:**
+- L2c: los siete mixins de `AgentEngine` (`_try_session_export`, `_intercept_session_file_propose`,
+  `_absorb_export_result`, `_remember_clip_data`, `_harvest_file_labels`, `_learn_row_models`, `_offer_page_card`) e
+  `inference_audit` de `_ask_design` (`chatboo_session.py:1216`);
+- C3: en qué punto escribe el worker en la tubería de vigilancia, y qué opciones de configuración son `multi.timeout` y
+  `multi.cron_timeout`;
+- las llamadas por posición a `request_safe_plan`.
+
 ## Decisiones de Sergio (12/11/2026, revisión de las dos propuestas)
 
 Sobre «Propuesta: parche de `flush` antes de abrir la caja A» y «Propuesta de implementación de la 3b».
