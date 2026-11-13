@@ -11,6 +11,8 @@ from datetime import timedelta
 
 from odoo import _, api, fields, SUPERUSER_ID
 from odoo.exceptions import UserError
+# Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+from odoo.addons.pns_base.utils.seges_side_env import seges_side_env
 
 from .view_policy_arch import arch_contains_field, check_ident
 
@@ -245,7 +247,8 @@ def create_field_required_choice(env, steps, title):
     nctx = dict(env.context or {})
     choice_id = None
     # Own cursor: SSE keeps the request TX open; Accept is another HTTP call.
-    with env.registry.cursor() as ncr:
+    # Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+    with seges_side_env(), env.registry.cursor() as ncr:
         nenv = api.Environment(ncr, SUPERUSER_ID, nctx)
         rec = nenv['ai.safe.choice'].create({
             'user_id': env.uid,

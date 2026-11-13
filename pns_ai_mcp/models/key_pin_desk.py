@@ -13,6 +13,8 @@ import time
 from datetime import timedelta
 
 from odoo import SUPERUSER_ID, api, fields, models
+# Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+from odoo.addons.pns_base.utils.seges_side_env import seges_side_env
 
 from ..utils.key_pin import DESK_TTL_SECONDS, pin_length
 
@@ -200,7 +202,8 @@ class KeyPinAsk(models.Model):
     def _collect(self, vals):
         self._drop_old()
         registry = self.env.registry
-        with registry.cursor() as cr:
+        # Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+        with seges_side_env(), registry.cursor() as cr:
             env = api.Environment(cr, SUPERUSER_ID, {})
             vals = dict(vals)
             vals['desks'] = len(env['ai.key.pin.desk'].sudo()._live())
@@ -224,7 +227,8 @@ class KeyPinAsk(models.Model):
         theirs, or when the wait ends with at least one refusal.
         """
         registry = self.env.registry
-        with registry.cursor() as cr:
+        # Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+        with seges_side_env(), registry.cursor() as cr:
             env = api.Environment(cr, SUPERUSER_ID, {})
             ask = env['ai.key.pin.ask'].sudo().browse(ask_id)
             if not ask.exists():

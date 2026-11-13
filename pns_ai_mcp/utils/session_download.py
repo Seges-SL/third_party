@@ -374,12 +374,15 @@ def _run_on_committed_cursor(env, fn):
         return fn(env)
     try:
         from odoo import api
+        # Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+        from odoo.addons.pns_base.utils.seges_side_env import seges_side_env  # pylint: disable=import-outside-toplevel
     except ImportError:
         return fn(env)
     uid = env.uid
     ctx = dict(getattr(env, 'context', None) or {})
     try:
-        with registry.cursor() as cr:
+        # Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+        with seges_side_env(), registry.cursor() as cr:
             env2 = api.Environment(cr, uid, ctx)
             result = fn(env2)
             cr.commit()

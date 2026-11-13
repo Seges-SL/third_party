@@ -10,6 +10,8 @@ from odoo import SUPERUSER_ID, api, fields, models, _
 from odoo.exceptions import ValidationError
 from odoo.tools import config
 from odoo.addons.pns_base.utils.compat import ODOO_VERSION
+# Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+from odoo.addons.pns_base.utils.seges_side_env import seges_side_env
 
 from ..utils.skill_runtime import (
     normalize_unresolved_key,
@@ -141,21 +143,23 @@ class AISkillParamCache(models.Model):
             return self.browse()
         if not self._own_cursor_env():
             return self.sudo()._create_or_get(skill_id, leftover, payload, key)
-        new_cr = None
-        try:
-            new_cr = self.env.registry.cursor()
-            env = api.Environment(new_cr, SUPERUSER_ID, {})
-            rec = env['ai.skill.param.cache']._create_or_get(
-                skill_id, leftover, payload, key,
-            )
-            new_cr.commit()
-            return rec
-        except Exception:
-            _logger.warning(
-                'param cache remember failed skill=%s key=%s',
-                skill_id, key, exc_info=True,
-            )
-            return self.browse()
-        finally:
-            if new_cr is not None:
-                new_cr.close()
+        # Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+        with seges_side_env():
+            new_cr = None
+            try:
+                new_cr = self.env.registry.cursor()
+                env = api.Environment(new_cr, SUPERUSER_ID, {})
+                rec = env['ai.skill.param.cache']._create_or_get(
+                    skill_id, leftover, payload, key,
+                )
+                new_cr.commit()
+                return rec
+            except Exception:
+                _logger.warning(
+                    'param cache remember failed skill=%s key=%s',
+                    skill_id, key, exc_info=True,
+                )
+                return self.browse()
+            finally:
+                if new_cr is not None:
+                    new_cr.close()

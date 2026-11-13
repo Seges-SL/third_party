@@ -30,6 +30,8 @@ from odoo import (
     fields,
     SUPERUSER_ID,
 )
+# Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+from odoo.addons.pns_base.utils.seges_side_env import seges_side_env
 from .controller_helpers import check_safe_plan_permissions
 from .mcp_decorators import mcp_tool
 
@@ -307,7 +309,8 @@ def request_safe_plan(env, steps, title='Supervised operation',
     session_id = resolve_session_ref(env)
     if session_id:
         nctx['ai_session_ref'] = int(session_id)
-    with env.registry.cursor() as ncr:
+    # Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+    with seges_side_env(), env.registry.cursor() as ncr:
         nenv = api.Environment(ncr, SUPERUSER_ID, nctx)
         first_model = _plan_display_model(steps)
         agent_code = (env.context or {}).get('mcp_agent_code')
@@ -406,7 +409,8 @@ def tool_safe_plan_request(controller, arguments):
             try:
                 exec_result = None
                 executed_ok = False
-                with env.registry.cursor() as ncr:
+                # Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+                with seges_side_env(), env.registry.cursor() as ncr:
                     ncr.execute("SET LOCAL lock_timeout = '5s'")
                     ncr.execute("SET LOCAL statement_timeout = '20s'")
                     nenv = api.Environment(ncr, user_id, dict(env.context or {}))

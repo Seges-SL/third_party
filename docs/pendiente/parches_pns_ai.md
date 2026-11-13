@@ -4776,3 +4776,115 @@ solo como referencia.
   - y si `lab_pns_ai_3879_14` sigue siendo fiable antes de volver a usarla.
 - **`csrf_token` impreso por error** en la salida del agente al filtrar el log (sesión del laboratorio, sin
   consecuencias).
+
+## Parches de la rama 14.0-pns-ai-3973 (parche 38, 13/11/2026)
+
+Propuesta, ajustes, decisiones de Sergio, baterías y neutralización: [propuesta de la fase 3](propuesta_fase3_3973.md),
+desde «Decisiones de PNS-105 y lecturas L/T (13/11/2026)» hasta «Implementación del parche 38 (13/11/2026)». Citas de
+Odoo: contenedor (`odoo` 14.0-20231106).
+
+### Parche 38: cursores propios con su propio conjunto de entornos (PNS-105, datos)
+
+- **Qué falla sin él** (del fabricante; confirmado por los tres tests de `TestSegesSideCursorCommit` y
+  `TestSegesSideCursorBoxB`, log `tests-20261112-190050.log`):
+  - en Odoo 14, `Cursor.commit` y `Cursor.rollback` hacen `flush_env`/`clear_env` (`odoo/sql_db.py:65-80`, `:82-87`),
+    que recorren `Environment.envs`, el conjunto de entornos del hilo; la caché, `towrite` y `tocompute` son de ese
+    conjunto (`odoo/api.py:757-765`);
+  - un cursor propio con `Environment` del mismo hilo confirmaba lo pendiente de quien llama fuera de su transacción
+    (E1), lo perdía en registros creados por él (E2), esperaba un bloqueo del propio plan en la caja B (E3) y vaciaba la
+    caché y lo pendiente de quien llama: después de cada `commit` (`flush_env` → `clear()`) y también al fallar, sin
+    confirmar nada (E4).
+- **Cambio:** helper `seges_side_env()` (`pns_base/utils/seges_side_env.py`, nuevo; no está en `utils/__init__.py`).
+  Uso: `with seges_side_env(), registry.cursor() as cr:` (el cursor sale primero y su `commit` o `close` solo ve el
+  conjunto temporal).
+  - `:93`: `api.Environments()` nuevo en el hilo durante el bloque; `:101-106`: restaura el anterior (en pila: el
+    anidamiento funciona sin estado global);
+  - `:85-88`: si hay petición con el cursor abierto y conjunto en el hilo, fuerza `request.env` en el de quien llama;
+  - `_check_only_side_envs` (`:66-77`), al salir: cuenta los entornos del conjunto temporal sobre un cursor de quien
+    llama (los de su conjunto y el de la petición) y compara las claves (modelo, id, campo) de su `towrite` y su
+    `tocompute` antes y después. Si algo cambia, registra siempre (ERROR en tests, WARNING fuera, con `stack_info`) y,
+    en tests y sin excepción en curso, lanza `AssertionError`. Mensaje con la etiqueta `seges_side_env: ` y solo
+    recuentos.
+- **Archivos y marcadores** (`# Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md`; 28):
+
+  | N.º | Apertura | Marcador / `with` |
+  |---|---|---|
+  | 1 | `pns_ai_mcp/models/ai_log.py`, `_create_log_entry` | `:722` / `:724` (`try/finally` dentro; `disable` de `R1702` en `:723`) |
+  | 2 | `models/ai_skill_param_cache.py`, `_remember_for_skill` | `:146` / `:147` (`try/finally` dentro) |
+  | 3 | `models/ai_change_journal.py`, `_record_failed_plan` | `:394` / `:395` |
+  | 4, 5 | `models/key_pin_desk.py`, `_collect`, `_take` | `:205` / `:206`; `:230` / `:231` |
+  | 6 | `models/api_result_cache.py`, `_store` | `:134` / `:135` |
+  | 7 | `utils/engine_tool_run.py`, `_mint_card_token` | `:549` / `:550` |
+  | 8 | `utils/field_required_plan.py`, `create_field_required_choice` | `:250` / `:251` |
+  | 9 | `utils/session_download.py`, `_run_on_committed_cursor` | `:384` / `:385` |
+  | 10, 11 | `controllers/safe_plan.py` | `:312` / `:313`; `:412` / `:413` |
+  | 12, 13, 15 | `models/safe_operation.py` | `:700` / `:701`; `:971` / `:972`; `:1596` / `:1597` |
+  | 23, 24 | `pns_ai_chatboo/models/chatboo_session.py`, `_store_design`, `_store_title` | `:1010` / `:1011`; `:1049` / `:1050` (`try/finally` dentro) |
+
+  Imports (11, con marcador encima): `ai_log.py:9`, `ai_skill_param_cache.py:14`, `ai_change_journal.py:8`,
+  `key_pin_desk.py:17`, `api_result_cache.py:13`, `engine_tool_run.py:11`, `field_required_plan.py:15`,
+  `session_download.py:378`, `safe_plan.py:34`, `safe_operation.py:16` y `chatboo_session.py:18`. Helper: `:3`.
+- **Qué cubre:** E1 a E4. Se conservan el `.all`, la caché, `towrite`, `tocompute` y los `new()` de quien llama. Lo que
+  quien llama lee después de una apertura es lo mismo que antes (L5, `REPEATABLE READ`); no se añade ninguna invalidación.
+- **Desviaciones frente a la propuesta:**
+  - helper con SPDX y Copyright antes del marcador (`:3`), como `seges_box_a_cache.py`; mensaje con f-string (lint);
+    `req.env` con `# noqa: B018  # pylint: disable=pointless-statement` y el comentario en la línea de encima;
+  - encima de cada apertura solo el marcador, sin el comentario en inglés del 37;
+  - apertura 9: el import va dentro del `try/except ImportError` de la función (`:375-380`), con
+    `# pylint: disable=import-outside-toplevel`, porque el módulo no importa Odoo arriba;
+  - `R1702` (6/5) en `ai_log.py`: `# pylint: disable=too-many-nested-blocks` en `:723`. En una línea suelta, pylint lo
+    aplica hasta el final del bloque: **vale para todo el `try` del fabricante** en `_create_log_entry`, no solo para el
+    `with`;
+  - la comprobación de salida registra siempre antes de lanzar (decisión 1 de la implementación): el `except Exception`
+    del fabricante en las aperturas 1, 2, 6, 7, 9 y 24, y el de `safe_operation.py:1541` en la 3, se tragan la
+    `AssertionError`;
+  - tests 4 y 5: el entorno creado dentro se guarda en una lista; el conjunto es un `WeakSet` (`api.py:760`) y sin
+    referencia desaparece antes de salir del bloque.
+- **Restos conocidos:**
+  - **apertura 14** (`safe_operation.py:1091`, `_retry_confirmed_not_executed`) sin envolver: no la llama nadie;
+  - **aperturas 16 a 22**, fuera: hilo propio o `manage` nuevo;
+  - **apertura 9, import sin aviso:** si fallara (solo con `pns_base` roto), `:379-380` haría `fn(env)` en el cursor de
+    quien llama sin ningún log;
+  - **apertura 9, en tests:** un incumplimiento lanza la `AssertionError` después del `commit` del cursor propio; el
+    `except Exception` de `:390` la atrapa (solo `debug`) y `:395` vuelve a ejecutar `fn(env)` en el cursor de quien
+    llama. El adjunto quedaría duplicado: uno confirmado por el cursor propio, fuera de la transacción de quien llama, y
+    otro en ella, por `:395`. La línea ERROR del helper sí queda en el log;
+  - **apertura 9 con quien llama sobre un usuario sin confirmar** (solo en tests): el intento en el cursor propio falla
+    siempre y acaba en `fn(env)` (`:395`), igual que antes; ahora falla antes del `INSERT` (desaparece el «bad query» de
+    `ir_attachment_create_uid_fkey`);
+  - **entornos sin referencia:** un entorno sobre el cursor de quien llama creado dentro del bloque y descartado antes de
+    salir no se cuenta (`WeakSet`); lo que escriba va al `towrite` temporal y lo vuelca el `commit` del cursor propio,
+    igual que antes del parche. La comparación de claves no lo ve;
+  - **tests del fabricante que comparten un cursor** parcheando `Registry.cursor`: no hay cursor propio y el parche no
+    puede aislar. `TestOneCompanyLive.test_plan_cannot_touch_the_other_company` deja en la apertura 3 **una línea ERROR
+    esperada** («1 caller environment(s) … changed: no»); su `AssertionError` la tragan `safe_operation.py:1541-1544` y
+    el propio test;
+  - el `disable` de `R1702`, que cubre todo el `try` del fabricante;
+  - 14 incidencias de lint del fabricante en líneas reindentadas (`ai_log.py` 5, `ai_skill_param_cache.py` 1,
+    `chatboo_session.py` 8), aceptadas como preexistentes.
+- **Qué se degrada:**
+  - el cursor propio no ve la caché ni lo pendiente de quien llama: lee de la BD lo que necesite, y lo que quien llama no
+    ha confirmado no existe para él (antes lo veía en la caché y fallaba al escribir, como en la apertura 9);
+  - por apertura, dos recorridos de las claves pendientes de quien llama (coste proporcional a lo pendiente) y uno de
+    su conjunto;
+  - con petición y cursor abierto, `request.env` se crea antes aunque luego no se use;
+  - un entorno de quien llama creado dentro del bloque, que antes pasaba desapercibido, da F y ERROR en tests y WARNING
+    con pila en producción.
+- **Tests** (`pns_ai_mcp/tests/test_seges_side_cursor_commit.py`):
+  - `test_log_commits_caller_pending_write`, `test_log_drops_pending_write_on_new_record` y
+    `test_box_b_side_cursor_waits_for_plan_row`: sin cambios, de F a correctos;
+  - `TestSegesSideEnv` (6): `test_side_cursor_keeps_caller_cache_and_new`, `test_nested_side_env_restores_stack`,
+    `test_request_env_forced_before_swap`, `test_caller_env_inside_side_env_fails_in_tests`,
+    `test_caller_env_inside_side_env_warns_in_production` y
+    `test_caller_pending_changed_inside_side_env_fails_in_tests`. Cursores aparte solo con SQL, prefijo
+    `seges-pns105-`, mensajes sin datos.
+- **Batería** (log `tests-20261113-131618.log`): 519 tests, 1 F (`test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin`),
+  0 E y 4 saltados. Traceback 58, «bad query» 0, «store failed» 0, `seges-pns105-` 0 y «seges_side_env: » 1 (la
+  esperada). Marcadores fuera de tests: 97.
+- **Neutralización:** N105a, N105r, N105c y N105p, todas F como estaba previsto y SHA-256 igual al restaurar. Logs en la
+  propuesta.
+- **Cómo comprobar si el fabricante ya lo ha corregido:** `test_seges_side_cursor_commit` pasa sin el parche 38 (los tres
+  primeros tests son los de la confirmación) y los cursores propios de las aperturas 1 a 15, 23 y 24 crean su
+  `Environment` en un conjunto aparte (`api.Environments()` o `Environment.manage()` en un hilo propio).
+- **Seguimiento:** PNS-105 (gravedad Alta, propuesta). La actualización de la ficha queda para el paso de laboratorio y
+  seguimiento.

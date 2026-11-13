@@ -14,6 +14,8 @@ from odoo.exceptions import AccessError, RedirectWarning, UserError
 
 from odoo.addons.pns_ai_mcp.utils import record_marks
 from odoo.addons.pns_ai_mcp.utils.markup_rename import rename_stored_markup
+# Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+from odoo.addons.pns_base.utils.seges_side_env import seges_side_env
 
 from ..utils import turn_documents
 from ..utils.chatboo_product_icp import ICP_HISTORY_RETENTION_DAYS
@@ -1005,34 +1007,36 @@ class ChatbooSession(models.Model):
         turn = self._normalize_turn_id(
             (self.env.context or {}).get('mcp_turn') or '',
         )
-        new_cr = self.env.registry.cursor()
-        try:
-            env_w = api.Environment(new_cr, SUPERUSER_ID, {})
-            session = env_w['chatboo.session'].browse(self.id)
-            rev = (session.canvas_rev or 0) + 1
-            values = {
-                'canvas_open': True,
-                'canvas_design': content,
-                'canvas_rev': rev,
-            }
-            if turn:
-                values['canvas_turn'] = turn
-            if title is not None:
-                values['canvas_title'] = title or False
-            session.write(values)
-            new_cr.commit()
-            return rev
-        except Exception:
+        # Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+        with seges_side_env():
+            new_cr = self.env.registry.cursor()
             try:
-                new_cr.rollback()
+                env_w = api.Environment(new_cr, SUPERUSER_ID, {})
+                session = env_w['chatboo.session'].browse(self.id)
+                rev = (session.canvas_rev or 0) + 1
+                values = {
+                    'canvas_open': True,
+                    'canvas_design': content,
+                    'canvas_rev': rev,
+                }
+                if turn:
+                    values['canvas_turn'] = turn
+                if title is not None:
+                    values['canvas_title'] = title or False
+                session.write(values)
+                new_cr.commit()
+                return rev
             except Exception:
-                pass
-            raise
-        finally:
-            try:
-                new_cr.close()
-            except Exception:
-                pass
+                try:
+                    new_cr.rollback()
+                except Exception:
+                    pass
+                raise
+            finally:
+                try:
+                    new_cr.close()
+                except Exception:
+                    pass
 
     def _store_title(self, title):
         """Name the open page when it has none. Same cursor as ``_store_design``."""
@@ -1042,27 +1046,29 @@ class ChatbooSession(models.Model):
             return False
         from odoo import SUPERUSER_ID
 
-        new_cr = self.env.registry.cursor()
-        try:
-            env_w = api.Environment(new_cr, SUPERUSER_ID, {})
-            session = env_w['chatboo.session'].browse(self.id)
-            if (session.canvas_title or '').strip():
+        # Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+        with seges_side_env():
+            new_cr = self.env.registry.cursor()
+            try:
+                env_w = api.Environment(new_cr, SUPERUSER_ID, {})
+                session = env_w['chatboo.session'].browse(self.id)
+                if (session.canvas_title or '').strip():
+                    return False
+                session.write({'canvas_title': title})
+                new_cr.commit()
+                return True
+            except Exception:
+                try:
+                    new_cr.rollback()
+                except Exception:
+                    pass
+                _logger.debug('Chatboo canvas: could not name the page', exc_info=True)
                 return False
-            session.write({'canvas_title': title})
-            new_cr.commit()
-            return True
-        except Exception:
-            try:
-                new_cr.rollback()
-            except Exception:
-                pass
-            _logger.debug('Chatboo canvas: could not name the page', exc_info=True)
-            return False
-        finally:
-            try:
-                new_cr.close()
-            except Exception:
-                pass
+            finally:
+                try:
+                    new_cr.close()
+                except Exception:
+                    pass
 
     def _paint_canvas(self, instruction, new_page=False, rows=None, title='',
                       images=None):

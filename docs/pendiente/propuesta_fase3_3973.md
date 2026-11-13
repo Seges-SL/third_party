@@ -1274,6 +1274,431 @@ Lecturas de solo lectura del 13/11/2026 (dos informes), sin cambiar código. Cit
   `multi.cron_timeout`;
 - las llamadas por posición a `request_safe_plan`.
 
+## Lecturas del paso 7 de PNS-105 (13/11/2026, solo lectura)
+
+Informe del agente sobre la rama `14.0-pns-ai-3973`, HEAD `f80ca99`; árbol sin cambios (solo los dos elementos sin commit
+de PNS-105). Citas de Odoo: contenedor `odoo-dev:14` (`odoo` 14.0.20231106), salidas `core14_pns105_paso7_c3.txt` y
+`core14_pns105_paso7_c3b.txt` en el scratchpad de la sesión.
+
+**L2c (escrituras del turno que hoy solo duren por un `commit` lateral): ninguna.**
+- `_try_session_export` es un `functools.partial` de `_tool_loop_session_export` (`utils/engine_tool_loop.py:328-331`;
+  función en `utils/engine_direct_delivery.py:229-315`). Él y `_intercept_session_file_propose`
+  (`utils/engine_presentation.py:242-305`) crean el `ir.attachment` en la apertura 9 (`utils/session_download.py:382`),
+  que lo confirma ella misma.
+- `_absorb_export_result`, `_remember_clip_data`, `_harvest_file_labels` y `_learn_row_models`
+  (`utils/engine_turn_records.py`) solo guardan en memoria o en el `context`.
+- `_offer_page_card` (`utils/engine_presentation.py:226-240`) escribe por las aperturas 23, 24 y 1.
+- `inference_audit` de `_ask_design` (`pns_ai_chatboo/models/chatboo_session.py:1216-1231`):
+  - sin turno, `'single'` → `_log_llm_inference` (`models/ai_execution_engine.py:687-779`) → `_create_log_entry` (`:752`),
+    apertura 1;
+  - con turno, `'accumulate'`: `flush` no escribe (`utils/inference_audit.py:84`); lo acumulado está en una `ContextVar`
+    (`utils/llm_usage.py:16`, `:30-35`) y lo escriben `_log_design_step` (apertura 1), `_mcp_log` y
+    `_log_side_usage_close` (apertura 1) y `_persist_provider_usage` → `ai_provider.py:1300` (solo SQL, sin
+    `Environment`).
+- `_log_provider_inference` (`'pair'`) no lo alcanza ningún camino.
+
+**C3 (vigilancia del worker), cerrado:**
+- el ping está en `Worker._runloop` (`odoo/service/server.py:1016`), antes de `process_work` (`:1020`), en el mismo hilo
+  que atiende la petición (`:1050`, `:1056-1059`);
+- `multi.timeout` = `limit_time_real` (`:659`; 120 por defecto, `config.py:326`); `multi.cron_timeout` =
+  `limit_time_real_cron or None` (`:661`), que con `-1` (por defecto, `config.py:329-330`) toma `limit_time_real`
+  (`:662-663`);
+- una petición HTTP bloqueada deja de hacer ping; el padre la mata con `SIGKILL` al vencer el plazo
+  (`process_timeout`, `:779-788`): 900 s en staging y 2400 s en LIYBEN;
+- un hilo `daemon` bloqueado (Chatboo) no lo impide; `limit_time_cpu` (`SIGXCPU`, `:923-928`; `RLIMIT_CPU`, `:956-960`)
+  no cuenta la espera de un bloqueo. Solo `check_limits` (padre, `request_max`, memoria, `:939-960`) terminaría el
+  proceso.
+
+**Llamadas a `request_safe_plan`:** firma en `controllers/safe_plan.py:222-224`; `replace_verification_id` es el
+6.º parámetro, sin `*args` ni `**kwargs`. Seis llamadas (tres en tests), todas con 2 argumentos por posición. El
+envoltorio `accept_choice` (`choice_ui.py:20-25`) la llama en `utils/field_required_plan.py:312-315` con `title` y
+`views_locked`. **H4 sigue descartada.**
+
+**Qué hay dentro del `with` de cada apertura (1 a 15, 23 y 24):**
+- ninguna lee `request.env`, `request.uid`, `request.session` ni `request.context`. La 1 lee
+  `request.httprequest.remote_addr` y `request.mcp_*` (`utils/mcp_logging.py:16-18`, `:33-41`); la 10 y la 11,
+  `request.ai_session_ref` y `request.mcp_turn`;
+- ninguna crea dentro entornos nuevos sobre el cursor de quien llama, ni escribe en sus registros. La 3 queda resuelta
+  abajo (P2 d);
+- anidamiento: las 11, 13 y 14 contienen a la 1, la 3, la 6, la 9 y la 15; la 15 contiene a la 1;
+- las 1, 2, 23 y 24 usan `try/finally` en lugar de `with`;
+- sin leer, a segundo nivel: `next_turn_step`, `cleanup_expired`, `_notify_safe_plan_hosts`,
+  `attach_verification_chat_hints`, `_maybe_auto_whitelist`, `MCPClientRegistry().get`, `maybe_attach_formatted_text`,
+  `render_context_from_env` y el `_sendone` del bus. Los cubre la comprobación de salida del helper (abajo).
+
+## Lecturas previas a la implementación de A (13/11/2026, solo lectura)
+
+Mismo árbol (HEAD `f80ca99`, sin cambios). Salidas `core14_pns105_paso7_p2.txt` y `core14_pns105_paso7_p2b.txt` en el
+scratchpad.
+
+- **N, número de parche:** el más alto es el 37, en el registro y en el código. **Siguiente libre: 38.**
+- **P1:** `pns_base` está en `depends` de `pns_ai_mcp` (`__manifest__.py:31`) y de `pns_ai_chatboo` (`:25`).
+  `pns_base/utils/` es paquete (`__init__.py`, que importa cinco submódulos en `:6-10`). `thread_env` solo se importa de
+  forma relativa (`pns_base/models/progress_job.py:29`). Desde los otros módulos, el helper se importa como
+  `odoo.addons.pns_base.utils.seges_side_env`.
+- **P2 (core):**
+  - a) `api.Environments` (`odoo/api.py:757-773`): `__init__` crea `envs` (`WeakSet`, `:760`), `cache` (`:761`),
+    `protected` (`:762`), `tocompute` (`:763`) y `towrite` (`:765`); tiene `add` (`:767-769`) y `__iter__` (`:771-773`).
+    `Environment.__new__` (`:447-469`) busca en `cls.envs` un entorno con los mismos argumentos (`:454-457`); si no
+    hay, crea uno con la caché, `protected` y `.all` del conjunto (`:464-467`) y lo añade (`:468`).
+  - b) `WebRequest`: el cursor está en `_cr`, que vale `None` al crear la petición (`odoo/http.py:205`) y se abre al
+    primer acceso a `cr` (`:231-232`). El entorno `_env` (`:208`) se crea al primer acceso a `env` (`:259-260`):
+    **forzarlo abre el cursor si no existía**. Vuelve a `None` al asignar `uid` (`:242`) o `context` (`:254`). La
+    petición en curso está en `_request_stack` (`LocalStack`, `:94`), y `request` es su proxy (`:95`); se apila en
+    `:271` y se desapila en `:275`.
+  - c) `odoo.modules.module.current_test` (`module.py:447`) se pone en `odoo/tests/loader.py:93` y se quita en `:100`.
+    `threading.current_thread().testing` se pone y se quita en `tests/loader.py:94`/`:99`, `modules/loading.py:63`/`:72`
+    y `service/server.py:1175`/`:1191`.
+  - d) `Selection.get_values` (`odoo/fields.py:2403-2408`) no crea ningún entorno: con lista fija no usa el entorno; con
+    `str` o función, `determine(selection, env[self.model_name])` (`:2407`). `ai.change.journal.origin` es una lista
+    fija (`ai_change_journal.py:65-72`). **La apertura 3 queda resuelta.**
+  - e) Aislamiento: `Cursor.__init__` (`sql_db.py:228-261`) tiene `serialized=True` por defecto (`:228`) y
+    `autocommit(False)` (`:257`); `Connection.cursor(serialized=True)` (`:712-715`); con `serialized`, `REPEATABLE READ`
+    (`:419-422`). `Environment.clear` (`odoo/api.py:620-627`) vacía la caché del conjunto (`:625`), `tocompute` y
+    `towrite`.
+- **P3:** `test_is_running(env)` (`pns_ai_mcp/utils/compat.py:42-57`) mira tres cosas: `test_enable` con
+  `TestCursor`, `current_thread().testing` y `module.current_test`. `is_test_mode(env)` de `pns_base`
+  (`pns_base/utils/thread_env.py:29-38`) mira `current_thread().testing` y `env.registry.in_test_mode()`.
+- **L5, quien llama después de una apertura:**
+  - todos los cursores de quien llama son `REPEATABLE READ` (`serialized` por defecto): el del turno de Chatboo, el de la
+    petición (`http.py:232`) y la caja A, que solo añade `SET TRANSACTION READ ONLY`
+    (`controller_helpers.py:195`, `:198`). El `Environment` de la caja A está en el conjunto del hilo
+    (`:190-192`, `:225-226`);
+  - en las 7, 11, 12, 13 y 24, quien llama no vuelve a leer en lo leído los campos que escribe el cursor propio;
+  - en la 23 (`_store_design`), una segunda lectura de `canvas_open` o `canvas_design` desde la caja A da hoy el valor
+    anterior. La caché se vacía, pero la relectura sale de la instantánea de la caja A, que es anterior al `commit` de
+    `:1023`. Con A da lo mismo, porque la caché conserva el valor anterior;
+  - donde quien llama necesita el valor nuevo, ya hace `commit` e `invalidate` (`safe_operation.py:945-946`,
+    `:954-955`);
+  - **conclusión: con A, quien llama ve lo mismo que hoy en todos los casos leídos. No se añade ninguna invalidación.**
+    Salvedad: que la instantánea se toma en la primera consulta de la transacción es comportamiento de PostgreSQL, sin
+    cita del contenedor.
+- **Visto de paso, fuera de A (sin comprobar; Sergio decide si se mira):** en `/verification/execute`, después de la
+  apertura 13, `_consume_confirm_token` (`verification_ui.py:96` → `safe_operation.py:596-602`) actualiza en el cursor
+  de la petición la fila que la 13 acaba de confirmar, y esa petición ya la había leído antes (`verification_ui.py:41`).
+  Con `REPEATABLE READ` podría dar un error de serialización (40001). Pasa igual con A o sin él.
+
+## Decisiones de Sergio (13/11/2026, paso 7)
+
+1. **Número de parche: 38**, el siguiente libre (comprobado en el registro y en el código).
+2. **Apertura 14:** no se toca. Resto conocido en el registro y en la ficha de PNS-105.
+3. **Aperturas con `try/finally` (1, 2, 23 y 24):** bloque entero dentro de `with seges_side_env():`, con reindentación.
+4. **Lecturas P1 a P3 y L5:** aprobadas y hechas (arriba).
+
+## Propuesta de implementación del parche 38 (PNS-105, opción A; 13/11/2026, sin implementar)
+
+Marcador: `# Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md`.
+
+### Helper
+
+**Dónde:** `pns_base/utils/seges_side_env.py` (nuevo). No se añade a `pns_base/utils/__init__.py`: se importa por su
+ruta completa, `from odoo.addons.pns_base.utils.seges_side_env import seges_side_env`.
+
+**Uso:** `with seges_side_env(), registry.cursor() as cr:`. El cursor sale primero (su `commit` o `close` → `flush_env` y
+`clear_env` solo sobre el conjunto temporal) y después se restaura el conjunto anterior.
+
+**Esquema** (para revisar; no es el código final):
+
+```python
+import contextlib
+import logging
+import threading
+
+from odoo import api, http
+from odoo.modules import module as odoo_module
+
+_logger = logging.getLogger(__name__)
+_MISSING = object()
+
+
+def _in_tests():
+    return bool(getattr(threading.current_thread(), 'testing', False)
+                or odoo_module.current_test)
+
+
+def _request_with_cursor():
+    req = http._request_stack.top
+    if req is None or getattr(req, '_cr', None) is None:
+        return None
+    return req
+
+
+@contextlib.contextmanager
+def seges_side_env():
+    local = api.Environment._local
+    req = _request_with_cursor()
+    if req is not None:
+        req.env                      # se crea en el conjunto de quien llama, sin abrir cursor
+    prev = getattr(local, 'environments', _MISSING)
+    caller_crs = {id(e.cr) for e in (() if prev is _MISSING else prev)}
+    if req is not None:
+        caller_crs.add(id(req._cr))
+    local.environments = api.Environments()
+    failed = False
+    try:
+        yield
+    except BaseException:
+        failed = True
+        raise
+    finally:
+        temp = local.environments
+        if prev is _MISSING:
+            del local.environments
+        else:
+            local.environments = prev
+        _check_only_side_envs(temp, caller_crs, failed)
+```
+
+- **Pila:** cada entrada guarda su `prev` y cada salida lo restaura, así que el anidamiento (las 11, 13 y 14 con la 1, la
+  3, la 6, la 9 y la 15 dentro) funciona sin estado global. Caso de la caja B: `_store` (apertura 6), dentro del plan
+  (11 o 13), ya no ve el `tocompute` del cursor del plan, y su `commit` no hace el `UPDATE` de la fila bloqueada
+  (efecto 3).
+- **Protección de `request.env`:** solo si hay petición (`_request_stack.top`, `http.py:94`) con el cursor ya abierto
+  (`_cr`, `:205`, `:231-232`). Forzar `env` sin cursor lo abriría (`:259-260`). Hoy no es necesaria (R4); es la defensa
+  aprobada.
+- **Comprobación de salida (`_check_only_side_envs`):** quien incumple es cualquier entorno del conjunto temporal
+  (iterable, `api.py:771-773`) cuyo cursor sea el de quien llama: los cursores de `prev` y el de la petición. Cubre
+  `request.env` creado dentro, y también cualquier `sudo()`, `with_context` o `env(...)` sobre registros de quien llama.
+  - Si `_in_tests()` y no hay excepción en curso: `AssertionError` (cuenta como F).
+  - En producción, o con una excepción en curso (para no taparla): WARNING del logger del helper, con el número de
+    entornos, sin datos.
+  - **Detector de tests:** `current_thread().testing` o `module.current_test` (`tests/loader.py:93-100`), las mismas
+    señales que usan `is_test_mode` y `test_is_running`, sin necesitar `env`.
+  - Cubre también las lecturas de segundo nivel sin hacer (R4): si alguna crea un entorno sobre el cursor de quien
+    llama, lo dirá la batería o el laboratorio.
+
+### Aperturas que se envuelven
+
+Once archivos más el helper:
+
+| N.º | Apertura | Forma |
+|---|---|---|
+| 1 | `pns_ai_mcp/models/ai_log.py:720` `_create_log_entry` | `try/finally` → dentro de `with seges_side_env():` |
+| 2 | `models/ai_skill_param_cache.py:146` `_remember_for_skill` | `try/finally` → ídem |
+| 3 | `models/ai_change_journal.py:392` `_record_failed_plan` | `with` |
+| 4, 5 | `models/key_pin_desk.py:203` `_collect`, `:227` `_take` | `with` |
+| 6 | `models/api_result_cache.py:132` `_store` | `with` |
+| 7 | `utils/engine_tool_run.py:547` `_mint_card_token` | `with` |
+| 8 | `utils/field_required_plan.py:248` `create_field_required_choice` | `with` |
+| 9 | `utils/session_download.py:382` `_run_on_committed_cursor` | `with` (la repetición de `:392` queda fuera) |
+| 10, 11 | `controllers/safe_plan.py:310` y `:409` | `with` |
+| 12, 13, 15 | `models/safe_operation.py:698`, `:968` y `:1592` | `with` |
+| 23, 24 | `pns_ai_chatboo/models/chatboo_session.py:1008` y `:1045` | `try/finally` → dentro de `with seges_side_env():` |
+
+- **Fuera:** la 14 (no alcanzada; resto conocido) y las 16 a 22 (hilo propio o `manage` nuevo).
+- **Marcadores previstos:** 16 aperturas + 11 imports + 1 del helper = **28** (de 69 a 97 fuera de tests). Se recuentan al
+  implementar.
+- **Revisión del diff:** `git diff -w` para ver solo los cambios reales en las cuatro aperturas reindentadas.
+
+### Efectos
+
+- **Se corrigen:** E1 (confirmación fuera de la transacción de quien llama), E2 (pérdida en registros nuevos), E3 (espera
+  de bloqueo en la caja B) y E4 (vaciado al fallar).
+- **Se conservan:** el `.all`, la caché, `towrite`, `tocompute` y los `new()` de quien llama.
+- **Sin cambio para quien llama (L5):** lo que lee después de una apertura es lo mismo que hoy, por la instantánea de
+  `REPEATABLE READ`. No se añade ninguna invalidación.
+- **Se degrada:** nada en lo leído. Un entorno creado dentro del bloque sobre el cursor de quien llama, que hoy pasa
+  desapercibido, da F en tests y WARNING en producción.
+
+### Tests
+
+En `pns_ai_mcp/tests/test_seges_side_cursor_commit.py`, el archivo sin commit, que sube con el parche:
+- **Los 3 actuales, de F a correctos, sin cambiarlos:** `test_log_commits_caller_pending_write`,
+  `test_log_drops_pending_write_on_new_record` y `test_box_b_side_cursor_waits_for_plan_row`.
+- **Clase nueva `TestSegesSideEnv`** (5 tests):
+  1. `test_side_cursor_keeps_caller_cache_and_new`: valor en caché de `base.main_partner` (precondición
+     `env.cache.contains`) y un `new()` con un valor; `_create_log_entry` (con `test_is_running` parcheado a `False`).
+     Después siguen los dos. Hoy F (`clear_env`, `api.py:625`).
+  2. `test_nested_side_env_restores_stack`: dentro del helper, un cursor propio con su entorno y una escritura pendiente
+     (`comment` de `base.main_partner`); dentro, otro helper con su cursor y `commit`. Comprueba:
+     - la escritura del de fuera sigue en su `towrite` tras el `commit` del de dentro;
+     - al salir de cada uno, `Environment._local.environments` es otra vez el conjunto anterior (identidad).
+
+     El de fuera cierra con `rollback`. Comprobación con SQL desde un cursor aparte: `comment` sin el marcador.
+  3. `test_request_env_forced_before_swap`: una petición simulada apilada en `http._request_stack` (`http.py:94`), con
+     `_cr` = el cursor del test y `env` sin crear. Tras el helper, su `env` existe, su `cr` es el del test y está en el
+     conjunto de quien llama, no en el temporal. Se desapila en `addCleanup`.
+  4. `test_caller_env_inside_side_env_fails_in_tests`: dentro del helper,
+     `self.env['res.partner'].with_context(seges_pns105=1)` (un entorno nuevo sobre el cursor del test) →
+     `assertRaises(AssertionError)`.
+  5. `test_caller_env_inside_side_env_warns_in_production`: lo mismo, con `_in_tests` del helper parcheado a `False` →
+     `assertLogs` del logger del helper con un WARNING.
+- **Las reglas de siempre:** cursores aparte solo con SQL; prefijo `seges-pns105-`; sin datos en los mensajes; la
+  excepción aprobada del ORM en `setUpClass` y `revoke_groups`.
+
+### Neutralización
+
+Una cada vez, con la batería completa y SHA-256 al restaurar:
+
+| Prueba | Cambio | Deben fallar (F) |
+|---|---|---|
+| N105a | el helper solo hace `yield`, sin cambio de conjunto ni comprobación | los 3 actuales, `test_side_cursor_keeps_caller_cache_and_new` y `test_nested_side_env_restores_stack` |
+| N105r | sin forzar `request.env` | `test_request_env_forced_before_swap` |
+| N105c | sin la comprobación de salida | `test_caller_env_inside_side_env_fails_in_tests` y `test_caller_env_inside_side_env_warns_in_production` |
+
+### Recuento
+
+| Tras | Batería | Esperado |
+|---|---|---|
+| Hoy (árbol con el test sin commit) | 513 | 4 F (`test_paap_i7` y los 3 de PNS-105), 0 E, 4 saltados |
+| Parche 38 | 513 + 5 = **518** | 1 F (`test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin`), 0 E, 4 saltados |
+
+Si la comprobación de salida da F en algún test existente, no se toca el test: se informa por nombre, con la apertura y
+el número de entornos (sin datos).
+
+### Comprobaciones finales y laboratorio
+
+- **Comprobaciones:** lint del kit (`--revisar` en los tres módulos), compilación con Python 3.7.3, recuento de marcadores,
+  `seges-pns105-` y UUID4 en los logs, y secretos (`seges-3b-[a-z0-9-]*[0-9a-f]{32}`) a 0.
+- **Laboratorio con Chatboo** (script y pasos presentados antes):
+  - un turno con herramienta (apertura 1);
+  - una página (23 y 24);
+  - un plan autoconfirmable (11);
+  - «Ejecutar» de la ficha (13);
+  - una llamada por `/mcp`.
+
+  En el log, 0 Traceback y ningún WARNING del helper.
+
+### Entrada en `parches_pns_ai.md` (borrador)
+
+> **Parche 38 (PNS-105, datos).** Los cursores propios con `Environment` del mismo hilo confirmaban y vaciaban lo
+> pendiente de quien los llama (`flush_env`/`clear_env` recorren todo `Environment.envs`). Helper
+> `pns_base/utils/seges_side_env.py`: un `api.Environments()` nuevo mientras dura el bloque del cursor propio,
+> restaurado al salir (en pila); fuerza `request.env` antes si la petición tiene el cursor abierto, y comprueba al salir
+> que el conjunto temporal no tiene entornos del cursor de quien llama (F en tests, WARNING en producción). Envuelve las
+> aperturas 1 a 13, 15, 23 y 24 del inventario. Corrige E1 a E4. Restos: la apertura 14 sin envolver (no alcanzada); las
+> 16 a 22, fuera (hilo propio). Tests: `test_seges_side_cursor_commit.py` (3 + 5). Neutralización N105a, N105r y N105c.
+
+### Ajustes de Sergio a la propuesta del parche 38 (13/11/2026)
+1. N105a = el helper solo hace yield (tampoco fuerza request.env ni comprueba). Deben fallar los 3 actuales y los 6
+   de TestSegesSideEnv.
+2. request.env solo se fuerza si hay conjunto en el hilo (prev no es _MISSING): sin conjunto, Environment.__new__
+   fallaría (envs = (), api.py:423-425; envs.cache/envs.add, :464-468).
+3. Test 2: el cursor de fuera sin with (Cursor.__exit__ hace commit, sql_db.py:136-153), con try/finally de
+   rollback y close; addCleanup que restaura comment de base.main_partner por SQL; lock_timeout de 3 s en los dos
+   cursores del test.
+4. Test 1: limpieza de la fila de ai.log (tool_name 'seges_3b_probe', como los dos tests actuales).
+5. Mensaje del helper con etiqueta fija 'seges_side_env: '; los tests 4 y 6 usan assertRaisesRegex, y el 5
+   comprueba la etiqueta.
+6. Refuerzo de la comprobación de salida: también se compara el conjunto de claves (modelo, id, campo) del towrite
+   y del tocompute de quien llama antes y después del bloque. Si cambia, mismo trato (F en tests, WARNING en
+   producción). Test 6 nuevo. Motivo: el forzado de request.env hace invisible a la comprobación de entornos su uso
+   dentro del bloque (pasos action de las aperturas 11 y 13).
+7. El WARNING va con stack_info=True (la pila no lleva datos).
+8. Test 3: petición simulada con context propio ({'seges_pns105_req': 1}), para que el entorno forzado sea nuevo
+   (api.py:454-457); se comprueba que su .all es el conjunto de quien llama y que no está en el temporal.
+9. Comprobación final: 16 usos de seges_side_env() y 11 imports, cada uso en la línea del registry.cursor() o
+   justo encima.
+10. Neutralización N105p (sin la comparación de pendientes): debe fallar solo el test 6.
+Recuento: 513 + 6 = 519 tests, 1 F (test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin), 0 E y 4 saltados.
+
+## Implementación del parche 38 (13/11/2026)
+
+Detalle en el [registro](parches_pns_ai.md), «Parche 38 (PNS-105, datos)». Rama `14.0-pns-ai-3973`, HEAD `f80ca99` más
+los cambios sin commit. Citas de Odoo: contenedor `odoo-dev:14` (`odoo` 14.0-20231106, werkzeug 0.14.1).
+
+**Citas del paso 1** (script de solo lectura, `inspect` y `ast`): `Environment._local` (`odoo/api.py:421`), `envs`
+(`:423-425`), `manage()` (`:427-438`), `reset()` (`:440-445`); `Environments` (`:757-773`): `tocompute` es `Field` →
+conjunto de ids (`:763`) y `towrite`, modelo → id → {campo: valor} (`:765`); `add_to_compute` (`:702-706`) y
+`remove_to_compute` (`:708-717`, existe); `_request_stack` (`odoo/http.py:94`) y `WebRequest.env` (`:256-261`);
+werkzeug `Local.__delattr__` (`local.py:82-86`) y `LocalStack.top` (`:160-168`). Ninguna contradijo el diseño.
+
+**Decisiones de Sergio durante la implementación (13/11/2026):**
+1. La comprobación de salida **siempre registra** (ERROR en tests, WARNING fuera, con `stack_info`) y, en tests, después
+   lanza la `AssertionError`. Motivo: en las aperturas 1, 2, 6, 7, 9 y 24 el `except Exception` del fabricante se
+   traga la excepción; con la línea en el log, el recuento de «seges_side_env: » lo detecta. Los tests 4 y 6 comprueban
+   también el ERROR con `assertLogs`.
+2. El import de la apertura 9 se queda dentro de la función (resto conocido).
+3. `R1702` de `ai_log.py`: `# pylint: disable=too-many-nested-blocks` entre el marcador y el `with`. Las 14 incidencias
+   del fabricante en líneas reindentadas se aceptan como preexistentes.
+4. La línea «seges_side_env: » de `test_plan_cannot_touch_the_other_company` es esperada (abajo). Sin cambio de código.
+5. La desaparición del «bad query» de `ir_attachment` es un efecto del parche (abajo).
+
+**Código:** helper `pns_base/utils/seges_side_env.py` (nuevo), 16 aperturas en 11 archivos, 11 imports. Marcadores fuera
+de tests: **97** (69 + 28: 1 del helper, 16 aperturas, 11 imports).
+
+**Tests:** `pns_ai_mcp/tests/test_seges_side_cursor_commit.py`: los 3 de la confirmación, sin cambios (de F a correctos), y
+`TestSegesSideEnv` (6). Docstring del módulo y línea de `tests/__init__.py` actualizados.
+
+**Baterías** (tres módulos; BD de tests desechable `test_lab_pns_ai_3973_14`):
+
+| Punto | Log | Tests | F | E | Saltados |
+|---|---|---|---|---|---|
+| Línea base (sin parche) | `tests-20261112-190050.log` | 513 | 4 | 0 | 4 |
+| Parche 38, antes de las decisiones 1 y 3 | `tests-20261113-122056.log` | 519 | 1: `test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin` | 0 | 4 |
+| Parche 38, antes de los textos | `tests-20261113-122946.log` | 519 | 1: `test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin` | 0 | 4 |
+| **Parche 38** | `tests-20261113-131618.log` | **519** | **1**: `test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin` | **0** | **4** |
+
+Saltados: los 4 de la línea base (`test_backend_starts_without_errors`, `test_a_pending_field_is_left_on_the_record_itself`,
+`test_typed_readers_keep_secret_keys_out`, `test_typed_setters_do_not_return_a_secret`).
+
+**Línea «seges_side_env: » esperada** (1 en el log final):
+- **apertura 3** (`_record_failed_plan`), test del fabricante `TestOneCompanyLive.test_plan_cannot_touch_the_other_company`;
+- `_shared_cursor()` (`tests/test_one_company_live.py:74-91`) parchea `Registry.cursor` para que devuelva siempre `view`,
+  el cursor sobre el que `_run_plan` crea el entorno de quien llama (`:181`);
+- dentro de la apertura 3, `registry.cursor()` devuelve `view` y `jenv` (`ai_change_journal.py:396`) se crea en el
+  conjunto temporal sobre un cursor de quien llama: la comprobación lo cuenta, correctamente;
+- la `AssertionError` la tragan `safe_operation.py:1541-1544` (silenciado por `@mute_logger`) y el `try/except` del test
+  (`:204-207`);
+- **`_()` descartado:** `GettextAlias._get_cr` toma primero la variable local `cr` (`odoo/tools/translate.py:386-387`),
+  que en la apertura 3 es el cursor propio; el entorno de `_get_translation` (`:483`) va sobre él;
+- fuera de este test, `registry.cursor()` devuelve siempre un cursor nuevo.
+
+**Efecto del parche en la apertura 9: desaparece el «bad query» de `ir_attachment`.**
+- `ir_attachment_create_uid_fkey`: 1 en `190050`; 0 en `122056` y `122946`. En `131618`, 0 «bad query».
+- `TestSegesChatbooExportOwn.test_fulfill_client_export_claims_own`: el usuario que exporta se crea en la transacción del
+  test (`pns_ai_chatboo/tests/test_seges_chatboo_export.py:197-201`) y el cursor propio no lo ve.
+- Descartado que el cursor propio cree y confirme ahora el adjunto: un `INSERT` suyo con `create_uid` de ese usuario viola
+  la clave ajena, y el test comprueba `create_uid = user_a` (`:224-226`). El adjunto se crea en la rama de respaldo
+  (`session_download.py:395`), dentro de la transacción del test.
+- **Deducido, sin ver en ejecución y sin conocer la excepción:** con el parche, el entorno del cursor propio tiene su caché
+  vacía y no ve lo que quien llama tiene en caché del usuario sin confirmar, así que falla antes del `INSERT` (candidato:
+  `env.company` → el usuario). La excepción la atrapa `:390-394` con un `debug`.
+
+**Neutralización** (una cada vez; copia, cambio con coincidencia única, batería completa, restauración con `cp -p` y
+SHA-256 comparado con la referencia fija `b2bb88b0…3c56610`). En todas: 519 tests, 0 E, 4 saltados, `test_paap_i7` en F y
+SHA-256 igual. Todas coinciden con lo previsto.
+
+| Prueba | Cambio | Log | F, además de `test_paap_i7` | «seges_side_env: » |
+|---|---|---|---|---|
+| N105a | el helper solo hace `yield` | `tests-20261113-124742.log` | los 3 de la confirmación y los 6 de `TestSegesSideEnv` | 0 |
+| N105r | sin forzar `request.env` (`if False:`) | `tests-20261113-125122.log` | `test_request_env_forced_before_swap` | 1 |
+| N105c | `return` al principio de `_check_only_side_envs` | `tests-20261113-125449.log` | tests 4, 5 y 6 | 0 |
+| N105p | `changed = False` | `tests-20261113-125807.log` | `test_caller_pending_changed_inside_side_env_fails_in_tests` | 1 |
+
+`test_nested_side_env_restores_stack` dio F en N105a, no E (el `lock_timeout` no llegó a saltar).
+
+**Comprobaciones finales:**
+- Ningún `.py` de los tres módulos es más nuevo que el log final (`find -newer`, vacío).
+- Lint del kit (`--revisar`): 0 en `pns_base`; 14 en líneas del fabricante reindentadas (`ai_log.py` 5,
+  `ai_skill_param_cache.py` 1, `chatboo_session.py` 8), aceptadas como preexistentes.
+- Python 3.7.3 (contenedor): 13 de 13 archivos; tras los textos, otra vez el test y `tests/__init__.py` (2 de 2, lint 0
+  nuevas).
+- Marcadores fuera de tests: 97 (28 del 38). Usos: 16 `seges_side_env()` y 11 imports; el cursor en la misma línea o en la
+  siguiente, salvo la apertura 2 (`new_cr = None` en medio; cursor en `ai_skill_param_cache.py:150`).
+- Log final frente a la línea base:
+
+  | Qué | `190050` | `131618` |
+  |---|---|---|
+  | Traceback | 62 | 58 |
+  | «bad query» | 2 (`UPDATE "res_partner"` de la caja B, `INSERT INTO "ir_attachment"`) | 0 |
+  | «store failed» | 1 | 0 |
+  | `seges-pns105-` | 3 | 0 |
+  | «seges_side_env: » | 0 | 1 (la esperada) |
+
+  Traceback por logger: cambian solo ERROR `pns_ai_mcp.tests.test_seges_side_cursor_commit` (3 → 0) y WARNING
+  `pns_ai_mcp.models.api_result_cache` (1 → 0). Siguen ERROR `odoo.http` 54, `safe_operation` 2 (`:1503`, `:984`, por el
+  stub del test de la caja B), `ai_change_journal` 1 y `test_system_action` 1.
+- Secretos `seges-3b-[a-z0-9-]*[0-9a-f]{32}` y cadenas UUID4: 0 en los 7 logs del 13/11/2026.
+
+**Desviaciones frente a la propuesta:** las del registro, «Desviaciones».
+
+**Incidencias del proceso:** tres órdenes no se ejecutaron tal como se presentaron: `wc -l` del registro, sin presentar;
+un `cat >>` que añadía al script del paso 1 dos bloques aprobados, sin presentar; y la compilación de los dos archivos de
+tests tras los textos, a la que se añadieron un `echo "exit=$?"` y un `cat` de su salida. Ninguna cambió nada del repo.
+
+**Pendiente:** laboratorio con Chatboo y seguimiento de PNS-105, en otro paso.
+
 ## Decisiones de Sergio (12/11/2026, revisión de las dos propuestas)
 
 Sobre «Propuesta: parche de `flush` antes de abrir la caja A» y «Propuesta de implementación de la 3b».

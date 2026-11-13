@@ -9,6 +9,8 @@ from datetime import timedelta
 
 from odoo import api, fields, models
 from odoo.addons.pns_base.utils.compat import ODOO_VERSION
+# Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+from odoo.addons.pns_base.utils.seges_side_env import seges_side_env
 
 from ..utils.api_call_result import API_CALL_CACHE_TTL_SECONDS, cache_key_for_api_call
 
@@ -129,7 +131,8 @@ class AIApiResultCache(models.Model):
                 'fetched_at': now,
                 'expires_at': expires,
             }
-            with self.env.registry.cursor() as cr:
+            # Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+            with seges_side_env(), self.env.registry.cursor() as cr:
                 Cache = api.Environment(cr, self.env.uid, self.env.context)[self._name].sudo()
                 existing = Cache.search([('cache_key', '=', key)], limit=1)
                 if existing:

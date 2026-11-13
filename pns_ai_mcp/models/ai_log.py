@@ -5,6 +5,8 @@
 
 from odoo import models, fields, api, SUPERUSER_ID, _
 from odoo.tools import html_escape
+# Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+from odoo.addons.pns_base.utils.seges_side_env import seges_side_env
 from ..utils import mcp_ui
 from ..utils.compat import read_sums, test_is_running
 from ..utils.import_export_guard import ensure_ai_admin
@@ -717,139 +719,142 @@ class AILog(models.Model):
             return None
         try:
             _logger.info(f"TRACE_MCP: _create_log_entry START - Endpoint: {tool_name}, User: {user_id}")
-            new_cr = self.env.registry.cursor()
-            try:
-                env_log = api.Environment(new_cr, SUPERUSER_ID, {})
+            # Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+            # pylint: disable=too-many-nested-blocks
+            with seges_side_env():
+                new_cr = self.env.registry.cursor()
+                try:
+                    env_log = api.Environment(new_cr, SUPERUSER_ID, {})
 
-                primitive = (request_type or 'tool')
-                if primitive == 'LLM':
-                    primitive = 'llm'
+                    primitive = (request_type or 'tool')
+                    if primitive == 'LLM':
+                        primitive = 'llm'
 
-                prompt_json = None
-                if prompt_data is not None:
-                    try:
-                        prompt_json = json.dumps(prompt_data, indent=2, default=str, ensure_ascii=False)
-                    except Exception as e:
-                        prompt_json = f"Error serializing prompt: {str(e)}\nData: {str(prompt_data)[:1000]}"
+                    prompt_json = None
+                    if prompt_data is not None:
+                        try:
+                            prompt_json = json.dumps(prompt_data, indent=2, default=str, ensure_ascii=False)
+                        except Exception as e:
+                            prompt_json = f"Error serializing prompt: {str(e)}\nData: {str(prompt_data)[:1000]}"
 
-                result_json = None
-                if result_data is not None:
-                    try:
-                        if isinstance(result_data, dict) and 'content' in result_data:
-                            content = result_data.get('content', [])
-                            if content and isinstance(content, list) and len(content) > 0:
-                                first_item = content[0]
-                                if isinstance(first_item, dict) and 'text' in first_item and isinstance(first_item['text'], str):
-                                    result_json = first_item['text']
+                    result_json = None
+                    if result_data is not None:
+                        try:
+                            if isinstance(result_data, dict) and 'content' in result_data:
+                                content = result_data.get('content', [])
+                                if content and isinstance(content, list) and len(content) > 0:
+                                    first_item = content[0]
+                                    if isinstance(first_item, dict) and 'text' in first_item and isinstance(first_item['text'], str):
+                                        result_json = first_item['text']
+                                    else:
+                                        result_json = json.dumps(result_data, indent=2, default=str, ensure_ascii=False)
                                 else:
                                     result_json = json.dumps(result_data, indent=2, default=str, ensure_ascii=False)
                             else:
                                 result_json = json.dumps(result_data, indent=2, default=str, ensure_ascii=False)
-                        else:
-                            result_json = json.dumps(result_data, indent=2, default=str, ensure_ascii=False)
-                    except Exception as e:
-                        result_json = f"Error serializing result: {str(e)}\nData: {str(result_data)[:1000]}"
+                        except Exception as e:
+                            result_json = f"Error serializing result: {str(e)}\nData: {str(result_data)[:1000]}"
 
-                max_length = 100000  # ~100KB per field
-                if prompt_json and len(prompt_json) > max_length:
-                    prompt_json = prompt_json[:max_length] + "\n... (truncated)"
-                if result_json and len(result_json) > max_length:
-                    result_json = result_json[:max_length] + "\n... (truncated)"
+                    max_length = 100000  # ~100KB per field
+                    if prompt_json and len(prompt_json) > max_length:
+                        prompt_json = prompt_json[:max_length] + "\n... (truncated)"
+                    if result_json and len(result_json) > max_length:
+                        result_json = result_json[:max_length] + "\n... (truncated)"
 
-                if request_size_bytes is None:
-                    request_size_bytes = len(prompt_json.encode('utf-8')) if prompt_json else 0
-                if response_size_bytes is None:
-                    response_size_bytes = len(result_json.encode('utf-8')) if result_json else 0
+                    if request_size_bytes is None:
+                        request_size_bytes = len(prompt_json.encode('utf-8')) if prompt_json else 0
+                    if response_size_bytes is None:
+                        response_size_bytes = len(result_json.encode('utf-8')) if result_json else 0
 
-                user_prompt_limited = None
-                if user_prompt:
-                    user_prompt_limited = user_prompt[:max_length] if len(user_prompt) > max_length else user_prompt
+                    user_prompt_limited = None
+                    if user_prompt:
+                        user_prompt_limited = user_prompt[:max_length] if len(user_prompt) > max_length else user_prompt
 
-                code_to_execute_limited = None
-                if code_to_execute:
-                    code_to_execute_limited = code_to_execute[:max_length] if len(code_to_execute) > max_length else code_to_execute
+                    code_to_execute_limited = None
+                    if code_to_execute:
+                        code_to_execute_limited = code_to_execute[:max_length] if len(code_to_execute) > max_length else code_to_execute
 
-                if usage:
-                    from ..utils.llm_usage import usage_log_fields
-                    _pt, _ct, _tt, _cost = usage_log_fields(usage)
-                    if prompt_tokens is None:
-                        prompt_tokens = _pt
-                    if completion_tokens is None:
-                        completion_tokens = _ct
-                    if total_tokens is None:
-                        total_tokens = _tt
-                    if cost_usd is None:
-                        cost_usd = _cost
+                    if usage:
+                        from ..utils.llm_usage import usage_log_fields
+                        _pt, _ct, _tt, _cost = usage_log_fields(usage)
+                        if prompt_tokens is None:
+                            prompt_tokens = _pt
+                        if completion_tokens is None:
+                            completion_tokens = _ct
+                        if total_tokens is None:
+                            total_tokens = _tt
+                        if cost_usd is None:
+                            cost_usd = _cost
 
-                # Capture remote IP centrally when the caller did not provide it.
-                from ..utils.mcp_logging import (
-                    known_doors,
-                    normalize_remote_ip,
-                    request_log_stamp,
-                    resolve_client_label,
-                )
-                remote_ip = normalize_remote_ip(remote_ip)
-                ctx = self.env.context or {}
-                stamp = request_log_stamp()
-                if not source_channel:
-                    source_channel = (
-                        ctx.get('mcp_source_channel')
-                        or stamp.get('source_channel')
+                    # Capture remote IP centrally when the caller did not provide it.
+                    from ..utils.mcp_logging import (
+                        known_doors,
+                        normalize_remote_ip,
+                        request_log_stamp,
+                        resolve_client_label,
                     )
-                if not client_label:
-                    client_label = (
-                        ctx.get('mcp_client_label')
-                        or stamp.get('client_label')
+                    remote_ip = normalize_remote_ip(remote_ip)
+                    ctx = self.env.context or {}
+                    stamp = request_log_stamp()
+                    if not source_channel:
+                        source_channel = (
+                            ctx.get('mcp_source_channel')
+                            or stamp.get('source_channel')
+                        )
+                    if not client_label:
+                        client_label = (
+                            ctx.get('mcp_client_label')
+                            or stamp.get('client_label')
+                        )
+                    origin = source_channel or 'internal'
+                    if origin not in known_doors(env_log):
+                        origin = 'internal'
+                    client_label = resolve_client_label(
+                        env_log, user_id, origin, explicit=client_label,
                     )
-                origin = source_channel or 'internal'
-                if origin not in known_doors(env_log):
-                    origin = 'internal'
-                client_label = resolve_client_label(
-                    env_log, user_id, origin, explicit=client_label,
-                )
 
-                if provider_id in (None, False, 0) and isinstance(prompt_data, dict):
-                    provider_id = prompt_data.get('provider_id')
-                try:
-                    provider_id = int(provider_id) if provider_id else False
-                except (TypeError, ValueError):
-                    provider_id = False
+                    if provider_id in (None, False, 0) and isinstance(prompt_data, dict):
+                        provider_id = prompt_data.get('provider_id')
+                    try:
+                        provider_id = int(provider_id) if provider_id else False
+                    except (TypeError, ValueError):
+                        provider_id = False
 
-                log_entry = env_log['ai.log'].create({
-                    'user_id': user_id,
-                    'timestamp': fields.Datetime.now(),
-                    'access_mode': operation_type,
-                    'primitive': primitive,
-                    'endpoint': tool_name,
-                    'provider_id': provider_id,
-                    'prompt_data': prompt_json,
-                    'result_data': result_json,
-                    'result_summary': result_summary[:5000] if result_summary and len(result_summary) > 5000 else result_summary,
-                    'additional_info': additional_info[:5000] if additional_info and len(additional_info) > 5000 else additional_info,
-                    'user_prompt': user_prompt_limited,
-                    'code_to_execute': code_to_execute_limited,
-                    'model_name': agent_llm[:255] if agent_llm and len(agent_llm) > 255 else agent_llm,
-                    'request_size_bytes': request_size_bytes,
-                    'response_size_bytes': response_size_bytes,
-                    'prompt_tokens': prompt_tokens,
-                    'completion_tokens': completion_tokens,
-                    'total_tokens': total_tokens,
-                    'cost_usd': cost_usd,
-                    'turn': turn[:8] if turn else None,
-                    'turn_step': turn_step or 0,
-                    'origin': origin,
-                    'remote_ip': remote_ip,
-                    'client_label': client_label[:255] if client_label else None,
-                })
+                    log_entry = env_log['ai.log'].create({
+                        'user_id': user_id,
+                        'timestamp': fields.Datetime.now(),
+                        'access_mode': operation_type,
+                        'primitive': primitive,
+                        'endpoint': tool_name,
+                        'provider_id': provider_id,
+                        'prompt_data': prompt_json,
+                        'result_data': result_json,
+                        'result_summary': result_summary[:5000] if result_summary and len(result_summary) > 5000 else result_summary,
+                        'additional_info': additional_info[:5000] if additional_info and len(additional_info) > 5000 else additional_info,
+                        'user_prompt': user_prompt_limited,
+                        'code_to_execute': code_to_execute_limited,
+                        'model_name': agent_llm[:255] if agent_llm and len(agent_llm) > 255 else agent_llm,
+                        'request_size_bytes': request_size_bytes,
+                        'response_size_bytes': response_size_bytes,
+                        'prompt_tokens': prompt_tokens,
+                        'completion_tokens': completion_tokens,
+                        'total_tokens': total_tokens,
+                        'cost_usd': cost_usd,
+                        'turn': turn[:8] if turn else None,
+                        'turn_step': turn_step or 0,
+                        'origin': origin,
+                        'remote_ip': remote_ip,
+                        'client_label': client_label[:255] if client_label else None,
+                    })
 
-                log_id = log_entry.id
-                if new_cr:
-                    new_cr.commit()
-                _logger.info(f"MCP: _create_log_entry SUCCESS - ID: {log_id}")
-                return log_entry
-            finally:
-                if new_cr:
-                    new_cr.close()
+                    log_id = log_entry.id
+                    if new_cr:
+                        new_cr.commit()
+                    _logger.info(f"MCP: _create_log_entry SUCCESS - ID: {log_id}")
+                    return log_entry
+                finally:
+                    if new_cr:
+                        new_cr.close()
         except Exception as e:
             # Never let a logging failure break the actual operation.
             _logger.exception("TRACE_MCP: CRITICAL FAILURE creating log entry (Safe Transaction): %s", str(e))

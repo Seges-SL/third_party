@@ -4,6 +4,8 @@
 """Permanent journal of ERP mutations applied via Safe Plan (not ``ai.log``)."""
 from odoo import models, fields, api, _
 from odoo.exceptions import AccessError, UserError
+# Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+from odoo.addons.pns_base.utils.seges_side_env import seges_side_env
 
 from ..utils.change_journal import (
     DEFAULT_TRASH_DAYS,
@@ -389,7 +391,8 @@ class AiChangeJournal(models.Model):
 
         created_ids = []
         registry = src.registry
-        with registry.cursor() as cr:
+        # Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+        with seges_side_env(), registry.cursor() as cr:
             jenv = odoo_api.Environment(cr, SUPERUSER_ID, ctx)
             Journal = jenv['ai.change.journal'].sudo()
             err = (error or '')[:2000]

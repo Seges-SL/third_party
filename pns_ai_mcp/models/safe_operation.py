@@ -12,6 +12,8 @@ from odoo import models, fields, api, _
 from odoo.exceptions import AccessError, UserError, ValidationError
 # Seges: parche 16 (PNS-54, seguridad). Ver docs/pendiente/parches_pns_ai.md
 from odoo.addons.base.models.res_users import check_identity
+# Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+from odoo.addons.pns_base.utils.seges_side_env import seges_side_env
 from datetime import datetime, timedelta
 import hashlib
 import hmac
@@ -695,7 +697,8 @@ class SafeOperation(models.Model):
         registry = self.env.registry
         context = dict(self.env.context)
 
-        with registry.cursor() as cr1:
+        # Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+        with seges_side_env(), registry.cursor() as cr1:
             # Fail-fast: on contention, busy right away (do not wait).
             cr1.execute("SET LOCAL lock_timeout = '2s'")
             cr1.execute("SET LOCAL statement_timeout = '5s'")
@@ -965,7 +968,8 @@ class SafeOperation(models.Model):
 
         registry = self.env.registry
         try:
-            with registry.cursor() as cr2:
+            # Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+            with seges_side_env(), registry.cursor() as cr2:
                 cr2.execute("SET LOCAL lock_timeout = '5s'")
                 cr2.execute("SET LOCAL statement_timeout = '15s'")
                 env2 = api.Environment(cr2, uid, context or {})
@@ -1589,7 +1593,8 @@ class SafeOperation(models.Model):
             },
         }]
         payload = json.dumps(results, ensure_ascii=False, default=str)
-        with registry.cursor() as cr:
+        # Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+        with seges_side_env(), registry.cursor() as cr:
             jenv = odoo_api.Environment(cr, SUPERUSER_ID, ctx)
             if not module and module_ids:
                 recs = jenv['ir.module.module'].sudo().browse(module_ids).exists()

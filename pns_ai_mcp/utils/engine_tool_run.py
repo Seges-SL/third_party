@@ -7,6 +7,8 @@ import json
 import logging
 
 from odoo import _, api
+# Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+from odoo.addons.pns_base.utils.seges_side_env import seges_side_env
 from .relaxaicode_render import render_context_from_env
 
 _logger = logging.getLogger(__name__)
@@ -544,7 +546,8 @@ class ToolRunMixin:
         # Own cursor, committed now: the turn's cursor commits when the turn
         # ends, and a Confirm pressed before that finds no hash.
         try:
-            with self.env.registry.cursor() as ncr:
+            # Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+            with seges_side_env(), self.env.registry.cursor() as ncr:
                 ncr.execute("SET LOCAL lock_timeout = '5s'")
                 nenv = api.Environment(ncr, self.env.uid, dict(self.env.context or {}))
                 op = nenv['ai.safe.operation'].sudo().search(

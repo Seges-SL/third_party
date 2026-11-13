@@ -61,3 +61,5 @@ from . import test_seges_box_a_vias
 from . import test_seges_sandbox_credentials
 # Seges: tests de la fase 3b sobre 3.1.973 (parche 37: flush antes de abrir la caja A). Ver docs/pendiente/parches_pns_ai.md
 from . import test_seges_box_a_flush
+# Seges: tests del parche 38 (PNS-105). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_side_cursor_commit
