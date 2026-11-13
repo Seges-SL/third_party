@@ -726,6 +726,458 @@ Que la caja A lo pierda antes no cambia el resultado final.
 - **Inventario completo** de cursores propios del fabricante con `Environment` y `commit` en el hilo del llamador
   (`registry.cursor()`, `pool.cursor()`), con archivo:línea. El `grep` se presenta antes de ejecutarlo.
 
+**Test de confirmación de PNS-105 (12/11/2026):**
+- **Archivo:** `pns_ai_mcp/tests/test_seges_side_cursor_commit.py` (`TestSegesSideCursorCommit`, 2 tests), importado en
+  el bloque de Seges de `pns_ai_mcp/tests/__init__.py`. Sin commit, como `test_seges_box_a_vias` hasta la 3b.
+- **Diseño final:**
+  - `test_is_running` se parchea en `ai_log.py` con `lambda *args, **kwargs: False`. La firma real es
+    `test_is_running(env)` (`utils/compat.py:42-54`). Se importa por nombre en `ai_log.py:9` y se llama como
+    `test_is_running(self.env)` en `:716`.
+  - Contacto confirmado: `base.main_partner`. Usuario del registro: `base.user_admin`. `_create_log_entry` usa
+    `tool_name='seges_3b_probe'`, que se guarda en la columna `endpoint` (`ai_log.py:823`).
+  - Los cursores aparte (comprobaciones y limpieza) usan solo SQL, sin `Environment`, para que su `commit` no vuelque lo
+    pendiente del test. Los de comprobación cierran con `rollback`, sin `commit`.
+  - Precondiciones con mensaje `PRECONDITION (not the PNS-105 result): …`:
+    - `comment` está en `env.all.towrite` antes de la llamada;
+    - `_create_log_entry` devuelve un registro;
+    - la fila de la sonda (por `id` y `endpoint`) se ve desde un cursor aparte.
+  - Limpieza (`addCleanup`, registrada antes de la llamada):
+    - empieza con `self.env.cr.rollback()`, para soltar cualquier bloqueo de fila del test;
+    - en un cursor nuevo, restaura `comment` (solo en el test 1) y borra las filas de `ai_log` con
+      `endpoint = 'seges_3b_probe'`;
+    - termina con `commit` (`# pylint: disable=invalid-commit`).
+  - `self.env['base'].flush()` en `setUp`, para que `towrite` empiece vacío.
+  - `write_date` y `write_uid` de `base.main_partner` no se restauran (BD de tests desechable).
+- **Citas del contenedor** (`odoo` 14.0.20231106) corregidas en este paso, frente a la referencia:
+  - `towrite`: `odoo/api.py:765` (`Environments` en `:757-765`);
+  - `_write` → `MissingError`: `odoo/models.py:3777-3780`;
+  - `flush` → `recs.exists()._write(vals)`: `models.py:5479-5482`;
+  - `res.partner.write`: `odoo/addons/base/models/res_partner.py:543-587`.
+
+  Leídas para el siguiente paso de PNS-105:
+  - `Cursor.__enter__` / `__exit__`: `odoo/sql_db.py:136-153` (`__exit__` hace `commit()` si no hubo excepción, y
+    después `close()`);
+  - `savepoint(flush=True)`: `sql_db.py:115-134` (al entrar y al salir bien, `flush_env(clear=False)` y
+    `precommit.run()`; con excepción, `clear_env`, `precommit.clear()` y `ROLLBACK TO SAVEPOINT`).
+- **Resultado** (`odoo-dev 14 tests pns_base,pns_ai_mcp,pns_ai_chatboo`, log `tests-20261112-175130.log`):
+  - **512 tests, 3 F, 0 E y 4 saltados**. Las F son `test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin`,
+    `test_log_commits_caller_pending_write` y `test_log_drops_pending_write_on_new_record`.
+  - `test_log_commits_caller_pending_write` (`base.main_partner`): pasan las dos observaciones.
+    > `PNS-105: the pending write was committed outside the test transaction; the pending write survived the test
+    > transaction's rollback`
+  - `test_log_drops_pending_write_on_new_record`: se lee `None` en lugar del marcador.
+    > `PNS-105: the pending write on a record created in the test transaction was lost (flushed on the side cursor,
+    > which cannot see the row, then cleared)`
+  - Precondiciones sin fallos (`_create_log_entry` creó las filas 28 y 29 de `ai.log`). Sin líneas ERROR ni WARNING de
+    la limpieza.
+  - Traceback: 58 (los 56 de `tests-20261112-165632.log` más los 2 de las F nuevas).
+  - `grep -c`: 0 secretos (`seges-3b-[a-z0-9-]*[0-9a-f]{32}`) y 0 UUID4. `seges-pns105-`: 1 (el marcador, en el
+    mensaje de la F del test 2).
+- **PNS-105 confirmado por test. Faltan el inventario y la caja B; el parche y el estado se deciden después.**
+
+## Inventario de cursores propios y caja B (12/11/2026, solo lectura)
+
+Fuente: los cuatro `grep` presentados (G1 cursores, G2 entornos, G3 `commit`, G4 hilos; `--exclude-dir=tests`, sobre
+`pns_base`, `pns_ai_mcp` y `pns_ai_chatboo`) y lectura de cada apertura. Nada ejecutado aparte de los `grep`. Citas del
+core: contenedor (`odoo` 14.0.20231106), con la errata de citas aplicada: `Cursor.__enter__`/`__exit__`
+`sql_db.py:136-153` (`__exit__` hace `commit()` si no hubo excepción y después `close()`); `commit` `:448-457` (`flush_env`
+en `:451`); `rollback` `:459-468` (`clear_env` en `:462`); `savepoint(flush=True)` `:115-134`; `flush_env` `:65-80`;
+`clear_env` `:82-87`.
+
+Fuera del inventario, como se pidió: `hooks.py`, `controller_helpers.py:195/217` (caja A) y los `self.env.cr.commit()`
+(solo se cuentan).
+
+**Cursores propios con `Environment`** (24). En todos, el `commit` (explícito o implícito por `with`) vuelca y confirma
+lo pendiente del hilo (`towrite`, `tocompute`) y después lo vacía. Ninguna apertura lleva marcador de Seges: **todas son
+del fabricante**. «(sin grep)»: llamador deducido del nombre, del docstring o de este documento, sin `grep` de llamadores.
+
+| # | Apertura | `Environment` | `commit` | Hilo | Quién lo alcanza | ¿Pendientes del llamador? |
+|---|---|---|---|---|---|---|
+| 1 | `pns_ai_mcp/models/ai_log.py:720` `_create_log_entry` | `:722` | explícito `:847` (sin `with`; `close` `:852`) | mismo | `_mcp_log` del motor (Chatboo, skills); `_log_mcp_operation` de `/mcp`; `_log_safe_plan_execution` de la caja B (`safe_operation.py:1703`) | **sí** (PNS-105, confirmado por test). En la caja B, después del `commit` del plan (`:1501`). No corre en tests (`:716`) |
+| 2 | `models/ai_skill_param_cache.py:146` `_remember_for_skill` | `:147` | `:151` | mismo | skills, relleno híbrido de parámetros (sin grep) | sí, en turno. No se abre con `TestCursor` (`:88-92`) |
+| 3 | `models/ai_change_journal.py:392` `_record_failed_plan` | `:393` | `:440` + `with` | mismo | caja B: `except` de `execute_plan_now` (`safe_operation.py:1534`) | no: después del `rollback` (`:1509`, `clear_env`) |
+| 4 | `models/key_pin_desk.py:203` `_collect` | `:204` | `with` | mismo | flujo del PIN (`_collect_pin`, `:190`; sin grep) | según llamador |
+| 5 | `models/key_pin_desk.py:227` `_take` | `:228` | `with` (también en los `return`) | mismo | ídem; en bucle cada 0,4 s (`:211-216`) | ídem |
+| 6 | `models/api_result_cache.py:132` `_store` | `:133` (vía `sudo()` del recordset) | `with` | mismo | **caja B**, `api_call` (`controllers/safe_plan_http.py:518`); otros, sin grep | **sí: pasos anteriores del plan**. Sin guarda de tests |
+| 7 | `utils/engine_tool_run.py:547` `_mint_card_token` | `:549` | `:556` + `with` | mismo | turno, tras `safe_plan_request` (`_tool_loop_after_plan_request`, `:564`) | sí: lo que la herramienta dejó en el cursor del turno |
+| 8 | `utils/field_required_plan.py:248` `create_field_required_choice` | `:249` | `:258` + `with` | mismo | `request_safe_plan` (`controllers/safe_plan.py:243`), desde `/mcp`, turno y atajo de skills | posible |
+| 9 | `utils/session_download.py:382` `_run_on_committed_cursor` | `:383` | `:385` + `with` (si falla, `:392` repite en el `env` del llamador) | mismo | `persist_turn_file_detail` (`:460`) ← **caja B**, `fetch_url`/`api_call` binarios (`safe_plan_http.py:95-100`, `:145-150`); otros, sin grep | **sí en la caja B** |
+| 10 | `controllers/safe_plan.py:310` `request_safe_plan` | `:311` | `:341` + `with` | mismo | `safe_plan_request` (`/mcp`, turno), atajo de skills | sí: lo del turno |
+| 11 | `controllers/safe_plan.py:409` autoconfirmación | `:412` | `:422`, `:428`, `:432` + `with` | mismo | `safe_plan_request` con pasos autoconfirmables. Es **cursor del plan** | en la rama de `_replace_pending_plan`, el `op.write` (`:198`) queda pendiente y lo confirma `:422`. En la otra, `:341` ya lo vació |
+| 12 | `models/safe_operation.py:698` `_resolve_confirm` | `:702` | `:760`, `:779`, `:781` + `with` | mismo | botón «Confirmar» del aviso; `_resolve_confirm_and_execute` | no en lo leído (antes solo lee, `:689-696`) |
+| 13 | `models/safe_operation.py:968` `_execute_plan_with_timeouts` | `:971` | `:983` + `with` (dentro, `:1457` y `:1501`) | mismo | `_resolve_execute` ← ejecución del aviso o `_resolve_confirm_and_execute`. **Cursor del plan** | no en lo leído (`:830-833` solo lee e invalida; `:945` hace `commit` antes) |
+| 14 | `models/safe_operation.py:1087` `_retry_confirmed_not_executed` | `:1090` | `:1095` + `with` | mismo | cron, vía `_cleanup_stuck_state` (`:1057`). **Cursor del plan** | no: antes solo hay `search` |
+| 15 | `models/safe_operation.py:1592` `_heal_module_update_after_registry_reset` (`Registry`, `:1570`) | `:1593` | `:1647` + `with` | mismo | `except` de `execute_plan_now` (`:1514`) | no: después de `:1509` |
+| 16 | `pns_base/models/progress_job.py:147` `runner` | `:148` | `with` | **hilo propio** (`:170-172`), con `env_manage()` (`:145`): pendientes propios del hilo | `_launch` (sin grep) | no: el llamador ya hizo `commit` (`:110`) |
+| 17 | `pns_base/models/progress_job.py:153` | `:154` | `:157` + `with` | hilo propio | ídem. Es el cursor del trabajo | — |
+| 18 | `pns_base/models/progress_job.py:162` | `:163` | `with` | hilo propio | ídem | posible (H2) |
+| 19 | `pns_ai_chatboo/models/chatboo_job.py:205` `_runner` | `:206` | `with` | **hilo propio** (`:223-226`), con `_env_manage` (`:203`) | turno de Chatboo y trabajo de Canvas (`_spawn`, desde `controllers/chatboo.py:918` y `chatboo_canvas_job.py:69`) | — (la petición hizo `commit` antes: `:917`, `:68`) |
+| 20 | `chatboo_job.py:247` `_record_crash` | `:248` | `with` (`return` dentro) | hilo del worker, `manage` nuevo (`:246`) | `except` del `runner` (`:221`) | no: pendientes del hilo nuevos |
+| 21 | `models/chatboo_async_request.py:703` `_finalize` | `:705` | `:741` + `with`; `savepoint` `:712` | hilo del worker (el `manage` anidado comparte los pendientes) | `_process` (`:514`, `:530`) | no fuera de tests: antes va `_release_turn_cursor` (`:590`, `rollback`). **En tests sí**: `:587-588` no hace nada |
+| 22 | `models/chatboo_canvas_job.py:144` `_close` | `:145` | `with` | hilo del worker | `_process` (`:103`, `:135`) | en `:135`, lo que dejó `open_page` (el cursor del trabajo lo confirmaría igual al salir) |
+| 23 | `models/chatboo_session.py:1008` `_store_design` | `:1010` | `:1023` | mismo | helpers de página **dentro de la caja A** (docstring `:997-1000`), en turno o en Canvas | con el parche 37, lo del turno ya se volcó antes; queda H3 |
+| 24 | `models/chatboo_session.py:1045` `_store_title` | `:1047` | `:1052` | mismo | ídem | ídem |
+
+**Sin `Environment` (solo SQL):** `flush_env` no encuentra ningún entorno de ese cursor y no vuelca nada.
+
+| Apertura | Qué hace |
+|---|---|
+| `pns_ai_mcp/models/ai_context.py:541` | `UPDATE` de uso, `commit` `:553` |
+| `models/ai_agent.py:1400` | `UPDATE` de caché, `:1410` |
+| `models/ai_provider.py:1300` | `UPDATE usage_support`, `:1309` |
+| `models/safe_operation.py:1255` `_claim_execute` | `UPDATE` de la reserva; `:1292` o `rollback` `:1284` |
+| `models/safe_operation.py:1310` `_release_execute_claim` | `:1332` |
+| `pns_base/models/progress_job.py:47` `ProgressReporter.step` | `UPDATE`, dentro del hilo |
+| `pns_ai_chatboo/models/chatboo_job.py` `:87`, `:254`, `:289` (hilo del latido), `:342` | `SELECT`/`UPDATE` |
+| `models/chatboo_async_request.py` `:553`, `:569`, `:753`, `:1542` | `UPDATE` |
+| `controllers/chatboo.py` `:947`, `:990` | `SELECT`/`UPDATE` desde el generador SSE |
+
+No son aperturas: `pns_base/utils/thread_env.py:26` y `chatboo_job.py:58-66` (obtienen el `Registry`);
+`validators_base.py:267` y `validators_repair.py:294`/`:380` (comentarios); `MCPClientRegistry` (3 sitios). Los
+`with_env` de G2 (`utils/skill_runtime.py:163`, `chatboo_canvas_page.py:89`, `chatboo_canvas_job.py:66`) usan el mismo
+cursor.
+
+**`self.env.cr.commit()`** (confirman la transacción de quien llama): **12**. `progress_job.py:110`;
+`safe_operation.py:945`, `:954`, `:1352`, `:1457`, `:1501`; `chatboo_canvas_job.py:68`; `controllers/chatboo.py:917`
+(`request.env.cr.commit()`); `chatboo_async_request.py:161`, `:329`, `:1639`; `wizard/openapi_spec_generate_wizard.py:242`.
+
+**Caja B, 3.1: dónde y con qué frontera.**
+- Son la caja B (docstring de `controllers/safe_plan.py:1-23`): `safe_plan.py` (propuesta y autoconfirmación),
+  `safe_operation.py` (confirmación, reserva y ejecución), `controllers/safe_plan_execute.py` (`execute_safe_plan`) y
+  `ai_change_journal.py` (diario).
+- **Pasos:** bucle de `safe_plan_execute.py:94-241`. Después de cada paso que escribe, el diario añade su fila en la
+  **misma transacción** (`record_executed_step` → `self.create`, `ai_change_journal.py:242-372`).
+- **Frontera del paso:** ninguna. Ni `SAVEPOINT` a pelo ni `cr.savepoint()`. El `SAVEPOINT` de
+  `engine_tool_run.py:324-358` es del turno, no del plan.
+- **Frontera del plan:** la transacción del cursor de quien llama a `execute_plan_now` (`:968`, `safe_plan.py:409`,
+  `:1087`; `safe_plan_status`, sin leer): `commit` `safe_operation.py:1457` → `execute_safe_plan` (`:1483`) → `flush`
+  (`:1491`) → `UPDATE executed` (`:1493`) → `commit` `:1501`.
+- **Cuándo se deshace:** ante cualquier excepción de un paso, de ese `flush` o del `UPDATE`: `rollback` (`:1509`),
+  `_release_execute_claim(error)` (cancela la autorización) y `_record_failed_plan` (`:1534`). Un `fetch_url` o un
+  `api_call` que falla devuelve un diccionario de error y no deshace el plan (`safe_plan_http.py:316`, `:439-513`). El
+  docstring (`:1363-1388`) promete atomicidad y da por hecho que «los llamadores llegan sin trabajo pendiente».
+
+**Caja B, 3.2: qué corre entre pasos con cursor propio y qué puede quedar pendiente.**
+- **`api_call`:** tras la respuesta del driver, si no venía de la caché, `Cache._store` (`safe_plan_http.py:516-523` →
+  `api_result_cache.py:132-138`): cursor propio con `Environment` y `commit` implícito al salir del `with`
+  (`sql_db.py:148-153` → `:451`).
+- **Respuesta binaria** de `fetch_url` (`:355`) o de `api_call` (`:472-497`): `_run_on_committed_cursor`
+  (`session_download.py:382-386`).
+- `ai.fetch.cache._store` (`:344`, `:400`) escribe en el cursor del plan (no aparece en G1).
+- Ni `_mcp_log` ni `_log_mcp_operation` corren dentro del plan. `_create_log_entry` solo después del `commit` (`:1544`).
+  `_record_failed_plan` y `_heal…` van después del `rollback`: no encuentran nada pendiente.
+- **Lo que queda sin volcar del paso anterior:**
+  - la escritura directa de `create`/`write`/`copy`/`unlink`, normalmente no: `snapshot_records` hace `recs.read(...)`
+    (`ai_change_journal.py:221`) y `_read` → `flush` (`models.py:3096`) saca todo lo pendiente de ese modelo, que queda
+    en el cursor del plan sin confirmar. Si esa lectura falla (`:222-224`), no se vuelca;
+  - sí pueden quedar cálculos guardados que esa lectura no pide: de la misma fila o de otras; el `verification_id`
+    (`related` guardado, `:77-80`) de la fila del diario recién creada; y lo que escriben los pasos `action` y
+    `field_required`, para los que el diario no lee registros (`:284-295`).
+- **Qué pasa en el `commit` de `_store`, según la fila pendiente:**
+
+  | Fila pendiente | Efecto |
+  |---|---|
+  | (a) ya existía y el plan no la ha bloqueado | se confirma fuera del plan y sobrevive al `rollback` de `:1509` |
+  | (b) creada en el plan | la otra conexión no la ve: `MissingError` → `exists()` vacío (`models.py:3777-3780`, `:5479-5482`); **se pierde**, también si el plan termina bien (p. ej., el diario sin `verification_id`) |
+  | (c) ya actualizada por el plan | el `UPDATE` del cursor propio espera al cursor del plan, en el mismo hilo; `_store` no pone `lock_timeout`: **el worker se cuelga** |
+
+- Por lectura, (c) es lo más probable en un `write` normal (por ejemplo, `commercial_company_name` o `email_normalized`
+  de la misma fila). **Sin comprobar:** depende de tres puntos del core que no están citados del contenedor:
+  `BaseModel.recompute(fnames, records)` (si recalcula todos los pendientes de esos campos), `Field.write` (si descarta
+  los valores iguales a los de la caché) y los cálculos guardados de `res.partner`.
+
+**Diseño del test de la caja B (propuesta, sin aprobar; pendiente de citar el core).**
+- **Archivo:** `pns_ai_mcp/tests/test_seges_side_cursor_commit.py`, clase nueva `TestSegesSideCursorBoxB`
+  (`TransactionCase`), en el bloque de Seges existente. Un test: `test_box_b_store_between_steps`.
+- **Datos confirmados en `setUpClass`** (cursor propio, prefijo `seges-pns105-b-`): un contacto empresa P con un contacto
+  hijo Q; un `ai.api.server` activo; un `ai.safe.operation` con `status='confirmed'`, `executed=False`, usuario
+  `base.user_admin` y `plan_steps`: (1) `write` de `{'name': marcador}` sobre P; (2) `api_call` a ese servidor.
+- **Parches:**
+  - `lib.api.drivers.get_api_driver` → stub cuyo `call` hace de **espía**: guarda solo modelo, campo e ids de
+    `env.all.towrite` y de lo pendiente de calcular, y devuelve un JSON fijo;
+  - `controllers.safe_plan_http._api_call_schema_error` → `None`;
+  - `utils.api_call_result.format_api_call_body_for_llm` → lanza una excepción, para que el paso 2 falle **después** de
+    `_store`;
+  - **guarda contra el cuelgue:** se envuelve `registry.cursor` para que, mientras dura el paso 2 (lo activa el espía),
+    cada cursor nuevo empiece con `SET LOCAL lock_timeout = '3s'`. Solo cambia tiempos.
+- **Precondiciones** (`PRECONDITION (not the PNS-105 result): …`): `towrite` vacío al empezar (`flush` en `setUp`); el
+  admin tiene los grupos de plan y de `api_call`; el espía se ejecutó y vio al menos una entrada pendiente;
+  `_execute_plan_with_timeouts` devuelve `status == 'error'`.
+- **Comprobaciones** (cursor aparte, solo SQL, `rollback` al final; solo booleanos, sin valores):
+  - control: `P.name` sigue siendo el original;
+  - variante «bloqueo»: `assertLogs` del logger de `api_result_cache` con «store failed» y excepción
+    `LockNotAvailable`/`55P03`;
+  - variante «confirmado fuera del plan»: el marcador aparece en `P.commercial_company_name`, `Q.display_name` o
+    `Q.commercial_company_name`.
+- **Limpieza** (`addCleanup`, registrado antes): `self.env.cr.rollback()`; en un cursor nuevo, borrar las filas de
+  `ai_change_journal` de esa operación (incluidas las `failed`), la operación, `ai_api_result_cache` por `server_code`,
+  el servidor, Q y P; `commit` (`# pylint: disable=invalid-commit`).
+- **Resultado esperado hoy:** F, con más probabilidad por bloqueo (en producción, cuelgue sin límite). Si el espía no ve
+  nada pendiente, la lectura de 3.2 está mal y se informa.
+- **Antes de escribirlo:** citar del contenedor `BaseModel.recompute`, `Field.write`/`Cache.get_records_different_from`,
+  los `_compute_*` guardados de `res.partner` y `Cursor.close` (este último, para H2).
+
+**Vistas de paso, sin seguimiento:**
+- **H2:** si `_my_work` falla, puede que `close()` no vacíe los pendientes del hilo, y el `commit` de
+  `progress_job.py:162` confirmaría trabajo a medias.
+- **H3:** si el sandbox pudiera hacer un `write` diferido en la caja A, el `commit` de `_store_design`
+  (`chatboo_session.py:1023`) lo escribiría en un cursor de escritura.
+
+**Riesgo para el diseño del parche de PNS-105:**
+- **H4:** en Chatboo, el `op.write` de `_replace_pending_plan` (`safe_plan.py:198`) solo dura gracias a un `commit`
+  lateral posterior (`:422` o el de `_mint_card_token`), porque el cursor del turno se deshace al terminar
+  (`chatboo_async_request.py:530-541`). Un parche que impida a los cursores propios volcar lo pendiente del llamador
+  haría que esa sustitución se perdiera.
+
+## Citas del core para la caja B (12/11/2026)
+
+Fuente: `docker run --rm -i --network none --read-only --tmpfs /tmp` sobre la imagen `odoo-dev:14` (Python 3.7.3,
+`odoo` 14.0-20231106), con `inspect` para las funciones y `ast` para los campos. Sin red, sin volúmenes y sin BD. Salida
+en el scratchpad de la sesión (`core14_pns105_cajab.txt`). El primer intento, solo con `--read-only`, falló al importar
+`odoo`: `config.py:187` necesita un directorio temporal. Se repitió con `--tmpfs /tmp`, aprobado por Sergio.
+
+**Funciones del ORM y del cursor:**
+
+| Función | Dónde | Qué hace |
+|---|---|---|
+| `BaseModel.recompute` | `odoo/models.py:5914-5958` | Sin `fnames`, recalcula todos los campos pendientes del hilo (`:5942-5945`). Con `fnames` y `records`, sale si ninguno de esos registros está pendiente (`:5949-5954`); si alguno lo está, procesa **todos** los registros pendientes de esos campos, no solo `records` (`process`, `:5921`, y `:5956-5958`). Ante un `MissingError`, recalcula solo los que existen y da por calculados los demás (`:5930-5937`) |
+| `Field.recompute` | `odoo/fields.py:1157-1178` | Recorre los pendientes del campo (`env.all.tocompute`, `:1161`) y llama a `compute_value` por lotes (`:1171-1178`) |
+| `Field.__set__` | `odoo/fields.py:1114-1150` | En un registro que se está calculando (protegido), solo llama a `Field.write`, sin lógica de negocio (`:1127-1130`). En el resto, un `write()` completo (`:1146-1150`) |
+| `Field.write` | `odoo/fields.py:939-966` | Quita el campo de los pendientes de cálculo (`:947`) y **descarta los registros cuyo valor en caché ya es el nuevo** (`:952-954`). Para los demás, actualiza la caché (`:955`) y, si el campo es guardado, lo deja en `towrite` (`:958-964`) |
+| `Cache.get_records_different_from` | `odoo/api.py:853-867` | Devuelve los registros sin ese valor en caché. Un registro **sin valor en caché cuenta como distinto** (`KeyError`, `:862-863`) |
+| `Cursor.close` | `odoo/sql_db.py:364-366` (`inspect` lo atribuye a `<decorator-gen-6>` por `@check`; la numeración encaja con `_close` en `:368`) | `return self._close(False)` |
+| `Cursor._close` | `odoo/sql_db.py:368-402` | Cierra el cursor de psycopg2 (`:382`) y después llama a `self.rollback()` (`:392`) → `clear_env` (`:462`) → `env.clear()` del primer entorno de ese cursor |
+
+**Consecuencias:**
+- **Un cursor propio con `Environment` vacía lo pendiente del hilo también cuando falla.** Si el bloque `with` lanza una
+  excepción, `__exit__` solo hace `close()` (`sql_db.py:148-153`) → `rollback` (`:392`) → `clear_env` → `env.clear()`:
+  las escrituras pendientes del llamador se descartan sin confirmarse. Ya no hace falta que haya `commit` para perderlas.
+- **H2** (`progress_job.py:162`, apuntada en el bloque anterior): **descartada**. Si `_my_work` falla, el `with` de
+  `:153` cierra el cursor y `clear_env` vacía lo pendiente antes de llegar a `:162`. Se pierde; no se confirma.
+
+**Cálculos guardados de `res.partner`** en la BD de tests (base, sus mixins y los 18 módulos):
+- Modelos de la cadena: `res.partner`, `format.address.mixin`, `image.mixin`, `mail.activity.mixin`, `mail.thread`,
+  `mail.thread.blacklist`, `mail.thread.phone` y `phone.validation.mixin`.
+- Campos guardados calculados o `related`:
+  - `base/models/res_partner.py`:
+    - `display_name` (`:156`, `_compute_display_name`, `:241`, depende de `is_company`, `name`, `parent_id.display_name`,
+      `type`, `company_name` y `commercial_company_name`);
+    - `partner_share` (`:220`, `:259`, depende de `user_ids.share` y `user_ids.active`);
+    - `commercial_partner_id` (`:227`, `:293`, depende de `is_company` y `parent_id.commercial_partner_id`);
+    - `commercial_company_name` (`:229`, `:301`, depende de `company_name`, `parent_id.is_company` y
+      `commercial_partner_id.name`);
+  - `base/models/image_mixin.py:16-19`: `image_1024`, `image_512`, `image_256` e `image_128`, `related` de `image_1920`;
+  - `mail/models/mail_thread_blacklist.py:33`: `email_normalized` (`_compute_email_normalized`, `:46`; sus `depends` no
+    son literales);
+  - `phone_validation/models/mail_thread_phone.py:30`: `phone_sanitized` (`:46`; `depends` tampoco literales).
+- Ningún `pns_*` hereda `res.partner` (comprobado con Read):
+  - los `models/__init__.py` de los tres módulos no importan ningún `res_partner`;
+  - `pns_ai_chatboo/models/res_users.py:31` hereda `res.users` y solo añade un `Float` y un `Boolean` sin cálculo;
+  - las extensiones de `base` (`sandbox_secret_read.py:56`, `seges_box_a_read.py:43`, `secret_native_export.py:29`) no
+    declaran campos.
+
+**Qué deja pendiente un `write` de `name` sobre un contacto P:**
+- `display_name` de P y de todos los contactos cuyo `display_name` dependa de él (hijos, por `parent_id.display_name`).
+  **No quedan pendientes al llegar al paso 2.** `snapshot_records` lee `['name', 'display_name']`, y `recompute` con
+  `fnames` procesa **todos** los registros pendientes de `display_name` (`:5921`, `:5956-5958`).
+- `commercial_company_name` de P (cuando `commercial_partner_id` es P: empresa o contacto sin padre, `:293`) y de los
+  contactos cuyo `commercial_partner_id` es P (`:301`). **Pueden quedar pendientes:** el diario no los lee, y solo se
+  calculan antes si el cálculo de `display_name` los lee (`name_get`, sin citar).
+- **No dependen de `name`:** `partner_share`, `commercial_partner_id`, `email_normalized`, `phone_sanitized`, `image_*`.
+- **Fuera de la cadena,** sin revisar: campos guardados de otros modelos que dependan de `res.partner.name`; por ejemplo,
+  `res.company.name`, si P fuera el contacto de una compañía.
+
+**Estado de las variantes de 3.2** (en el `commit` de `_store`, entre el paso 1 y el paso 2):
+
+| Variante | Estado | Por qué |
+|---|---|---|
+| (a) se confirma fuera del plan una fila ya existente que el plan no ha bloqueado | **Descartada para `res.partner`; abierta para otros modelos y para los pasos `action`/`field_required`** | Lo pendiente que deja un `write` de `res.partner` cae en filas que el propio paso ya ha volcado y bloqueado (P y los contactos cuyo `display_name` se recalculó). Queda una cita pendiente: que el `flush(fnames)` de `_read` (`models.py:3096`) vuelque todo `res.partner`. La rama `fnames` de `flush` no está en esta salida |
+| (b) se pierde lo pendiente de una fila creada en el plan | **Abierta** | Si la fila del diario tiene `verification_id` pendiente, se pierde: `MissingError` → `exists()` vacío (`:5930-5937`, `:5479-5482`). Que lo tenga pendiente depende de `create`, sin citar |
+| (c) el cursor propio espera una fila que el plan ya ha actualizado | **Abierta, la más probable** | Todo lo que viene después del pendiente está citado: `recompute()` lo calcula (`:5942-5945`) → `Field.write` lo deja en `towrite` si el valor cambia o no estaba en caché (`:952-964`, `api.py:862-863`) → el `UPDATE` del cursor de `_store` espera al cursor del plan, que está en el mismo hilo. Falta que haya un pendiente así; lo comprueba el test |
+
+**Diseño revisado del test de la caja B (propuesta, sin aprobar).** Sustituye al diseño del bloque anterior.
+- **Archivo y clase:** `pns_ai_mcp/tests/test_seges_side_cursor_commit.py`, clase nueva `TestSegesSideCursorBoxB`
+  (`TransactionCase`), en el bloque de Seges. Un test: `test_box_b_side_cursor_waits_for_plan_row`.
+- **Variante elegida: (c), con un `write` de `email` en lugar de `name`.** Su pendiente (`email_normalized`, misma fila)
+  no depende de `name_get` ni de si P es empresa, y no lo lee nada del paso 1. `name` dejaría el resultado entre (a) y (c)
+  según `name_get`.
+- **Datos confirmados en `setUpClass`** (cursor propio; prefijo `seges-pns105-b-`):
+  - un contacto P sin padre ni hijos, con un correo inicial;
+  - un `ai.api.server` activo;
+  - un `ai.safe.operation` con `status='confirmed'`, `executed=False`, usuario `base.user_admin` y `plan_steps`:
+    1. `write` de `{'email': 'seges-pns105-b-<hex>@example.com'}` sobre P;
+    2. `api_call` a ese servidor.
+- **Parches:**
+  - `lib.api.drivers.get_api_driver` → stub cuyo `call` hace de **espía**: con `srv.env.all`, anota solo nombres e ids
+    (`towrite` y `tocompute`, `api.py:760-765`) y devuelve un JSON fijo;
+  - `controllers.safe_plan_http._api_call_schema_error` → `None`;
+  - `utils.api_call_result.format_api_call_body_for_llm` → lanza `RuntimeError`. Así el paso 2 falla **después** de
+    `_store`;
+  - guarda: mientras el espía la tiene activada, `registry.cursor` devuelve cada cursor nuevo con
+    `SET LOCAL lock_timeout = '3s'`. Solo cambia tiempos, y convierte el cuelgue en un error medible.
+- **Precondiciones** (`PRECONDITION (not the PNS-105 result): …`):
+  - `towrite` vacío al empezar (`self.env['base'].flush()` en `setUp`);
+  - el admin tiene los grupos de plan y de `api_call`;
+  - en el espía: P ya no tiene `email` en `towrite['res.partner']`, porque el paso 1 lo volcó en el cursor del plan;
+  - en el espía: P está en `tocompute` de `email_normalized`;
+  - `_execute_plan_with_timeouts` devuelve `status == 'error'`.
+- **Única comprobación del resultado:** `assertLogs` del logger `odoo.addons.pns_ai_mcp.models.api_result_cache`. El test
+  pasa si no hay ningún «store failed» cuya excepción sea `LockNotAvailable` (`pgcode` `55P03`). Se mira solo el nombre de
+  la clase o el `pgcode`; no se imprime nada más.
+- **Control, no es el resultado** (cursor aparte, solo SQL, `rollback` al final; booleanos): `email` y `email_normalized`
+  de P siguen con sus valores iniciales después del `rollback` del plan.
+- **Limpieza** (`addCleanup`, registrada antes):
+  - `self.env.cr.rollback()`;
+  - en un cursor nuevo, borrar las filas de `ai_change_journal` de esa operación (incluidas las `failed`), la operación,
+    `ai_api_result_cache` por `server_code`, el servidor y P;
+  - `commit` (`# pylint: disable=invalid-commit`).
+- **Resultado esperado hoy (uno solo):** **F**, con el mensaje «PNS-105 (box B): step 2's own cursor waited for a row
+  the plan cursor had already updated (lock timeout in the test; `_store` sets none, so in production the worker
+  hangs)».
+- Si falla una precondición, no es el resultado. Se informa sin cambiar el test. Por ejemplo, que `email_normalized` ya
+  no esté pendiente querría decir que algo del paso 1 lo calcula.
+- **Citas que aún faltan** (no cambian el resultado esperado si las precondiciones se cumplen): la rama `fnames` de
+  `flush`, el marcado de cálculos en `create` y los `depends` de `email_normalized` (`mail_thread_blacklist.py:44-46`).
+
+## Test de la caja B (12/11/2026)
+
+Test de confirmación de PNS-105 en la caja B, sin parche y sin tocar código del fabricante:
+`pns_ai_mcp/tests/test_seges_side_cursor_commit.py`, clase `TestSegesSideCursorBoxB` (`:193`), test
+`test_box_b_side_cursor_waits_for_plan_row` (`:361`). **Resultado: F, la esperada.** La espera de la variante (c)
+queda **confirmada en ejecución**.
+
+**Citas del core** (contenedor `odoo-dev:14`: Python 3.7.3, `odoo` 14.0-20231106; `docker run --rm -i --network none
+--read-only --tmpfs /tmp`, la misma forma del bloque anterior; salida `core14_pns105_c3.txt` en el scratchpad de la
+sesión). Completan las «Citas que aún faltan» del diseño revisado:
+- **C1, `BaseModel.flush` con `fnames`** (`odoo/models.py:5461-5531`):
+  - primero recalcula solo esos campos (`:5492`);
+  - con `records`, sale si ninguno tiene esos campos en `towrite` (`:5495-5502`);
+  - si algún registro del modelo tiene en `towrite` alguno de los `fnames`, hace `towrite.pop(model_name)` y vuelca
+    **todo** el `towrite` del modelo: todos los campos y todos los registros (`:5518-5525`);
+  - no calcula lo pendiente de otros campos.
+  - Con eso queda resuelta la cita pendiente de la variante (a): el `flush(fnames)` de `_read` vuelca todo
+    `res.partner` cuando alguno de los campos leídos está pendiente.
+- **C2, cálculos guardados en `create`:**
+  - los marca `_create`, con `records.modified(self._fields, create=True)` (`:4044`, y `:4057` para los campos que no
+    son columna), dentro de `env.protecting` (`:4042`);
+  - `modified` los pasa a `add_to_compute` (`:5843-5846`), menos los protegidos (`:5840`; los calculados no
+    `readonly` que vienen en `vals`, `:3867-3869`);
+  - ni `create` (`:3791-3933`) ni `_create` (`:3935-4079`) llaman a `flush` ni a `recompute`, así que **quedan
+    pendientes** mientras nada los lea. Salvedad, sin citar: una restricción de `_validate_fields` (`:4065`) que los lea.
+  - El `verification_id` del diario es `related` guardado (`pns_ai_mcp/models/ai_change_journal.py:77-80`), así que una
+    fila creada en el plan lo deja pendiente. La variante (b) no la comprueba este test.
+- **C3, `email_normalized`:**
+  - `_primary_email = 'email'` (`addons/mail/models/mail_thread_blacklist.py:31`); ninguno de estos tres archivos lo
+    redefine: `mail/models/res_partner.py`, `base/models/res_partner.py` y `phone_validation/models/mail_thread_phone.py`;
+  - el campo está en `:33-36` (`store=True`, `compute_sudo=True`);
+  - `@api.depends(lambda self: [self._primary_email])` (`:46`), que en `res.partner` da `['email']`;
+  - un `write` de `email` lo deja en `tocompute` (`models.py:5846`).
+- **C4, entorno:**
+  - `psycopg2` 2.7.7, **sin `psycopg2.errors`**, con `errorcodes.LOCK_NOT_AVAILABLE = '55P03'`;
+  - `sql_db.Cursor` sin `__slots__`;
+  - `unittest` **sin `assertNoLogs`** (Python 3.7);
+  - `Cursor.execute` (`odoo/sql_db.py:292-333`) registra en ERROR «bad query» en `odoo.sql_db` y relanza (`:302-305`);
+  - `Registry.cursor` (`odoo/modules/registry.py:698-706`) solo devuelve un `TestCursor` en el modo de pruebas de
+    `HttpCase` (`:702-705`); en un `TransactionCase`, cada cursor es una conexión nueva (`:706`).
+
+**Citas del repo** (con Read):
+- **R1, `pns_ai_mcp/models/api_result_cache.py`:**
+  - `_logger = logging.getLogger(__name__)` (`:15`);
+  - `_store` (`:106-143`) abre `with self.env.registry.cursor() as cr` (`:132`) con un `api.Environment` propio y
+    `sudo()` (`:133`);
+  - el `try` (`:114`) envuelve todo, `with` incluido;
+  - `except Exception` (`:139-143`) registra un WARNING «ai.api.result.cache: store failed for %s/%s», con
+    `exc_info=True` y sin relanzar.
+- **R2, `pns_ai_mcp/controllers/safe_plan_http.py`, `_execute_api_call` (`:411-539`):**
+  - `_api_call_schema_error` (`:447`) va fuera de cualquier `try`;
+  - un `try` (`:461-497`) envuelve `_get_cached`, `get_api_driver`, `_resolve_auth_token` y `driver.call` (`:469`); sus
+    `except` (`:498-513`) devuelven un diccionario de error sin relanzar;
+  - `Cache._store` va en `try/except Exception: pass` (`:517-523`);
+  - **`format_api_call_body_for_llm` (`:525`) no tiene `try`**, y `execute_safe_plan` tampoco envuelve el paso
+    (`safe_plan_execute.py:103-111`);
+  - contrato de `driver.call` (`lib/api/drivers/base.py:85-100`): `call(server, tool_name, arguments=None,
+    auth_token=None)`, que devuelve `str`. Un cuerpo con claves de fichero se trata como binario
+    (`utils/session_download.py:588-637`).
+- **R3, `pns_ai_mcp/models/safe_operation.py`:**
+  - `_execute_plan_with_timeouts` (`:960-1030`) pone en `cr2` `lock_timeout = '5s'` y `statement_timeout = '15s'`
+    (`:969-970`). Se pierden en el `commit` de `:1457` y se reponen en `:1467-1468`. No hay alarma ni hilo;
+  - ante una excepción, `execute_plan_now` (`:1502-1541`) hace `rollback`, libera el claim, registra el plan fallido y
+    relanza;
+  - `_execute_plan_with_timeouts` la captura (`:984`) y devuelve `status: 'error'` (`:1001-1010`) sin relanzar;
+  - el plan se ejecuta con `op.user_id` (`:1439`).
+- **R4, destino de los parches:**
+  - `get_api_driver` y `format_api_call_body_for_llm` se importan dentro de la función en cada llamada
+    (`safe_plan_http.py:422-427`), así que se parchean en `lib.api.drivers` (que lo reexporta,
+    `drivers/__init__.py:9`) y en `utils.api_call_result`;
+  - `_api_call_schema_error` se importa por nombre al cargar el módulo (`:18-20`), así que se parchea en
+    `controllers.safe_plan_http`.
+
+**Cambios frente al «Diseño revisado del test de la caja B»** (decididos por Sergio el 12/11/2026):
+- **A. Guarda y comprobación:**
+  - `self.patch` sobre `Registry.cursor` (`:318-339`). Con la guarda activa, cada cursor nuevo recibe
+    `SET LOCAL lock_timeout = '3s'` y un envoltorio de `execute` como atributo de la instancia (C4: sin `__slots__`);
+  - ante un `psycopg2.Error` con `pgcode == errorcodes.LOCK_NOT_AVAILABLE`, el envoltorio anota la tabla de la
+    plantilla SQL (`_table_of`, `:54`; nunca los parámetros) y relanza;
+  - la guarda la activa el espía y la desactivan el stub de `format_api_call_body_for_llm` (`:341-344`), el `finally`
+    de la llamada y la limpieza;
+  - la única comprobación es `assertFalse(esperas)` (`:399-403`).
+  - **Por qué:** con psycopg2 2.7.7 no existe la clase `LockNotAvailable`, así que se mira el `pgcode`. Y `assertLogs`
+    falla si no hay ningún log; en Python 3.7 no hay `assertNoLogs`. No se usa ni `assertLogs` ni un handler del logger.
+- **B. Llamada al plan:** dentro de `try/except Exception` (`:373-382`), que solo guarda el nombre de la clase para el
+  mensaje. Es `_execute_plan_with_timeouts(op.id, admin_uid, {}, op.verification_id, title)`.
+- **C. Precondiciones y control:**
+  - el `status == 'error'` y el control van solo en el mensaje;
+  - precondiciones: `towrite` vacío, grupos del admin, el espía se ejecutó, `email` de P fuera de `towrite` y P en
+    `tocompute` de `email_normalized`;
+  - se añadió una más: que el espía no fallara al anotar (`:387-390`).
+- **D. Parches:** en los destinos de R4 (`:306-308`). El espía devuelve `'{"ok": true}'`.
+- **E. Operación** (decisión de Sergio): `create_verification` + `_confirm_by_user`, como el flujo real y
+  `test_safe_plan_atomicity`, con:
+  - `operation_type='write'`, `model_name='res.partner'`, `records_count=2`, `changes_info` y `operation_data`
+    (`plan_steps`, `title`, `plan`, `danger_level: 'low'`), `tool_name='seges_pns105_b'`;
+  - la confirma el admin, que es su dueño (`op.with_user(admin)._confirm_by_user()`, `:254`), porque `_can_resolve`
+    (`safe_operation.py:345-352`) pide ser el dueño o `group_ai_admin`;
+  - ninguno de los dos abre cursores propios ni hace `commit` (`:476-541`, `:604-643`, `:1729-1745`, `:1938-1984`).
+- **F. Datos y limpieza:**
+  - datos con el ORM, en un cursor propio con `commit` (`odoo.registry(get_db_name())`, como en
+    `test_seges_box_a_vias.py:93`), con el prefijo `seges-pns105-b-`;
+  - grupos: se dan los que falten con `grant_groups` y se quitan con `revoke_groups` (decisión de Sergio). Los dos solo
+    implican `base.group_user`;
+  - limpieza (`:263-297`): borrado por SQL en savepoints y `commit`. `revoke_groups` usa el ORM y va en un cursor
+    propio, después del SQL.
+
+**Ejecución:**
+- **Primera batería** (`tests-20261112-184842.log`): **E en `setUpClass`**, por un fallo del test (`cls.registry` no
+  existe en un `TransactionCase` de Odoo 14). Se informó sin cambiarlo. Corrección aprobada: `odoo.registry(get_db_name())`.
+- **Segunda batería** (`odoo-dev 14 tests pns_base,pns_ai_mcp,pns_ai_chatboo`, log `tests-20261112-190050.log`):
+  - lint 0 incidencias nuevas; compilación con Python 3.7.3 correcta;
+  - **513 tests, 4 F, 0 E y 4 saltados.** Las F: `test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin`,
+    `test_log_commits_caller_pending_write`, `test_log_drops_pending_write_on_new_record` y el nuevo;
+  - mensaje del nuevo: «PNS-105 (box B): step 2's own cursor waited for a row the plan cursor had already updated (lock
+    timeout in the test; _store sets none, so in production the worker hangs). Waits on: res_partner; plan:
+    status=error; control: email kept=True, email_normalized kept=True». Ninguna precondición falló.
+- **Recuentos del log:**
+
+  | Qué | Recuento |
+  |---|---|
+  | «store failed» | 1, del test nuevo (WARNING) |
+  | «bad query» | 2: el `UPDATE "res_partner"` del test nuevo, con «canceling statement due to lock timeout», y el `INSERT INTO "ir_attachment"` de `TestSegesChatbooExportOwn.test_fulfill_client_export_claims_own`, de la línea base |
+  | Errores del plan | `safe_operation.py:1503`: 1; `:984`: 1 |
+  | Traceback | 62, frente a 58 de la línea base. Los 4 de más son del test nuevo: «store failed», `:1503`, `:984` y la F |
+  | `seges-pns105-` | 3: el «bad query» y el «store failed» (`seges-pns105-b-`, 2) y la F de `test_log_drops_pending_write_on_new_record` |
+  | Secretos `seges-3b-…` | 0 |
+  | UUID4 | 0 |
+
+  «incomplete cleanup» no aparece. La BD de tests se borra al acabar, así que no se pudo comprobar con un `SELECT` que
+  no quedara nada; la limpieza no registró ningún error.
+- **Qué confirma:**
+  - el paso 1 vuelca `email` de P en el cursor del plan y deja `email_normalized` pendiente;
+  - el `commit` del cursor propio de `_store` lo calcula y hace el `UPDATE` de P en su transacción;
+  - ese `UPDATE` espera al cursor del plan, que está en el mismo hilo;
+  - en el test lo corta el `lock_timeout` de 3 s, y `_store` se traga el error;
+  - en producción `_store` no pone ningún límite: el worker se queda esperando hasta el `statement_timeout` de su
+    propio cursor, si lo tiene. Esto no se ha comprobado.
+
 ## Decisiones de Sergio (12/11/2026, revisión de las dos propuestas)
 
 Sobre «Propuesta: parche de `flush` antes de abrir la caja A» y «Propuesta de implementación de la 3b».

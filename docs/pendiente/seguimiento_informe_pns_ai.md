@@ -177,7 +177,7 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-102 | Crítica | NUEVO | VULNERABLE (herramienta real, segundo rechazo de E2′, 27/10/2026, sobre 3.1.782 y en LIYBEN) | · **Parche 24 (E2′, `14.0-pns-ai-3879`): validación local y neutralización hechas (28/10/2026)**; tests `test_seges_identity_su.py` · LIYBEN: claves MCP revocadas el 27/10/2026; regenerarlas tras el despliegue final |
 | PNS-103 | Baja | NUEVO | CONFIRMADO (laboratorio `lab_pns_ai_3973`, 11/11/2026, sobre 3.1.973; mismo código en 3.1.879) | · **Parche 36 (fase 2c, `14.0-pns-ai-3973`)**: ver su ficha · pendiente del informe al fabricante |
 | PNS-104 | Baja | NUEVO | CONFIRMADO (`test_pending_write_survives_box_a_close`, batería de `lab_pns_ai_3973`, 12/11/2026, sobre 3.1.973; mismo código en 3.1.879); latente: ningún llamador real pierde datos hoy | · **Parche 37 (fase 3b, `14.0-pns-ai-3973`)**, como defensa: ver su ficha · pendiente del informe al fabricante |
-| PNS-105 | Alta (propuesta) | NUEVO | Por lectura de código (12/11/2026, sobre 3.1.973; mismo patrón en 3.1.879); test de confirmación pendiente, después de la 3b | · Sin parche: ver su ficha · pendiente del informe al fabricante |
+| PNS-105 | Alta (propuesta) | NUEVO | Por lectura de código (12/11/2026, sobre 3.1.973; mismo patrón en 3.1.879); confirmado por test (12/11/2026); inventario hecho (12/11/2026); caja B: confirmado por test (12/11/2026, espera de bloqueo del worker) | · Sin parche: ver su ficha · pendiente del informe al fabricante |
 
 **Recuento:** CORREGIDO 31 · PARCIAL 33 · SIN CAMBIOS 13 · YA NO APLICA 2 · DUDOSO 1 (80 del
 informe) · NUEVO 22 (total 102). Por gravedad:
@@ -2375,6 +2375,20 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
 - **Errata de citas (12/11/2026):** comprobadas contra el contenedor (`odoo` 14.0.20231106); el texto de arriba no se
   reescribe. `odoo/sql_db.py:294-302`, en `:296`, es `sql_db.py:448-457`, en `:451` (`Cursor.commit` → `flush_env`).
   Las demás citas de Odoo de esta ficha coinciden con el contenedor.
+- **Evidencia (12/11/2026):** confirmado por test (`pns_ai_mcp/tests/test_seges_side_cursor_commit.py`, 2 F esperadas;
+  log `tests-20261112-175130.log`). Ver [propuesta de la fase 3](propuesta_fase3_3973.md), «Test de confirmación de
+  PNS-105 (12/11/2026)».
+- **Inventario y caja B (12/11/2026):** 24 cursores propios con `Environment`, todos del fabricante; en la caja B,
+  `api_call` (`api_result_cache._store`) y las descargas binarias (`_run_on_committed_cursor`) hacen `commit` a mitad
+  del plan. Variante más probable: espera de bloqueo del worker (sin confirmar). Ver
+  [propuesta de la fase 3](propuesta_fase3_3973.md), «Inventario de cursores propios y caja B» y «Citas del core para
+  la caja B».
+- **Evidencia, caja B (12/11/2026):** confirmado por test (`test_seges_side_cursor_commit.py`,
+  `TestSegesSideCursorBoxB.test_box_b_side_cursor_waits_for_plan_row`, F esperada; log `tests-20261112-190050.log`):
+  - el cursor propio de `_store`, en el paso `api_call`, espera la fila de `res_partner` que el cursor del plan ya
+    actualizó en el paso 1;
+  - en el test lo corta un `lock_timeout` de 3 s; `_store` no pone ninguno.
+  - Ver [propuesta de la fase 3](propuesta_fase3_3973.md), «Test de la caja B (12/11/2026)».
 
 ### Observaciones sin ficha (para valorar en E4′)
 
