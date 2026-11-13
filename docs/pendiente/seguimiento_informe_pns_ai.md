@@ -813,6 +813,19 @@ Restos que se repiten en varios parciales:
   se repite nada. Queda una línea ERROR en el log por cada confirmación. Visto en R4 y R6 del staging y
   reproducido en el laboratorio con y sin los parches de E1′: es del fabricante. No afecta a
   Autorizaciones. Detalle en el [diagnóstico](diagnostico_r6_staging_e1p.md), 5.2.
+- **Confirmación en 3.1.973 (13/11/2026; gravedad de esta parte: Baja, sin cambios):** confirmado por test en
+  `14.0-pns-ai-3973`, con el parche 38, del que no depende (`test_seges_verify_execute_40001.py`, log
+  `tests-20261113-175250.log`).
+  - Corrige «no se pierde ni se repite nada»: no se repite, pero **se pierde el aviso `executed` del bus** (el `rollback`
+    del reintento deshace su `INSERT` y la rama idempotente no lo reenvía).
+  - Además: retraso de 0 a 1 s; en el log, un ERROR «bad query» (`odoo.sql_db`) y un INFO «SERIALIZATION_FAILURE,
+    retry 1/5» (`odoo.service.model`) por cada «Ejecutar» correcto; con los 5 intentos agotados, «Confirmed — apply
+    pending» con el plan aplicado y el token sin consumir.
+  - Vistas de paso: con el plan fallido (operación `cancelled`), la ficha dice «Confirmed — apply pending (Approvals if
+    needed)» (`pns_ai_chatboo/static/src/js/chatboo_component_v2.js:2464-2466`); y tras la ejecución, la petición lee
+    con la instantánea anterior al plan (`attach_verification_chat_hints`), lo que hoy tapa el reintento.
+  - Sin parche. Detalle en la [propuesta de la fase 3](propuesta_fase3_3973.md), «Anexo de PNS-26 (serialización en
+    `/execute`): confirmación en 3.1.973 (13/11/2026)».
 
 ### PNS-27 — jsPDF 2.5.1 y SheetJS 0.18.5 con CVE conocidas en todo el backend
 

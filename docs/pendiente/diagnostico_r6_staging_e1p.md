@@ -272,6 +272,18 @@ estado ni el resultado (apartado 6, consulta 2).
 - **PNS:** misma familia que PNS-26 (escrituras en el cursor del llamador mezcladas con cursores
   propios que hacen commit). **Propuesta:** añadirlo al «resto» de PNS-26 en lugar de abrir otro.
   **Añadido a PNS-26** en el [seguimiento](seguimiento_informe_pns_ai.md).
+- **Nota (13/11/2026): confirmación en 3.1.973.** Lo de arriba no se reescribe.
+  - Confirmado por test en `14.0-pns-ai-3973`, con el parche 38, que no influye (`test_seges_verify_execute_40001.py`,
+    log `tests-20261113-175250.log`).
+  - **Corrige «no hay pérdida ni duplicado: el plan no se repite, por el claim y la rama idempotente»:** no se duplica
+    nada, pero **se pierde el aviso `executed` del bus**. El `rollback` del reintento (`odoo/http.py:345-347`) deshace el
+    `INSERT` en `bus_bus` del primer intento, y la rama idempotente no lo vuelve a enviar.
+  - Con los 5 intentos agotados (`odoo/service/model.py:99-101`), el cliente muestra «Confirmed — apply pending» con el
+    plan ya aplicado y el token sin consumir (por lectura; improbable).
+  - En el log, por cada «Ejecutar» correcto: un ERROR «bad query» (`odoo.sql_db`) y un INFO «SERIALIZATION_FAILURE,
+    retry 1/5» (`odoo.service.model`), como en R4 y R6.
+  - Detalle en la [propuesta de la fase 3](propuesta_fase3_3973.md), «Anexo de PNS-26 (serialización en `/execute`):
+    confirmación en 3.1.973 (13/11/2026)».
 
 ### 5.3 `missing_token` / `bad_token` en la tarjeta del chat
 

@@ -2075,3 +2075,113 @@ con página), las dos operaciones (`executed` y `cancelled`), la fila `failed` d
 con él solo cubre el camino del error.
 
 **Resultado:** parche 38 validado en el laboratorio con Chatboo y `/mcp`. Pendiente: seguimiento de PNS-105.
+
+## Anexo de PNS-26 (serialización en `/execute`): confirmación en 3.1.973 (13/11/2026)
+
+Lecturas de solo lectura y test de confirmación, sin parche. Rama `14.0-pns-ai-3973`, HEAD `db76eff`. Citas de Odoo:
+contenedor `odoo-dev:14` (`odoo` 14.0-20231106), salida `core14_40001.txt` en el scratchpad de la sesión.
+**Antecedente:** [diagnóstico R6](diagnostico_r6_staging_e1p.md), §5.2 (26/10/2026, sobre 3.1.879; staging y laboratorio),
+registrado como anexo de PNS-26 en el [seguimiento](seguimiento_informe_pns_ai.md). Responde a «Visto de paso, fuera de
+A» de «Lecturas previas a la implementación de A», que no tenía en cuenta ese antecedente.
+
+**Secuencia** (`/pns_ai_mcp/verification/execute`, `type=JSON_ROUTE_TYPE`, `auth='user'`,
+`controllers/verification_ui.py:78-97`):
+- antes del controlador, en el cursor de la petición: `ir_http.py:226` → `_authenticate` → `:118` `check_security` →
+  `http.py:1065` → `security.py:16-17` (`_compute_session_token`, consulta a `res_users`). Es la primera consulta de la
+  transacción, la instantánea S0 (comportamiento de PostgreSQL, sin cita);
+- `_call_function` envuelve el controlador en `@service_model.check` (`http.py:340-367`) cuando hay `self.db`
+  (`:369-370`);
+- en el cursor de la petición: `:24` y `:29` (fila), `:41` y `:43` (hash del token); `_resolve_execute`
+  (`models/safe_operation.py:807-927`): `:814`, `:826`, invalidación de caché `:833-835`, `:837`;
+- apertura 13 (`:972`, `cr2`): `execute_plan_now` → `_claim_execute` (cursor propio solo con SQL, `:1259`; `UPDATE`
+  `:1271-1278`, `commit` `:1296`) → `cr2.commit()` `:1461` → plan `:1487` → `UPDATE executed` `:1497-1503` → `commit`
+  `:1505`. Sin `FOR UPDATE` ni `NOWAIT` (solo en la 12, `:713`);
+- con éxito: `_notify_safe_plan_hosts` (`:883`; `savepoint` `:1744`; `INSERT` en `bus_bus`, `bus.py:61`, y `NOTIFY` en
+  `postcommit`, `:68-75`), `attach_verification_chat_hints` (`:884`) y `_consume_confirm_token`
+  (`verification_ui.py:95-96` → `safe_operation.py:598-604`, `write` del ORM). El `UPDATE` sale en `flush_env`, dentro
+  de `checked_call` (`http.py:365`);
+- con error: `cr2.rollback()` `:1513`, `_release_execute_claim` (SQL, `status='cancelled'`, `commit` `:1336`), apertura 3
+  y `status: 'error'` (`:988-1014`); `:95` no consume el token. Tampoco con `busy` (`:978-986`) ni sin pasos
+  (`:1016-1024`);
+- entre S0 y `:96`, el cursor de la petición no hace ningún `commit` ni `rollback`: solo invalidaciones de caché y un
+  `savepoint`. Los `commit` + `invalidate` de quien llama (`:948-951` y `:957-960`; la propuesta citaba `:945-946` y
+  `:954-955`) son de `_resolve_confirm_and_execute` (Autorizaciones), fuera de esta ruta.
+
+**Veredicto:**
+- **en el camino de éxito, 40001 siempre:** la reserva (`:1296`) y el plan (`:1505`) confirman la fila después de S0, y
+  `:96` la actualiza con S0. `Field.write` no lo evita: solo descarta los valores iguales a los de la caché
+  (`odoo/fields.py:952-954`), y en la caché está el hash (`:41`);
+- **en el camino de error, imposible:** la petición no escribe en la fila.
+
+**Reintento** (`odoo/service/model.py`):
+- reintenta `LOCK_NOT_AVAILABLE`, `SERIALIZATION_FAILURE` y `DEADLOCK_DETECTED` (`:22`), hasta 5 veces (`:23`, `:99`);
+- espera `random.uniform(0, 2**tries)` (`:102`, `:105`): de 0 a 1 s el primero;
+- registra en INFO `"%s, retry %d/%d in %.04f sec..."` (`:104`) y, al agotar los intentos,
+  `"%s, maximum number of tries reached"` (`:100`). Antes, «bad query» en ERROR de `odoo.sql_db` (`sql_db.py:292-333`,
+  `:302-305`);
+- entre intentos, `rollback` y `env.clear()` (`http.py:345-347`), y el controlador entero se repite (`:358`).
+
+**Efecto:**
+- segundo intento: la fila está `executed` y con el hash (el consumo se deshizo); `_gate_card_token` sale en `:39-40`;
+  `_resolve_execute` va por la rama idempotente (`:837-857`). **El plan no se repite**; aunque se llamara, lo frenarían
+  `:1406-1412` y `_claim_execute` (`:1248-1249`, `:1265`, `:1275`). `:96` consume el token con una instantánea nueva;
+- el usuario ve «Operation executed» (`chatboo_component_v2.js:2461-2466`, que solo mira `status`);
+  `_finishVerificationOutcome` (`:2859-2871`) no mira `idempotent`. Retraso de 0 a 1 s;
+- **se pierde el aviso `executed` del bus:** el `rollback` deshace el `INSERT` del primer intento y la rama idempotente
+  no lo reenvía. Autorizaciones y las demás pestañas no reciben el aviso de esta ficha;
+- con los 5 intentos agotados (otro proceso escribiendo la fila; improbable): error JSON, el `catch` del JS
+  (`:2469-2474`) muestra «Confirmed — apply pending» con el plan ya aplicado, y el token queda sin consumir.
+
+**`/verification/confirm`: sin 40001.** La petición lee la fila en S0 (`:24`, `:41`, `:45`; `_resolve_confirm`, `:679`,
+`:692`). La apertura 12 (`:701`) escribe y confirma (`:770-782`, o `:761-763` si ha caducado). Después, la petición solo
+llama a `attach_verification_chat_hints` (`:793-805`) y no escribe en la fila (salvo lo que haga `build_user_ack_message`
+o `_needs_llm_followup`, sin leer).
+
+**Cliente** (`chatboo_component_v2.js`): una pulsación encadena `/confirm` (`:2410-2417`, 8 s) y, si va bien y no es
+idempotente, `/execute` (`:2454-2460`, 20 s). Con `status: 'error'` del plan, que deja la operación `cancelled`
+(`safe_operation.py:1321`), la ficha dice «Confirmed — apply pending (Approvals if needed)» (`:2464-2466`).
+
+**Test** (`pns_ai_mcp/tests/test_seges_verify_execute_40001.py`, sin commit, en el bloque de Seges de
+`tests/__init__.py`):
+- `TransactionCase` con cursores reales (`registry.py:706`; en `HttpCase` serían `TestCursor`, `:702-705`);
+- `setUpClass`: una operación por test (`create_verification` + `_confirm_by_user`, `AI_PLAN_GROUPS`, plan `write` de
+  `comment` de un contacto `seges-pns-v40-…`) y `commit`; después, `_mint_confirm_token` en otro cursor (valor
+  descartado) y precondición por SQL. Limpieza por SQL en `tearDownClass`;
+- cursor P = la petición (`REPEATABLE READ`; su `env` está en el conjunto del hilo, como `request.env`). Cada intento
+  copia `verification_ui.py:79-97` y el `flush_env` de `http.py:365`; el bucle copia `checked_call` y `check`, sin
+  espera. No interfiere con el parche 38: los cursores del plan son conexiones nuevas, no hay petición en la pila y P no
+  tiene nada pendiente al abrir la 13;
+- a) `test_execute_success_no_serialization_failure`: el primer intento sin 40001. Hoy, F;
+- b) `test_execute_retry_is_idempotent`: con reintento, `executed`, `idempotent` (si hubo reintento), hash vacío,
+  `comment` aplicado y el diario igual que tras el primer intento; «diario > 0» como precondición. Hoy, correcto;
+- c) `test_execute_bus_notice_survives_retry`: aviso `executed` en `bus_bus`. Hoy, F.
+
+**Batería** (`tests-20261113-175250.log`): 522 tests, 3 F (`test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin`, a y
+c), 0 E y 4 saltados (los de la línea base).
+- Mensajes: a) «'40001' unexpectedly found in ['40001'] …»; c) «0 not greater than or equal to 1 … (attempts: 2;
+  codes: 40001)».
+- b): un intento con 40001 y un reintento correcto, **deducido** de las 3 «bad query» (una por test); su mensaje no se
+  registra porque pasa.
+- Recuentos: «seges_side_env: » 1 (`test_plan_cannot_touch_the_other_company`, la esperada); «bad query» 3, todas de
+  `ai_safe_operation`; `seges-pns-v40-` 0; secretos y UUID4 0; Traceback 60 frente a 58 en `131618`, con los 2 de más
+  en ERROR de `odoo.addons.pns_ai_mcp.tests.test_seges_verify_execute_40001` (las dos F).
+- Lint: 0 incidencias nuevas. Compilación con Python 3.7.3: 2 de 2.
+- Primera batería, con el marcador PNS-106 (`tests-20261113-174303.log`): los mismos resultados y recuentos. El cambio
+  posterior a «anexo de PNS-26» solo tocó textos del test (marcador, docstrings, mensajes y `title`).
+
+**Sin leer:**
+- `build_user_ack_message`, `_needs_llm_followup`, `_ack_field_lookup`, `_can_resolve`, `get_operation_data` y
+  `execute_safe_plan` por dentro;
+- del core, `Cursor.rollback` y `postcommit` (si el `NOTIFY` del primer intento se descarta; aunque saliera, no
+  encontraría ninguna fila).
+
+**Notas (13/11/2026):**
+- **Corrección de L5** («Lecturas previas a la implementación de A»): tras la apertura 13, `attach_verification_chat_hints`
+  lee con el `env` de la petición, con la instantánea S0 (`controllers/safe_plan_ack.py:202-210`, `exists()` y
+  `display_name`; `utils/verification_ack_records.py:92-106`). Un registro creado por el plan no se ve en el primer
+  intento. Hoy queda tapado, porque la respuesta es la del segundo. En este test no tiene efecto: `resolve_document_target`
+  da `None` para `res.partner` (`utils/record_cite.py:21-39`, `:68-90`).
+- **Laboratorio del parche 38:** la salvedad «Éxito del plan dentro de la 13 — sin cubrir» queda cubierta por
+  `test_execute_retry_is_idempotent`.
+- **Errata de L1 c:** `_mint_confirm_token` no abre cursor propio (escribe en el `env` de quien llama,
+  `safe_operation.py:564-576`); la apertura 7 es `_mint_card_token`.
