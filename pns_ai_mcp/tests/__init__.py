@@ -63,3 +63,5 @@ from . import test_seges_sandbox_credentials
 from . import test_seges_box_a_flush
 # Seges: tests del parche 38 (PNS-105). Ver docs/pendiente/parches_pns_ai.md
 from . import test_seges_side_cursor_commit
+# Seges: test de confirmación del anexo de PNS-26, sin parche. Ver docs/pendiente/propuesta_fase3_3973.md
+from . import test_seges_verify_execute_40001
