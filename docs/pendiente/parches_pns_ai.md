@@ -4897,6 +4897,9 @@ Odoo: contenedor (`odoo` 14.0-20231106).
   (página), 11 (`fetch_url` autoconfirmado), 12 y 13 (ficha, camino del error por falta de permiso del usuario 12),
   3 (`_record_failed_plan`); 10 y 7 de paso (deducido). **Sin cubrir:** 24 (no se distingue en la BD) y el éxito del
   plan dentro de la 13 (el de `execute_plan_now` lo cubre la 11).
+  - **Éxito del plan dentro de la 13 (13/11/2026):** lo cubre `test_execute_retry_is_idempotent`, test del anexo de
+    PNS-26 ([propuesta](propuesta_fase3_3973.md), «Anexo de PNS-26 (serialización en `/execute`): confirmación en
+    3.1.973 (13/11/2026)»).
 - **Log:** 0 «seges_side_env: », 0 «bad query», 0 «store failed». 14 Traceback y 6 ERROR ajenos al parche: proveedor
   (3 `ReadTimeout`, 1 HTTP 503) y el plan sin permiso (`AccessError`).
 - Configuración de prueba (lista blanca de `example.com`, dos grupos y la clave MCP de `seges_target`) puesta y

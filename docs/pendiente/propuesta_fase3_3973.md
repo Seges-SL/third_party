@@ -2185,3 +2185,28 @@ c), 0 E y 4 saltados (los de la línea base).
   `test_execute_retry_is_idempotent`.
 - **Errata de L1 c:** `_mint_confirm_token` no abre cursor propio (escribe en el `env` de quien llama,
   `safe_operation.py:564-576`); la apertura 7 es `_mint_card_token`.
+
+**Decisión de Sergio (13/11/2026):**
+- **Sin parche.** Gravedad Baja: el reintento de Odoo da el resultado correcto y el plan no se repite.
+- **Por qué no:** un parche que solo quite el 40001 dejaría a la vista la lectura con S0 de
+  `attach_verification_chat_hints` (nota «Corrección de L5», arriba), que hoy tapa el reintento. Uno completo tendría
+  que renovar la transacción de la petición tras la apertura 13, antes del aviso y de las pistas: más cambio en la caja B
+  del que justifica una gravedad Baja.
+- **Test:** b) `test_execute_retry_is_idempotent` sube sin cambios; a) `test_execute_success_no_serialization_failure`
+  y c) `test_execute_bus_notice_survives_retry`, con `@unittest.skip` y el motivo «PNS-26 annex: no Seges patch
+  (decision 13/11/2026). Fails on 3.1.973 by design; remove the skip if a patch is proposed.». El docstring del módulo
+  lo dice y añade que b) cubre el éxito del plan dentro de la apertura 13 del parche 38. El marcador de
+  `tests/__init__.py` no cambia.
+- **Batería** (log `tests-20261113-182647.log`): 522 tests, 1 F (`test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin`),
+  0 E y 6 saltados (los 4 de la línea base, a y c).
+  - «bad query»: 1 (`UPDATE "ai_safe_operation"`, de b);
+  - «SERIALIZATION_FAILURE, retry»: 0. El test reproduce el reintento sin pasar por `service.model.check`, que es quien
+    escribe esa INFO; en staging sí debe salir;
+  - «seges_side_env: »: 1 (`test_plan_cannot_touch_the_other_company`);
+  - Traceback: 58 (los 60 de `175250` menos los 2 de las F de a y c);
+  - `seges-pns-v40-`, secretos `seges-3b-[a-z0-9-]*[0-9a-f]{32}` y UUID4: 0.
+  - Lint (`--revisar` del test): 0 incidencias nuevas. Compilación con Python 3.7.3 (`odoo-dev:14`, sin red y de solo
+    lectura): OK.
+- **Comprobación en staging:** por cada «Confirmar» correcto de la ficha (encadena `/confirm` y `/execute`), en el log
+  deben salir un ERROR «bad query» de `odoo.sql_db` sobre `ai_safe_operation` y un INFO «SERIALIZATION_FAILURE, retry
+  1/5» de `odoo.service.model`. No cuentan como fallo.

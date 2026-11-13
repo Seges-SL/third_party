@@ -826,6 +826,8 @@ Restos que se repiten en varios parciales:
     con la instantánea anterior al plan (`attach_verification_chat_hints`), lo que hoy tapa el reintento.
   - Sin parche. Detalle en la [propuesta de la fase 3](propuesta_fase3_3973.md), «Anexo de PNS-26 (serialización en
     `/execute`): confirmación en 3.1.973 (13/11/2026)».
+  - Confirmado en 3.1.973 por test (13/11/2026); sin parche; comprobación en staging (decisión de Sergio del 13/11/2026,
+    en la misma sección de la propuesta).
 
 ### PNS-27 — jsPDF 2.5.1 y SheetJS 0.18.5 con CVE conocidas en todo el backend
 

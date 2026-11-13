@@ -378,6 +378,10 @@ Orden:
 5. P-15: `-u` completo sobre una copia de `pns_demo` que carga Sergio.
 6. P-21 de nuevo (solo lectura), justo antes del `-u` del staging.
 7. Staging `pns_demo`.
+   - Anexo de PNS-26: un «Confirmar» correcto de la ficha (encadena `/confirm` y `/execute`). En el log, por cada
+     uno, un ERROR «bad query» de `odoo.sql_db` sobre `ai_safe_operation` y un INFO «SERIALIZATION_FAILURE, retry 1/5»
+     de `odoo.service.model`. No cuentan como fallo ([propuesta](propuesta_fase3_3973.md), «Anexo de PNS-26
+     (serialización en `/execute`): confirmación en 3.1.973 (13/11/2026)», «Decisión de Sergio (13/11/2026)»).
 
 ## Tras el `-u` (staging y LIYBEN)
 
