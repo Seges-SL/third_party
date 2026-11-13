@@ -2006,3 +2006,72 @@ rechazaba el criterio de `token`. Por decisión de Sergio, el subtest pasa a med
     3.1.973 sobre ella y pudieron escribir.
 - **`csrf_token` impreso por error** en la salida del agente al filtrar el log de los turnos de Chatboo (dos líneas de
   `werkzeug`). Es de la sesión del laboratorio y no tiene consecuencias. Desde entonces se filtra antes de imprimir.
+
+## Laboratorio del parche 38 (13/11/2026)
+
+`lab_pns_ai_3973` (BD `lab_pns_ai_3973_14`), rama en `348fa2d` (parche 38 con push), árbol limpio. Scripts en el
+scratchpad de la sesión, fuera del repo (`lab38_recuentos.py`, `lab38_log.py`, `lab38_mcp.py`, `lab38_permiso.py`):
+solo recuentos, booleanos, nombres de BD y de logger, y archivo:línea de `pns_*` en las pilas.
+
+**Preparación (lecturas de las tandas 1, 1b y 1c):**
+- Servidor del laboratorio: el kit arranca Odoo con `workers = 0`, sin `db_name` ni `dbfilter`
+  (`claude-odoo-kit/entorno/entorno.sh:375-386`). Con hilos, `cron_thread` solo recorre `Registry.registries`
+  (`odoo/service/server.py:406-413`); en prefork, `WorkerCron._db_list` recorre todas las BD (`:1093-1098`,
+  `:1104-1114`). `parar` hace `docker compose down` (`entorno.sh:428`). **Mitigación usada** (sin cambiar el kit):
+  cookies de `localhost:8169` borradas, entrada solo por `/web/login?db=lab_pns_ai_3973_14`, comprobación en el log de
+  que solo se carga esa BD, y `parar` al acabar. La limitación del servidor sigue pendiente.
+- Autoconfirmación (apertura 11): solo `fetch_url` a un host de confianza o `api_call` a un servidor con `trusted=True`
+  (`_all_steps_auto_confirmable`, `safe_plan_describe.py:15-56`; un `write` nunca, `:54-55`).
+- Ficha: una pulsación de «Confirmar» encadena `/verification/confirm` (apertura 12) y `/verification/execute`
+  (apertura 13) (`chatboo_component_v2.js:2410-2417`, `:2454-2460`).
+- `/mcp`: `auth='none'`, sin elección de BD en la ruta (`main.py:759`); exige `group_ai_conversational` si el agente
+  enlazado es conversacional (`main.py:861-865`). Generar la clave a un usuario sustituye su hash; borrarla le oculta
+  los menús de IA (`mcp_user.py:59-61`, `:68-69`, `:411-422`): se usó `seges_target`, que no tenía clave.
+- Apertura 24: solo con una página nueva sin título, que depende del resultado del modelo (`page_title`,
+  `chatboo_canvas.py:863-873`; `_name_it_later`, `:929-930`). No se puede provocar desde la interfaz.
+
+**Ejecución** (log desde el arranque, 13:39:29 UTC, hasta 15:46:33 UTC; 851 registros; BD solo «?» y
+`lab_pns_ai_3973_14`, que cargó sus 47 módulos a las 14:27:11):
+
+| Apertura | Bloque | Cómo | Prueba | Resultado |
+|---|---|---|---|---|
+| 1 | D | turno de Chatboo como `seges_int` (tabla de 5 contactos) | `ai_log` del usuario 12: 5 → 21, sin Traceback | cubierta |
+| 1 | D | turno fallido (ReadTimeout del proveedor, 14:34:10 UTC): su cursor se deshace siempre | `ai_log` del usuario 12: 0 → 5, sin Traceback: solo pudo guardarlas el `commit` de la apertura 1 | cubierta |
+| 1 | G | `tools/call` de `relaxaicode` por `/mcp` como `seges_target` (petición HTTP: forzado de `request.env`) | HTTP 200, `isError` falso; `ai_log` del usuario 11: 1 (`relaxaicode`), sin Traceback | cubierta |
+| 23 | D | «Make a page with 5 of my contacts and their email»; la página se abre con los 5 contactos | sesión con `canvas_open`, `canvas_design` y `canvas_rev ≥ 1`: 0 → 1; `chatboo_canvas_page` sin cambios | cubierta |
+| 11 | E | `fetch_url` a `https://example.com/` (en la lista blanca, `kind='web'`) | operación `executed` sin confirmación; diario sin filas (la rama `fetch_url` no lo escribe) | cubierta |
+| 12 y 13 | F | «Confirmar» de la ficha (`write` de `comment`) | operación `cancelled`: el usuario 12 no tiene escritura en `res.partner` (sin `base.group_partner_manager` ni ACL); el plan se deshizo y el contacto quedó igual | cubiertas, camino del error |
+| 3 | F | `_record_failed_plan` del plan fallido | diario `failed`: 1 | cubierta |
+| 10 y 7 | E y F | creación de la operación y token de la ficha | las dos operaciones existen aunque el cursor del turno se deshace; la confirmación llegó a ejecutar el plan | cubiertas (deducido) |
+| 24 | — | — | `canvas_title` también lo escribe `_store_design` en una página con título: no se distingue | sin cubrir |
+| Éxito del plan dentro de la 13 | — | — | el éxito de `execute_plan_now` está cubierto por la 11 | sin cubrir |
+
+**Log:** 0 «seges_side_env: », 0 «bad query», 0 «store failed», 0 «could not serialize», 0 HTTP 5xx propios y
+0 CRITICAL. 14 Traceback y 6 ERROR, todos ajenos al parche 38:
+- proveedor (Gemini lab, `gemini-3.6-flash`): 3 `ReadTimeout` (bloques D y E) y 1 HTTP 503 (bloque E), en
+  `engine_tool_loop` (`openai_driver.py:705/738/750`, `engine_tool_loop.py:582`);
+- plan sin permiso (bloque F): 1 `AccessError` con su `KeyError` encadenado, registrado dos veces por
+  `safe_operation` (`safe_plan_execute.py:184` ← `safe_operation.py:1487` ← `:977`, dentro del `with` de la apertura
+  13).
+
+**Configuración puesta y quitada** (booleanos antes, durante y después): entrada `example.com` en la lista blanca
+(False → True → False; 2 → 3 → 2 activas `web`), «AI External URL» a `seges_int` y «AI Conversational» a
+`seges_target` (False → True → False), clave MCP de `seges_target` (generada y borrada en el bloque G; al final
+False). Servidor de Odoo 14 parado al acabar.
+
+**Desviaciones:**
+- `sesiones_12_nuevas` 2 en lugar de 3 en el bloque D (probablemente «New» reutilizó la sesión vacía del turno
+  fallido; no se investiga).
+- Proveedor inestable: un reintento en el bloque D; en el E, «All providers failed» después de ejecutarse el plan.
+- Dos «Hecho» pegados antes de hacer los turnos; los recuentos sin cambios lo detectaron.
+- Errata del prompt («bloque D» por «bloque E»).
+- `urllib` da `ConnectionResetError` desde el contenedor web; `requests`, que usa `fetch_url`, llega (200).
+
+**Queda en la BD del laboratorio:** filas de `ai_log` (39 del usuario 12 y 1 del 11), 6 sesiones del usuario 12 (una
+con página), las dos operaciones (`executed` y `cancelled`), la fila `failed` del diario y un transitorio de
+`ai.api.key.wizard` con la clave de `seges_target` ya inválida (hallazgo de P-22, ya registrado).
+
+**Para futuros laboratorios:** el usuario 12 no tiene escritura en contactos; un plan de `write` sobre `res.partner`
+con él solo cubre el camino del error.
+
+**Resultado:** parche 38 validado en el laboratorio con Chatboo y `/mcp`. Pendiente: seguimiento de PNS-105.
