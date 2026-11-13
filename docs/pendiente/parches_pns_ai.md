@@ -257,7 +257,7 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
 | 24 | PNS-102 | seguridad | `pns_ai_mcp/controllers/context_builder.py` | 3a | Aplicado (12/11/2026) |
 | 25 | M1 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | 2b | Aplicado (11/11/2026): solo la comprobación del dueño, en `chatboo_session.py` |
 | 26 | M2 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | 2b | Aplicado (11/11/2026) |
-| 27 | F1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/controllers/chatboo.py` | 4 | Pendiente de portar |
+| 27 | F1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py` (`controllers/chatboo.py` sin cambios: la cabecera del fabricante se mantiene) | 4 | Aplicado (13/11/2026): a, a′, b y c, sin d; validado en el laboratorio (13/11/2026) |
 | 28 | D1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas_page.py`, `pns_ai_chatboo/security/security.xml` | 2b | Aplicado (11/11/2026): sin la parte de `owner_id` |
 | 29 | F1 (P-8e a) | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_session.py` | 4 | Pendiente de portar |
 | 30 | M11 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
@@ -4905,3 +4905,74 @@ Odoo: contenedor (`odoo` 14.0-20231106).
 - Configuración de prueba (lista blanca de `example.com`, dos grupos y la clave MCP de `seges_target`) puesta y
   quitada, comprobada con booleanos.
 - Detalle en la propuesta, «Laboratorio del parche 38 (13/11/2026)».
+
+## Parches de la rama 14.0-pns-ai-3973 (fase 4, 13/11/2026)
+
+Comprobación previa de la CSP, propuesta, decisiones de Sergio (D1 a D5), batería, neutralizaciones y laboratorio:
+[propuesta de la fase 4](propuesta_fase4_3973.md). Las líneas son del árbol actual.
+
+### Parche 27 en 3.1.973
+
+- **Comprobación previa (13/11/2026):** con la cabecera HTTP del fabricante y la `<meta>` de Seges a la vez (decisión 6),
+  la resultante solo pierde `'self'` en `img-src` y `connect-src` dentro del marco, y todo lo que no va en línea en las
+  descargas. Nada legítimo lo usa: el código mete las imágenes como `data:`, el prompt no pide URL y P-9 midió que las
+  peticiones del marco al propio Odoo van sin sesión. A7 (4 diseños guardados en `lab_pns_ai_3973_14`) dio 0 cargas del
+  propio Odoo. Sin paso B (decisión de Sergio).
+- **Qué se porta de la 3879:**
+  - **a) Escape:** `_SCRIPT_UNSAFE`, `_script_safe` y `_script_json` (`chatboo_canvas.py:25-44`), en seis puntos:
+    `_page_for_rows` (1098), las dos salidas de `_payload_for_const_data` (1426, con `_script_safe` sobre el texto de
+    `figures_for_design`, y 1427), `bind_const_title` (1440), `bind_script_row_json` (1734) y `_spare_rows_watch`
+    (2195). Son líneas del árbol anterior al parche, como en la propuesta.
+    - En 2195, el `.replace('</', '<\\/')` del fabricante no basta: `<!--<script` no contiene `</` y deja el bloque
+      en el estado *script data double escaped*, donde el siguiente `</script>` no lo cierra.
+    - **Sale 2047-2048** (`wrap_captured_page`): escribe código Python del sandbox, no HTML. El HTML vuelve a pasar
+      por `page_html`, que escribe `DATA` y `TITLE` con los puntos de arriba.
+  - **a′) Imágenes:** en `_picture_of`, un `data:image/` solo cuenta como imagen con `_DATA_URI_RE.fullmatch` (el regex
+    ya es del fabricante). Si no, queda como texto y lo serializa `_script_json`.
+    - **Resto conocido (decisión D1):** un `data:` con espacios o saltos de línea dentro del base64 deja de reconocerse y
+      queda como texto. Lo que genera `_base64_picture` no los lleva.
+  - **b) CSP en `<meta>` al servir:** `_CSP_META`, `_CSP_PREFIX` y `_with_csp`, tal cual de la 3879, como último paso de
+    `canvas_page` (el `srcdoc` de `/chatboo/canvas/<id>` y `/chatboo/page/<id>`) y de `downloadable_page` (las dos
+    descargas).
+    - **Orden:** el prefijo ocupa los primeros bytes de lo servido. Todo lo que añade el servidor (`_THEME_START`,
+      `_THEME_BRIDGE`, `_HIDDEN_HIDES`, `_PRINT_BRIDGE`, los botones de la descarga y el vigilante) va detrás. La CSP es
+      el segundo hijo de `<head>`, tras la `<meta charset>`, también si el diseño no tiene `<head>` (lo abre el prefijo).
+    - La página exterior no lleva `<meta>`: sus scripts de compartir necesitan el `connect-src 'self'` de la cabecera.
+  - **c) Regla del prompt:** «Do not load external libraries, fonts, stylesheets or images…», detrás de `'Do not fetch
+    and do not call APIs. '` en `_PAGE_RULES` (llega a `DESIGN_SYSTEM` y `EDIT_SYSTEM`).
+- **Qué no se porta:** **d)** `X-Frame-Options` (decisión D3). Las cabeceras del fabricante quedan intactas
+  (`_PAGE_CSP` y `_page_headers`, `controllers/chatboo.py:1175-1187`, usadas en `:1171` y `:1277`), con
+  `frame-ancestors 'self'`.
+- **Riesgos en 3.1.973** (tabla completa en la propuesta):
+  - **siguen:** autonavegación del marco, WebRTC y DNS, el paso de los diseños sin doctype a modo estándar, m-a y m-b;
+  - **cambian:** las imágenes `http(s)` externas ya las bloquea el fabricante en el marco (el parche solo las quita de
+    las descargas); el 404 de la carcasa va sin la cabecera CSP (antes, sin `X-Frame-Options`);
+  - **mejora:** la vía D5 sigue abierta, pero limitada también en las descargas;
+  - **desaparece:** el `'self'` del fabricante dentro del marco.
+- **Tests** (`pns_ai_chatboo/tests/test_seges_chatboo_canvas.py`, etiqueta `seges_e3p`):
+  - `TestSegesCanvasScriptJson` (8) y `TestSegesCanvasShell` (8), de la 3879;
+  - `test_canvas_shell` y `test_page_shell` comprueban la CSP literal del fabricante en lugar de `X-Frame-Options`;
+    las descargas, que no llevan cabecera CSP;
+  - `TestSegesCanvasHeaders` (3): P-9 parte A como test, sin la parte RPC → compartir (la vía D5 no es del 27).
+- **Batería** (`tests-20261113-190554.log`): 541 tests, 1 F (`test_paap_i7`), 0 E y los mismos 6 saltados; resto de
+  recuentos iguales a la línea base (`tests-20261113-182647.log`).
+- **Neutralizaciones:** las 10 (N27a1 a N27a6, N27b1, N27b2, N27a′ y N27c), todas F en los tests previstos y con SHA-256
+  IGUAL al restaurar. Fuera de lo previsto: N27a6 tumba también `test_whole_page` (con `captured=True` incluye el
+  vigilante). Los subtests se confirman por el total del runner y por un grep de nombres.
+- **Laboratorio D5 (13/11/2026):** correcto; fila en el «Registro de laboratorios» de
+  [lab_procedimiento_3973.md](lab_procedimiento_3973.md).
+- **Estado:** aplicado (13/11/2026) y validado en el laboratorio (13/11/2026).
+
+### Para el informe al fabricante (fase 4)
+
+- **URL de imagen que `_WEB_IMAGE_RE` no reconoce** (`chatboo_canvas.py:654` en 3.1.973):
+  - un valor de imagen de las filas como `/web/image/<id>`, `/web/image?model=…`, `/web/content/…` o una URL absoluta
+    sigue como texto en la muestra a Design y en `DATA` (`pictures_as_tokens`, `:729-737` en 3.1.973);
+  - si Design lo pone en un `<img>`, el marco lo pide sin sesión, así que sale la imagen rota o la de por defecto aunque
+    el usuario tenga acceso;
+  - pasa ya en 3.1.973 sin Seges;
+  - va al informe sin parche (decisión de Sergio, 13/11/2026). Es distinta de «Canvas sin imágenes» (el botón Canvas no
+    lleva imágenes a Design; fase 2c).
+- **Marco y descarga se comportan distinto con librerías externas:** el prompt del fabricante no las prohíbe y su
+  `script-src 'unsafe-inline'` las bloquea en el marco, así que un diseño con una librería de un CDN sale sin gráficos
+  en el lienzo y con gráficos en la descarga.

@@ -2475,6 +2475,20 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
     abortada.») cancela todas las verificaciones pendientes del usuario, no solo la del intento;
   - solo afecta a las del propio usuario: no cruza permisos ni toca operaciones de otros;
   - sin ficha PNS; para valorar en E4′.
+- **URL de imagen del lienzo que `_WEB_IMAGE_RE` no reconoce** (fase 4, `14.0-pns-ai-3973`, 13/11/2026, por lectura
+  sobre 3.1.973; [propuesta de la fase 4](propuesta_fase4_3973.md), «Observación nueva para el informe al fabricante»):
+  - **Descripción:** `pictures_as_tokens` (`pns_ai_chatboo/models/chatboo_canvas.py:729-737` en 3.1.973) solo
+    incrusta como `data:` los valores que `_picture_of` reconoce: `/web/image/<modelo>/<id>/<campo>` según
+    `_WEB_IMAGE_RE` (`:654`), `data:image/` o base64. Los demás (`/web/image/<id>`, `/web/image?model=…`,
+    `/web/content/…` o una URL absoluta) siguen como texto en la muestra a Design y en `DATA`;
+  - **Impacto:** si Design pone ese valor en un `<img>`, el marco del lienzo lo pide sin la sesión del usuario (P-9,
+    comparación con 3.1.973, §9). Sale la imagen rota o la de por defecto aunque el usuario tenga acceso. Pasa ya en
+    3.1.973 sin Seges; con el parche 27 la petición ni sale (`img-src` sin `'self'`);
+  - **Corrección sugerida:** reconocer también esos formatos (o resolver el adjunto) e incrustarlos como `data:` con
+    los permisos del usuario, como hace `_web_image_picture`;
+  - **Rama Seges:** sin parche (decisión de Sergio, 13/11/2026). Distinta de «Canvas sin imágenes» (el botón Canvas no
+    lleva imágenes a Design; fase 2c). **Candidata al informe al fabricante.** Número propuesto: PNS-106, pendiente
+    de comprobar que no figura en `docs/` y de buscar el síntoma en anexos y diagnósticos antes de numerarla.
 
 ### Candidatos evaluados y descartados
 

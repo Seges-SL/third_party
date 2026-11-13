@@ -311,6 +311,13 @@ Orden:
   - comprobar antes que el lienzo de 3.1.973 sigue pintando sin `'self'`, sobre todo `/sales-board` y las
     imágenes de la página. Si algo legítimo necesita `'self'`, se presenta a Sergio antes de decidir;
   - tests: `test_seges_chatboo_canvas` y P-9 parte A como test.
+  - **Hecho (13/11/2026):**
+    - comprobación previa hecha, sin paso B (decisión de Sergio);
+    - puntos corregidos del escape: 1098, 1426, 1427, 1440, 1734 y 2195 (árbol anterior al parche). Sale 2047-2048
+      (`wrap_captured_page`, que genera Python, no HTML);
+    - parche implementado (a, a′, b y c; sin d) y validado: batería de 541 tests, 1 F (`test_paap_i7`), 0 E y 6
+      saltados; 10 neutralizaciones con SHA-256 igual; laboratorio D5 correcto;
+    - detalle en [propuesta_fase4_3973.md](propuesta_fase4_3973.md).
 - **29:** muestra para Design (`:829-858`) y `place_rows_on_page` (`:2062-2105`).
 - **34:** `log_no_page` (`:587-616`); `_process` y `_save_to_session` (`chatboo_async_request.py:149-162,
   1184-1410`), con la opción A y F1. P-13 en la interfaz.
@@ -376,6 +383,10 @@ Orden:
    - `_require_settings` (con y sin el 32);
    - reintento de la tarjeta (manual).
 5. P-15: `-u` completo sobre una copia de `pns_demo` que carga Sergio.
+   - **Añadido el 13/11/2026 (fase 4, parche 27):** A7 en solo lectura sobre la copia de `pns_demo`. Es el script
+     `~/pns_ai_3973/fase4/csp/a7_recuentos.py`, que cuenta diseños por patrón, sin contenido ni ID (ver
+     [propuesta_fase4_3973.md](propuesta_fase4_3973.md), A7). Su constante `BD` es `lab_pns_ai_3973_14`: para la
+     copia hay que cambiarla, y el cambio se presenta antes.
 6. P-21 de nuevo (solo lectura), justo antes del `-u` del staging.
 7. Staging `pns_demo`.
    - Anexo de PNS-26: un «Confirmar» correcto de la ficha (encadena `/confirm` y `/execute`). En el log, por cada

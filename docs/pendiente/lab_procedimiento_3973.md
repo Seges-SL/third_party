@@ -168,4 +168,4 @@ Horas en UTC (las del log). Un bloque por laboratorio; no se reescriben los ante
 
 | Fecha | Arranque | Parada | C (tras la entrada / tras reinicios / log guardado) | Log guardado | Notas |
 |---|---|---|---|---|---|
-| | | | | | |
+| 13/11/2026 | 18:52:45 | 18:57:35 (última línea del log guardado) | cubierta por la del log guardado / sin reinicios / `?` (17), `lab_pns_ai_3973_14` (99); Starting job: `lab_pns_ai_3973_14` (13) | `servidor-20261113-195757.log` | Parche 27 (D5). Primer uso real de C: funciona. Navegador sin errores ni «Refused» en `canvas/8`, su descarga desde el disco, Compartir con `seges_aiadm`, `page/<id>` y su descarga. Log: 1 WARNING `py.warnings`, 0 ERROR. `servidor-20261113-195320.log` (6 líneas), guardado antes de tiempo, sin uso. |
