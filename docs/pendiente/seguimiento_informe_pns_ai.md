@@ -177,7 +177,7 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-102 | Crítica | NUEVO | VULNERABLE (herramienta real, segundo rechazo de E2′, 27/10/2026, sobre 3.1.782 y en LIYBEN) | · **Parche 24 (E2′, `14.0-pns-ai-3879`): validación local y neutralización hechas (28/10/2026)**; tests `test_seges_identity_su.py` · LIYBEN: claves MCP revocadas el 27/10/2026; regenerarlas tras el despliegue final |
 | PNS-103 | Baja | NUEVO | CONFIRMADO (laboratorio `lab_pns_ai_3973`, 11/11/2026, sobre 3.1.973; mismo código en 3.1.879) | · **Parche 36 (fase 2c, `14.0-pns-ai-3973`)**: ver su ficha · pendiente del informe al fabricante |
 | PNS-104 | Baja | NUEVO | CONFIRMADO (`test_pending_write_survives_box_a_close`, batería de `lab_pns_ai_3973`, 12/11/2026, sobre 3.1.973; mismo código en 3.1.879); latente: ningún llamador real pierde datos hoy | · **Parche 37 (fase 3b, `14.0-pns-ai-3973`)**, como defensa: ver su ficha · pendiente del informe al fabricante |
-| PNS-105 | Alta (propuesta) | NUEVO | CONFIRMADO (test, 12/11/2026; efecto 3 incluido) | — |
+| PNS-105 | Alta (propuesta) | NUEVO | CONFIRMADO (test, 12/11/2026; efecto 3 incluido) | · **Parche 38 (`14.0-pns-ai-3973`, `348fa2d`)**: tests, batería y neutralización hechos; validado en el laboratorio, con salvedades (ver ficha) (13/11/2026) · pendiente del informe al fabricante |
 
 **Recuento:** CORREGIDO 31 · PARCIAL 33 · SIN CAMBIOS 13 · YA NO APLICA 2 · DUDOSO 1 (80 del
 informe) · NUEVO 22 (total 102). Por gravedad:
@@ -219,6 +219,11 @@ informe) · NUEVO 22 (total 102). Por gravedad:
 > - Observación para el informe, sin número: un campo `Reference` salta la puerta de los modelos de credenciales del
 >   fabricante (camino de V2 y de P-22). Detalle en `docs/specs/estado_hallazgos_3879.md` (§6) y en el
 >   [registro](parches_pns_ai.md), «Para el informe al fabricante (fase 3b)».
+>
+> **13/11/2026 (parche 38):**
+> - PNS-105: **parche 38** aplicado en `14.0-pns-ai-3973` (`348fa2d`) y validado en el laboratorio, con salvedades (ver
+>   ficha). Como en PNS-104, «Estado» sigue en NUEVO y el parche va en «Rama Seges».
+> - El recuento de arriba no cambia.
 
 Restos que se repiten en varios parciales:
 1. **El sandbox (caja A) bloquea por lista de nombres y no impide llamar a métodos privados**
@@ -2423,6 +2428,28 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
   - **Condición general:** con idle_in_transaction_session_timeout activo, PostgreSQL cortaría la conexión del plan.
     Entonces el UPDATE lateral seguiría adelante y se confirmaría fuera del plan, y el efecto 3 pasaría a ser el
     efecto 1.
+- **Parche 38 (13/11/2026):**
+  - **Rama Seges:** parche 38 aplicado en `14.0-pns-ai-3973` (commit `348fa2d`). Helper `seges_side_env()`
+    (`pns_base/utils/seges_side_env.py`): cada cursor propio trabaja con un conjunto de entornos aparte durante el
+    bloque y, al salir, se comprueba que no ha cambiado nada de quien llama. 16 aperturas envueltas (1 a 13, 15, 23 y
+    24). Cubre E1 a E4 ([registro](parches_pns_ai.md), «Parche 38»).
+  - **Tests:** los tres de confirmación pasan de F a correctos; `TestSegesSideEnv` (6). Batería de 519 tests (log
+    `tests-20261113-131618.log`): 1 F (`test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin`), 0 E. Neutralización
+    N105a, N105r, N105c y N105p, todas F como estaba previsto.
+  - **Laboratorio (13/11/2026, `lab_pns_ai_3973`):** validado con Chatboo y `/mcp`. Aperturas 1, 3, 11, 12, 13 y 23
+    cubiertas (7 y 10, deducidas, sin evidencia directa); 0 «seges_side_env: »; los Traceback son del proveedor y de
+    un plan sin permiso. Sin cubrir: 24 y el éxito del plan dentro de la 13 ([propuesta de la fase
+    3](propuesta_fase3_3973.md), «Laboratorio del parche 38 (13/11/2026)»).
+  - **Restos conocidos:**
+    - apertura 14 sin envolver (no la llama nadie); aperturas 16 a 22 fuera (hilo propio o `manage` nuevo);
+    - apertura 9: el import falla sin aviso si `pns_base` está roto; en tests, un incumplimiento puede duplicar el
+      adjunto;
+    - los entornos sin referencia creados dentro del bloque no se cuentan;
+    - los tests del fabricante que comparten cursor no se aíslan (una línea ERROR esperada en la apertura 3);
+    - el `disable` de `R1702` cubre todo el `try` de `_create_log_entry`; 14 incidencias de lint del fabricante en
+      líneas reindentadas.
+  - «Estado» sigue en NUEVO (describe el código del fabricante) y «Laboratorio y staging», en CONFIRMADO. Staging del
+    parche 38: pendiente. **Pendiente del informe al fabricante.**
 
 ### Observaciones sin ficha (para valorar en E4′)
 

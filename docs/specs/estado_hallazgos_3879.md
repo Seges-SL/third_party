@@ -26,6 +26,8 @@
     `ai.key.pin.desk`;
   - observación nueva para el informe, sin número: un `Reference` salta la puerta de los modelos de credenciales (§6,
     «Alta del 12/11/2026»).
+- **Parche 38 (13/11/2026):** PNS-105 se corrige en `14.0-pns-ai-3973` con el p38 (`348fa2d`), validado en el
+  laboratorio, con salvedades (ver ficha). Sigue en AI, como PNS-103 y PNS-104: sin corregir en 3.1.879.
 - **Rama y HEAD:** `14.0-pns-ai-3879`, `be934bc` (copia de trabajo limpia).
 - **Código comprobado:** `pns_base`, `pns_ai_mcp` y `pns_ai_chatboo` de `8d218ea` (validado en el staging
   `pns_demo` el 09/11/2026; ningún commit posterior toca los módulos).
@@ -162,6 +164,9 @@ Por gravedad (la de los documentos; si cambia, la última) y estado:
 > por test el 12/11/2026, también el efecto 3 (espera de bloqueo del worker en la caja B). Sin parche en ninguna rama.
 > - Las tablas de arriba no lo incluyen. Con PNS-103 a PNS-105: **filas 189**; **AI 59** (antes 58); Alta 35 (AI 9).
 > - Ya no queda ninguno de PNS-103 a PNS-105 sin estado.
+
+> **13/11/2026, parche 38:** PNS-105 se corrige en `14.0-pns-ai-3973` con el p38 (laboratorio del 13/11/2026, con
+> salvedades). Sigue en **AI**, como PNS-103 y PNS-104: sin corregir en 3.1.879 y sin staging. Los recuentos no cambian.
 
 ## 2. SIN TRATAR / SIN ESTADO CLARO
 
@@ -407,7 +412,7 @@ Abreviaturas de origen: **inf.** informes de Seges (PNS-01 a 80, 08/10/2026; 81 
 | PNS-102 | seg (nuevo, E2′) | Crítica | `user`/`company` con `su` | CS (p24; lab 28/10 P-102; stg 29/10 sin prueba propia); AI | reg «Parche 24»; plan §3.2 | §2, fila 2. Claves MCP de LIYBEN: regenerar tras el despliegue (plan §3.1) |
 | PNS-103 | seg (nuevo, lab 3973, 11/11) | Baja | AI Administrator sin Ajustes: `AccessError` en la revisión y el resultado de las importaciones | AI (12/11) | seg PNS-103; reg «Parche 36» | Alta del 12/11 (§1, nota). Mismo código en 3.1.879 (`_inject_*_arch` sin `sudo`); no se corrige en `14.0-pns-ai-3879` (`pns_demo` lo tiene; se validó con usuarios con Ajustes). Corregido en `14.0-pns-ai-3973` por el p36 |
 | PNS-104 | seg (nuevo, batería 3973, 12/11) | Baja | Cerrar la caja A descarta las escrituras pendientes del llamador (`rollback` → `clear_env` → `env.clear()`) | AI (12/11) | seg PNS-104; prop fase 3, «Propuesta: parche de `flush`» e «Implementación de la 3b»; reg «Parche 37» | Alta del 12/11 (§1, notas). Latente: ningún llamador real pierde datos hoy. Mismo código en 3.1.879; no se corrige en `14.0-pns-ai-3879`. Corregido en `14.0-pns-ai-3973` por el p37, como defensa (los `new()` del llamador siguen perdiéndose) |
-| PNS-105 | seg (nuevo, lectura de código 3973, 12/11) | Alta (propuesta) | Los cursores propios con `commit` (p. ej. `ai.log._create_log_entry`) confirman y descartan las escrituras pendientes de quien los llama (`Cursor.commit` → `flush_env`) | AI (13/11) | seg PNS-105; prop fase 3, «Resultado de X1 a X4» | Alta del 12/11 (§1, nota). Mismo patrón en 3.1.879; sin parche. Confirmado por test (12/11/2026), también el efecto 3 (espera de bloqueo del worker en la caja B); ver seguimiento_informe_pns_ai.md |
+| PNS-105 | seg (nuevo, lectura de código 3973, 12/11) | Alta (propuesta) | Los cursores propios con `commit` (p. ej. `ai.log._create_log_entry`) confirman y descartan las escrituras pendientes de quien los llama (`Cursor.commit` → `flush_env`) | AI (13/11) | seg PNS-105; prop fase 3, «Resultado de X1 a X4» y «Laboratorio del parche 38»; reg «Parche 38» | Alta del 12/11 (§1, nota). Mismo patrón en 3.1.879. Corregido en `14.0-pns-ai-3973` por el p38 (lab 13/11, con salvedades). Confirmado por test (12/11/2026), también el efecto 3 (espera de bloqueo del worker en la caja B); ver seguimiento_informe_pns_ai.md |
 
 ### 3.2 Observaciones comunicadas, petición de §5 y compatibilidad sin número
 
