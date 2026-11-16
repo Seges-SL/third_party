@@ -6,12 +6,13 @@ Solo biblioteca estándar: sin Node, sin websocket-client, sin instalar nada.
 Órdenes:
   c            Comprobación C sobre un log leído por la entrada estándar
                (la misma lógica que lab_procedimiento_3973.md).
+  rutas        Solo las guardas de las rutas (antes de arrancar nada).
   navegar      Entra como LAB_LOGIN/LAB_PASSWORD por /web/login?db=lab_pns_ai_3973_14,
-               hace C sobre el log del servidor, comprueba que la sesión es de
-               lab_pns_ai_3973_14 y visita las rutas dadas. Por ruta: imágenes
-               pintadas en el marco srcdoc, «Refused» de CSP por directiva
-               (consola de Chrome), errores de JS y una captura. Bloquea
-               cualquier petición a /web/database/*.
+               resume la medida del login, comprueba que la sesión es de
+               lab_pns_ai_3973_14, hace C sobre el log del servidor y visita las
+               rutas dadas. Por ruta: imágenes pintadas en el marco srcdoc,
+               «Refused» de CSP por directiva (consola de Chrome), errores de JS
+               y una captura. Bloquea cualquier petición a /web/database/*.
   autoprueba   Lo mismo contra un servidor simulado en 127.0.0.1 (sin Odoo),
                con resultados esperados. Sirve para validar el script en el equipo.
 
@@ -19,8 +20,18 @@ No imprime contenido de las páginas ni del log: solo nombres de BD, recuentos y
 nombres de archivo. Los textos de los errores de JS van a <salida>/detalle.txt,
 que es local y no se copia a la documentación.
 
-Códigos de salida: 0 todo como se espera; 1 hay incidencias; 2 abortado
-(C con otra BD, sesión de otra BD o error de Chrome).
+Códigos de salida (los mismos que lab_auto.sh; un código por causa):
+   0  todo como se espera
+   1  incidencias de medición (rutas o login)
+   3  otra BD (sesión, C en vivo o C de un log)
+   4  el servidor no responde
+   5  falla el login
+   6  error de Chrome (CDP)
+   7  C sin líneas de Odoo (log vacío o que no es del servidor)
+  11  faltan LAB_LOGIN o LAB_PASSWORD
+  12  argumentos o rutas no válidos
+  20  error interno de este script (traceback en la salida de errores)
+ 130  Ctrl+C
 """
 import argparse
 import base64
@@ -38,8 +49,23 @@ import sys
 import tempfile
 import threading
 import time
+import traceback
 import urllib.parse
 import urllib.request
+
+# Códigos de salida (ver el docstring). El 2 no se usa: era el «abortado» de
+# antes y es también el de un error de argparse sin capturar.
+OK = 0
+INCIDENCIAS = 1
+OTRA_BD = 3
+SIN_SERVIDOR = 4
+FALLA_LOGIN = 5
+FALLA_CHROME = 6
+C_SIN_LINEAS = 7
+SIN_CREDENCIALES = 11
+ARGUMENTOS = 12
+INTERNO = 20
+INTERRUMPIDO = 130
 
 BD = 'lab_pns_ai_3973_14'
 BASE = 'http://localhost:8169'
@@ -75,7 +101,8 @@ RE_CSP_SIN_DIRECTIVA = re.compile(r"violates the document's Content Security Pol
 PAT_C = re.compile(r"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ \S+ (\S+) (\S+): (.*)")
 
 
-def comprobacion_c(lineas_log):
+def resultado_c(lineas_log):
+    """C con código: OK, OTRA_BD o C_SIN_LINEAS (ninguna línea de Odoo)."""
     lineas = collections.Counter()
     crons = collections.Counter()
     for linea in lineas_log:
@@ -87,9 +114,19 @@ def comprobacion_c(lineas_log):
             crons[m.group(1)] += 1
     print("BD con líneas:", ", ".join("%s (%d)" % kv for kv in sorted(lineas.items())) or "ninguna")
     print("BD con Starting job:", ", ".join("%s (%d)" % kv for kv in sorted(crons.items())) or "ninguna")
-    ok = set(lineas) <= PERMITIDAS and set(crons) <= {BD}
-    print("C:", "OK" if ok else "OTRA BD (parar: «Si aparece otra BD»)")
-    return ok
+    if not lineas:
+        # Un log sin ninguna línea de Odoo no prueba nada: no es «OK».
+        print("C: SIN LÍNEAS DE ODOO (log vacío o que no es del servidor)")
+        return C_SIN_LINEAS
+    if set(lineas) <= PERMITIDAS and set(crons) <= {BD}:
+        print("C: OK")
+        return OK
+    print("C: OTRA BD (parar: «Si aparece otra BD»)")
+    return OTRA_BD
+
+
+def comprobacion_c(lineas_log):
+    return resultado_c(lineas_log) == OK
 
 
 def c_en_vivo():
@@ -98,7 +135,7 @@ def c_en_vivo():
         ['odoo-dev', '14', 'log', 'all'], cwd=LAB,
         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False,
     ).stdout
-    return comprobacion_c(io.StringIO(salida.decode('utf-8', 'replace')))
+    return resultado_c(io.StringIO(salida.decode('utf-8', 'replace')))
 
 
 # --------------------------------------------------------------------------
@@ -106,6 +143,14 @@ def c_en_vivo():
 # --------------------------------------------------------------------------
 class ErrorCDP(Exception):
     pass
+
+
+class ErrorLogin(Exception):
+    """El login no se completó (formulario, envío o sesión)."""
+
+
+class ErrorRuta(Exception):
+    """Una ruta no pasa las guardas."""
 
 
 class Chrome:
@@ -362,19 +407,30 @@ def esperar_servidor(base, espera=120):
 
 def comprobar_ruta(ruta):
     if not ruta.startswith('/') or ruta.startswith('//'):
-        raise SystemExit('ruta no válida (debe empezar por una sola /): %s' % ruta)
+        raise ErrorRuta('ruta no válida (debe empezar por una sola /): %s' % ruta)
     if '/web/database' in ruta:
-        raise SystemExit('ruta prohibida: %s' % ruta)
+        raise ErrorRuta('ruta prohibida: %s' % ruta)
     q = urllib.parse.parse_qs(urllib.parse.urlsplit(ruta).query)
     if any(v != BD for v in q.get('db', [])):
-        raise SystemExit('ruta con otra BD: %s' % ruta)
+        raise ErrorRuta('ruta con otra BD: %s' % ruta)
+
+
+def comprobar_rutas(rutas):
+    """Guardas de todas las rutas; código OK o ARGUMENTOS."""
+    try:
+        for r in rutas:
+            comprobar_ruta(r)
+    except ErrorRuta as e:
+        print('ABORTADO: %s' % e)
+        return ARGUMENTOS
+    return OK
 
 
 def nombre_archivo(ruta):
     return re.sub(r'[^A-Za-z0-9]+', '_', ruta).strip('_') or 'raiz'
 
 
-def resumir(ruta, error, marcos, medida, captura):
+def resumir(ruta, error, marcos, medida, captura, con_marcos=True):
     incid = []
     print('\n== %s' % ruta)
     if error:
@@ -388,7 +444,7 @@ def resumir(ruta, error, marcos, medida, captura):
             ' (2.º hijo de <head>)' if m['meta_csp_primera'] else '', m['modo']))
         if m['rotas'] or not m['meta_csp'] or m['modo'] != 'CSS1Compat':
             incid.append('marco %d' % i)
-    if not marcos:
+    if con_marcos and not marcos:
         print('  marco: ninguno medido')
         incid.append('sin marco')
     refused = sorted((k.split(':', 1)[1], v) for k, v in medida.items() if k.startswith('refused:'))
@@ -413,7 +469,7 @@ def resumir(ruta, error, marcos, medida, captura):
 def entrar(ch, base, login, clave):
     err = ch.ir(base + '/web/login?db=' + BD)
     if err:
-        raise ErrorCDP('login: ' + err)
+        raise ErrorLogin('login: ' + err)
     js = (
         "(() => { const f = document.querySelector('form.oe_login_form');"
         " if (!f) return 'sin-formulario';"
@@ -422,12 +478,12 @@ def entrar(ch, base, login, clave):
         " f.submit(); return 'ok'; })()" % (json.dumps(login), json.dumps(clave)))
     ch.cargas = 0
     if ch.evaluar(js) != 'ok':
-        raise ErrorCDP('login: no está el formulario de /web/login')
+        raise ErrorLogin('login: no está el formulario de /web/login')
     if not ch.esperar(lambda: ch.cargas >= 1, 90):
-        raise ErrorCDP('login: la página tras el envío no cargó')
+        raise ErrorLogin('login: la página tras el envío no cargó')
     ruta = ch.evaluar('location.pathname')
     if not ruta.startswith('/web') or ruta.startswith('/web/login'):
-        raise ErrorCDP('login: no entró (ruta %s)' % ruta)
+        raise ErrorLogin('login: no entró (ruta %s)' % ruta)
     info = ch.evaluar(
         "fetch('/web/session/get_session_info', {method: 'POST',"
         " headers: {'Content-Type': 'application/json'},"
@@ -437,33 +493,48 @@ def entrar(ch, base, login, clave):
     return info
 
 
-def navegar(args, base=BASE, c_func=c_en_vivo, login=None, clave=None):
+def navegar(args, base=BASE, c_func=c_en_vivo, login=None, clave=None, espera_servidor=120):
     login = login or os.environ.get('LAB_LOGIN')
     clave = clave or os.environ.get('LAB_PASSWORD')
     if not login or not clave:
-        raise SystemExit('Faltan LAB_LOGIN y LAB_PASSWORD en el entorno.')
-    for r in args.rutas + args.descarga:
-        comprobar_ruta(r)
+        print('ABORTADO: faltan LAB_LOGIN y LAB_PASSWORD en el entorno.')
+        return SIN_CREDENCIALES
+    codigo = comprobar_rutas(args.rutas + args.descarga)
+    if codigo:
+        return codigo
     os.makedirs(args.salida, exist_ok=True)
+    print('Esperando al servidor…')
+    if not esperar_servidor(base, espera_servidor):
+        print('ABORTADO: el servidor no responde en %s' % base)
+        return SIN_SERVIDOR
     perfil = tempfile.mkdtemp(prefix='lab3973-chrome-')
     descargas = tempfile.mkdtemp(prefix='lab3973-descargas-')
-    print('Esperando al servidor…')
-    if not esperar_servidor(base):
-        print('El servidor no responde en %s' % base)
-        return 2
-    ch = Chrome(perfil, args.salida)
+    try:
+        ch = Chrome(perfil, args.salida)
+    except OSError as e:
+        print('ABORTADO: Chrome no arranca (%s)' % e.__class__.__name__)
+        shutil.rmtree(perfil, ignore_errors=True)
+        shutil.rmtree(descargas, ignore_errors=True)
+        return FALLA_CHROME
     incidencias = []
     try:
         ch.abrir_pagina(descargas)
         ch.nueva_medida('login')
         info = entrar(ch, base, login, clave)
+        # Lo que el cliente web emite justo después de entrar es del login,
+        # no de la primera ruta.
+        ch.bombear(ESPERA_PINTADO)
         print('Sesión: BD %s, uid %s' % (info.get('db'), info.get('uid')))
+        incidencias += [('login', i) for i in resumir(
+            'login', None, [], ch.medida, None, con_marcos=False)]
         if info.get('db') != BD:
             print('ABORTADO: la sesión no es de %s' % BD)
-            return 2
+            return OTRA_BD
         print('\nComprobación C tras la entrada:')
-        if not c_func():
-            return 2
+        codigo = c_func()
+        if codigo:
+            print('ABORTADO: C tras la entrada (código %d)' % codigo)
+            return codigo
         for ruta in args.rutas:
             ch.nueva_medida(ruta)
             err = ch.ir(base + ruta)
@@ -494,9 +565,12 @@ def navegar(args, base=BASE, c_func=c_en_vivo, login=None, clave=None):
             incidencias += [(ruta, i) for i in resumir(
                 ruta + ' (desde el disco: %s)' % os.path.basename(destino),
                 err, marcos, ch.medida, png)]
+    except ErrorLogin as e:
+        print('ABORTADO: %s' % e)
+        return FALLA_LOGIN
     except ErrorCDP as e:
         print('ABORTADO: %s' % e)
-        return 2
+        return FALLA_CHROME
     finally:
         ch.cerrar()
         shutil.rmtree(perfil, ignore_errors=True)
@@ -504,7 +578,7 @@ def navegar(args, base=BASE, c_func=c_en_vivo, login=None, clave=None):
     print('\nResultado: %s' % ('sin incidencias' if not incidencias else
                                'incidencias: ' + '; '.join('%s → %s' % x for x in incidencias)))
     print('Peticiones a /web/database bloqueadas en total: %d' % ch.bloqueadas)
-    return 1 if incidencias else 0
+    return INCIDENCIAS if incidencias else OK
 
 
 # --------------------------------------------------------------------------
@@ -531,7 +605,7 @@ LOG_BUENO = (
 LOG_MALO = LOG_BUENO + 'web-1  | 2026-11-13 18:55:00,001 1 INFO otra_14 odoo.modules.loading: loading\n'
 
 
-def servidor_simulado():
+def servidor_simulado(error_js_login=False, bd_sesion=BD):
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
     class H(BaseHTTPRequestHandler):
@@ -568,7 +642,9 @@ def servidor_simulado():
             if not self._sesion():
                 return self._resp(303, extra=[('Location', '/web/login')])
             if u.path == '/web':
-                return self._resp(200, b'<!DOCTYPE html><title>web</title><p>web</p>')
+                extra_js = (b'<script>console.error("seges-login-js")</script>'
+                            if error_js_login else b'')
+                return self._resp(200, b'<!DOCTYPE html><title>web</title><p>web</p>' + extra_js)
             hdr = [('Content-Security-Policy', CSP_FAB), ('X-Content-Type-Options', 'nosniff')]
             if u.path == '/chatboo/canvas/1':
                 return self._resp(200, self._carcasa(DISENO_LIMPIO), extra=hdr)
@@ -600,7 +676,8 @@ def servidor_simulado():
                 return self._resp(200, b'mal')
             if u.path == '/web/session/get_session_info' and self._sesion():
                 return self._resp(200, json.dumps(
-                    {'jsonrpc': '2.0', 'result': {'db': BD, 'uid': 99}}).encode(), 'application/json')
+                    {'jsonrpc': '2.0', 'result': {'db': bd_sesion, 'uid': 99}}).encode(),
+                    'application/json')
             return self._resp(404)
 
     srv = ThreadingHTTPServer(('127.0.0.1', 0), H)
@@ -608,7 +685,28 @@ def servidor_simulado():
     return srv
 
 
+def _navegar_capturado(ns, base, **kw):
+    """navegar() con la salida estándar capturada; devuelve (código, texto)."""
+    capturado = io.StringIO()
+    real = sys.stdout
+    sys.stdout = capturado
+    try:
+        codigo = navegar(ns, base=base, **kw)
+    finally:
+        sys.stdout = real
+    return codigo, capturado.getvalue()
+
+
+def _bloques(texto):
+    return {b.split('\n', 1)[0].strip(): b for b in texto.split('\n== ')[1:]}
+
+
+def _bloque(bloques, prefijo):
+    return next((v for k, v in bloques.items() if k.startswith(prefijo)), '')
+
+
 def autoprueba(args):
+    global CHROME
     fallos = 0
 
     def ver(nombre, cond):
@@ -616,42 +714,81 @@ def autoprueba(args):
         print('%s  %s' % ('PASA ' if cond else 'FALLA', nombre))
         fallos += 0 if cond else 1
 
+    def c_bueno():
+        return resultado_c(io.StringIO(LOG_BUENO))
+
+    def sub_carpeta(nombre):
+        ruta = os.path.join(args.salida, nombre)
+        os.makedirs(ruta, exist_ok=True)
+        return ruta
+
+    nulo = io.StringIO()
     print('--- C sobre logs simulados')
     ver('C con solo ? y %s' % BD, comprobacion_c(io.StringIO(LOG_BUENO)))
     ver('C detecta otra BD', not comprobacion_c(io.StringIO(LOG_MALO)))
+    real = sys.stdout
+    sys.stdout = nulo
+    try:
+        codigos_c = (resultado_c(io.StringIO(LOG_BUENO)), resultado_c(io.StringIO(LOG_MALO)),
+                     resultado_c(io.StringIO('')), resultado_c(io.StringIO('sin formato\n')))
+    finally:
+        sys.stdout = real
+    ver('códigos de C: 0 OK, 3 otra BD, 7 log vacío, 7 log sin líneas de Odoo',
+        codigos_c == (OK, OTRA_BD, C_SIN_LINEAS, C_SIN_LINEAS))
     print('--- Guardas de rutas')
     for r in ('/web/database/selector', '//evil.example/x', 'http://x/y', '/web/login?db=otra'):
         try:
             comprobar_ruta(r)
             ver('rechaza %s' % r, False)
-        except SystemExit:
+        except ErrorRuta:
             ver('rechaza %s' % r, True)
+    print('--- Códigos de la línea de órdenes (sin Chrome)')
+    yo = os.path.abspath(__file__)
+
+    def orden(*a, entorno=None):
+        e = dict(os.environ)
+        e.pop('LAB_LOGIN', None)
+        e.pop('LAB_PASSWORD', None)
+        e.update(entorno or {})
+        return subprocess.run([sys.executable, '-I', yo] + list(a), env=e,
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                              stdin=subprocess.DEVNULL).returncode
+    ver('rutas válidas → 0', orden('rutas', '--descarga', '/chatboo/canvas/1/download',
+                                   '/chatboo/canvas/1') == OK)
+    ver('rutas con /web/database → 12', orden('rutas', '/web/database/selector') == ARGUMENTOS)
+    ver('argumentos mal formados → 12', orden('navegar') == ARGUMENTOS)
+    ver('orden desconocida → 12', orden('no-existe') == ARGUMENTOS)
+    ver('navegar sin credenciales → 11',
+        orden('navegar', '--salida', sub_carpeta('sin_credenciales'), '/chatboo/canvas/1')
+        == SIN_CREDENCIALES)
+    sys.stderr, err_real = io.StringIO(), sys.stderr
+    try:
+        ver('excepción interna → 20 (traceback a la salida de errores)',
+            ejecutar(lambda: 1 // 0) == INTERNO)
+    finally:
+        sys.stderr = err_real
+
     print('--- Chrome contra el servidor simulado')
     srv = servidor_simulado()
     base = 'http://127.0.0.1:%d' % srv.server_address[1]
-    salida = args.salida
-    ns = argparse.Namespace(salida=salida, rutas=['/chatboo/canvas/1', '/chatboo/canvas/2',
-                                                  '/chatboo/canvas/3'],
+    ns = argparse.Namespace(salida=sub_carpeta('principal'),
+                            rutas=['/chatboo/canvas/1', '/chatboo/canvas/2', '/chatboo/canvas/3'],
                             descarga=['/chatboo/canvas/1/download'])
-    capturado = io.StringIO()
-    real = sys.stdout
-    sys.stdout = capturado
     try:
-        codigo = navegar(ns, base=base, c_func=lambda: comprobacion_c(io.StringIO(LOG_BUENO)),
-                         login='prueba', clave='clave-prueba')
+        codigo, texto = _navegar_capturado(ns, base, c_func=c_bueno,
+                                           login='prueba', clave='clave-prueba')
     finally:
-        sys.stdout = real
         srv.shutdown()
-    texto = capturado.getvalue()
     print(texto)
-    bloques = {b.split('\n', 1)[0].strip(): b for b in texto.split('\n== ')[1:]}
-
-    def bloque(prefijo):
-        return next((v for k, v in bloques.items() if k.startswith(prefijo)), '')
-
-    b1, b2, b3 = bloque('/chatboo/canvas/1'), bloque('/chatboo/canvas/2'), bloque('/chatboo/canvas/3')
-    bd = bloque('/chatboo/canvas/1/download')
+    bloques = _bloques(texto)
+    b1, b2, b3 = (_bloque(bloques, '/chatboo/canvas/1'), _bloque(bloques, '/chatboo/canvas/2'),
+                  _bloque(bloques, '/chatboo/canvas/3'))
+    bd = _bloque(bloques, '/chatboo/canvas/1/download')
+    bl = _bloque(bloques, 'login')
     ver('sesión de %s' % BD, ('Sesión: BD %s' % BD) in texto)
+    ver('login resumido: sin Refused, 0 errores de JS, sin marco exigido',
+        'Refused (consola): ninguno' in bl and 'errores de JS: 0' in bl
+        and 'ninguno medido' not in bl and 'login →' not in texto)
     ver('canvas/1: 2/2 pintadas, sin Refused, <meta> 2.º hijo, CSS1Compat',
         'imágenes 2/2 pintadas, 0 rotas; <meta> CSP sí (2.º hijo de <head>); CSS1Compat' in b1
         and 'Refused (consola): ninguno' in b1)
@@ -660,15 +797,88 @@ def autoprueba(args):
     ver('canvas/3: la guardia bloquea /web/database', 'bloqueadas: 1' in b3)
     ver('descarga desde el disco: 2/2 pintadas, sin Refused',
         'imágenes 2/2 pintadas' in bd and 'Refused (consola): ninguno' in bd)
-    ver('código de salida 1 (hay incidencias simuladas)', codigo == 1)
+    ver('código de salida 1 (hay incidencias simuladas)', codigo == INCIDENCIAS)
+
+    print('--- Variantes (una ejecución corta cada una)')
+    corto = dict(rutas=['/chatboo/canvas/1'], descarga=[])
+    srv = servidor_simulado(error_js_login=True)
+    base = 'http://127.0.0.1:%d' % srv.server_address[1]
+    try:
+        codigo, texto = _navegar_capturado(
+            argparse.Namespace(salida=sub_carpeta('login_js'), **corto), base,
+            c_func=c_bueno, login='prueba', clave='clave-prueba')
+    finally:
+        srv.shutdown()
+    bl = _bloque(_bloques(texto), 'login')
+    ver('error de JS en el login → incidencia «login → js», código 1',
+        codigo == INCIDENCIAS and 'errores de JS: 1' in bl and 'login → js' in texto
+        and '/chatboo/canvas/1 →' not in texto)
+
+    srv = servidor_simulado(bd_sesion='otra_14')
+    base = 'http://127.0.0.1:%d' % srv.server_address[1]
+    try:
+        codigo, texto = _navegar_capturado(
+            argparse.Namespace(salida=sub_carpeta('otra_bd'), **corto), base,
+            c_func=c_bueno, login='prueba', clave='clave-prueba')
+        ver('sesión de otra BD → 3', codigo == OTRA_BD and 'la sesión no es de' in texto)
+        codigo, texto = _navegar_capturado(
+            argparse.Namespace(salida=sub_carpeta('login_malo'), **corto), base,
+            c_func=c_bueno, login='prueba', clave='otra-clave')
+        ver('contraseña mala → 5', codigo == FALLA_LOGIN)
+    finally:
+        srv.shutdown()
+
+    srv = servidor_simulado()
+    base = 'http://127.0.0.1:%d' % srv.server_address[1]
+    try:
+        for nombre, c_func, esperado in (
+                ('C en vivo con otra BD → 3', lambda: OTRA_BD, OTRA_BD),
+                ('C en vivo sin líneas de Odoo → 7', lambda: C_SIN_LINEAS, C_SIN_LINEAS)):
+            codigo, texto = _navegar_capturado(
+                argparse.Namespace(salida=sub_carpeta('c_%d' % esperado), **corto), base,
+                c_func=c_func, login='prueba', clave='clave-prueba')
+            ver(nombre, codigo == esperado and '== /chatboo/canvas/1' not in texto)
+        chrome_real = CHROME
+        CHROME = os.path.join(args.salida, 'no-existe-chrome')
+        try:
+            codigo, texto = _navegar_capturado(
+                argparse.Namespace(salida=sub_carpeta('sin_chrome'), **corto), base,
+                c_func=c_bueno, login='prueba', clave='clave-prueba')
+        finally:
+            CHROME = chrome_real
+        ver('Chrome que no arranca → 6', codigo == FALLA_CHROME)
+    finally:
+        srv.shutdown()
+
+    srv = servidor_simulado()
+    puerto = srv.server_address[1]
+    srv.shutdown()
+    srv.server_close()
+    codigo, texto = _navegar_capturado(
+        argparse.Namespace(salida=sub_carpeta('sin_servidor'), **corto),
+        'http://127.0.0.1:%d' % puerto, c_func=c_bueno, login='prueba',
+        clave='clave-prueba', espera_servidor=3)
+    ver('servidor que no responde → 4', codigo == SIN_SERVIDOR)
+
     print('\nAutoprueba: %s' % ('todo PASA' if not fallos else '%d FALLA' % fallos))
-    return 0 if not fallos else 1
+    return OK if not fallos else INCIDENCIAS
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    sub = ap.add_subparsers(dest='orden', required=True)
+class _Argumentos(argparse.ArgumentParser):
+    """argparse sale con 2 por defecto; aquí, con ARGUMENTOS (12)."""
+
+    def error(self, message):
+        self.print_usage(sys.stderr)
+        self.exit(ARGUMENTOS, '%s: error: %s\n' % (self.prog, message))
+
+
+def _main():
+    ap = _Argumentos(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest='orden', required=True, parser_class=_Argumentos)
     sub.add_parser('c', help='C sobre un log por la entrada estándar')
+    r = sub.add_parser('rutas', help='solo las guardas de las rutas')
+    r.add_argument('--descarga', action='append', default=[])
+    r.add_argument('rutas', nargs='*')
     n = sub.add_parser('navegar', help='entrar y visitar rutas de lab_pns_ai_3973_14')
     n.add_argument('--salida', required=True, help='carpeta para capturas y detalle.txt')
     n.add_argument('--descarga', action='append', default=[],
@@ -678,13 +888,29 @@ def main():
     a.add_argument('--salida', required=True)
     args = ap.parse_args()
     if args.orden == 'c':
-        ok = comprobacion_c(io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8', errors='replace'))
-        return 0 if ok else 2
+        return resultado_c(io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8', errors='replace'))
+    if args.orden == 'rutas':
+        return comprobar_rutas(args.rutas + args.descarga)
     if args.orden == 'navegar':
         return navegar(args)
     os.makedirs(args.salida, exist_ok=True)
     return autoprueba(args)
 
 
+def ejecutar(funcion):
+    """Ejecuta la orden y traduce lo inesperado a un código propio."""
+    try:
+        return funcion()
+    except SystemExit:
+        raise
+    except KeyboardInterrupt:
+        print('\nInterrumpido (Ctrl+C).')
+        return INTERRUMPIDO
+    except Exception:
+        traceback.print_exc()
+        print('ERROR INTERNO de lab_cdp.py (traceback en la salida de errores).')
+        return INTERNO
+
+
 if __name__ == '__main__':
-    sys.exit(main())
+    sys.exit(ejecutar(_main))

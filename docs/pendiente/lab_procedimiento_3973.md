@@ -171,13 +171,19 @@ Desde el 16/11/2026 (parche 29, D10). Sirve para laboratorios cortos y sin el mo
 
 | Script | Uso | Copia de referencia | SHA-256 |
 |---|---|---|---|
-| `lab_cdp.py` | `~/pns_ai_3973/fase4/lab/lab_cdp.py` | [lab_3973/lab_cdp.py](lab_3973/lab_cdp.py) | `7c5445ac0cd6ca60b7f4a471ec18fedc7d63b8388ba72ee2e0a4464a3ee3f761` |
-| `lab_auto.sh` | `~/pns_ai_3973/fase4/lab/lab_auto.sh` | [lab_3973/lab_auto.sh](lab_3973/lab_auto.sh) | `9287587cc1f5d89959e297fb37ac541a0095e68e056decf5f160e9ebbe936a3d` |
+| `lab_cdp.py` | `~/pns_ai_3973/fase4/lab/lab_cdp.py` | [lab_3973/lab_cdp.py](lab_3973/lab_cdp.py) | `4c65f341a9936ef5caf70e532ea42aeba32ebe6046e54be1f38515987965d3f0` |
+| `lab_auto.sh` | `~/pns_ai_3973/fase4/lab/lab_auto.sh` | [lab_3973/lab_auto.sh](lab_3973/lab_auto.sh) | `8391b87c83d5425438e95cf8dc00c91ba9e61de79f14dcf0ff604d7f840725ac` |
+| `prueba_lab_auto.sh` | `~/pns_ai_3973/fase4/lab/prueba_lab_auto.sh` | [lab_3973/prueba_lab_auto.sh](lab_3973/prueba_lab_auto.sh) | `643c35fd4caf209b232b811b9ba426ea0126c9308f75d33d2e770f76d2e6b55b` |
+
+SHA-256 vigentes desde el 16/11/2026, con la corrección de los tres límites (bloque «Corrección (16/11/2026): los tres
+límites», abajo). Los del primer uso (laboratorio del 29) eran `7c5445ac…3f761` (`lab_cdp.py`) y `9287587c…36a3d`
+(`lab_auto.sh`).
 
 Antes de usarlos, `sha256sum` de los de `~` debe dar estos valores. Si alguno ha cambiado, se registra el SHA-256 nuevo
 y se vuelve a copiar al repo.
 
-**Qué hace `lab_auto.sh`:**
+**Qué hace `lab_auto.sh`** (descripción del primer uso; desde el 16/11/2026 cambian el orden del principio y los
+códigos: ver «Corrección (16/11/2026): los tres límites»):
 1. Pregunta si `odoo-dev 14 estado` mostró el contenedor `web` parado. Con otra respuesta que no sea `s` no arranca
    nada y sale con 1.
 2. Pone un `trap` de `EXIT`. Pase lo que pase (fin normal, error o Ctrl+C), ese `trap` guarda el log del servidor
@@ -244,7 +250,8 @@ LOG=~/odoo-dev/14.0/logs/servidor-AAAAMMDD-HHMMSS.log; grep -oE "[0-9]{4}-[0-9]{
 - Si `lab_cdp.py` da problemas, `python3 -I ~/pns_ai_3973/fase4/lab/lab_cdp.py autoprueba --salida <carpeta nueva>`
   lo valida en el equipo contra un servidor simulado en `127.0.0.1`, sin Odoo y sin BD.
 
-**Códigos de salida de `lab_auto.sh`:**
+**Códigos de salida de `lab_auto.sh`** (tabla del primer uso, sustituida el 16/11/2026 por la del bloque «Corrección
+(16/11/2026): los tres límites»):
 
 | Código | Significado |
 |---|---|
@@ -268,7 +275,7 @@ LOG=~/odoo-dev/14.0/logs/servidor-AAAAMMDD-HHMMSS.log; grep -oE "[0-9]{4}-[0-9]{
 **Qué no cubre:** Compartir, `/chatboo/page/<id>` ni nada con el modelo real. Esos casos siguen siendo manuales, con
 el procedimiento de arriba (los del modelo real van con P-13 del parche 34).
 
-**Límites conocidos (16/11/2026, sin corregir todavía):**
+**Límites conocidos (16/11/2026, sin corregir todavía):** corregidos el mismo día (bloque siguiente).
 - **Medida del login sin resumir:** `lab_cdp.py` abre una medida para el login pero no la resume. Los errores durante el
   login solo quedan en `detalle.txt`; no salen en la salida ni cambian el código de salida.
 - **C final sin efecto en el código de salida:** la C que hace el `trap` sobre el log guardado no cambia el código de
@@ -278,7 +285,61 @@ el procedimiento de arriba (los del modelo real van con P-13 del parche 34).
 Los tres límites (medida del login sin resumir, C final sin efecto en el código de salida y código 1 con varias causas)
 se corrigen antes del laboratorio del 34, con su autoprueba.
 
-**Si aparece otra BD:** sigue valiendo «Si aparece otra BD». El script aborta (código 2) si la C tras la entrada da
+**Corrección (16/11/2026): los tres límites.** Antes del laboratorio del 34, con su autoprueba. Los scripts de la
+tabla de arriba (SHA-256 nuevos) sustituyen a los del primer uso; la copia del repo se actualiza a la vez.
+
+- **Medida del login, resumida:** tras entrar, `lab_cdp.py` espera lo mismo que en cada ruta (2,5 s) y saca un bloque
+  `== login` con «Refused», recursos con error HTTP (informativo), errores de JS y peticiones bloqueadas a
+  `/web/database`. Es incidencia (código 1) lo mismo que en una ruta, salvo «ningún marco medido», que en el login no se
+  exige. En el laboratorio del 29 el login solo dejó un recurso HTTP informativo (el 404 de `/es/website/translations/…`),
+  así que con el criterio nuevo habría dado igualmente código 0.
+- **La C final cambia el código:** si la C del log guardado da otra BD, el código final es 3; si no se pudo guardar el
+  log, si el log no tiene ninguna línea de Odoo o si falla `odoo-dev 14 parar`, es 7. Un log sin líneas de Odoo ya no da
+  «C: OK» (antes sí). Excepción: si falló `arrancar` (14), un log sin líneas es lo esperable y no da 7.
+- **Un código por causa:** tabla de abajo. El 2 ya no se usa (era el «abortado» de antes y el de `argparse`).
+- **Orden nuevo del principio de `lab_auto.sh`:** argumentos → credenciales → guardas de las rutas (`lab_cdp.py rutas`)
+  → carpeta del laboratorio → pregunta → `trap` → `arrancar`. Una ruta mal escrita ya no llega a arrancar Odoo.
+- **Errores internos:** `lab_cdp.py` captura sus propias excepciones (traceback en la salida de errores) y sale con 20,
+  para que no se confundan con el 1.
+- **Al acabar,** `lab_auto.sh` imprime dos líneas: `Navegación: N (…) · C del log guardado: M` y `Código final N: <motivo>`.
+
+| Código | Causa | ¿Arranca Odoo? |
+|---|---|---|
+| 0 | Todo como se espera | Sí |
+| 1 | Incidencias de medición (rutas o login; detalle por ruta en la salida) | Sí |
+| 3 | Otra BD: sesión, C tras la entrada o C del log guardado | Sí |
+| 4 | El servidor no responde en 120 s | Sí |
+| 5 | Falla el login | Sí |
+| 6 | Error de Chrome (CDP), también si Chrome no arranca | Sí |
+| 7 | «Al acabar» incompleto: log no guardado, sin líneas de Odoo o falla `parar` | Sí |
+| 10 | Respuesta distinta de `s` a la pregunta inicial | No |
+| 11 | Faltan `LAB_LOGIN` o `LAB_PASSWORD` | No |
+| 12 | Argumentos o rutas no válidos (guardas y `argparse`) | No |
+| 13 | No existe `~/GitHub/lab_pns_ai_3973` | No |
+| 14 | Falla `odoo-dev 14 arrancar` (el `trap` guarda el log y para) | Sí |
+| 20 | Error interno de `lab_cdp.py` | Sí |
+| 130 | Ctrl+C o `TERM` (el `trap` guarda el log, hace C y para) | Sí |
+
+Si coinciden varias causas: 7, después 3, después el código de la navegación.
+
+**Validación de los scripts** (sin Odoo, sin Docker y sin BD; Chrome solo en la primera):
+
+```bash
+# Autoprueba de lab_cdp.py contra un servidor simulado (esperado: «Autoprueba: todo PASA», 27 PASA, código 0)
+AP=$(mktemp -d /tmp/autoprueba_lab.XXXXXX); python3 -I ~/pns_ai_3973/fase4/lab/lab_cdp.py autoprueba --salida "$AP" | grep -E "PASA|FALLA|Autoprueba"; echo "código ${PIPESTATUS[0]}"
+
+# Prueba de lab_auto.sh con dobles de odoo-dev y de navegar, en una carpeta temporal (esperado: 21 PASA, código 0)
+bash ~/pns_ai_3973/fase4/lab/prueba_lab_auto.sh; echo "código $?"
+```
+
+`prueba_lab_auto.sh` ejecuta una copia de `lab_auto.sh` con `HOME` en una carpeta temporal y un `odoo-dev` falso en el
+`PATH`: no toca `~/GitHub`, `~/odoo-dev` ni Docker, y borra la carpeta temporal al acabar.
+
+**Qué no ha cambiado:** las rutas que mide, lo que es incidencia en una ruta, la guardia de `/web/database`, la C (su
+lógica), el `trap`, las órdenes 1 a 8 de arriba y lo que sigue siendo manual.
+
+**Si aparece otra BD** (texto del primer uso; desde el 16/11/2026 el código es 3 y también lo da la C del log
+guardado): sigue valiendo «Si aparece otra BD». El script aborta (código 2) si la C tras la entrada da
 otra BD, y el `trap` ya guarda el log y para. Si la otra BD aparece solo en la C del `trap` (log guardado), el código
 de salida no lo refleja: hay que leer esa C. En los dos casos, anotar y «Crons de la otra BD» sobre el log guardado.
 
