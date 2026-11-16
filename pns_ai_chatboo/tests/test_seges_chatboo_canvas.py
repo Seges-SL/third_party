@@ -927,7 +927,7 @@ class TestSegesNoPageNotice(_SegesCanvasCase):
         canvas.log_no_page(self.env_a, 'seges e4p', self.session_a.id)
         res, last = self._save(self.job)
         self._assert_notice(
-            res, last, NO_PAGE_ACC + '\n\n_' + NO_PAGE_NOTICE + '_',
+            res, last, NO_PAGE_ACC + '\n\n' + NO_PAGE_NOTICE,
         )
 
     def test_notice_unknown_session(self):
@@ -935,19 +935,19 @@ class TestSegesNoPageNotice(_SegesCanvasCase):
         canvas.log_no_page(self.env_a, 'seges e4p')
         res, last = self._save(self.job)
         self._assert_notice(
-            res, last, NO_PAGE_ACC + '\n\n_' + NO_PAGE_NOTICE + '_',
+            res, last, NO_PAGE_ACC + '\n\n' + NO_PAGE_NOTICE,
         )
 
     def test_notice_empty_answer(self):
         self._watch(self.job, self.session_a)
         canvas.log_no_page(self.env_a, 'seges e4p', self.session_a.id)
         res, last = self._save(self.job, acc='')
-        self._assert_notice(res, last, '_' + NO_PAGE_NOTICE + '_')
+        self._assert_notice(res, last, NO_PAGE_NOTICE)
 
     def test_notice_html_answer(self):
-        # F1 (Sergio, 06/11/2026): cuando acc ya es HTML (p. ej. una tabla del
-        # servidor) el aviso se anexa como HTML, no en markdown, para que el
-        # cliente lo pinte en su propio párrafo (mismo criterio isLikelyHtml).
+        # D25 (Sergio, 16/11/2026): el aviso va como línea llana también tras
+        # una respuesta HTML; con marcas, el cliente las pinta literales en
+        # algunas rutas (laboratorio del 34, L1).
         self._watch(self.job, self.session_a)
         canvas.log_no_page(self.env_a, 'seges e4p', self.session_a.id)
         acc = (
@@ -955,10 +955,9 @@ class TestSegesNoPageNotice(_SegesCanvasCase):
             '</table></div>\n\nHe actualizado el color de fondo.'
         )
         res, last = self._save(self.job, acc=acc)
-        self._assert_notice(
-            res, last, acc + '<p><em>' + html.escape(NO_PAGE_NOTICE) + '</em></p>',
-        )
-        self.assertNotIn('\n\n_', last['content'])
+        self._assert_notice(res, last, acc + '\n\n' + NO_PAGE_NOTICE)
+        self.assertNotIn('<em>', last['content'])
+        self.assertFalse(last['content'].endswith('_'))
 
     def test_no_notice_without_refusal(self):
         self._watch(self.job, self.session_a)
