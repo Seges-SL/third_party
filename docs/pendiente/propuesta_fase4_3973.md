@@ -1445,3 +1445,105 @@ Solo lectura de `pns_ai_chatboo/static/src/js/` de la rama y de `~/pns_fabricant
      la forma que funcione en las cuatro rutas está por diseñar y ver en pantalla;
   3. parchear el JS del cliente para que reconozca el aviso: toca código del fabricante que hoy no tiene parches.
 - **Decisión:** después del laboratorio del 34 (Sergio, 16/11/2026).
+- Confirmado en L1 y resuelto con D25: ver «Forma del aviso: línea llana (16/11/2026, D20 a D28)», abajo.
+
+## Forma del aviso: línea llana (16/11/2026, D20 a D28)
+
+### Laboratorio L1
+
+- **Dónde:** [lab_procedimiento_3973.md](lab_procedimiento_3973.md), «Ampliación (16/11/2026): pintado del aviso» y filas
+  del 16/11/2026 de las 16:13 y las 16:58 UTC del «Registro de laboratorios». Sin modelo, con el `formatContent` real
+  del cliente.
+- **Con F1 (16:13):** el aviso sale en cursiva en a y b, con `<p><em>` literales en a′ y con `_…_` literales en b′, c y
+  d; 12/12 igual que lo previsto, código 0. Confirma la lectura de código de «Pintado del aviso en el cliente» y
+  resuelve d (literal).
+- **Con la línea llana (16:58):** 12/12 «línea llana», código 0.
+
+### Decisiones de Sergio (16/11/2026, D20 a D28)
+
+- **D20:** dos laboratorios: L1 sin modelo y L2 con turnos reales.
+- **D21:** Chrome visible en L2.
+- **D22:** «Design» lo cambia Sergio en la interfaz.
+- **D23:** contacto hostil para 6c.
+- **D24:** lienzo plantado para 6d′, que se borra al acabar.
+- **D25:** el aviso pasa a ser una línea llana sin marcas en todos los casos: `acc`, dos saltos de línea y el aviso; con
+  `acc` vacío, solo el aviso. Reabre D15 y F1.
+- **D26:** se quita `import html` y su marcador.
+- **D27:** cambian los esperados de `test_notice_after_refusal`, `test_notice_unknown_session`,
+  `test_notice_empty_answer` y `test_notice_html_answer`.
+- **D28:** neutralizaciones N34p (nueva), N34s y N34o. Desaparece N34h (ya no hay rama F1). No se repiten N34m, N34r,
+  N34j ni N34x: `chatboo_canvas.py` y `page_refused_in_job` no cambian.
+
+### Implementación
+
+- **Código** (`pns_ai_chatboo/models/chatboo_async_request.py`):
+  - rama de éxito de `_save_to_session` (`:1359-1371`): desde el comentario de F1 hasta `_content = f"_{_note}_"`, se
+    sustituye por un comentario nuevo y `f"{acc}\n\n{_note}"` si `acc` tiene texto, o `_note` si no;
+  - se quitan `import html` y su marcador (`:12-13` antes del cambio);
+  - no cambian el marcador del bloque, `_content = acc or ''`, el msgid de `_note`, `_assistant_content = _content` ni la
+    opción A (`content` y `original_content` con el mismo texto);
+  - las citas de este archivo bajan 2 líneas: los marcadores quedan en `:19`, `:165`, `:537`, `:1359`, `:1429` y
+    `:1430`, y el `return` temprano de D16 en `:344`.
+- **Tests** (`pns_ai_chatboo/tests/test_seges_chatboo_canvas.py`, `TestSegesNoPageNotice`):
+  - `test_notice_after_refusal` y `test_notice_unknown_session`: `NO_PAGE_ACC + '\n\n' + NO_PAGE_NOTICE`;
+  - `test_notice_empty_answer`: `NO_PAGE_NOTICE`;
+  - `test_notice_html_answer` (mismo `acc`): `acc + '\n\n' + NO_PAGE_NOTICE`, con `assertNotIn('<em>', …)` y
+    `assertFalse(….endswith('_'))` en lugar de `assertNotIn('\n\n_', …)`, y el comentario de D25;
+  - los otros 5 tests y el `import html` del test (lo usa `:797`) no cambian.
+- **Comprobaciones:** 11 marcadores fuera de `tests/` (5 en `chatboo_canvas.py` y 6 en `chatboo_async_request.py`);
+  «3.7.3 COMPILA 1» en cada archivo (forma fija del registro, «Parche 29 en 3.1.973»); lint `--revisar --base 7768d74`:
+  0 incidencias nuevas.
+- **SHA-256:**
+
+  | Archivo | Antes | Después |
+  |---|---|---|
+  | `chatboo_async_request.py` | `f992a1bd…92e3d7` | `54b8a5c2f636455c070824db8f1d72341309cd46cc5cb289d8e7c3ff80a60ca4` |
+  | `test_seges_chatboo_canvas.py` | `4f65f424…c63c564a` | `072c4d3470989dc7251593730b500add7254e9be4f4ccaa57b53fc9ec5b307c5` |
+  | `chatboo_canvas.py` | `78ee3ea4…742198a61` | sin cambios |
+
+### Batería
+
+`tests-20261116-172418.log`: 566 tests, 1 F (`test_paap_i7`), 0 E y los mismos 6 saltados; Traceback 58, «bad query» 1
+(`UPDATE "ai_safe_operation"`), «seges_side_env: » 1 y secretos 0, iguales que en la línea base
+(`tests-20261116-160401.log`); los 9 de `TestSegesNoPageNotice` en verde; módulos desde `/mnt/compartidos/third_party`.
+
+### Neutralizaciones
+
+Una cada vez, con la batería completa y SHA-256 igual al del paso 3 al restaurar (`54b8a5c2…`).
+
+| Id | Cambio | Log | Resultado | Traceback |
+|---|---|---|---|---|
+| N34p (nueva) | el aviso vuelve a markdown: `f"{acc}\n\n_{_note}_"` y `f"_{_note}_"` | `tests-20261116-172840.log` | 5 F: `test_paap_i7` y los 4 con aviso | 62 |
+| N34s | `if False and page_refused_in_job(…)` | `tests-20261116-173222.log` | 5 F: los mismos | 62 |
+| N34o | `'original_content'` vuelve a `acc or ''` | `tests-20261116-173603.log` | 5 F: los mismos | 62 |
+
+Los 4 con aviso son `test_notice_after_refusal`, `test_notice_unknown_session`, `test_notice_empty_answer` y
+`test_notice_html_answer`. En las tres: 0 E, los 6 saltados, «bad query» 1, «seges_side_env: » 1 y secretos 0; Traceback
+62, uno por test que cae.
+
+### Revisión (`odoo-reviewer`, 16/11/2026)
+
+APROBADO CON OBSERVACIONES: 0 críticos, 2 avisos y 3 sugerencias.
+
+- **Sin hallazgos en:**
+  - inyección: el aviso sale de un msgid fijo, su traducción (`pns_ai_chatboo/i18n/es.po`) no lleva marcas y nada del
+    usuario ni del modelo entra en él;
+  - `html` no se usa en ningún otro punto del archivo;
+  - opción A, invariante 2 y apertura y `reset` de la marca en `_process`;
+  - otros lectores del contenido guardado (exportaciones PDF, DOCX y XLSX, copiar, `history_compact`,
+    `get_model_history`, componente del chat): ninguno busca `_`, `<em>` ni el párrafo;
+  - cobertura de los tests, neutralizaciones y Python 3.7.3.
+- **Avisos (documentación):** la viñeta «Marcadores» del registro («Parche 34 en 3.1.973») y los textos de F1 en el
+  registro y en esta propuesta. Resueltos con la viñeta corregida y con los bloques fechados del 16/11/2026, sin
+  reescribir los anteriores.
+- **Sugerencias:**
+  - el comentario del código está en inglés y cita «laboratorio del 34»: se deja (texto decidido);
+  - `assertFalse(….endswith('_'))` es redundante con la comparación exacta: se deja (documenta la intención);
+  - repetir los casos en el laboratorio: previsto en L2.
+
+### Riesgo aceptado y laboratorio
+
+- **Riesgo aceptado:** tras una respuesta que se pinta como HTML (casos a y d), el aviso queda pegado al último texto,
+  sin línea propia.
+- **Laboratorio:** L1 hecho (16/11/2026). L2 pendiente: P-13 con proveedor real, 6c y 6d′ de
+  [lab_p29_3879.md](lab_p29_3879.md); la apertura de la marca y el `reset` en `_process` (S1, sin test) se ven en P-13.

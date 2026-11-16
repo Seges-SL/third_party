@@ -16,7 +16,8 @@ Solo biblioteca estándar: sin Node, sin websocket-client, sin instalar nada.
                Con --pintado (parche 34, L1), antes de las rutas pasa por el
                formatContent real del cliente (pns_ai_chatboo.formatters) las
                respuestas con el aviso de los casos a, a′, b, b′, c y d, en
-               inglés y en español, y compara el pintado con lo previsto. No
+               inglés y en español, y compara el pintado con lo previsto
+               (desde D25, línea llana: sin marcas a la vista). No
                escribe en la BD ni llama al modelo.
   autoprueba   Lo mismo contra un servidor simulado en 127.0.0.1 (sin Odoo),
                con resultados esperados. Sirve para validar el script en el equipo.
@@ -115,7 +116,8 @@ NOTAS_P34 = {
 }
 # Respuestas del modelo (acc) de cada caso de «Pintado del aviso en el
 # cliente» (propuesta_fase4_3973.md). El aviso lo añade componer_p34, con la
-# misma regla F1 que el servidor (chatboo_async_request.py:1361-1376).
+# misma regla que el servidor: desde D25 (16/11/2026), una línea llana, sin
+# marcas (chatboo_async_request.py, bloque del parche 34 de _save_to_session).
 TABLA_P34 = ('<div class="o_ai_table_block table-responsive"><table class="o_ai_data_table">'
              '<tr><th>id</th><th>Nombre</th></tr><tr><td>1</td><td>A</td></tr></table></div>')
 CASOS_P34 = [
@@ -126,20 +128,19 @@ CASOS_P34 = [
     ('c', 'respuesta vacía', ''),
     ('d', 'texto + tabla incrustada', 'Aquí tienes la tabla:\n' + TABLA_P34 + '\nHe actualizado el color de fondo.'),
 ]
-# Lo previsto: lectura de código y ejecución de los JS de la rama con un
-# cargador simulado (16/11/2026). L1 lo confirma o lo desmiente en Odoo.
-PREVISTO_P34 = {'a': 'cursiva', 'a′': 'etiquetas literales', 'b': 'cursiva',
-                'b′': 'guiones literales', 'c': 'guiones literales', 'd': 'guiones literales'}
+# Lo previsto con la línea llana (D25): el aviso se lee sin marcas a la vista
+# en los seis casos (ejecución de los JS de la rama con un cargador simulado,
+# 16/11/2026). Con F1, L1 dio: a y b, cursiva; a′, etiquetas literales; b′, c
+# y d, guiones literales (registro de laboratorios, 16/11/2026).
+PREVISTO_P34 = {k: 'línea llana' for k in ('a', 'a′', 'b', 'b′', 'c', 'd')}
 ESPERA_MODULO = 30  # segundos para que el cliente web exponga el formateador
 
 
 def componer_p34(acc, nota):
-    """El contenido guardado con aviso, como lo compone el servidor (F1)."""
-    if (acc or '').lstrip().startswith('<'):
-        return acc + '<p><em>' + html.escape(nota) + '</em></p>'
+    """El contenido guardado con aviso, como lo compone el servidor (D25)."""
     if (acc or '').strip():
-        return '%s\n\n_%s_' % (acc, nota)
-    return '_%s_' % nota
+        return '%s\n\n%s' % (acc, nota)
+    return nota
 
 
 # El formateador se busca como lo registra el cargador de Odoo 14
@@ -217,7 +218,7 @@ def clase_pintado(r):
         return 'guiones literales'
     if r['cursiva']:
         return 'cursiva'
-    return 'otro'
+    return 'línea llana'
 
 
 def medir_pintado(ch, salida):
@@ -805,9 +806,10 @@ window.odoo = {define: function (nombre, fabrica) {
 ''',
     # El cliente no expone el formateador: NO CONCLUYENTE.
     'sin_modulo': 'window.odoo = {define: function () {}};',
-    # Un cliente que escapa siempre: pintado distinto de lo previsto.
+    # Un cliente que deja etiquetas a la vista: pintado distinto de lo previsto.
     'distinto': FORMATEADOR_SIMULADO + '''
-window.odoo = {__DEBUG__: {services: {'pns_ai_chatboo.formatters': {formatContent: segesEsc}}}};
+window.odoo = {__DEBUG__: {services: {'pns_ai_chatboo.formatters':
+  {formatContent: function (s) { return segesEsc(s) + '&lt;/em&gt;'; }}}}};
 ''',
 }
 # Cargador mínimo para los JS reales: como odoo.define de Odoo 14 con
@@ -1089,10 +1091,14 @@ def autoprueba(args):
     ver('rutas --pintado → 0', orden('rutas', '--pintado') == OK)
     ver('seis casos, cada uno con su previsto',
         len(CASOS_P34) == 6 and set(PREVISTO_P34) == {k for k, _d, _a in CASOS_P34})
-    ver('composición F1 como el servidor',
-        componer_p34('<p>x</p>', 'N.') == '<p>x</p><p><em>N.</em></p>'
-        and componer_p34('x', 'N.') == 'x\n\n_N._' and componer_p34('', 'N.') == '_N._'
-        and componer_p34('  ', 'N.') == '_N._')
+    ver('composición como el servidor (D25, línea llana)',
+        componer_p34('<p>x</p>', 'N.') == '<p>x</p>\n\nN.'
+        and componer_p34('x', 'N.') == 'x\n\nN.' and componer_p34('', 'N.') == 'N.'
+        and componer_p34('  ', 'N.') == 'N.')
+    ver('clases del pintado: ausente, etiquetas, guiones, cursiva y línea llana',
+        [clase_pintado(dict(presente=p, etiquetas=e, guiones=g, cursiva=c)) for p, e, g, c in (
+            (0, 0, 0, 0), (1, 1, 0, 0), (1, 0, 1, 0), (1, 0, 0, 1), (1, 0, 0, 0))]
+        == ['ausente', 'etiquetas literales', 'guiones literales', 'cursiva', 'línea llana'])
     solo_pintado = dict(rutas=[], descarga=[], pintado=True)
     espera_real = ESPERA_MODULO
     ESPERA_MODULO = 3

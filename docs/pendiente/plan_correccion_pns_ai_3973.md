@@ -356,6 +356,27 @@ Orden:
         código, sin confirmar; [propuesta_fase4_3973.md](propuesta_fase4_3973.md), «Pintado del aviso en el cliente»).
         Si se confirma, Sergio decide entre aceptarlo, cambiar la forma del aviso en el servidor o parchear el cliente.
 
+**Tras el laboratorio L1 del 34 (16/11/2026, decisiones D20 a D28):**
+
+- **34, forma del aviso cambiada (D25):**
+  - L1 confirmó, con el `formatContent` real del cliente, las marcas literales de F1 (`<p><em>` en a′; `_…_` en b′, c y
+    d). Fila del 16/11/2026 de las 16:13 UTC en el «Registro de laboratorios» de
+    [lab_procedimiento_3973.md](lab_procedimiento_3973.md).
+  - El aviso pasa a ser una línea llana sin marcas: `acc`, dos saltos de línea y el aviso; con `acc` vacío, solo el
+    aviso. Reabre D15 y F1. Se quita `import html` (D26): quedan 11 marcadores.
+  - Tests (D27): cambian los esperados de los 4 tests con aviso. Batería `tests-20261116-172418.log`: 566 tests, 1 F
+    (`test_paap_i7`), 0 E y 6 saltados, igual que la línea base. Neutralizaciones N34p (nueva), N34s y N34o (D28): 5 F
+    cada una, SHA-256 igual al restaurar.
+  - Revisión de `odoo-reviewer`: APROBADO CON OBSERVACIONES (0 críticos; los 2 avisos, de documentación, resueltos).
+  - Riesgo aceptado: tras una respuesta que se pinta como HTML (casos a y d), el aviso queda pegado al último texto.
+  - Detalle en [propuesta_fase4_3973.md](propuesta_fase4_3973.md), «Forma del aviso: línea llana (16/11/2026, D20 a
+    D28)», y en el registro, «Parche 34 en 3.1.973».
+- **Laboratorio del 34:**
+  - L1 (sin modelo): hecho (16/11/2026); con la línea llana, 12/12 «línea llana», código 0 (fila de las 16:58 UTC);
+  - L2 (turnos reales, D20 y D21): pendiente: P-13 con proveedor real, 6c (contacto hostil, D23) y 6d′ (lienzo plantado y
+    borrado al acabar, D24) de [lab_p29_3879.md](lab_p29_3879.md), con «Design» cambiado por Sergio en la interfaz
+    (D22), y la apertura de la marca y el `reset` en `_process`.
+
 ## Parche 35: crons de NUEVO-2 (decisión 4)
 
 - `pns_ai_mcp/migrations/14.0.3.1.973/post-migrate.py`, como parche de Seges (registro, marcador, test y

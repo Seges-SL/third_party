@@ -264,7 +264,7 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
 | 31 | M12 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
 | 32 | PNS-97 | seguridad | `pns_ai_mcp/models/ai_trusted_action.py` | 2a | Aplicado (11/11/2026) |
 | 33 | PNS-29 | seguridad | `pns_ai_mcp/models/ai_provider.py`, `pns_ai_mcp/wizard/ai_provider_usage_wizard.py` | 2a | Aplicado (11/11/2026) |
-| 34 | PNS-96 | funcional | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_async_request.py` | 4 | Aplicado (16/11/2026): opción A y F1; laboratorio pendiente (P-13) |
+| 34 | PNS-96 | funcional | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_async_request.py` | 4 | Aplicado (16/11/2026): opción A; aviso en línea llana sin marcas (D25, sustituye a F1); L1 hecho, L2 pendiente (P-13) |
 | 36 | PNS-103 | funcional | `pns_base/models/operation_report_wizard.py` | 2c | Aplicado (11/11/2026); validado en el laboratorio (12/11/2026) |
 | 37 | PNS-104 | datos | `pns_ai_mcp/controllers/controller_helpers.py` | 3b | Aplicado (12/11/2026) |
 | 35 | NUEVO-2 | robustez | `pns_ai_mcp/migrations/14.0.3.1.973/post-migrate.py` | plan, «Parche 35» | Pendiente (decisión 4 del plan). Única excepción a «sin `migrations/` propios»: solo se ejecuta en un `-u` que cruce 3.1.973; una BD actualizada a 3.1.973 sin el parche no lo ejecuta y se corrige a mano (una instalación nueva no lo necesita) |
@@ -5080,10 +5080,10 @@ Comprobación previa de la CSP, propuesta, decisiones de Sergio (D1 a D5), bater
 - **Marcadores** (`# Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md`):
   - `pns_ai_chatboo/models/chatboo_canvas.py` (5): import de `ContextVar` (`:20`), `_NO_PAGE_WATCH` (`:29`),
     `watch_no_page` (`:653`), `page_refused_in_job` (`:661`) y la anotación en `log_no_page` (`:679`);
-  - `pns_ai_chatboo/models/chatboo_async_request.py` (7): `import html` (`:12`), import de `_NO_PAGE_WATCH`,
-    `page_refused_in_job` y `watch_no_page` (`:21`), apertura tras `_notify('thinking')` (`:167`), `reset` en la primera
-    línea del `finally` del motor (`:539`, D16), composición F1 al principio de la rama de éxito de `_save_to_session`
-    (`:1361`), `'content': _content` (`:1434`, inline) y la opción A antes de `'original_content': _content` (`:1435`).
+  - `pns_ai_chatboo/models/chatboo_async_request.py` (6): import de `_NO_PAGE_WATCH`, `page_refused_in_job` y
+    `watch_no_page` (`:19-20`), apertura tras `_notify('thinking')` (`:165`), `reset` en la primera línea del `finally`
+    del motor (`:537`, D16), aviso en línea llana al principio de la rama de éxito de `_save_to_session` (`:1359`, D25),
+    `'content': _content` (`:1429`, inline) y la opción A antes de `'original_content': _content` (`:1430`).
   - El `return` temprano de la confirmación fallida (`:346`; `:339` antes del parche) sale sin `reset`, como en la 3879
     (D16). La lectura de `canvas_rev` al abrir sigue sin `try` (D17).
 - **Qué cambia frente a la 3879:** nada en el código del fabricante de esas zonas, salvo comentarios, docstrings,
@@ -5183,6 +5183,70 @@ Comprobación previa de la CSP, propuesta, decisiones de Sergio (D1 a D5), bater
     frontera de F1;
   - la apertura de la marca y el `reset` en `_process` (S1: sin test).
 - **Estado:** aplicado (16/11/2026); laboratorio pendiente.
+
+**Tras el laboratorio L1 y las decisiones D20 a D28 (16/11/2026): el aviso pasa a línea llana.** Detalle en la
+[propuesta de la fase 4](propuesta_fase4_3973.md), «Forma del aviso: línea llana (16/11/2026, D20 a D28)».
+
+- **L1 del 34** ([lab_procedimiento_3973.md](lab_procedimiento_3973.md), «Ampliación (16/11/2026): pintado del aviso» y
+  filas del 16/11/2026 de las 16:13 y las 16:58 UTC del «Registro de laboratorios»): sin modelo, con el `formatContent`
+  real del cliente.
+  - Con F1 (16:13): el aviso sale en cursiva en a y b, con `<p><em>` literales en a′ y con `_…_` literales en b′, c y
+    d; 12/12 igual que lo previsto, código 0. Confirma la lectura de código de «Pintado del aviso en el cliente», arriba,
+    y resuelve d (literal).
+  - Con la línea llana (16:58): 12/12 «línea llana», código 0.
+- **Decisiones de Sergio (16/11/2026):**
+  - D20: dos laboratorios, L1 sin modelo y L2 con turnos reales;
+  - D21: Chrome visible en L2;
+  - D22: «Design» lo cambia Sergio en la interfaz;
+  - D23: contacto hostil para 6c;
+  - D24: lienzo plantado para 6d′, que se borra al acabar;
+  - D25: el aviso pasa a línea llana sin marcas (`acc`, dos saltos de línea y el aviso; con `acc` vacío, solo el aviso).
+    Reabre D15 y F1;
+  - D26: se quita `import html` y su marcador;
+  - D27: cambian los esperados de `test_notice_after_refusal`, `test_notice_unknown_session`, `test_notice_empty_answer` y
+    `test_notice_html_answer`;
+  - D28: neutralizaciones N34p (nueva), N34s y N34o; desaparece N34h (ya no hay rama F1); no se repiten N34m, N34r, N34j
+    ni N34x (`chatboo_canvas.py` y `page_refused_in_job` sin cambios).
+- **Código** (`chatboo_async_request.py`, rama de éxito de `_save_to_session`, `:1359-1371`): desaparecen la rama HTML
+  (`<p><em>` con `html.escape`) y la de markdown (`_…_`); queda `f"{acc}\n\n{_note}"` o, sin texto, `_note`. El
+  marcador del bloque, `_content = acc or ''`, el msgid de `_note` y `_assistant_content = _content` no cambian; la opción A
+  tampoco (`content` y `original_content` con el mismo texto). Sin `import html`, las citas de este archivo bajan 2
+  líneas: el `return` temprano de D16 pasa de `:346` a `:344`.
+- **Marcadores:** 11 fuera de `tests/` (5 en `chatboo_canvas.py` y 6 en `chatboo_async_request.py`: `:19`, `:165`,
+  `:537`, `:1359`, `:1429` y `:1430`; viñeta «Marcadores», arriba, corregida). «3.7.3 COMPILA 1» en cada archivo; lint
+  `--revisar --base 7768d74`: 0 incidencias nuevas.
+- **Tests** (D27):
+  - `test_notice_after_refusal` y `test_notice_unknown_session` esperan `NO_PAGE_ACC + '\n\n' + NO_PAGE_NOTICE`;
+  - `test_notice_empty_answer`, `NO_PAGE_NOTICE`;
+  - `test_notice_html_answer` (mismo `acc`), `acc + '\n\n' + NO_PAGE_NOTICE`, sin `<em>` y sin terminar en `_`;
+  - los otros 5 de `TestSegesNoPageNotice` no cambian.
+- **SHA-256** (antes → después): `chatboo_async_request.py` `f992a1bd…92e3d7` →
+  `54b8a5c2f636455c070824db8f1d72341309cd46cc5cb289d8e7c3ff80a60ca4`; `test_seges_chatboo_canvas.py`
+  `4f65f424…c63c564a` → `072c4d3470989dc7251593730b500add7254e9be4f4ccaa57b53fc9ec5b307c5`; `chatboo_canvas.py` sin
+  cambios (`78ee3ea4…`).
+- **Batería** (`tests-20261116-172418.log`): 566 tests, 1 F (`test_paap_i7`), 0 E y los mismos 6 saltados; Traceback 58,
+  «bad query» 1 (`UPDATE "ai_safe_operation"`), «seges_side_env: » 1 y secretos 0, iguales que en la línea base
+  (`tests-20261116-160401.log`); los 9 del 34 en verde; módulos desde `/mnt/compartidos/third_party`.
+- **Neutralizaciones** (una cada vez, SHA-256 igual al restaurar): N34p (el aviso vuelve a `_…_`,
+  `tests-20261116-172840.log`), N34s (`if False and page_refused_in_job(…)`, `-173222`) y N34o (`'original_content'`
+  vuelve a `acc or ''`, `-173603`): 5 F cada una (`test_paap_i7` y `test_notice_after_refusal`,
+  `test_notice_unknown_session`, `test_notice_empty_answer` y `test_notice_html_answer`), 0 E, los 6 saltados y Traceback
+  62 (uno por test que cae).
+- **Revisión (`odoo-reviewer`, 16/11/2026):** APROBADO CON OBSERVACIONES: 0 críticos, 2 avisos y 3 sugerencias.
+  - Sin hallazgos en: inyección (el aviso es un msgid fijo y su traducción no lleva marcas; nada del usuario ni del
+    modelo entra en él), restos de `html`, opción A, invariante 2, apertura y `reset` de la marca, otros lectores del
+    contenido guardado (exportaciones, copiar, `history_compact`, `get_model_history`: ninguno busca `_`, `<em>` ni el
+    párrafo), cobertura de los tests y Python 3.7.3.
+  - Avisos (documentación): la viñeta «Marcadores» de arriba y este bloque fechado, que recoge el cambio.
+  - Sugerencias: el comentario del código está en inglés y cita «laboratorio del 34» (se deja: es el texto decidido);
+    `assertFalse(…endswith('_'))` es redundante con la comparación exacta (se deja: documenta la intención); repetir los
+    casos en el laboratorio (previsto en L2).
+- **Riesgo aceptado:** tras una respuesta que se pinta como HTML (casos a y d), el aviso queda pegado al último texto, sin
+  línea propia.
+- **Laboratorio:** L1 hecho (16/11/2026). L2 pendiente: P-13 con proveedor real, 6c y 6d′ de
+  [lab_p29_3879.md](lab_p29_3879.md); la apertura de la marca y el `reset` en `_process` siguen sin test (S1) y se ven
+  en P-13.
+- **Estado:** aplicado con la línea llana (16/11/2026); L1 hecho; L2 pendiente.
 
 ### Para el informe al fabricante (fase 4)
 
