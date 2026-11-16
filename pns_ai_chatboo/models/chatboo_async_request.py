@@ -9,8 +9,6 @@ truth is the database. The SSE at /chatboo/stream only tails this job.
 """
 
 import base64
-# Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
-import html
 import json
 import logging
 import time
@@ -1362,17 +1360,14 @@ class ChatbooAsyncRequest(models.Model):
             _content = acc or ''
             if page_refused_in_job(self.id, session.id, session.canvas_rev):
                 _note = _('No page was built. The reason is in the AI History.')
-                # When the answer is already HTML (a server-built table), the
-                # client paints it as HTML and markdown emphasis would render
-                # literally, so append the notice as HTML to keep it in its own
-                # paragraph. Same HTML test as the client's isLikelyHtml
-                # (chatboo_formatters.js:90-99); plain text keeps markdown.
-                if (acc or '').lstrip().startswith('<'):
-                    _content = acc + '<p><em>' + html.escape(_note) + '</em></p>'
-                elif (acc or '').strip():
-                    _content = f"{acc}\n\n_{_note}_"
+                # A plain line, with no markdown or HTML marks: the client paints
+                # an answer by several routes (_formatContent, chatboo_formatters.js)
+                # and marks show up literally in some of them. Plain text reads
+                # the same in all (laboratorio del 34, L1, 16/11/2026).
+                if (acc or '').strip():
+                    _content = f"{acc}\n\n{_note}"
                 else:
-                    _content = f"_{_note}_"
+                    _content = _note
                 _assistant_content = _content
             # Answer footer: each stack reads a different shape and we must
             # write BOTH so the footer survives a session reload
