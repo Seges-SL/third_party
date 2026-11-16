@@ -259,7 +259,7 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
 | 26 | M2 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | 2b | Aplicado (11/11/2026) |
 | 27 | F1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py` (`controllers/chatboo.py` sin cambios: la cabecera del fabricante se mantiene) | 4 | Aplicado (13/11/2026): a, a′, b y c, sin d; validado en el laboratorio (13/11/2026) |
 | 28 | D1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas_page.py`, `pns_ai_chatboo/security/security.xml` | 2b | Aplicado (11/11/2026): sin la parte de `owner_id` |
-| 29 | F1 (P-8e a) | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_session.py` | 4 | Pendiente de portar |
+| 29 | F1 (P-8e a) | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_session.py` | 4 | Aplicado (16/11/2026); laboratorio pendiente |
 | 30 | M11 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
 | 31 | M12 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
 | 32 | PNS-97 | seguridad | `pns_ai_mcp/models/ai_trusted_action.py` | 2a | Aplicado (11/11/2026) |
@@ -4889,6 +4889,19 @@ Odoo: contenedor (`odoo` 14.0-20231106).
 - **Seguimiento:** PNS-105 (gravedad Alta, propuesta). La actualización de la ficha queda para el paso de laboratorio y
   seguimiento.
 
+- **Nota (16/11/2026), desde el parche 29:** el cursor aparte tampoco recibe lo que quien llama tenga pendiente del
+  **mismo campo**. Al volcarse después, esa escritura pisaría lo guardado (en tests, con el `TestCursor` en la misma
+  transacción) o daría 40001 (en producción, por `REPEATABLE READ`). Con una fila ya volcada por quien llama, el `UPDATE`
+  del cursor aparte esperaría en el mismo hilo. En producción no se da hoy, por dos invariantes (los campos `canvas_*` solo
+  los escriben `_store_design` y `_store_title`; el turno confirma sus escrituras de la sesión en
+  `chatboo_async_request.py:329` y no vuelve a escribir la fila). Detalle en «Parche 29 en 3.1.973», en la sección de la
+  fase 4.
+- **Corrección (16/11/2026, revisión de `odoo-reviewer`):** la primera invariante de la nota anterior queda así: en la
+  transacción de un `_paint_canvas`, los campos `canvas_*` solo los escriben `_store_design` y `_store_title` (cursor
+  aparte); una escritura por RPC (vía D5) es otra transacción, ya confirmada. La conclusión no cambia. Veredicto de la
+  revisión del 29 en 3.1.973: APROBADO CON OBSERVACIONES, sin hallazgos críticos. La batería de referencia sigue siendo
+  `tests-20261116-100426.log`.
+
 ### Laboratorio del parche 38 (13/11/2026)
 
 - `lab_pns_ai_3973` (BD `lab_pns_ai_3973_14`) con `348fa2d`. Reinicio sin `-u`; mitigación del servidor sin limitar
@@ -4962,6 +4975,98 @@ Comprobación previa de la CSP, propuesta, decisiones de Sergio (D1 a D5), bater
 - **Laboratorio D5 (13/11/2026):** correcto; fila en el «Registro de laboratorios» de
   [lab_procedimiento_3973.md](lab_procedimiento_3973.md).
 - **Estado:** aplicado (13/11/2026) y validado en el laboratorio (13/11/2026).
+
+### Parche 29 en 3.1.973
+
+- **Fecha:** 16/11/2026. Propuesta, decisiones de Sergio (D6 a D14) y resultados: [propuesta de la fase 4](propuesta_fase4_3973.md),
+  «Propuesta del parche 29 en 3.1.973», «Decisiones de Sergio (16/11/2026, parche 29)» e «Implementación y resultados del
+  parche 29 (16/11/2026)».
+- **Qué se porta (D6):** el 29 entero de la 3879, sin cambios de texto:
+  - la regla de `textContent`, en un bloque propio con su marcador, detrás de la del 27 c en `_PAGE_RULES` (D8);
+  - C1, A y B;
+  - la envoltura `place_rows_on_page` sobre la del fabricante, renombrada `_place_rows_on_page` (D7);
+  - q: `quote=True` en `_cell_html` y `_rows_as_table`, y la forma `&quot;` en `_page_shows_rows`;
+  - D, con B1 y n1, en `_paint_canvas`;
+  - m1, m3 y m8.
+
+  Son 12 bloques y 14 marcadores (9 en `chatboo_canvas.py` y 5 en `chatboo_session.py`), copiados por rango de líneas del
+  archivo de la 3879 con el guion de la simulación (`~/pns_ai_3973/fase4/29/aplicar.py`). Líneas: tabla del punto 1 de la
+  propuesta.
+- **Qué cambia frente a la 3879:** nada en el código del fabricante de esas zonas, que es idéntico al de 3.1.879.
+  - El sandbox sigue dando `page_url`, `page_edit` y `page_html`, que en 3.1.973 envuelven `_page_url`, `_page_edit` y
+    `_page_html`.
+  - Los dos únicos llamadores de `place_rows_on_page` (`_page_html` y `_paint_canvas`) usan `captured=True`.
+  - El defecto de `keys` de R8 sigue igual y queda fuera del 29, para el informe al fabricante (D9). No impide ningún test.
+- **SHA-256:**
+
+  | Archivo | Antes | Con el parche |
+  |---|---|---|
+  | `pns_ai_chatboo/models/chatboo_canvas.py` | `bb42701991968f2b11042fb1b69e4541045040be88bbe9bdd9d3230c0c3377d1` | `3f8daf37f21af0746c674d65a07bc63ccd36c73eeef48c154753ee61334f6afc` |
+  | `pns_ai_chatboo/models/chatboo_session.py` | `739c3b7fdfcc0b5a6007abf5e439ed505ac97852a0ba6a3228d52fe716778d5e` | `40e8c4f5d51a8cb86e4ccafbebb031aefa14ecdb292494da00637aa764d5714a` |
+
+  Los de «con el parche» son los de la simulación, y son la referencia de las neutralizaciones
+  (`~/pns_ai_3973/fase4/29/sha256_parche.txt`).
+- **Comprobaciones:**
+  - lint `--revisar`: 0 incidencias nuevas en los dos modelos y en el test;
+  - compilan con Python 3.7.3 en `odoo-dev:14` («3.7.3 COMPILA 2» y «3.7.3 COMPILA 1»);
+  - **forma de compilar con 3.7.3 a partir de ahora**, en lugar de `-m py_compile`, que no puede escribir el `.pyc` en el
+    montaje `:ro` (`OSError: [Errno 30]`):
+    `docker run --rm --network none --read-only --tmpfs /tmp --entrypoint python3 -v <carpeta>:/src:ro odoo-dev:14 -c "import py_compile, sys; [py_compile.compile(f, cfile='/tmp/c.pyc', doraise=True) for f in sys.argv[1:]]; print(sys.version.split()[0], 'COMPILA', len(sys.argv) - 1)" <archivos>`.
+- **Tests** (`pns_ai_chatboo/tests/test_seges_chatboo_canvas.py`, `TestSegesCanvasModelData`, etiqueta `seges_e3p`, 16
+  tests):
+  - los 15 de la 3879;
+  - `test_quoted_values_in_server_table`, con 2 subtests (D11);
+  - el subtest de m1 en `test_data_not_written_by_server` (D12);
+  - **adaptado:** `test_edit_page_without_data`, con `self.env['base'].flush()` detrás de las dos escrituras de la sesión
+    (parche 38; ver abajo).
+- **Batería** (`tests-20261116-100426.log`): 557 tests, 1 F (`test_paap_i7`), 0 E y los mismos 6 saltados. Traceback 58,
+  «bad query» 1 (`UPDATE "ai_safe_operation"`), «seges_side_env: » 1 y secretos 0, iguales que en la línea base
+  (`tests-20261113-190554.log`). Módulos desde `/mnt/compartidos/third_party`, con 0 `pns_*` en OCA, en la imagen y en el
+  volumen.
+- **Neutralizaciones:** las 12 (N29r, N29c1, N29A, N29B, N29env, N29q, N29q2, N29q3, N29m1, N29D, N29B1 y N29n1), todas F,
+  0 E y con SHA-256 IGUAL en los dos archivos al restaurar. Tabla en la propuesta. Fuera de lo previsto:
+  - N29A y N29env tumban también el subtest de D12, que es un caso de A;
+  - N29q3 tumba también `test_edit_page_without_data` por su premisa: sin la forma `&quot;`, el diseño sin DATA cae a
+    `_page_for_rows`, que escribe `const DATA`.
+
+  N29D y N29B1 tumban también «dos pasos, hostil», como se había previsto (n1 está dentro de esas ramas).
+- **D14** (16/11/2026, solo lectura, `odoo-dev 14 shell`): en `lab_pns_ai_3973_14`, 4 diseños en `canvas_design` y 0 con
+  DATA ilegible; 0 en `chatboo.canvas.page.design`.
+- **Escrituras del llamador y cursor aparte (parche 38), en 3.1.973:**
+  - **qué pasó:** en la primera batería (`tests-20261116-095208.log`) fallaban 3 subtests de `test_edit_page_without_data`.
+    - El test escribe la sesión en su transacción, y esa escritura queda pendiente porque el 38 aísla al llamador.
+    - `invalidate_cache()` no la vuelca (`odoo/models.py:5769-5771` del contenedor). La lectura siguiente sí
+      (`_read`, `:3094-3096`), y así pisaba lo que había guardado `_store_design`.
+    - En la 3879, el `commit` del cursor aparte la volcaba antes (PNS-105).
+  - **invariantes que hacen que no pase en producción:**
+    1. los campos `canvas_*` solo los escriben `_store_design` y `_store_title`, en cursor aparte;
+       - **Corrección (16/11/2026, revisión de `odoo-reviewer`):** la redacción de arriba no es exacta, porque el dueño
+         puede escribir `canvas_*` por RPC (vía D5). Queda así: en la transacción de un `_paint_canvas`, los campos
+         `canvas_*` solo los escriben `_store_design` y `_store_title` (cursor aparte); una escritura por RPC (vía D5) es
+         otra transacción, ya confirmada. La conclusión no cambia. Veredicto de la revisión del 29 en 3.1.973: APROBADO
+         CON OBSERVACIONES, sin hallazgos críticos. La batería de referencia sigue siendo `tests-20261116-100426.log`.
+    2. el turno confirma sus escrituras de la sesión (`presentation_show_mode`, marcas y documentos) en
+       `chatboo_async_request.py:329`, antes del motor, y no vuelve a escribir la fila en su cursor. La caja A va en
+       `READ ONLY` (`controller_helpers.py:195-198`) y el job de Canvas solo escribe su propia fila.
+  - **qué pasaría en producción si se rompieran:**
+    - con una fila volcada y sin confirmar por quien llama, el `UPDATE` del cursor aparte esperaría en el mismo hilo,
+      sin `lock_timeout` en `_store_design`. Es la espera que ya describe el fabricante en `_release_turn_cursor`
+      (`:580-586`);
+    - con el mismo campo pendiente, quien llama daría 40001 al volcarlo, por `REPEATABLE READ` (`odoo/sql_db.py:420`).
+  - **en modo test**, el `TestCursor` comparte la transacción (`odoo/modules/registry.py:702-705`; su `commit` es un
+    `SAVEPOINT`, `odoo/sql_db.py:479-524`) y no hay `commit` en `:329`. De ahí la adaptación con `flush()`, que solo vale
+    en modo test.
+  - **comprobación obligatoria de la propuesta del 34:** que el 34 no escriba la fila de `chatboo.session` en el cursor del
+    turno después del motor.
+  - **por comprobar en la propuesta del 34 (16/11/2026, revisión de `odoo-reviewer`):** si la caja B puede escribir
+    `canvas_*` y llamar a `page_edit` en la misma transacción. Es la única forma teórica de romper la invariante 1 dentro
+    de un turno; afectaría a la disponibilidad (espera o 40001), no a la seguridad del 29.
+- **Riesgos residuales:** los de la 3879 (registro, «Parche 29»), con lo que cambia en 3.1.973 según la tabla del punto 7
+  de la propuesta.
+- **Laboratorio:** pendiente: automatizado y sin LLM (D10); los casos con el modelo real, con P-13 del 34.
+  - La autoprueba de `lab_cdp.py` (`~/pns_ai_3973/fase4/lab/`) pasó el 16/11/2026 en el equipo (12 PASA, código 0), antes
+    del primer uso con Odoo.
+- **Estado:** aplicado (16/11/2026); laboratorio pendiente.
 
 ### Para el informe al fabricante (fase 4)
 

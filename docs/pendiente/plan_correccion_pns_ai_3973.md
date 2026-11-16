@@ -319,8 +319,23 @@ Orden:
       saltados; 10 neutralizaciones con SHA-256 igual; laboratorio D5 correcto;
     - detalle en [propuesta_fase4_3973.md](propuesta_fase4_3973.md).
 - **29:** muestra para Design (`:829-858`) y `place_rows_on_page` (`:2062-2105`).
+  - **Hecho (16/11/2026):**
+    - propuesta y decisiones D6 a D14 en [propuesta_fase4_3973.md](propuesta_fase4_3973.md). Se porta el 29 entero, con
+      12 bloques y 14 marcadores. Las líneas de arriba son de 3.1.973 limpia; las del árbol están en la propuesta;
+    - batería: 557 tests, 1 F (`test_paap_i7`), 0 E y 6 saltados; 12 neutralizaciones con SHA-256 igual;
+    - D14: 0 diseños con DATA ilegible en `lab_pns_ai_3973_14`;
+    - `test_edit_page_without_data`, adaptado por el parche 38 (solo vale en modo test);
+    - laboratorio pendiente: automatizado y sin LLM (D10); los casos con el modelo real, con P-13 del 34.
 - **34:** `log_no_page` (`:587-616`); `_process` y `_save_to_session` (`chatboo_async_request.py:149-162,
   1184-1410`), con la opción A y F1. P-13 en la interfaz.
+  - **Condiciones nuevas (16/11/2026):**
+    - la propuesta del 34 comprueba que el 34 no escriba la fila de `chatboo.session` en el cursor del turno después del
+      motor (invariante 2 del registro, «Parche 29 en 3.1.973»);
+    - por comprobar (revisión de `odoo-reviewer`, 16/11/2026): si la caja B puede escribir `canvas_*` y llamar a
+      `page_edit` en la misma transacción (única forma teórica de romper la invariante 1 dentro de un turno; afectaría a
+      la disponibilidad, no a la seguridad del 29);
+    - su laboratorio incluye 6c y 6d′ del 29 (casos con el modelo real; [lab_p29_3879.md](lab_p29_3879.md)), junto a P-13,
+      porque los dos necesitan proveedor (D10).
 
 ## Parche 35: crons de NUEVO-2 (decisión 4)
 
