@@ -13,8 +13,15 @@ Solo biblioteca estándar: sin Node, sin websocket-client, sin instalar nada.
                rutas dadas. Por ruta: imágenes pintadas en el marco srcdoc,
                «Refused» de CSP por directiva (consola de Chrome), errores de JS
                y una captura. Bloquea cualquier petición a /web/database/*.
+               Con --pintado (parche 34, L1), antes de las rutas pasa por el
+               formatContent real del cliente (pns_ai_chatboo.formatters) las
+               respuestas con el aviso de los casos a, a′, b, b′, c y d, en
+               inglés y en español, y compara el pintado con lo previsto. No
+               escribe en la BD ni llama al modelo.
   autoprueba   Lo mismo contra un servidor simulado en 127.0.0.1 (sin Odoo),
                con resultados esperados. Sirve para validar el script en el equipo.
+               Con --js <carpeta static/src/js de pns_ai_chatboo>, también pasa
+               el pintado por los archivos JS reales con un cargador simulado.
 
 No imprime contenido de las páginas ni del log: solo nombres de BD, recuentos y
 nombres de archivo. Los textos de los errores de JS van a <salida>/detalle.txt,
@@ -28,6 +35,7 @@ Códigos de salida (los mismos que lab_auto.sh; un código por causa):
    5  falla el login
    6  error de Chrome (CDP)
    7  C sin líneas de Odoo (log vacío o que no es del servidor)
+   8  no concluyente: --pintado no encuentra el formateador del cliente
   11  faltan LAB_LOGIN o LAB_PASSWORD
   12  argumentos o rutas no válidos
   20  error interno de este script (traceback en la salida de errores)
@@ -62,6 +70,7 @@ SIN_SERVIDOR = 4
 FALLA_LOGIN = 5
 FALLA_CHROME = 6
 C_SIN_LINEAS = 7
+NO_CONCLUYENTE = 8
 SIN_CREDENCIALES = 11
 ARGUMENTOS = 12
 INTERNO = 20
@@ -93,6 +102,161 @@ MEDIR_JS = r"""(() => {
 # anteriores: «Refused to load … because it violates the following …».
 RE_REFUSED = re.compile(r'violates the following Content Security Policy directive: "([a-z-]+)')
 RE_CSP_SIN_DIRECTIVA = re.compile(r"violates the document's Content Security Policy")
+
+
+# --------------------------------------------------------------------------
+# Pintado del aviso del parche 34 (L1, sin modelo y sin escribir en la BD)
+# --------------------------------------------------------------------------
+# Texto del aviso: msgid de chatboo_async_request.py:1364 y su traducción en
+# pns_ai_chatboo/i18n/es.po:2213-2214.
+NOTAS_P34 = {
+    'en': 'No page was built. The reason is in the AI History.',
+    'es': 'No se ha creado la página. El motivo está en el Historial IA.',
+}
+# Respuestas del modelo (acc) de cada caso de «Pintado del aviso en el
+# cliente» (propuesta_fase4_3973.md). El aviso lo añade componer_p34, con la
+# misma regla F1 que el servidor (chatboo_async_request.py:1361-1376).
+TABLA_P34 = ('<div class="o_ai_table_block table-responsive"><table class="o_ai_data_table">'
+             '<tr><th>id</th><th>Nombre</th></tr><tr><td>1</td><td>A</td></tr></table></div>')
+CASOS_P34 = [
+    ('a', 'HTML + prosa sin marcas', TABLA_P34 + '\n\nHe actualizado el color de fondo.'),
+    ('a′', 'tabla en <div> + ## / ** / lista', TABLA_P34 + '## Análisis\n\n**Total:** 1 contacto.\n\n- uno'),
+    ('b', 'texto con markdown', '## Resumen\n\nHe preparado **los datos**.'),
+    ('b′', 'texto llano', 'He actualizado el color de fondo.'),
+    ('c', 'respuesta vacía', ''),
+    ('d', 'texto + tabla incrustada', 'Aquí tienes la tabla:\n' + TABLA_P34 + '\nHe actualizado el color de fondo.'),
+]
+# Lo previsto: lectura de código y ejecución de los JS de la rama con un
+# cargador simulado (16/11/2026). L1 lo confirma o lo desmiente en Odoo.
+PREVISTO_P34 = {'a': 'cursiva', 'a′': 'etiquetas literales', 'b': 'cursiva',
+                'b′': 'guiones literales', 'c': 'guiones literales', 'd': 'guiones literales'}
+ESPERA_MODULO = 30  # segundos para que el cliente web exponga el formateador
+
+
+def componer_p34(acc, nota):
+    """El contenido guardado con aviso, como lo compone el servidor (F1)."""
+    if (acc or '').lstrip().startswith('<'):
+        return acc + '<p><em>' + html.escape(nota) + '</em></p>'
+    if (acc or '').strip():
+        return '%s\n\n_%s_' % (acc, nota)
+    return '_%s_' % nota
+
+
+# El formateador se busca como lo registra el cargador de Odoo 14
+# (odoo.__DEBUG__.services) y, si no está, se pide con un odoo.define propio.
+# Cada contenido se pasa por formatContent (lo mismo que pinta el chat,
+# chatboo_component_v2.js:1226 y :5348) y se lee en un documento inerte.
+PINTADO_JS = r"""(async () => {
+  const casos = %(casos)s, espera = %(espera)d * 1000, fin = Date.now() + espera;
+  let F = null, via = '';
+  while (Date.now() < fin) {
+    try {
+      const s = window.odoo && odoo.__DEBUG__ && odoo.__DEBUG__.services;
+      if (s && s['pns_ai_chatboo.formatters']) { F = s['pns_ai_chatboo.formatters']; via = 'services'; break; }
+    } catch (e) {}
+    if (window.__segesLabF) { F = window.__segesLabF; via = 'define'; break; }
+    if (!window.__segesLabDef && window.odoo && typeof odoo.define === 'function') {
+      window.__segesLabDef = 1;
+      try {
+        odoo.define('seges_lab.pintado', function (require) {
+          window.__segesLabF = require('pns_ai_chatboo.formatters');
+        });
+      } catch (e) {}
+    }
+    await new Promise(r => setTimeout(r, 250));
+  }
+  if (!F || typeof F.formatContent !== 'function') return {via: '', res: []};
+  const inerte = document.implementation.createHTMLDocument('');
+  const res = [];
+  for (const c of casos) {
+    const h = F.formatContent(c.contenido);
+    const d = inerte.createElement('div');
+    d.innerHTML = h;
+    const t = d.textContent;
+    res.push({
+      caso: c.caso, idioma: c.idioma,
+      cursiva: Array.from(d.querySelectorAll('em, i')).some(e => e.textContent.indexOf(c.nota) >= 0),
+      guiones: t.indexOf('_' + c.nota + '_') >= 0,
+      etiquetas: /<\/?(em|p)>/.test(t),
+      presente: t.indexOf(c.nota) >= 0,
+      html_cliente: typeof F.isLikelyHtml === 'function' ? !!F.isLikelyHtml(c.contenido) : null,
+      parte_cola: (window.ChatbooSse && ChatbooSse.splitHtmlAndMarkdownTail)
+        ? !!ChatbooSse.splitHtmlAndMarkdownTail(c.contenido.trim()) : null,
+      _html: h,
+    });
+  }
+  // Muestra para la captura: los doce pintados, en una capa que se quita después.
+  const capa = document.createElement('div');
+  capa.id = 'seges_lab_pintado';
+  capa.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#fff;overflow:auto;'
+    + 'padding:8px;font-size:12px;columns:2;';
+  for (const r of res) {
+    const b = document.createElement('div');
+    b.style.cssText = 'break-inside:avoid;border:1px solid #ccc;margin:0 0 6px;padding:4px;';
+    const e = document.createElement('div');
+    e.style.cssText = 'font-weight:bold;color:#555;';
+    e.textContent = r.caso + ' · ' + r.idioma;
+    const cuerpo = document.createElement('div');
+    cuerpo.innerHTML = r._html;
+    b.appendChild(e);
+    b.appendChild(cuerpo);
+    capa.appendChild(b);
+    delete r._html;
+  }
+  document.body.appendChild(capa);
+  return {via: via, res: res};
+})()"""
+
+
+def clase_pintado(r):
+    if not r['presente']:
+        return 'ausente'
+    if r['etiquetas']:
+        return 'etiquetas literales'
+    if r['guiones']:
+        return 'guiones literales'
+    if r['cursiva']:
+        return 'cursiva'
+    return 'otro'
+
+
+def medir_pintado(ch, salida):
+    """Pintado del aviso por el formatContent real. Devuelve (incidencias, código)."""
+    casos = [{'caso': k, 'idioma': idioma, 'nota': nota, 'contenido': componer_p34(acc, nota)}
+             for k, _desc, acc in CASOS_P34 for idioma, nota in sorted(NOTAS_P34.items())]
+    ch.nueva_medida('pintado')
+    r = ch.evaluar(PINTADO_JS % {'casos': json.dumps(casos), 'espera': ESPERA_MODULO},
+                   promesa=True, espera=ESPERA_MODULO + 30) or {}
+    print('\n== pintado del aviso (parche 34)')
+    if not r.get('res'):
+        print('  formateador del cliente: NO encontrado en %d s (ni por services ni por define)'
+              % ESPERA_MODULO)
+        print('  Resultado del pintado: NO CONCLUYENTE')
+        return [], NO_CONCLUYENTE
+    print('  formateador: pns_ai_chatboo.formatters.formatContent (por %s)' % r['via'])
+    iguales, incid = 0, []
+    for m in r['res']:
+        clase, previsto = clase_pintado(m), PREVISTO_P34[m['caso']]
+        ok = clase == previsto
+        iguales += ok
+        if not ok:
+            incid.append('pintado %s %s' % (m['caso'], m['idioma']))
+        print('  %-2s %s: %-19s previsto: %-19s %s  [isLikelyHtml %s · parte la cola %s]' % (
+            m['caso'], m['idioma'], clase, previsto, 'igual' if ok else 'DISTINTO',
+            {True: 'sí', False: 'no', None: '?'}[m['html_cliente']],
+            {True: 'sí', False: 'no', None: '?'}[m['parte_cola']]))
+    print('  coincide con lo previsto: %d/%d' % (iguales, len(r['res'])))
+    png = os.path.join(salida, 'pintado.png')
+    ch.captura(png)
+    ch.evaluar("(() => { const c = document.getElementById('seges_lab_pintado');"
+               " if (c) c.remove(); return 1; })()")
+    print('  captura: %s' % os.path.basename(png))
+    medida = ch.medida
+    errores = medida['errores_log'] + medida['errores_consola'] + medida['excepciones_js']
+    print('  errores de JS durante el pintado: %d (textos en detalle.txt)' % errores)
+    if errores:
+        incid.append('pintado js')
+    return incid, OK
 
 
 # --------------------------------------------------------------------------
@@ -349,11 +513,11 @@ class Chrome:
             return 'sin evento load en %d s' % espera
         return None
 
-    def evaluar(self, expr, sesion=None, contexto=None, promesa=False):
+    def evaluar(self, expr, sesion=None, contexto=None, promesa=False, espera=30):
         p = {'expression': expr, 'returnByValue': True, 'awaitPromise': promesa}
         if contexto:
             p['contextId'] = contexto
-        r = self.llamar('Runtime.evaluate', p, sesion or self.pagina)
+        r = self.llamar('Runtime.evaluate', p, sesion or self.pagina, espera=espera)
         if 'exceptionDetails' in r:
             raise ErrorCDP('evaluate: ' + r['exceptionDetails'].get('text', ''))
         return r['result'].get('value')
@@ -517,6 +681,7 @@ def navegar(args, base=BASE, c_func=c_en_vivo, login=None, clave=None, espera_se
         shutil.rmtree(descargas, ignore_errors=True)
         return FALLA_CHROME
     incidencias = []
+    no_concluyente = False
     try:
         ch.abrir_pagina(descargas)
         ch.nueva_medida('login')
@@ -535,6 +700,10 @@ def navegar(args, base=BASE, c_func=c_en_vivo, login=None, clave=None, espera_se
         if codigo:
             print('ABORTADO: C tras la entrada (código %d)' % codigo)
             return codigo
+        if getattr(args, 'pintado', False):
+            incid, codigo = medir_pintado(ch, args.salida)
+            incidencias += [('pintado', i) for i in incid]
+            no_concluyente = codigo == NO_CONCLUYENTE
         for ruta in args.rutas:
             ch.nueva_medida(ruta)
             err = ch.ir(base + ruta)
@@ -577,8 +746,12 @@ def navegar(args, base=BASE, c_func=c_en_vivo, login=None, clave=None, espera_se
         shutil.rmtree(descargas, ignore_errors=True)
     print('\nResultado: %s' % ('sin incidencias' if not incidencias else
                                'incidencias: ' + '; '.join('%s → %s' % x for x in incidencias)))
+    if no_concluyente:
+        print('Pintado del aviso: NO CONCLUYENTE (formateador del cliente no encontrado)')
     print('Peticiones a /web/database bloqueadas en total: %d' % ch.bloqueadas)
-    return INCIDENCIAS if incidencias else OK
+    if incidencias:
+        return INCIDENCIAS
+    return NO_CONCLUYENTE if no_concluyente else OK
 
 
 # --------------------------------------------------------------------------
@@ -605,7 +778,49 @@ LOG_BUENO = (
 LOG_MALO = LOG_BUENO + 'web-1  | 2026-11-13 18:55:00,001 1 INFO otra_14 odoo.modules.loading: loading\n'
 
 
-def servidor_simulado(error_js_login=False, bd_sesion=BD):
+# Cliente simulado para --pintado. FORMATEADOR_SIMULADO reproduce lo previsto
+# (no es el JS del fabricante: con --js se usan los archivos reales).
+FORMATEADOR_SIMULADO = r'''
+function segesEsc(t) { return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function segesFormatea(s) {
+  if (s.charAt(0) === '<') {
+    if (s.indexOf('## ') >= 0) { var i = s.indexOf('</div>') + 6; return s.slice(0, i) + '<p>' + segesEsc(s.slice(i)) + '</p>'; }
+    return s;
+  }
+  if (s.indexOf('## ') >= 0) { return segesEsc(s).replace(/_([^_]+)_/g, '<em>$1</em>'); }
+  return segesEsc(s);
+}
+'''
+CLIENTES_SIMULADOS = {
+    # Como Odoo 14: el módulo aparece en odoo.__DEBUG__.services al cabo de un rato.
+    'services': FORMATEADOR_SIMULADO + '''
+window.odoo = {__DEBUG__: {services: {}}};
+setTimeout(function () { odoo.__DEBUG__.services['pns_ai_chatboo.formatters'] =
+  {formatContent: segesFormatea, isLikelyHtml: function (c) { return c.trim().charAt(0) === '<'; }}; }, 600);
+''',
+    # Sin services: solo se llega al módulo con un odoo.define propio.
+    'define': FORMATEADOR_SIMULADO + '''
+window.odoo = {define: function (nombre, fabrica) {
+  fabrica(function (m) { return m === 'pns_ai_chatboo.formatters' ? {formatContent: segesFormatea} : null; }); }};
+''',
+    # El cliente no expone el formateador: NO CONCLUYENTE.
+    'sin_modulo': 'window.odoo = {define: function () {}};',
+    # Un cliente que escapa siempre: pintado distinto de lo previsto.
+    'distinto': FORMATEADOR_SIMULADO + '''
+window.odoo = {__DEBUG__: {services: {'pns_ai_chatboo.formatters': {formatContent: segesEsc}}}};
+''',
+}
+# Cargador mínimo para los JS reales: como odoo.define de Odoo 14 con
+# require('web.core') y registro en odoo.__DEBUG__.services.
+CARGADOR_REAL = '''
+window.odoo = {__DEBUG__: {services: {}}, define: function (nombre, fabrica) {
+  var req = function (m) { return m === 'web.core' ? {_t: function (t) { return t; }} : odoo.__DEBUG__.services[m]; };
+  odoo.__DEBUG__.services[nombre] = fabrica(req); }};
+'''
+JS_REALES = ('chatboo_sse.js', 'chatboo_markdown.js', 'chatboo_formatters.js')
+
+
+def servidor_simulado(error_js_login=False, bd_sesion=BD, cliente=None, js_dir=None):
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
     class H(BaseHTTPRequestHandler):
@@ -644,7 +859,16 @@ def servidor_simulado(error_js_login=False, bd_sesion=BD):
             if u.path == '/web':
                 extra_js = (b'<script>console.error("seges-login-js")</script>'
                             if error_js_login else b'')
+                if js_dir:
+                    extra_js += ('<script>%s</script>' % CARGADOR_REAL).encode()
+                    extra_js += ''.join('<script src="/seges_js/%s"></script>' % n
+                                        for n in JS_REALES).encode()
+                elif cliente:
+                    extra_js += ('<script>%s</script>' % CLIENTES_SIMULADOS[cliente]).encode()
                 return self._resp(200, b'<!DOCTYPE html><title>web</title><p>web</p>' + extra_js)
+            if js_dir and u.path.startswith('/seges_js/') and u.path[10:] in JS_REALES:
+                with open(os.path.join(js_dir, u.path[10:]), 'rb') as f:
+                    return self._resp(200, f.read(), 'text/javascript; charset=utf-8')
             hdr = [('Content-Security-Policy', CSP_FAB), ('X-Content-Type-Options', 'nosniff')]
             if u.path == '/chatboo/canvas/1':
                 return self._resp(200, self._carcasa(DISENO_LIMPIO), extra=hdr)
@@ -860,6 +1084,56 @@ def autoprueba(args):
         clave='clave-prueba', espera_servidor=3)
     ver('servidor que no responde → 4', codigo == SIN_SERVIDOR)
 
+    print('--- Pintado del aviso (--pintado, parche 34)')
+    global ESPERA_MODULO
+    ver('rutas --pintado → 0', orden('rutas', '--pintado') == OK)
+    ver('seis casos, cada uno con su previsto',
+        len(CASOS_P34) == 6 and set(PREVISTO_P34) == {k for k, _d, _a in CASOS_P34})
+    ver('composición F1 como el servidor',
+        componer_p34('<p>x</p>', 'N.') == '<p>x</p><p><em>N.</em></p>'
+        and componer_p34('x', 'N.') == 'x\n\n_N._' and componer_p34('', 'N.') == '_N._'
+        and componer_p34('  ', 'N.') == '_N._')
+    solo_pintado = dict(rutas=[], descarga=[], pintado=True)
+    espera_real = ESPERA_MODULO
+    ESPERA_MODULO = 3
+    try:
+        for cliente, nombre, esperado, textos in (
+                ('services', 'cliente como Odoo 14 (services) → 12/12, código 0', OK,
+                 ('(por services)', 'coincide con lo previsto: 12/12', 'captura: pintado.png')),
+                ('define', 'cliente sin services (odoo.define propio) → 12/12, código 0', OK,
+                 ('(por define)', 'coincide con lo previsto: 12/12')),
+                ('distinto', 'pintado distinto de lo previsto → código 1', INCIDENCIAS,
+                 ('DISTINTO', 'pintado → pintado a en')),
+                ('sin_modulo', 'formateador no encontrado → 8 (no concluyente)', NO_CONCLUYENTE,
+                 ('NO encontrado', 'NO CONCLUYENTE'))):
+            srv = servidor_simulado(cliente=cliente)
+            base = 'http://127.0.0.1:%d' % srv.server_address[1]
+            carpeta = sub_carpeta('pintado_' + cliente)
+            try:
+                codigo, texto = _navegar_capturado(
+                    argparse.Namespace(salida=carpeta, **solo_pintado), base,
+                    c_func=c_bueno, login='prueba', clave='clave-prueba')
+            finally:
+                srv.shutdown()
+            if cliente == 'services':
+                print(_bloque(_bloques(texto), 'pintado'))
+            ver(nombre, codigo == esperado and all(t in texto for t in textos)
+                and (cliente == 'sin_modulo') == ('pintado.png' not in os.listdir(carpeta)))
+        if args.js:
+            srv = servidor_simulado(js_dir=os.path.abspath(args.js))
+            base = 'http://127.0.0.1:%d' % srv.server_address[1]
+            try:
+                codigo, texto = _navegar_capturado(
+                    argparse.Namespace(salida=sub_carpeta('pintado_js_reales'), **solo_pintado),
+                    base, c_func=c_bueno, login='prueba', clave='clave-prueba')
+            finally:
+                srv.shutdown()
+            print(_bloque(_bloques(texto), 'pintado'))
+            ver('JS reales de %s con cargador simulado → 12/12, código 0' % args.js,
+                codigo == OK and 'coincide con lo previsto: 12/12' in texto)
+    finally:
+        ESPERA_MODULO = espera_real
+
     print('\nAutoprueba: %s' % ('todo PASA' if not fallos else '%d FALLA' % fallos))
     return OK if not fallos else INCIDENCIAS
 
@@ -878,14 +1152,18 @@ def _main():
     sub.add_parser('c', help='C sobre un log por la entrada estándar')
     r = sub.add_parser('rutas', help='solo las guardas de las rutas')
     r.add_argument('--descarga', action='append', default=[])
+    r.add_argument('--pintado', action='store_true')
     r.add_argument('rutas', nargs='*')
     n = sub.add_parser('navegar', help='entrar y visitar rutas de lab_pns_ai_3973_14')
     n.add_argument('--salida', required=True, help='carpeta para capturas y detalle.txt')
     n.add_argument('--descarga', action='append', default=[],
                    help='ruta de una descarga, para abrirla desde el disco (repetible)')
+    n.add_argument('--pintado', action='store_true',
+                   help='pintado del aviso del parche 34 por el formatContent real (L1)')
     n.add_argument('rutas', nargs='*', help='rutas que empiezan por /, p. ej. /chatboo/canvas/8')
     a = sub.add_parser('autoprueba', help='prueba contra un servidor simulado')
     a.add_argument('--salida', required=True)
+    a.add_argument('--js', help='carpeta static/src/js de pns_ai_chatboo (pintado con los JS reales)')
     args = ap.parse_args()
     if args.orden == 'c':
         return resultado_c(io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8', errors='replace'))

@@ -171,13 +171,14 @@ Desde el 16/11/2026 (parche 29, D10). Sirve para laboratorios cortos y sin el mo
 
 | Script | Uso | Copia de referencia | SHA-256 |
 |---|---|---|---|
-| `lab_cdp.py` | `~/pns_ai_3973/fase4/lab/lab_cdp.py` | [lab_3973/lab_cdp.py](lab_3973/lab_cdp.py) | `4c65f341a9936ef5caf70e532ea42aeba32ebe6046e54be1f38515987965d3f0` |
-| `lab_auto.sh` | `~/pns_ai_3973/fase4/lab/lab_auto.sh` | [lab_3973/lab_auto.sh](lab_3973/lab_auto.sh) | `8391b87c83d5425438e95cf8dc00c91ba9e61de79f14dcf0ff604d7f840725ac` |
-| `prueba_lab_auto.sh` | `~/pns_ai_3973/fase4/lab/prueba_lab_auto.sh` | [lab_3973/prueba_lab_auto.sh](lab_3973/prueba_lab_auto.sh) | `643c35fd4caf209b232b811b9ba426ea0126c9308f75d33d2e770f76d2e6b55b` |
+| `lab_cdp.py` | `~/pns_ai_3973/fase4/lab/lab_cdp.py` | [lab_3973/lab_cdp.py](lab_3973/lab_cdp.py) | `7c71b42148e3fdc130fdba8d1bbc99b174645c9ed10878743169e7faf2815b3e` |
+| `lab_auto.sh` | `~/pns_ai_3973/fase4/lab/lab_auto.sh` | [lab_3973/lab_auto.sh](lab_3973/lab_auto.sh) | `0fe7df59324dc86c3c9d4806bc4203a72a8d891843e3ec339f89b03aeb0a48bc` |
+| `prueba_lab_auto.sh` | `~/pns_ai_3973/fase4/lab/prueba_lab_auto.sh` | [lab_3973/prueba_lab_auto.sh](lab_3973/prueba_lab_auto.sh) | `278f7d66abf7da456b7d8592c347c8d6ff5fd813a43af80914c3481111973b04` |
 
-SHA-256 vigentes desde el 16/11/2026, con la corrección de los tres límites (bloque «Corrección (16/11/2026): los tres
-límites», abajo). Los del primer uso (laboratorio del 29) eran `7c5445ac…3f761` (`lab_cdp.py`) y `9287587c…36a3d`
-(`lab_auto.sh`).
+SHA-256 vigentes desde el 16/11/2026 por la tarde, con el pintado del aviso del parche 34 (bloque «Ampliación
+(16/11/2026): pintado del aviso (`--pintado`, L1)», abajo). Los de la corrección de los tres límites eran
+`4c65f341…d3f0` (`lab_cdp.py`), `8391b87c…725ac` (`lab_auto.sh`) y `643c35fd…2b55b` (`prueba_lab_auto.sh`); los del
+primer uso (laboratorio del 29), `7c5445ac…3f761` (`lab_cdp.py`) y `9287587c…36a3d` (`lab_auto.sh`).
 
 Antes de usarlos, `sha256sum` de los de `~` debe dar estos valores. Si alguno ha cambiado, se registra el SHA-256 nuevo
 y se vuelve a copiar al repo.
@@ -338,6 +339,44 @@ bash ~/pns_ai_3973/fase4/lab/prueba_lab_auto.sh; echo "código $?"
 **Qué no ha cambiado:** las rutas que mide, lo que es incidencia en una ruta, la guardia de `/web/database`, la C (su
 lógica), el `trap`, las órdenes 1 a 8 de arriba y lo que sigue siendo manual.
 
+**Ampliación (16/11/2026): pintado del aviso (`--pintado`, L1).** Para el laboratorio del 34 (decisiones D20 a D24 de
+Sergio, 16/11/2026: dos laboratorios, L1 sin modelo y L2 con turnos reales). Sin cambios en lo anterior: rutas, C,
+`trap`, guardias y códigos 0 a 7 y 10 a 130 siguen igual.
+
+- **Qué hace:** `lab_auto.sh <salida> --pintado` (con o sin rutas). Tras el login y la C, en `/web`, `lab_cdp.py` busca
+  el formateador del cliente (`pns_ai_chatboo.formatters`) en `odoo.__DEBUG__.services` (cargador de Odoo 14) o, si no
+  está, con un `odoo.define` propio, durante 30 s como mucho. Pasa por `formatContent` (lo mismo que pinta el chat,
+  `chatboo_component_v2.js:1226` y `:5348`) la respuesta con aviso de los casos a, a′, b, b′, c y d, en inglés y en
+  español (12 en total), compuesta con la regla F1 del servidor (`chatboo_async_request.py:1361-1376`). Lee el
+  resultado en un documento inerte y lo clasifica: `cursiva`, `guiones literales`, `etiquetas literales` o `ausente`.
+- **No escribe en la BD ni llama al modelo:** el formateador corre en el navegador sobre cadenas fijas del script
+  (`CASOS_P34`, `NOTAS_P34`). La capa con los doce pintados se añade a la página para la captura (`pintado.png`) y se
+  quita después.
+- **Previsto** (`PREVISTO_P34`; lectura de código y ejecución de los JS de la rama con un cargador simulado, 16/11/2026):
+  a y b, `cursiva`; a′, `etiquetas literales`; b′, c y d, `guiones literales`. En d, además, el aviso queda pegado al
+  final del párrafo.
+- **Salida:** un bloque `== pintado del aviso (parche 34)` con una línea por caso e idioma (resultado, previsto,
+  `igual`/`DISTINTO`, e `isLikelyHtml` y si `splitHtmlAndMarkdownTail` parte la cola, informativos), la cuenta
+  `coincide con lo previsto: N/12`, la captura y los errores de JS.
+- **Es incidencia** (código 1): un caso distinto de lo previsto o un error de JS durante el pintado. Un resultado
+  distinto no es un fallo del 34: desmiente la lectura de código y se lleva a la decisión de Sergio sobre el pintado.
+- **Código nuevo 8:** no concluyente, el formateador del cliente no aparece en 30 s. Prioridad: la de la navegación (7 y
+  3 siguen por delante; 1 va por delante de 8).
+- **Validación** (sin Odoo; Chrome para la primera):
+  - `autoprueba`: 34 PASA (antes 27). Nuevos: `rutas --pintado`, los seis casos con su previsto, la composición F1, un
+    cliente como Odoo 14 (`services`, 12/12, código 0), uno sin `services` (`define`, 12/12, código 0), uno que pinta
+    distinto (código 1) y uno sin formateador (código 8);
+  - con `--js <carpeta static/src/js de pns_ai_chatboo>`, además, los tres JS reales (`chatboo_sse.js`,
+    `chatboo_markdown.js` y `chatboo_formatters.js`) con un cargador simulado: 35 PASA y 12/12;
+  - `prueba_lab_auto.sh`: 25 PASA (antes 21). Nuevos: código 8, solo `--pintado`, 8 con otra BD en el log (da 3) y una
+    opción desconocida (12, sin arrancar).
+- **Primer uso con Odoo:** L1 del laboratorio del 34. Si algo falla, se corrige antes de seguir.
+
+```bash
+# Autoprueba con los JS reales de la rama (esperado: «Autoprueba: todo PASA», 35 PASA, código 0)
+AP=$(mktemp -d /tmp/autoprueba_lab.XXXXXX); python3 -I ~/pns_ai_3973/fase4/lab/lab_cdp.py autoprueba --salida "$AP" --js ~/GitHub/third_party/pns_ai_chatboo/static/src/js | grep -E "PASA|FALLA|Autoprueba"; echo "código ${PIPESTATUS[0]}"
+```
+
 **Si aparece otra BD** (texto del primer uso; desde el 16/11/2026 el código es 3 y también lo da la C del log
 guardado): sigue valiendo «Si aparece otra BD». El script aborta (código 2) si la C tras la entrada da
 otra BD, y el `trap` ya guarda el log y para. Si la otra BD aparece solo en la C del `trap` (log guardado), el código
@@ -351,3 +390,4 @@ Horas en UTC (las del log). Un bloque por laboratorio; no se reescriben los ante
 |---|---|---|---|---|---|
 | 13/11/2026 | 18:52:45 | 18:57:35 (última línea del log guardado) | cubierta por la del log guardado / sin reinicios / `?` (17), `lab_pns_ai_3973_14` (99); Starting job: `lab_pns_ai_3973_14` (13) | `servidor-20261113-195757.log` | Parche 27 (D5). Primer uso real de C: funciona. Navegador sin errores ni «Refused» en `canvas/8`, su descarga desde el disco, Compartir con `seges_aiadm`, `page/<id>` y su descarga. Log: 1 WARNING `py.warnings`, 0 ERROR. `servidor-20261113-195320.log` (6 líneas), guardado antes de tiempo, sin uso. |
 | 16/11/2026 | 10:32:49 | 10:33:02 (última línea del log guardado) | `?` (17), `lab_pns_ai_3973_14` (41) / sin reinicios / `?` (17), `lab_pns_ai_3973_14` (47); Starting job: ninguna | `servidor-20261116-113304.log` | Parche 29 (D10), automatizado y sin LLM. Primer uso real de `lab_cdp.py` y `lab_auto.sh` con Odoo: código 0 («Laboratorio automatizado»). Sesión de `lab_pns_ai_3973_14` (uid 12). `canvas/4`, `canvas/8` y la descarga de la 8 abierta desde el disco: en las tres, imágenes 15/15 pintadas, 0 rotas, `<meta>` CSP como 2.º hijo de `<head>`, CSS1Compat, ningún «Refused», 0 errores de JS; 0 peticiones a `/web/database` bloqueadas. Informativos, fuera del lienzo: un 404 de `/es/website/translations/…` en el login y un 404 de `/es/favicon.ico` en `canvas/4`. Log (66 líneas): 1 WARNING `py.warnings` (`lab_pns_ai_3973_14`), 0 ERROR, 0 CRITICAL, 0 Traceback, 0 «bad query». D14 después igual que antes. |
+| 16/11/2026 | 16:13:16 | 16:13:23 (última línea del log guardado) | `?` (17), `lab_pns_ai_3973_14` (42) / sin reinicios / `?` (17), `lab_pns_ai_3973_14` (42); Starting job: ninguna | `servidor-20261116-171325.log` | Parche 34, L1 (D20): `lab_auto.sh … --pintado`, sin modelo y sin escrituras. Primer uso real de `--pintado` con Odoo: código 0. Sesión de `lab_pns_ai_3973_14` (uid 12). Formateador del cliente encontrado por `services`; 12/12 igual que lo previsto: a y b, cursiva; a′, etiquetas `<p><em>` literales; b′, c y d, guiones bajos literales (en d, además, pegado al párrafo). 0 errores de JS; 0 peticiones a `/web/database` bloqueadas. Informativo: un 404 de `/es/website/translations/…` en el login. Log (61 líneas): 1 WARNING `py.warnings` (`lab_pns_ai_3973_14`), 0 ERROR, 0 CRITICAL, 0 Traceback, 0 «bad query». Con el pintado confirmado, Sergio decide D25 (16/11/2026): el aviso pasa a línea llana, antes de L2. |

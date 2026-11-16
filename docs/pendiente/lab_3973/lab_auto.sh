@@ -5,11 +5,13 @@
 # (también con Ctrl+C o un error), guarda el log, hace C sobre él y para.
 #
 # Uso (desde cualquier carpeta):
-#   lab_auto.sh <salida> [--descarga RUTA]... RUTA...
+#   lab_auto.sh <salida> [--pintado] [--descarga RUTA]... [RUTA...]
+# --pintado (parche 34, L1): pintado del aviso por el formatContent real del
+# cliente, antes de las rutas; sin modelo y sin escribir en la BD.
 # Requiere LAB_LOGIN y LAB_PASSWORD exportadas. «Antes de arrancar» (estado y
 # bd-lista) se hace a mano antes de lanzarlo.
 #
-# Códigos de salida (un código por causa; los de 1 a 7, 11, 12 y 20 son los
+# Códigos de salida (un código por causa; los de 1 a 8, 11, 12 y 20 son los
 # de lab_cdp.py):
 #    0 todo como se espera            10 respuesta distinta de «s» (no arranca)
 #    1 incidencias de medición        11 faltan LAB_LOGIN o LAB_PASSWORD (no arranca)
@@ -18,6 +20,7 @@
 #    5 falla el login                 14 falla «odoo-dev 14 arrancar»
 #    6 error de Chrome (CDP)          20 error interno de lab_cdp.py
 #    7 «Al acabar» incompleto        130 Ctrl+C o TERM
+#    8 no concluyente (--pintado no encuentra el formateador del cliente)
 # Prioridad si coinciden: 7, después 3, después el código de la navegación.
 set -uo pipefail
 
@@ -33,6 +36,7 @@ motivo() {
         5) echo "falla el login" ;;
         6) echo "error de Chrome (CDP)" ;;
         7) echo "«Al acabar» incompleto (log no guardado, sin líneas de Odoo o falla parar)" ;;
+        8) echo "no concluyente: el pintado no encontró el formateador del cliente" ;;
         10) echo "respuesta distinta de «s»: no se arranca" ;;
         11) echo "faltan LAB_LOGIN o LAB_PASSWORD: no se arranca" ;;
         12) echo "argumentos o rutas no válidos: no se arranca" ;;
@@ -44,7 +48,7 @@ motivo() {
     esac
 }
 
-[ $# -ge 1 ] || { echo "Uso: lab_auto.sh <carpeta de salida> [--descarga RUTA]... RUTA..."; exit 12; }
+[ $# -ge 1 ] || { echo "Uso: lab_auto.sh <carpeta de salida> [--pintado] [--descarga RUTA]... [RUTA...]"; exit 12; }
 SALIDA=$1
 shift
 [ -n "${LAB_LOGIN:-}" ] && [ -n "${LAB_PASSWORD:-}" ] || {

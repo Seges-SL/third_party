@@ -89,6 +89,10 @@ caso "el servidor no responde"            4 s s STUB_NAV=4 "${R[@]}"
 caso "falla el login"                     5 s s STUB_NAV=5 "${R[@]}"
 caso "error de Chrome"                    6 s s STUB_NAV=6 "${R[@]}"
 caso "error interno de lab_cdp.py"       20 s s STUB_NAV=20 "${R[@]}"
+caso "pintado no concluyente"             8 s s STUB_NAV=8 "${R[@]}"
+caso "solo --pintado (sin rutas)"         0 s s STUB_NAV=0 -- "$T/home/salida" --pintado
+caso "pintado no concluyente y otra BD"   3 s s STUB_NAV=8 STUB_LOG=malo -- "$T/home/salida" --pintado
+caso "opción desconocida"                12 n s -- "$T/home/salida" --no-existe
 caso "falla arrancar (log vacío)"        14 s s STUB_ARRANCAR=1 STUB_LOG=vacio "${R[@]}"
 caso "falla arrancar (log con otra BD)"   3 s s STUB_ARRANCAR=1 STUB_LOG=malo "${R[@]}"
 caso "respuesta distinta de s"           10 n n "${R[@]}"
