@@ -4,6 +4,7 @@
 # Seges: fase 2b sobre 3.1.973, solo los casos de los parches 25, 26 y 28 (los de 27, 29 y 34 vuelven en la fase 4). Ver docs/pendiente/parches_pns_ai.md
 # Seges: fase 4 sobre 3.1.973, vuelven los casos del parche 27 y P-9 parte A (los de 29 y 34, en su parche). Ver docs/pendiente/parches_pns_ai.md
 # Seges: fase 4 sobre 3.1.973, vuelven los casos del parche 29. Ver docs/pendiente/parches_pns_ai.md
+# Seges: fase 4 sobre 3.1.973, vuelven los casos del parche 34. Ver docs/pendiente/parches_pns_ai.md
 """Entrega E3′, el lienzo (docs/pendiente/e3_propuesta_3879.md, «Propuesta final»).
 
 En la rama 14.0-pns-ai-3973 (fase 2b) solo están los casos de:
@@ -877,3 +878,114 @@ class TestSegesCanvasModelData(_SegesCanvasCase):
         for prompt in (canvas._PAGE_RULES, canvas.DESIGN_SYSTEM, canvas.EDIT_SYSTEM):
             self.assertIn(rule, prompt)
             self.assertIn('Never insert them with innerHTML', prompt)
+
+
+# Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
+NO_PAGE_ACC = 'He actualizado el color de fondo.'
+NO_PAGE_NOTICE = 'No page was built. The reason is in the AI History.'
+
+
+@tagged('post_install', '-at_install', 'pns_ai_chatboo', 'seges_e4p')
+class TestSegesNoPageNotice(_SegesCanvasCase):
+    """Parche 34: aviso fijo del servidor cuando ``log_no_page`` rechaza en un turno."""
+
+    def setUp(self):
+        super().setUp()
+        self.env_a = self.env(user=self.user_a)
+        self.job = self._job()
+
+    def _job(self):
+        return self.env['chatboo.async.request'].with_user(self.user_a)._enqueue(
+            self.session_a.id, 'seges e4p',
+        )
+
+    def _watch(self, job, session):
+        """Abre la marca como ``_process`` y la deshace al acabar el test."""
+        token = canvas.watch_no_page(job.id, session.id, session.canvas_rev)
+        self.addCleanup(canvas._NO_PAGE_WATCH.reset, token)
+
+    def _save(self, job, acc=NO_PAGE_ACC):
+        res = job.with_user(self.user_a)._save_to_session(acc, {}, error=None)
+        last = self._fresh(self.session_a).get_messages()[-1]
+        self.assertEqual(last['role'], 'assistant')
+        return res, last
+
+    def _assert_notice(self, res, last, content):
+        # Opción A (Sergio, 05/11/2026): el aviso va también en original_content
+        # (mismo texto que content), no solo en content.
+        self.assertEqual(last['content'], content)
+        self.assertEqual(last['original_content'], content)
+        self.assertEqual(res.get('assistant_content'), content)
+
+    def _assert_no_notice(self, res, last):
+        self.assertEqual(last['content'], NO_PAGE_ACC)
+        self.assertEqual(last['original_content'], NO_PAGE_ACC)
+        self.assertNotIn('assistant_content', res)
+
+    def test_notice_after_refusal(self):
+        self._watch(self.job, self.session_a)
+        canvas.log_no_page(self.env_a, 'seges e4p', self.session_a.id)
+        res, last = self._save(self.job)
+        self._assert_notice(
+            res, last, NO_PAGE_ACC + '\n\n_' + NO_PAGE_NOTICE + '_',
+        )
+
+    def test_notice_unknown_session(self):
+        self._watch(self.job, self.session_a)
+        canvas.log_no_page(self.env_a, 'seges e4p')
+        res, last = self._save(self.job)
+        self._assert_notice(
+            res, last, NO_PAGE_ACC + '\n\n_' + NO_PAGE_NOTICE + '_',
+        )
+
+    def test_notice_empty_answer(self):
+        self._watch(self.job, self.session_a)
+        canvas.log_no_page(self.env_a, 'seges e4p', self.session_a.id)
+        res, last = self._save(self.job, acc='')
+        self._assert_notice(res, last, '_' + NO_PAGE_NOTICE + '_')
+
+    def test_notice_html_answer(self):
+        # F1 (Sergio, 06/11/2026): cuando acc ya es HTML (p. ej. una tabla del
+        # servidor) el aviso se anexa como HTML, no en markdown, para que el
+        # cliente lo pinte en su propio párrafo (mismo criterio isLikelyHtml).
+        self._watch(self.job, self.session_a)
+        canvas.log_no_page(self.env_a, 'seges e4p', self.session_a.id)
+        acc = (
+            '<div class="o_ai_table_block"><table><tr><td>x</td></tr>'
+            '</table></div>\n\nHe actualizado el color de fondo.'
+        )
+        res, last = self._save(self.job, acc=acc)
+        self._assert_notice(
+            res, last, acc + '<p><em>' + html.escape(NO_PAGE_NOTICE) + '</em></p>',
+        )
+        self.assertNotIn('\n\n_', last['content'])
+
+    def test_no_notice_without_refusal(self):
+        self._watch(self.job, self.session_a)
+        self._assert_no_notice(*self._save(self.job))
+
+    def test_no_notice_when_page_changed(self):
+        rev = self.session_a.canvas_rev
+        self._watch(self.job, self.session_a)
+        canvas.log_no_page(self.env_a, 'seges e4p', self.session_a.id)
+        self.session_a.sudo().write({'canvas_rev': rev + 1})
+        self._assert_no_notice(*self._save(self.job))
+
+    def test_no_notice_other_job(self):
+        self._watch(self.job, self.session_a)
+        canvas.log_no_page(self.env_a, 'seges e4p', self.session_a.id)
+        other = self._job()
+        self._assert_no_notice(*self._save(other))
+
+    def test_no_notice_other_session(self):
+        self._watch(self.job, self.session_a)
+        canvas.log_no_page(self.env_a, 'seges e4p', self.session_b.id)
+        self._assert_no_notice(*self._save(self.job))
+
+    def test_no_watch(self):
+        token = canvas._NO_PAGE_WATCH.set(None)
+        self.addCleanup(canvas._NO_PAGE_WATCH.reset, token)
+        self.assertEqual(
+            canvas.log_no_page(self.env_a, 'seges e4p', self.session_a.id), '',
+        )
+        self._assert_no_notice(*self._save(self.job))
