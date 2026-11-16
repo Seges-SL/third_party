@@ -1250,3 +1250,198 @@ Además:
   descarga de la 8 (código 0; C solo con `?` y `lab_pns_ai_3973_14`); fila del 16/11/2026 en el «Registro de
   laboratorios» de [lab_procedimiento_3973.md](lab_procedimiento_3973.md). Los casos con el modelo real, con P-13 del 34.
   La autoprueba de `lab_cdp.py` pasó el 16/11/2026 (12 PASA, código 0).
+
+## Parche 34 en 3.1.973 (16/11/2026)
+
+- **Fecha:** 16/11/2026. **Rama:** `14.0-pns-ai-3973`, código en `05a05a5` (HEAD `c278827` solo añade documentación; no
+  comprobado con git).
+- **Fuente:** rama `14.0-pns-ai-3879`, rev. `3feb224a20175c16d2ace5ee5aa64418756747bc` (`/tmp/p34_codigo/seges3879/`, con
+  `SHA256SUMS` comprobado): `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_async_request.py` y
+  `pns_ai_chatboo/tests/test_seges_chatboo_canvas.py`. Registro, «Parche 34: aviso fijo del servidor cuando `log_no_page`
+  rechaza en un turno (PNS-96)» y «Parches de la rama 14.0-pns-ai-3879 (E4′.b2 y E4′.b3)» (opción A y F1).
+
+### Propuesta
+
+- **Código del fabricante en las zonas del 34:** igual entre 3.1.879 y 3.1.973 salvo comentarios, docstrings, mensajes
+  de log e imports. Comparado sin comentarios (`tokenize`), función a función:
+  - `log_no_page`: igual;
+  - `_process`: las diferencias de 3.1.973 (empresas de la pantalla en `get_fresh_query_data` y en la llamada al motor,
+    `_prompt_runs_a_skill`, `turn_file_names`) quedan fuera de la apertura tras `_notify('thinking')` y del `finally`;
+  - `_save_to_session`: las diferencias (`result_note` en el mensaje del usuario, `last_query_company_ids`) quedan fuera
+    de la rama de éxito y de su diccionario.
+- **Porte por anclajes:** los bloques del 34 se copian tal cual de la 3879 en 10 puntos, cada uno sobre un anclaje que
+  aparece una sola vez en el archivo (paso 0 b, abajo). No cambia nada del código del fabricante que los rodea; solo se
+  sustituyen `'content': acc or ''` y `'original_content': acc or ''` del diccionario de la rama de éxito.
+- **Comprobaciones nuevas** (condiciones del plan del 16/11/2026, desde el parche 29):
+  - invariante 2: que el 34 no escriba la fila de `chatboo.session` en el cursor del turno después del motor;
+  - invariante 1: si la caja B puede escribir `canvas_*` y llamar a `page_edit` en la misma transacción.
+
+### Decisiones de Sergio (16/11/2026, parche 34)
+
+15. **D15:** porte literal del parche 34 de la 3879: opción A y F1, 12 marcadores, mismo texto y mismo msgid.
+16. **D16:** la marca se abre tras `self._notify('thinking')` y el `reset` es la primera línea del `finally` del `try` del
+    motor. El `return` temprano de la confirmación fallida (`chatboo_async_request.py:339` antes del parche) queda sin
+    `reset`, como en la 3879.
+17. **D17:** la lectura de `canvas_rev` al abrir la marca sigue sin `try`.
+18. **D18:** se portan los 9 tests de `TestSegesNoPageNotice` tal cual.
+19. **D19:** las invariantes 1 y 2 del parche 38 se anotan en el registro y no llevan código.
+
+## Implementación y resultados del parche 34 (16/11/2026)
+
+- **Paso 0 (solo lectura):**
+  - fuente: `sha256sum -c` de `/tmp/p34_codigo/SHA256SUMS` correcto;
+  - SHA-256 antes (copias en `/tmp/p34_antes/`):
+
+    | Archivo | Antes | Con el parche |
+    |---|---|---|
+    | `pns_ai_chatboo/models/chatboo_canvas.py` | `3f8daf37f21af0746c674d65a07bc63ccd36c73eeef48c154753ee61334f6afc` | `78ee3ea46bc4749d119d5c252a1b5e61a0795ce9aebce9932c005ee742198a61` |
+    | `pns_ai_chatboo/models/chatboo_async_request.py` | `112f0dc8377e0ad807d86f99e93fe204a7ee418e0198e36d8b90abe82a85f52c` | `f992a1bd4b8a510cb9d44e580f1b2c82e38252915087ee748c7759d84392e3d7` |
+    | `pns_ai_chatboo/tests/test_seges_chatboo_canvas.py` | `903d611908a6ba1d7a220be50728bb0150c18cbbd3866df820be2d54d4097c03` | `4f65f4243994f3589ee0c092362aa7d9f3d156fcf753c3554a9a212eb63c564a` |
+
+    «Con el parche» son los SHA-256 finales, tras el cierre (cita del comentario de F1 y cabecera del test). Los del
+    paso 3 y de las seis primeras neutralizaciones eran `9696786f…` (`chatboo_async_request.py`) y `aa11275b…` (test);
+    `chatboo_canvas.py` no cambia en el cierre.
+
+  - los 10 anclajes (4 en `chatboo_canvas.py` y 6 en `chatboo_async_request.py`, con el diccionario de la rama de éxito),
+    1 vez cada uno;
+  - el msgid «No page was built. The reason is in the AI History.» está en `pns_ai_chatboo/i18n/es.po:2213` y lo usa
+    `chatboo_canvas_job.py:133` y `:156`. No se toca `i18n`;
+  - invariante 2 y caja B: resultado en el registro, «Parche 34 en 3.1.973».
+- **Código (paso 1):** 10 bloques con 12 marcadores (5 en `chatboo_canvas.py` y 7 en `chatboo_async_request.py`). Cada
+  bloque añadido es una subcadena literal del archivo de la 3879. Líneas tras el parche:
+  - `chatboo_canvas.py`: import de `ContextVar` (`:20-21`), `_NO_PAGE_WATCH` (`:29-32`), `watch_no_page` (`:653-658`),
+    `page_refused_in_job` (`:661-668`) y la anotación en `log_no_page` (`:679-688`). Son las mismas líneas que en la 3879;
+  - `chatboo_async_request.py`: `import html` (`:12-13`), import de `_NO_PAGE_WATCH`, `page_refused_in_job` y
+    `watch_no_page` (`:21-22`), apertura de la marca (`:167-169`), `reset` (`:539-540`), composición F1 (`:1361-1376`),
+    `'content': _content` (`:1434`) y la opción A antes de `'original_content': _content` (`:1435-1438`). El `return`
+    de D16 queda en `:346`.
+  - `grep -rn "Seges: parche 34 (" pns_ai_mcp pns_ai_chatboo --include=*.py | grep -v /tests/` → 12.
+  - Compila con Python 3.7.3: «3.7.3 COMPILA 3».
+- **Tests (paso 2):** al final de `pns_ai_chatboo/tests/test_seges_chatboo_canvas.py`, el marcador, `NO_PAGE_ACC`,
+  `NO_PAGE_NOTICE` y `TestSegesNoPageNotice(_SegesCanvasCase)` (etiqueta `seges_e4p`, 9 tests), copiados por rango de
+  líneas (`:756-864` de la 3879). `_SegesCanvasCase` es igual en las dos ramas. Lint `--revisar --base 05a05a5`: 0
+  incidencias nuevas.
+- **Batería (paso 3):**
+
+  | Log | Tests | F | E | Saltados | Traceback | bad query | seges_side_env | Secretos |
+  |---|---|---|---|---|---|---|---|---|
+  | `tests-20261116-100426.log` (línea base) | 557 | 1 (`test_paap_i7`) | 0 | 6 | 58 | 1 | 1 | 0 |
+  | `tests-20261116-125048.log` (con el 34) | 566 | 1 (`test_paap_i7`) | 0 | los 6 | 58 | 1 (`UPDATE "ai_safe_operation"`) | 1 | 0 |
+  | `tests-20261116-131620.log` (final, tras las neutralizaciones) | 566 | 1 (`test_paap_i7`) | 0 | los 6 | 58 | 1 | 1 | 0 |
+
+  - los 9 de `TestSegesNoPageNotice`, en verde;
+  - origen de los módulos: `addons paths` con `/mnt/compartidos/third_party`; 0 `pns_*` en `~/odoo-dev/14.0/oca`, en la
+    imagen `odoo-dev:14-lab_pns_ai_3973` y en el volumen `odoo-dev-14_web-data` (montado en solo lectura). Contexto
+    activo: el de `lab_pns_ai_3973`, el mismo de la línea base.
+- **Neutralizaciones (paso 4):** una cada vez, batería completa, restauración con SHA-256 igual al del paso 3. Además de
+  `test_paap_i7`; todas con 0 E y los 6 saltados:
+
+  | Id | Qué se retira | Log | Runner | Caen | ¿Lo previsto? |
+  |---|---|---|---|---|---|
+  | N34m | `log_no_page` no anota (`pass` en lugar de `watch['refused'] = True`) | `tests-20261116-125537.log` | 5 | `test_notice_after_refusal`, `test_notice_unknown_session`, `test_notice_empty_answer` y `test_notice_html_answer` | Sí |
+  | N34s | `_save_to_session` no añade el aviso (`if False and page_refused_in_job(…)`) | `-125902` | 5 | los mismos cuatro | Sí |
+  | N34r | `page_refused_in_job` no compara `canvas_rev` | `-130220` | 2 | `test_no_notice_when_page_changed` | Sí |
+  | N34j | `page_refused_in_job` no compara el job | `-130546` | 2 | `test_no_notice_other_job` | Sí |
+  | N34o | `original_content` vuelve a `acc or ''` | `-130917` | 5 | los cuatro con aviso | Sí |
+  | N34h | F1 fuerza siempre el markdown (`if False:`) | `-131244` | 2 | `test_notice_html_answer` | Sí |
+  | N34x | la anotación no compara la sesión (`same = True` antes de `if same:`; cierre, S1) | `tests-20261116-155852.log` | 2 | `test_no_notice_other_session` | Sí |
+
+  - `test_no_notice_without_refusal`, `test_no_notice_other_session` y `test_no_watch` pasan en las seis primeras;
+    `test_no_notice_without_refusal` y `test_no_watch`, también en N34x. N34x se hizo sobre el código del cierre, con
+    restauración al SHA-256 final;
+  - Traceback: 62 con 4 F del 34 y 59 con 1, uno por cada test que cae; «bad query», «seges_side_env: » y secretos,
+    iguales que en la línea base.
+- **Revisión (paso 5):** APROBADO CON OBSERVACIONES: 0 críticos, 0 avisos y 3 sugerencias, que no reabren ninguna
+  decisión ni llevan código:
+  - **S1:** ningún test ejecuta `_process`: la apertura (`chatboo_async_request.py:167-169`) y el `reset` (`:539-540`)
+    solo se validan en el laboratorio (P-13); sin ellos la batería seguiría en verde. Tampoco hay neutralización de la
+    comparación de sesión de `log_no_page` (`chatboo_canvas.py:683-688`), que debería tumbar
+    `test_no_notice_other_session` (no comprobado).
+  - **S2 (junto a D16):** además del `return` de `:346`, una excepción no controlada de `_augment_prompt_with_files`
+    (`:248-250`), `_recall_prior_images` (`:358`) o `_start_heartbeat` (`:364`) sale de `_process` antes del `try` del
+    motor (`:397`) y sin `reset`. Inocuo: la marca va ligada al id del job, en producción el hilo es nuevo por job y en
+    los tests cada uno hace su `reset`. No es un olvido.
+  - **S3:** el comentario de F1 cita `chatboo_formatters.js:88-97` (texto literal de la 3879, D15); en 3.1.973
+    `isLikelyHtml` está en `:90-99`, con la misma lógica. Además, el cliente de 3.1.973 parte el contenido con
+    `splitHtmlAndMarkdownTail` (`chatboo_sse.js:361-393`, llamado desde `chatboo_formatters.js:1074`), así que el
+    `<p><em>…</em></p>` tras «tabla + texto» puede caer en la cola tratada como markdown: comprobar en P-13 que se ve en
+    cursiva y no como etiquetas.
+  - Sin hallazgos en: Python 3.7.3, ciclos de import, `ContextVar` entre hilos (un hilo por job; `_cancel_pending` y el
+    job de lienzo no ven la marca; `_reclaim_one` va por la rama `incomplete`), traducción e invariante 2.
+- **Laboratorio:** pendiente. P-13 con proveedor real, 6c y 6d′ de [lab_p29_3879.md](lab_p29_3879.md) (D10) y, en
+  pantalla, en vivo y al recargar, los casos a′, b′, c y d de «Pintado del aviso en el cliente», abajo.
+
+### Decisiones de Sergio (16/11/2026, cierre del parche 34)
+
+- **Observación de la invariante 1:** aceptada sin código. Es el mismo falso negativo que `test_no_notice_when_page_changed`.
+- **S1:** se añade la neutralización N34x (la anotación de `log_no_page` no compara la sesión). La apertura y el `reset` en
+  `_process` quedan para P-13 (D18: no se añaden tests).
+- **S2:** sin cambio.
+- **S3:** se corrige la cita del comentario de F1 a `chatboo_formatters.js:90-99` (solo el comentario,
+  `chatboo_async_request.py:1369`). Se añade a la cabecera del test la línea «fase 4 sobre 3.1.973, vuelven los casos del
+  parche 34», con la forma de la del 29.
+- **Pintado del aviso en el cliente** (abajo): no se reabren D15 ni F1. Es lectura de código, sin confirmar, y no es una
+  diferencia entre la 3879 y 3.1.973. Se comprueba en pantalla en el laboratorio del 34. Si se confirma, Sergio decide
+  entonces entre aceptarlo, cambiar la forma del aviso en el servidor (parche propio) o parchear el cliente.
+
+### Cierre del parche 34 (16/11/2026)
+
+- **Cambios:** cita del comentario de F1 (`chatboo_async_request.py:1369`, `:88-97` → `:90-99`) y línea nueva en la
+  cabecera de `test_seges_chatboo_canvas.py` (`:7`). «3.7.3 COMPILA 3»; lint `--revisar --base 05a05a5`: 0 incidencias
+  nuevas; 12 marcadores fuera de `tests/`.
+- **N34x:** 2 F (`test_paap_i7` y `test_no_notice_other_session`), 0 E, los 6 saltados; Traceback 59 (uno por el test
+  que cae), «bad query» 1, «seges_side_env: » 1 y secretos 0. SHA-256 igual al restaurar.
+- **Batería final:** `tests-20261116-160401.log`, 566 tests, 1 F (`test_paap_i7`), 0 E, los 6 saltados; Traceback 58, «bad query» 1
+  (`UPDATE "ai_safe_operation"`), «seges_side_env: » 1 y secretos 0, iguales que en la línea base; los 9 del 34 en verde;
+  módulos desde `/mnt/compartidos/third_party`.
+
+### Pintado del aviso en el cliente (16/11/2026, lectura de código, sin confirmar)
+
+Solo lectura de `pns_ai_chatboo/static/src/js/` de la rama y de `~/pns_fabricante/3.1.879/` (enlace
+`_fabricante/`). No se ha ejecutado nada ni se ha visto en pantalla.
+
+- **Dónde están las funciones:**
+
+  | | 3.1.879 | Rama (= 3.1.973) |
+  |---|---|---|
+  | `isLikelyHtml` | `chatboo_formatters.js:88-97` | `chatboo_formatters.js:90-99` |
+  | `splitHtmlAndMarkdownTail` | `chatboo_sse.js:361-393` | `chatboo_sse.js:361-393` |
+  | quién llama a `splitHtmlAndMarkdownTail` | solo `_formatContent` (`chatboo_formatters.js:1072-1073`) | solo `_formatContent` (`chatboo_formatters.js:1074-1075`) |
+
+  - `splitHtmlAndMarkdownTail` ya existía en 3.1.879. El código de pintado es el mismo en las dos versiones:
+    `chatboo_markdown.js` es idéntico, y `chatboo_sse.js` y `chatboo_formatters.js` solo cambian en comentarios y en una
+    cadena que ahora pasa por `_t`. El `chatboo_formatters.js` y el `chatboo_sse.js` de la rama tienen el mismo SHA-256
+    que los de 3.1.973 limpia.
+- **Ruta común:**
+  - al recargar, el componente toma `original_content || content` y lo pasa por `_formatContent`
+    (`chatboo_component_v2.js:1224-1226`);
+  - en vivo, al cerrar el turno, el evento `done` trae `assistant_content` (`chatboo_async_request.py:731-738`), que pasa
+    por la misma `_formatContent` (`chatboo_component_v2.js:3184-3185` y `:3287`);
+  - después se sanea con `sanitizeHtml` (`chatboo_formatters.js:1185`), que conserva `P` y `EM`
+    (`_ALLOWED_TAGS`, `:124-135`). Durante el streaming no hay aviso. El resultado es el mismo en vivo y al recargar.
+- **Punto clave:**
+  - `ChatbooMarkdown.toHtml` escapa todo `<` del texto (`inline`, `chatboo_markdown.js:130`);
+  - el `_…_` solo se convierte en `<em>` en la ruta de markdown (`chatboo_markdown.js:112`);
+  - `_formatContent` solo entra en esa ruta si el contenido tiene `#`, `` ` ``, `**`, `__`, una lista o una fila de tabla
+    (`chatboo_formatters.js:1163-1170`). Un `_…_` suelto no la activa; si no entra, se escapa tal cual (`:1181`).
+- **Casos:**
+
+  | Caso | Recorrido | Conclusión |
+  |---|---|---|
+  | **a.** `<table>…</table>` + `<p><em>aviso</em></p>`, sin `</div>` antes de la prosa o con prosa sin marcas de markdown tras el `</div>` (los tests y T1 del staging) | `splitHtmlAndMarkdownTail` no parte (la cola no cumple `looksLikeMarkdownTail`, `chatboo_sse.js:113-122`); pasa `isLikelyHtml` (`chatboo_formatters.js:1082`) y va a `enhanceHtmlProse` | cursiva |
+  | **a′.** Tabla del servidor en `<div>…</div>` + prosa con `##`, `**` o una lista + `<p><em>aviso</em></p>` (el patrón `` `...</div>## Analysis…` `` del fabricante, `chatboo_formatters.js:1071-1073`) | el split separa la cola (`:1074-1078`), con el `<p><em>`, y la pasa a `_formatMarkdown` → `toHtml`, que la escapa | etiquetas literales |
+  | **b.** Texto con marcas de markdown + `\n\n_aviso_` | ruta de markdown (`:1174`) | cursiva |
+  | **b′.** Texto llano + `\n\n_aviso_` (`NO_PAGE_ACC` de los tests, o «Se ha generado la página» de E3′) | sin marcas: `escapeHtml` (`:1181`) | guiones bajos literales |
+  | **c.** Solo `_aviso_` (respuesta vacía) | como b′: ni el aviso ni su traducción tienen marcas | guiones bajos literales |
+  | **d.** Texto + tabla incrustada + `\n\n_aviso_` (frontera de F1) | la regex de HTML incrustado (`:1146-1148`) lo manda a `enhanceHtmlProse`; con tabla no se vuelve a leer como markdown; no se ha seguido qué hace con el nodo de texto `_aviso_` | no se puede deducir del código (probablemente literal) |
+
+- **Afecta igual a la 3879**, que tiene el mismo código de pintado.
+- **Por qué no se vio en su staging** (`staging_e4_3879.md:1077-1080` y `:1096-1099`): solo salió la forma HTML (T1 y F1-t
+  empezaban por `<` y la prosa no llevaba marcas de markdown). Ningún laboratorio ni staging ha visto en pantalla b′ ni c,
+  y los tests del servidor comprueban el texto guardado, no cómo lo pinta el cliente.
+- **Opciones, si el laboratorio lo confirma:**
+  1. aceptarlo y documentarlo, sin código: el aviso se lee, con `_…_` o etiquetas a la vista en a′, b′ y c;
+  2. cambiar la forma del aviso en el servidor (parche propio): reabre D15 y F1 y exige tests y neutralizaciones nuevos;
+     la forma que funcione en las cuatro rutas está por diseñar y ver en pantalla;
+  3. parchear el JS del cliente para que reconozca el aviso: toca código del fabricante que hoy no tiene parches.
+- **Decisión:** después del laboratorio del 34 (Sergio, 16/11/2026).

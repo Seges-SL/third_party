@@ -264,7 +264,7 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
 | 31 | M12 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
 | 32 | PNS-97 | seguridad | `pns_ai_mcp/models/ai_trusted_action.py` | 2a | Aplicado (11/11/2026) |
 | 33 | PNS-29 | seguridad | `pns_ai_mcp/models/ai_provider.py`, `pns_ai_mcp/wizard/ai_provider_usage_wizard.py` | 2a | Aplicado (11/11/2026) |
-| 34 | PNS-96 | funcional | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_async_request.py` | 4 | Pendiente de portar |
+| 34 | PNS-96 | funcional | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_async_request.py` | 4 | Aplicado (16/11/2026): opción A y F1; laboratorio pendiente (P-13) |
 | 36 | PNS-103 | funcional | `pns_base/models/operation_report_wizard.py` | 2c | Aplicado (11/11/2026); validado en el laboratorio (12/11/2026) |
 | 37 | PNS-104 | datos | `pns_ai_mcp/controllers/controller_helpers.py` | 3b | Aplicado (12/11/2026) |
 | 35 | NUEVO-2 | robustez | `pns_ai_mcp/migrations/14.0.3.1.973/post-migrate.py` | plan, «Parche 35» | Pendiente (decisión 4 del plan). Única excepción a «sin `migrations/` propios»: solo se ejecuta en un `-u` que cruce 3.1.973; una BD actualizada a 3.1.973 sin el parche no lo ejecuta y se corrige a mano (una instalación nueva no lo necesita) |
@@ -5069,6 +5069,120 @@ Comprobación previa de la CSP, propuesta, decisiones de Sergio (D1 a D5), bater
   - La autoprueba de `lab_cdp.py` (`~/pns_ai_3973/fase4/lab/`) pasó el 16/11/2026 en el equipo (12 PASA, código 0), antes
     del primer uso con Odoo.
 - **Estado:** aplicado (16/11/2026); laboratorio hecho (16/11/2026).
+
+### Parche 34 en 3.1.973
+
+- **Fecha:** 16/11/2026. Propuesta, decisiones de Sergio (D15 a D19) y resultados: [propuesta de la fase 4](propuesta_fase4_3973.md),
+  «Parche 34 en 3.1.973 (16/11/2026)» e «Implementación y resultados del parche 34 (16/11/2026)».
+- **Qué se porta (D15):** el 34 de la 3879 tal cual, con la opción A y F1 (rev. `3feb224a…` de `14.0-pns-ai-3879`): 10
+  bloques y 12 marcadores, mismo texto y mismo msgid. Descripción, límites y degradaciones: «Parche 34: aviso fijo del
+  servidor…» y «Parches de la rama 14.0-pns-ai-3879 (E4′.b2 y E4′.b3)», arriba.
+- **Marcadores** (`# Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md`):
+  - `pns_ai_chatboo/models/chatboo_canvas.py` (5): import de `ContextVar` (`:20`), `_NO_PAGE_WATCH` (`:29`),
+    `watch_no_page` (`:653`), `page_refused_in_job` (`:661`) y la anotación en `log_no_page` (`:679`);
+  - `pns_ai_chatboo/models/chatboo_async_request.py` (7): `import html` (`:12`), import de `_NO_PAGE_WATCH`,
+    `page_refused_in_job` y `watch_no_page` (`:21`), apertura tras `_notify('thinking')` (`:167`), `reset` en la primera
+    línea del `finally` del motor (`:539`, D16), composición F1 al principio de la rama de éxito de `_save_to_session`
+    (`:1361`), `'content': _content` (`:1434`, inline) y la opción A antes de `'original_content': _content` (`:1435`).
+  - El `return` temprano de la confirmación fallida (`:346`; `:339` antes del parche) sale sin `reset`, como en la 3879
+    (D16). La lectura de `canvas_rev` al abrir sigue sin `try` (D17).
+- **Qué cambia frente a la 3879:** nada en el código del fabricante de esas zonas, salvo comentarios, docstrings,
+  mensajes de log e imports (comparación sin comentarios en la propuesta).
+- **SHA-256** (antes → con el parche): `chatboo_canvas.py` `3f8daf37…` → `78ee3ea4…`; `chatboo_async_request.py`
+  `112f0dc8…` → `f992a1bd…`; `test_seges_chatboo_canvas.py` `903d6119…` → `4f65f424…`. Son los finales, tras el
+  cierre; completos en la propuesta, con los del paso 3.
+- **Tests** (`pns_ai_chatboo/tests/test_seges_chatboo_canvas.py`, al final, `TestSegesNoPageNotice(_SegesCanvasCase)`,
+  etiqueta `seges_e4p`, 9): los de la 3879 tal cual (D18), con su marcador, `NO_PAGE_ACC` y `NO_PAGE_NOTICE`.
+- **Comprobaciones:** 12 marcadores fuera de `tests/`; «3.7.3 COMPILA 3»; lint `--revisar --base 05a05a5`: 0 incidencias
+  nuevas.
+- **Batería** (`tests-20261116-125048.log`): 566 tests, 1 F (`test_paap_i7`), 0 E y los mismos 6 saltados; los 9 del 34
+  en verde. Traceback 58, «bad query» 1 (`UPDATE "ai_safe_operation"`), «seges_side_env: » 1 y secretos 0, iguales que en
+  la línea base (`tests-20261116-100426.log`). Módulos desde `/mnt/compartidos/third_party`, con 0 `pns_*` en OCA, en la
+  imagen y en el volumen. Batería final, tras las neutralizaciones (`tests-20261116-131620.log`): igual.
+- **Neutralizaciones:** las 7 (N34m, N34s, N34r, N34j, N34o, N34h y, en el cierre, N34x), todas F en los tests previstos y
+  ninguno más, 0 E y SHA-256 IGUAL al restaurar. Los controles `test_no_notice_without_refusal` y `test_no_watch` pasan en
+  todas, y `test_no_notice_other_session` en todas menos N34x, que es la que lo tumba. Tabla en la propuesta.
+- **Invariante 2 del parche 38** (D19, sin código): el 34 no escribe la fila de `chatboo.session` en el cursor del turno
+  después del motor.
+  - Las líneas añadidas no contienen `write(`, `commit`, `cursor`, `execute`, `flush` ni `invalidate`. Solo leen
+    `self.session_id.canvas_rev` (apertura) y `session.canvas_rev` (rama de éxito) y cambian el contenido del mensaje
+    que ya guardaba el fabricante.
+  - `_save_to_session` solo se llama desde:
+    - `_finalize` (`chatboo_async_request.py:722`), en un cursor nuevo (`:712`) y dentro de un `savepoint`;
+    - `_cancel_pending` (`:1588`), en el cursor de la petición de `request_cancel` (`chatboo_job.py:319-333`), sin
+      marca en ese contexto;
+    - `_reclaim_one` (`:1631`), en el cursor del cron o del poll, dentro de un `savepoint` (`chatboo_job.py:403-408`).
+  - **Resultado:** se cumple.
+- **Invariante 1 del parche 38** (D19, sin código): si la caja B puede escribir `canvas_*` y llamar a `page_edit` en la
+  misma transacción.
+  1. **¿Puede un plan escribir `chatboo.session` y sus `canvas_*`?** Sí, con `op: write`, si el usuario está en AI
+     Writer: `base.group_user` tiene `1,1,1,1` sobre `chatboo.session`
+     (`pns_ai_chatboo/security/ir.model.access.csv:2`), el `write` del modelo solo veta `user_id`
+     (`chatboo_session.py:2014-2018`), y ni `_meta_crud_block_error` (`safe_plan_validate.py:92-105`) ni
+     `crud_cusp_error` (`utils/privilege_cusp.py:124-127`) vetan ese modelo. Lo ejecuta `execute_safe_plan`
+     (`controllers/safe_plan_execute.py:175-190`).
+  2. **¿Puede llamar a un método?** No: solo verbos fijos (`ALLOWED_OPS`, `safe_plan_validate.py:35-38`; comprobado en
+     `safe_plan_execute.py:95-97`). `op: action` solo llama a acciones de `ai.trusted.action` del catálogo, y en
+     `pns_ai_mcp` no hay ninguna que llame a `page_edit`, `_page_edit`, `_paint_canvas` ni `_store_design`.
+  3. **¿En qué transacción corre?** Nunca deja escrituras pendientes en la transacción del turno:
+     - autoconfirmación al proponer: cursor propio (`controllers/safe_plan.py:413`);
+     - confirmación por el aviso: cursor propio (`models/safe_operation.py:972`);
+     - `safe_plan_status` (`controllers/safe_plan.py:592`): en el cursor de quien llama, pero `execute_plan_now` confirma
+       tras la reserva (`safe_operation.py:1461`) y tras el plan (`:1505`), o deshace si falla (`:1513`);
+     - desde la caja A no se puede (`execute_plan_now` vetado por nombre, `controllers/validators_base.py:234`; caja A en
+       `READ ONLY`, `controllers/controller_helpers.py:198`).
+  4. **¿Es `page_edit` accesible fuera de `sandbox_helpers`?** No. `page_edit` solo existe como envoltura del sandbox
+     (`chatboo_session.py:833-858`) sobre `_page_edit` (`:965`), que es privado y no se puede llamar por RPC en Odoo 14.
+  - **Conclusión: no posible.** Una escritura de `canvas_*` por un plan es otra transacción, ya confirmada, como la vía
+    D5; la conclusión del 29 no cambia.
+  - **Observación (aceptada sin código por Sergio, 16/11/2026):** un plan confirmado durante el turno que suba `canvas_rev`
+    después de un rechazo hace que `page_refused_in_job` no vea el rechazo y el aviso no sale. Es el mismo falso negativo
+    de `test_no_notice_when_page_changed` (límite ya aceptado en la 3879: «si en el mismo turno se crea una página…»);
+    no afecta a la seguridad.
+- **Revisión (`odoo-reviewer`, 16/11/2026):** APROBADO CON OBSERVACIONES: 0 críticos, 0 avisos y 3 sugerencias, que no reabren ninguna
+  decisión ni llevan código:
+  - **S1:** ningún test ejecuta `_process`: la apertura (`chatboo_async_request.py:167-169`) y el `reset` (`:539-540`)
+    solo se validan en el laboratorio (P-13); sin ellos la batería seguiría en verde. Tampoco hay neutralización de la
+    comparación de sesión de `log_no_page` (`chatboo_canvas.py:683-688`), que debería tumbar
+    `test_no_notice_other_session` (no comprobado).
+  - **S2 (junto a D16):** además del `return` de `:346`, una excepción no controlada de `_augment_prompt_with_files`
+    (`:248-250`), `_recall_prior_images` (`:358`) o `_start_heartbeat` (`:364`) sale de `_process` antes del `try` del
+    motor (`:397`) y sin `reset`. Inocuo: la marca va ligada al id del job, en producción el hilo es nuevo por job y en
+    los tests cada uno hace su `reset`. No es un olvido.
+  - **S3:** el comentario de F1 cita `chatboo_formatters.js:88-97` (texto literal de la 3879, D15); en 3.1.973
+    `isLikelyHtml` está en `:90-99`, con la misma lógica. Además, el cliente de 3.1.973 parte el contenido con
+    `splitHtmlAndMarkdownTail` (`chatboo_sse.js:361-393`, llamado desde `chatboo_formatters.js:1074`), así que el
+    `<p><em>…</em></p>` tras «tabla + texto» puede caer en la cola tratada como markdown: comprobar en P-13 que se ve en
+    cursiva y no como etiquetas.
+  - Sin hallazgos en: Python 3.7.3, ciclos de import, `ContextVar` entre hilos (un hilo por job; `_cancel_pending` y el
+    job de lienzo no ven la marca; `_reclaim_one` va por la rama `incomplete`), traducción e invariante 2.
+- **Decisiones de Sergio en el cierre (16/11/2026):** observación de la invariante 1 aceptada sin código; S1 con la
+  neutralización N34x, y la apertura y el `reset` de `_process` para P-13 (D18); S2 sin cambio; S3 con la cita del
+  comentario de F1 corregida a `chatboo_formatters.js:90-99` (`chatboo_async_request.py:1369`) y la línea de la fase 4 en la
+  cabecera del test (`:7`). Cierre: «3.7.3 COMPILA 3», lint con 0 incidencias nuevas, 12 marcadores; N34x
+  (`tests-20261116-155852.log`): 2 F (`test_paap_i7` y `test_no_notice_other_session`); batería final: `tests-20261116-160401.log`, 566 tests, 1 F (`test_paap_i7`), 0 E, los 6 saltados; Traceback 58, «bad query» 1
+  (`UPDATE "ai_safe_operation"`), «seges_side_env: » 1 y secretos 0, iguales que en la línea base; los 9 del 34 en verde;
+  módulos desde `/mnt/compartidos/third_party`.
+- **Pintado del aviso en el cliente (16/11/2026, lectura de código, sin confirmar):** detalle con archivo:línea en la
+  propuesta, «Pintado del aviso en el cliente».
+  - Ruta: en vivo (evento `done` con `assistant_content`) y al recargar, el contenido pasa por `_formatContent` y
+    `sanitizeHtml`. `ChatbooMarkdown.toHtml` escapa todo `<` (`chatboo_markdown.js:130`), y `_formatContent` solo usa
+    markdown si hay `#`, `` ` ``, `**`, `__`, lista o fila de tabla (`chatboo_formatters.js:1163-1170`); si no, escapa el
+    texto (`:1181`).
+  - Resultado por caso: **a** (HTML, prosa sin marcas tras la tabla) cursiva; **a′** (tabla en `<div>` + prosa con
+    marcas de markdown + `<p><em>`) etiquetas literales; **b** (texto con marcas + `_aviso_`) cursiva; **b′** (texto llano
+    + `_aviso_`) guiones bajos literales; **c** (solo `_aviso_`) guiones bajos literales; **d** (texto + tabla incrustada +
+    `_aviso_`) no se puede deducir del código.
+  - Afecta igual a la 3879 (mismo código de pintado que 3.1.879). En su staging solo salió la forma HTML (T1 y F1-t).
+  - No se reabren D15 ni F1 (Sergio, 16/11/2026). Si el laboratorio lo confirma, Sergio decide entonces entre aceptarlo,
+    cambiar la forma del aviso en el servidor (parche propio) o parchear el cliente.
+- **Laboratorio:** pendiente:
+  - P-13 con proveedor real (en la interfaz: un rechazo del lienzo en un turno deja el aviso en la burbuja tras recargar);
+  - 6c y 6d′ de [lab_p29_3879.md](lab_p29_3879.md) (D10 del 29);
+  - en pantalla, en vivo y al recargar, los casos a′, b′, c y d del pintado del aviso (sin confirmar), con d como caso
+    frontera de F1;
+  - la apertura de la marca y el `reset` en `_process` (S1: sin test).
+- **Estado:** aplicado (16/11/2026); laboratorio pendiente.
 
 ### Para el informe al fabricante (fase 4)
 

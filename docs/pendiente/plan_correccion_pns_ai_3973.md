@@ -338,6 +338,23 @@ Orden:
       la disponibilidad, no a la seguridad del 29);
     - su laboratorio incluye 6c y 6d′ del 29 (casos con el modelo real; [lab_p29_3879.md](lab_p29_3879.md)), junto a P-13,
       porque los dos necesitan proveedor (D10).
+  - **Hecho el código (16/11/2026):**
+    - decisiones D15 a D19 y resultados en [propuesta_fase4_3973.md](propuesta_fase4_3973.md); registro, «Parche 34 en
+      3.1.973». Porte literal de la 3879 con la opción A y F1: 10 bloques y 12 marcadores;
+    - citas recalculadas sobre `05a05a5`: `log_no_page` en `chatboo_canvas.py:646` antes del parche (`:671` tras él);
+      `chatboo_async_request.py` antes del parche es igual al de 3.1.973 limpia (mismo SHA-256 `112f0dc8…` que
+      `~/pns_fabricante/3.1.973/`; `_process` en `:149` y `_save_to_session` en `:1184`, como arriba);
+    - batería: 566 tests, 1 F (`test_paap_i7`), 0 E y 6 saltados; 6 neutralizaciones con SHA-256 igual;
+    - invariante 2: se cumple; invariante 1 (caja B): no posible. La observación (un plan que suba `canvas_rev` en el
+      turno suprime el aviso) queda aceptada sin código (Sergio, 16/11/2026; registro, «Parche 34 en 3.1.973»);
+    - cierre (16/11/2026): cita del comentario de F1 corregida, línea de la fase 4 en la cabecera del test y
+      neutralización N34x (S1);
+    - laboratorio pendiente:
+      - P-13 con proveedor real;
+      - 6c y 6d′ de [lab_p29_3879.md](lab_p29_3879.md);
+      - en pantalla, en vivo y al recargar, los casos a′, b′, c y d del pintado del aviso en el cliente (lectura de
+        código, sin confirmar; [propuesta_fase4_3973.md](propuesta_fase4_3973.md), «Pintado del aviso en el cliente»).
+        Si se confirma, Sergio decide entre aceptarlo, cambiar la forma del aviso en el servidor o parchear el cliente.
 
 ## Parche 35: crons de NUEVO-2 (decisión 4)
 
