@@ -3,6 +3,7 @@
 # Seges: parches 25 a 29 (tests de la entrega E3′) y 34 (E4′.b). Ver docs/pendiente/parches_pns_ai.md
 # Seges: fase 2b sobre 3.1.973, solo los casos de los parches 25, 26 y 28 (los de 27, 29 y 34 vuelven en la fase 4). Ver docs/pendiente/parches_pns_ai.md
 # Seges: fase 4 sobre 3.1.973, vuelven los casos del parche 27 y P-9 parte A (los de 29 y 34, en su parche). Ver docs/pendiente/parches_pns_ai.md
+# Seges: fase 4 sobre 3.1.973, vuelven los casos del parche 29. Ver docs/pendiente/parches_pns_ai.md
 """Entrega E3′, el lienzo (docs/pendiente/e3_propuesta_3879.md, «Propuesta final»).
 
 En la rama 14.0-pns-ai-3973 (fase 2b) solo están los casos de:
@@ -12,6 +13,9 @@ En la rama 14.0-pns-ai-3973 (fase 2b) solo están los casos de:
 - Parche 27 (F1), fase 4: JSON seguro dentro de ``<script>``, imágenes ``data:`` solo en
   base64, CSP en ``<meta>`` al servir (diseño y descargas) y regla de diseño sin recursos
   externos; la cabecera CSP del fabricante no cambia (P-9 parte A).
+- Parche 29 (P-8e a), fase 4: no se guarda un DATA que no escribió el servidor ni un
+  valor de las filas en crudo (página de rescate), la muestra a Design va escapada y la
+  edición sin filas vuelve a escribir las de la página abierta.
 - Parche 28 (D1): ``user_ids`` solo internos y el AI Administrator solo lee y borra
   páginas ajenas. ``owner_id`` y el alta fuera de ``su`` los cierra ya el fabricante
   (``_SYSTEM_FIELDS`` y ``create``): esos casos quedan como no regresión.
@@ -547,3 +551,329 @@ class TestSegesCanvasHeaders(_SegesCanvasCase):
                 self.assertEqual(resp.headers.get('X-Content-Type-Options'), 'nosniff')
                 self.assertIsNone(resp.headers.get('Content-Security-Policy'))
                 self.assertTrue(resp.text.startswith(canvas._CSP_PREFIX), resp.text[:200])
+
+
+# Seges: parche 29 (P-8e a, seguridad). Ver docs/pendiente/parches_pns_ai.md
+# Parche 29 (P-8e a): el DATA que escribe el modelo.
+P29_MARK = 'seges-p29-design'
+P29_QUOTE = 'x" onmouseover="alert(1)'
+P29_ROWS = [
+    {'id': 1, 'name': EVIL}, {'id': 2, 'name': EVIL_COMMENT},
+    {'id': 3, 'name': 'Seges P29 tres'},
+]
+P29_PLAIN = [{'id': 1, 'name': 'Seges P29 uno'}, {'id': 2, 'name': 'Seges P29 dos'}]
+P29_DATA = 'const DATA = [{"id": 0, "name": "a"}];'
+P29_SAMPLE_NOTE = 'Sample figures (shape only; the server replaces const DATA):\n'
+
+
+def _p29_design(data_js, body='', title='Seges P29'):
+    """Plantilla del modelo: ``data_js`` en el script y ``body`` en el HTML."""
+    return (
+        '<!DOCTYPE html><html><head><title>' + title + '</title></head><body>'
+        '<div id="' + P29_MARK + '"></div>' + body
+        + '<section id="pns-page-rows"></section><script>' + data_js
+        + '\ndocument.getElementById("' + P29_MARK + '").textContent = DATA.length;'
+        '</script></body></html>'
+    )
+
+
+def _p29_copied_sample(names):
+    """Diseño que copia en ``const DATA`` la muestra, sin escapar, con una fila inventada."""
+    data = [{'id': n, 'name': name} for n, name in enumerate(names, 1)]
+    data.append({'id': 69, 'name': 'Seges E3 Contacto 4'})
+    sample = [{'title': '', 'keys': ['id', 'name'], 'data': data}]
+    return _p29_design('const DATA = ' + json.dumps(sample, ensure_ascii=False) + ';')
+
+
+@tagged('post_install', '-at_install', 'pns_ai_chatboo', 'seges_e3p')
+class TestSegesCanvasModelData(_SegesCanvasCase):
+    """Parche 29 (P-8e a): DATA del modelo sin sustituir, valores en crudo y edición sin filas."""
+
+    def setUp(self):
+        super().setUp()
+        self.helpers = collect_sandbox_helpers(self.env(
+            user=self.user_a.id, context={'ai_session_ref': self.session_a.id},
+        ))
+
+    def _answers(self, *answers):
+        """Driver de Design que devuelve ``answers`` en orden (el último se repite)."""
+        queue = list(answers)
+
+        def driver(env, system, prompt, **kwargs):
+            self.design_calls.append(prompt)
+            answer = queue.pop(0) if len(queue) > 1 else queue[0]
+            if isinstance(answer, dict):
+                return dict(answer, usage={'total_tokens': 1})
+            return {'content': answer, 'error': '', 'usage': {'total_tokens': 1}}
+
+        return mock.patch(LLM, side_effect=driver)
+
+    def _stored(self):
+        return self._fresh(self.session_a).canvas_design
+
+    def _page_url(self, rows, *answers):
+        with self._answers(*answers):
+            url = self.helpers['page_url'](rows, 'Seges P29')
+        self.assertTrue(url)
+        return self._stored()
+
+    def _assert_no_breakout(self, page):
+        for breakout in BREAKOUTS:
+            self.assertNotIn(breakout, page)
+
+    def _assert_rescue(self, page, rows):
+        self._assert_no_breakout(page)
+        self.assertNotIn(P29_MARK, page)
+        self.assertIn('pns-page-rows-visible', page)
+        self.assertEqual(_json_after(page, 'const DATA='), rows)
+
+    def _assert_kept(self, page, rows):
+        self._assert_no_breakout(page)
+        self.assertIn(P29_MARK, page)
+        self.assertNotIn('pns-page-rows-visible', page)
+        self.assertEqual(_json_after(page, 'const DATA = '), rows)
+
+    def test_sample_copied_evil_first(self):
+        hostile = _p29_copied_sample([EVIL, EVIL_COMMENT])
+        page = self._page_url(P29_ROWS, hostile, hostile)
+        self.assertEqual(len(self.design_calls), 2)
+        self._assert_rescue(page, P29_ROWS)
+
+    def test_sample_copied_comment_first(self):
+        hostile = _p29_copied_sample([EVIL_COMMENT, EVIL])
+        page = self._page_url(P29_ROWS, hostile, hostile)
+        self.assertEqual(len(self.design_calls), 2)
+        self._assert_rescue(page, P29_ROWS)
+
+    def test_sample_copied_retry_error(self):
+        hostile = _p29_copied_sample([EVIL, EVIL_COMMENT])
+        page = self._page_url(
+            P29_ROWS, hostile, {'content': '', 'error': 'HTTP 503'},
+        )
+        self.assertEqual(len(self.design_calls), 2)
+        self._assert_rescue(page, P29_ROWS)
+
+    def test_data_not_written_by_server(self):
+        for data_js in (
+            'const DATA = [{id: 1, name: "a"}];',
+            'const DATA = [{"id": 9, "name": "x</script><script>alert(1)</script>"}];',
+            'let DATA = [{"otra": 1}];',
+            "var DATA = JSON.parse('[]');",
+            'window.DATA = [{"otra": 1}];',
+            # Seges: subtest añadido en 3.1.973 (D12, aviso m1). Ver docs/pendiente/parches_pns_ai.md
+            P29_DATA + ' window.DATA = DATA' + chr(10) + '.concat([{"id": 9, "name": "x"}]);',
+        ):
+            with self.subTest(data_js=data_js):
+                out = canvas.place_rows_on_page(
+                    _p29_design(data_js), P29_PLAIN, captured=True,
+                )
+                self._assert_rescue(out, P29_PLAIN)
+
+    def test_data_forms_bound_kept(self):
+        for data_js in (
+            P29_DATA + ' window.DATA = DATA;',
+            'let DATA = [{"id": 0, "name": "a"}];',
+        ):
+            with self.subTest(data_js=data_js):
+                out = canvas.place_rows_on_page(
+                    _p29_design(data_js), P29_PLAIN, captured=True,
+                )
+                self._assert_no_breakout(out)
+                self.assertIn(P29_MARK, out)
+                self.assertNotIn('pns-page-rows-visible', out)
+
+    def test_raw_value_in_markup(self):
+        accent = 'Señor <b>"P29"</b>'
+        rows = P29_ROWS + [
+            {'id': 4, 'name': P29_QUOTE}, {'id': 5, 'name': 'R&D Ltd'},
+            {'id': 6, 'name': accent},
+        ]
+        for body, title, rescue in (
+            ('<p>' + EVIL + '</p>', '', True),
+            ('<p>' + EVIL_COMMENT + '</p>', '', True),
+            ('<div data-name="' + P29_QUOTE + '"></div>', '', True),
+            # Copia fuera de DATA, como cadena JSON: " pasa a \".
+            ('<script>const SAMPLE = ' + json.dumps([{'name': EVIL}], ensure_ascii=False)
+             + ';</script>', '', True),
+            ('<script>const SAMPLE = ' + json.dumps([{'name': accent}], ensure_ascii=True)
+             + ';</script>', '', True),
+            ('', EVIL, True),
+            ('<p>R&D Ltd</p>', '', False),
+        ):
+            with self.subTest(body=body, title=title):
+                design = _p29_design(P29_DATA, body, title=title or 'Seges P29')
+                out = canvas.place_rows_on_page(design, rows, captured=True, title=title)
+                if rescue:
+                    self._assert_rescue(out, rows)
+                else:
+                    self._assert_kept(out, rows)
+
+    def test_page_html_hostile_template(self):
+        url = self.helpers['page_html'](
+            _p29_copied_sample([EVIL, EVIL_COMMENT]), rows=P29_ROWS,
+        )
+        self.assertTrue(url)
+        self._assert_rescue(self._stored(), P29_ROWS)
+
+    def _edit(self, answer):
+        self._page_url(P29_ROWS, _p29_design(P29_DATA))
+        with self._answers(answer):
+            url = self.helpers['page_edit']('Seges P29: fondo azul')
+        self.assertTrue(url)
+        self.assertEqual(self._fresh(self.session_a).canvas_rev, 2)
+        return self._stored()
+
+    def test_edit_rebinds_rows(self):
+        changed = [{'id': 1, 'name': EVIL_COMMENT}]
+        page = self._edit(_p29_design(
+            'const DATA = ' + json.dumps(changed, ensure_ascii=False) + ';',
+        ))
+        self._assert_no_breakout(page)
+        self.assertIn(P29_MARK, page)
+        self.assertEqual(_json_after(page, 'const DATA = '), P29_ROWS)
+
+    def test_edit_unescaped_data(self):
+        changed = [{'id': 1, 'name': EVIL}]
+        page = self._edit(_p29_design(
+            'const DATA = ' + json.dumps(changed, ensure_ascii=False) + ';',
+        ))
+        self._assert_rescue(page, P29_ROWS)
+
+    def test_edit_raw_value_in_markup(self):
+        page = self._edit(_p29_design(P29_DATA, '<p>' + EVIL + '</p>'))
+        self._assert_rescue(page, P29_ROWS)
+
+    def test_edit_page_without_data(self):
+        no_data = canvas.place_rows_on_page(
+            _p29_design('var n = 1;'), P29_ROWS, captured=True,
+        )
+        scalars = canvas.place_rows_on_page(
+            _p29_design(P29_DATA), [EVIL, 'Seges P29 dos'], captured=True,
+        )
+        # Premisa: sin DATA legible de filas, con la tabla del servidor.
+        for stored in (no_data, scalars):
+            self.assertFalse(canvas._blocks_for_page(
+                canvas._rows_from_const_data(canvas._const_data_value(stored)),
+            ))
+            self.assertIn(EVIL, canvas.page_rows_texts(stored))
+        hostile = _p29_design('var n = 1;', '<p>' + EVIL + '</p>')
+        empty_slot = _p29_design('var n = 1;')
+        for label, stored, answer, kept in (
+            ('(2) inocente', no_data,
+             no_data.replace('<body>', '<body style="background:#00f">'), True),
+            ('(2) hostil', no_data, hostile, False),
+            ('(2) hostil, filas escalares', scalars, hostile, False),
+            ('(3) sin DATA ni tabla', empty_slot, hostile, False),
+        ):
+            with self.subTest(label):
+                self.session_a.sudo().write({
+                    'canvas_open': True, 'canvas_design': stored, 'canvas_rev': 1,
+                })
+                # Seges: adaptado a 3.1.973 (parche 38). Solo vale en modo test: en
+                # producción el turno confirma sus escrituras de la sesión antes del
+                # motor (chatboo_async_request.py:329).
+                self.env['base'].flush()
+                self.design_calls.clear()
+                with self._answers(answer):
+                    url = self.helpers['page_edit']('Seges P29: fondo azul')
+                after = self._fresh(self.session_a)
+                self._assert_no_breakout(after.canvas_design)
+                if kept:
+                    self.assertTrue(url)
+                    self.assertEqual(after.canvas_rev, 2)
+                    self.assertIn('background:#00f', after.canvas_design)
+                else:
+                    self.assertFalse(url)
+                    self.assertEqual(after.canvas_rev, 1)
+                    self.assertEqual(after.canvas_design, stored)
+                if label.startswith('(3)'):
+                    self.assertFalse(self.design_calls)
+        # n1: la edición 1 saca el valor de la tabla, escapado; la 2 lo desescapa.
+        table = canvas._blocks_as_html(canvas._blocks_for_page(P29_ROWS))
+        self.assertIn(table, no_data)
+        mark = '<div id="' + P29_MARK + '"></div>'
+        moved = no_data.replace(table, '<table><tr><td>x</td></tr></table>').replace(
+            mark, mark + '<p>' + html.escape(EVIL) + '</p>',
+        )
+        for label, second, kept in (
+            ('dos pasos, hostil', hostile, False),
+            ('dos pasos, inocente',
+             moved.replace('<body>', '<body style="background:#00f">'), True),
+        ):
+            with self.subTest(label):
+                self.session_a.sudo().write({
+                    'canvas_open': True, 'canvas_design': no_data, 'canvas_rev': 1,
+                })
+                # Seges: adaptado a 3.1.973 (parche 38). Solo vale en modo test: en
+                # producción el turno confirma sus escrituras de la sesión antes del
+                # motor (chatboo_async_request.py:329).
+                self.env['base'].flush()
+                with self._answers(moved):
+                    self.assertTrue(self.helpers['page_edit']('Seges P29: tarjetas'))
+                step1 = self._fresh(self.session_a).canvas_design
+                self.assertEqual(self._fresh(self.session_a).canvas_rev, 2)
+                self.assertNotIn(EVIL, canvas.page_rows_texts(step1))
+                with self._answers(second):
+                    url = self.helpers['page_edit']('Seges P29: fondo azul')
+                after = self._fresh(self.session_a)
+                self._assert_no_breakout(after.canvas_design)
+                if kept:
+                    self.assertTrue(url)
+                    self.assertEqual(after.canvas_rev, 3)
+                else:
+                    self.assertFalse(url)
+                    self.assertEqual(after.canvas_rev, 2)
+                    self.assertEqual(after.canvas_design, step1)
+
+    def test_design_prompt_escaped(self):
+        self._page_url(P29_ROWS, _p29_design(P29_DATA))
+        prompt = self.design_calls[0]
+        self._assert_no_breakout(prompt)
+        self.assertNotIn('</script', prompt)
+        self.assertEqual(_json_after(prompt, P29_SAMPLE_NOTE), [{
+            'title': '', 'keys': ['id', 'name'], 'data': P29_ROWS,
+        }])
+
+    def test_normal_design_kept(self):
+        page = self._page_url(P29_PLAIN, _p29_design(P29_DATA))
+        self.assertEqual(len(self.design_calls), 1)
+        self._assert_kept(page, P29_PLAIN)
+
+    def test_hostile_rows_design_kept(self):
+        rows = P29_ROWS + [
+            {'id': 4, 'name': 'R&D'}, {'id': 5, 'name': '&amp; Co'},
+            {'id': 6, 'name': "O'Brien"}, {'id': 7, 'name': 'Seges "P29"'},
+            {'id': 8, 'name': 'x > y'},
+        ]
+        title = EVIL + ' "P29"'
+        out = canvas.place_rows_on_page(
+            _p29_design(P29_DATA), rows, captured=True, title=title,
+        )
+        self._assert_kept(out, rows)
+        blocks = canvas._blocks_for_page(rows)
+        rescue = canvas._finish_rescue(canvas._page_for_rows(blocks))
+        self.assertFalse(canvas._model_data_left(rescue, blocks))
+        self.assertIsNone(canvas._raw_value_left(rescue, blocks, title))
+
+    # Seges: test añadido en 3.1.973 (D11). Ver docs/pendiente/parches_pns_ai.md
+    def test_quoted_values_in_server_table(self):
+        """La tabla del servidor escribe la comilla como &quot; y se reconoce: sin rescate."""
+        design = _p29_design('var n = 1;')
+        for label, rows in (
+            ('filas escalares', ['Seges "P29" uno', 'Seges P29 dos']),
+            ('filas con columnas', [
+                {'id': 1, 'name': 'Seges "P29" uno'}, {'id': 2, 'name': 'Seges P29 dos'},
+            ]),
+        ):
+            with self.subTest(label):
+                out = canvas.place_rows_on_page(design, rows, captured=True)
+                self._assert_no_breakout(out)
+                self.assertIn(P29_MARK, out)
+                self.assertIn('Seges &quot;P29&quot; uno', out)
+                self.assertIn('pns-page-rows-visible', out)
+
+    def test_design_rule_text_content(self):
+        rule = 'Put every value from DATA and TITLE on the page with textContent'
+        for prompt in (canvas._PAGE_RULES, canvas.DESIGN_SYSTEM, canvas.EDIT_SYSTEM):
+            self.assertIn(rule, prompt)
+            self.assertIn('Never insert them with innerHTML', prompt)
