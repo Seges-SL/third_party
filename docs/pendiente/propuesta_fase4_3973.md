@@ -1246,5 +1246,7 @@ Además:
     escritura pendiente. «(2) inocente» y «dos pasos, inocente» pasan en todas.
   - Los subtests salen en el log como `FAIL: Subtest <Clase>.<test> [etiqueta]` o `(clave=…)`. Se confirman con el total
     del runner y con un grep de nombres.
-- **Laboratorio:** pendiente: automatizado y sin LLM (D10); los casos con el modelo real, con P-13 del 34. La autoprueba de
-  `lab_cdp.py` pasó el 16/11/2026 (12 PASA, código 0).
+- **Laboratorio:** hecho (16/11/2026): automatizado y sin LLM (D10), sin incidencias en `canvas/4`, `canvas/8` y la
+  descarga de la 8 (código 0; C solo con `?` y `lab_pns_ai_3973_14`); fila del 16/11/2026 en el «Registro de
+  laboratorios» de [lab_procedimiento_3973.md](lab_procedimiento_3973.md). Los casos con el modelo real, con P-13 del 34.
+  La autoprueba de `lab_cdp.py` pasó el 16/11/2026 (12 PASA, código 0).

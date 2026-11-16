@@ -259,7 +259,7 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
 | 26 | M2 | seguridad | `pns_ai_chatboo/models/chatboo_session.py`, `pns_ai_chatboo/models/chatboo_canvas.py` | 2b | Aplicado (11/11/2026) |
 | 27 | F1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py` (`controllers/chatboo.py` sin cambios: la cabecera del fabricante se mantiene) | 4 | Aplicado (13/11/2026): a, a′, b y c, sin d; validado en el laboratorio (13/11/2026) |
 | 28 | D1 | seguridad | `pns_ai_chatboo/models/chatboo_canvas_page.py`, `pns_ai_chatboo/security/security.xml` | 2b | Aplicado (11/11/2026): sin la parte de `owner_id` |
-| 29 | F1 (P-8e a) | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_session.py` | 4 | Aplicado (16/11/2026); laboratorio pendiente |
+| 29 | F1 (P-8e a) | seguridad | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_session.py` | 4 | Aplicado (16/11/2026); laboratorio hecho (16/11/2026) |
 | 30 | M11 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
 | 31 | M12 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
 | 32 | PNS-97 | seguridad | `pns_ai_mcp/models/ai_trusted_action.py` | 2a | Aplicado (11/11/2026) |
@@ -5063,10 +5063,12 @@ Comprobación previa de la CSP, propuesta, decisiones de Sergio (D1 a D5), bater
     de un turno; afectaría a la disponibilidad (espera o 40001), no a la seguridad del 29.
 - **Riesgos residuales:** los de la 3879 (registro, «Parche 29»), con lo que cambia en 3.1.973 según la tabla del punto 7
   de la propuesta.
-- **Laboratorio:** pendiente: automatizado y sin LLM (D10); los casos con el modelo real, con P-13 del 34.
+- **Laboratorio:** hecho (16/11/2026): automatizado y sin LLM (D10), sin incidencias en `canvas/4`, `canvas/8` y la
+  descarga de la 8 (código 0; C solo con `?` y `lab_pns_ai_3973_14`); fila del 16/11/2026 en el «Registro de
+  laboratorios» de [lab_procedimiento_3973.md](lab_procedimiento_3973.md). Los casos con el modelo real, con P-13 del 34.
   - La autoprueba de `lab_cdp.py` (`~/pns_ai_3973/fase4/lab/`) pasó el 16/11/2026 en el equipo (12 PASA, código 0), antes
     del primer uso con Odoo.
-- **Estado:** aplicado (16/11/2026); laboratorio pendiente.
+- **Estado:** aplicado (16/11/2026); laboratorio hecho (16/11/2026).
 
 ### Para el informe al fabricante (fase 4)
 

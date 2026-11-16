@@ -325,7 +325,9 @@ Orden:
     - batería: 557 tests, 1 F (`test_paap_i7`), 0 E y 6 saltados; 12 neutralizaciones con SHA-256 igual;
     - D14: 0 diseños con DATA ilegible en `lab_pns_ai_3973_14`;
     - `test_edit_page_without_data`, adaptado por el parche 38 (solo vale en modo test);
-    - laboratorio pendiente: automatizado y sin LLM (D10); los casos con el modelo real, con P-13 del 34.
+    - laboratorio hecho (16/11/2026): automatizado y sin LLM (D10), sin incidencias (fila del 16/11/2026 en el
+      «Registro de laboratorios» de [lab_procedimiento_3973.md](lab_procedimiento_3973.md)); los casos con el modelo
+      real, con P-13 del 34.
 - **34:** `log_no_page` (`:587-616`); `_process` y `_save_to_session` (`chatboo_async_request.py:149-162,
   1184-1410`), con la opción A y F1. P-13 en la interfaz.
   - **Condiciones nuevas (16/11/2026):**
