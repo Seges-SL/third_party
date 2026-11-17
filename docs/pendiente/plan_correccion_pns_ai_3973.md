@@ -489,10 +489,129 @@ Orden:
        los crons siguen rotos; corrección a mano;
      - (c) instalación limpia (`lab_pns_ai_3973_14`): crons bien y el script no los toca.
 
-     `lab_pns_ai_3973_14` solo cubre (c); (a) y (b) usan `~/pns_ai_3973/fase0/modulos_3879`;
+     `lab_pns_ai_3973_14` solo cubre (c); (a) y (b) usan `~/pns_ai_3973/fase0/modulos_3879`.
+
+     **P-2 se hace en el laboratorio, no en el VPS.** La corrección a mano solo es del caso (b) y de su BD de
+     laboratorio (`lab_p2b_879_14`). En el staging (`pns_demo`, desde 3.1.879) y en LIYBEN (desde 3.1.782), el `-u`
+     cruza 3.1.973 y los dos crons los corrige el parche 35 («Tras el `-u` (staging y LIYBEN)», abajo).
+     Orden de la corrección a mano (decisión de Sergio del 17/11/2026; contexto `lab_pns_ai_3973`, web parado; muestra
+     el code y pide «s/N»; escribe con `commit` exactamente `model._gc_expired()` por `cron.write`, como
+     `migrations/14.0.3.1.973/post-migrate.py:18-19` y `:35-42`, y solo donde el code es `model.gc_expired()`):
+
+     ```bash
+     bash ~/pns_ai_3973/fase4/lab/rama_corregir_p2b.sh --bd lab_p2b_879_14
+     ```
    - P-11;
    - `_require_settings` (con y sin el 32);
-   - reintento de la tarjeta (manual).
+   - reintento de la tarjeta (con CDP desde el 17/11/2026: D47, abajo).
+   - **Guía:** [lab_3973/guia_rama.md](lab_3973/guia_rama.md), con los bloques 0, 3, 1, 2 y 4, «Al acabar» y la
+     limpieza final.
+
+   **Preparación de las pruebas con toda la rama (17/11/2026; decisiones D41 a D47 de Sergio).** Scripts y guía
+   preparados, sin ejecutar ningún laboratorio. Están en [lab_3973/](lab_3973/), con sus SHA-256 en la guía.
+   - **D41 (carpetas):** `COMPARTIDOS=""` y `DOCKERFILE="infra/Dockerfile.14"` (copia del de `lab_pns_ai_3973`,
+     `cfc58aed…c348`). 3.1.879 sale de `~/pns_ai_3973/fase0/modulos_3879` (711 archivos, SHA-256 contra
+     `sha256_copias.tsv`). La base limpia 3.1.973 es el `git archive` del commit de la 1b (`33ca68c`, «base 3.1.973 del
+     fabricante»): solo `pns_base`, `pns_ai_mcp` y `pns_ai_chatboo`, 657 archivos, permisos 644/755. Todo `-u` a la rama
+     se lanza desde `lab_pns_ai_3973` con `--bd` y `-u pns_base,pns_ai_mcp,pns_ai_chatboo` (D38).
+     Respuesta al paso 0 (17/11/2026): 3.1.879 se instala en las dos BD desde `lab_pns_ai_879`, y el primer `-u` del
+     caso (b), a la base limpia, desde `lab_pns_ai_973f`. La guía comprueba el contexto, en solo lectura, antes de cada
+     `-u`; cada `-u` va con el web parado y su `actualizar-*.log` (línea «==> actualizar en `<bd>` (log: …)») es el
+     `--log` de `rama_comprobar.sh`.
+   - **D42 (BD y carpetas):** `lab_p2a_879_14` (bloque 1) y `lab_p2b_879_14` (bloque 2); carpetas
+     `~/GitHub/lab_pns_ai_879` y `~/GitHub/lab_pns_ai_973f` (`git init` y `CLAUDE.md` con «Versión de Odoo: 14.0»,
+     MANUAL 6.7), creadas por `rama_carpetas.sh`. Se aceptan los datos de demostración (el kit no pasa
+     `--without-demo`).
+     Versiones esperadas antes del `-u` (`rama_plantar.sh`): `pns_base` `14.0.1.2.47`, `pns_ai_mcp` `14.0.3.1.879` y
+     `pns_ai_chatboo` `14.0.2.1.538`. Salen de `modulos_3879/pns_base/__manifest__.py:8`,
+     `pns_ai_mcp/__manifest__.py:8` y `pns_ai_chatboo/__manifest__.py:7` (`1.2.47`, `3.1.879` y `2.1.538`; Odoo antepone
+     `14.0.`).
+   - **D43 (siguiente pasada de P-2):** `method_direct_trigger()` de los dos crons (escribe) y `ValueError` de
+     `safe_eval` en la salida, esperado 0 (`rama_crons.sh`).
+     **Control negativo** (revisión del 17/11/2026; bloque 2, entre los puntos 8 y 9 de la guía): `rama_crons.sh --bd
+     lab_p2b_879_14` antes de la corrección a mano. Esperado: código 1, «RAMA CRONS sin error 0 de 2», `ValueError` 2 o
+     más (`safe_eval` envuelve el `AttributeError` en `ValueError`, `odoo/tools/safe_eval.py:346-347` de la imagen) y
+     nada escrito. Dos motivos: `method_direct_trigger` solo escribe `lastcall` después de `run()`
+     (`odoo/addons/base/models/ir_cron.py:83-84`), y cada cron va en su `savepoint`, que deshace lo que hubiera hecho la
+     acción.
+   - **D44:** `lab_auto.sh` y `lab_cdp.py` aceptan `--lab <carpeta>` y `--bd <bd>`; por defecto, `lab_pns_ai_3973` y
+     `lab_pns_ai_3973_14`. La C espera la BD indicada. `prueba_lab_auto.sh`: 49 PASA (antes 32).
+   - **D45 (P-11, tests por lectura):** ningún test de Seges crea un AI Administrator y espera que no tenga AI
+     Conversational. Las dos únicas menciones a `group_ai_conversational` en los tests de Seges dan ese grupo a usuarios
+     que no son AI Administrator (`pns_ai_mcp/tests/test_seges_sandbox_credentials.py:323` y
+     `test_seges_review_views.py:46`). Ningún test de Seges cambia de resultado por la implicación de §6.2. La línea base
+     (580 tests, 1 F en `test_paap_i7`) ya se midió con ella.
+   - **D46 (`_require_settings`):** `rama_require_settings.sh` (con `--sin-32` para la pasada con N32, SHA-256 antes y
+     después). Sin commit y con cada caso en un savepoint deshecho. No pasa por `_resolve_execute`, que hace commit
+     (`safe_operation.py:948` y `:957`): ejecuta como el servidor (`:1441-1445` y `:1477-1486`) con `execute_safe_plan`.
+     Por lectura: la propuesta de `field_required` de un AI Administrator sin Ajustes ya la rechaza la validación
+     (`safe_plan_validate.py:198-202`). El script lo informa y crea la operación igualmente, para probar la barrera al
+     ejecutar.
+     Revisión del 17/11/2026: `execute_safe_plan` no captura errores (los lanza) y, si va bien, devuelve la lista
+     `results` (`safe_plan_execute.py:60-242`). «ok» exige el valor de éxito (`ok` en el dict de la fila, `:122-133` y
+     `:146-148`) y el efecto, mirado dentro del savepoint:
+     - vista: `comment` readonly en la arquitectura de la vista de prueba;
+     - campo: `required` del campo en el registro (`ai_system_action.py:410-412`). En un campo de módulo,
+       `ir.model.fields` no se persiste (`ir_model.py:924-927` de la imagen; nota en `ai_system_action.py:408`).
+
+     Un error devuelto se clasifica como la excepción.
+   - **D47 (reintento de la tarjeta):** `tarjeta_plantar.sh` (solo la operación, de `seges_int`, sin sesión: la tarjeta
+     la pinta el panel con las operaciones pendientes, `chatboo_systray.js:409-411` →
+     `chatboo_component_v2.js:2162-2188`), escenario `lab_auto.sh … --escenario tarjeta` y `tarjeta_borrar.sh`.
+     El escenario comprueba antes, por SQL, que la operación sigue pendiente y sin caducar
+     (`pns_ai_mcp/constants.py:7`, 15 min). Si no, para sin pulsar nada. Se lanza antes de 15 min desde el plantado.
+     - **Clic forzado** (decisión de Sergio del 17/11/2026): el botón «Confirmar» de una tarjeta `high` está
+       deshabilitado 5 s desde que se pinta (`chatboo_component_v2.js:2373-2393`). El escenario solo quita `disabled`
+       al botón y lanza el clic sobre él. Una persona no puede seguir ese camino.
+     - **Esperado** (corregido tras el paso 0): rechazo `too_soon`; ningún `/verification/pending` sin `peek` tras el
+       clic; confirmación sola unos 5,5 s después del rechazo y con el mismo token (`chatboo_component_v2.js:2275-2281`);
+       la operación ejecutada (SQL de solo lectura).
+       En el log, el ERROR «bad query» sobre `ai_safe_operation` y «SERIALIZATION_FAILURE, retry 1/5» (anexo de PNS-26)
+       no son fallo; «retry 2/5» o «maximum number of tries reached», sí.
+     - **Matiz de lectura:** tras cada respuesta de `/confirm`, la bandeja pide `/verification/pending` con `peek: true`
+       (`chatboo_component_v2.js:2426` → `:3410-3419` → `chatboo_systray.js:67-73` y `:262-268`). No genera token. El
+       escenario la cuenta como informativa; solo es fallo una petición sin `peek`.
+   - **Parche 39 en el laboratorio (bloque 3):** `p39_lab.sh` (sin commit; antes, SQL de que `sms` e `iap` están
+     instalados). Llama a la herramienta `relaxaicode` real como `seges_int`, con `tool_relaxaicode`
+     (`tools_relaxaicode.py:104-107`) y `_StubController` (`tests/seges_common.py:15-43`). Casos:
+     `iap.account.get('seges_lab39')`, `get_credits_url('seges_lab39')`, `f = get_config_account_url` y `f()`, y
+     `sms.resend.new({}).action_buy_credits()`: los cuatro con `"isError": true` o la respuesta de
+     `_read_only_response()` (`relaxaicode_prepare.py:400-416`, `requires_write`; `tools_relaxaicode.py:159-172`).
+     Control: `result = {'a': {'k': 1}.get('k'), 'n': env['iap.account'].search_count([])}`, sin error. Antes y
+     después, `count(*)` y `max(id)` de `iap_account` desde un cursor aparte, de solo lectura, sin cambios.
+     Revisión del 17/11/2026: el script distingue por qué se rechaza, sin imprimir el texto.
+     - **Bloqueado por el 39:** `isError` con el marcador «Method '<nombre>' writes outside RelaxAICode's rollback» de
+       `_seges_check_model_method` (`context_builder.py:309-327`, llamado desde `_read_attr`, `:330-334`; devuelto como
+       «Error executing code: …», `relaxaicode_failures.py:194-199`). Es lo previsto para `get` y para
+       `f = get_config_account_url; f()`.
+     - **`requires_write`:** el AST ve una llamada cuyo nombre está en la lista global (`validators_checks.py:464-484`;
+       nombres del 39 en `validators_base.py:304-314`). Es lo previsto para `get_credits_url` y `action_buy_credits`.
+     - **Otro error, o una clase distinta de la prevista:** FALLO.
+     - **Una excepción de la herramienta:** no es un rechazo. El resultado es NO CONCLUYENTE (código 8).
+   - **Caminos reales hacia `too_soon`** (pregunta de Sergio, solo por lectura; no van en el escenario, se decide
+     después):
+     - **Con la tarjeta pintada por `/verification/pending`, no hay ninguno.** El servidor cuenta los 5 s desde
+       `confirm_token_at` (`safe_operation.py:564-596`) y la tarjeta los cuenta desde que se pinta, después de recibir
+       el token. El botón se habilita 5 s después del pintado (`chatboo_component_v2.js:2373-2393`). Además,
+       `fields.Datetime.now()` quita los microsegundos (`odoo/fields.py:1868-1874` de la imagen), lo que hace la espera
+       del servidor más corta, no más larga.
+     - **Tras `bad_token` o `missing_token`:** `_retryRefusedCard` pide un token nuevo (`:2284`) y espera 5,5 s antes de
+       confirmar (`:2276`, `:2302`). No llega a `too_soon`. Si el segundo intento también falla, vuelve a habilitar el
+       botón sin token nuevo (`:2266-2271`).
+     - **Dos operaciones:** el reintento de una pasa `held` con todas las tarjetas pintadas menos ella (`:2190-2200`),
+       así que no cambia el token de las otras.
+     - **Dos pestañas:** la otra pestaña genera un token nuevo para la operación (su `held` no la incluye). La pestaña
+       con el token antiguo recibe `bad_token`, no `too_soon`. La tarjeta nueva de la otra pestaña empieza con su
+       propia cuenta atrás.
+     - **Camino real posible: tarjeta pintada sin token.** La tarjeta del SSE va sin token si `_mint_card_token` no lo
+       genera (`engine_tool_run.py:541-563`: la operación aún no se ve en su cursor, otro usuario o un error; también en
+       `agent_engine.py:1769-1778`). Una tarjeta sin token no entra en `held` (`chatboo_component_v2.js:2190-2200`). Si
+       el panel se vuelve a abrir (`chatboo_systray.js:409-411`), la restauración genera un token y se lo pone a la
+       tarjeta ya pintada sin volver a deshabilitar el botón (`chatboo_component_v2.js:2311-2316`). Un clic en los 5 s
+       siguientes da `too_soon`.
+     - **Carrera posible:** una restauración en vuelo mientras llega la tarjeta del SSE. Su `held` se calculó antes del
+       pintado y renueva el token de esa tarjeta, con la cuenta atrás ya en marcha (`:2311-2316`). El margen es el
+       retraso entre el pintado del SSE y la respuesta de `/verification/pending`.
 5. P-15: `-u` completo sobre una copia de `pns_demo` que carga Sergio.
    - **Añadido el 13/11/2026 (fase 4, parche 27):** A7 en solo lectura sobre la copia de `pns_demo`. Es el script
      `~/pns_ai_3973/fase4/csp/a7_recuentos.py`, que cuenta diseños por patrón, sin contenido ni ID (ver
