@@ -25,8 +25,24 @@ Solo biblioteca estándar: sin Node, sin websocket-client, sin instalar nada.
                marcar «Design» en una segunda ventana (cookies aparte), y
                comprueba cada paso con SQL de solo lectura. Con --visible,
                Chrome se ve (perfil temporal igualmente).
-  sqlprueba    Las consultas del escenario p34 contra la BD real, en solo
-               lectura (con db en marcha), para validarlas antes del laboratorio.
+               Con --escenario tarjeta (D47, 17/11/2026), tras la C: comprueba
+               por SQL que la operación plantada por tarjeta_plantar.sh sigue
+               pendiente y sin caducar, abre el panel de Chatboo (pinta la
+               tarjeta), quita «disabled» al botón Confirmar y lo pulsa antes
+               de los 5 s (camino FORZADO: una persona no puede, el botón está
+               deshabilitado durante la cuenta atrás) y mide por CDP (Network)
+               el rechazo too_soon, que no hay /verification/pending sin peek
+               tras el clic, la confirmación sola unos 5,5 s después con el
+               mismo token, el /execute y, por SQL, la operación ejecutada.
+               En el log del servidor cuenta las líneas del anexo de PNS-26.
+  sqlprueba    Las consultas del escenario p34 (o, con --escenario tarjeta,
+               las del escenario tarjeta) contra la BD real, en solo lectura
+               (con db en marcha), para validarlas antes del laboratorio.
+
+--lab <carpeta> y --bd <bd> (D44, 17/11/2026) en c, rutas, navegar y
+sqlprueba: carpeta de ~/GitHub desde la que se lee el log y BD esperada (login,
+sesión, C, guardas de rutas y SQL). Por defecto, lab_pns_ai_3973 y
+lab_pns_ai_3973_14.
   autoprueba   Lo mismo contra un servidor simulado en 127.0.0.1 (sin Odoo),
                con resultados esperados. Sirve para validar el script en el equipo.
                Con --js <carpeta static/src/js de pns_ai_chatboo>, también pasa
@@ -46,8 +62,11 @@ Códigos de salida (los mismos que lab_auto.sh; un código por causa):
    7  C sin líneas de Odoo (log vacío o que no es del servidor)
    8  no concluyente: --pintado no encuentra el formateador del cliente, o
       un paso del escenario p34 no prueba nada (error del proveedor, turno
-      sin fin o un desenlace del modelo que no pasa por el parche)
-   9  escenario p34: una condición o un paso manual no confirmado por SQL
+      sin fin o un desenlace del modelo que no pasa por el parche), o en el
+      escenario tarjeta el chat no se abre o la tarjeta no se pinta
+   9  escenario p34: una condición o un paso manual no confirmado por SQL;
+      escenario tarjeta: la operación plantada no está lista (no pendiente,
+      caducada, de otro usuario…) o el SQL no se pudo hacer
   11  faltan LAB_LOGIN o LAB_PASSWORD
   12  argumentos o rutas no válidos
   20  error interno de este script (traceback en la salida de errores)
@@ -57,6 +76,7 @@ import argparse
 import base64
 import collections
 import fcntl
+import hashlib
 import html
 import io
 import json
@@ -383,6 +403,9 @@ class Chrome:
         self.admin = None          # destino de la segunda ventana (escenario p34)
         self.admin_ctx = None
         self.admin_sesiones = set()
+        # Escenario tarjeta (D47): peticiones de la página a /pns_ai_mcp/verification/*
+        # (fetch y XHR), en orden. None: no se registra nada.
+        self.red = None
         self.detalle = open(os.path.join(salida, 'detalle.txt'), 'a', encoding='utf-8')
 
     # -- transporte --------------------------------------------------------
@@ -489,6 +512,21 @@ class Chrome:
             self._anotar('bloqueadas_por_guardia')
             self._enviar('Fetch.failRequest',
                          {'requestId': p['requestId'], 'errorReason': 'BlockedByClient'}, s)
+        elif metodo == 'Network.requestWillBeSent' and self.red is not None and s == self.pagina:
+            req = p.get('request') or {}
+            reg = peticion_verificacion(req.get('url', ''), req.get('postData'), p.get('timestamp'))
+            if reg is not None:
+                reg['id'] = p.get('requestId')
+                self.red.append(reg)
+        elif metodo == 'Network.responseReceived' and self.red is not None and s == self.pagina:
+            for reg in self.red:
+                if reg.get('id') == p.get('requestId') and reg['t_resp'] is None:
+                    reg['t_resp'] = p.get('timestamp')
+                    reg['http'] = (p.get('response') or {}).get('status')
+        elif metodo == 'Network.loadingFinished' and self.red is not None and s == self.pagina:
+            for reg in self.red:
+                if reg.get('id') == p.get('requestId'):
+                    reg['terminada'] = True
         elif metodo == 'Log.entryAdded':
             e = p.get('entry', {})
             r = RE_REFUSED.search(e.get('text', ''))
@@ -772,6 +810,32 @@ MOTIVOS_FIJOS = (
 PSQL = ['docker', 'exec', '-i', '-e', 'PGOPTIONS=-c default_transaction_read_only=on',
         'odoo-dev-14-db-1', 'psql', '-X', '-q', '-U', 'odoo', '-d', BD,
         '-v', 'ON_ERROR_STOP=1', '-At', '-F', '|']
+
+# --lab y --bd (D44, 17/11/2026). Sin ellas, lo de siempre.
+LAB_POR_DEFECTO = 'lab_pns_ai_3973'
+BD_POR_DEFECTO = 'lab_pns_ai_3973_14'
+RE_NOMBRE_LAB = re.compile(r'^[A-Za-z0-9_][A-Za-z0-9_.-]*$')
+RE_NOMBRE_BD = re.compile(r'^[a-z0-9_]+$')
+
+
+def configurar(lab=None, bd=None):
+    """Carpeta del laboratorio (en ~/GitHub) y BD esperada. Devuelve un error o None.
+
+    Cambia BD, LAB, PERMITIDAS y la BD de PSQL: lo usan la C, el login, la
+    comprobación de la sesión, las guardas de las rutas y el SQL.
+    """
+    global BD, LAB, PERMITIDAS, PSQL
+    lab = LAB_POR_DEFECTO if lab is None else lab
+    bd = BD_POR_DEFECTO if bd is None else bd
+    if not RE_NOMBRE_LAB.match(lab) or '..' in lab:
+        return '--lab no válido (solo el nombre de una carpeta de ~/GitHub): %r' % lab
+    if not RE_NOMBRE_BD.match(bd):
+        return '--bd no válida (minúsculas, cifras y _): %r' % bd
+    BD = bd
+    LAB = os.path.join(os.path.expanduser('~/GitHub'), lab)
+    PERMITIDAS = {'?', BD}
+    PSQL = PSQL[:PSQL.index('-d') + 1] + [BD] + PSQL[PSQL.index('-d') + 2:]
+    return None
 RE_MARCA_TIEMPO = re.compile(r'^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$')
 RE_COLUMNA = re.compile(r'^[a-z_][a-z0-9_]*$')
 HOSTIL_SQL = "'</script><script>alert'"
@@ -1550,6 +1614,390 @@ def escenario_p34(ch, base, salida, uid, consultas, pausa, repetir, espera_turno
     return e.codigo()
 
 
+# --------------------------------------------------------------------------
+# Escenario tarjeta (D47, 17/11/2026): reintento tras un rechazo too_soon
+# --------------------------------------------------------------------------
+# Lo que mide (lectura de código, rama 14.0-pns-ai-3973):
+# - la tarjeta se pinta al abrir el panel: chatboo_systray.js:409-411 →
+#   _restorePendingVerifications (chatboo_component_v2.js:2162-2188) →
+#   /verification/pending sin peek, que genera el token y empieza los 5 s del
+#   servidor (verification_ui.py:142-152; safe_operation.py:564-596 y :2076-2097);
+# - una tarjeta high deja Confirmar deshabilitado 5 s desde que se pinta
+#   (chatboo_component_v2.js:2373-2393): el clic antes de 5 s es FORZADO (se
+#   quita «disabled» y se lanza click() sobre el botón; pasa por el manejador
+#   normal, :2494). Una persona no puede hacerlo;
+# - con too_soon, _retryRefusedCard (chatboo_component_v2.js:2275-2281) solo
+#   espera 5,5 s y vuelve a confirmar con el mismo token: sin
+#   /verification/pending. Las peticiones con peek de la bandeja
+#   (:2426 → :3410-3419 → chatboo_systray.js:67-73 y :262-268) solo cuentan y no
+#   generan token: se informan, no son fallo;
+# - Confirmar encadena /confirm y /execute (:2453-2463).
+# Nunca se imprime ni se guarda un token: solo su SHA-256, en memoria, para
+# comparar.
+TOOL_TARJETA = 'seges_lab47'
+CONTACTO_TARJETA = 'Seges P47 contacto de prueba'
+COMENTARIO_TARJETA = 'Seges P47 reintento'
+RUTA_VERIF = '/pns_ai_mcp/verification/'
+ESPERA_TARJETA = 30       # segundos para que la tarjeta se pinte con token
+ESPERA_FIN_TARJETA = 30   # segundos para el /execute tras el clic
+ASIENTO_TARJETA = 3       # segundos tras el /execute para ver lo que llega después
+MARGEN_TARJETA = 60       # segundos mínimos antes de que caduque la operación
+REINTENTO_MIN, REINTENTO_MAX = 5.4, 7.0  # previsto: unos 5,5 s tras el rechazo
+ERRORES_TARJETA = ('too_soon', 'bad_token', 'missing_token', 'busy', 'not_found',
+                   'forbidden', 'missing_id', 'not_pending')
+TARJETA_ESTADO_JS = r"""(() => {
+  const c = document.getElementById('pns_verif_' + %s);
+  if (!c) return {existe: false};
+  const b = Array.from(c.querySelectorAll('button'))
+    .find(x => /^Confirm/.test((x.textContent || '').trim()));
+  return {existe: true, token: !!c.dataset.confirmToken, boton: !!b, deshabilitado: !!(b && b.disabled)};
+})()"""
+# Solo quita «disabled» al botón Confirmar y lanza el clic (decisión de Sergio,
+# 17/11/2026): nada de funciones internas, del token ni de los tiempos.
+TARJETA_CLIC_JS = r"""(() => {
+  const c = document.getElementById('pns_verif_' + %s);
+  if (!c) return {clic: false, motivo: 'sin-tarjeta'};
+  const b = Array.from(c.querySelectorAll('button'))
+    .find(x => /^Confirm/.test((x.textContent || '').trim()));
+  if (!b) return {clic: false, motivo: 'sin-boton'};
+  const antes = b.disabled, cuenta = /\(\d+s\)/.test(b.textContent || '');
+  b.disabled = false;
+  b.click();
+  return {clic: true, deshabilitado: antes, cuenta: cuenta};
+})()"""
+
+
+def _huella(token):
+    return hashlib.sha256(token.encode('utf-8')).hexdigest() if token else ''
+
+
+def peticion_verificacion(url, post, t):
+    """Lo que se guarda de una petición a /pns_ai_mcp/verification/*, o None.
+
+    Ruta, hora (reloj de CDP), si es peek y la huella del token enviado.
+    """
+    ruta = urllib.parse.urlsplit(url or '').path
+    if not ruta.startswith(RUTA_VERIF):
+        return None
+    try:
+        params = (json.loads(post or '{}') or {}).get('params') or {}
+    except (ValueError, AttributeError):
+        params = {}
+    if not isinstance(params, dict):
+        params = {}
+    token = params.get('confirm_token')
+    return {'ruta': ruta[len(RUTA_VERIF):], 't': t, 'peek': bool(params.get('peek')),
+            'huella': _huella(token if isinstance(token, str) else ''), 't_resp': None,
+            'terminada': False, 'http': None, 'leida': False, 'success': None, 'error': '',
+            'status': '', 'items': None, 'huella_vid': ''}
+
+
+def resumen_respuesta(reg, texto, vid):
+    """Anota en reg lo que interesa de la respuesta JSON-RPC (sin guardar el texto)."""
+    reg['leida'] = True
+    try:
+        j = json.loads(texto)
+    except ValueError:
+        reg['error'] = 'respuesta ilegible'
+        return
+    if not isinstance(j, dict) or j.get('error'):
+        reg['error'] = 'error RPC'
+        return
+    res = j.get('result') or {}
+    if not isinstance(res, dict):
+        return
+    reg['success'] = res.get('success')
+    err = res.get('error') or ''
+    reg['error'] = err if err in ERRORES_TARJETA or not err else 'otro'
+    reg['status'] = res.get('status') if res.get('status') in (
+        'pending', 'confirmed', 'executed', 'cancelled', 'expired') else ''
+    items = res.get('items')
+    if isinstance(items, list):
+        reg['items'] = len(items)
+        for item in items:
+            if isinstance(item, dict) and item.get('verification_id') == vid:
+                tok = item.get('confirm_token')
+                reg['huella_vid'] = _huella(tok if isinstance(tok, str) else '')
+
+
+def leer_cuerpo(ch, reg, vid):
+    if reg['ruta'] not in ('pending', 'confirm', 'execute') or not reg.get('terminada'):
+        return
+    try:
+        r = ch.llamar('Network.getResponseBody', {'requestId': reg['id']}, ch.pagina)
+    except ErrorCDP:
+        reg['error'] = 'cuerpo no disponible'
+        return
+    texto = r.get('body') or ''
+    if r.get('base64Encoded'):
+        texto = base64.b64decode(texto).decode('utf-8', 'replace')
+    resumen_respuesta(reg, texto, vid)
+
+
+def motivo_tarjeta_no_lista(ops, uid):
+    """Por qué no se puede lanzar el escenario (None si se puede). Solo lectura."""
+    if len(ops) != 1:
+        return ('hay %d operaciones %s (se espera 1): tarjeta_borrar.sh y tarjeta_plantar.sh'
+                % (len(ops), TOOL_TARJETA))
+    op = ops[0]
+    if op['status'] != 'pending' or op['executed']:
+        return 'la operación no está pendiente (estado %s)' % (op['status'] or '?')
+    if op['danger'] != 'high':
+        return 'la operación no es high'
+    if op['uid'] != uid:
+        return 'la operación no es del usuario de la sesión (uid %s)' % uid
+    if not op['vigente']:
+        return ('la operación ha caducado (15 min, pns_ai_mcp/constants.py:7): '
+                'tarjeta_borrar.sh y otra vez tarjeta_plantar.sh')
+    if op['restante'] < MARGEN_TARJETA:
+        return 'la operación caduca en menos de %d s: bórrala y vuelve a plantarla' % MARGEN_TARJETA
+    return None
+
+
+def analizar_tarjeta(registro, n_clic):
+    """(líneas, incidencias) de las peticiones a /verification/* antes y después del clic."""
+    lineas, incid = [], []
+    antes, despues = registro[:n_clic], registro[n_clic:]
+    pinta = [r for r in antes if r['ruta'] == 'pending' and not r['peek'] and r['huella_vid']]
+    huella = pinta[-1]['huella_vid'] if pinta else ''
+    t_pinta = pinta[-1]['t_resp'] if pinta else None
+    lineas.append('tarjeta pintada por /verification/pending (con token): %s' % _si(pinta))
+    if not pinta:
+        incid.append('la tarjeta no salió de /verification/pending')
+    conf = [r for r in despues if r['ruta'] == 'confirm']
+    pend = [r for r in despues if r['ruta'] == 'pending' and not r['peek']]
+    peek = [r for r in despues if r['ruta'] == 'pending' and r['peek']]
+    ejec = [r for r in despues if r['ruta'] == 'execute']
+    otras = [r for r in despues if r['ruta'] not in ('confirm', 'pending', 'execute')]
+    lineas.append('tras el clic: /confirm %d, /execute %d, /pending sin peek %d, /pending con peek '
+                  '%d (bandeja, informativo), otras %d'
+                  % (len(conf), len(ejec), len(pend), len(peek), len(otras)))
+    if len(conf) != 2:
+        incid.append('se esperaban 2 /confirm y hay %d' % len(conf))
+    if pend:
+        incid.append('%d /verification/pending sin peek tras el clic (se esperaba ninguna)' % len(pend))
+    if otras:
+        incid.append('%d peticiones a otras rutas de /verification' % len(otras))
+    c1 = conf[0] if conf else None
+    if c1:
+        d0 = (c1['t'] - t_pinta) if (c1['t'] is not None and t_pinta is not None) else None
+        lineas.append('primer /confirm: %s, a %s del pintado (forzado: antes de 5 s)' % (
+            c1['error'] or ('éxito' if c1['success'] else 'sin error'),
+            '%.2f s' % d0 if d0 is not None else '?'))
+        if c1['error'] != 'too_soon':
+            incid.append('el primer /confirm no fue too_soon')
+        if d0 is None or d0 >= 5.0:
+            incid.append('el clic no fue antes de 5 s desde el pintado')
+    if len(conf) >= 2:
+        c2 = conf[1]
+        d = (c2['t'] - c1['t_resp']) if (c2['t'] is not None and c1['t_resp'] is not None) else None
+        lineas.append('segundo /confirm: %s, %s después del rechazo (previsto unos 5,5 s)' % (
+            c2['error'] or ('éxito' if c2['success'] is not False else 'fallo'),
+            '%.2f s' % d if d is not None else '?'))
+        if d is None or not REINTENTO_MIN <= d <= REINTENTO_MAX:
+            incid.append('el segundo /confirm no llegó entre %.1f y %.1f s después del rechazo'
+                         % (REINTENTO_MIN, REINTENTO_MAX))
+        if c2['success'] is False or c2['error'] or not c2['leida']:
+            incid.append('el segundo /confirm no confirmó')
+        mismo = bool(huella) and c1['huella'] == huella and c2['huella'] == huella
+        lineas.append('mismo token en los dos /confirm y en la tarjeta pintada: %s' % _si(mismo))
+        if not mismo:
+            incid.append('el token no es el mismo')
+    if len(ejec) != 1:
+        incid.append('se esperaba 1 /execute y hay %d' % len(ejec))
+    else:
+        e = ejec[0]
+        lineas.append('/execute: %s' % (e['status'] or e['error'] or '?'))
+        if e['status'] != 'executed' or e['success'] is False:
+            incid.append('el /execute no dejó la operación ejecutada')
+    return lineas, incid
+
+
+def despues_tarjeta(ops, uid, n_contacto, comentado):
+    """(líneas, incidencias) del SQL de solo lectura tras el clic."""
+    lineas, incid = [], []
+    if len(ops) != 1:
+        return ['SQL después: %d operaciones' % len(ops)], ['SQL: no hay una sola operación']
+    op = ops[0]
+    lineas.append('SQL después: estado %s, ejecutada %s, confirmada por el usuario de la sesión %s; '
+                  'contacto %d, comentario escrito %s' % (
+                      op['status'], _si(op['executed']), _si(op['confirmado_por'] == uid),
+                      n_contacto, _si(comentado)))
+    if op['status'] != 'executed' or not op['executed']:
+        incid.append('SQL: la operación no está ejecutada')
+    if op['confirmado_por'] != uid:
+        incid.append('SQL: no la confirmó el usuario de la sesión')
+    if n_contacto != 1 or not comentado:
+        incid.append('SQL: el comentario del contacto de prueba no está escrito')
+    return lineas, incid
+
+
+RE_LINEA_LOG = re.compile(
+    r'(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d),\d+ \d+ (\S+) (\S+) (\S+): (.*)')
+RE_RETRY_MAS = re.compile(r'SERIALIZATION_FAILURE, retry [2-9]/\d')
+
+
+def contar_tarjeta(texto, desde, bd):
+    """Líneas del anexo de PNS-26 en la BD desde la marca UTC (solo recuentos)."""
+    c = collections.Counter()
+    for linea in texto.splitlines():
+        m = RE_LINEA_LOG.search(linea)
+        if not m or m.group(1) < desde or m.group(3) != bd:
+            continue
+        nivel, logger, msg = m.group(2), m.group(4), m.group(5)
+        if logger == 'odoo.sql_db' and nivel == 'ERROR' and msg.startswith('bad query'):
+            c['bad_query_aso' if 'ai_safe_operation' in msg else 'bad_query_otra'] += 1
+        elif logger == 'odoo.service.model':
+            if 'SERIALIZATION_FAILURE, retry 1/' in msg:
+                c['retry1'] += 1
+            elif RE_RETRY_MAS.search(msg):
+                c['retry_mas'] += 1
+            elif 'maximum number of tries reached' in msg:
+                c['maximo'] += 1
+    return c
+
+
+def tarjeta_log_en_vivo(desde):
+    salida = subprocess.run(
+        ['odoo-dev', '14', 'log', 'all'], cwd=LAB,
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False, timeout=120,
+    ).stdout
+    return contar_tarjeta(salida.decode('utf-8', 'replace'), desde, BD)
+
+
+class ConsultasTarjeta(Consultas):
+    """Consultas del escenario tarjeta. Todas de solo lectura y sin contenidos."""
+
+    def operaciones(self):
+        filas = self.ejecutar(
+            "SELECT id, verification_id, status, executed, coalesce(danger_level, ''), "
+            "coalesce(user_id, 0), coalesce(expires_at > (now() AT TIME ZONE 'UTC'), false), "
+            "coalesce(round(extract(epoch FROM expires_at - (now() AT TIME ZONE 'UTC')))::int, 0), "
+            "coalesce(confirmed_by_uid, 0) "
+            "FROM ai_safe_operation WHERE tool_name = '%s' ORDER BY id;" % TOOL_TARJETA)
+        ops = []
+        for f in filas:
+            if len(f) != 9:
+                raise ErrorSQL('fila de ai_safe_operation con %d campos' % len(f))
+            ops.append({'id': int(f[0]), 'vid': f[1], 'status': f[2], 'executed': _t(f[3]),
+                        'danger': f[4], 'uid': int(f[5]), 'vigente': _t(f[6]),
+                        'restante': int(f[7]), 'confirmado_por': int(f[8])})
+        return ops
+
+    def comentario(self):
+        f = self.una(
+            "SELECT count(*), coalesce(bool_and(comment = '%s'), false) FROM res_partner "
+            "WHERE name = '%s';" % (COMENTARIO_TARJETA, CONTACTO_TARJETA), 2)
+        return int(f[0]), _t(f[1])
+
+
+def escenario_tarjeta(ch, base, salida, uid, consultas, log_func=None):
+    """Devuelve (incidencias, no confirmado, no concluyente)."""
+    log_func = log_func or tarjeta_log_en_vivo
+    print('\n== escenario tarjeta (D47): rechazo too_soon y reintento; clic FORZADO antes de 5 s')
+    try:
+        ops = consultas.operaciones()
+    except ErrorSQL as e:
+        print('  ABORTADO: SQL de la operación plantada: %s' % e)
+        return [], True, False
+    motivo = motivo_tarjeta_no_lista(ops, uid)
+    if motivo:
+        print('  NO se pulsa nada: %s' % motivo)
+        return [], True, False
+    op = ops[0]
+    print('  SQL antes: operación %d pendiente, high, del uid %d, sin ejecutar; caduca en %d s'
+          % (op['id'], op['uid'], op['restante']))
+    desde = consultas.ahora()
+    vid_js = json.dumps(op['vid'])
+    incid = []
+    registro, n_clic, fin_ok = [], 0, False
+    ch.red = []
+    try:
+        ch.llamar('Network.enable', {}, ch.pagina)
+        ch.nueva_medida('tarjeta')
+        err = ch.ir(base + '/web')
+        if err:
+            print('  /web no carga: %s' % err)
+            return [('tarjeta', 'carga de /web')], False, False
+        abierto = ch.evaluar(CHAT_ABRIR_JS % {
+            'espera': ESPERA_CHAT, 'relanzar': RELANZAR_MS, 'sin_bandeja': SIN_BANDEJA_MS},
+            promesa=True, espera=ESPERA_CHAT + 30)
+        if abierto != 'ok':
+            print('  NO CONCLUYENTE: el chat no se abre (%s)' % abierto)
+            return [], False, True
+        if not ch.esperar(lambda: (ch.evaluar(TARJETA_ESTADO_JS % vid_js) or {}).get('token'),
+                          ESPERA_TARJETA):
+            print('  NO CONCLUYENTE: la tarjeta no se pintó con token en %d s' % ESPERA_TARJETA)
+            return [], False, True
+        n_clic = len(ch.red)
+        clic = ch.evaluar(TARJETA_CLIC_JS % vid_js) or {}
+        if not clic.get('clic'):
+            print('  no se pudo pulsar: %s' % clic.get('motivo', '?'))
+            return [('tarjeta', 'sin botón Confirmar')], False, False
+        print('  clic FORZADO: botón deshabilitado antes del clic %s; con cuenta atrás %s' % (
+            _si(clic.get('deshabilitado')), _si(clic.get('cuenta'))))
+        fin_ok = ch.esperar(lambda: any(r['ruta'] == 'execute' and r['terminada'] for r in ch.red),
+                            ESPERA_FIN_TARJETA)
+        ch.bombear(ASIENTO_TARJETA)
+        png = os.path.join(salida, 'tarjeta.png')
+        ch.captura(png)
+        for r in ch.red:
+            leer_cuerpo(ch, r, op['vid'])
+        incid += resumir('tarjeta (navegador)', None, [], ch.medida, png, con_marcos=False)
+    finally:
+        registro, ch.red = ch.red or [], None
+        try:
+            ch.llamar('Network.disable', {}, ch.pagina)
+        except ErrorCDP:
+            pass
+    print('\n== tarjeta (peticiones)')
+    lineas, inc = analizar_tarjeta(registro, n_clic)
+    if not fin_ok:
+        inc.append('sin /execute terminado en %d s' % ESPERA_FIN_TARJETA)
+    for linea in lineas:
+        print('  ' + linea)
+    incid += inc
+    try:
+        lineas, inc = despues_tarjeta(consultas.operaciones(), uid, *consultas.comentario())
+    except ErrorSQL as e:
+        print('  ABORTADO: SQL después: %s' % e)
+        return [('tarjeta', i) for i in incid], True, False
+    for linea in lineas:
+        print('  ' + linea)
+    incid += inc
+    cuenta = log_func(desde)
+    print('  log (%s desde %s UTC): «bad query» sobre ai_safe_operation %d, «bad query» sin '
+          'ai_safe_operation en la línea %d, «retry 1/5» %d (anexo de PNS-26, previsto 1 y 1 por '
+          'cada /execute correcto: no son fallo); «retry 2/5» o más %d, «maximum number of tries '
+          'reached» %d (fallo si alguno)' % (
+              BD, desde, cuenta['bad_query_aso'], cuenta['bad_query_otra'], cuenta['retry1'],
+              cuenta['retry_mas'], cuenta['maximo']))
+    if cuenta['retry_mas'] or cuenta['maximo']:
+        incid.append('log: reintentos de serialización más allá del 1/5')
+    for i in incid:
+        print('  INCIDENCIA: %s' % i)
+    print('  escenario tarjeta: %s' % ('como se espera' if not incid else '%d incidencias' % len(incid)))
+    return [('tarjeta', i) for i in incid], False, False
+
+
+def sqlprueba_tarjeta(consultas=None):
+    """Las consultas del escenario tarjeta contra la BD real, en solo lectura."""
+    q = consultas or ConsultasTarjeta()
+    fallos = 0
+    for nombre, f in (
+            ('hora del servidor', lambda: 'leída' if q.ahora() else ''),
+            ('operaciones %s' % TOOL_TARJETA, lambda: '%d filas' % len(q.operaciones())),
+            ('contacto de prueba', lambda: '%d, comentario escrito %s' % (
+                q.comentario()[0], _si(q.comentario()[1])))):
+        try:
+            print('  %-45s OK (%s)' % (nombre, f()))
+        except ErrorSQL as e:
+            fallos += 1
+            print('  %-45s FALLA: %s' % (nombre, e))
+    print('Consultas del escenario tarjeta: %s' % ('todas OK' if not fallos else '%d FALLA' % fallos))
+    return OK if not fallos else NO_CONFIRMADO
+
+
 def navegar(args, base=BASE, c_func=c_en_vivo, login=None, clave=None, espera_servidor=120,
             consultas=None, pausa=pausa_terminal, repetir=repetir_terminal, motor=motor_en_vivo,
             continuar=None):
@@ -1607,6 +2055,12 @@ def navegar(args, base=BASE, c_func=c_en_vivo, login=None, clave=None, espera_se
             incidencias += incid
             no_concluyente = no_concluyente or nc
             print('\nalert() en total: %d; otros diálogos aceptados: %d' % (ch.alertas, ch.otros_dialogos))
+        if getattr(args, 'escenario', None) == 'tarjeta':
+            incid, nconf, nc = escenario_tarjeta(
+                ch, base, args.salida, info.get('uid'), consultas or ConsultasTarjeta())
+            incidencias += incid
+            no_confirmado = no_confirmado or nconf
+            no_concluyente = no_concluyente or nc
         for ruta in args.rutas:
             ch.nueva_medida(ruta)
             err = ch.ir(base + ruta)
@@ -2530,8 +2984,114 @@ def autoprueba(args):
     ESPERA_CHAT, RELANZAR_MS = chat_real
     ASIENTO, SONDEO, ESPERA_PINTADO = tiempos_reales
 
+    autoprueba_rama(ver)
     print('\nAutoprueba: %s' % ('todo PASA' if not fallos else '%d FALLA' % fallos))
     return OK if not fallos else INCIDENCIAS
+
+
+def autoprueba_rama(ver):
+    """--lab/--bd (D44) y el análisis del escenario tarjeta (D47), sin Chrome ni Odoo."""
+    print('--- --lab y --bd (D44)')
+    psql_antes = list(PSQL)
+    ver('--lab y --bd válidos cambian BD, LAB, PERMITIDAS y la BD de psql',
+        configurar('lab_pns_ai_879', 'lab_p2a_879_14') is None and BD == 'lab_p2a_879_14'
+        and LAB.endswith('/GitHub/lab_pns_ai_879') and PERMITIDAS == {'?', 'lab_p2a_879_14'}
+        and PSQL[PSQL.index('-d') + 1] == 'lab_p2a_879_14' and len(PSQL) == len(psql_antes))
+    real = sys.stdout
+    sys.stdout = io.StringIO()
+    try:
+        c_otra = resultado_c(io.StringIO(LOG_BUENO.replace('lab_pns_ai_3973_14', 'lab_p2a_879_14')))
+        c_3973 = resultado_c(io.StringIO(LOG_BUENO))
+    finally:
+        sys.stdout = real
+    ver('C con --bd lab_p2a_879_14: su log da 0 y el de lab_pns_ai_3973_14 da otra BD (3)',
+        c_otra == OK and c_3973 == OTRA_BD)
+    ver('--lab y --bd no válidos se rechazan',
+        configurar('../x', None) and configurar('a/b', None) and configurar(None, 'Mal;')
+        and configurar(None, 'x y'))
+    ver('sin --lab ni --bd, lo de siempre',
+        configurar() is None and BD == BD_POR_DEFECTO and PSQL == psql_antes
+        and LAB.endswith('/GitHub/' + LAB_POR_DEFECTO))
+
+    print('--- Escenario tarjeta (D47): análisis sin navegador')
+    tok, otro = 'token-de-prueba-1', 'token-de-prueba-2'
+
+    def pet(ruta, t, t_resp, token='', peek=False, **resp):
+        reg = peticion_verificacion(
+            'http://localhost:8169' + RUTA_VERIF + ruta,
+            json.dumps({'jsonrpc': '2.0', 'method': 'call',
+                        'params': dict({'peek': peek} if peek else {},
+                                       **({'confirm_token': token} if token else {}))}), t)
+        reg.update(t_resp=t_resp, terminada=True)
+        cuerpo = {'jsonrpc': '2.0', 'result': resp}
+        resumen_respuesta(reg, json.dumps(cuerpo), 'WRIT0047')
+        return reg
+
+    def bueno(token2=tok, espera=5.55, primero='too_soon', extra=()):
+        antes = [pet('pending', 100.0, 100.1, success=True,
+                     items=[{'verification_id': 'WRIT0047', 'confirm_token': tok}])]
+        despues = [pet('confirm', 101.0, 101.05, tok, success=False, error=primero),
+                   pet('pending', 101.1, 101.15, peek=True, success=True, items=[{}])]
+        despues += list(extra)
+        despues += [pet('confirm', 101.05 + espera, 101.05 + espera + 0.05, token2, success=True,
+                        status='confirmed'),
+                    pet('execute', 101.2 + espera, 101.6 + espera, tok, success=True,
+                        status='executed')]
+        return antes + despues, len(antes)
+
+    reg = pet('confirm', 1.0, 1.1, tok, success=False, error='too_soon')
+    ver('peticion_verificacion: guarda la huella del token, nunca el token',
+        tok not in repr(reg) and reg['huella'] == _huella(tok) and reg['error'] == 'too_soon')
+    ver('peticion_verificacion: ignora otras rutas y marca peek',
+        peticion_verificacion('http://x/web/dataset/call_kw', '{}', 1) is None
+        and pet('pending', 1, 1, peek=True)['peek'])
+    ver('resumen_respuesta: un error desconocido queda como «otro» (sin texto)',
+        pet('confirm', 1, 1, error='Traceback con datos')['error'] == 'otro')
+    registro, n = bueno()
+    lineas, incid = analizar_tarjeta(registro, n)
+    ver('análisis: too_soon, sin /pending sin peek, 5,55 s, mismo token y ejecutada → sin incidencias',
+        not incid and any('con peek 1' in x for x in lineas))
+    casos = (
+        ('el primer /confirm no es too_soon', bueno(primero='')),
+        ('reintento a los 3 s', bueno(espera=3.0)),
+        ('token distinto en el segundo /confirm', bueno(token2=otro)),
+        ('un /pending sin peek tras el clic', bueno(extra=[pet(
+            'pending', 102.0, 102.1, success=True,
+            items=[{'verification_id': 'WRIT0047', 'confirm_token': otro}])])),
+    )
+    for nombre, (registro, n) in casos:
+        ver('análisis: %s → incidencia' % nombre, bool(analizar_tarjeta(registro, n)[1]))
+    registro, n = bueno()
+    ver('análisis: un solo /confirm → incidencia',
+        bool(analizar_tarjeta([r for i, r in enumerate(registro) if i != 3], n)[1]))
+    ver('análisis: clic a 5 s o más del pintado → incidencia',
+        bool(analizar_tarjeta([dict(r, t=r['t'] + 5) if i >= n else r
+                               for i, r in enumerate(registro)], n)[1]))
+    op = {'id': 9, 'vid': 'WRIT0047', 'status': 'pending', 'executed': False, 'danger': 'high',
+          'uid': 12, 'vigente': True, 'restante': 800, 'confirmado_por': 0}
+    ver('operación lista: pendiente, high, del uid y sin caducar',
+        motivo_tarjeta_no_lista([op], 12) is None)
+    ver('operación no lista: caducada, a punto de caducar, de otro uid, dos, ninguna, ya ejecutada',
+        all(motivo_tarjeta_no_lista(o, 12) for o in (
+            [dict(op, vigente=False)], [dict(op, restante=30)], [dict(op, uid=2)], [op, op], [],
+            [dict(op, status='executed', executed=True)])))
+    hecha = dict(op, status='executed', executed=True, confirmado_por=12)
+    ver('SQL después: ejecutada, confirmada por el uid y comentario escrito → sin incidencias',
+        not despues_tarjeta([hecha], 12, 1, True)[1]
+        and despues_tarjeta([dict(hecha, status='confirmed', executed=False)], 12, 1, True)[1]
+        and despues_tarjeta([hecha], 12, 1, False)[1])
+    bd = 'lab_pns_ai_3973_14'
+    muestra = '\n'.join((
+        'web-1  | 2026-11-17 10:00:01,000 1 ERROR %s odoo.sql_db: bad query: UPDATE ai_safe_operation SET' % bd,
+        'web-1  | 2026-11-17 10:00:01,100 1 INFO %s odoo.service.model: SERIALIZATION_FAILURE, retry 1/5 in 0.5 sec...' % bd,
+        'web-1  | 2026-11-17 10:00:02,000 1 INFO %s odoo.service.model: SERIALIZATION_FAILURE, retry 2/5 in 1.2 sec...' % bd,
+        'web-1  | 2026-11-17 10:00:03,000 1 INFO %s odoo.service.model: SERIALIZATION_FAILURE, maximum number of tries reached' % bd,
+        'web-1  | 2026-11-17 10:00:04,000 1 ERROR otra_14 odoo.sql_db: bad query: UPDATE ai_safe_operation SET',
+        'web-1  | 2026-11-17 09:00:00,000 1 ERROR %s odoo.sql_db: bad query: UPDATE ai_safe_operation SET' % bd))
+    cuenta = contar_tarjeta(muestra, '2026-11-17 09:30:00', bd)
+    ver('log de la tarjeta: bad query 1, retry 1/5 1, retry 2/5 1, máximo 1 (BD y marca filtradas)',
+        (cuenta['bad_query_aso'], cuenta['retry1'], cuenta['retry_mas'], cuenta['maximo'])
+        == (1, 1, 1, 1))
 
 
 class _Argumentos(argparse.ArgumentParser):
@@ -2545,11 +3105,11 @@ class _Argumentos(argparse.ArgumentParser):
 def _main():
     ap = _Argumentos(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest='orden', required=True, parser_class=_Argumentos)
-    sub.add_parser('c', help='C sobre un log por la entrada estándar')
+    c = sub.add_parser('c', help='C sobre un log por la entrada estándar')
     r = sub.add_parser('rutas', help='solo las guardas de las rutas')
     r.add_argument('--descarga', action='append', default=[])
     r.add_argument('--pintado', action='store_true')
-    r.add_argument('--escenario', choices=['p34'])
+    r.add_argument('--escenario', choices=['p34', 'tarjeta'])
     r.add_argument('--visible', action='store_true')
     r.add_argument('--espera-turno', type=int, default=ESPERA_TURNO)
     r.add_argument('rutas', nargs='*')
@@ -2559,19 +3119,30 @@ def _main():
                    help='ruta de una descarga, para abrirla desde el disco (repetible)')
     n.add_argument('--pintado', action='store_true',
                    help='pintado del aviso del parche 34 por el formatContent real (L1)')
-    n.add_argument('--escenario', choices=['p34'],
-                   help='p34: turnos reales del parche 34 (L2), con pausas y SQL de solo lectura')
+    n.add_argument('--escenario', choices=['p34', 'tarjeta'],
+                   help='p34: turnos reales del parche 34 (L2), con pausas y SQL de solo lectura; '
+                        'tarjeta: reintento tras too_soon (D47), clic forzado y SQL de solo lectura')
     n.add_argument('--visible', action='store_true', help='Chrome visible (perfil temporal)')
     n.add_argument('--espera-turno', type=int, default=ESPERA_TURNO,
                    help='segundos de espera por turno del escenario (por defecto %d)' % ESPERA_TURNO)
     n.add_argument('rutas', nargs='*', help='rutas que empiezan por /, p. ej. /chatboo/canvas/8')
-    sub.add_parser('sqlprueba', help='consultas del escenario p34 contra la BD real (solo lectura)')
+    s = sub.add_parser('sqlprueba', help='consultas de un escenario contra la BD real (solo lectura)')
+    s.add_argument('--escenario', choices=['p34', 'tarjeta'], default='p34')
+    for p in (c, r, n, s):
+        p.add_argument('--lab', help='carpeta de ~/GitHub del laboratorio (por defecto %s)'
+                       % LAB_POR_DEFECTO)
+        p.add_argument('--bd', help='BD esperada (por defecto %s)' % BD_POR_DEFECTO)
     a = sub.add_parser('autoprueba', help='prueba contra un servidor simulado')
     a.add_argument('--salida', required=True)
     a.add_argument('--js', help='carpeta static/src/js de pns_ai_chatboo (pintado con los JS reales)')
     args = ap.parse_args()
     # Con la salida en una tubería (tee), cada línea se ve en cuanto se escribe.
     sys.stdout.reconfigure(line_buffering=True)
+    if args.orden != 'autoprueba':
+        error = configurar(args.lab, args.bd)
+        if error:
+            print('ABORTADO: %s' % error)
+            return ARGUMENTOS
     if args.orden == 'c':
         return resultado_c(io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8', errors='replace'))
     if args.orden == 'rutas':
@@ -2580,7 +3151,7 @@ def _main():
             return ARGUMENTOS
         return comprobar_rutas(args.rutas + args.descarga)
     if args.orden == 'sqlprueba':
-        return sqlprueba()
+        return sqlprueba_tarjeta() if args.escenario == 'tarjeta' else sqlprueba()
     if args.orden == 'navegar':
         return navegar(args)
     os.makedirs(args.salida, exist_ok=True)
