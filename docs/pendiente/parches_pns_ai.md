@@ -5248,6 +5248,45 @@ Comprobación previa de la CSP, propuesta, decisiones de Sergio (D1 a D5), bater
   en P-13.
 - **Estado:** aplicado con la línea llana (16/11/2026); L1 hecho; L2 pendiente.
 
+**Laboratorio L2 (17/11/2026).** El laboratorio que quedaba pendiente arriba («Laboratorio» y «Estado» de los dos bloques
+anteriores) está **hecho**. Turnos reales con `lab_auto.sh … --escenario p34`. Procedimiento, scripts y SHA-256 en
+[lab_procedimiento_3973.md](lab_procedimiento_3973.md), «Ampliación (17/11/2026): escenario p34 (L2, turnos reales)»;
+fila del 17/11/2026, ~14:05-14:12 UTC, del «Registro de laboratorios» (`servidor-20261117-151159.log`, código 8 por T1 y
+T1b, C: OK, modelo `gemini-3.5-flash-lite`). Antes hubo cuatro intentos no válidos, con su causa en el mismo registro.
+
+| Paso | Sesión | Resultado | Valoración |
+|---|---|---|---|
+| T1 (sin «Design») | 26 | Rechazo «No page was built: No AI provider is configured for agent pns_ai_chatboo» (`ai_log` 190 y 194, dos por turno). Aviso en línea llana y al final, en vivo y tras recargar. `canvas_rev` 0, `original_content` = `content`, respuesta en HTML. | OK, a mano (D33) |
+| T1b | 26 | Igual que T1 (`ai_log` 203 y 207), con la tabla en el chat (caso a/d): aviso al final y sin marcas. | OK, a mano (D33) |
+| V2 | 26 | Página creada (`canvas_rev` 1) y burbuja sin aviso. Valida la apertura y el `reset` de la marca en `_process` (S1). | OK |
+| 5b′ | 27 | `canvas_rev` 1; `cierra_script` no; escapado sí; sin `alert()` ni aviso. | OK |
+| 6c | 27 | `canvas_rev` 2; sigue escapado; sin `alert()` ni aviso. | OK |
+| 6d′ | 25 (plantada, D24) | Intento 1: fallo del proveedor. Intento 2: rechazo «the change left a value of the page as markup» (`ai_log` 237), `canvas_rev` igual, aviso en línea llana en vivo y tras recargar. | OK |
+| Control del lienzo plantado | 25 | 0 `alert()` y 0 «Refused». Informativo: el marco tiene `sandbox` y la `<meta>` CSP del parche 27. | Informativo |
+
+- **Log** (`servidor-20261117-151159.log`): 1 `ERROR` `openai_driver`, 1 `ERROR` `engine_tool_loop`, 5 `WARNING`
+  `relaxaicode_outcome`, 2 `WARNING` `agent_engine` y 1 `WARNING` `py.warnings`; Traceback 3; «bad query» 0; «key=» 0.
+- **Decisiones de Sergio (17/11/2026):**
+  - D29: arreglos del laboratorio: el chat se abre esperando a la bandeja y relanzando el evento; SQL y log antes de
+    abortar; fallo del proveedor deducido de los `ERROR` del motor cuando el turno no deja huella;
+  - D30: mensajes en inglés; 6d′ juzgado con otro motivo; `alert()` informativo; `docker ps` en `lab_auto.sh`; cada turno
+    dice si se activó `page_tab` y por qué;
+  - D31: tras dos pasos seguidos con el proveedor caído, se pregunta si seguir;
+  - D32: L2 con `gemini-3.5-flash-lite`. Es una excepción a la decisión 6 de la E3′ solo para este laboratorio: la cuota
+    gratuita de Gemini es de 20 peticiones al día por modelo, y estaba agotada en 3.6 flash y en 3.5 flash;
+  - D33: T1 y T1b, OK por valoración manual, sin repetirlos.
+- **Errata (17/11/2026):** lo que se dio por esperado antes de este laboratorio, que T1 en 3.1.973 dejaría «no design
+  provider: …» (`chatboo_session.py:1164`), no es correcto. El texto real es «No AI provider is configured for agent
+  pns_ai_chatboo» (`pns_ai_mcp/utils/agent_engine.py:258`), como en la 3879. «no design provider: …» es el mensaje de
+  `paint_canvas` cuando falla la llamada a Design (`chatboo_session.py:1163-1166`), no el de un turno del chat. Con
+  `grep -n "no design provider" docs/pendiente/*.md` solo salen `e3_propuesta_3879.md:398` (el lienzo, no T1) y
+  `lab_fase2_3973.md:260` (parche 25: que **no** aparezca). Ninguno es la expectativa de T1, así que no llevan errata.
+  Esa expectativa solo estaba en `lab_cdp.py` (pendiente en el plan).
+- **Observación, sin decisión:** un usuario con el idioma en inglés que escribe en español no recibe páginas: las frases
+  de `page_tab` se eligen por el idioma del usuario (`pns_ai_mcp/models/ai_context.py:79-80`). Es comportamiento del
+  fabricante y no lleva parche; solo irá al informe si Sergio lo decide.
+- **Estado:** aplicado con la línea llana (16/11/2026); L1 y L2 hechos (17/11/2026).
+
 ### Para el informe al fabricante (fase 4)
 
 - **URL de imagen que `_WEB_IMAGE_RE` no reconoce** (`chatboo_canvas.py:654` en 3.1.973):

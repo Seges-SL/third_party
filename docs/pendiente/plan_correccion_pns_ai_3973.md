@@ -377,6 +377,18 @@ Orden:
     borrado al acabar, D24) de [lab_p29_3879.md](lab_p29_3879.md), con «Design» cambiado por Sergio en la interfaz
     (D22), y la apertura de la marca y el `reset` en `_process`.
 
+**Tras el laboratorio L2 del 34 (17/11/2026, decisiones D29 a D33):**
+
+- **34: laboratorio hecho.** L2 con turnos reales (~14:05-14:12 UTC, `servidor-20261117-151159.log`, modelo
+  `gemini-3.5-flash-lite` por D32): los seis pasos validados (T1 y T1b a mano, D33; V2, 5b′, 6c y 6d′ OK), y con V2, la
+  apertura de la marca y el `reset` en `_process` (S1). D14 después: 6 con diseño y 0 ilegibles; limpieza hecha.
+  Resultados en el registro, «Parche 34 en 3.1.973», «Laboratorio L2 (17/11/2026)»; fila y los cuatro intentos no válidos
+  en el «Registro de laboratorios» de [lab_procedimiento_3973.md](lab_procedimiento_3973.md).
+- **Lo siguiente:** parche 35 (sección siguiente).
+- **Pendiente menor:** el clasificador de `lab_cdp.py` (`MOTIVOS_FIJOS`) no reconoce «No AI provider is configured…», y
+  `rechazo()` de T1 busca «no design provider» (errata en el registro). Hay que corregirlo antes de reutilizar el
+  escenario p34.
+
 ## Parche 35: crons de NUEVO-2 (decisión 4)
 
 - `pns_ai_mcp/migrations/14.0.3.1.973/post-migrate.py`, como parche de Seges (registro, marcador, test y
