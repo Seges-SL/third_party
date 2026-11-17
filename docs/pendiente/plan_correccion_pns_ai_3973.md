@@ -409,6 +409,32 @@ Orden:
 - **En una instalación limpia de 3.1.973** los crons nacen con `model._gc_expired()` y ya están bien: el
   script no tiene nada que hacer (y tampoco se ejecuta, porque no hay `-u` que cruce la versión).
 
+### Parche 35: código y tests hechos (17/11/2026)
+
+- **Hecho:** script, 9 tests, batería y cinco neutralizaciones sobre `7c68ae8`, con las decisiones D34 a D38 de
+  Sergio (17/11/2026). Detalle en el [registro](parches_pns_ai.md), «Parches de la rama 14.0-pns-ai-3973 (parche 35,
+  17/11/2026)».
+- **D38:** el `-u` de P-2 y del staging nombra los tres módulos: `-u pns_base,pns_ai_mcp,pns_ai_chatboo`.
+- **Qué mirar en P-2:**
+  - **(a)** `-u` desde 3.1.879 con el 35: en el log, «module pns_ai_mcp: Running migration [14.0.3.1.973>]
+    post-migrate» y dos «Seges patch 35: … fixed (gc_expired -> _gc_expired)», una por cron; ningún WARNING del 35
+    («not found» ni «unexpected code»);
+  - **(b)** `-u` desde 3.1.879 con la base limpia y después a la rama con el 35: ninguna de las dos (el script no se
+    ejecuta); los crons siguen con `model.gc_expired()` y se corrigen a mano;
+  - **(c)** instalación limpia: ninguna de las dos; los crons nacen con `model._gc_expired()`.
+- **Comprobación de `ir_cron.code`**, en los tres casos y en el staging, solo de lectura:
+
+  ```sql
+  SELECT d.name, s.code
+    FROM ir_model_data d
+    JOIN ir_cron c ON c.id = d.res_id
+    JOIN ir_act_server s ON s.id = c.ir_actions_server_id
+   WHERE d.module = 'pns_ai_mcp' AND d.model = 'ir.cron'
+     AND d.name IN ('ir_cron_ai_fetch_cache_gc', 'ir_cron_ai_api_result_cache_gc');
+  ```
+
+  Esperado: `model._gc_expired()` en las dos filas, salvo en (b) antes de la corrección a mano.
+
 ## Parches retirados: 10, 13, 14, 23, 30 y 31
 
 - **Registro:** estado «Retirado en 3.1.973 (cubierto por el fabricante)», en el índice de la rama

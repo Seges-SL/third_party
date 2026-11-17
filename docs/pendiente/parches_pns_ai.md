@@ -267,7 +267,7 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
 | 34 | PNS-96 | funcional | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_async_request.py` | 4 | Aplicado (16/11/2026): opción A; aviso en línea llana sin marcas (D25, sustituye a F1); L1 hecho, L2 pendiente (P-13) |
 | 36 | PNS-103 | funcional | `pns_base/models/operation_report_wizard.py` | 2c | Aplicado (11/11/2026); validado en el laboratorio (12/11/2026) |
 | 37 | PNS-104 | datos | `pns_ai_mcp/controllers/controller_helpers.py` | 3b | Aplicado (12/11/2026) |
-| 35 | NUEVO-2 | robustez | `pns_ai_mcp/migrations/14.0.3.1.973/post-migrate.py` | plan, «Parche 35» | Pendiente (decisión 4 del plan). Única excepción a «sin `migrations/` propios»: solo se ejecuta en un `-u` que cruce 3.1.973; una BD actualizada a 3.1.973 sin el parche no lo ejecuta y se corrige a mano (una instalación nueva no lo necesita) |
+| 35 | NUEVO-2 | robustez | `pns_ai_mcp/migrations/14.0.3.1.973/post-migrate.py` | plan, «Parche 35» | Aplicado (17/11/2026); se comprueba en P-2 (a, b y c). Única excepción a «sin `migrations/` propios»: solo se ejecuta en un `-u` que cruce 3.1.973; una BD actualizada a 3.1.973 sin el parche no lo ejecuta y se corrige a mano (una instalación nueva no lo necesita) |
 
 Las entradas de cada parche portado se añaden debajo, en «Parches de la rama 14.0-pns-ai-3973», con sus
 archivos y líneas, los ajustes, el test y la neutralización.
@@ -4918,6 +4918,115 @@ Odoo: contenedor (`odoo` 14.0-20231106).
 - Configuración de prueba (lista blanca de `example.com`, dos grupos y la clave MCP de `seges_target`) puesta y
   quitada, comprobada con booleanos.
 - Detalle en la propuesta, «Laboratorio del parche 38 (13/11/2026)».
+
+## Parches de la rama 14.0-pns-ai-3973 (parche 35, 17/11/2026)
+
+Base: `7c68ae8`. Plan: [plan_correccion_pns_ai_3973.md](plan_correccion_pns_ai_3973.md), «Parche 35: crons de NUEVO-2
+(decisión 4)». Citas de Odoo: imagen `odoo-dev:14` (`/usr/lib/python3/dist-packages/odoo`), no la referencia.
+
+### Parche 35: crons de NUEVO-2 tras un `-u` a 3.1.973 (NUEVO-2, robustez)
+
+- **Qué falla sin él:**
+  - `pns_ai_mcp.ir_cron_ai_fetch_cache_gc` y `pns_ai_mcp.ir_cron_ai_api_result_cache_gc` están en datos
+    `noupdate="1"` (`data/fetch_cache_cron.xml:2,6,10`; `data/api_result_cache_cron.xml:2,6,10`);
+  - en 3.1.782 y 3.1.879 su `code` es `model.gc_expired()` (en una línea); en 3.1.973, `model._gc_expired()`, y el
+    método público desaparece (`models/fetch_cache.py:135`, `models/api_result_cache.py:149`). Los otros cinco crons no
+    cambian;
+  - una BD actualizada desde 3.1.782 o 3.1.879 conserva el código antiguo. Al lanzarlo,
+    `ir.actions.server._run_action_code_multi` lo pasa a `safe_eval` (`odoo/addons/base/models/ir_actions.py:500-502`),
+    que convierte la `AttributeError` en `ValueError` (`odoo/tools/safe_eval.py:346-347`): los dos crons fallan cada
+    hora. A mano: `method_direct_trigger` (`odoo/addons/base/models/ir_cron.py:80-85`). En la referencia
+    `/opt/odoo-src/14.0`, `ir_cron.py:81-86` e `ir_actions.py:506-508` (desplazadas una línea y seis).
+- **Cuándo lo ejecuta Odoo** (núcleo de la imagen, `odoo/modules/`):
+  - solo con el módulo marcado para actualizar, nunca en una instalación (`migration.py:81-83` y `:105`);
+  - una carpeta con 2 o más puntos es una versión completa; corre si instalada < 14.0.3.1.973 <= manifest
+    (`migration.py:108-111` y `:144-161`);
+  - `load_script(pyfile, 'post-migrate')`: `__name__` vale `'post-migrate'` y deja el INFO
+    «module pns_ai_mcp: Running migration [14.0.3.1.973>] post-migrate» (`migration.py:21-26` y `:172-178`);
+  - el post va después de `init_models` y de `load_data` (`loading.py:199`, `:220-224` y `:227`).
+- **Decisiones de Sergio (17/11/2026):**
+  - **D34:** script de migración, no `init()`;
+  - **D35:** comparación del código con `strip()` (el núcleo también lo ejecuta con `strip()`, `ir_actions.py:501`);
+  - **D36:** código ya correcto, nada en el log; cron ausente, WARNING;
+  - **D37:** escritura con el ORM (`cron.write`);
+  - **D38:** el `-u` de P-2 y del staging nombra los tres módulos (`-u pns_base,pns_ai_mcp,pns_ai_chatboo`).
+- **Cambio:** `pns_ai_mcp/migrations/14.0.3.1.973/post-migrate.py` (nuevo). Marcador
+  `# Seges: parche 35 (NUEVO-2, robustez). Ver docs/pendiente/parches_pns_ai.md` en `:3`, tras SPDX y Copyright.
+  Logger fijo `odoo.addons.pns_ai_mcp.migrations.seges_35`. `migrate(cr, version)`:
+  - sin `version` (no es un `-u`), no hace nada;
+  - por cada XML ID, `env.ref(xmlid, raise_if_not_found=False)` con `SUPERUSER_ID`:
+    - no existe o no es `ir.cron`: WARNING «Seges patch 35: %s not found; nothing changed»;
+    - `(code or '').strip() == 'model._gc_expired()'`: nada, sin log;
+    - distinto de `model.gc_expired()`: WARNING «Seges patch 35: %s has unexpected code; left unchanged», sin el
+      código;
+    - igual a `model.gc_expired()`: `cron.write({'code': 'model._gc_expired()'})` e INFO
+      «Seges patch 35: %s fixed (gc_expired -> _gc_expired)».
+  - Sin tocar `version`, `depends` ni archivos del fabricante. Compila con Python 3.7.3 (imagen). Marcadores fuera de
+    `tests/`: «# Seges: parche» (solo `.py`) 129 → 130; con el criterio de la fase 3a («Seges: parche» en `.py`, `.js`
+    y `.xml`) 134 → 135.
+- **Tests** (`pns_ai_mcp/tests/test_seges_migration_gc_crons.py`, `TestSegesMigrationGcCrons`, tags
+  `post_install`, `-at_install`, `pns_ai_mcp`, `seges_e2p`; import con marcador al final de `tests/__init__.py`). El
+  script se carga con `odoo.modules.migration.load_script` (ruta de `get_module_resource`). Cada `setUp` pone el código
+  antiguo en los dos crons; lo escrito se lee con SQL de `ir_act_server` tras `flush`. Cada `migrate` va dentro de
+  `assertLogs` del logger fijo, con una línea testigo DEBUG («ninguna línea» = solo la testigo; Python 3.7 no tiene
+  `assertNoLogs`):
+  1. `test_1_old_code_fails_when_run_by_hand`: confirma NUEVO-2 (`ValueError` con `AttributeError`, por cron);
+  2. `test_2_migrate_fixes_both_crons`: `migrate(cr, '14.0.3.1.879')` corrige los dos y deja dos INFO;
+  3. `test_3_fixed_crons_run_by_hand`: corregidos, se lanzan a mano sin error (subtest por cron);
+  4. `test_4_second_run_changes_nothing`: la segunda ejecución no cambia nada ni deja línea;
+  5. `test_5_edited_code_is_left_unchanged`: `model.gc_expired()  # edited` no se toca; un WARNING con el XML ID y sin
+     el código;
+  6. `test_6_new_code_is_not_touched`: `model._gc_expired()` no se toca ni deja línea;
+  7. `test_7_missing_cron_is_reported_and_the_other_fixed`: cron borrado en la transacción, WARNING «not found» para
+     él y el otro corregido, con su INFO;
+  8. `test_8_no_version_changes_nothing`: `migrate(cr, None)` y `migrate(cr, '')` (lo que pasa Odoo sin versión
+     instalada, `migration.py:144`) no cambian nada (subtest por valor);
+  9. `test_9_old_code_with_surrounding_whitespace_is_fixed`: D35, el código antiguo con saltos de línea y espacios
+     alrededor se corrige (añadido por la revisión).
+- **Lint:** `odoo_lint.py --revisar pns_ai_mcp/ --base 7c68ae8`, 0 incidencias nuevas (2 preexistentes en
+  `tests/__init__.py`).
+- **Batería** (log `tests-20261117-165502.log`, con los 9 tests): 575 tests, 1 F
+  (`test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin`), 0 E y los 6 saltados de la línea base. Traceback 58,
+  «bad query» 1 (`UPDATE "ai_safe_operation"`), «seges_side_env: » 1, secretos 0 y «Seges patch 35:» 0. Origen:
+  `addons paths` con `/mnt/compartidos/third_party` y las 21 rutas `pns_*` del log, todas bajo ella.
+- **Neutralización** (sobre `post-migrate.py`; SHA-256 de referencia
+  `577c6e18d5816c14419032a195dff8a08c8910614820beed6ad19e85d13dc5c2`, igual tras restaurar cada una). Todas con 0 E, los
+  6 saltados y el test 1 correcto (F por nombre; «FAIL: Subtest» cuenta en el runner):
+
+  | Neutralización | Log | F | Runner |
+  |---|---|---|---|
+  | N35w: `cron.write(...)` → `pass` | `tests-20261117-165847.log` | tests 2, 4, 7 y 9; 3 (dos subtests); `test_paap_i7` | 7 |
+  | N35x: sin la comparación con el código antiguo | `tests-20261117-170220.log` | test 5; `test_paap_i7` | 2 |
+  | N35l: los dos WARNING → `pass` | `tests-20261117-170552.log` | tests 5 y 7; `test_paap_i7` | 3 |
+  | N35v: sin `if not version: return` | `tests-20261117-170929.log` | test 8 (dos subtests, `None` y `''`); `test_paap_i7` | 3 |
+  | N35s: sin `.strip()` | `tests-20261117-171341.log` | test 9; `test_paap_i7` | 2 |
+
+  En N35w y N35v el log tiene 4 líneas «Seges patch 35:»: son el texto de la `AssertionError` de los tests 4 y 8 (la
+  lista de líneas recibidas), no del logger.
+- **Primera ronda** (8 tests, antes de la revisión): batería `tests-20261117-162958.log` (574 tests, mismos recuentos);
+  N35w `tests-20261117-163417.log`, N35x `tests-20261117-163750.log`, N35l `tests-20261117-164125.log` y N35v
+  `tests-20261117-164455.log`, todas como se esperaba. La sustituye la segunda.
+- **Restos conocidos:**
+  - una BD ya actualizada a 3.1.973 sin el parche no lo ejecuta (no hay `-u` que cruce la versión): se corrige a mano;
+  - un código editado a mano se queda como está, con su WARNING: hay que revisarlo a mano;
+  - `ir.cron.write` llama a `_try_lock()`: si un worker de la misma BD estuviera ejecutando ese cron, el `-u` abortaría
+    con `UserError`. La ventana es mínima (con el código antiguo el cron falla en el acto) y el `-u` se lanza con el
+    servicio parado. Se mantiene `write` (D37).
+- **Queda por validar (P-2):** (a) `-u` desde 3.1.879 con el 35: en el log, «Running migration [14.0.3.1.973>]
+  post-migrate» y dos «Seges patch 35: … fixed»; (b) `-u` desde 3.1.879 con la base limpia y después a la rama: ninguna
+  de las dos líneas, crons rotos y corrección a mano; (c) instalación limpia: ninguna de las dos líneas, crons bien.
+  En los tres, `ir_cron.code` por XML ID con un `SELECT` de solo lectura. Detalle en el plan.
+- **Cómo comprobar si el fabricante ya lo ha corregido:** `test_1_old_code_fails_when_run_by_hand` falla (el fabricante
+  recupera `gc_expired` o lo acepta como alias), o el fabricante publica su propio
+  `pns_ai_mcp/migrations/14.0.3.1.973/`. En ese caso hay que fusionar o retirar este script: dos `post-migrate.py` en la
+  misma carpeta se pisan.
+- **Seguimiento:** NUEVO-2 no figura en [seguimiento_informe_pns_ai.md](seguimiento_informe_pns_ai.md). Queda por
+  decidir si entra en el informe al fabricante.
+- **Revisión (`odoo-reviewer`, 17/11/2026):** APROBADO CON OBSERVACIONES, sin hallazgos críticos. Aplicados: test 9 y
+  N35s (`strip()` de D35 sin test), INFO del otro cron en el test 7, `''` en el test 8, criterio del recuento de
+  marcadores, `_try_lock` en restos, y estos dos apartados. No aplicado: comprobar el otro cron en el test 5, porque
+  haría fallar el test 5 con N35w (ya lo cubren los tests 2 y 7). Se mantiene la posición de la sección. Las citas de
+  `migration.py` y `loading.py` están contrastadas en la imagen.
 
 ## Parches de la rama 14.0-pns-ai-3973 (fase 4, 13/11/2026)
 
