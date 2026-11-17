@@ -301,7 +301,37 @@ RELAXAICODE_SIDE_EFFECT_METHODS = frozenset({
     'parent_migration_process_cb',
     'message_process',
     'message_route',
+    # Seges: parche 39 (PNS-107, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    # Public methods that reach iap.account.get (own cursor, commit) before
+    # writing anything, so box A's READ ONLY does not stop them.
+    'get_credits_url',
+    'get_config_account_url',
+    'redirect_to_buy_autocomplete_credit',
+    'action_buy_credits',
+    'action_buy_sms_credits',
+    'action_send_sms',
+    'action_send_sms_mass_now',
+    'action_submit',
 })
+
+# Seges: parche 39 (PNS-107, seguridad). Ver docs/pendiente/parches_pns_ai.md
+# Methods that commit on a cursor of their own but carry a common name
+# (``get``), so they cannot go in the list above: blocked only on the model
+# that defines them, at run time, literal or dynamic.
+# The public callers of iap.account.get are also listed on their models, so
+# that a bare read (``f = rec.action_send_sms``) is refused too: the AST only
+# sees calls and the global list only applies to dynamic names.
+RELAXAICODE_SIDE_EFFECT_MODEL_METHODS = {
+    'iap.account': frozenset({
+        'get', 'get_credits_url', 'get_config_account_url',
+    }),
+    'res.config.settings': frozenset({'redirect_to_buy_autocomplete_credit'}),
+    'sms.resend': frozenset({'action_buy_credits'}),
+    'mailing.mailing': frozenset({'action_buy_sms_credits'}),
+    'sms.composer': frozenset({'action_send_sms', 'action_send_sms_mass_now'}),
+    'mailing.sms.test': frozenset({'action_send_sms'}),
+    'crm.iap.lead.mining.request': frozenset({'action_submit'}),
+}
 
 # RelaxAICode always runs as the asking user. These names hand out another
 # identity: ``sudo()``, ``with_user(1)`` (uid 1 is superuser), ``with_env``,
