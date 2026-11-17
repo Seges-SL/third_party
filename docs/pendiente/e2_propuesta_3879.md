@@ -1277,6 +1277,14 @@ rutas de importación (`ai_context_disk.py`, `ai_skill.py`, `ai_agent.py`, `util
 | `action_quotation_send`, `action_buy_credits`, `get_credits_url`, `get_account_url`, `get_config_account_url` | — | Solo devuelven una acción o una URL | — | — | No (falsos positivos del barrido) |
 | `button_immediate_install` / `_upgrade` / `_uninstall`, y los del parche 15 (`get_content`, `log_*`, `test_connection`, `collect`, `page_html`, `paint_canvas`…) | — | — | — | — | Ya están en la lista |
 
+> **Corrección (17/11/2026, parche 39, PNS-107):** la fila de «falsos positivos del barrido» es incorrecta para
+> `action_buy_credits`, `get_credits_url` y `get_config_account_url`: los tres llegan a `iap.account.get`
+> (`iap/models/iap_account.py:33-77`), que crea o borra cuentas IAP en un cursor propio y confirma
+> (`get_credits_url` en `:80-87`; `get_config_account_url` en `:126-128`; `sms.resend.action_buy_credits` en
+> `sms/wizard/sms_resend.py:110-111`). `get_account_url` (`:99`) no llama a `get` y sigue fuera. Quedan bloqueados en
+> `14.0-pns-ai-3973` por el parche 39, con otros cinco nombres; inventario en el [registro](parches_pns_ai.md),
+> «Parches de la rama 14.0-pns-ai-3973 (parche 39, 17/11/2026)». La rama `14.0-pns-ai-3879` no se corrige.
+
 **Lista definitiva del parche 22**, 28 nombres en un bloque nuevo de `RELAXAICODE_SIDE_EFFECT_METHODS`
 (`controllers/validators_base.py`), con su marcador:
 

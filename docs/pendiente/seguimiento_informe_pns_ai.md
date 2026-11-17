@@ -178,6 +178,7 @@ prueba que solo comprueba otro rol o el ACL estándar).
 | PNS-103 | Baja | NUEVO | CONFIRMADO (laboratorio `lab_pns_ai_3973`, 11/11/2026, sobre 3.1.973; mismo código en 3.1.879) | · **Parche 36 (fase 2c, `14.0-pns-ai-3973`)**: ver su ficha · pendiente del informe al fabricante |
 | PNS-104 | Baja | NUEVO | CONFIRMADO (`test_pending_write_survives_box_a_close`, batería de `lab_pns_ai_3973`, 12/11/2026, sobre 3.1.973; mismo código en 3.1.879); latente: ningún llamador real pierde datos hoy | · **Parche 37 (fase 3b, `14.0-pns-ai-3973`)**, como defensa: ver su ficha · pendiente del informe al fabricante |
 | PNS-105 | Alta (propuesta) | NUEVO | CONFIRMADO (test, 12/11/2026; efecto 3 incluido) | · **Parche 38 (`14.0-pns-ai-3973`, `348fa2d`)**: tests, batería y neutralización hechos; validado en el laboratorio, con salvedades (ver ficha) (13/11/2026) · pendiente del informe al fabricante |
+| PNS-107 | Baja | NUEVO | CONFIRMADO (N39, batería de `lab_pns_ai_3973`, 17/11/2026, sobre 3.1.973) | · **Parche 39 (`14.0-pns-ai-3973`)**: tests, batería y neutralización hechos (17/11/2026) · candidata al informe al fabricante |
 
 **Recuento:** CORREGIDO 31 · PARCIAL 33 · SIN CAMBIOS 13 · YA NO APLICA 2 · DUDOSO 1 (80 del
 informe) · NUEVO 22 (total 102). Por gravedad:
@@ -224,6 +225,14 @@ informe) · NUEVO 22 (total 102). Por gravedad:
 > - PNS-105: **parche 38** aplicado en `14.0-pns-ai-3973` (`348fa2d`) y validado en el laboratorio, con salvedades (ver
 >   ficha). Como en PNS-104, «Estado» sigue en NUEVO y el parche va en «Rama Seges».
 > - El recuento de arriba no cambia.
+>
+> **17/11/2026 (parche 39, decisiones de Sergio):**
+> - Alta de **PNS-107** (NUEVO, **Baja**, D40): `iap.account.get` crea o borra cuentas IAP en cursores propios desde la
+>   caja A (P2 de la fase 3b). **Parche 39** aplicado en `14.0-pns-ai-3973`. Candidata al informe al fabricante.
+> - D39: NUEVO-2 (crons `gc_expired` tras el `-u` a 3.1.973) entra en el informe al fabricante; corrección a proponer:
+>   fijar el `code` de los dos crons por XML ID en su `init()`. Sin ficha PNS todavía.
+> - El recuento de arriba no incluye PNS-103 a PNS-105 ni PNS-107 (con ellas: NUEVO 26, total 106); PNS-106 está
+>   propuesto, sin alta.
 
 Restos que se repiten en varios parciales:
 1. **El sandbox (caja A) bloquea por lista de nombres y no impide llamar a métodos privados**
@@ -2465,6 +2474,53 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
       líneas reindentadas.
   - «Estado» sigue en NUEVO (describe el código del fabricante) y «Laboratorio y staging», en CONFIRMADO. Staging del
     parche 38: pendiente. **Pendiente del informe al fabricante.**
+
+### PNS-107 — `iap.account.get` escribe y confirma desde la caja A
+
+- **Gravedad:** Baja (decisión de Sergio, 17/11/2026, D40) · **Estado:** NUEVO; CONFIRMADO por test con el parche 39
+  neutralizado (N39, 17/11/2026, `lab_pns_ai_3973`, sobre 3.1.973; mismo camino en 3.1.879). Origen: P2 de la fase 3b
+  (12/11/2026, por lectura; [propuesta de la fase 3](propuesta_fase3_3973.md), «Hallazgos de P1 a P3»). Antes de
+  numerarlo se comprobó con Grep que PNS-107 no figuraba en `docs/` y que el síntoma no tenía otro antecedente.
+- **Descripción** (Odoo 14 de la imagen, `odoo` 14.0.20231106):
+  - `iap.account.get(service_name, force_create=True)` (`odoo/addons/iap/models/iap_account.py:33-77`) es público y
+    `@api.model`;
+  - con cuentas sin token, las borra con `sudo()` en un cursor propio (`self.pool.cursor()`, `:43-53`);
+  - sin cuenta, crea una en un cursor propio (`:54-73`); los dos cursores confirman al salir del `with`;
+  - desde `relaxaicode`, `env['iap.account'].get('<servicio>')` pasa el AST (el nombre `get` es el de `dict.get`) y
+    llega a ejecutarse en la caja A: ni el READ ONLY ni el `ROLLBACK` de la caja alcanzan esos cursores;
+  - también llegan a `get`, sin escribir antes, ocho métodos públicos (inventario del 17/11/2026 en el
+    [registro](parches_pns_ai.md), sección del parche 39): `iap.account.get_credits_url` (`iap_account.py:80-87`) y
+    `get_config_account_url` (`:126-128`), `res.config.settings.redirect_to_buy_autocomplete_credit`,
+    `sms.resend.action_buy_credits`, `mailing.mailing.action_buy_sms_credits`, `sms.composer.action_send_sms` (que
+    además envía el SMS) y `action_send_sms_mass_now`, `mailing.sms.test.action_send_sms` y
+    `crm.iap.lead.mining.request.action_submit`. El parche 22 los dio por falsos positivos (`e2_propuesta_3879.md`,
+    corrección del 17/11/2026).
+- **Impacto:** cualquier usuario con `relaxaicode` puede crear cuentas IAP vacías fuera del READ ONLY de la caja A (la
+  ACL del core da creación a Usuario interno, `1,0,1,0`) y borrar las que no tienen token, que la ACL no le permite
+  (`sudo()`). Sin fuga de secretos (el token nuevo en caché lo cierra el parche 18, O1) ni
+  coste. De ahí la gravedad Baja.
+- **Rama Seges:** **parche 39** en `14.0-pns-ai-3973` (17/11/2026): `RELAXAICODE_SIDE_EFFECT_MODEL_METHODS`
+  (`controllers/validators_base.py`) y `_seges_check_model_method` en `_read_attr` (`controllers/context_builder.py`),
+  que rechazan `get` solo sobre `iap.account`, literal y dinámico, y los ocho métodos públicos en la lista global
+  `RELAXAICODE_SIDE_EFFECT_METHODS` (AST y nombre dinámico) y, para cerrar el alias sin llamada
+  (`f = rec.get_credits_url; f(...)`), también en la tabla por modelo, solo en los modelos donde llegan a `get`. La
+  familia del alias para los nombres de los parches 15 y 22 sigue pendiente (E3, D-2). `action_send_sms` y `action_submit` coinciden con acciones
+  de otros modelos (`hr.employee`, `website.visitor`; OCA `stock.request`), que abren un asistente o cambian el estado:
+  se bloquean igualmente porque ninguna es de lectura. Tests, batería, N39 y N39b en el [registro](parches_pns_ai.md),
+  «Parches de la rama 14.0-pns-ai-3973 (parche 39, 17/11/2026)».
+- **Restos conocidos (sin código, por lectura):**
+  - **campo calculado:** leer `res.config.settings.partner_autocomplete_insufficient_credit`
+    (`partner_autocomplete/models/res_config_settings.py:9-13`) llama a `iap.account.get_credits` (`iap_account.py:139`)
+    → `get(force_create=False)` (`:140`): borra con `sudo()` y confirma las cuentas `partner_autocomplete` sin token y,
+    si hay cuenta, hace un JSON-RPC a IAP con su token (`:143-153`). **Candidato al informe al fabricante.** La familia
+    (campos calculados con efectos al leerlos) queda como resto conocido;
+  - `crm.lead.iap_enrich` (`crm_iap_lead_enrich/models/crm_lead.py:49`) llega a `get`, pero hoy lo frena su
+    `SELECT … FOR UPDATE NOWAIT` (`:56-58`) en la transacción READ ONLY de la caja A.
+- **Corrección sugerida al fabricante:** una lista de métodos por modelo en el sandbox (como la del parche 39) para los
+  métodos del core con nombre común que confirman en cursor propio, más sus llamadores públicos (`get_credits_url` y
+  `get_config_account_url` como puntos de entrada), o un inventario de esos métodos; y tratar los campos calculados
+  con efectos.
+- **Candidata al informe al fabricante.**
 
 ### Observaciones sin ficha (para valorar en E4′)
 

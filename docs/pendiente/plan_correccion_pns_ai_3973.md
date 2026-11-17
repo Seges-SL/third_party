@@ -464,6 +464,24 @@ Orden:
 4. Con toda la rama:
    - **Antes:** decisión sobre `iap.account.get` (P2) y comprobación de la versión del core del staging (ver
      «Planificación hasta el staging», punto 4);
+     - **P2 decidido y hecho (17/11/2026):** opción B (D40), **parche 39** (PNS-107, Baja): `iap.account.get` bloqueado
+       en la caja A por modelo y nombre, literal y dinámico, y sus 8 llamadores públicos por nombre (D40b), también como alias sin llamada en sus modelos (D40d); el campo
+       calculado de `partner_autocomplete` y `crm.lead.iap_enrich`, restos conocidos (D40c). Tests, batería y
+       neutralizaciones N39, N39b y N39c en el
+       [registro](parches_pns_ai.md), «Parches de la rama 14.0-pns-ai-3973 (parche 39, 17/11/2026)». Sin cambios en
+       P-2;
+     - **Core del staging, comprobado (17/11/2026, solo lectura en el VPS):** `odoo14_pns` monta en `ro`
+       `/opt/odoo/odoo-core/odoo` en `/usr/lib/python3/dist-packages/odoo` y `/opt/odoo/odoo-core/addons` en
+       `/mnt/core-addons`. Commit `cc0060e889603eb2e47fa44a8a22a70d7d784185` (22/10/2024), sin cambios locales: el
+       mismo que LIYBEN y que la referencia `/opt/odoo-src/14.0`. SHA-256 (16) dentro del contenedor iguales a la tabla
+       de LIYBEN (propuesta de la fase 3, «Datos de LIYBEN»): `fields.py` `f915e7114ceb705d`, `models.py`
+       `aae6b5a0c3027136`, `auth_totp/models/res_users.py` `a8bb617ffd88f3b8`, `auth_signup/models/res_partner.py`
+       `c848abd85790cadd`; `iap/models/iap_account.py` `010ed431f82f5666`, igual en la imagen `odoo-dev:14` y en la
+       referencia (las citas del parche 39 valen para el staging y LIYBEN). `iap` solo carga de `/mnt/core-addons`.
+       El core de la imagen del laboratorio no es `cc0060e` (variante de `totp_secret`): el laboratorio con el core
+       de LIYBEN cubriría también el staging (decisión pendiente, tras el bloque 4 de las pruebas con toda la rama).
+       Observación sin acción: volumen anónimo en `/mnt/extra-addons` (`rw`, el `VOLUME` de la imagen), fuera del
+       `addons_path` (solo usa `/mnt/extra-addons/pns`, `ro`);
    - P-14, en una BD instalada con `~/pns_ai_3973/fase0/modulos_3879` y después actualizada;
    - P-2, con tres casos:
      - (a) `-u` desde 3.1.879 con el parche 35: corrige los dos crons;

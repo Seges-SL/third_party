@@ -268,6 +268,7 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
 | 36 | PNS-103 | funcional | `pns_base/models/operation_report_wizard.py` | 2c | Aplicado (11/11/2026); validado en el laboratorio (12/11/2026) |
 | 37 | PNS-104 | datos | `pns_ai_mcp/controllers/controller_helpers.py` | 3b | Aplicado (12/11/2026) |
 | 35 | NUEVO-2 | robustez | `pns_ai_mcp/migrations/14.0.3.1.973/post-migrate.py` | plan, «Parche 35» | Aplicado (17/11/2026); se comprueba en P-2 (a, b y c). Única excepción a «sin `migrations/` propios»: solo se ejecuta en un `-u` que cruce 3.1.973; una BD actualizada a 3.1.973 sin el parche no lo ejecuta y se corrige a mano (una instalación nueva no lo necesita) |
+| 39 | PNS-107 | seguridad | `pns_ai_mcp/controllers/validators_base.py`, `pns_ai_mcp/controllers/context_builder.py` | plan, «Pruebas posteriores», punto 4 (P2) | Aplicado (17/11/2026): `iap.account.get` bloqueado en la caja A por modelo y nombre, y sus 8 llamadores públicos por nombre (D40); campo calculado de `partner_autocomplete` e `iap_enrich`, restos conocidos |
 
 Las entradas de cada parche portado se añaden debajo, en «Parches de la rama 14.0-pns-ai-3973», con sus
 archivos y líneas, los ajustes, el test y la neutralización.
@@ -5027,6 +5028,198 @@ Base: `7c68ae8`. Plan: [plan_correccion_pns_ai_3973.md](plan_correccion_pns_ai_3
   marcadores, `_try_lock` en restos, y estos dos apartados. No aplicado: comprobar el otro cron en el test 5, porque
   haría fallar el test 5 con N35w (ya lo cubren los tests 2 y 7). Se mantiene la posición de la sección. Las citas de
   `migration.py` y `loading.py` están contrastadas en la imagen.
+
+## Parches de la rama 14.0-pns-ai-3973 (parche 39, 17/11/2026)
+
+Base: `51d4630`. Plan: [plan_correccion_pns_ai_3973.md](plan_correccion_pns_ai_3973.md), «Pruebas posteriores», punto
+4 («Antes»: decisión sobre P2). Hallazgo P2: [propuesta de la fase 3](propuesta_fase3_3973.md), «Hallazgos de P1 a P3
+(12/11/2026, solo lectura)». Citas de Odoo: imagen `odoo-dev:14` (`odoo` 14.0.20231106,
+`/usr/lib/python3/dist-packages/odoo`), no la referencia.
+
+### Decisiones de Sergio (17/11/2026)
+
+- **D39:** NUEVO-2 entra en el informe al fabricante. Corrección a proponer: que el `init()` del modelo fije el `code`
+  de los dos crons por su XML ID (`pns_ai_mcp.ir_cron_ai_fetch_cache_gc` y `pns_ai_mcp.ir_cron_ai_api_result_cache_gc`),
+  de modo que una BD actualizada sin pasar por `migrations/` también quede bien. El parche 35 no cambia.
+- **D40:** P2 (`iap.account.get`), **opción B**, **parche 39**, hallazgo **PNS-107**, gravedad **Baja**. Subpuntos:
+  - **D40a:** `get` se bloquea por modelo y nombre en tiempo de ejecución (`RELAXAICODE_SIDE_EFFECT_MODEL_METHODS`);
+  - **D40b** (tras la revisión): los métodos públicos que llegan a `get` antes de escribir van a la lista global
+    `RELAXAICODE_SIDE_EFFECT_METHODS` (8 nombres, inventario abajo), aunque dos colisionen con acciones de otros
+    modelos;
+  - **D40c:** la vía del campo calculado de `partner_autocomplete` y `crm.lead.iap_enrich` quedan como restos conocidos,
+    sin código;
+  - **D40d** (tras la segunda revisión): el alias sin llamada de esos 8 nombres (`f = rec.get_credits_url; f(...)`) se
+    cierra con datos: cada nombre va también a `RELAXAICODE_SIDE_EFFECT_MODEL_METHODS`, solo en los modelos del grupo A,
+    donde llega a `get` (no en los de las colisiones ni en `mailing.mailing.action_send_sms`, del grupo B). La familia
+    del alias para los nombres de los parches 15 y 22 sigue pendiente como E3 (D-2), sin cambio en el 39.
+
+### Parche 39: `iap.account.get` desde la caja A (PNS-107, seguridad)
+
+- **Qué falla sin él:** `iap.account.get(service_name, force_create=True)` (`odoo/addons/iap/models/iap_account.py:33-77`)
+  abre cursores propios con `self.pool.cursor()` y confirma al salir del `with`:
+  - si hay cuentas sin token, las borra con `sudo()` (`:43-53`, `unlink` en `:52`);
+  - si no hay cuenta, crea una (`:54-73`, `create` en `:67`) y deja su `account_token` en la caché (`:70-72`).
+
+  Desde la caja A es una escritura fuera de su `ROLLBACK` y de su READ ONLY (familia de los parches 15 y 22): cualquier
+  usuario con `relaxaicode` puede crear o borrar cuentas IAP con `env['iap.account'].get('<servicio>')`, o con un método
+  público que llegue a `get` (inventario). El token nuevo en caché ya lo cierra O1 (parche 18). El nombre `get` no puede
+  ir a `RELAXAICODE_SIDE_EFFECT_METHODS`: rompería `dict.get` en tiempo de ejecución y el AST tomaría por escritura
+  cualquier `x.get(...)`.
+- **Inventario de llamadores** (17/11/2026, por lectura; búsqueda en `/opt/odoo-src/14.0/odoo/addons` —todos los addons,
+  no solo los instalados—, `oca`, `vertical-instaladores` y este repo; llamadas directas, por variables y a través de
+  `get_credits`. Las líneas citadas son iguales en la imagen: los 11 archivos coinciden o solo difieren en otras
+  líneas):
+  - **A. Públicos que llegan a `get` sin escribir antes (bloqueados por D40b):**
+
+    | Nombre | Modelo (módulo) | Cadena hasta `get` |
+    |---|---|---|
+    | `get_credits_url` | `iap.account` (iap) | `iap_account.py:80` → `self.get(...)` `:87` |
+    | `get_config_account_url` | `iap.account` (iap) | `iap_account.py:126` → `get('partner_autocomplete')` `:128` |
+    | `redirect_to_buy_autocomplete_credit` | `res.config.settings` (partner_autocomplete) | `partner_autocomplete/models/res_config_settings.py:15` → `get_credits_url` `:19` |
+    | `action_buy_credits` | `sms.resend` (sms) | `sms/wizard/sms_resend.py:110` → `get_credits_url` `:111` |
+    | `action_buy_sms_credits` | `mailing.mailing` (mass_mailing_sms) | `mass_mailing_sms/models/mailing_mailing.py:147` → `get_credits_url` `:148` |
+    | `action_send_sms` | `sms.composer` (sms) | `sms/wizard/sms_composer.py:191` → `_action_send_sms` `:197` (`:205`) → `_action_send_sms_numbers` `:208` (`:219`) → `sms.api._send_sms_batch` `:220` (`sms/models/sms_api.py:38`) → `_contact_iap` `:58` (`:15`) → `get('sms')` `:16`. Con `new({...})` y `composition_mode='numbers'` no escribe nada antes, y además envía el SMS |
+    | `action_send_sms` | `mailing.sms.test` (mass_mailing_sms) | `mass_mailing_sms/wizard/mailing_sms_test.py:19` → `sms.api._send_sms_batch` `:34` (como arriba) |
+    | `action_send_sms_mass_now` | `sms.composer` (sms) | `sms_composer.py:200` → `action_send_sms` `:203`; con `mass_force_send=True` no hace el `write` de `:202` |
+    | `action_submit` | `crm.iap.lead.mining.request` (crm_iap_lead) | `crm_iap_lead/models/crm_iap_lead_mining_request.py:230` → `_perform_request` `:234` (`:167`) → `get('reveal')` `:173`; con un `name` distinto de «New» no pasa por `next_by_code` (`:232-233`) |
+
+  - **B. Públicos que el READ ONLY de la caja A frena antes de `get`** (por lectura): `crm.lead.iap_enrich`
+    (`crm_iap_lead_enrich/models/crm_lead.py:49`) llega a `get('reveal')` por `iap.enrich.api._request_enrich` (`:83`;
+    `crm_iap_lead_enrich/models/iap_enrich_api.py:23` → `_contact_iap` `:39` → `:15`) y a `get_credits_url` (`:88`), pero
+    antes hace `SELECT … FOR UPDATE NOWAIT` (`:56-58`), que PostgreSQL rechaza en una transacción READ ONLY.
+    `mailing.mailing.action_send_sms` (`mailing_mailing.py:261`) y `action_send_mail` (`:255`) crean el composer
+    (`create`, `:268`) antes de llegar. `sms.resend.action_resend` (`sms/wizard/sms_resend.py:66`) llega al envío por `_notify_record_by_sms` (`:93`), que crea los `sms.sms` (`sms/models/mail_thread.py:305`)
+    antes de `send` (`:347`). Sin código (D40c para `iap_enrich`); `action_send_sms` queda bloqueado igualmente
+    por nombre.
+  - **C. Ya bloqueados por el parche 22:** `get_credits` (`iap_account.py:139` → `get(force_create=False)` `:140`),
+    `autocomplete`, `enrich_company` y `read_by_vat` (`partner_autocomplete/models/res_partner.py:108, 121, 146` →
+    `_rpc_remote_api` `:85` → `get` `:89`), `start_sync` (`res_partner_autocomplete_sync.py:17` → `:28`), `send_letter`
+    (`mail.message`, `snailmail/models/mail_message.py:30` → `_snailmail_print` `:31` → … → `_snailmail_create`,
+    `snailmail_letter.py:215`), `snailmail_print` (escribe antes, `snailmail_letter.py:407`), `send` (`sms.sms`) y
+    `run`.
+  - **D. No alcanzables por nombre:** los métodos `_privados` de las cadenas (los rechaza `blocked_private_attr`),
+    `crm.reveal.rule._process_lead_generation` (privado; solo lo llama su cron, `crm_iap_lead_website/data/reveal_data.xml:9`)
+    y el controlador de `mail_client_extension` (`controllers/main.py:114-120`). OCA y `vertical-instaladores` no llaman a
+    `get`; `server_environment_iap` e `iap_alternative_provider` (OCA) heredan `iap.account` con `_name` y no redefinen
+    `get`.
+  - **Colisiones de nombre** (`def <nombre>(` en el core, OCA, este repo y `vertical-instaladores`):
+    `action_send_sms` también en `hr.employee` (`hr_presence/models/hr_employee.py:141`) y `website.visitor`
+    (`website_sms/models/website_visitor.py:25`), que abren el asistente de SMS; `action_submit` también en
+    `stock.request.order` y `stock.request` (OCA `stock_request_submit/models/stock_request_order.py:12`,
+    `stock_request.py:17`), que cambian el estado. Ninguno es de lectura: bloquearlos en la caja A no quita nada que una
+    consulta necesite, y dejarlos abriría `sms.composer` y `crm.iap.lead.mining.request`. Los otros seis nombres solo
+    existen donde se indica.
+- **Cambio** (marcador `# Seges: parche 39 (PNS-107, seguridad). Ver docs/pendiente/parches_pns_ai.md`):
+  - `pns_ai_mcp/controllers/validators_base.py`:
+    - `:304-314`: los 8 nombres de A al final de `RELAXAICODE_SIDE_EFFECT_METHODS` (`:230-315`), con un comentario en
+      inglés. Los rechaza el AST (caja A → `requires_write`) y, por nombre dinámico, `_refuse_attr_name`, como
+      `get_credits` en el 22;
+    - `:317-334`: `RELAXAICODE_SIDE_EFFECT_MODEL_METHODS`, con un comentario en inglés: `get` en `iap.account` (D40a) y
+      cada nombre del grupo A en su modelo (D40d): `iap.account` (`get_credits_url`, `get_config_account_url`),
+      `res.config.settings`, `sms.resend`, `mailing.mailing` (`action_buy_sms_credits`), `sms.composer`
+      (`action_send_sms`, `action_send_sms_mass_now`), `mailing.sms.test` (`action_send_sms`) y
+      `crm.iap.lead.mining.request` (`action_submit`). Las cadenas, con archivo:línea, en el inventario (A). Así hay dos
+      capas: la lista global (AST y nombre dinámico) y la tabla por modelo (cualquier lectura en `_read_attr`, también
+      la literal sin llamada);
+  - `pns_ai_mcp/controllers/context_builder.py`:
+    - import de la constante en los dos caminos: el de Odoo (`:30-31`) y el de respaldo con `_vm` (`:53-54`);
+    - `_seges_check_model_method(obj, name)` (`:308-327`): si `name` es `str` y `obj` es un recordset o una clase de
+      `BaseModel` cuyo `_name` está en la constante con ese nombre, `AttributeError` con el texto de los métodos de
+      efectos de `_refuse_attr_name` («Method 'get' writes outside RelaxAICode's rollback…»). Sin Odoo
+      (`_SegesBaseModel is None`), no hace nada;
+    - llamada en `_read_attr` (`:333-334`), tras el primer `is_db_handle` y antes del `getattr`. `_read_attr` es el
+      camino común de la lectura literal (`sandbox_attr`) y de la dinámica (`guarded_getattr`, que usan también
+      `attrgetter` y `methodcaller`): un solo punto cubre las dos.
+  - El texto del error va como f-string (el hook de lint marca `%`); el mensaje es el mismo.
+  - Marcadores fuera de `tests/`: «# Seges: parche» (solo `.py`) 130 → 136; con el criterio de la fase 3a («Seges:
+    parche» en `.py`, `.js` y `.xml`) 135 → 141.
+- **Tests** (`pns_ai_mcp/tests/test_seges_sandbox_side_effects.py:177-273`, al final de `TestSegesSandboxSideEffects`,
+  sin tocar los 10 que había):
+  1. `test_box_a_iap_get_refused`: `_assert_box_a_refused('iap.account', 'get', …)` con
+     `env['iap.account'].get('seges_p39')` por `tool_relaxaicode` como `base.user_admin`; el `get` sustituido no se
+     llama;
+  2. `test_box_a_iap_get_dynamic_refused`: con `get` sustituido (`autospec=True`), `AttributeError` en
+     `guarded_getattr(recordset, 'get')`, `guarded_getattr(type(recordset), 'get')` y
+     `guarded_methodcaller('get', 'seges_p39')(recordset)`; el sustituto no se llama;
+  3. `test_box_a_get_controls_pass` (controles): `guarded_getattr({'k': 1}, 'get')` devuelve el método de `dict` y
+     funciona, `guarded_getattr(env['iap.account'], 'search')` pasa, y por `tool_relaxaicode`
+     `result = {'a': {'k': 1}.get('k'), 'n': env['iap.account'].search_count([])}` no da `isError`;
+  4. `test_box_a_iap_get_indirect_refused`: un subtest por cada uno de los 9 casos de A (8 nombres; `action_send_sms` en
+     dos modelos): primero, si el modelo está en la BD, `_assert_box_a_refused(modelo, nombre, …)` con la llamada sobre
+     `new({...})` (el método sustituido no se llama); después, el nombre está en la lista y
+     `guarded_getattr(object(), nombre)` da `AttributeError`. Si el modelo no está en la BD, solo se hacen las dos
+     comprobaciones de nombre y el subtest se salta con motivo;
+  5. `test_box_a_iap_get_alias_refused`: un subtest por cada uno de los 9 casos de A con alias sin llamada
+     (`f = <recordset>.<nombre>`, después `f(...)`), por `_assert_box_a_refused` (el AST no ve llamada con ese nombre;
+     lo rechaza la tabla por modelo en tiempo de ejecución). Salto con motivo si el modelo no está en la BD (lo hace el
+     helper).
+
+  Los tests 1 a 3 se saltan con motivo si `iap.account` no está en la BD. Ajuste sobre el encargo: la forma
+  `guarded_methodcaller('get')(recordset, 'seges_p39')` da `TypeError` (la función devuelta solo recibe el objeto, como
+  `operator.methodcaller`); la primera batería (`tests-20261117-175033.log`) lo mostró como 1 E en el test 2.
+- **Lint:** `odoo_lint.py --revisar pns_ai_mcp/ --base 51d4630`, 0 incidencias nuevas (148 preexistentes en
+  `context_builder.py` y 14 en `validators_base.py`).
+- **Batería final** (`tests-20261117-184700.log`): 580 tests (+5), 1 F
+  (`test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin`), 0 E y 12 saltados: los 6 de la línea base, por nombre, y 3
+  subtests de cada uno de los tests 4 y 5 (`mailing.mailing`, `mailing.sms.test` y `crm.iap.lead.mining.request`:
+  `mass_mailing_sms` y `crm_iap_lead` no están en la BD de tests). Traceback 58, «bad query» 1
+  (`UPDATE "ai_safe_operation"`), «seges_side_env: » 1 y secretos 0, iguales que en la línea base. Origen:
+  `addons paths` con `/mnt/compartidos/third_party`.
+- **Neutralizaciones finales** (SHA-256 de referencia de `validators_base.py`,
+  `f28cf1040531817c6571d7e0bca5bf331855f91e0b25f9cf937c859cd2e2bedf`, igual tras restaurar cada una). En todas: 580
+  tests, 0 E, «bad query» 1 (`UPDATE "ai_safe_operation"`), «seges_side_env: » 1, secretos 0 y la F de `test_paap_i7`:
+
+  | Neutralización | Log | Resultado |
+  |---|---|---|
+  | N39: `RELAXAICODE_SIDE_EFFECT_MODEL_METHODS = {}` (`:324-334`) | `tests-20261117-185028.log` | F en los tests 1 y 2 y en los 6 subtests del test 5 con módulo instalado (`:270`: el método sustituido se llama); tests 3 y 4 correctos (al test 4 lo cubre la lista global); 12 saltados; Traceback 66 |
+  | N39b: sin `:304-314` (los 8 nombres de la lista global y su marcador) | `tests-20261117-185353.log` | F en los 9 subtests del test 4, todos en el `assertIn` (`:241`): la llamada literal la sigue rechazando la tabla por modelo (segunda capa); test 5 correcto; 9 saltados (los del test 4 ya no se saltan); Traceback 67 |
+  | N39c: tabla reducida a `{'iap.account': frozenset({'get'})}` (sin D40d) | `tests-20261117-185717.log` | F solo en los 6 subtests del test 5 con módulo instalado (`:270`: `get_credits_url`, `get_config_account_url`, `redirect_to_buy_autocomplete_credit`, `action_buy_credits`, `action_send_sms` y `action_send_sms_mass_now`): es el alias sin llamada; tests 1 a 4 correctos; 12 saltados; Traceback 64 |
+
+- **Rondas anteriores** (sustituidas por la final):
+  - primera, sin D40b: batería `tests-20261117-175513.log` (578 tests, mismos recuentos) y N39
+    `tests-20261117-175930.log` (F en los tests 1 y 2; en el test 1, el `get` sustituido se llama y `tool_relaxaicode`
+    devuelve `1` sin error: confirma PNS-107);
+  - segunda, con D40b y sin D40d: baterías `tests-20261117-181748.log` y `tests-20261117-183018.log` (579 tests, mismos
+    recuentos); N39 `tests-20261117-182143.log` (F en los tests 1 y 2); N39b `tests-20261117-182539.log` (9 F en el
+    `assertIn`: con el test 4 comprobando antes la lista, probaba la lista y no la llamada, y por eso se reordenó) y
+    `tests-20261117-183424.log` (9 F: 6 en `_assert_box_a_refused`, porque el método sustituido se llamaba, y 3 en el
+    `assertIn`). SHA-256 de referencia de entonces: `41279d09a92c24248fb9899de580a986f7683d1eef7317e727096e0e046f7b48`.
+- **Restos conocidos:**
+  - **alias sin llamada de los nombres de los parches 15 y 22** (`f = rec.<nombre>; f()`): el AST solo ve llamadas y la
+    lista global solo se aplica al nombre dinámico (`validators_checks.py:481-485`; `context_builder.py`,
+    `_refuse_attr_name` con `dynamic=False` en `sandbox_attr`). Sigue pendiente como E3 (D-2), igual que antes del 39.
+    Para los 8 nombres del 39 en sus modelos lo cierra la tabla por modelo (D40d); `get_credits` (parche 22) sigue en
+    la familia;
+  - **campo calculado con efectos al leerlo** (por lectura, sin comprobar en ejecución; D40c): leer
+    `res.config.settings.partner_autocomplete_insufficient_credit` (`partner_autocomplete/models/res_config_settings.py:9`,
+    no almacenado) ejecuta `_compute_partner_autocomplete_insufficient_credit` (`:11-13`) → `iap.account.get_credits`
+    (`iap_account.py:139`) → `get(service_name, force_create=False)` (`:140`): borra con `sudo()`, en un cursor propio que
+    confirma, las cuentas `partner_autocomplete` sin token (`:43-53`) y, si hay cuenta, hace un JSON-RPC a IAP con su
+    token (`:143-153`). Se alcanza con `env['res.config.settings'].new({}).partner_autocomplete_insufficient_credit` para
+    quien lea Ajustes. Es un hueco previo al 39 (el parche 22 cierra `get_credits` por nombre, no por campo).
+    **Candidato al informe al fabricante.** La familia —campos calculados que tienen efectos al leerlos— queda como
+    resto conocido: el sandbox controla nombres de método, no los `compute` que dispara una lectura;
+  - `crm.lead.iap_enrich` (B): llega a `get`, pero hoy lo frena el `SELECT … FOR UPDATE NOWAIT`
+    (`crm_lead.py:56-58`) en la transacción READ ONLY de la caja A (por lectura). Si ese orden cambiara, quedaría
+    abierto;
+  - el bloqueo de `get` es por `_name`: una clase de extensión con solo `_inherit = 'iap.account'` tiene `_name` vacío
+    en su definición, y `type(rec).mro()[i].get` sobre ella pasaría el filtro si esa clase redefiniera `get`. Hoy no hay
+    ninguna (ni en el core ni en OCA);
+  - otros métodos del core con nombre común que confirman en cursor propio no están inventariados; la constante es el
+    sitio para añadirlos.
+- **Cómo comprobar si el fabricante ya lo ha corregido:** los tests 1, 2, 4 y 5 pasan con N39 y N39b aplicadas a la vez, o el
+  fabricante publica un bloqueo propio de `iap.account.get` y de sus llamadores en la caja A.
+- **Seguimiento:** ficha PNS-107 en [seguimiento_informe_pns_ai.md](seguimiento_informe_pns_ai.md) (Baja, candidata al
+  informe al fabricante). Corrección de la clasificación del parche 22 en
+  [e2_propuesta_3879.md](e2_propuesta_3879.md), nota del 17/11/2026 tras la tabla de candidatos.
+- **Revisión (`odoo-reviewer`, 17/11/2026):** primera vuelta RECHAZADO: CRÍTICO, los métodos públicos que llegan a
+  `get` (de ahí el inventario y D40b); AVISO, el campo calculado (resto conocido, D40c) y el alcance de la
+  documentación. Confirmado sin hallazgos: `_read_attr` es el único camino de lectura de atributos, el manejo de clases
+  y el coste. Segunda vuelta (17/11/2026): APROBADO CON OBSERVACIONES. Inventario completo para la llamada directa
+  (core, OCA y vertical; imagen igual a la referencia); citas, marcadores y logs contrastados; lint 0 nuevas. AVISO: el
+  alias sin llamada de los 8 nombres no lo frenaban ni el AST ni la lista global; cerrado con la tabla por modelo
+  (D40d), con el test 5 y N39c. Sugerencias aplicadas: precisión del apartado C (`send_letter`) y `action_resend` en el
+  B.
 
 ## Parches de la rama 14.0-pns-ai-3973 (fase 4, 13/11/2026)
 
