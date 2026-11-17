@@ -173,3 +173,101 @@ class TestSegesSandboxSideEffects(TransactionCase):
             "{'seges': 'https://seges.invalid/seges.zip'})\n"
             "result = 1\n"
         ))
+
+    # Seges: parche 39 (PNS-107, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    def test_box_a_iap_get_refused(self):
+        self._assert_box_a_refused('iap.account', 'get', (
+            "env['iap.account'].get('seges_p39')\n"
+            "result = 1\n"
+        ))
+
+    def test_box_a_iap_get_dynamic_refused(self):
+        if 'iap.account' not in self.env:
+            self.skipTest('iap.account no está instalado en esta BD')
+        records = self.env['iap.account']
+        with mock.patch.object(type(records), 'get', autospec=True) as called:
+            with self.assertRaises(AttributeError):
+                guarded_getattr(records, 'get')
+            with self.assertRaises(AttributeError):
+                guarded_getattr(type(records), 'get')
+            with self.assertRaises(AttributeError):
+                guarded_methodcaller('get', 'seges_p39')(records)
+        self.assertFalse(called.called)
+
+    def test_box_a_get_controls_pass(self):
+        if 'iap.account' not in self.env:
+            self.skipTest('iap.account no está instalado en esta BD')
+        self.assertEqual(guarded_getattr({'k': 1}, 'get')('k'), 1)
+        self.assertTrue(callable(guarded_getattr({}, 'get')))
+        self.assertTrue(callable(guarded_getattr(self.env['iap.account'], 'search')))
+        code = (
+            "result = {'a': {'k': 1}.get('k'), "
+            "'n': env['iap.account'].search_count([])}\n"
+        )
+        resp = tool_relaxaicode(
+            _StubController(self.env(user=self.admin)), {'code': code})
+        text = json.dumps(resp, default=str)
+        self.assertFalse(resp.get('isError'), text[:300])
+
+    # Seges: parche 39 (PNS-107, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    def test_box_a_iap_get_indirect_refused(self):
+        sms = "{'composition_mode': 'numbers', 'numbers': '+34600000000', 'body': 'x'}"
+        cases = (
+            ('iap.account', 'get_credits_url',
+             "env['iap.account'].get_credits_url('seges_p39')"),
+            ('iap.account', 'get_config_account_url',
+             "env['iap.account'].get_config_account_url()"),
+            ('res.config.settings', 'redirect_to_buy_autocomplete_credit',
+             "env['res.config.settings'].new({}).redirect_to_buy_autocomplete_credit()"),
+            ('sms.resend', 'action_buy_credits',
+             "env['sms.resend'].new({}).action_buy_credits()"),
+            ('mailing.mailing', 'action_buy_sms_credits',
+             "env['mailing.mailing'].new({}).action_buy_sms_credits()"),
+            ('sms.composer', 'action_send_sms',
+             f"env['sms.composer'].new({sms}).action_send_sms()"),
+            ('mailing.sms.test', 'action_send_sms',
+             "env['mailing.sms.test'].new({'numbers': '+34600000000'}).action_send_sms()"),
+            ('sms.composer', 'action_send_sms_mass_now',
+             f"env['sms.composer'].new({sms}).action_send_sms_mass_now()"),
+            ('crm.iap.lead.mining.request', 'action_submit',
+             "env['crm.iap.lead.mining.request'].new({'name': 'seges_p39'}).action_submit()"),
+        )
+        for model, method, call in cases:
+            with self.subTest(model=model, method=method):
+                installed = model in self.env and hasattr(type(self.env[model]), method)
+                if installed:
+                    # First: without the patch the sandbox reaches the method.
+                    self._assert_box_a_refused(model, method, f"{call}\nresult = 1\n")
+                self.assertIn(method, RELAXAICODE_SIDE_EFFECT_METHODS)
+                with self.assertRaises(AttributeError):
+                    guarded_getattr(object(), method)
+                if not installed:
+                    self.skipTest(f'{model}.{method} no está instalado en esta BD')
+
+    # Seges: parche 39 (PNS-107, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    def test_box_a_iap_get_alias_refused(self):
+        sms = "{'composition_mode': 'numbers', 'numbers': '+34600000000', 'body': 'x'}"
+        cases = (
+            ('iap.account', 'get_credits_url', "env['iap.account']", "'seges_p39'"),
+            ('iap.account', 'get_config_account_url', "env['iap.account']", ""),
+            ('res.config.settings', 'redirect_to_buy_autocomplete_credit',
+             "env['res.config.settings'].new({})", ""),
+            ('sms.resend', 'action_buy_credits', "env['sms.resend'].new({})", ""),
+            ('mailing.mailing', 'action_buy_sms_credits',
+             "env['mailing.mailing'].new({})", ""),
+            ('sms.composer', 'action_send_sms', f"env['sms.composer'].new({sms})", ""),
+            ('mailing.sms.test', 'action_send_sms',
+             "env['mailing.sms.test'].new({'numbers': '+34600000000'})", ""),
+            ('sms.composer', 'action_send_sms_mass_now',
+             f"env['sms.composer'].new({sms})", ""),
+            ('crm.iap.lead.mining.request', 'action_submit',
+             "env['crm.iap.lead.mining.request'].new({'name': 'seges_p39'})", ""),
+        )
+        for model, method, records, args in cases:
+            with self.subTest(model=model, method=method):
+                # A bare read, then the call: the AST sees no call by that name.
+                self._assert_box_a_refused(model, method, (
+                    f"f = {records}.{method}\n"
+                    f"f({args})\n"
+                    "result = 1\n"
+                ))
