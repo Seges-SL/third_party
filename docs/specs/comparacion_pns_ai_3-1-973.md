@@ -582,10 +582,15 @@ Seges sin traer media versión.
 
 ### 6.1 Reintento automático de la tarjeta frente al parche 16 y D29
 
-- **Qué hace 3.1.973:** tras un Confirmar rechazado por `too_soon`, `bad_token` o `missing_token`, la tarjeta
-  pide un token nuevo a `/pns_ai_mcp/verification/pending` (solo operaciones propias, `held` para no rotar las
-  demás) y confirma una vez más sola, tras 5,5 s si es `high` (`chatboo_component_v2.js`, `_retryRefusedCard`;
-  `controllers/verification_ui.py:142-152`).
+- **Qué hace 3.1.973** (corregido el 17/11/2026 por lectura de `chatboo_component_v2.js:2275-2284`, en
+  `_retryRefusedCard`): tras un Confirmar rechazado, la tarjeta confirma una vez más sola, y lo que hace antes depende
+  del motivo:
+  - con `too_soon`, no pide nada: espera 5,5 s si es `high` (1 s si no) y vuelve a confirmar con el **mismo token**;
+  - con `bad_token` o `missing_token`, pide un token nuevo a `/pns_ai_mcp/verification/pending` (solo operaciones
+    propias, con `held` para no rotar las demás; `controllers/verification_ui.py:142-152`) y confirma tras 5,5 s si es
+    `high`.
+
+  Antes de esta corrección se decía que también pedía un token nuevo con `too_soon`.
 - **Por dónde confirma:** el reintento confirma por `/pns_ai_mcp/verification/confirm`
   (`controllers/verification_ui.py:52-76`), que no pasa por `@check_identity`. Es coherente con D29: la
   contraseña solo se pide en Autorizaciones.
