@@ -397,6 +397,67 @@ guardado): sigue valiendo «Si aparece otra BD». El script aborta (código 2) s
 otra BD, y el `trap` ya guarda el log y para. Si la otra BD aparece solo en la C del `trap` (log guardado), el código
 de salida no lo refleja: hay que leer esa C. En los dos casos, anotar y «Crons de la otra BD» sobre el log guardado.
 
+**Ampliación (17/11/2026): escenario p34 (L2, turnos reales).** Para el L2 del parche 34 (D20 a D24 del 16/11/2026 y
+D29 a D33 del 17/11/2026, en el registro de parches, «Parche 34 en 3.1.973»). La guía paso a paso del L2 está en
+[lab_3973/guia_l2_p34.md](lab_3973/guia_l2_p34.md). Los scripts de la tabla de abajo sustituyen a los de la tabla
+«Scripts» de arriba, que queda como histórica; la copia del repo se actualiza a la vez.
+
+- **Órdenes:**
+  - `lab_auto.sh <salida> --escenario p34 [--visible] [--espera-turno N]`: el escenario completo. `--visible`, Chrome a
+    la vista (D21); `--espera-turno`, segundos de espera por turno (por defecto, 600).
+  - `lab_cdp.py sqlprueba`: las once consultas del escenario contra la BD real, todas de solo lectura, para comprobarlas
+    antes del laboratorio.
+  - `p34_plantar.sh` y `p34_borrar.sh`: plantan y borran el lienzo de D24 (sesión plantada para 6d′).
+  - `p34_modelo.sh estado | poner lite | poner flash | devolver`: lee o cambia el `model_id` del proveedor 2 (30 =
+    `gemini-3.6-flash`, el de siempre; 24 = `gemini-3.5-flash`; 25 = `gemini-3.5-flash-lite`). `model_name` es un
+    `related` de `model_id.name`: solo se cambia `model_id`. `estado` solo lee; las otras tres escriben.
+- **Qué hace el escenario, en orden:**
+  1. paso 0: comprobaciones por SQL;
+  2. pausa 1, en una segunda ventana con cookies aparte: crear el contacto de D23 y quitar «Design» del proveedor 2;
+  3. T1 y T1b (rechazo sin «Design»);
+  4. pausa 2: volver a marcar «Design»;
+  5. V2 (página creada), 5b′ y 6c;
+  6. control del lienzo plantado (`alert()`, informativo);
+  7. 6d′, con dos intentos;
+  8. limpieza (pausa 3: archivar el contacto).
+- **Mensajes en inglés,** porque `seges_int` está en `en_US`: las frases de `page_tab` se eligen por el idioma del
+  usuario.
+- **En cada turno mide:**
+  - la burbuja en vivo y tras recargar;
+  - por SQL, la sesión y el último mensaje;
+  - «No page was built», con el motivo clasificado;
+  - si se activó `page_tab` y por qué;
+  - el recuento de líneas `ERROR` y `WARNING` de `pns_ai_mcp` en el log (solo el recuento, nunca el texto).
+- **Códigos** (los demás no cambian):
+  - 8: también un paso no concluyente o «NO EJECUTADO (proveedor caído)»;
+  - 9 (nuevo): una condición o una pausa que el SQL no confirma, o un chat que no se puede manejar;
+  - 10 (cambia): el `web` está en marcha o `docker ps` no responde. Antes era la respuesta distinta de `s`;
+    `lab_auto.sh` ya no pregunta.
+- **Validación sin Odoo:**
+  - autoprueba de `lab_cdp.py`: 76 PASA (75 sin `--js`; unos 13 min);
+  - `prueba_lab_auto.sh`: 32 PASA;
+  - `prueba_p34_scripts.sh`: 15 PASA;
+  - `prueba_p34_modelo.sh`: 21 PASA.
+
+| Archivo | Copia de referencia | SHA-256 |
+|---|---|---|
+| `lab_cdp.py` | [lab_3973/lab_cdp.py](lab_3973/lab_cdp.py) | `2593fc4e0b5fc6103c97593e6fde3ae5cbcfffd65b0345e5fcdf0e75bfe645eb` |
+| `lab_auto.sh` | [lab_3973/lab_auto.sh](lab_3973/lab_auto.sh) | `54dfa24d0ef1c985aa185f0a0531dd2e7cd98a70cdd15594526849b8fcf7646b` |
+| `prueba_lab_auto.sh` | [lab_3973/prueba_lab_auto.sh](lab_3973/prueba_lab_auto.sh) | `d73022db30855aed57396bcfe7e09dfb28087ea8aad63aac66b38a1d80fb9e03` |
+| `p34_plantar.sh` | [lab_3973/p34_plantar.sh](lab_3973/p34_plantar.sh) | `d213220e987d5ef46b2e8314d0d370f28437513212fd997f5429e31b3fd41ac3` |
+| `p34_borrar.sh` | [lab_3973/p34_borrar.sh](lab_3973/p34_borrar.sh) | `934b7ef1940de86a34d52fe7951972b3009e5fd12db91bf7de5664f4e2b1600f` |
+| `prueba_p34_scripts.sh` | [lab_3973/prueba_p34_scripts.sh](lab_3973/prueba_p34_scripts.sh) | `970fcd7d8a89d42a13a96ed9a6a671cd7edcb1313cbc9b58bc28dd2d0318ef0f` |
+| `p34_modelo.sh` | [lab_3973/p34_modelo.sh](lab_3973/p34_modelo.sh) | `f331facfea2d3c34d7ce285b3b990a918b03e5607b57b1d81e2b2871ec18da0c` |
+| `prueba_p34_modelo.sh` | [lab_3973/prueba_p34_modelo.sh](lab_3973/prueba_p34_modelo.sh) | `b4fbce683a4b85acb1558bb7fffe629b92ca210133e3a407606464af6fbaf97b` |
+| Guía del L2 (`guia_l2_p34_v6.md`) | [lab_3973/guia_l2_p34.md](lab_3973/guia_l2_p34.md) | `dc4fdcd8e9fc1ab5d77d3b305b80d8e7c8de55afd806ada6d3692d1010b6b4f4` |
+
+Los scripts se usan desde `~/pns_ai_3973/fase4/lab/`, con la misma regla que arriba: antes de usarlos, `sha256sum`
+debe dar estos valores.
+
+**Pendiente antes de reutilizar el escenario:** el clasificador de motivos de `lab_cdp.py` (`MOTIVOS_FIJOS`) no
+reconoce «No AI provider is configured…», y `rechazo()` de T1 busca «no design provider». Por eso T1 y T1b dieron
+código 8 en el L2 y se validaron a mano (D33). Errata en el registro de parches, «Parche 34 en 3.1.973».
+
 ## Registro de laboratorios
 
 Horas en UTC (las del log). Un bloque por laboratorio; no se reescriben los anteriores.
@@ -407,3 +468,8 @@ Horas en UTC (las del log). Un bloque por laboratorio; no se reescriben los ante
 | 16/11/2026 | 10:32:49 | 10:33:02 (última línea del log guardado) | `?` (17), `lab_pns_ai_3973_14` (41) / sin reinicios / `?` (17), `lab_pns_ai_3973_14` (47); Starting job: ninguna | `servidor-20261116-113304.log` | Parche 29 (D10), automatizado y sin LLM. Primer uso real de `lab_cdp.py` y `lab_auto.sh` con Odoo: código 0 («Laboratorio automatizado»). Sesión de `lab_pns_ai_3973_14` (uid 12). `canvas/4`, `canvas/8` y la descarga de la 8 abierta desde el disco: en las tres, imágenes 15/15 pintadas, 0 rotas, `<meta>` CSP como 2.º hijo de `<head>`, CSS1Compat, ningún «Refused», 0 errores de JS; 0 peticiones a `/web/database` bloqueadas. Informativos, fuera del lienzo: un 404 de `/es/website/translations/…` en el login y un 404 de `/es/favicon.ico` en `canvas/4`. Log (66 líneas): 1 WARNING `py.warnings` (`lab_pns_ai_3973_14`), 0 ERROR, 0 CRITICAL, 0 Traceback, 0 «bad query». D14 después igual que antes. |
 | 16/11/2026 | 16:13:16 | 16:13:23 (última línea del log guardado) | `?` (17), `lab_pns_ai_3973_14` (42) / sin reinicios / `?` (17), `lab_pns_ai_3973_14` (42); Starting job: ninguna | `servidor-20261116-171325.log` | Parche 34, L1 (D20): `lab_auto.sh … --pintado`, sin modelo y sin escrituras. Primer uso real de `--pintado` con Odoo: código 0. Sesión de `lab_pns_ai_3973_14` (uid 12). Formateador del cliente encontrado por `services`; 12/12 igual que lo previsto: a y b, cursiva; a′, etiquetas `<p><em>` literales; b′, c y d, guiones bajos literales (en d, además, pegado al párrafo). 0 errores de JS; 0 peticiones a `/web/database` bloqueadas. Informativo: un 404 de `/es/website/translations/…` en el login. Log (61 líneas): 1 WARNING `py.warnings` (`lab_pns_ai_3973_14`), 0 ERROR, 0 CRITICAL, 0 Traceback, 0 «bad query». Con el pintado confirmado, Sergio decide D25 (16/11/2026): el aviso pasa a línea llana, antes de L2. |
 | 16/11/2026 | 16:58:41 | 16:58:47 (última línea del log guardado) | `?` (17), `lab_pns_ai_3973_14` (42) / sin reinicios / `?` (17), `lab_pns_ai_3973_14` (42); Starting job: ninguna | `servidor-20261116-175850.log` | Parche 34, L1 repetido con la línea llana (D25): `lab_auto.sh … --pintado` con `lab_cdp.py` `f16d49fa…4604`, sin modelo y sin escrituras. Código 0. Sesión de `lab_pns_ai_3973_14` (uid 12). Formateador por `services`; 12/12 `línea llana`, igual que lo previsto: en los seis casos, en inglés y en español, el aviso se lee sin cursiva, guiones bajos ni etiquetas a la vista. 0 errores de JS; 0 peticiones a `/web/database` bloqueadas. Informativo: un recurso con error HTTP en el login. Log (61 líneas): 1 WARNING `py.warnings` (`lab_pns_ai_3973_14`), 0 ERROR, 0 CRITICAL, 0 Traceback, 0 «bad query». No mide si el aviso queda en línea propia o pegado al párrafo (se ve en `pintado.png`). Pendiente L2 (turnos reales). |
+| 17/11/2026 | ~09:29 | sí (log guardado; código final 9) | `?` (18), `lab_pns_ai_3973_14` (40) / no aplica (sin reinicios en el laboratorio automatizado) / `?` (48), `lab_pns_ai_3973_14` (441); Starting job: `lab_pns_ai_3973_14` (20) | `servidor-20261117-103610.log` (salida `salida_34_L2_20261117-102926`) | Parche 34, L2, **intento no válido**: código 9, «chat no manejable»: el chat no se abrió tras recargar y el escenario se abortó («ABORTADO el escenario: el chat no se abre (sin-componente)» → «escenario: NO CONFIRMADO»). En el log se vio además un timeout de Gemini en ese turno, que no causó el 9. |
+| 17/11/2026 | ~11:32 | sí (log guardado; código final 8) | `?` (17), `lab_pns_ai_3973_14` (42) / no aplica (sin reinicios en el laboratorio automatizado) / `?` (39), `lab_pns_ai_3973_14` (626); Starting job: `lab_pns_ai_3973_14` (18) | `servidor-20261117-124027.log` (salida `salida_34_L2_20261117-123117`) | Parche 34, L2, **intento no válido**: `page_tab` sin activar (`seges_int` en `en_US` y mensajes en español). |
+| 17/11/2026 | ~12:28 | sí (log guardado; código final 8) | `?` (18), `lab_pns_ai_3973_14` (41) / no aplica (sin reinicios en el laboratorio automatizado) / `?` (40), `lab_pns_ai_3973_14` (685); Starting job: `lab_pns_ai_3973_14` (15) | `servidor-20261117-134003.log` (salida `salida_34_L2_20261117-132720`) | Parche 34, L2, **intento no válido**: proveedor caído (8 timeouts y 2 × 429). |
+| 17/11/2026 | ~13:38 (primera línea del log guardado: 13:36:52) | 13:56:37 (última línea del log guardado); sí (log guardado; código final 8) | `?` (17), `lab_pns_ai_3973_14` (42) / no aplica (sin reinicios en el laboratorio automatizado) / `?` (41), `lab_pns_ai_3973_14` (689); Starting job: `lab_pns_ai_3973_14` (20) | `servidor-20261117-145639.log` (salida `salida_34_L2_20261117-143631`) | Parche 34, L2, **intento no válido**: 429 con `gemini-3.5-flash` (cuota agotada). |
+| 17/11/2026 | ~14:05 | ~14:12; sí (log guardado; código final 8) | `?` (17), `lab_pns_ai_3973_14` (42) / no aplica (sin reinicios en el laboratorio automatizado) / `?` (39), `lab_pns_ai_3973_14` (701); Starting job: `lab_pns_ai_3973_14` (13) | `servidor-20261117-151159.log` (salida `salida_34_L2_20261117-150436`) | Parche 34, **L2** (turnos reales): `lab_auto.sh … --escenario p34` con los scripts de «Ampliación (17/11/2026): escenario p34». Modelo `gemini-3.5-flash-lite` (excepción a la decisión 6 de la E3′, D32). Código 8, por T1 y T1b: el clasificador no reconoce el motivo real (pendiente en la ampliación). Los seis pasos validados (T1 y T1b, a mano, D33). Resultados por paso en el registro de parches, «Parche 34 en 3.1.973», «Laboratorio L2 (17/11/2026)». D14 después: 6 con diseño y 0 ilegibles. Limpieza hecha. |

@@ -38,6 +38,18 @@ exit 0
 DOBLE
 chmod +x "$T/bin/odoo-dev"
 
+# Doble de docker: solo «docker ps», según STUB_WEB (parado, en_marcha o falla).
+cat > "$T/bin/docker" <<'DOBLE'
+#!/usr/bin/env bash
+[ "$1" = ps ] || exit 0
+case "${STUB_WEB:-parado}" in
+    parado) echo "odoo-dev-14-db-1" ;;
+    en_marcha) printf 'odoo-dev-14-db-1\nodoo-dev-14-web-1\n' ;;
+    falla) exit 1 ;;
+esac
+DOBLE
+chmod +x "$T/bin/docker"
+
 # Doble de lab_cdp.py: navegar sale con STUB_NAV (y espera STUB_NAV_ESPERA s).
 cat > "$T/scripts/lab_cdp.py" <<'DOBLE'
 import os, subprocess, sys, time
@@ -92,10 +104,17 @@ caso "error interno de lab_cdp.py"       20 s s STUB_NAV=20 "${R[@]}"
 caso "pintado no concluyente"             8 s s STUB_NAV=8 "${R[@]}"
 caso "solo --pintado (sin rutas)"         0 s s STUB_NAV=0 -- "$T/home/salida" --pintado
 caso "pintado no concluyente y otra BD"   3 s s STUB_NAV=8 STUB_LOG=malo -- "$T/home/salida" --pintado
+caso "escenario p34 visible, todo bien"   0 s s STUB_NAV=0 -- "$T/home/salida" --escenario p34 --visible
+caso "escenario p34 no confirmado"        9 s s STUB_NAV=9 -- "$T/home/salida" --escenario p34 --visible
+caso "escenario p34 no concluyente"       8 s s STUB_NAV=8 -- "$T/home/salida" --escenario p34 --visible --espera-turno 300
+caso "escenario no confirmado y otra BD"  3 s s STUB_NAV=9 STUB_LOG=malo -- "$T/home/salida" --escenario p34
+caso "escenario desconocido"             12 n s -- "$T/home/salida" --escenario otro
+caso "espera por turno no válida"        12 n s -- "$T/home/salida" --escenario p34 --espera-turno 0
 caso "opción desconocida"                12 n s -- "$T/home/salida" --no-existe
 caso "falla arrancar (log vacío)"        14 s s STUB_ARRANCAR=1 STUB_LOG=vacio "${R[@]}"
 caso "falla arrancar (log con otra BD)"   3 s s STUB_ARRANCAR=1 STUB_LOG=malo "${R[@]}"
-caso "respuesta distinta de s"           10 n n "${R[@]}"
+caso "web ya en marcha (docker ps)"      10 n s STUB_WEB=en_marcha "${R[@]}"
+caso "docker ps no responde"             10 n s STUB_WEB=falla "${R[@]}"
 caso "sin credenciales"                  11 n s LAB_LOGIN= "${R[@]}"
 caso "ruta a /web/database"              12 n s -- "$T/home/salida" /web/database/selector
 caso "ruta con otra BD"                  12 n s -- "$T/home/salida" "/web/login?db=otra"

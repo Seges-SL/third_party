@@ -5,22 +5,27 @@
 # (también con Ctrl+C o un error), guarda el log, hace C sobre él y para.
 #
 # Uso (desde cualquier carpeta):
-#   lab_auto.sh <salida> [--pintado] [--descarga RUTA]... [RUTA...]
+#   lab_auto.sh <salida> [--pintado] [--escenario p34] [--visible]
+#               [--espera-turno N] [--descarga RUTA]... [RUTA...]
 # --pintado (parche 34, L1): pintado del aviso por el formatContent real del
 # cliente, antes de las rutas; sin modelo y sin escribir en la BD.
+# --escenario p34 (parche 34, L2): turnos reales con el proveedor, con dos
+# pausas en esta terminal y SQL de solo lectura. --visible: Chrome se ve.
 # Requiere LAB_LOGIN y LAB_PASSWORD exportadas. «Antes de arrancar» (estado y
 # bd-lista) se hace a mano antes de lanzarlo.
 #
 # Códigos de salida (un código por causa; los de 1 a 8, 11, 12 y 20 son los
 # de lab_cdp.py):
-#    0 todo como se espera            10 respuesta distinta de «s» (no arranca)
+#    0 todo como se espera            10 web ya en marcha o docker no responde
 #    1 incidencias de medición        11 faltan LAB_LOGIN o LAB_PASSWORD (no arranca)
 #    3 otra BD                        12 argumentos o rutas no válidos (no arranca)
 #    4 el servidor no responde        13 no existe ~/GitHub/lab_pns_ai_3973 (no arranca)
 #    5 falla el login                 14 falla «odoo-dev 14 arrancar»
 #    6 error de Chrome (CDP)          20 error interno de lab_cdp.py
 #    7 «Al acabar» incompleto        130 Ctrl+C o TERM
-#    8 no concluyente (--pintado no encuentra el formateador del cliente)
+#    8 no concluyente (--pintado no encuentra el formateador del cliente, o un
+#      paso de --escenario p34 no prueba nada)
+#    9 --escenario p34: condición o paso manual no confirmado por SQL
 # Prioridad si coinciden: 7, después 3, después el código de la navegación.
 set -uo pipefail
 
@@ -36,8 +41,9 @@ motivo() {
         5) echo "falla el login" ;;
         6) echo "error de Chrome (CDP)" ;;
         7) echo "«Al acabar» incompleto (log no guardado, sin líneas de Odoo o falla parar)" ;;
-        8) echo "no concluyente: el pintado no encontró el formateador del cliente" ;;
-        10) echo "respuesta distinta de «s»: no se arranca" ;;
+        8) echo "no concluyente: el pintado no encontró el formateador o un paso del escenario no prueba nada" ;;
+        9) echo "escenario p34: condición o paso manual no confirmado por SQL" ;;
+        10) echo "el contenedor web ya está en marcha (o docker no responde): no se arranca" ;;
         11) echo "faltan LAB_LOGIN o LAB_PASSWORD: no se arranca" ;;
         12) echo "argumentos o rutas no válidos: no se arranca" ;;
         13) echo "no existe $LAB: no se arranca" ;;
@@ -48,7 +54,7 @@ motivo() {
     esac
 }
 
-[ $# -ge 1 ] || { echo "Uso: lab_auto.sh <carpeta de salida> [--pintado] [--descarga RUTA]... [RUTA...]"; exit 12; }
+[ $# -ge 1 ] || { echo "Uso: lab_auto.sh <carpeta de salida> [--pintado] [--escenario p34] [--visible] [--espera-turno N] [--descarga RUTA]... [RUTA...]"; exit 12; }
 SALIDA=$1
 shift
 [ -n "${LAB_LOGIN:-}" ] && [ -n "${LAB_PASSWORD:-}" ] || {
@@ -60,8 +66,15 @@ RC=$?
 mkdir -p "$SALIDA" || exit 12
 cd "$LAB" 2>/dev/null || { echo "No existe $LAB."; exit 13; }
 
-read -rp "¿«odoo-dev 14 estado» mostró el contenedor web PARADO? (s/N) " RESP
-[ "$RESP" = "s" ] || { echo "No se arranca: primero «Al acabar» del laboratorio anterior."; exit 10; }
+# Desde el 17/11/2026 lo comprueba el script (antes se preguntaba): en el
+# segundo intento de L2, «web» seguía en marcha aunque la respuesta fue «s».
+NOMBRES=$(docker ps --format '{{.Names}}' 2>/dev/null) || {
+    echo "No se arranca: «docker ps» no responde."; exit 10; }
+if printf '%s\n' "$NOMBRES" | grep -qx 'odoo-dev-14-web-1'; then
+    echo "No se arranca: el contenedor odoo-dev-14-web-1 está en marcha. Primero «Al acabar» del laboratorio anterior (guardar el log, C y «odoo-dev 14 parar»)."
+    exit 10
+fi
+echo "Contenedor web parado (docker ps): se arranca."
 
 HECHO=0
 al_acabar() {
