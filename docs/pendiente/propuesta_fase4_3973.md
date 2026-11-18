@@ -115,6 +115,9 @@ Lo que pierde la resultante frente al fabricante:
 
 1. **Sin paso B.** La `<meta>` no rompe nada legítimo: lo confirman el código, el prompt de Design, P-9 y A7 (4
    diseños, ninguna carga del propio Odoo). El parche 27 sigue como en el plan.
+   Revisado en P-15 (18/11/2026): un diseño de `pns_demo` anterior a 3.1.973 carga imágenes con `/web/image` desde
+   JavaScript; se mantiene esta decisión ([plan](plan_correccion_pns_ai_3973.md), punto 5, D55), con comprobación a la
+   vista en el staging.
 2. **A7 se repite**, en solo lectura, sobre la copia de `pns_demo` de P-15.
 3. **La observación nueva** (abajo) va al informe al fabricante, sin parche.
 

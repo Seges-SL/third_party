@@ -771,6 +771,79 @@ Orden:
      `~/pns_ai_3973/fase4/csp/a7_recuentos.py`, que cuenta diseños por patrón, sin contenido ni ID (ver
      [propuesta_fase4_3973.md](propuesta_fase4_3973.md), A7). Su constante `BD` es `lab_pns_ai_3973_14`: para la
      copia hay que cambiarla, y el cambio se presenta antes.
+   - **Decisiones de Sergio (18/11/2026, tarde).** Numeración a continuación de D51, confirmada por Sergio:
+     - **D52:** P-15 en `lab_pns_ai_cc0060e` (core del staging, punto 4) con el web parado. Excepción al
+       procedimiento fijo ([lab_procedimiento_3973.md](lab_procedimiento_3973.md)): no hay `arrancar` ni reinicios del
+       web, así que no aplica la comprobación C. Si alguna vez se levantara el web con la copia, sería una decisión
+       aparte: la neutralización no vacía las claves de los proveedores de IA;
+     - **D53:** copia por `pg_dump`, sin filestore;
+     - **D54:** `-u` de los tres módulos (D38). A7 solo después, con una comprobación por SQL de los diseños
+       antes y después. Se añaden a P-15 `ai_skill` (las 7 retiradas) y P-11;
+     - **D55:** diseño con `/web/image` (A7b, abajo): **opción A**, se mantiene la decisión 1 del 13/11/2026
+       («sin paso B», [propuesta_fase4_3973.md](propuesta_fase4_3973.md), «Decisiones de Sergio (13/11/2026)»).
+       - Motivo: la cabecera del fabricante permite `'self'` en `img-src` y la `<meta>` del 27 lo quita. Es el efecto
+         buscado (propuesta de la fase 4, `:52` y `:314`). Es el único caso encontrado, y es un diseño de demostración
+         anterior a 3.1.973.
+       - Salvedad: en la 3879, el 27 ya tenía `img-src data: blob:`, pero «las de `/web/image` siguen, porque se
+         incrustan en `data:`» ([parches_pns_ai.md](parches_pns_ai.md), «Parche 27: el lienzo no deja salir datos
+         (F1)», e, de la 3879). No está comprobado si ese diseño muestra hoy sus imágenes en el staging: se comprueba a
+         la vista allí (punto 7).
+   - **P-15 hecho (18/11/2026).** Las salidas están fuera del repo, en `~/pns_ai_3973/fase4/cc0060e/p15/`: aquí se citan
+     por su nombre y se resumen, sin datos. Son `t0-20261118-133146.txt`, `t1-20261118-133247.txt`,
+     `t2-20261118-133339.txt`, `t3-20261118-133535.txt`, `t3b-20261118-133822.txt`, `t4-20261118-134055.txt`,
+     `t5-20261118-134441.txt`, `t6-20261118-135128.txt` y `t7-20261118-135715.txt`, más `p15_antes.txt`,
+     `p15_antes_b.txt` y `p15_despues.txt`. Log del `-u`: `actualizar-20261118-134056.log`. Fila en el registro de
+     laboratorios del [procedimiento](lab_procedimiento_3973.md).
+     - **Contexto y copia:** `lab_pns_ai_cc0060e` (core del staging) con el web parado de principio a fin (D52); BD
+       `p15_pns_demo_14`. Copia de `pns_demo` del 18/11/2026 a las 13:29 (hora local), por `pg_dump -Fc` desde
+       `odoo14_pns_db`, directa por SSH al portátil y sin filestore (D53): 5,4 MB. El archivo local tiene permisos 600
+       y se borra en la limpieza final del staging.
+     - **Carga:** `bd-cargar --bd`, neutralizada; log de carga vacío (0 errores). Paridad: 48 instalados, 45 iguales, 3
+       con versión distinta (`pns_base` 1.2.47 → 1.2.69, `pns_ai_mcp` 3.1.879 → 3.1.973 y `pns_ai_chatboo` 2.1.538 →
+       2.1.587) y 0 sin código. El «la instalación FALLARÁ» del final de `bd-cargar` es falso (pendientes, abajo).
+     - **`-u pns_base,pns_ai_mcp,pns_ai_chatboo`** (el de E1, D38): analizador OK, 0 bloqueantes, 0 avisos, código 0,
+       72 s. Log de 306 líneas: 0 Traceback, 0 «bad query» y ningún CRITICAL; «Running migration [14.0.3.1.973>]
+       post-migrate» 1; versiones de la rama.
+     - **WARNING del log (esperados):**
+       - `py.warnings` de `jinja2`, 1 (librería de la imagen);
+       - `ir_model` «Two fields … same label», 3 (`ai.log` ×2 y `ai.trusted.action` ×1): campos del fabricante,
+         cosmético;
+       - `ai_skill_disk` «MCP: skip retired unlink for pns_ai_mcp (no skill files on disk)», 2. Sale en todos los `-u`
+         de noviembre (1 con un módulo, 2 con varios): comportamiento del fabricante.
+     - **Parche 35 en una BD con historia:** «Seges patch 35: pns_ai_mcp.ir_cron_ai_api_result_cache_gc fixed» y
+       «… ir_cron_ai_fetch_cache_gc fixed», 1 y 1; WARNING del 35, 0. Los dos crons pasan de `model.gc_expired()` a
+       `model._gc_expired()`; inactivos por la neutralización antes y después.
+     - **Skills retiradas:** las 7 (`annual_billing`, `cash_forecast`, `credit_facility`, `customer_risk_analysis`,
+       `sys_info`, `users_all` y `users_logged`) estaban en `pns_demo` con fila de fábrica (`code`, `source_module`
+       `pns_ai_chatboo` y `owner_id` vacío); tras el `-u`, 0. `ai_skill`: 13 antes y 10 después (las 6 no retiradas y,
+       por la cuenta, 4 nuevas de 3.1.973; cuáles, no se sabe por esta copia). Cubre lo que el punto 7 («Skills sin
+       importar en 3.1.879») decía que el laboratorio no podía cubrir.
+     - **P-11** (consulta de `rama_comprobar.sh`): AI Administrators 3, sin AI Conversational 0. Solo después: el
+       «antes» no se tomó.
+     - **Diseños no vacíos, por SQL:** `chatboo_session.canvas_design` 12 y `chatboo_canvas_page.design` 0, iguales
+       antes y después.
+     - **A7** (solo después, D54; antes no, porque con el esquema de 3.1.879 y el código de 3.1.973 la lectura por ORM
+       podía fallar): 12 y 0 diseños, iguales al SQL. 0 en todos los patrones de ruta del servidor como atributo
+       (`src`/`href`/`url(` con `/`), `//`, `/web/content`, `/web/binary`, `/web/static`, `/pns_ai_`, `localhost`, de
+       petición, de `http(s)` y de `<script src=`. Más de 0: `data:image/` 1, `pns-img:` 1 y `/web/image` 1.
+     - **A7b** (diagnóstico de ese `/web/image`; contexto enmascarado, solo lectura; `t6-20261118-135128.txt`): 5
+       apariciones en un solo diseño, anterior a 3.1.973, sin `data:image/` ni `pns-img:`. 4 están dentro de `<script>`:
+       2 como datos embebidos (la ruta `/web/image/<modelo>/<id>/<campo>` como valor) y 2 en el código que decide si un
+       valor es imagen (`startsWith("/web/image") || startsWith("http")`). La quinta es texto en una celda. Es decir: el
+       diseño carga imágenes del propio Odoo por ruta relativa desde JavaScript. Decisión: D55 (arriba).
+   - **Copias adaptadas de los scripts** (`~/pns_ai_3973/fase4/lab/cc0060e/`, fuera del repo):
+     - `a7_recuentos.py`: solo cambia `BD = 'p15_pns_demo_14'`. SHA-256
+       `836b5718adcf71f5327113b9744981adbd51c1a7eadf754680ac9b3eff24668b`. El original
+       (`~/pns_ai_3973/fase4/csp/a7_recuentos.py`, `a8ab66c3f617665385d76655517d72b4de16fafeeca0235f865f8e8c37bdaa90`)
+       no cambia;
+     - `a7b_contexto.py` (nuevo, 47 líneas): solo lectura con `rollback` y contexto enmascarado. SHA-256
+       `467129c3c547d1440411d47ab6acec37c188360a6297ee423d96e755bd02a519`.
+   - **Pendientes:**
+     - **(kit)** `bd-cargar` llama a `cmd_paridad` con el archivo como argumento, y la paridad lo trata como un módulo
+       «por instalar»: por eso sale un falso «la instalación FALLARÁ» al final de `bd-cargar`. La primera parte de la
+       paridad es la válida. Se analiza otro día en el kit, no aquí;
+     - **conservación:** `p15_pns_demo_14` y la copia `.dump` se conservan hasta la limpieza final del staging, con el
+       laboratorio `cc0060e`.
 6. P-21 de nuevo (solo lectura), justo antes del `-u` del staging.
 7. Staging `pns_demo`.
    - **Core `cc0060e`, cubierto en el laboratorio (18/11/2026):** ver el punto 4, «Laboratorio con el core cc0060e». El
@@ -785,6 +858,20 @@ Orden:
      solo lectura de `ai_skill` para `sys_info`, `users_all` y `users_logged` (filas, `source_module` y `owner_id`),
      antes y después de la subida. En una instalación nueva de 3.1.879 no existen, porque piden `required_groups`;
      una BD con historia podría tenerlas, y su retirada no la cubre el laboratorio.
+     Cubierto en P-15 sobre una copia de `pns_demo` (18/11/2026): las 7 retiradas tenían fila de fábrica y quedan en 0
+     tras el `-u` (punto 5, D54).
+   - **Añadido tras P-15 (18/11/2026; punto 5):**
+     - **P-11** antes y después del `-u`, con la misma consulta de `rama_comprobar.sh`. Previsto después: sin AI
+       Conversational 0;
+     - **`ai_skill`:** lista de `code` con `source_module` y si `owner_id` está vacío, antes y después. Previsto: las 7
+       retiradas, en 0; 13 → 10 si `pns_demo` sigue igual. P-15 ya cubrió la retirada en una BD con historia;
+     - **diseño con `/web/image` (D55):** localizar su sesión con una consulta de solo lectura (solo el id de la
+       `chatboo_session` cuyo `canvas_design` contiene `/web/image`) y abrirlo antes y después del `-u`. Anotar si se
+       ven las imágenes y si la consola muestra «Refused to load the image» de `img-src`. Si se ven antes y no después,
+       va en el documento de subida como cambio de comportamiento (decisión A, ya tomada);
+     - **valores esperados del log del `-u`** (`docker compose run … | tee`): 0 Traceback; «post-migrate» de
+       14.0.3.1.973, 1; «Seges patch 35: … fixed», 1 y 1; como WARNING esperados, los de P-15 (`jinja2` 1, «same label»
+       3 y «skip retired unlink» 2). Duración en el laboratorio: 72 s (orientativa).
 
 ## Tras el `-u` (staging y LIYBEN)
 

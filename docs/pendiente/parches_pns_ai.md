@@ -5027,6 +5027,12 @@ Base: `7c68ae8`. Plan: [plan_correccion_pns_ai_3973.md](plan_correccion_pns_ai_3
     migración 0 y «Seges patch 35» 0; los crons con `model.gc_expired()`. Control negativo de D43: FALLO, como se
     prevé (0 de 2, `ValueError` 2, código 1; `rama_crons-lab_p2b_879_14-20261118-101232.log`). Corrección a mano:
     «CORREGIDOS 2», `model._gc_expired()` en los dos. D43: OK (`rama_crons-lab_p2b_879_14-20261118-101447.log`).
+- **Validado en P-15 sobre una copia de `pns_demo` (18/11/2026):** BD `p15_pns_demo_14`, con historia desde 3.1.879,
+  `-u pns_base,pns_ai_mcp,pns_ai_chatboo` en el contexto `lab_pns_ai_cc0060e` (`actualizar-20261118-134056.log`).
+  «Running migration [14.0.3.1.973>] post-migrate» 1; «Seges patch 35: pns_ai_mcp.ir_cron_ai_api_result_cache_gc
+  fixed» y «… ir_cron_ai_fetch_cache_gc fixed», 1 y 1; WARNING del 35, 0. Los dos crons pasan de `model.gc_expired()` a
+  `model._gc_expired()`; inactivos por la neutralización antes y después. Detalle en el plan, «Pruebas posteriores»,
+  punto 5.
 - **Cómo comprobar si el fabricante ya lo ha corregido:** `test_1_old_code_fails_when_run_by_hand` falla (el fabricante
   recupera `gc_expired` o lo acepta como alias), o el fabricante publica su propio
   `pns_ai_mcp/migrations/14.0.3.1.973/`. En ese caso hay que fusionar o retirar este script: dos `post-migrate.py` en la
@@ -5295,6 +5301,19 @@ Comprobación previa de la CSP, propuesta, decisiones de Sergio (D1 a D5), bater
 - **Laboratorio D5 (13/11/2026):** correcto; fila en el «Registro de laboratorios» de
   [lab_procedimiento_3973.md](lab_procedimiento_3973.md).
 - **Estado:** aplicado (13/11/2026) y validado en el laboratorio (13/11/2026).
+- **Nota de P-15 (18/11/2026; A7 y A7b sobre la copia de `pns_demo`):**
+  - **A7:** 12 diseños en `canvas_design` y 0 en `chatboo.canvas.page.design`. Más de 0 solo en `data:image/` 1,
+    `pns-img:` 1 y `/web/image` 1.
+  - **A7b:** el `/web/image` es de un solo diseño, de demostración y anterior a 3.1.973. Tiene 5 apariciones, sin
+    `data:image/` ni `pns-img:`: 4 dentro de `<script>` (2 como datos embebidos con la ruta
+    `/web/image/<modelo>/<id>/<campo>` y 2 en el código que decide si un valor es imagen) y 1 como texto en una celda.
+    El diseño carga imágenes del propio Odoo por ruta relativa desde JavaScript. Con el 27 deja de poder hacerlo: la
+    cabecera del fabricante permite `'self'` en `img-src` y la `<meta>` lo quita.
+  - **Decisión A** (D55; plan, «Pruebas posteriores», punto 5): se mantiene la decisión 1 del 13/11/2026,
+    «sin paso B». Es el efecto buscado y el único caso encontrado.
+  - **Salvedad:** en la 3879, el 27 ya tenía `img-src data: blob:`, pero «las de `/web/image` siguen, porque se
+    incrustan en `data:`» («Parche 27: el lienzo no deja salir datos (F1)», e). No está comprobado si ese diseño
+    muestra hoy sus imágenes en el staging. Se comprueba a la vista allí, antes y después del `-u` (plan, punto 7).
 
 ### Parche 29 en 3.1.973
 
