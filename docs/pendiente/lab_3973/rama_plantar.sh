@@ -112,9 +112,9 @@ PY
 )
 
 # 1. Foto (solo lectura; el shell hace rollback al salir).
-FOTO=$({ printf 'BD = "%s"\n' "$BD"; echo "$COMUN"; echo "print('RAMA FOTO OK')"; } | odoo-dev 14 shell --bd "$BD" 2>&1)
+FOTO=$({ printf 'BD = "%s"\n' "$BD"; echo "$COMUN"; echo "print('RAMA FOTO TERMINADA (compárala con la guía)')"; } | odoo-dev 14 shell --bd "$BD" 2>&1)
 echo "$FOTO" | grep '^RAMA ' || echo "Sin líneas «RAMA»: el shell no ejecutó el script."
-if ! echo "$FOTO" | grep -qx 'RAMA FOTO OK'; then
+if ! echo "$FOTO" | grep -qx 'RAMA FOTO TERMINADA (compárala con la guía)'; then
     echo "$FOTO" | grep -q 'RAMA ERROR: .*\(3.1.879\|plantado\)' && exit 15
     echo "Foto fallida (nada escrito). Errores del shell, solo el tipo: $(echo "$FOTO" | grep -oE '^[A-Za-z_.]+(Error|Exception)' | sort -u | paste -sd, -)"
     exit 1

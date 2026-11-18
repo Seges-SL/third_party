@@ -70,7 +70,7 @@ print('RAMA CRONS sin error %d de %d (commit hecho)' % (bien, len(CRONS)))
 PY
 grep "^RAMA " "$LOG_CRONS"
 N_VALUE=$(grep -c 'ValueError' "$LOG_CRONS")
-echo "ValueError en la salida del shell: $N_VALUE (previsto 0) · salida guardada: $(basename "$LOG_CRONS") (no se copia a la documentación)"
+echo "ValueError en la salida del shell: $N_VALUE (previsto 0 en una pasada normal) · salida guardada: $(basename "$LOG_CRONS") (no se copia a la documentación)"
 if grep -qx 'RAMA CRONS sin error 2 de 2 (commit hecho)' "$LOG_CRONS" && [ "$N_VALUE" = 0 ]; then
     echo "Resultado: OK"; exit 0
 fi

@@ -10,6 +10,11 @@
 - **Datos de demostración:** las BD de P-2 (`lab_p2a_879_14` y `lab_p2b_879_14`) se instalan con ellos: el kit no pasa
   `--without-demo`. Aceptado por Sergio (17/11/2026).
 - **Salidas:** nada de lo que imprimen los scripts lleva datos ni secretos; los logs se citan por su nombre de archivo.
+- **Correcciones del 18/11/2026**, tras la primera ejecución (resultados en el plan, «Pruebas posteriores», punto 4):
+  «Al acabar corto» espera al servidor antes de guardar el log; `rama_carpetas.sh` deja las carpetas legibles por el
+  contenedor y lo comprueba; la foto de 3.1.879 tiene 4 skills retiradas con fila de fábrica, no 7; requisito de D47
+  (`seges_int` debe poder escribir en `res.partner`); textos de `rama_plantar.sh`, `rama_crons.sh` y
+  `tarjeta_plantar.sh`.
 
 ## Contextos de `odoo-dev 14`
 
@@ -44,8 +49,14 @@ Esperado: `CONTEXTO <carpeta> Y WEB PARADO: OK`.
 **Al acabar corto** (tras un `arrancar` que solo cambia el contexto; procedimiento, «Al acabar»):
 
 ```bash
-cd ~/GitHub/<carpeta> && LOG_LAB=~/odoo-dev/14.0/logs/servidor-$(date +%Y%m%d-%H%M%S).log; odoo-dev 14 log all > "$LOG_LAB" && wc -l "$LOG_LAB"; python3 -I ~/pns_ai_3973/fase4/lab/lab_cdp.py c --lab <carpeta> --bd <bd> < "$LOG_LAB"; echo "C: código $?"; odoo-dev 14 parar
+cd ~/GitHub/<carpeta> && for i in $(seq 1 40); do odoo-dev 14 log 200 2>&1 | grep -q 'HTTP service (werkzeug) running' && break; sleep 3; done; LOG_LAB=~/odoo-dev/14.0/logs/servidor-$(date +%Y%m%d-%H%M%S).log; odoo-dev 14 log all > "$LOG_LAB" && wc -l "$LOG_LAB"; python3 -I ~/pns_ai_3973/fase4/lab/lab_cdp.py c --lab <carpeta> --bd <bd> < "$LOG_LAB"; echo "C: código $?"; odoo-dev 14 parar
 ```
+
+El bucle del principio espera, como mucho 2 min (40 × 3 s), a que el servidor escriba «HTTP service (werkzeug)
+running», y solo entonces se guarda el log. El 18/11/2026, el primer `arrancar` de `lab_pns_ai_879` se guardó a los
+13 s, antes de que Odoo escribiera nada: el log salió vacío y la C dio código 7 (`C_SIN_LINEAS`, ninguna línea de
+Odoo; `lab_cdp.py:104`), NO CONCLUYENTE. Si en 2 min no aparece la línea, el bucle sigue igualmente y la C dará 7: se
+mira `odoo-dev 14 log` y se repite el «Al acabar corto».
 
 Esperado: «BD con líneas: ? (N)» (ninguna BD: nadie ha entrado), «BD con Starting job: ninguna», «C: OK», `C: código 0`.
 Si sale otra BD: «Si aparece otra BD» del procedimiento. Cada `arrancar` lleva su fila en el registro de laboratorios.
@@ -70,6 +81,49 @@ LOG_U973F=$(sed -n 's/^==> actualizar en lab_p2b_879_14 (log: \(.*\))$/\1/p' ~/p
 
 `$LOG_U` cambia en cada `-u` a la rama: tras el bloque 2, el de `lab_pns_ai_3973_14` y el de `lab_p2a_879_14` solo
 salen ya de su `u_<bd>.txt`.
+
+**Grupos de `seges_int` para D47** (bloque 4, punto 4, «Requisito de D47»; desde `~/GitHub/lab_pns_ai_3973`, con el
+web parado). Probadas con Odoo el 18/11/2026.
+
+Lista de antes (solo lectura):
+
+```bash
+odoo-dev 14 shell --bd lab_pns_ai_3973_14 2>&1 <<'PY' | grep '^P47G' | tee ~/pns_ai_3973/fase4/rama/grupos_seges_int_antes.txt
+u = env['res.users'].with_context(active_test=False).browse(12)
+print('P47G grupos:', ', '.join(sorted(g.get_external_id().get(g.id) or g.full_name for g in u.groups_id)))
+PY
+```
+
+Añadir (con commit; solo si la lista de antes no tiene `base.group_partner_manager`):
+
+```bash
+odoo-dev 14 shell --bd lab_pns_ai_3973_14 2>&1 <<'PY' | grep '^P47G'
+u = env['res.users'].with_context(active_test=False).browse(12)
+g = env.ref('base.group_partner_manager')
+u.write({'groups_id': [(4, g.id)]})
+env.cr.commit()
+P = env['res.partner'].with_user(u)
+print('P47G AÑADIDO base.group_partner_manager; write res.partner ahora: %s' % P.check_access_rights('write', raise_exception=False))
+PY
+```
+
+Esperado: «P47G AÑADIDO base.group_partner_manager; write res.partner ahora: True».
+
+Quitar, lista de después y comparación (con commit; tras `tarjeta_borrar.sh`, o si el escenario falla; solo si se
+añadió):
+
+```bash
+odoo-dev 14 shell --bd lab_pns_ai_3973_14 2>&1 <<'PY' | grep '^P47G' | tee ~/pns_ai_3973/fase4/rama/grupos_seges_int_despues.txt
+u = env['res.users'].with_context(active_test=False).browse(12)
+g = env.ref('base.group_partner_manager')
+u.write({'groups_id': [(3, g.id)]})
+env.cr.commit()
+print('P47G grupos:', ', '.join(sorted(x.get_external_id().get(x.id) or x.full_name for x in u.groups_id)))
+PY
+cmp -s ~/pns_ai_3973/fase4/rama/grupos_seges_int_antes.txt ~/pns_ai_3973/fase4/rama/grupos_seges_int_despues.txt && echo "P47G QUITADO: grupos de seges_int IGUALES a los de antes" || echo "P47G GRUPOS DISTINTOS DE LOS DE ANTES: avisar"
+```
+
+Esperado: «P47G QUITADO: grupos de seges_int IGUALES a los de antes». Si sale «DISTINTOS», se para y se avisa a Sergio.
 
 ## Bloque 0: preparación
 
@@ -96,13 +150,19 @@ salen ya de su `u_<bd>.txt`.
    bash ~/pns_ai_3973/fase4/lab/rama_carpetas.sh; echo "código $?"
    ```
 
-   Esperado: código 0 y estas líneas (los SHA-256 de `SHA256SUMS.txt` son deterministas: contenido y rutas de los
-   módulos):
+   Esperado: código 0 y estas seis líneas (los SHA-256 de `SHA256SUMS.txt` son deterministas: contenido y rutas de los
+   módulos). Las dos de las carpetas salen con la ruta completa (`/home/…/GitHub/lab_pns_ai_879: …`):
    - `modulos_3879: 711 archivos, todos con el SHA-256 de sha256_copias.tsv, ninguno de más`;
    - `commit de la 1b: 33ca68c054b5a6faff937bfd32123358f136efc2 (657 archivos de los tres módulos)`;
-   - `lab_pns_ai_879: 711 archivos de módulos; SHA256SUMS.txt e37be4488f2b086a38ff8e6f04baf2f5464a880efd5d241b442909d10fcd1844`;
-   - `lab_pns_ai_973f: 657 archivos de módulos (blobs de 33ca68c); SHA256SUMS.txt 4c5b1cd294de9ddb074f8e78a3b4416968bb9e36d6670063d5382fc24fae6c53`;
-   - `Dockerfile.14 en las dos: cfc58aed82d52734706dca9b28bef12dfbe42d5db6288f224ec2a481a9f4c348`.
+   - `/home/…/GitHub/lab_pns_ai_879: 711 archivos de módulos; SHA256SUMS.txt e37be4488f2b086a38ff8e6f04baf2f5464a880efd5d241b442909d10fcd1844`;
+   - `/home/…/GitHub/lab_pns_ai_973f: 657 archivos de módulos (blobs de 33ca68c); SHA256SUMS.txt 4c5b1cd294de9ddb074f8e78a3b4416968bb9e36d6670063d5382fc24fae6c53`;
+   - `Dockerfile.14 en las dos: cfc58aed82d52734706dca9b28bef12dfbe42d5db6288f224ec2a481a9f4c348`;
+   - `Permisos en las dos (sin .git): todo legible por otros (carpetas 755, archivos 644)`.
+
+   El script trabaja con `umask 022` y fija 755/644 en la raíz y en lo que escribe (`infra/`, `infra/Dockerfile.14`,
+   `CLAUDE.md`, `.odoo-dev.conf`, `SHA256SUMS.txt`, `ORIGEN.txt`): el usuario del contenedor tiene que poder entrar
+   (con la raíz en 700, la paridad dio `FALLARÁ`, «SIN CÓDIGO», el 18/11/2026). Si algo de las carpetas (sin `.git`)
+   no es legible por otros, lo nombra bajo «No legibles por otros …», borra las dos carpetas y sale con código 1.
 
 ## Bloque 3: P-2 (c) y el parche 39 en `lab_pns_ai_3973_14`
 
@@ -170,9 +230,12 @@ Contexto `lab_pns_ai_3973` (el de siempre). Si el último `arrancar` no fue desd
    ```
 
    Esperado en la foto: `pns_base` `14.0.1.2.47`, `pns_ai_mcp` `14.0.3.1.879` y `pns_ai_chatboo` `14.0.2.1.538`
-   instalados, y el código montado con las mismas versiones; los dos crons con `"model.gc_expired()"`; las siete skills
-   retiradas con su fila de fábrica; «ya plantado: usuario 0, sesión 0, caché 0». Tras «s»: `RAMA PLANTADO usuario=…
-   sesion=… skill=… cache=…`, código 0.
+   instalados, y el código montado con las mismas versiones; los dos crons con `"model.gc_expired()"`; las cuatro skills
+   (`annual_billing`, `cash_forecast`, `credit_facility`, `customer_risk_analysis`) con su fila de fábrica;
+   `sys_info`, `users_all` y `users_logged` con 0 filas, porque 3.1.879 no las importa (piden `required_groups`);
+   «ya plantado: usuario 0, sesión 0, caché 0». La última línea, «RAMA FOTO TERMINADA (compárala con la guía)», solo
+   dice que el shell terminó: la foto se compara con esta lista. Tras «s»: `RAMA PLANTADO usuario=… sesion=… skill=…
+   cache=…`, código 0.
 5. Contexto de la rama. Desde `~/GitHub/lab_pns_ai_3973`: `odoo-dev 14 arrancar` y «Al acabar corto» con
    `--lab lab_pns_ai_3973 --bd lab_pns_ai_3973_14`.
 6. «Comprobar el contexto» con `C=lab_pns_ai_3973` y `-u` a la rama con `<bd>` = `lab_p2a_879_14`.
@@ -194,7 +257,9 @@ Contexto `lab_pns_ai_3973` (el de siempre). Si el último `arrancar` no fue desd
    `--lab lab_pns_ai_879 --bd lab_p2b_879_14`.
 2. «Comprobar el contexto» con `C=lab_pns_ai_879`; paridad e instalación como en el bloque 1, punto 3, con
    `--bd lab_p2b_879_14`.
-3. Foto y plantado, **escribe**: `rama_plantar.sh --bd lab_p2b_879_14`. Esperado como en el bloque 1, punto 4.
+3. Foto y plantado, **escribe**: `rama_plantar.sh --bd lab_p2b_879_14`. Esperado como en el bloque 1, punto 4 (cuatro
+   skills con su fila de fábrica y `sys_info`, `users_all` y `users_logged` con 0 filas; la foto se compara con la
+   lista).
 4. Contexto de la base limpia: desde `~/GitHub/lab_pns_ai_973f`, `odoo-dev 14 arrancar` (la primera vez construye
    `odoo-dev:14-lab_pns_ai_973f`; compartidos ninguno, cliente `~/GitHub/lab_pns_ai_973f`) y «Al acabar corto» con
    `--lab lab_pns_ai_973f --bd lab_p2b_879_14`.
@@ -225,7 +290,9 @@ Contexto `lab_pns_ai_3973` (el de siempre). Si el último `arrancar` no fue desd
    ```
 
    Esperado: los dos crons con `"model.gc_expired()"` y «falló con ValueError»; «RAMA CRONS sin error 0 de 2 (commit
-   hecho)»; «ValueError en la salida del shell: 2» (o más); «Resultado: FALLO», código 1. Con el código antiguo,
+   hecho)»; «ValueError en la salida del shell: 2 (previsto 0 en una pasada normal)» (o más de 2): es la línea esperada
+   en este control negativo, porque el «previsto» es el de la pasada normal; «Resultado: FALLO», código 1. Con el
+   código antiguo,
    `safe_eval` envuelve el `AttributeError` en `ValueError` (`odoo/tools/safe_eval.py:346-347` de la imagen). No queda
    nada escrito aunque el script haga commit:
    - `method_direct_trigger` solo escribe `lastcall` después de `run()` (`odoo/addons/base/models/ir_cron.py:83-84`), así
@@ -281,6 +348,18 @@ Contexto `lab_pns_ai_3973` (el del final del bloque 2).
 4. Reintento de la tarjeta (D47). **Camino forzado:** una tarjeta `high` deja «Confirmar» deshabilitado 5 s desde que se
    pinta (`chatboo_component_v2.js:2373-2393`); una persona no puede pulsar antes. El escenario solo quita `disabled` al
    botón y lanza el clic sobre él (pasa por el manejador normal, `:2494`).
+
+   **Requisito de D47:** `seges_int` (uid 12) debe poder escribir en `res.partner`. Si no puede, `tarjeta_plantar.sh`
+   lo dice («no puede escribir el contacto de prueba (res.partner)») y para sin escribir nada. Entonces (decisión de
+   Sergio del 18/11/2026; no lo automatiza ningún script), con las órdenes «Grupos de `seges_int` para D47» de
+   «Órdenes que se repiten»:
+   - antes de plantar, la lista de antes; si no tiene `base.group_partner_manager`, «Añadir» (solo durante D47);
+   - al acabar (tras el borrado del punto 5, o si el escenario falla), «Quitar», lista de después y `cmp` con la de
+     antes: deben ser iguales.
+
+   **Salidas en columnas** (`lab_cdp.py sqlprueba`): van alineadas con varios espacios
+   («`  operaciones seges_lab47                       OK (0 filas)`»). Para comprobarlas con `grep`, espacios con `+`
+   (`grep -E 'operaciones seges_lab47 +OK \(0 filas\)'`), no un espacio fijo.
    1. Consultas del escenario (solo lectura). Antes, `bd-lista` (solo lectura) levanta `db` si estaba parado:
 
       ```bash
@@ -333,6 +412,8 @@ Contexto `lab_pns_ai_3973` (el del final del bloque 2).
       ```
 
       Esperado: «P47 BORRADA operaciones=1 contactos=1 quedan=0», código 0.
+   6. Si se añadió `base.group_partner_manager` («Requisito de D47»): «Quitar», lista de después y comparación.
+      Esperado: «P47G QUITADO: grupos de seges_int IGUALES a los de antes».
 
 ## Al acabar
 
@@ -365,12 +446,12 @@ estos valores.
 | `lab_auto.sh` | Laboratorio automatizado; `--lab`, `--bd` (D44) y `--escenario tarjeta` (D47) | `322a9adec5f3d61790a026181b252407441e7e8b5af9ae1217af7d1044a5180d` |
 | `lab_cdp.py` | CDP, C y SQL; `--lab`/`--bd` y el escenario tarjeta | `1520b3425da299ddbbd8305f21e7a1a9246a1b231adba0b0982e63d2372b940d` |
 | `prueba_lab_auto.sh` | Prueba de `lab_auto.sh` sin Odoo (49 PASA) | `a5aace954d88687e9d3af645df32422a691ac126054e36c33b9fb9f910f882b3` |
-| `rama_carpetas.sh` | Bloque 0: carpetas de laboratorio (escribe en `~/GitHub`) | `e1101f0307256c2ef2bc497c615a92a0bd8bbd7b25c11b2ded4ffdee16cbb215` |
-| `rama_plantar.sh` | Bloques 1 y 2: foto y P-11/P-14 (escribe) | `85764a11adb6afc602e5df4a5b1b96e5cec137de1f47f6d97760249d88c91019` |
+| `rama_carpetas.sh` | Bloque 0: carpetas de laboratorio (escribe en `~/GitHub`) | `0f6d276bb9c2ec2a039c6d9b38001ff7dfb1bb277dae55870b26a3cd056d4902` |
+| `rama_plantar.sh` | Bloques 1 y 2: foto y P-11/P-14 (escribe) | `b6929dc1acb2e3d34ecb5edc0f11dc86ad8ed9b522835b67c572b89e739deef8` |
 | `rama_comprobar.sh` | P-2, P-11 y P-14 (solo lectura) | `5e09c67926543713f55cbda5e5d409d25958585af24571c6ecad1ed5be2d9435` |
-| `rama_crons.sh` | D43, siguiente pasada (escribe) | `95d55e713ee56a959664acdc50b6efc55f008bad6fbd836d9faa175549a10c18` |
+| `rama_crons.sh` | D43, siguiente pasada (escribe) | `d0b04fb4db7f647abf6ed8ad15bedb8c68197359eac755760a65076fa9b7f912` |
 | `rama_corregir_p2b.sh` | P-2 (b), corrección a mano (escribe) | `943c7d8777834c7d34bee83a492b3c04850e66adcb2d440eca5d4fb8811e074a` |
 | `p39_lab.sh` | Bloque 3: parche 39 (sin commit) | `b9673941724e0145b829efb117223f43f9053a121bb2b2c164b7160c31f3bffb` |
 | `rama_require_settings.sh` | Bloque 4: D46, con y sin el 32 (sin commit) | `022c571fc9144f9953297ea201f8031750dceb4d731cacd0898be80219ef3ab7` |
-| `tarjeta_plantar.sh` | Bloque 4: D47, plantar (escribe) | `bd12a0a2d827ac4c809c1a4c73873c57fc615c71b5b771c08639cdb38e436cb5` |
+| `tarjeta_plantar.sh` | Bloque 4: D47, plantar (escribe) | `6c1163de55638fcb9a433f1972bbe61deac10689aefab41fe609d23f7b047eff` |
 | `tarjeta_borrar.sh` | Bloque 4: D47, borrar (escribe) | `094432e7df11ad3ea8b8aa420c8197b56a5ee2993f4dea13e11eee641784493d` |

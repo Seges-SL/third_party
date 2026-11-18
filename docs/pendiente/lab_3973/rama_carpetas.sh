@@ -11,6 +11,13 @@
 # (COMPARTIDOS="" y DOCKERFILE="infra/Dockerfile.14"), infra/Dockerfile.14
 # (copia del de ~/GitHub/lab_pns_ai_3973), ORIGEN.txt y SHA256SUMS.txt.
 # Permisos de los módulos: 644 (archivos) y 755 (carpetas).
+# Permisos de la raíz y de lo que escribe el script (infra/, infra/Dockerfile.14,
+# CLAUDE.md, .odoo-dev.conf, SHA256SUMS.txt y ORIGEN.txt): 755 y 644, sea cual
+# sea el umask de la terminal (umask 022 y chmod explícito). Corrección del
+# 18/11/2026: con umask 077, mkdir, las redirecciones y cp sin -p los dejaban en
+# 700/600 y el usuario del contenedor no podía entrar (paridad «SIN CÓDIGO»).
+# Al final comprueba que todo lo de las dos carpetas (sin .git) es legible por
+# otros; si no, nombra lo que no lo es y falla (código 1).
 #
 # SOLO ESCRIBE en esas dos carpetas, que no pueden existir antes. No arranca
 # Odoo, no toca ninguna BD y solo lee third_party (git archive, ls-tree y
@@ -18,11 +25,13 @@
 # esta ejecución.
 #
 # Uso: bash rama_carpetas.sh
-# Códigos: 0 creadas y comprobadas; 1 falló al crearlas (se borra lo creado);
+# Códigos: 0 creadas y comprobadas; 1 falló al crearlas o algo no es legible
+# por otros (se borra lo creado);
 # 10 respuesta distinta de «s»; 13 falta un origen; 17 un SHA-256 o el commit
 # no es el previsto (no se crea nada); 18 alguna carpeta ya existe (no se crea
 # nada).
 set -uo pipefail
+umask 022  # lo nuevo, 755 y 644 (no el umask de la terminal)
 
 REPO=~/GitHub/third_party
 COMMIT_1B=33ca68c
@@ -62,8 +71,14 @@ permisos() {
 # SHA256SUMS.txt de los módulos de una carpeta; imprime su propio SHA-256.
 sumas() {
     (cd "$1" && find "${MODULOS[@]}" -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) \
-        > "$1/SHA256SUMS.txt" || return 1
+        > "$1/SHA256SUMS.txt" && chmod 644 "$1/SHA256SUMS.txt" || return 1
     sha256sum "$1/SHA256SUMS.txt" | cut -d' ' -f1
+}
+
+# Lo que otros no pueden leer en una carpeta, sin .git: carpetas sin r-x y
+# archivos sin r para «otros» (el usuario del contenedor). Solo lectura.
+no_legibles() {
+    find "$1" -path "$1/.git" -prune -o \( -type d ! -perm -o=rx -o ! -type d ! -perm -o=r \) -print
 }
 
 base_carpeta() {  # base_carpeta <destino> <título>
@@ -73,6 +88,7 @@ base_carpeta() {  # base_carpeta <destino> <título>
     printf '# %s\n\nVersión de Odoo: 14.0\n' "$2" > "$1/CLAUDE.md" || return 1
     printf 'COMPARTIDOS=""\nDOCKERFILE="infra/Dockerfile.14"\n' > "$1/.odoo-dev.conf" || return 1
     mkdir "$1/infra" && cp "$DOCKERFILE_ORIGEN" "$1/infra/Dockerfile.14" || return 1
+    chmod 755 "$1" "$1/infra" && chmod 644 "$1/CLAUDE.md" "$1/.odoo-dev.conf" "$1/infra/Dockerfile.14" || return 1
     echo "$SHA_DOCKERFILE  $1/infra/Dockerfile.14" | sha256sum -c --quiet - >/dev/null 2>&1
 }
 
@@ -124,6 +140,7 @@ Módulos copiados de ~/pns_ai_3973/fase0/modulos_3879 (711 archivos, SHA-256 de 
 SHA256SUMS.txt (lista de los módulos): $SUMAS_879
 Dockerfile.14: copia de ~/GitHub/lab_pns_ai_3973/infra/Dockerfile.14 ($SHA_DOCKERFILE).
 EOF
+chmod 644 "$DEST_879/ORIGEN.txt" || falla "permisos de ORIGEN.txt de $DEST_879"
 
 # -- lab_pns_ai_973f --------------------------------------------------------
 base_carpeta "$DEST_973F" 'Laboratorio pns_ai 3.1.973 base limpia (P-2 b de la rama 14.0-pns-ai-3973)' \
@@ -144,10 +161,20 @@ pns_base, pns_ai_mcp y pns_ai_chatboo ($N_1B archivos, cada uno igual a su blob 
 SHA256SUMS.txt (lista de los módulos): $SUMAS_973F
 Dockerfile.14: copia de ~/GitHub/lab_pns_ai_3973/infra/Dockerfile.14 ($SHA_DOCKERFILE).
 EOF
+chmod 644 "$DEST_973F/ORIGEN.txt" || falla "permisos de ORIGEN.txt de $DEST_973F"
+
+# -- Permisos: todo legible por otros (sin .git), solo lectura ----------------
+NO_LEGIBLES=$(for d in "$DEST_879" "$DEST_973F"; do no_legibles "$d"; done)
+if [ -n "$NO_LEGIBLES" ]; then
+    echo "No legibles por otros (el usuario del contenedor no podría leerlos):"
+    printf '%s\n' "$NO_LEGIBLES" | sed 's/^/  /'
+    falla "permisos de las carpetas"
+fi
 trap - INT TERM
 
 echo "Creadas y comprobadas:"
 echo "  $DEST_879: 711 archivos de módulos; SHA256SUMS.txt $SUMAS_879"
 echo "  $DEST_973F: $N_1B archivos de módulos (blobs de $COMMIT_1B); SHA256SUMS.txt $SUMAS_973F"
 echo "  Dockerfile.14 en las dos: $SHA_DOCKERFILE"
+echo "  Permisos en las dos (sin .git): todo legible por otros (carpetas 755, archivos 644)"
 exit 0

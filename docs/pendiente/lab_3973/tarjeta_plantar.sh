@@ -75,7 +75,8 @@ try:
     contacto.with_user(usuario).check_access_rights('write')
     contacto.with_user(usuario).check_access_rule('write')
 except AccessError:
-    fallo('seges_int no puede escribir el contacto de prueba')
+    fallo('seges_int no puede escribir el contacto de prueba (res.partner): '
+          'ver guia_rama.md, bloque 4, punto 4, «Requisito de D47»')
 steps = [{'op': 'write', 'model': 'res.partner', 'ids': [contacto.id],
           'values': {'comment': COMENTARIO}}]
 plan = ['write 1 res.partner']
