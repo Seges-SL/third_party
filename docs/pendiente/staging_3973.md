@@ -933,9 +933,10 @@ Mínima, como en E4′: no hay usuarios ni claves de prueba en esta subida.
   de T6. Las salidas (`t0` a `t8`, `t4b*`, `f1`, `p21.txt`, `antes.txt`, `despues.txt`, `t7.txt`, `u-*.log`,
   `t4b-shell-*.log`, `servidor-*.log`, `diff_3973.txt`, `rsync_*.txt`, `bajas_*`, `started_at.txt`, `copia_ok`) y los
   `.sql` (los tres y `t4b.sql`), después del [DOC] del resultado. Antes se copian al equipo, porque G los cita por su
-  nombre.
+  nombre. **Hecho el 18/11/2026, tras el [DOC]:** copiado al equipo (L1 y L1b) y borrado (L2). Ver G, «Limpieza de
+  `/tmp`».
 - **Equipo:** `/tmp/pns_addons_5d0559b.tar.gz`, `/tmp/pns_addons_8d218ea_ctl.tar.gz`, `/tmp/pns_3973_e0` y
-  `/tmp/pns_3973_e0_ctl` (E0), después del [DOC] del resultado.
+  `/tmp/pns_3973_e0_ctl` (E0), después del [DOC] del resultado. **Hecho el 18/11/2026** (L3).
 - **Laboratorio:** `p15_pns_demo_14`, `p15b_pns_demo_14`, la copia de P-15 y el laboratorio `cc0060e` se conservan hasta
   la limpieza final del staging (traspaso de P-15).
 
@@ -1081,8 +1082,8 @@ tb && /^[A-Za-z_][A-Za-z0-9_.]*(:|$)/ { e = $0; m = e; sub(/:.*/, "", e); sub(/^
 - **VPS:** `/opt/odoo/pns_staging/addons_antes_3973` (`8d218ea`, 711, `e37be448…1844`).
 - **Equipo:** la copia de T3 (600) y `~/pns_ai_3973/staging/`.
 - **Laboratorio:** `p15_pns_demo_14`, `p15b_pns_demo_14`, la copia de P-15 y el laboratorio `cc0060e`.
-- **Después del [DOC] del resultado** (F): `/tmp/pns_3973` del VPS, una vez copiado al equipo, y los cuatro restos de E0
-  en `/tmp` del equipo.
+- **Salidas del VPS:** desde la limpieza de `/tmp` (abajo), solo en el equipo, en
+  `~/pns_ai_3973/staging/vps/pns_3973/` (32 archivos, 700/600). Se conservan con `~/pns_ai_3973/staging/`.
 
 ### Pendientes de decisión (de Sergio), abiertos
 
@@ -1103,3 +1104,176 @@ tb && /^[A-Za-z_][A-Za-z0-9_.]*(:|$)/ { e = $0; m = e; sub(/:.*/, "", e); sub(/^
 - Un plan de la IA puede pasar el validador y no ejecutarse en el core: revisar el plan en la ficha antes de
   «Confirmar» (tipo de operación, modelo y `res_id`; el `res_id` por SQL, con su xml_id).
 - Un «esperado» de un fenómeno de concurrencia (el 40001) puede no darse: por eso va en `INFO`.
+- Un «esperado» sobre el número de salidas de una tanda se saca de la lista real de archivos, no de lo que se
+  recuerda de la ejecución: L1 esperaba una salida de T8 con `TODO OK` y había dos (limpieza de `/tmp`).
+- Una tanda no pisa una salida que ya existe: dos ejecuciones en el mismo segundo darían el mismo nombre y `tee` la
+  sobrescribiría (visto en la prueba de L1 en el entorno de Claude).
+
+### Limpieza de `/tmp` (18/11/2026, tras el [DOC] del resultado)
+
+Después de los commits del [DOC] (con push). Horas en UTC. Cuatro tandas, probadas en el entorno de Claude con `ssh`,
+`git` y el VPS simulados (positivos y negativos de cada una). L1, L1b y L3, en el equipo; L2, en el VPS, con P.0.
+
+| Tanda | Hora (UTC) | Resultado | Salida |
+|---|---|---|---|
+| L1 (equipo) | 17:38 | Comprobaciones previas `OK` (repo sin cambios, HEAD con push, commit del [DOC], copia sin hacer, `/tmp/pns_3973` en el VPS). **Copia hecha:** 32 archivos, las mismas huellas en los dos lados, sin lectura para otros. Termina con 1 `FALLO` **de la comprobación, no de la copia:** esperaba una salida de T8 con `TODO OK` y hay dos (la de diagnóstico, 170349, también terminó con `TODO OK`, porque en T8 el 40001 es `INFO`). No imprimió la huella | `l1-20261118-183843.txt`, `l1_lista_vps.txt`, `l1_lista_equipo.txt` |
+| L1b (equipo, nueva) | 17:42 | `TODO OK`. La copia y el VPS, iguales que la lista de L1; la última línea de cada salida de tanda (solo `t7-20261118-170340.txt` con su `FALLO` de entonces); al menos un `TODO OK` por tanda, también en las válidas de T7 (171030) y T8 (171037). Huella de la lista: `ba2fd446c249e126875d007a5433b3a310c2dbd9406f473069328b6b45a5dcbf` | `l1b-20261118-184207.txt`, `l1b_lista_vps.txt`, `l1b_lista_equipo.txt` |
+| L2 (VPS) | ~17:43 | `TODO OK`. Lista igual a la de L1; `/tmp/pns_3973` borrado; el código montado (688, `0dc381e0…ba7a`) y `addons_antes_3973` (711, `e37be448…1844`), intactos; disco al 87 % | solo en pantalla (borra la carpeta de las salidas) |
+| L3 (equipo) | 17:43 | `TODO OK`. Exige L1b con `TODO OK`, la salida de E0 y el `.tar.gz` de E0 (`ca9c0315…`). Borrados los cuatro restos de E0 de `/tmp`; la copia de T3, intacta (600) | `l3-20261118-184345.txt` |
+
+Todas las salidas, en `~/pns_ai_3973/staging/`. Los bloques, tal como se ejecutaron:
+
+**L1** (42 líneas, SHA-256 `15da8d5d433cd7b3de80677a2c545b24116bb8461ca440bc57bd6460eda96398`). Su comprobación de las
+salidas de tanda exige exactamente un `TODO OK` (`… 1`) y falla con T8; la corrige L1b. No se vuelve a usar tal cual.
+
+```bash
+s3_l1() (
+  set -u
+  umask 077
+  D=~/pns_ai_3973/staging
+  V="$D/vps"
+  read -rp 'Puerto SSH del VPS: ' VPS_PORT
+  read -rp 'Usuario@host del VPS: ' VPS_DEST
+  O="$D/l1-$(date +%Y%m%d-%H%M%S).txt"
+  test ! -e "$O" || { echo "Ya existe $O: espera un segundo y repite"; exit 1; }
+  {
+  F=0
+  chk() { if [ "$2" = "$3" ]; then echo "OK      $1"; else echo "FALLO   $1: esperado [$3], obtenido [$2]"; F=$((F + 1)); fi; }
+  echo "== 1. Comprobaciones previas (solo lectura)"
+  G=~/GitHub/third_party
+  chk "repo sin cambios pendientes" "$(git -C "$G" status --short | wc -l | tr -d ' ')" 0
+  chk "HEAD con push" "$(git -C "$G" rev-parse HEAD)" "$(git -C "$G" rev-parse '@{u}')"
+  chk "commit del [DOC] del resultado" "$(git -C "$G" log -8 --format=%s | grep -c 'resultado de la subida al staging de la 3973')" 1
+  chk "la copia no existe todavía" "$(test -e "$V" && echo existe || echo no)" no
+  chk "/tmp/pns_3973 en el VPS" "$(ssh -p "$VPS_PORT" "$VPS_DEST" 'test -d /tmp/pns_3973 && echo si || echo no')" si
+  [ "$F" = 0 ] || { echo "== L1: $F FALLO(S). No se ha copiado nada."; exit 1; }
+  echo "== 2. Lista con huellas en el VPS (solo lectura)"
+  ssh -p "$VPS_PORT" "$VPS_DEST" 'cd /tmp/pns_3973 && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum' > "$D/l1_lista_vps.txt" \
+    || { echo "== L1: FALLO al listar en el VPS"; exit 1; }
+  echo "archivos en el VPS: $(wc -l < "$D/l1_lista_vps.txt" | tr -d ' ')"
+  echo "== 3. [ALTERA el equipo] Copia de /tmp/pns_3973 a $V/pns_3973 (700/600)"
+  mkdir "$V" || exit 1
+  ssh -p "$VPS_PORT" "$VPS_DEST" 'tar -C /tmp -cf - pns_3973' | tar -C "$V" -xf - || { echo "== L1: FALLO en la copia"; exit 1; }
+  echo "== 4. Verificación"
+  ( cd "$V/pns_3973" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum ) > "$D/l1_lista_equipo.txt"
+  chk "mismos archivos y huellas" "$(cmp -s "$D/l1_lista_vps.txt" "$D/l1_lista_equipo.txt" && echo si || echo no)" si
+  chk "archivos (más de 0)" "$([ "$(wc -l < "$D/l1_lista_vps.txt")" -gt 0 ] && echo si || echo no)" si
+  for t in t0:T0 t2:T2 t4:T4 t4b:T4b t5:T5 t6:T6 t7:T7 t8:T8 f1:F1; do
+    chk "salida de ${t#*:} con TODO OK" "$(cat "$V/pns_3973/${t%%:*}"-*.txt 2>/dev/null | grep -cx "== ${t#*:}: TODO OK")" 1
+  done
+  chk "sin lectura para otros" "$(find "$V" -perm /o=rwx | wc -l | tr -d ' ')" 0
+  H=$(sha256sum < "$D/l1_lista_vps.txt" | cut -d' ' -f1)
+  if [ "$F" = 0 ]; then echo "== L1: TODO OK"; echo "Huella de la lista (argumento de s3_l2): $H"
+  else echo "== L1: $F FALLO(S). No borres nada en el VPS: pega la salida."; fi
+  } 2>&1 | tee "$O"
+  echo "Guardado en $O"
+)
+s3_l1
+```
+
+**L1b** (37 líneas, SHA-256 `5c834db06a213db0359247506dcf01f16af811be97014171bb4a546464b93111`). Solo lectura sobre la
+copia de L1 y el VPS; exige al menos un `TODO OK` por tanda y el de las válidas de T7 y T8.
+
+```bash
+s3_l1b() (
+  set -u
+  umask 077
+  D=~/pns_ai_3973/staging
+  V="$D/vps/pns_3973"
+  read -rp 'Puerto SSH del VPS: ' VPS_PORT
+  read -rp 'Usuario@host del VPS: ' VPS_DEST
+  O="$D/l1b-$(date +%Y%m%d-%H%M%S).txt"
+  test ! -e "$O" || { echo "Ya existe $O: espera un segundo y repite"; exit 1; }
+  {
+  F=0
+  chk() { if [ "$2" = "$3" ]; then echo "OK      $1"; else echo "FALLO   $1: esperado [$3], obtenido [$2]"; F=$((F + 1)); fi; }
+  echo "== 1. Copia de L1 frente a su lista (solo lectura)"
+  ( cd "$V" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum ) > "$D/l1b_lista_equipo.txt"
+  chk "copia = lista del VPS de L1" "$(cmp -s "$D/l1_lista_vps.txt" "$D/l1b_lista_equipo.txt" && echo si || echo no)" si
+  echo "== 2. El VPS no ha cambiado desde L1 (solo lectura)"
+  ssh -p "$VPS_PORT" "$VPS_DEST" 'cd /tmp/pns_3973 && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum' > "$D/l1b_lista_vps.txt" \
+    || { echo "== L1b: FALLO al listar en el VPS"; exit 1; }
+  chk "lista del VPS = la de L1" "$(cmp -s "$D/l1_lista_vps.txt" "$D/l1b_lista_vps.txt" && echo si || echo no)" si
+  echo "== 3. Salidas de las tandas (final de cada una)"
+  for t in t0 t2 t4 t4b t5 t6 t7 t8 f1; do
+    for f in "$V/$t"-*.txt; do printf '%-28s %s\n' "$(basename "$f")" "$(grep -E '^== [A-Za-z0-9]+: ' "$f" | tail -1)"; done
+  done
+  for t in t0:T0 t2:T2 t4:T4 t4b:T4b t5:T5 t6:T6 t7:T7 t8:T8 f1:F1; do
+    n=$(cat "$V/${t%%:*}"-*.txt 2>/dev/null | grep -cx "== ${t#*:}: TODO OK")
+    chk "${t#*:} con al menos un TODO OK" "$([ "$n" -ge 1 ] && echo si || echo "no ($n)")" si
+  done
+  chk "T7 válida (171030) con TODO OK" "$(grep -cx '== T7: TODO OK' "$V"/t7-20261118-171030.txt 2>/dev/null)" 1
+  chk "T8 válida (171037) con TODO OK" "$(grep -cx '== T8: TODO OK' "$V"/t8-20261118-171037.txt 2>/dev/null)" 1
+  chk "sin lectura para otros" "$(find "$D/vps" -perm /o=rwx | wc -l | tr -d ' ')" 0
+  H=$(sha256sum < "$D/l1_lista_vps.txt" | cut -d' ' -f1)
+  if [ "$F" = 0 ]; then echo "== L1b: TODO OK"; echo "Huella de la lista (argumento de s3_l2): $H"
+  else echo "== L1b: $F FALLO(S). No borres nada en el VPS: pega la salida."; fi
+  } 2>&1 | tee "$O"
+  echo "Guardado en $O"
+)
+s3_l1b
+```
+
+**L2** (22 líneas, SHA-256 `6d96438ce5cfb8e25abab6b6ad1a33cdf022548c769538305a0c1edeeb576c90`, con la huella de L1b en
+la última línea). Exige las funciones de P.0 y la huella; borra solo si la lista coincide.
+
+```bash
+s3_l2() (
+  set -u
+  S3_FALLOS=0
+  type s3chk >/dev/null 2>&1 && [ -n "${S3:-}" ] || { echo "Faltan las funciones de P.0: pégalas antes"; exit 1; }
+  H="${1:-}"
+  [ -n "$H" ] || { echo "Falta la huella que imprimió s3_l1"; exit 1; }
+  echo "== 1. Comprobaciones previas (solo lectura)"
+  s3chk "S3 es /tmp/pns_3973" "$S3" /tmp/pns_3973
+  s3chk "lista = la copiada al equipo (L1)" "$(cd "$S3" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)" "$H"
+  s3chk "código montado = 5d0559b" "$(s3arbol /opt/odoo/pns_staging/addons | s3una)" "688 0dc381e0ca78b4d46a4c2c4c0b82eec7cedae444beded41b60867b11b411ba7a"
+  s3chk "addons_antes_3973 = 8d218ea (se conserva)" "$(s3arbol /opt/odoo/pns_staging/addons_antes_3973 | s3una)" "711 e37be4488f2b086a38ff8e6f04baf2f5464a880efd5d241b442909d10fcd1844"
+  [ "$S3_FALLOS" = 0 ] || { s3fin L2; echo "No se ha borrado nada."; exit 1; }
+  echo "== 2. [BORRA] /tmp/pns_3973"
+  rm -rf -- /tmp/pns_3973
+  echo "== 3. Verificación"
+  s3chk "/tmp/pns_3973 borrada" "$(test -e /tmp/pns_3973 && echo existe || echo no)" no
+  s3chk "código montado intacto" "$(s3arbol /opt/odoo/pns_staging/addons | s3una)" "688 0dc381e0ca78b4d46a4c2c4c0b82eec7cedae444beded41b60867b11b411ba7a"
+  s3chk "addons_antes_3973 intacta" "$(s3arbol /opt/odoo/pns_staging/addons_antes_3973 | s3una)" "711 e37be4488f2b086a38ff8e6f04baf2f5464a880efd5d241b442909d10fcd1844"
+  df -h /tmp | tail -1
+  s3fin L2
+)
+s3_l2 ba2fd446c249e126875d007a5433b3a310c2dbd9406f473069328b6b45a5dcbf
+```
+
+**L3** (31 líneas, SHA-256 `475653f73a80965e4791d7ea7b21cc5d7e92d3dea7db35f121e6cb67b689af63`).
+
+```bash
+s3_l3() (
+  set -u
+  umask 077
+  D=~/pns_ai_3973/staging
+  O="$D/l3-$(date +%Y%m%d-%H%M%S).txt"
+  test ! -e "$O" || { echo "Ya existe $O: espera un segundo y repite"; exit 1; }
+  {
+  F=0
+  chk() { if [ "$2" = "$3" ]; then echo "OK      $1"; else echo "FALLO   $1: esperado [$3], obtenido [$2]"; F=$((F + 1)); fi; }
+  echo "== 1. Comprobaciones previas (solo lectura)"
+  chk "L1b terminó con TODO OK" "$(cat "$D"/l1b-*.txt 2>/dev/null | grep -cx '== L1b: TODO OK')" 1
+  chk "E0 guardada" "$(ls "$D"/e0-*.txt 2>/dev/null | wc -l | tr -d ' ')" 1
+  chk ".tar.gz de 5d0559b" "$(sha256sum /tmp/pns_addons_5d0559b.tar.gz 2>/dev/null | cut -d' ' -f1)" ca9c03158ebb4118fe019812ad7efe116ec98ed8122bf9f640f2fd2982044cae
+  for p in /tmp/pns_addons_8d218ea_ctl.tar.gz /tmp/pns_3973_e0 /tmp/pns_3973_e0_ctl; do
+    chk "existe $p" "$(test -e "$p" && echo si || echo no)" si
+  done
+  chk "la copia de T3 sigue (600)" "$(stat -c %a "$D"/pns_demo_antes_3973-20261118-1744.dump 2>/dev/null)" 600
+  [ "$F" = 0 ] || { echo "== L3: $F FALLO(S). No se ha borrado nada."; exit 1; }
+  echo "== 2. [BORRA solo en /tmp del equipo] los cuatro restos de E0"
+  rm -f -- /tmp/pns_addons_5d0559b.tar.gz /tmp/pns_addons_8d218ea_ctl.tar.gz
+  rm -rf -- /tmp/pns_3973_e0 /tmp/pns_3973_e0_ctl
+  echo "== 3. Verificación"
+  for p in /tmp/pns_addons_5d0559b.tar.gz /tmp/pns_addons_8d218ea_ctl.tar.gz /tmp/pns_3973_e0 /tmp/pns_3973_e0_ctl; do
+    chk "borrado $p" "$(test -e "$p" && echo existe || echo no)" no
+  done
+  chk "la copia de T3 intacta" "$(stat -c %a "$D"/pns_demo_antes_3973-20261118-1744.dump)" 600
+  if [ "$F" = 0 ]; then echo "== L3: TODO OK"; else echo "== L3: $F FALLO(S). Pega la salida."; fi
+  } 2>&1 | tee "$O"
+  echo "Guardado en $O"
+)
+s3_l3
+```
