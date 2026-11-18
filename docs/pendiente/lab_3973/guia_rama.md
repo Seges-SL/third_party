@@ -455,3 +455,5 @@ estos valores.
 | `rama_require_settings.sh` | Bloque 4: D46, con y sin el 32 (sin commit) | `022c571fc9144f9953297ea201f8031750dceb4d731cacd0898be80219ef3ab7` |
 | `tarjeta_plantar.sh` | Bloque 4: D47, plantar (escribe) | `6c1163de55638fcb9a433f1972bbe61deac10689aefab41fe609d23f7b047eff` |
 | `tarjeta_borrar.sh` | Bloque 4: D47, borrar (escribe) | `094432e7df11ad3ea8b8aa420c8197b56a5ee2993f4dea13e11eee641784493d` |
+| `Dockerfile.14.cc0060e` | Laboratorio con el core `cc0060e` (D49, 18/11/2026): copia de `infra/Dockerfile.14` de `~/GitHub/lab_pns_ai_cc0060e`, para reconstruir la imagen `odoo-dev:14-lab_pns_ai_cc0060e` | `8800092a909f73bdecac1e9b1c1379fdb36c3cd65da55f286775732daf50e69a` |
+| `comparar_core.py` | Laboratorio con el core `cc0060e`: compara el core de una imagen con la referencia `/opt/odoo-src/14.0` (solo lectura; paso 0 y comprobación de la imagen) | `878abdb66e01ad1ae5921f493211e5540683f42ce78634ba2f01e513e55a0c9c` |
