@@ -2,8 +2,9 @@
 
 - **Rama:** `14.0-pns-ai-3973` · **Base (montada ahora):** `8d218ea` (E4′, rama `14.0-pns-ai-3879`) · **Commit a
   desplegar:** `5d0559b`, el último que toca los módulos. Los posteriores (`5ed7878`, HEAD el 18/11/2026) solo son
-  [DOC] y dan el mismo árbol de módulos (comprobado en E0) · **Preparado:** 18/11/2026 · **Estado:** preparado, sin
-  ejecutar.
+  [DOC] y dan el mismo árbol de módulos (comprobado en E0) · **Preparado:** 18/11/2026 (`2e7f784`) · **Estado:**
+  ejecutado el 18/11/2026, de 16:11 a 17:12 UTC (montado ahora: `5d0559b`, `pns_demo` en 3.1.973), con dos tandas
+  nuevas, T4b y F1; resultado en G.
 - **Qué se sube:** el portado de los parches de Seges a 3.1.973 ([plan](plan_correccion_pns_ai_3973.md), fases 1 a 4,
   parches 35 a 39 y pruebas con toda la rama). Módulos: `pns_base` 14.0.1.2.69, `pns_ai_mcp` 14.0.3.1.973 y
   `pns_ai_chatboo` 14.0.2.1.587.
@@ -36,9 +37,9 @@ ejecutarse E0 y la carga de `p15b_pns_demo_14`; a, c, d, e y g, a las 17:03.
 
 0. Método de despliegue y diferencias con E4′
 1. Cómo se ejecuta (tandas)
-2. Tandas, en orden: E0 (hecha) · E1 · P.0 y T0 · T1 · T2 · T3 · T4 · T5 · T6 · T7 · T8
+2. Tandas, en orden: E0 (hecha) · E1 · P.0 y T0 · T1 · T2 · T3 · T4 · T4b (nueva) · T5 · T6 · T7 · T8
 3. E. Vuelta atrás (descrita)
-4. F. Limpieza
+4. F. Limpieza (con F1, nueva)
 5. G. Resultado de la subida
 
 ---
@@ -73,7 +74,8 @@ el VPS, copia previa del código (`addons_antes_3973`), parada de `web`, `rsync 
   **`== <tanda>: TODO OK`** o **`== <tanda>: n FALLO(S). No sigas: pega la salida.`**
 - Las comprobaciones que bloquean están antes de lo que escribe: si una falla, la tanda para sin escribir lo siguiente.
 - **Sergio pega la salida y Claude la contrasta antes de la tanda siguiente.** Hay **cortes** obligatorios antes de T2
-  (lo primero que escribe en el VPS) y antes de T5 (arrancar con el código nuevo).
+  (lo primero que escribe en el VPS) y después de T4, antes de T4b (lo primero que escribe tras el `-u`; T4b corre con el
+  web parado y T5 lo arranca).
 - **Dónde:** E1 y T3 en el **equipo de Sergio**; P.0, T0, T2 y T4 a T8 en el **VPS**, como `ubuntu`, en una sola
   sesión (si se abre otra, se vuelve a pegar P.0). T1 y la parte manual de T7, en la **interfaz** (ventana privada,
   F12 abierto).
@@ -89,6 +91,8 @@ el VPS, copia previa del código (`addons_antes_3973`), parada de `web`, `rsync 
   alterado (parche 35 con WARNING, 47 módulos), `retry 2/5` y copia demasiado pequeña. **Queda por validar en el VPS:**
   la salida real de `docker compose ps --status running --services`, el formato de las líneas `*deleting` de `rsync`
   con carpetas, la línea «HTTP service (werkzeug) running» con `workers = 2` y el `pg_dump` por SSH.
+- **Validado en el VPS (18/11/2026):** los cuatro puntos anteriores, y también `odoo shell` con `workers = 2` (T4b). T4b
+  y F1 se probaron igual en el entorno de Claude antes de entregarlas (abajo, en cada una).
 
 ### Archivos SQL
 
@@ -348,8 +352,8 @@ Si pasa más de una hora entre T0 y T2, se repite T0: P-21 y el «antes» tienen
 
 | Comprobación | Esperado | Obtenido |
 |---|---|---|
-| «Test Connection» y cuota | correcto en los Gemini de la cadena | [ ] |
-| Sesión con `/web/image`, antes | se anota: imágenes sí/no; «Refused to load the image» sí/no | [ ] |
+| «Test Connection» y cuota | correcto en los Gemini de la cadena | proveedores 3 y 4, OK; **el 1 (Gemini 3.6 flash), `Read timed out` (240 s)** contra la API de Google. Sergio: fallo del proveedor, se sigue. Cuota: no comprobada (no se localizó la pantalla en AI Studio) |
+| Sesión con `/web/image`, antes | se anota: imágenes sí/no; «Refused to load the image» sí/no | sesión 51, un registro, tarjeta con `[object Object]`, **sin imágenes**; consola sin «Refused to load the image» |
 
 **Corte.** Sergio pega T0 y anota T1; Claude lo contrasta antes de T2.
 
@@ -555,7 +559,122 @@ Esperado (de la salida real de P-15, `actualizar-20261118-134056.log`):
 | WARNING | «same label» 2 de `ai.log` y 1 de `ai.trusted.action`, «skip retired unlink for pns_ai_mcp» 2 (informativos); ningún otro de `odoo.addons.pns_*` (bloquea). Los de librería (`jinja2` en el laboratorio, `distutils` en E4′) son informativos |
 
 **Si hay `FALLO`: no se arranca** y se decide con E. **Corte** en cualquier caso: Sergio pega T4 y Claude lo contrasta
-antes de T5.
+antes de T4b.
+
+### T4b. VPS: recarga de `es_ES` y rol Diseño, con el web parado (nueva, 18/11/2026)
+
+**[ALTERA `pns_demo`]** Añadida durante la subida (aprobada por Sergio a las 17:42 hora local, 16:42 UTC) y ejecutada
+entre T4 y T5. **Sustituye los puntos 1 y 2 manuales de T7** (decisión c y «Tras el `-u`» del plan): en un solo `odoo shell`, recarga
+`es_ES` con sobrescritura y pone `use_fallback` del rol Diseño a falso, con un `commit` explícito. Antes y después,
+SQL de solo lectura (`/tmp/pns_3973/t4b.sql`, lo escribe la propia tanda): rol Diseño, sus proveedores, todos los roles,
+`res_lang` y el número de `ir_translation` de `es_ES`. Exige el web parado y una salida de T4 con `TODO OK`.
+
+Base en el core del staging (`cc0060e`):
+- `--load-language` no sirve: `load_language` crea el asistente solo con `lang` (`odoo/tools/translate.py:1292-1301`) y
+  `--i18n-overwrite` exige `-u` o una importación (`odoo/tools/config.py:387-388`).
+- El asistente `base.language.install` tiene `overwrite` con `default=True`; `lang_install` activa el idioma y llama a
+  `_update_translations(lang, overwrite)` sobre todos los módulos instalados
+  (`odoo/addons/base/wizard/base_language_install.py:27-37`).
+- `odoo shell` con la entrada sin tty ejecuta el texto con `env` de superusuario dentro del cursor y hace
+  `cr.rollback()` al final (`odoo/cli/shell.py`): hace falta el `commit` explícito.
+- `use_fallback` es un Boolean editable del rol (`pns_ai_mcp/models/ai_provider_role.py:72-78`); su `write` solo
+  bloquea a quien no es superusuario en `_SHIPPED_FIELDS` (`:216`).
+
+Bloque: 80 líneas, SHA-256 `81c8ac0699d3c98ff0b55511c017b83d4bfc4da9790f78a512f787fc8036c811`. Probado en el entorno de
+Claude con `docker` y `odoo shell` simulados: `TODO OK`; `FALLO` con el web en marcha, sin la salida de T4 y con una
+excepción antes del `commit`.
+
+```bash
+s3_t4b() (
+  set -u
+  umask 077
+  S3_FALLOS=0
+  type s3chk >/dev/null 2>&1 && [ -n "${S3:-}" ] || { echo "Faltan las funciones de P.0: pégalas antes"; exit 1; }
+  O="$S3/t4b-$(date +%Y%m%d-%H%M%S).txt"
+  L="$S3/t4b-shell-$(date +%Y%m%d-%H%M%S).log"
+  Q="$S3/t4b.sql"
+  cat > "$Q" <<'SQL'
+BEGIN TRANSACTION READ ONLY;
+\echo '## rol Diseño (xml_id|code|activo|use_fallback|alternativa)'
+SELECT d.module || '.' || d.name, r.code, r.active, r.use_fallback, fb.code
+  FROM ai_provider_role r
+  LEFT JOIN ir_model_data d ON d.model = 'ai.provider.role' AND d.res_id = r.id
+  LEFT JOIN ai_provider_role fb ON fb.id = r.fallback_id
+ WHERE r.code = 'design';
+\echo '## proveedores con el rol Diseño (provider_id|proveedor activo|use_fallback del rol)'
+SELECT p.id, p.active, r.use_fallback
+  FROM ai_provider_role r
+  JOIN ai_provider_role_rel rr ON rr.role_id = r.id
+  JOIN ai_provider p ON p.id = rr.provider_id
+ WHERE r.code = 'design'
+ ORDER BY p.id;
+\echo '## roles (code|use_fallback)'
+SELECT code, use_fallback FROM ai_provider_role ORDER BY code;
+\echo '## res_lang es_ES (code|active)'
+SELECT code, active FROM res_lang WHERE code = 'es_ES';
+\echo '## ir_translation es_ES (n)'
+SELECT count(*) FROM ir_translation WHERE lang = 'es_ES';
+ROLLBACK;
+SQL
+  {
+  cd /opt/odoo/pns_staging || exit 1
+  echo "== 1. Comprobaciones previas"
+  s3chk "web parado" "$(docker compose ps --status running --services | grep -cx web)" 0
+  s3chk "T4 terminó con TODO OK" "$(cat "$S3"/t4-*.txt 2>/dev/null | grep -cx '== T4: TODO OK')" 1
+  s3sql < "$Q" > "$S3/t4b_antes.txt" || { echo "FALLO   psql (antes)"; exit 1; }
+  cat "$S3/t4b_antes.txt"
+  s3chk "rol Diseño, antes" "$(s3sec "$S3/t4b_antes.txt" 'rol Diseño' | s3una)" "pns_ai_mcp.ai_provider_role_design|design|t|t|conversation"
+  s3chk "proveedores con el rol Diseño, antes" "$(s3sec "$S3/t4b_antes.txt" 'proveedores con el rol' | s3una)" "3|t|t"
+  s3chk "es_ES activo" "$(s3sec "$S3/t4b_antes.txt" 'res_lang es_ES' | s3una)" "es_ES|t"
+  [ "$S3_FALLOS" = 0 ] || { s3fin T4b; echo "No se ha cambiado nada. No arranques: pega la salida."; exit 1; }
+
+  echo "== 2. [ALTERA pns_demo] odoo shell: recarga de es_ES con sobrescritura y use_fallback del rol Diseño a falso (un solo commit), lanzado a las $(date +%H:%M:%S)"
+  docker compose run --rm -T web odoo shell -d pns_demo > "$L" 2>&1 <<'PY'
+role = env.ref('pns_ai_mcp.ai_provider_role_design')
+print('T4B rol antes: use_fallback=%s' % role.use_fallback)
+wiz = env['base.language.install'].create({'lang': 'es_ES', 'overwrite': True})
+wiz.lang_install()
+print('T4B es_ES: state=%s overwrite=%s' % (wiz.state, wiz.overwrite))
+role.write({'use_fallback': False})
+env.cr.commit()
+print('T4B rol despues: use_fallback=%s' % role.use_fallback)
+print('T4B COMMIT OK')
+PY
+  RC=$?
+  echo "terminado a las $(date +%H:%M:%S); log: $L ($(wc -l < "$L" | tr -d ' ') líneas)"
+  grep '^T4B ' "$L"
+  s3chk "salida de odoo shell" "$RC" 0 info
+  s3chk "commit hecho" "$(grep -cx 'T4B COMMIT OK' "$L")" 1
+  s3chk "Traceback, ERROR o CRITICAL" "$(grep -cE 'Traceback|ERROR|CRITICAL' "$L")" 0
+  s3chk "rol antes y después" "$(grep -E '^T4B rol (antes|despues):' "$L" | s3una)" "T4B rol antes: use_fallback=True T4B rol despues: use_fallback=False"
+  s3chk "asistente de idioma" "$(grep -E '^T4B es_ES:' "$L")" "T4B es_ES: state=done overwrite=True"
+  echo "-- WARNING (informativo)"
+  grep ' WARNING ' "$L" | sed 's/.* WARNING [^ ]* //' | cut -c1-90 | sort | uniq -c
+  echo "-- líneas con «translation» en el log (informativo): $(grep -ci 'translation' "$L")"
+
+  echo "== 3. Después (solo lectura)"
+  s3sql < "$Q" > "$S3/t4b_despues.txt" || { echo "FALLO   psql (después)"; exit 1; }
+  cat "$S3/t4b_despues.txt"
+  s3chk "rol Diseño sin alternativa" "$(s3sec "$S3/t4b_despues.txt" 'rol Diseño' | s3una)" "pns_ai_mcp.ai_provider_role_design|design|t|f|conversation"
+  s3chk "rol Diseño solo en Gemini 3.5 flash" "$(s3sec "$S3/t4b_despues.txt" 'proveedores con el rol' | s3una)" "3|t|f"
+  s3chk "los demás roles, iguales" "$(s3sec "$S3/t4b_despues.txt" 'roles (' | grep -v '^design|' | s3una)" "$(s3sec "$S3/t4b_antes.txt" 'roles (' | grep -v '^design|' | s3una)"
+  s3chk "es_ES activo" "$(s3sec "$S3/t4b_despues.txt" 'res_lang es_ES' | s3una)" "es_ES|t"
+  s3chk "ir_translation es_ES (antes → después)" "$(s3sec "$S3/t4b_despues.txt" 'ir_translation es_ES' | s3una)" "$(s3sec "$S3/t4b_antes.txt" 'ir_translation es_ES' | s3una)" info
+  s3fin T4b || echo "No arranques el web: pega la salida."
+  } 2>&1 | tee "$O"
+  echo "Guardado en $O"
+)
+s3_t4b
+```
+
+Esperado:
+- **1:** web parado; T4 con `TODO OK`; antes, rol Diseño `pns_ai_mcp.ai_provider_role_design|design|t|t|conversation`,
+  sus proveedores `3|t|t` y `es_ES|t`. Si algo falla, no ha cambiado nada.
+- **2:** `commit hecho`; 0 `Traceback`, `ERROR` y `CRITICAL`; `use_fallback` de `True` a `False`; el asistente con
+  `state=done overwrite=True`. La salida de `odoo shell` es `INFO` si no es 0. Los WARNING son informativos.
+- **3:** rol Diseño `…|design|t|f|conversation`, solo en el proveedor `3|t|f`; los demás roles, iguales; `es_ES|t`; el
+  número de `ir_translation` de `es_ES` se anota (`INFO` si cambia).
+- Si falla, no se arranca el web: Sergio pega la salida.
 
 ### T5. VPS: arranque
 
@@ -662,16 +781,20 @@ Esperado (`OK` salvo donde se dice):
 | P-11 | sin AI Conversational 0 (§6.2); AI Administrators, como antes (`INFO`) |
 | Iguales a antes | diseños (12 y 0), acciones de confianza, `iap_account` (decisión d, parche 39) y proveedores (id, activo, modelo, nombre) |
 | Operaciones | 0 `pending` o `confirmed` sin ejecutar; por status, como antes (`INFO`) |
-| Rol Diseño | los proveedores con el rol = los que tenían `fit_design` (el 3, Gemini 3.5 flash); el rol con `use_fallback` activado y alternativa `conversation` (`INFO`: T7 lo cambia); los roles de cada proveedor = sus `fit_*` de antes (`INFO`); `ai_provider_fit_stash` borrada (`INFO`); la cadena de proveedores, igual (`INFO`) |
+| Rol Diseño | los proveedores con el rol = los que tenían `fit_design` (el 3, Gemini 3.5 flash); el rol con `use_fallback` activado y alternativa `conversation` (`INFO`: T7 lo cambia; desde T4b, que corre antes, sale `t|f|conversation` y ese `INFO` es el esperado); los roles de cada proveedor = sus `fit_*` de antes (`INFO`); `ai_provider_fit_stash` borrada (`INFO`); la cadena de proveedores, igual (`INFO`) |
 
 ### T7. Interfaz y VPS: recarga de `es_ES`, rol Diseño, diseño con `/web/image` y anexo de PNS-26
 
+> **Desde el 18/11/2026, T4b sustituye los puntos 1 y 2** (recarga de `es_ES` y rol Diseño): se hacen automatizados
+> entre T4 y T5, con el web parado, y no a mano aquí. Se conservan abajo como referencia de lo que hacen. Quedan los
+> puntos 3 y 4, manuales, y `s3_t7`, que comprueba también lo de T4b.
+
 **Manual, solo Sergio, en este orden:**
 
-1. **[ALTERA `pns_demo`] Recarga de `es_ES`** (decisión c), como C.3 de E1′: Ajustes → Traducciones → Idiomas, fila de
+1. **(Sustituido por T4b.) [ALTERA `pns_demo`] Recarga de `es_ES`** (decisión c), como C.3 de E1′: Ajustes → Traducciones → Idiomas, fila de
    `es_ES`, «Activate / Update» y, en «Load a Translation», «Add». Sobrescribe los términos de todos los módulos
    instalados con los oficiales (no consta ninguno retocado a mano). Esperar a que termine. Los errores los cuenta T8.
-2. **[ALTERA la configuración] Rol Diseño** («Tras el `-u`» del plan): desactivar `use_fallback` en el rol Diseño
+2. **(Sustituido por T4b.) [ALTERA la configuración] Rol Diseño** («Tras el `-u`» del plan): desactivar `use_fallback` en el rol Diseño
    (`pns_ai_mcp.ai_provider_role_design`), sin tocar sus proveedores. Debe quedar solo en Gemini 3.5 flash (el 3), como
    salió del `-u`. Comprobar que el botón Canvas no aparece con los demás. **Sin confirmar:** el menú y la etiqueta del
    campo en la interfaz (`ai_provider_role.py:85-91`).
@@ -732,10 +855,10 @@ Esperado: rol Diseño `…|design|t|f|conversation` y solo en el proveedor `3|t|
 
 | # | Comprobación | Esperado | Obtenido |
 |---|---|---|---|
-| 1 | Recarga de `es_ES` | el asistente termina; sin errores (T8) | [ ] |
-| 2 | Rol Diseño | solo Gemini 3.5 flash; `use_fallback` desactivado; sin botón Canvas con los demás | [ ] |
-| 3 | Sesión con `/web/image`, después | como antes; si no, cambio de comportamiento | [ ] |
-| 4 | Anexo de PNS-26 | operación `executed`, confirmada por `admin`; la nota en el contacto | [ ] |
+| 1 | Recarga de `es_ES` | el asistente termina; sin errores (T8) | hecha en T4b (`state=done overwrite=True`, 0 errores) |
+| 2 | Rol Diseño | solo Gemini 3.5 flash; `use_fallback` desactivado; sin botón Canvas con los demás | hecho en T4b; `s3_t7`: `…|design|t|f|conversation` y `3|t|f`. Botón Canvas con los demás: no comprobado a la vista |
+| 3 | Sesión con `/web/image`, después | como antes; si no, cambio de comportamiento | igual que antes (T1): un registro, tarjeta con `[object Object]`, sin imágenes. **Sin cambio de comportamiento** (D55). Consola: queda por confirmar por Sergio que seguía sin «Refused to load the image» |
+| 4 | Anexo de PNS-26 | operación `executed`, confirmada por `admin`; la nota en el contacto | operación 36 `executed|t|2` (17:09:24); `mail.message` 205 en el contacto 29. Antes, la 35, cancelada (G, «Anexo de PNS-26») |
 
 ### T8. VPS: log del servidor desde el arranque
 
@@ -784,6 +907,8 @@ proveedor (429/503), si los hay.
 
 ## 3. E. Vuelta atrás (descrita, no lista para pegar)
 
+**No se usó** (18/11/2026): todas las tandas terminaron con `TODO OK`.
+
 Operaciones que cambian el VPS: las decide y hace quien administra el VPS.
 
 1. **Antes del `-u` (fallo en T0 a T3, o en T4 antes de lanzarlo).** `pns_demo` no ha cambiado. Si el código ya se
@@ -804,17 +929,177 @@ Mínima, como en E4′: no hay usuarios ni claves de prueba en esta subida.
 
 - **Se quedan** (se anotan en G para la limpieza final): la operación y la nota del anexo de PNS-26; las sesiones de
   `admin` de T7; `addons_antes_3973`; la copia de T3 en el equipo (600).
-- **`/tmp/pns_3973` del VPS:** `pns_addons_5d0559b.tar.gz` y `addons_5d0559b/` se pueden borrar después de T6; las
-  salidas (`t0` a `t8`, `p21.txt`, `antes.txt`, `despues.txt`, `t7.txt`, `u-*.log`, `servidor-*.log`, `diff_3973.txt`,
-  `rsync_*.txt`) y los `.sql`, después del [DOC] del resultado.
+- **`/tmp/pns_3973` del VPS:** `pns_addons_5d0559b.tar.gz` y `addons_5d0559b/` se borraron con **F1** (abajo), después
+  de T6. Las salidas (`t0` a `t8`, `t4b*`, `f1`, `p21.txt`, `antes.txt`, `despues.txt`, `t7.txt`, `u-*.log`,
+  `t4b-shell-*.log`, `servidor-*.log`, `diff_3973.txt`, `rsync_*.txt`, `bajas_*`, `started_at.txt`, `copia_ok`) y los
+  `.sql` (los tres y `t4b.sql`), después del [DOC] del resultado. Antes se copian al equipo, porque G los cita por su
+  nombre.
 - **Equipo:** `/tmp/pns_addons_5d0559b.tar.gz`, `/tmp/pns_addons_8d218ea_ctl.tar.gz`, `/tmp/pns_3973_e0` y
   `/tmp/pns_3973_e0_ctl` (E0), después del [DOC] del resultado.
 - **Laboratorio:** `p15_pns_demo_14`, `p15b_pns_demo_14`, la copia de P-15 y el laboratorio `cc0060e` se conservan hasta
   la limpieza final del staging (traspaso de P-15).
 
+### F1. VPS: borrado del código extraído (nueva, 18/11/2026)
+
+**[BORRA solo en `/tmp/pns_3973`]** Ejecutada después de T6. Antes comprueba: T6 con `TODO OK`, el código montado
+(688, `0dc381e0…ba7a`), `addons_antes_3973` (711, `e37be448…1844`, que se conserva) y que existen los dos que borra.
+Después comprueba que ya no están y que el código montado sigue intacto, y lista lo que queda.
+
+Bloque: 29 líneas, SHA-256 `6ae26c7be9a441f8b7a32e47c1c2bad30a56297cc5e33c32c62600b2d87553e9`. Probado en el entorno de
+Claude: `TODO OK`; repetido, `FALLO` sin borrar nada.
+
+```bash
+s3_f1() (
+  set -u
+  umask 077
+  S3_FALLOS=0
+  type s3chk >/dev/null 2>&1 && [ -n "${S3:-}" ] || { echo "Faltan las funciones de P.0: pégalas antes"; exit 1; }
+  cd "$S3" || exit 1
+  O="$S3/f1-$(date +%Y%m%d-%H%M%S).txt"
+  {
+  echo "== 1. Comprobaciones previas"
+  s3chk "T6 terminó con TODO OK" "$(cat t6-*.txt 2>/dev/null | grep -cx '== T6: TODO OK')" 1
+  s3chk "código montado = 5d0559b" "$(s3arbol /opt/odoo/pns_staging/addons | s3una)" "688 0dc381e0ca78b4d46a4c2c4c0b82eec7cedae444beded41b60867b11b411ba7a"
+  s3chk "addons_antes_3973 = 8d218ea (se conserva)" "$(s3arbol /opt/odoo/pns_staging/addons_antes_3973 | s3una)" "711 e37be4488f2b086a38ff8e6f04baf2f5464a880efd5d241b442909d10fcd1844"
+  s3chk "existe pns_addons_5d0559b.tar.gz" "$(test -f pns_addons_5d0559b.tar.gz && echo si || echo no)" si
+  s3chk "existe addons_5d0559b/" "$(test -d addons_5d0559b && echo si || echo no)" si
+  [ "$S3_FALLOS" = 0 ] || { s3fin F1; echo "No se ha borrado nada."; exit 1; }
+  echo "== 2. [BORRA solo en $S3] pns_addons_5d0559b.tar.gz y addons_5d0559b/"
+  rm -f -- "$S3/pns_addons_5d0559b.tar.gz"
+  rm -rf -- "$S3/addons_5d0559b"
+  echo "== 3. Verificación"
+  s3chk "tar.gz borrado" "$(test -e pns_addons_5d0559b.tar.gz && echo existe || echo no)" no
+  s3chk "addons_5d0559b borrado" "$(test -e addons_5d0559b && echo existe || echo no)" no
+  s3chk "código montado intacto" "$(s3arbol /opt/odoo/pns_staging/addons | s3una)" "688 0dc381e0ca78b4d46a4c2c4c0b82eec7cedae444beded41b60867b11b411ba7a"
+  echo "-- lo que queda en $S3"
+  ls -1 "$S3"
+  s3fin F1
+  } 2>&1 | tee "$O"
+  echo "Guardado en $O"
+)
+s3_f1
+```
+
+Esperado: cinco `OK` antes del borrado, tres después y `== F1: TODO OK`. Si algo falla en el punto 1, no se borra nada.
+
 ---
 
-## 5. G. Resultado de la subida
+## 5. G. Resultado de la subida (18/11/2026)
 
-Sin ejecutar. Se rellena con las salidas de cada tanda (por su nombre, sin datos), los «Obtenido» de T1 y T7, las
-huellas de T3 y los ids que quedan para la limpieza final.
+Sergio con Claude. **Horas en UTC** (las del VPS; las locales son UTC + 1; los nombres de las salidas del equipo
+llevan la hora local). Commit `5d0559b` de `14.0-pns-ai-3973`, con este documento en `2e7f784`. Todas las tandas se
+ejecutaron tal cual, más **T4b** y **F1**, nuevas (arriba). Salidas del VPS en `/tmp/pns_3973/` (copiadas al equipo
+antes de la limpieza); del equipo, en `~/pns_ai_3973/staging/`. Resultado: **la subida, hecha; ninguna tanda con
+`FALLO` salvo la primera T7** (operación 35, abajo), repetida con `TODO OK`.
+
+### Por tanda
+
+| Tanda | Hora (UTC) | Resultado | Salida |
+|---|---|---|---|
+| E1 (equipo) | 16:11 | `TODO OK`: 5 huellas; `/tmp/pns_3973` en 700 | `e1-20261118-171159.txt` (equipo) |
+| P.0 + T0 | 16:17 | `TODO OK`, **sin ningún `INFO`**: valores idénticos a los de la copia de las 13:29 | `t0-20261118-161728.txt`, `p21.txt`, `antes.txt` |
+| T1 (interfaz) | ~16:20 a 16:33 | ver «Obtenido» de T1 y abajo | — |
+| T2 | 16:42 | `TODO OK`. 131 bajas de archivos, las de la lista de E0; 113 carpetas (`OK`, no `INFO`); `diff -rq`: 282 distintos, 102 «solo en addons» y 97 «solo en addons_antes_3973» (una carpeta entera cuenta una línea). Web parado desde las 16:43 | `t2-20261118-164225.txt`, `rsync_*.txt`, `diff_3973.txt` |
+| T3 (equipo) | 16:44 | `TODO OK`. `pns_demo_antes_3973-20261118-1744.dump`, 5 383 981 bytes, SHA-256 `ecde6453d7f782ee0d5046b1201a0301c58379cec6cb017f5277d092a04ef88b`, permisos 600 | `t3-20261118-174436.txt` (equipo) |
+| T4 (`-u`) | 16:47:00 a 16:47:54 | `TODO OK`. Log de 308 líneas; «Deleting field» 6; post-migrate 1; parche 35 «fixed» 1 y 1; 48 módulos; «DROP leftover» 11; los WARNING esperados más 2 `py.warnings` de `ir_actions_report.py` (core, informativos) | `t4-20261118-164700.txt`, `u-20261118-164700.log` |
+| **T4b (nueva)** | 16:51:36 a 16:51:48 | `TODO OK`. `es_ES` recargado con `overwrite=True`; rol Diseño, `use_fallback` a `f`; `ir_translation` de `es_ES` 19 627 → 19 640 (`INFO`). WARNING informativos: 9 de `pns_base.models.ir_translation` («language import drop duplicate code/model» y «removed N duplicate translation row(s)») y 2 `py.warnings` | `t4b-20261118-165135.txt`, `t4b-shell-20261118-165135.log`, `t4b_antes.txt`, `t4b_despues.txt` |
+| T5 | 16:52 | `TODO OK`. **`StartedAt` `2026-11-18T16:52:46.088479983Z`**; «HTTP service (werkzeug) running» sale con `workers = 2`; `/web/login` 200 y `GET /mcp` 403. **Web parado de 16:43 a 16:52** | `t5-20261118-165245.txt` |
+| T6 | 16:53 | `TODO OK`, con un `INFO` esperado: el rol Diseño ya en `f` por T4b. Skills 13 → 10 (`bill_draft billing customer_360 dashboard financial_health forecast pipeline sales_board top_sales users`); roles por proveedor = las `fit_*` de antes; `ai_log` (max) 1760 → 1762 | `t6-20261118-165357.txt`, `despues.txt` |
+| T7 | 17:10 | `TODO OK`. La primera, a las 17:03, dio `FALLO` por la operación 35 (abajo) | `t7-20261118-171030.txt` (la válida); `t7-20261118-170340.txt` (diagnóstico) |
+| T8 | 17:10 | `TODO OK`. «bad query» 0 y «retry 1/5» 0 (`INFO`: se esperaba 1); «retry 2/5» 0; «maximum» 0 | `t8-20261118-171037.txt`, `servidor-20261118-171037.log` (las válidas); `t8-20261118-170349.txt` (diagnóstico) |
+| **F1 (nueva)** | 17:12 | `TODO OK`. Borrados `pns_addons_5d0559b.tar.gz` y `addons_5d0559b/` de `/tmp/pns_3973` | `f1-20261118-171241.txt` |
+
+- **Validado en el VPS** todo lo que §1 dejaba por validar: la salida de `docker compose ps --status running
+  --services`, el formato de `*deleting` con carpetas, «HTTP service (werkzeug) running» con `workers = 2` y el
+  `pg_dump` por SSH. También `odoo shell` con `workers = 2` (T4b).
+- **Notas de T0:**
+  - `docker port` da además `8072/tcp -> 127.0.0.1:8172` (longpolling; T0 no lo comprueba);
+  - montajes con `config` y `addons` en `rw=false` (no se compararon línea a línea con A.0 a A.3 de E4′);
+  - el último `-u` antes de este fue el del 09/11/2026 a las 09:50:03 (P-21);
+  - disco al 87 %.
+- **P-21 (dentro de T0):** el mismo resultado que el 10/11/2026 (12 contextos y 3 skills que se reescriben sin edición,
+  7 retiradas, 0 que adoptar, 0 archivadas).
+
+### Interfaz (T1 y T7)
+
+- **«Test Connection» (T1):** proveedores 3 y 4, OK; **el 1 (Gemini 3.6 flash) falla con `Read timed out` (240 s)**
+  contra la API de Google. Sergio: fallo del proveedor, se sigue. **Cuota:** no comprobada.
+- **Diseño con `/web/image` (D55), sesión 51:** antes (T1), un registro, tarjeta con `[object Object]`, **sin
+  imágenes**; consola sin «Refused to load the image». Después (T7), **igual**: **sin cambio de comportamiento**, así
+  que la decisión A de D55 no tiene nada que anotar. Queda por confirmar por Sergio que la consola seguía sin el aviso
+  después.
+- **`es_ES` y rol Diseño (T7, puntos 1 y 2):** hechos en T4b. El botón Canvas con los demás proveedores no se miró a la
+  vista; el SQL da el rol solo en el proveedor 3.
+
+### Anexo de PNS-26: dos intentos
+
+1. **Operación 35 (`WRIT00000011`): creada a las 16:57:59, cancelada a las 16:58:34.** Prompt de la decisión e sobre el
+   contacto de demostración 14 (`base.res_partner_12`). El modelo (servido por el proveedor 4) propuso un `write` sobre
+   `res.partner` con un `mail.message` dentro de `message_ids`. `admin` la confirmó y la ejecución falló con
+   `KeyError: 14` en el core:
+   - `pns_ai_mcp/controllers/safe_plan_execute.py:184` (`recs.write(vals)`) → `mail/models/mail_message.py:598`
+     (`create`) → `mail_message.py:1195` (`_get_reply_to`): sin `model` en los valores, `records` es un `mail.thread`
+     vacío y a `_notify_get_reply_to(...)[res_id]` le falta la clave 14;
+   - resultado guardado: `{"error": "14", "_executing": false}`;
+   - en esa cadena no hay código de Seges. Ningún `mail_message` creado desde el arranque (comprobado por SQL): no quedó
+     nada a medias.
+2. **Operación 36 (`CREA00000003`): creada a las 17:07:59, ejecutada a las 17:09:24.** Prompt: crear en el chatter del
+   contacto una nota interna (`mail.message` nuevo, tipo `comment`, subtipo nota) con el texto «Prueba anexo PNS-26
+   (3973)». El modelo eligió **otro contacto de demostración, el 29** (`base.res_partner_address_18`), y Sergio lo
+   aceptó. Un «Confirmar», `executed|t|2`, `mail.message` **205** en el chatter del contacto 29.
+   - **El 40001 no se reprodujo:** «bad query» `UPDATE ai_safe_operation` 0 y «retry 1/5» 0 (en D47 del laboratorio, 1
+     y 1); «retry 2/5» y «maximum», 0. El documento lo trata como `INFO`. Por qué no salió esta vez: sin analizar
+     (fuera del alcance de la subida).
+
+### Log del servidor desde el arranque (T8)
+
+- **6 ERROR y 6 Traceback:**
+  - 4 de `engine_tool_loop`, todos `RuntimeError` en `openai_driver._raise_http` con **HTTP 503**, dos por turno (de
+    los proveedores 1 y 3; en los dos turnos respondió el 4);
+  - 2 de `safe_operation`: el `KeyError: 14` de la operación 35.
+- **Orden de diagnóstico usada** (no es tanda; solo lectura): por cada ERROR, la hora, el nivel y el logger; por cada
+  Traceback, archivo, línea y función, y el tipo de la excepción (su valor, solo si es numérico). No saca mensajes ni
+  datos. Probada en el entorno de Claude con un log simulado. 8 líneas, SHA-256
+  `cfd0cae121307a4fc3691f1d07b57e66bca2cd25dcfd4fcdebaba90c833664b0`.
+
+```bash
+( L=$(ls -t /tmp/pns_3973/servidor-*.log | head -1); echo "$L"
+  awk '
+{ sub(/^[^|]*\| /, "") }
+/ (ERROR|CRITICAL) / { split($0, a, " "); print "## " a[2] " " a[4] " " a[6]; next }
+/^Traceback/ { tb = 1; print "  Traceback"; next }
+tb && /^  File "/ { l = $0; sub(/^  File "/, "", l); sub(/^.*\/(pns|odoo)\//, "", l); gsub(/"/, "", l); print "    " l; next }
+tb && /^[A-Za-z_][A-Za-z0-9_.]*(:|$)/ { e = $0; m = e; sub(/:.*/, "", e); sub(/^[^:]*:? */, "", m); if (m ~ /^[0-9]+$/) e = e ": " m; print "  -> " e; tb = 0; next }
+' "$L" )
+```
+
+### Lo que queda para la limpieza final del staging
+
+- **`pns_demo`:** operaciones 35 (cancelada) y 36 (ejecutada); `mail.message` 205 en el contacto 29; las sesiones de
+  Chatboo de `admin` de los dos turnos: las de `user_id` 2 creadas desde `StartedAt` (16:52:46). Sus ids se sacan en la
+  limpieza final.
+- **VPS:** `/opt/odoo/pns_staging/addons_antes_3973` (`8d218ea`, 711, `e37be448…1844`).
+- **Equipo:** la copia de T3 (600) y `~/pns_ai_3973/staging/`.
+- **Laboratorio:** `p15_pns_demo_14`, `p15b_pns_demo_14`, la copia de P-15 y el laboratorio `cc0060e`.
+- **Después del [DOC] del resultado** (F): `/tmp/pns_3973` del VPS, una vez copiado al equipo, y los cuatro restos de E0
+  en `/tmp` del equipo.
+
+### Pendientes de decisión (de Sergio), abiertos
+
+- **Informe al fabricante:** el plan que el validador acepta y el core no puede ejecutar (operación 35), anotado en el
+  [seguimiento](seguimiento_informe_pns_ai.md) como observación sin ficha. Que el modelo eligiera otro contacto no va
+  al informe (es conducta del modelo).
+- Por qué el 40001 no salió en el staging: sin investigar.
+- Proveedores 1 y 3 con 503 y tiempo agotado el 18/11 (lado de Google; cuota sin comprobar).
+- Los WARNING de `pns_base.models.ir_translation` al recargar el idioma: se miran si salen otra vez en LIYBEN (no se
+  sabe si salieron en E1′, que no guardó el log del asistente).
+
+### Lecciones
+
+- Antes de pegar en la sesión del VPS, mirar el prompt: P.0 y T0 se pegaron primero en el equipo y no hicieron nada (el
+  `cd` de la tanda lo paró).
+- Para recargar un idioma con sobrescritura: el asistente `base.language.install` desde `odoo shell`, con `commit`
+  explícito. `--load-language` no admite `--i18n-overwrite` sin `-u`, y `load_language` ignora esa opción.
+- Un plan de la IA puede pasar el validador y no ejecutarse en el core: revisar el plan en la ficha antes de
+  «Confirmar» (tipo de operación, modelo y `res_id`; el `res_id` por SQL, con su xml_id).
+- Un «esperado» de un fenómeno de concurrencia (el 40001) puede no darse: por eso va en `INFO`.
