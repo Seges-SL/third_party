@@ -296,7 +296,7 @@ Orden:
 4. **Pruebas con toda la rama** («Pruebas posteriores», punto 4), con la **versión del core del staging** comprobada en
    el código montado y no con `dpkg`, como en LIYBEN (propuesta, «Datos de LIYBEN»). **`iap.account.get` (P2) se
    decide antes** de estas pruebas (propuesta, «Hallazgos de P1 a P3»).
-5. **Staging** de la rama (`pns_demo`).
+5. **Staging** de la rama (`pns_demo`). **Hecho el 18/11/2026** («Pruebas posteriores», punto 7).
 
 **Laboratorio con el core de LIYBEN** (`DOCKERFILE` propio): antes de LIYBEN. Ya se aplazó así el 12/11/2026 (propuesta,
 «Decisiones de Sergio sobre V1 a V5 y la 3b», punto 5).
@@ -845,7 +845,36 @@ Orden:
      - **conservación:** `p15_pns_demo_14` y la copia `.dump` se conservan hasta la limpieza final del staging, con el
        laboratorio `cc0060e`.
 6. P-21 de nuevo (solo lectura), justo antes del `-u` del staging.
+   - **Hecho el 18/11/2026** (16:17 UTC), dentro de T0 del [documento de subida](staging_3973.md), con
+     `staging_3973/p21.sql`: el mismo resultado que el 10/11/2026 (12 contextos y 3 skills que se reescriben sin
+     edición, 7 retiradas, 0 que adoptar, 0 archivadas).
 7. Staging `pns_demo`.
+   - **Hecho el 18/11/2026** (16:11 a 17:12 UTC): commit `5d0559b`, `-u pns_base,pns_ai_mcp,pns_ai_chatboo`, con el
+     procedimiento de [staging_3973.md](staging_3973.md) (en `2e7f784`) y dos tandas nuevas, **T4b** (recarga de `es_ES`
+     y rol Diseño con el web parado; sustituye los puntos 1 y 2 manuales de T7) y **F1** (borrado del código extraído en
+     `/tmp`). Todas con `TODO OK`; la vuelta atrás no se usó. Resultado por tanda, salidas y lo que queda para la
+     limpieza final: [staging_3973.md](staging_3973.md), apartado G. Copia previa de `pns_demo` (decisión a): T3,
+     `ecde6453…f88b`. Web parado de 16:43 a 16:52 UTC. Lo previsto abajo, cómo quedó:
+     - **parche 39** (decisión d): `iap_account` igual antes y después; la validación es la del laboratorio `cc0060e`;
+     - **parche 35:** «fixed» 1 y 1 y 0 WARNING en el `-u`; `model._gc_expired()` en los dos crons (T6);
+     - **skills:** las 7 retiradas a 0; 13 → 10, con las 4 nuevas de 3.1.973;
+     - **P-11:** sin AI Conversational 0; AI Administrators como antes;
+     - **diseño con `/web/image` (D55):** sesión 51, sin imágenes antes y después: **sin cambio de comportamiento**.
+       Pendiente de confirmar por Sergio que la consola seguía sin «Refused to load the image» después;
+     - **log del `-u`:** 0 Traceback, post-migrate 1, «Deleting field» 6, 48 módulos, «DROP leftover» 11. WARNING: los
+       previstos y 2 `py.warnings` de `ir_actions_report.py` (core, informativos), en lugar del de `jinja2` de P-15;
+     - **anexo de PNS-26:** la primera operación (35) falló en el core (`KeyError: 14`, plan no ejecutable) y se
+       canceló; la segunda (36) se ejecutó con un «Confirmar». **El 40001 no se reprodujo** (0 y 0; en D47, 1 y 1): se
+       queda en `INFO`, como preveía el documento;
+     - **rol Diseño y `es_ES`:** hechos en T4b (abajo, «Tras el `-u`»).
+   - **Pendientes de decisión, abiertos** (staging_3973.md, G):
+     - el plan no ejecutable de la operación 35, anotado en el
+       [seguimiento](seguimiento_informe_pns_ai.md) como observación sin ficha, candidata al informe al fabricante;
+     - por qué el 40001 no salió en el staging: sin investigar;
+     - proveedores 1 y 3 con 503 y tiempo agotado el 18/11 (lado de Google; cuota sin comprobar);
+     - los WARNING de `pns_base.models.ir_translation` al recargar el idioma: se miran si salen otra vez en LIYBEN.
+   - **Siguiente:** limpieza de `/tmp` del VPS y del equipo (copiando antes al equipo las salidas del VPS); después,
+     LIYBEN (D50 antes de su despliegue) y el informe al fabricante (al final).
    - **Core `cc0060e`, cubierto en el laboratorio (18/11/2026):** ver el punto 4, «Laboratorio con el core cc0060e». El
      laboratorio (carpeta, imagen y BD) se conserva hasta la limpieza final del staging.
    - Anexo de PNS-26: un «Confirmar» correcto de la ficha (encadena `/confirm` y `/execute`). En el log, por cada
@@ -874,6 +903,10 @@ Orden:
        3 y «skip retired unlink» 2). Duración en el laboratorio: 72 s (orientativa).
 
 ## Tras el `-u` (staging y LIYBEN)
+
+**Staging, hecho el 18/11/2026** ([staging_3973.md](staging_3973.md), T4b y T6): rol Diseño con `use_fallback`
+desactivado y solo en el proveedor 3 (SQL; el botón Canvas con los demás no se miró a la vista); crons de NUEVO-2 con
+`model._gc_expired()`; P-11 sin AI Conversational 0; `es_ES` recargado. Lo que sigue queda para LIYBEN.
 
 - **Rol Diseño:**
   - `use_fallback` desactivado;
