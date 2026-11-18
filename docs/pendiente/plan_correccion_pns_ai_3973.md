@@ -860,7 +860,7 @@ Orden:
      - **skills:** las 7 retiradas a 0; 13 → 10, con las 4 nuevas de 3.1.973;
      - **P-11:** sin AI Conversational 0; AI Administrators como antes;
      - **diseño con `/web/image` (D55):** sesión 51, sin imágenes antes y después: **sin cambio de comportamiento**.
-       Pendiente de confirmar por Sergio que la consola seguía sin «Refused to load the image» después;
+       Consola sin «Refused to load the image» antes y después (confirmado por Sergio, 18/11/2026);
      - **log del `-u`:** 0 Traceback, post-migrate 1, «Deleting field» 6, 48 módulos, «DROP leftover» 11. WARNING: los
        previstos y 2 `py.warnings` de `ir_actions_report.py` (core, informativos), en lugar del de `jinja2` de P-15;
      - **anexo de PNS-26:** la primera operación (35) falló en el core (`KeyError: 14`, plan no ejecutable) y se

@@ -857,7 +857,7 @@ Esperado: rol Diseño `…|design|t|f|conversation` y solo en el proveedor `3|t|
 |---|---|---|---|
 | 1 | Recarga de `es_ES` | el asistente termina; sin errores (T8) | hecha en T4b (`state=done overwrite=True`, 0 errores) |
 | 2 | Rol Diseño | solo Gemini 3.5 flash; `use_fallback` desactivado; sin botón Canvas con los demás | hecho en T4b; `s3_t7`: `…|design|t|f|conversation` y `3|t|f`. Botón Canvas con los demás: no comprobado a la vista |
-| 3 | Sesión con `/web/image`, después | como antes; si no, cambio de comportamiento | igual que antes (T1): un registro, tarjeta con `[object Object]`, sin imágenes. **Sin cambio de comportamiento** (D55). Consola: queda por confirmar por Sergio que seguía sin «Refused to load the image» |
+| 3 | Sesión con `/web/image`, después | como antes; si no, cambio de comportamiento | igual que antes (T1): un registro, tarjeta con `[object Object]`, sin imágenes. **Sin cambio de comportamiento** (D55). Consola sin «Refused to load the image», como antes (confirmado por Sergio el 18/11/2026) |
 | 4 | Anexo de PNS-26 | operación `executed`, confirmada por `admin`; la nota en el contacto | operación 36 `executed|t|2` (17:09:24); `mail.message` 205 en el contacto 29. Antes, la 35, cancelada (G, «Anexo de PNS-26») |
 
 ### T8. VPS: log del servidor desde el arranque
@@ -1027,8 +1027,8 @@ antes de la limpieza); del equipo, en `~/pns_ai_3973/staging/`. Resultado: **la 
   contra la API de Google. Sergio: fallo del proveedor, se sigue. **Cuota:** no comprobada.
 - **Diseño con `/web/image` (D55), sesión 51:** antes (T1), un registro, tarjeta con `[object Object]`, **sin
   imágenes**; consola sin «Refused to load the image». Después (T7), **igual**: **sin cambio de comportamiento**, así
-  que la decisión A de D55 no tiene nada que anotar. Queda por confirmar por Sergio que la consola seguía sin el aviso
-  después.
+  que la decisión A de D55 no tiene nada que anotar. La consola, sin el aviso antes y después (confirmado por Sergio
+  el 18/11/2026).
 - **`es_ES` y rol Diseño (T7, puntos 1 y 2):** hechos en T4b. El botón Canvas con los demás proveedores no se miró a la
   vista; el SQL da el rol solo en el proveedor 3.
 
