@@ -837,6 +837,10 @@ Restos que se repiten en varios parciales:
     `/execute`): confirmación en 3.1.973 (13/11/2026)».
   - Confirmado en 3.1.973 por test (13/11/2026); sin parche; comprobación en staging (decisión de Sergio del 13/11/2026,
     en la misma sección de la propuesta).
+  - **Comprobación en staging (`pns_demo`, 18/11/2026, 3.1.973 con la rama de Seges):** en el único «Confirmar»
+    correcto desde la ficha (operación 36), **el 40001 no se reprodujo**: «bad query» `UPDATE ai_safe_operation` 0 y
+    «SERIALIZATION_FAILURE, retry 1/5» 0; «retry 2/5» y «maximum», 0. En el laboratorio (D47, 18/11/2026) salieron 1 y
+    1. Por qué no salió: sin analizar. Detalle en [staging_3973.md](staging_3973.md), apartado G, «Anexo de PNS-26».
 
 ### PNS-27 — jsPDF 2.5.1 y SheetJS 0.18.5 con CVE conocidas en todo el backend
 
@@ -2545,6 +2549,23 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
   - **Rama Seges:** sin parche (decisión de Sergio, 13/11/2026). Distinta de «Canvas sin imágenes» (el botón Canvas no
     lleva imágenes a Design; fase 2c). **Candidata al informe al fabricante.** Número propuesto: PNS-106, pendiente
     de comprobar que no figura en `docs/` y de buscar el síntoma en anexos y diagnósticos antes de numerarla.
+- **Un plan que el validador acepta y el core no puede ejecutar, con un resultado que no lo explica** (staging
+  `pns_demo`, 18/11/2026, 3.1.973 con la rama de Seges; [staging_3973.md](staging_3973.md), apartado G, «Anexo de
+  PNS-26», operación 35):
+  - **Descripción:** pedida una nota en el chatter de un contacto, el modelo propuso un `write` sobre `res.partner` con
+    un `mail.message` dentro de `message_ids`. El validador lo aceptó y `admin` lo confirmó. La ejecución falló en el
+    core: `pns_ai_mcp/controllers/safe_plan_execute.py:184` (`recs.write(vals)`) → `mail/models/mail_message.py:598`
+    (`create`) → `:1195` (`_get_reply_to`). Sin `model` en los valores, `records` es un `mail.thread` vacío y a
+    `_notify_get_reply_to(...)[res_id]` le falta la clave;
+  - **Impacto:** no queda nada a medias (ningún `mail_message` creado), pero el resultado guardado es solo
+    `str(e)` (`{"error": "14", …}`): ni el usuario ni el AI Administrator ven por qué falló. Sin código de Seges en esa
+    cadena;
+  - **Corrección sugerida:** que el validador rechace (o reescriba como `create` de `mail.message` con `model` y
+    `res_id`) las escrituras de `mail.message` a través de `message_ids`, y que el resultado guarde el tipo de la
+    excepción y un mensaje útil;
+  - **Rama Seges:** sin parche. **Candidata al informe al fabricante**, sin numerar: antes, comprobar que no figura en
+    `docs/` y buscar el síntoma en anexos y diagnósticos (decisión de Sergio, 18/11/2026). Que el modelo eligiera otro
+    contacto que el pedido no va al informe (es conducta del modelo).
 
 ### Candidatos evaluados y descartados
 
