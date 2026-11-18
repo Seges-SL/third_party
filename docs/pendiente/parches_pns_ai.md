@@ -267,8 +267,12 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
 | 34 | PNS-96 | funcional | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_async_request.py` | 4 | Aplicado (16/11/2026): opción A; aviso en línea llana sin marcas (D25, sustituye a F1); L1 hecho, L2 pendiente (P-13) |
 | 36 | PNS-103 | funcional | `pns_base/models/operation_report_wizard.py` | 2c | Aplicado (11/11/2026); validado en el laboratorio (12/11/2026) |
 | 37 | PNS-104 | datos | `pns_ai_mcp/controllers/controller_helpers.py` | 3b | Aplicado (12/11/2026) |
-| 35 | NUEVO-2 | robustez | `pns_ai_mcp/migrations/14.0.3.1.973/post-migrate.py` | plan, «Parche 35» | Aplicado (17/11/2026); se comprueba en P-2 (a, b y c). Única excepción a «sin `migrations/` propios»: solo se ejecuta en un `-u` que cruce 3.1.973; una BD actualizada a 3.1.973 sin el parche no lo ejecuta y se corrige a mano (una instalación nueva no lo necesita) |
-| 39 | PNS-107 | seguridad | `pns_ai_mcp/controllers/validators_base.py`, `pns_ai_mcp/controllers/context_builder.py` | plan, «Pruebas posteriores», punto 4 (P2) | Aplicado (17/11/2026): `iap.account.get` bloqueado en la caja A por modelo y nombre, y sus 8 llamadores públicos por nombre (D40); campo calculado de `partner_autocomplete` e `iap_enrich`, restos conocidos |
+| 35 | NUEVO-2 | robustez | `pns_ai_mcp/migrations/14.0.3.1.973/post-migrate.py` | plan, «Parche 35» | Aplicado (17/11/2026); se comprueba en P-2 (a, b y c). Única excepción a «sin `migrations/` propios»: solo se ejecuta en un `-u` que cruce 3.1.973; una BD actualizada a 3.1.973 sin el parche no lo ejecuta y se corrige a mano (una instalación nueva no lo necesita). Validado en el laboratorio (P-2, 18/11/2026), en P-15 y en staging (`pns_demo`, 18/11/2026) |
+| 39 | PNS-107 | seguridad | `pns_ai_mcp/controllers/validators_base.py`, `pns_ai_mcp/controllers/context_builder.py` | plan, «Pruebas posteriores», punto 4 (P2) | Aplicado (17/11/2026): `iap.account.get` bloqueado en la caja A por modelo y nombre, y sus 8 llamadores públicos por nombre (D40); campo calculado de `partner_autocomplete` e `iap_enrich`, restos conocidos. Validado en el laboratorio (18/11/2026, también con el core `cc0060e`); desplegado en staging (18/11/2026), con `iap_account` sin cambios |
+
+**Staging (18/11/2026):** la rama se desplegó en `pns_demo` con el commit `5d0559b`
+([staging_3973.md](staging_3973.md), apartado G). Comprobaciones propias en staging solo de los parches 35 (validado) y
+39 (solo `iap_account` sin cambios); los demás están desplegados con la rama, sin prueba propia allí.
 
 Las entradas de cada parche portado se añaden debajo, en «Parches de la rama 14.0-pns-ai-3973», con sus
 archivos y líneas, los ajustes, el test y la neutralización.
@@ -5033,6 +5037,10 @@ Base: `7c68ae8`. Plan: [plan_correccion_pns_ai_3973.md](plan_correccion_pns_ai_3
   fixed» y «… ir_cron_ai_fetch_cache_gc fixed», 1 y 1; WARNING del 35, 0. Los dos crons pasan de `model.gc_expired()` a
   `model._gc_expired()`; inactivos por la neutralización antes y después. Detalle en el plan, «Pruebas posteriores»,
   punto 5.
+- **Validado en staging (`pns_demo`, 18/11/2026):** commit `5d0559b`, con historia desde 3.1.879,
+  `-u pns_base,pns_ai_mcp,pns_ai_chatboo` (T4, `u-20261118-164700.log`): «Running migration [14.0.3.1.973>]
+  post-migrate» 1; «Seges patch 35: … fixed» de los dos crons, 1 y 1; WARNING del 35, 0. Después (T6, solo lectura),
+  `model._gc_expired()` en los dos. Detalle en [staging_3973.md](staging_3973.md), apartado G.
 - **Cómo comprobar si el fabricante ya lo ha corregido:** `test_1_old_code_fails_when_run_by_hand` falla (el fabricante
   recupera `gc_expired` o lo acepta como alias), o el fabricante publica su propio
   `pns_ai_mcp/migrations/14.0.3.1.973/`. En ese caso hay que fusionar o retirar este script: dos `post-migrate.py` en la
@@ -5231,6 +5239,9 @@ Base: `51d4630`. Plan: [plan_correccion_pns_ai_3973.md](plan_correccion_pns_ai_3
   `LAB_NOMBRE` y `BD` de ese laboratorio), «P39 VEREDICTO OK»: 4/4 previstos con su clase, 0 excepciones, control OK,
   `iap_account` 0/0 sin cambios. Salida `p39_lab_pns_ai_cc0060e_14.txt`. Detalle en el plan, «Pruebas posteriores»,
   punto 4, «Laboratorio con el core cc0060e».
+- **En staging (`pns_demo`, 18/11/2026): desplegado** con el commit `5d0559b`, sin prueba propia (decisión d de
+  [staging_3973.md](staging_3973.md): la validación es la del laboratorio con el core `cc0060e`, el mismo core y el mismo
+  código). Comprobado allí solo que `iap_account` queda igual antes y después del `-u` (`1|1`, T0 y T6).
 - **Cómo comprobar si el fabricante ya lo ha corregido:** los tests 1, 2, 4 y 5 pasan con N39 y N39b aplicadas a la vez, o el
   fabricante publica un bloqueo propio de `iap.account.get` y de sus llamadores en la caja A.
 - **Seguimiento:** ficha PNS-107 en [seguimiento_informe_pns_ai.md](seguimiento_informe_pns_ai.md) (Baja, candidata al
