@@ -250,6 +250,7 @@ Detalle y decisiones en [decisiones](pns_ai_decisiones.md), §10.
 |---|---|---|
 | Archivar los 18 usuarios de portal | Hecho el 23/10/2026, 14:17 (interfaz, usuario soporte@liyben.com). Comprobado por SQL: 0 usuarios externos activos. IDs: de portal, 8, 9, 11, 12, 13, 14, 15, 16, 27 y 28; externos sin grupo de portal, 10, 17, 19, 20, 21, 22, 23 y 24 | N7 |
 | Despliegue de las correcciones (parches 7 en adelante) | Al terminar el plan, de una vez y con todo validado en el staging (se registra aquí: commit, fecha y comprobación) | [plan de corrección](plan_correccion_pns_ai.md), §3 |
+| Antes del `-u`: D50, vaciar los 7 tokens de registro; antes, comprobar en `cc0060e` qué hace `signup_cancel` de `auth_signup` | Pendiente (D50, Sergio, 18/11/2026) | [plan_correccion_pns_ai_3973.md](plan_correccion_pns_ai_3973.md), «Tras el `-u`» |
 | Integrar en `14.0` (merge commit) y volver el clon a `14.0` | Al terminar el plan de corrección | §4; plan de corrección §3 |
 | Limpieza del staging | Al terminar el plan de corrección | plan de staging, §9 |
 | D15 (infraestructura) | Se decide más adelante | decisiones, D15 |

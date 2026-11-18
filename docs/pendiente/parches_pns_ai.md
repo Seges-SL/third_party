@@ -5221,6 +5221,10 @@ Base: `51d4630`. Plan: [plan_correccion_pns_ai_3973.md](plan_correccion_pns_ai_3
   «P39 VEREDICTO OK». Los 4 casos, 4/4 con su clase: `get` y `f()` «bloqueado por el 39»; `get_credits_url` y
   `action_buy_credits`, `requires_write`. Control OK; `iap_account` 0/0, sin cambios. Queda validado en laboratorio el
   marcador del 39 en el texto de `isError`. Detalle en el plan, «Pruebas posteriores», punto 4, «Resultados».
+- **Validado en el laboratorio con el core cc0060e (18/11/2026, `lab_pns_ai_cc0060e_14`):** `p39_lab.sh` (copia con
+  `LAB_NOMBRE` y `BD` de ese laboratorio), «P39 VEREDICTO OK»: 4/4 previstos con su clase, 0 excepciones, control OK,
+  `iap_account` 0/0 sin cambios. Salida `p39_lab_pns_ai_cc0060e_14.txt`. Detalle en el plan, «Pruebas posteriores»,
+  punto 4, «Laboratorio con el core cc0060e».
 - **Cómo comprobar si el fabricante ya lo ha corregido:** los tests 1, 2, 4 y 5 pasan con N39 y N39b aplicadas a la vez, o el
   fabricante publica un bloqueo propio de `iap.account.get` y de sus llamadores en la caja A.
 - **Seguimiento:** ficha PNS-107 en [seguimiento_informe_pns_ai.md](seguimiento_informe_pns_ai.md) (Baja, candidata al

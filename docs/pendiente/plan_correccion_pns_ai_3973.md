@@ -684,6 +684,88 @@ Orden:
        Conversational y AI Writer, sin `base.group_partner_manager`. `tarjeta_plantar.sh` paró antes de plantar, sin
        escribir nada. Decisión de Sergio: añadir `base.group_partner_manager` solo durante D47 y quitarlo al acabar.
        La lista de grupos de antes y la de después, IGUALES. En la guía, «Requisito de D47».
+
+   **Laboratorio con el core cc0060e (18/11/2026).** Se repite parte de las pruebas con toda la rama, ahora con el core
+   del staging y de LIYBEN (`cc0060e`, punto 4, «Antes»). Las salidas están fuera del repo, en
+   `~/pns_ai_3973/fase4/cc0060e/`: aquí se citan por su nombre y se resumen, sin datos. El `arrancar` tiene su fila
+   en el registro de laboratorios del [procedimiento](lab_procedimiento_3973.md).
+   - **Decisiones de Sergio (18/11/2026):**
+     - **D48:** laboratorio con el core `cc0060e` antes del staging, con el alcance del paso 0: instalación limpia
+       (P-2 c), batería, `p39_lab.sh` y `rama_require_settings.sh` con el 32. Quedan fuera D47 y P-2 (a) y (b), porque
+       `migration.py`, `loading.py`, `iap`, el JS y las plantillas son iguales en los dos cores;
+     - **D49:** el core va en un Dockerfile propio: carpeta `~/GitHub/lab_pns_ai_cc0060e`, imagen
+       `odoo-dev:14-lab_pns_ai_cc0060e`, BD `lab_pns_ai_cc0060e_14`;
+     - **D50:** los 7 tokens de registro de LIYBEN se vacían justo antes de su despliegue, no ahora. Antes hay que
+       comprobar en `cc0060e` qué hace `signup_cancel` de `auth_signup` («Tras el `-u`», abajo);
+     - **D51:** limpieza final de las pruebas con toda la rama: hecha (abajo);
+     - **Conservación:** el laboratorio `cc0060e` (carpeta, imagen y BD) se conserva hasta la limpieza final del
+       staging.
+   - **Limpieza final de las pruebas con toda la rama (D51, ~11:28 hora local):** `bd-borrar` de `lab_p2a_879_14` y
+     `lab_p2b_879_14`. Se borraron también las carpetas `lab_pns_ai_879` y `lab_pns_ai_973f` y sus dos imágenes. El
+     `arrancar` final de la guía no se lanzó, porque el contexto ya era `lab_pns_ai_3973` y no cambió. `bd-borrar` no
+     pregunta en la terminal; la confirmación es solo para los agentes (MANUAL del kit, 6.4). La guía está corregida
+     («Limpieza final»).
+   - **Paso 0, comparación de cores (`comprobar/resumen_0a_odoo-dev14.txt`):** se comparó la imagen `odoo-dev:14`
+     (paquete 14.0.20231106) con `/opt/odoo-src/14.0/odoo` (`cc0060e`, sin cambios locales). Resultado: 9205 iguales,
+     187 distintos, 581 solo en la imagen (`design-themes`) y 10 solo en la referencia. `odoo-dev:14-lab_pns_ai_3973`
+     da lo mismo. Diferencias que importan a la rama:
+     - `totp_secret` y `signup_token`, calculados por SQL;
+     - `_allow_sudo_commands` y `uid_origin`;
+     - `HTTPRequest` nueva en `http.py`;
+     - `call_kw`;
+     - reglas `ir.rule` multicompañía.
+
+     **Excepción a la forma fija de `docker run`** (aprobada por Sergio el 18/11/2026): la comparación se ejecutó
+     también con las imágenes locales `odoo-dev:14-lab_pns_ai_3973` y `odoo-dev:14-lab_pns_ai_cc0060e`, en solo
+     lectura. Con la primera, en este paso 0; con la segunda, en la comprobación posterior de la imagen (abajo).
+   - **Imagen (D49; `arrancar` a las 11:52 hora local, `arrancar_20261118-115229.txt`):** `infra/Dockerfile.14`
+     descarga el tarball del commit `cc0060e`, sustituye con él todo el core del paquete y comprueba 5 huellas
+     (`fields.py`, `models.py`, `auth_totp/models/res_users.py`, `auth_signup/models/res_partner.py` e
+     `iap/models/iap_account.py`, las del staging y LIYBEN). Las 5, OK. El SHA-256 del tarball, `925cf1c3…9654`, es un
+     dato y no una referencia, porque GitHub no garantiza que el tarball sea estable.
+     - Comprobación posterior con `comparar_core.py`: iguales 9402, distintos 0, solo en la imagen 0, solo en la
+       referencia 0.
+     - SHA-256 de los archivos de la carpeta: `CLAUDE.md` `c3de247c…4f3d`, `.odoo-dev.conf` `9f87184c…00d9` e
+       `infra/Dockerfile.14` `8800092a…e69a`.
+     - «Al acabar corto» con `servidor-20261118-115434.log`: 6 líneas, nadie entró, sin Starting job, C código 0.
+   - **Batería (`tests-20261118-120134.log`; salida `tests_20261118-120131.txt`):** 580 tests, 1 F
+     (`TestSystemTrustedActions.test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin`), 0 E y los 6 saltados de siempre. En el log: Traceback 58,
+     `seges_side_env` 1, secretos 0 y 1 «bad query» (`UPDATE "ai_safe_operation"`). **Igual a la línea base.**
+     `test_seges_box_a_vias` pasa, así que V3, V4 y O1 del parche 18 quedan validados en la variante de `totp_secret`
+     de LIYBEN. Los subtests saltados no se contaron (pendiente, abajo).
+   - **Instalación y P-2 (c) (`instalar-20261118-121058.log`; salidas `i_lab_pns_ai_cc0060e_14.txt` y
+     `p2c_lab_pns_ai_cc0060e_14.txt`):** `-i` OK, 0 bloqueantes y 0 avisos; el web no se reinició. P-2 (c), con una
+     consulta de solo lectura, todo OK:
+     - 596 líneas de la BD y 0 de otras; migración 0 y «Seges patch 35» 0. Estos recuentos del log de `instalar` salen
+       de la salida de la tanda 4a, que no se guardó en `p2c_lab_pns_ai_cc0060e_14.txt`;
+     - versiones `14.0.2.1.587`, `14.0.3.1.973` y `14.0.1.2.69`;
+     - `iap` y `sms` instalados;
+     - `model._gc_expired()` en los dos crons;
+     - `P11|0|0|1`.
+
+     `rama_comprobar.sh` no sirve para un `-i`: exige un `actualizar-*.log` y al menos un AI Administrator.
+   - **Preparación (`prep_seges_int.txt`):** se creó `seges_int` con commit (id 8, solo `base.group_user`,
+     `no_reset_password`).
+   - **Copias de los scripts (`~/pns_ai_3973/fase4/lab/cc0060e/`):** de los originales solo cambian `LAB_NOMBRE` y `BD`,
+     y los originales no se tocaron. `p39_lab.sh` `6d160f93…1656` y `rama_require_settings.sh` `eb7cbb3c…38f1`.
+   - **Parche 39 (`p39_lab_pns_ai_cc0060e_14.txt`):** «P39 VEREDICTO OK»: 4/4 previstos con su clase, 0 excepciones,
+     control OK, `iap_account` 0/0 sin cambios. El usuario no tiene AI Conversational, a diferencia del bloque 3.
+   - **D46 con el 32 (`d46_lab_pns_ai_cc0060e_14.txt`):** 4/4, código 0. Las cuatro líneas coinciden con lo esperado en
+     la guía (bloque 4, punto 2), incluida la propuesta «rechazada en la validación» de «sin Ajustes, campo»
+     (`safe_plan_validate.py:198-202`; `rama_require_settings.sh`, comentario de cabecera y `propuesta`).
+   - **Conclusión:** el core del staging y de LIYBEN (`cc0060e`) queda cubierto en el alcance de D48. La instalación
+     limpia, la batería, el 39 y D46 con el 32 dan lo mismo que con el core de la imagen `odoo-dev:14`. Lo que queda
+     fuera (D47 y P-2 a/b) no depende de lo que cambia entre los dos cores.
+   - **Archivos de referencia en [lab_3973/](lab_3973/)**, con su SHA-256 en la tabla de la
+     [guía](lab_3973/guia_rama.md):
+     - `Dockerfile.14.cc0060e`: copia de `infra/Dockerfile.14` del laboratorio, para reconstruir la imagen;
+     - `comparar_core.py`: compara, en solo lectura, el core de una imagen con la referencia.
+   - **Pendientes:**
+     - `--lab` en `p39_lab.sh` y `rama_require_settings.sh` si se reutilizan. Hoy llevan el laboratorio fijo, y las
+       copias de `cc0060e` se adaptaron a mano;
+     - contar los subtests saltados con el core `cc0060e` (no se contaron; en la línea base son 6);
+     - D50: comprobar en `cc0060e` qué hace `signup_cancel` de `auth_signup` antes de vaciar los tokens de LIYBEN
+       («Tras el `-u`», abajo).
 5. P-15: `-u` completo sobre una copia de `pns_demo` que carga Sergio.
    - **Añadido el 13/11/2026 (fase 4, parche 27):** A7 en solo lectura sobre la copia de `pns_demo`. Es el script
      `~/pns_ai_3973/fase4/csp/a7_recuentos.py`, que cuenta diseños por patrón, sin contenido ni ID (ver
@@ -691,6 +773,8 @@ Orden:
      copia hay que cambiarla, y el cambio se presenta antes.
 6. P-21 de nuevo (solo lectura), justo antes del `-u` del staging.
 7. Staging `pns_demo`.
+   - **Core `cc0060e`, cubierto en el laboratorio (18/11/2026):** ver el punto 4, «Laboratorio con el core cc0060e». El
+     laboratorio (carpeta, imagen y BD) se conserva hasta la limpieza final del staging.
    - Anexo de PNS-26: un «Confirmar» correcto de la ficha (encadena `/confirm` y `/execute`). En el log, por cada
      uno, un ERROR «bad query» de `odoo.sql_db` sobre `ai_safe_operation` y un INFO «SERIALIZATION_FAILURE, retry 1/5»
      de `odoo.service.model`. No cuentan como fallo ([propuesta](propuesta_fase3_3973.md), «Anexo de PNS-26
@@ -714,3 +798,6 @@ Orden:
   reproduce con un usuario que no sea AI Administrator.
 - **Decisión 10:** antes de LIYBEN, consultar si sus AI Administrators tienen Ajustes (ahora también decide
   `_require_settings`).
+- **D50 (Sergio, 18/11/2026; antes del despliegue en LIYBEN):** los 7 tokens de registro de LIYBEN se vacían justo
+  antes de su despliegue. Antes de eso, comprobar en el core `cc0060e` qué hace `signup_cancel` de `auth_signup` (en
+  `cc0060e`, `signup_token` se calcula por SQL; punto 4, «Laboratorio con el core cc0060e», paso 0).
