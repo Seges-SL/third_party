@@ -5017,6 +5017,16 @@ Base: `7c68ae8`. Plan: [plan_correccion_pns_ai_3973.md](plan_correccion_pns_ai_3
   post-migrate» y dos «Seges patch 35: … fixed»; (b) `-u` desde 3.1.879 con la base limpia y después a la rama: ninguna
   de las dos líneas, crons rotos y corrección a mano; (c) instalación limpia: ninguna de las dos líneas, crons bien.
   En los tres, `ir_cron.code` por XML ID con un `SELECT` de solo lectura. Detalle en el plan.
+- **Validado en el laboratorio (18/11/2026, pruebas con toda la rama):** P-2 (a), (b) y (c) y D43, OK. Detalle en el
+  plan, «Pruebas posteriores», punto 4, «Resultados».
+  - (c), en `lab_pns_ai_3973_14` (`actualizar-20261118-092113.log`): migración 0; Seges patch 35: líneas 0, WARNING 0;
+    `model._gc_expired()` en los dos. D43: 2 de 2, `ValueError` 0 (`rama_crons-lab_pns_ai_3973_14-20261118-092314.log`);
+  - (a), en `lab_p2a_879_14` (`actualizar-20261118-094410.log`): migración 1; «Seges patch 35: … fixed» 1 y 1; WARNING
+    0; `model._gc_expired()`. D43: OK (`rama_crons-lab_p2a_879_14-20261118-095755.log`);
+  - (b), en `lab_p2b_879_14`: base limpia (`actualizar-20261118-100519.log`) y rama (`actualizar-20261118-100813.log`),
+    migración 0 y «Seges patch 35» 0; los crons con `model.gc_expired()`. Control negativo de D43: FALLO, como se
+    prevé (0 de 2, `ValueError` 2, código 1; `rama_crons-lab_p2b_879_14-20261118-101232.log`). Corrección a mano:
+    «CORREGIDOS 2», `model._gc_expired()` en los dos. D43: OK (`rama_crons-lab_p2b_879_14-20261118-101447.log`).
 - **Cómo comprobar si el fabricante ya lo ha corregido:** `test_1_old_code_fails_when_run_by_hand` falla (el fabricante
   recupera `gc_expired` o lo acepta como alias), o el fabricante publica su propio
   `pns_ai_mcp/migrations/14.0.3.1.973/`. En ese caso hay que fusionar o retirar este script: dos `post-migrate.py` en la
@@ -5207,6 +5217,10 @@ Base: `51d4630`. Plan: [plan_correccion_pns_ai_3973.md](plan_correccion_pns_ai_3
     ninguna (ni en el core ni en OCA);
   - otros métodos del core con nombre común que confirman en cursor propio no están inventariados; la constante es el
     sitio para añadirlos.
+- **Validado en el laboratorio (18/11/2026, pruebas con toda la rama, bloque 3, `lab_pns_ai_3973_14`):** `p39_lab.sh`,
+  «P39 VEREDICTO OK». Los 4 casos, 4/4 con su clase: `get` y `f()` «bloqueado por el 39»; `get_credits_url` y
+  `action_buy_credits`, `requires_write`. Control OK; `iap_account` 0/0, sin cambios. Queda validado en laboratorio el
+  marcador del 39 en el texto de `isError`. Detalle en el plan, «Pruebas posteriores», punto 4, «Resultados».
 - **Cómo comprobar si el fabricante ya lo ha corregido:** los tests 1, 2, 4 y 5 pasan con N39 y N39b aplicadas a la vez, o el
   fabricante publica un bloqueo propio de `iap.account.get` y de sus llamadores en la caja A.
 - **Seguimiento:** ficha PNS-107 en [seguimiento_informe_pns_ai.md](seguimiento_informe_pns_ai.md) (Baja, candidata al

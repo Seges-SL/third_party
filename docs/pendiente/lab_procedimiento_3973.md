@@ -97,6 +97,12 @@ print("BD con Starting job:", ", ".join("%s (%d)" % kv for kv in sorted(crons.it
 2. tras cada reinicio por `instalar` o `actualizar`;
 3. antes de parar (sobre el log guardado, en «Al acabar»).
 
+**Log vacío (18/11/2026).** Un log guardado demasiado pronto, antes de que Odoo escriba su primera línea, sale vacío.
+`lab_cdp.py c` da entonces código 7 (`C_SIN_LINEAS`, ninguna línea de Odoo; `lab_cdp.py:104`): NO CONCLUYENTE, no OK.
+Pasó en el primer `arrancar` de `lab_pns_ai_879` de las pruebas con toda la rama, con el log guardado a los 13 s. Por
+eso el «Al acabar corto» de [lab_3973/guia_rama.md](lab_3973/guia_rama.md) espera a «HTTP service (werkzeug) running»
+antes de guardarlo.
+
 ## Si aparece otra BD
 
 1. **Parar**, guardando antes el log (órdenes de «Al acabar»).
@@ -473,3 +479,12 @@ Horas en UTC (las del log). Un bloque por laboratorio; no se reescriben los ante
 | 17/11/2026 | ~12:28 | sí (log guardado; código final 8) | `?` (18), `lab_pns_ai_3973_14` (41) / no aplica (sin reinicios en el laboratorio automatizado) / `?` (40), `lab_pns_ai_3973_14` (685); Starting job: `lab_pns_ai_3973_14` (15) | `servidor-20261117-134003.log` (salida `salida_34_L2_20261117-132720`) | Parche 34, L2, **intento no válido**: proveedor caído (8 timeouts y 2 × 429). |
 | 17/11/2026 | ~13:38 (primera línea del log guardado: 13:36:52) | 13:56:37 (última línea del log guardado); sí (log guardado; código final 8) | `?` (17), `lab_pns_ai_3973_14` (42) / no aplica (sin reinicios en el laboratorio automatizado) / `?` (41), `lab_pns_ai_3973_14` (689); Starting job: `lab_pns_ai_3973_14` (20) | `servidor-20261117-145639.log` (salida `salida_34_L2_20261117-143631`) | Parche 34, L2, **intento no válido**: 429 con `gemini-3.5-flash` (cuota agotada). |
 | 17/11/2026 | ~14:05 | ~14:12; sí (log guardado; código final 8) | `?` (17), `lab_pns_ai_3973_14` (42) / no aplica (sin reinicios en el laboratorio automatizado) / `?` (39), `lab_pns_ai_3973_14` (701); Starting job: `lab_pns_ai_3973_14` (13) | `servidor-20261117-151159.log` (salida `salida_34_L2_20261117-150436`) | Parche 34, **L2** (turnos reales): `lab_auto.sh … --escenario p34` con los scripts de «Ampliación (17/11/2026): escenario p34». Modelo `gemini-3.5-flash-lite` (excepción a la decisión 6 de la E3′, D32). Código 8, por T1 y T1b: el clasificador no reconoce el motivo real (pendiente en la ampliación). Los seis pasos validados (T1 y T1b, a mano, D33). Resultados por paso en el registro de parches, «Parche 34 en 3.1.973», «Laboratorio L2 (17/11/2026)». D14 después: 6 con diseño y 0 ilegibles. Limpieza hecha. |
+| 18/11/2026 | 08:25:30 | 08:25:54 | nadie entró / sin reinicios / **NO CONCLUYENTE** (código 7): log vacío, ninguna línea de Odoo | `servidor-20261118-092543.log` (0 líneas) | Pruebas con toda la rama ([guía](lab_3973/guia_rama.md)), bloque 1, punto 1: `arrancar` de `lab_pns_ai_879` solo para cambiar de contexto. El log se guardó a los 13 s, antes de que Odoo escribiera nada. Nadie entró. Repetido en la fila siguiente; desde entonces, el «Al acabar corto» espera a «HTTP service (werkzeug) running» («Comprobación C», «Log vacío»). |
+| 18/11/2026 | 08:28:25 | 08:28:42 | nadie entró / sin reinicios / `?` (6); Starting job: ninguna. C OK | `servidor-20261118-092840.log` | Repetición del anterior (`lab_pns_ai_879`), esperando a «HTTP service (werkzeug) running». |
+| 18/11/2026 | 08:43:53 | 08:44:10 | nadie entró / sin reinicios / `?` (6); Starting job: ninguna. C OK | `servidor-20261118-094408.log` | Bloque 1, punto 5: `arrancar` de `lab_pns_ai_3973` para cambiar de contexto. |
+| 18/11/2026 | 08:59:40 | 08:59:56 | nadie entró / sin reinicios / `?` (6); Starting job: ninguna. C OK | `servidor-20261118-095955.log` | Bloque 2, punto 1: `arrancar` de `lab_pns_ai_879` para cambiar de contexto. |
+| 18/11/2026 | 09:04:55 | 09:05:18 | nadie entró / sin reinicios / `?` (6); Starting job: ninguna. C OK | `servidor-20261118-100516.log` | Bloque 2, punto 4: `arrancar` de `lab_pns_ai_973f` (primera vez) para cambiar de contexto. |
+| 18/11/2026 | 09:07:53 | 09:08:13 | nadie entró / sin reinicios / `?` (6); Starting job: ninguna. C OK | `servidor-20261118-100811.log` | Bloque 2, punto 6: `arrancar` de `lab_pns_ai_3973` para cambiar de contexto. |
+| 18/11/2026 | 09:32:43 | 09:33:02 | OK / no aplica (sin reinicios en el laboratorio automatizado) / `?` (24), `lab_pns_ai_3973_14` (78); Starting job: ninguna. C OK | `servidor-20261118-103306.log` (salida `salida_tarjeta_20261118-103230`) | Bloque 4, punto 4: D47, `lab_auto.sh … --escenario tarjeta` en `lab_pns_ai_3973`. «Código final 0». Log: «bad query» 1 (`UPDATE "ai_safe_operation"`), «retry 1/5» 1, «retry 2/5» o más 0, «maximum» 0, Traceback 0. Informativos: 1 WARNING `py.warnings` (`DeprecationWarning` de `jinja2/sandbox.py`, core) y 1 HTTP 404 de `/es/website/translations/…` en el login. Resultados en el plan, «Pruebas posteriores», punto 4. |
+
+Horas en UTC; los nombres de los logs (servidor-AAAAMMDD-HHMMSS.log) llevan la hora local de la máquina.

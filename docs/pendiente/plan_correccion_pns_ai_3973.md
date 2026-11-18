@@ -612,6 +612,78 @@ Orden:
      - **Carrera posible:** una restauración en vuelo mientras llega la tarjeta del SSE. Su `held` se calculó antes del
        pintado y renueva el token de esa tarjeta, con la cuenta atrás ya en marcha (`:2311-2316`). El margen es el
        retraso entre el pintado del SSE y la respuesta de `/verification/pending`.
+
+   **Resultados de las pruebas con toda la rama (18/11/2026).** Ejecutadas con la
+   [guía](lab_3973/guia_rama.md), en el orden 0, 3, 1, 2 y 4. Todos los bloques, OK. Línea base sin cambios: 580 tests, 1 F
+   (`test_paap_i7`), 0 E, 6 saltados y 6 subtests saltados. Los logs se citan solo por su nombre. Cada `arrancar` tiene
+   su fila en el registro de laboratorios del [procedimiento](lab_procedimiento_3973.md).
+   - **Bloque 0 (preparación): OK.** Copia y 12 SHA-256, OK; `prueba_lab_auto.sh`, 49 PASA; web parado; no existían
+     `lab_p2a_879_14` ni `lab_p2b_879_14`. `rama_carpetas.sh`: 5 de 5 líneas esperadas (`modulos_3879` 711; 1b
+     `33ca68c`, 657; `SHA256SUMS.txt` `e37be448…1844` y `4c5b1cd2…6c53`; `Dockerfile.14` `cfc58aed…c348`). Los
+     permisos de las carpetas, en la incidencia b).
+   - **Bloque 3 (`lab_pns_ai_3973_14`): OK.**
+     - `-u` a la rama: OK, 0 bloqueantes, 0 avisos (`actualizar-20261118-092113.log`);
+     - P-2 (c): todo OK. 206 líneas de la BD y 0 de otras; migración 0; Seges patch 35: líneas 0, WARNING 0;
+       versiones `14.0.2.1.587`, `14.0.3.1.973` y `14.0.1.2.69`; `model._gc_expired()` en los dos crons; P-11: 4 AI
+       Administrators, 0 sin AI Conversational;
+     - D43: OK, 2 de 2, `ValueError` 0 (`rama_crons-lab_pns_ai_3973_14-20261118-092314.log`);
+     - parche 39: «P39 VEREDICTO OK». Los 4 casos, 4/4 con su clase: `get` y `f()` «bloqueado por el 39»;
+       `get_credits_url` y `action_buy_credits`, `requires_write`. Control OK; `iap_account` 0/0, sin cambios.
+       **Queda validado en laboratorio** el marcador del 39 en el texto de `isError`.
+   - **Bloque 1 (`lab_p2a_879_14`): OK.**
+     - instalación de 3.1.879: OK (`instalar-20261118-093241.log`);
+     - foto y plantado: OK (`usuario=8 sesion=1 skill=3 cache=1`). La foto, con 4 de 7 skills retiradas con fila de
+       fábrica (incidencia c);
+     - `-u` a la rama: OK (`actualizar-20261118-094410.log`);
+     - P-2 (a): todo OK. 290 líneas y 0 de otras; migración 1; «Seges patch 35: … fixed» 1 y 1; WARNING 0; versiones
+       de la rama; `model._gc_expired()`; P-11: 1 AI Administrator, con AI Conversational, y `seges_p11_admin` también;
+       P-14: 0 filas de fábrica, la caché borrada en cascada y la sesión presente con `active_skill_code`
+       `cash_forecast`;
+     - D43: OK (`rama_crons-lab_p2a_879_14-20261118-095755.log`).
+   - **Bloque 2 (`lab_p2b_879_14`): OK.**
+     - instalación: OK (`instalar-20261118-100001.log`); plantado: OK (`usuario=8 sesion=1 skill=3 cache=1`);
+     - `-u` a la base limpia: OK, migración 0, «Seges patch 35» 0 (`actualizar-20261118-100519.log`);
+     - `-u` a la rama: OK (`actualizar-20261118-100813.log`);
+     - P-2 (b) antes de corregir: todo OK. 200 líneas; migración 0; «Seges patch 35» 0; los crons con
+       `model.gc_expired()`;
+     - control negativo de D43 (8b): FALLO, como se prevé. 0 de 2, `ValueError` 2, código 1
+       (`rama_crons-lab_p2b_879_14-20261118-101232.log`);
+     - corrección a mano: «CORREGIDOS 2»;
+     - P-2 (b) tras corregir: todo OK, `model._gc_expired()` en los dos;
+     - D43: OK (`rama_crons-lab_p2b_879_14-20261118-101447.log`).
+   - **Bloque 4 (`lab_pns_ai_3973_14`): OK.**
+     - D46 con el 32: 4/4 → OK. Vista: `comment` readonly, antes no y después sí; vistas heredadas 1. Campo:
+       `required`, antes no y después sí;
+     - D46 con N32: 4/4 → OK. N32 `4b74193c…bf91`; restaurado, IGUAL (`11d9877f…33d1`); git limpio;
+     - **quedan validados en laboratorio** `comment` readonly en `modifiers` y el número de vistas heredadas (1);
+     - D47: «Código final 0» (op=13). Primer `/confirm`, `too_soon`, a 0,06 s del pintado; segundo, éxito 5,51 s
+       después, con el mismo token. `/pending` sin `peek` 0 y con `peek` 2 (informativo); `/execute` `executed`. SQL
+       después: `executed`, confirmada por el usuario de la sesión, comentario escrito;
+     - log de D47 (`servidor-20261118-103306.log`): «bad query» 1 (`UPDATE "ai_safe_operation"`), «retry 1/5» 1,
+       «retry 2/5» o más 0, «maximum» 0, Traceback 0. Informativos: 1 WARNING `py.warnings` (`DeprecationWarning` de
+       `jinja2/sandbox.py`, core) y 1 HTTP 404 de `/es/website/translations/…` en el login. Confirma el anexo de
+       PNS-26 (punto 7);
+     - borrado: operaciones 1, contactos 1, quedan 0.
+   - **Incidencias y desviaciones, con su resolución:**
+     - a) **primer `arrancar` de `lab_pns_ai_879` (09:25, hora local):** C NO CONCLUYENTE (código 7). El log se guardó a
+       los 13 s y salió vacío; nadie entró. Se repitió esperando a «HTTP service (werkzeug) running»: C OK. Corregido
+       en el «Al acabar corto» de la guía;
+     - b) **paridad `FALLARÁ` («SIN CÓDIGO») en `lab_pns_ai_879`:** `rama_carpetas.sh` dejó en 700 la raíz de las dos
+       carpetas, y sus metadatos en 700/600 (`infra/`, `infra/Dockerfile.14`, `CLAUDE.md`, `.odoo-dev.conf`,
+       `SHA256SUMS.txt` y `ORIGEN.txt`). El usuario 101 del contenedor no podía entrar. Se corrigió a mano con
+       `chmod 755` de las dos raíces, sin recursivo. Los `SHA256SUMS` no cambian. Corregido en `rama_carpetas.sh`;
+     - c) **foto de los bloques 1 y 2:** 4 de 7 skills retiradas con fila de fábrica, no 7. Es causa de 3.1.879 del
+       fabricante. `sys_info`, `users_all` y `users_logged` declaran `required_groups`, y el motor 14.0.3.1.879 no
+       publica esa capacidad. `_raise_unpublished_capability` (`pns_ai_mcp/models/ai_skill.py:409` en 3.1.879) las
+       rechaza en la importación, que solo lo deja en INFO («skills import_from_files: {'created': 10, … 'errors': […
+       requests engine capability "required_groups" …]}», 3 errores en cada instalación). En una instalación nueva de
+       3.1.879 esas tres no existen; P-2 (a) y (b) cubren la retirada de las 4 que sí. Decisión de Sergio: seguir con
+       4 de 7. Para el staging, la comprobación del punto 7. **Informe al fabricante: pendiente de decisión de
+       Sergio** (no se añade);
+     - d) **D47:** `seges_int` (uid 12) no tenía escritura en `res.partner`. Sus grupos: `base.group_user`, ventas, AI
+       Conversational y AI Writer, sin `base.group_partner_manager`. `tarjeta_plantar.sh` paró antes de plantar, sin
+       escribir nada. Decisión de Sergio: añadir `base.group_partner_manager` solo durante D47 y quitarlo al acabar.
+       La lista de grupos de antes y la de después, IGUALES. En la guía, «Requisito de D47».
 5. P-15: `-u` completo sobre una copia de `pns_demo` que carga Sergio.
    - **Añadido el 13/11/2026 (fase 4, parche 27):** A7 en solo lectura sobre la copia de `pns_demo`. Es el script
      `~/pns_ai_3973/fase4/csp/a7_recuentos.py`, que cuenta diseños por patrón, sin contenido ni ID (ver
@@ -623,6 +695,12 @@ Orden:
      uno, un ERROR «bad query» de `odoo.sql_db` sobre `ai_safe_operation` y un INFO «SERIALIZATION_FAILURE, retry 1/5»
      de `odoo.service.model`. No cuentan como fallo ([propuesta](propuesta_fase3_3973.md), «Anexo de PNS-26
      (serialización en `/execute`): confirmación en 3.1.973 (13/11/2026)», «Decisión de Sergio (13/11/2026)»).
+     **Confirmado en el laboratorio en D47 (18/11/2026):** «bad query» 1 (`UPDATE "ai_safe_operation"`) y «retry 1/5»
+     1, sin «retry 2/5» (`servidor-20261118-103306.log`; punto 4, resultados).
+   - **Skills sin importar en 3.1.879 (añadido el 18/11/2026; punto 4, resultados, incidencia c):** comprobación en
+     solo lectura de `ai_skill` para `sys_info`, `users_all` y `users_logged` (filas, `source_module` y `owner_id`),
+     antes y después de la subida. En una instalación nueva de 3.1.879 no existen, porque piden `required_groups`;
+     una BD con historia podría tenerlas, y su retirada no la cubre el laboratorio.
 
 ## Tras el `-u` (staging y LIYBEN)
 
