@@ -423,18 +423,24 @@ Contexto `lab_pns_ai_3973` (el del final del bloque 2).
 
 ## Limpieza final
 
-Borrar BD es decisión de Sergio (`bd-borrar` pide confirmación).
+Borrar BD es decisión de Sergio (`bd-borrar` no pregunta en la terminal; la confirmación es solo para los agentes,
+MANUAL del kit, 6.4).
 
 ```bash
 cd ~/GitHub/lab_pns_ai_3973 && odoo-dev 14 bd-borrar lab_p2a_879_14 && odoo-dev 14 bd-borrar lab_p2b_879_14 && odoo-dev 14 bd-lista
 rm -rf ~/GitHub/lab_pns_ai_879 ~/GitHub/lab_pns_ai_973f
 docker image rm odoo-dev:14-lab_pns_ai_879 odoo-dev:14-lab_pns_ai_973f
+```
+
+El `arrancar` final solo hace falta si el contexto no es ya `lab_pns_ai_3973` (`odoo-dev 14 estado`):
+
+```bash
 cd ~/GitHub/lab_pns_ai_3973 && odoo-dev 14 arrancar
 ```
 
-Después del último `arrancar`, «Al acabar corto» con `--lab lab_pns_ai_3973 --bd lab_pns_ai_3973_14`. Esperado: en
-`bd-lista` ya no están las dos BD; `docker image ls` ya no muestra las dos imágenes; el contexto vuelve a ser
-`lab_pns_ai_3973` (`odoo-dev 14 estado`).
+Si se lanza, «Al acabar corto» con `--lab lab_pns_ai_3973 --bd lab_pns_ai_3973_14`. Esperado: en `bd-lista` ya no
+están las dos BD; `docker image ls` ya no muestra las dos imágenes; el contexto es `lab_pns_ai_3973`
+(`odoo-dev 14 estado`).
 
 ## Scripts y SHA-256
 
