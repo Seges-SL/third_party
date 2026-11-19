@@ -765,7 +765,7 @@ Orden:
        copias de `cc0060e` se adaptaron a mano;
      - contar los subtests saltados con el core `cc0060e` (no se contaron; en la línea base son 6);
      - D50: comprobar en `cc0060e` qué hace `signup_cancel` de `auth_signup` antes de vaciar los tokens de LIYBEN
-       («Tras el `-u`», abajo).
+       («Tras el `-u`», abajo). → Hecho el 19/11/2026 («Tras el `-u`», «D50 hecho»).
 5. P-15: `-u` completo sobre una copia de `pns_demo` que carga Sergio.
    - **Añadido el 13/11/2026 (fase 4, parche 27):** A7 en solo lectura sobre la copia de `pns_demo`. Es el script
      `~/pns_ai_3973/fase4/csp/a7_recuentos.py`, que cuenta diseños por patrón, sin contenido ni ID (ver
@@ -921,3 +921,52 @@ desactivado y solo en el proveedor 3 (SQL; el botón Canvas con los demás no se
 - **D50 (Sergio, 18/11/2026; antes del despliegue en LIYBEN):** los 7 tokens de registro de LIYBEN se vacían justo
   antes de su despliegue. Antes de eso, comprobar en el core `cc0060e` qué hace `signup_cancel` de `auth_signup` (en
   `cc0060e`, `signup_token` se calcula por SQL; punto 4, «Laboratorio con el core cc0060e», paso 0).
+  - **D50 hecho (19/11/2026; decisiones de Sergio: las recomendaciones de Claude).** Vaciado por SQL (A1), solo si el
+    perfil es el esperado (B), probado antes en el laboratorio (C), los 8 tokens (E2 a) y compuerta con el perfil
+    exacto y sin tokens vigentes de internos (E3). Tandas en [`liyben_3973/`](liyben_3973/) (se pegan como función;
+    salidas en `~/pns_ai_3973/liyben/`, que no van al repo):
+
+    | Archivo | Líneas | SHA-256 |
+    |---|---|---|
+    | `d50_core.sh` | 45 | `dff0219ca4102a210e314dc6cecd16b533309f1cf28576b4018b7543883943c9` |
+    | `d50_lab.sh` | 85 | `436f041a00b055302f7628b28fc8362786f8bfa5d033d346c48464a4c6cf9bcb` |
+    | `d50_vaciar.sh` | 102 | `301a0dd070bc980455d75e4e701bf85f0e9d8036b319b94c5099587cc55a3797` |
+
+    - **Core** (`d50_core.sh`, solo lectura, 09:35 local, `d50-20261119-093520.txt`): referencia
+      `/opt/odoo-src/14.0/odoo` en `cc0060e`, sin cambios locales; `auth_signup/models/res_partner.py` con SHA-256
+      `c848abd85790cadd…`, el mismo que LIYBEN (tabla del 12/11 en
+      [propuesta_fase3_3973.md](propuesta_fase3_3973.md)). `signup_cancel` (`:139-140`) es un `write` de
+      `signup_token`, `signup_type` y `signup_expiration` a `False`. `signup_token` (`:27`) es calculado, con
+      `inverse` `_inverse_token` (`:60-62`): `UPDATE res_partner SET signup_token = %s` con `None`. Las otras dos son
+      columnas normales. En la BD, las tres quedan a `NULL`; por el ORM, además, `write_date`/`write_uid` y los
+      `write` heredados. Sin token ni `signup_type`, `_get_signup_url_for_action` (`:78-87`) ya no pone el token en la
+      URL, y a un contacto sin usuario no le da URL. Llaman a `signup_cancel`: `survey/controllers/main.py:146` y
+      `auth_signup/models/res_users.py:251`.
+    - **Laboratorio** (`d50_lab.sh`, `lab_pns_ai_cc0060e_14`, `shell --bd`, web parado, sin commit; 09:19:05 UTC,
+      `d50lab-20261119-101905.txt`): en dos contactos de demostración sin usuario, `signup_prepare` (2 tokens
+      distintos, tipo `signup`) y después `signup_cancel` en uno y el `UPDATE` de A1 en el otro. Los dos quedan
+      igual: columnas `(False, None, None)` y ORM `(token, signup_valid, signup_url)` `(False, False, False)`. Huella
+      de las columnas de signup antes y después del `rollback`, igual (`cf5237692fe1`). VEREDICTO OK.
+    - **Perfil de LIYBEN** (solo lectura, 09:18:59 UTC; recuentos sin tokens, nombres ni ids): 8 tokens, todos de
+      contactos activos; 0 contactos con tipo o caducidad sin token.
+
+      | Usuarios del contacto | Tipo | Caducidad | n |
+      |---|---|---|---|
+      | portal, archivados | `signup` | sin caducidad | 3 |
+      | externos sin portal, archivados | `signup` | sin caducidad | 2 |
+      | externos sin portal, archivados | `reset` | sin caducidad | 1 |
+      | sin usuario | `reset` | sin caducidad | 1 |
+      | interno activo | `reset` | caducado (05/08/2025 13:42 UTC) | 1 |
+
+      Los «7 tokens de registro vigentes sin caducidad» de la 3b son los 7 sin caducidad: los «6 de usuarios de
+      portal archivados» son 3 de portal y 3 externos sin portal (los 18 archivados del 23/10 mezclaban los dos, ver
+      [instalación en LIYBEN](instalacion_liyben_pns_ai.md), §6.2), y 2 de los 7 son de tipo `reset`. El octavo ya
+      existía en la 3b (caducado desde el 05/08/2025) y no se contó por no estar vigente; está caducado, así que
+      `signup_valid` es falso (`:42-43`) y `_signup_retrieve_partner` lo rechaza al comprobar la validez
+      (`:169-172`).
+    - **Ensayo en LIYBEN** (`d50_vaciar ensayo`, 09:24:18 UTC): TODO OK. Compuerta superada (8 tokens, el perfil de
+      la tabla, 0 vigentes de internos), 8 filas vaciadas y 0 con token, tipo o caducidad dentro de la transacción,
+      `ROLLBACK`, y 8 tokens después en otra sesión: LIYBEN sin cambios.
+    - **En el despliegue, justo antes del `-u`:** `d50_vaciar VACIAR` (misma transacción, termina en `COMMIT`; esperado
+      `TODO OK` y 0 tokens después). Si la compuerta falla (otro perfil o un token vigente de un interno), no se vacía
+      nada y decide Sergio. Va al documento de despliegue en LIYBEN, insertado desde el archivo y con su huella.
