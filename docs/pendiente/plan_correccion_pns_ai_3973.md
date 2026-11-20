@@ -1015,11 +1015,12 @@ uso real, en G de [liyben_3973.md](liyben_3973.md).
   `/opt/odoo/backups` no se toca (K2). DNS y clave de Gemini del staging, quitados por Sergio (K4).
 - **Equipo:** borrados la copia de Y1, `tandas/` del ensayo, `lab_liyben_3973` y su imagen (K5 a K7); las copias de L3
   se conservan (LIYBEN no tiene copia fuera del VPS).
-- **GitHub:** `14.0-pns-ai-3` borrada (K9).
+- **GitHub:** `14.0-pns-ai-3` borrada (K9). Segundo merge commit `d8cb3f0` (PR #3, padres `d9b2e16` y `3a9b111`) y
+  `14.0-pns-ai-3973` borrada (M7 y K9).
 - **LIYBEN:** sin cambios (U0 v4, mismo estado por SQL). INFO: la copia de `auto_backup` del 20/11 falló (D15).
-- **Pendiente:** K8 (restos del staging en el equipo, al cierre de la ficha 26) y M7 (segundo merge commit y borrado de
-  `14.0-pns-ai-3973`).
-- **Siguiente:** M7; después, la ficha 26 en el laboratorio y el informe (punto 5).
+- **Pendiente:** K8 (restos del staging en el equipo, al cierre de la ficha 26).
+- **Siguiente:** punto 5, en la rama `14.0-pns-ai-informe` (desde `14.0` en `d8cb3f0`): la ficha 26 en el laboratorio
+  (`lab_pns_ai_cc0060e_14`, core `cc0060e`), K8 y la 2.ª entrega del informe al fabricante.
 
 **Despliegue en LIYBEN (19 y 20/11/2026; decisiones de Sergio: las recomendaciones de Claude).** Documento:
 [liyben_3973.md](liyben_3973.md), con sus tandas y el SQL en [`liyben_3973/`](liyben_3973/). Antes se hizo un ensayo
