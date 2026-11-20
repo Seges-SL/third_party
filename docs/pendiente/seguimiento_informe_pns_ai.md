@@ -2566,6 +2566,34 @@ efecto lateral (ver su detalle). El mismo patrón aparece como punto de entrada 
   - **Rama Seges:** sin parche. **Candidata al informe al fabricante**, sin numerar: antes, comprobar que no figura en
     `docs/` y buscar el síntoma en anexos y diagnósticos (decisión de Sergio, 18/11/2026). Que el modelo eligiera otro
     contacto que el pedido no va al informe (es conducta del modelo).
+- **La recarga de las traducciones de los `pns_*` con sobrescritura reescribe términos `code` de otros módulos**
+  (ensayo del despliegue en LIYBEN, 19/11/2026, copia de LIYBEN con 3.1.973 y la rama de Seges sobre el core
+  `cc0060e`; [documento de despliegue](liyben_3973.md), Anexo A, Y6):
+  - **Descripción:** en Odoo 14, una traducción `code` es una fila por texto inglés, de cualquier módulo. Al importar
+    con sobrescritura, el core actualiza esa fila (`ON CONFLICT (type, lang, md5(src)) … DO UPDATE`, conserva el `id` y
+    pisa `module` y `value`; `odoo/addons/base/models/ir_translation.py:107-115` de `cc0060e`).
+    `pns_base/models/ir_translation.py:94-111` solo descarta los duplicados entre filas de los propios `pns_*`;
+  - **Impacto:** `_update_translations('es_ES', True)` de los tres `pns_*` sobre la copia de LIYBEN cambió 49 filas de
+    otros módulos: 13 con el texto cambiado (la redacción de los `pns_*` sustituye a la de LIYBEN en todo Odoo) y 36
+    que solo pasan a figurar como de los `pns_*`. La recarga completa del idioma (asistente) haría lo mismo;
+  - **Corrección sugerida:** que las traducciones de los `pns_*` no reutilicen textos ingleses de otros módulos con otra
+    redacción, o que la importación de los `pns_*` no sobrescriba filas de otros módulos;
+  - **Rama Seges:** sin parche. En LIYBEN se resuelve en el despliegue con B′ (D66 revisada: se restauran por `id` las
+    filas de fuera). **Candidata al informe al fabricante**, sin numerar: antes, comprobar que no figura en `docs/` y
+    buscar el síntoma en anexos y diagnósticos.
+- **La conversión de las casillas `fit_*` en roles no valida contra el protocolo y deja registros que el módulo
+  rechaza** (mismo ensayo; Y6 v1):
+  - **Descripción:** el `-u` a 3.1.973 pasa cada casilla al rol del mismo código por SQL (`stash_fit_columns` y
+    `promote_fit_columns`, `pns_ai_mcp/utils/schema_fossils.py:290-341`), sin mirar el protocolo. Un proveedor `openai`
+    con `fit_decision` queda con el rol Decisión, que solo `systemone` admite (`_check_roles_match_protocol`,
+    `pns_ai_mcp/models/ai_provider.py:625-634`; `chooses`, `pns_ai_mcp/lib/llm/drivers/systemone_driver.py:17`);
+  - **Impacto:** cualquier `write` de `role_ids` de ese proveedor da `ValidationError` hasta quitarle Decisión. Si se
+    activara y el motor le pidiera una decisión, `_choose` daría `DecisionCallError` (`ai_provider.py:665-675`). En
+    LIYBEN le pasa al proveedor 1;
+  - **Corrección sugerida:** que la conversión no asigne Decisión a proveedores cuyo protocolo no la admite (y lo
+    registre), o que la valide como el `write`;
+  - **Rama Seges:** sin parche. En LIYBEN se resuelve en el despliegue con D67 (en el mismo `write`, quitar Decisión y
+    añadir Diseño). **Candidata al informe al fabricante**, sin numerar, con la misma comprobación previa.
 
 ### Candidatos evaluados y descartados
 
