@@ -908,11 +908,11 @@ Orden:
 desactivado y solo en el proveedor 3 (SQL; el botón Canvas con los demás no se miró a la vista); crons de NUEVO-2 con
 `model._gc_expired()`; P-11 sin AI Conversational 0; `es_ES` recargado. Lo que sigue queda para LIYBEN.
 
-- **Rol Diseño:**
-  - `use_fallback` desactivado;
-  - el rol solo en `3.5-flash`: el `-u` se lo da a todos los proveedores con la casilla «Design», `lite`
-    incluido;
-  - comprobar que no aparece el botón Canvas en los demás.
+- **Rol Diseño (LIYBEN; sustituye a la del staging, que hablaba de `3.5-flash` y de la casilla «Design»):** en
+  3.1.782 no existe `fit_design`, así que tras el `-u` nadie tiene el rol. D62: al proveedor 1
+  (`models/gemini-3.5-flash`, inactivo) con `use_fallback` desactivado; D67: en el mismo `write`, quitarle Decisión,
+  que el `-u` le da y su protocolo (`openai`) no admite. Botón Canvas: en L7 del
+  [documento de despliegue](liyben_3973.md). Detalle abajo, «Despliegue en LIYBEN».
 - **Crons de NUEVO-2:** confirmar que el parche 35 los corrigió (`ir_cron.code`).
 - **§6.2:** todos los AI Administrators ganan AI Conversational, y no se puede quitar. La ficha 26 se
   reproduce con un usuario que no sea AI Administrator.
@@ -970,3 +970,44 @@ desactivado y solo en el proveedor 3 (SQL; el botón Canvas con los demás no se
     - **En el despliegue, justo antes del `-u`:** `d50_vaciar VACIAR` (misma transacción, termina en `COMMIT`; esperado
       `TODO OK` y 0 tokens después). Si la compuerta falla (otro perfil o un token vigente de un interno), no se vacía
       nada y decide Sergio. Va al documento de despliegue en LIYBEN, insertado desde el archivo y con su huella.
+      → En [liyben_3973.md](liyben_3973.md): L4 lo carga desde `/tmp/liyben_3973` (copiado por E1 con su huella) y
+      L0 lo ensaya antes.
+
+**Despliegue en LIYBEN (19 y 20/11/2026; decisiones de Sergio: las recomendaciones de Claude).** Documento:
+[liyben_3973.md](liyben_3973.md), con sus tandas y el SQL en [`liyben_3973/`](liyben_3973/). Antes se hizo un ensayo
+sobre una copia de LIYBEN (`liyben_ens_14`, Anexo A del documento), del que salen los «Esperado».
+
+| | Decisión |
+|---|---|
+| D56 | **Ensayo** del `-u` sobre una copia de LIYBEN antes del documento, con el web parado de principio a fin. Laboratorio nuevo `~/GitHub/lab_liyben_3973` (no se toca `cc0060e`); Dockerfile = el del VPS exacto más el bloque del core `cc0060e`; en el ensayo, el `-u` y la recarga con el rol (D50 no: ya ensayado en LIYBEN); OCA y `vertical-instaladores` en los commits del VPS (clones fijados y restaurados al acabar). Hecho el 19/11 |
+| D57 | **Copia completa antes del `-u`:** BD y filestore, por SSH al equipo, con el web parado. Orden: parar el web → copia → `d50_vaciar VACIAR` → `checkout` → `-u` |
+| D58 | **Commit que se despliega:** el HEAD de la rama en el commit del documento, con compuerta de árbol de los módulos = `5d0559b` (688 / `0dc381e0…ba7a`). Concreción (19/11): HEAD = `origin/14.0-pns-ai-3973`, de `c6ec077` a HEAD solo cambia `docs/`; el hash, en `commit.txt` (E0) y en G |
+| D59 | **Comprobaciones heredadas** (§3 «Al terminar» del plan de la 3879 y A.4 a A.6 de E3′/E4′), en L0, de solo lectura. Bloquean las operaciones pendientes o confirmadas sin ejecutar con pasos sobre `ai.trusted.action`; INFO: decisión 10, servidores MCP (PNS-17), PNS-82, PNS-37 y A.6 |
+| D60 | **Claves MCP** (revocadas el 27/10): no se regeneran en el despliegue (Nginx da 404 en `/mcp`, D20); si hacen falta, en el uso real |
+| D61 | **Ficha 26** (§6.2, usuario sin AI Administrator): al uso real. En el despliegue, solo el SQL de AI Conversational de los AI Administrators |
+| D62 | **Rol Diseño** al proveedor 1 (`models/gemini-3.5-flash`, inactivo) y `use_fallback` desactivado. El rol dice «Nobody holding it: Conversation answers» (`pns_ai_mcp/data/ai_provider_role_data.xml:48-57`) y el motor solo usa titulares activos: mientras el 1 esté inactivo, nadie diseña (no cae a Qwen 9B) |
+| D63 | Nombre: `docs/pendiente/liyben_3973.md`; SQL y tandas en `docs/pendiente/liyben_3973/` |
+| D64 | **Los 3 AI Administrators se quedan** (ids 2, 6 y 7; D4 y D46 decían dos). El 2 no tiene AI Conversational y lo gana fijo en el `-u` (§6.2) |
+| D65 | **«Antes» de LIYBEN con P-21 adaptado a 3.1.782:** A, lista de `ai/` de `578859b` al commit = la del fabricante de 3.1.782 a 3.1.973 (A 15, D 12, M 19, `f413c755…d4`); B, esquema por `information_schema` y correspondencia exacta de los 56 contextos y las 10 skills con los archivos de 3.1.782 por `source_module` + `rel_path`; C, «antes» y P-21 con las listas de 3.1.782; D, contraste con I0. Una edición de fábrica es FALLO. Criterio de edición (el contador de uso de 3.1.782 pone `write_date`): contexto editado si `write_uid` ≠ 1, o `write_date` posterior al último `-u` y distinto de `last_used`; skill editada si `write_date` es posterior al último `-u` o `write_uid` ≠ 1 |
+| D66 (revisada) | **Recarga de `es_ES`: B′.** En una sola transacción, guardar las filas `es_ES` de fuera de los `pns_*`, `_update_translations('es_ES', True)` de los tres `pns_*` y restaurar por `id` las que cambiaron (y reinsertar las borradas). Los `pns_*` reciben sus 196 traducciones cambiadas y nada de fuera cambia |
+| D67 | **Rol Diseño con un solo `write`** del proveedor 1: `role_ids: [(3, decisión), (4, diseño)]` y `use_fallback` de Diseño a falso. El `-u` da Decisión al 1 (`fit_decision = t` en 3.1.782) y en 3.1.973 solo `systemone` la admite (`_check_roles_match_protocol`, `pns_ai_mcp/models/ai_provider.py:625-634`; `chooses`, `pns_ai_mcp/lib/llm/drivers/systemone_driver.py:17`): sin quitarla, el `write` da `ValidationError` |
+
+Historia de D66: primera elección **B** (solo los tres `pns_*` con sobrescritura, en vez del asistente sobre los 215
+módulos), revisada el 19/11 tras la medida de Y6 v3: B reescribía 13 textos y 36 orígenes `code` de otros módulos (en
+Odoo 14 la traducción `code` se busca por el texto inglés, de cualquier módulo).
+
+- **Ensayo (19/11, `liyben_ens_14`):** «antes» con P-21 (Y4): 13 contextos y 3 skills (`billing`, `financial_health`,
+  `forecast`) reescritos sin edición, 3 contextos nuevos (`page_tab`, `discovery_page_tab`, `discovery_page_tab_es_ES`),
+  6 skills retiradas (`annual_billing`, `credit_facility`, `customer_risk_analysis`, `sys_info`, `users_all`,
+  `users_logged`), ninguna edición de fábrica. `-u` (Y5, dos veces): 67-72 s, 0 Traceback, las 5 `fit_*` y 7 campos
+  más borrados (todos documentados: `ai.mcp.user.key_pin*`, PNS-84 y D60; `ai.log.agent_id`/`agent_display`, `ai_log`
+  vacío; `ai.skill.capture.wizard.from_chatboo`, transitorio), 1 migración, parche 35 `fixed` 2, «DROP leftover» 22.
+  Recarga B′ y rol (Y6 v3) con `TODO OK`; «después» (Y7) con `TODO OK`.
+- **Cron nuevo:** `pns_ai_mcp.ir_cron_ai_journal_trash` (`pns_ai_mcp/data/journal_trash_cron.xml:5-15`,
+  `noupdate="1"`, `active` verdadero, diario) es el único cron que crea el `-u`; en LIYBEN, sin neutralizar, queda
+  **activo**, y los 6 de antes siguen activos. `pns_ai_mcp.journal_trash_days` no existe tras el `-u` (vale 30 por
+  defecto).
+- **El `-u` escribe los 56 contextos y las 10 skills** (`write_date` del `-u`), no solo los 13 y 3 de P-21: las
+  ediciones de fábrica solo se detectan **antes** del `-u` (L0).
+- **Roles tras el `-u`:** 7 (`conversation`, `audio`, `vision`, `video`, `decision`, `design`, `parser`); `parser` con
+  alternativa `conversation`; todos salvo Diseño con `use_fallback` activado (tras L4b).
