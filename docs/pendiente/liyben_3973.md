@@ -4,7 +4,9 @@
   §3.2). **Commit a desplegar:** el HEAD de la rama en el commit de este documento (D58). E0 comprueba que de `c6ec077`
   a él solo cambia `docs/` y que el árbol de los módulos es el de `5d0559b` (688 archivos, `0dc381e0…ba7a`). El hash
   completo queda en `commit.txt` (E0) y se anota en G. **Preparado:** 20/11/2026. **Estado:** ejecutado el
-  20/11/2026, con el commit `3df4307` (G). **Uso real:** hecho el 20/11/2026 (H).
+  20/11/2026, con el commit `3df4307` (G). **Uso real:** hecho el 20/11/2026 (H). **Merge en 14.0:**
+  hecho el 20/11/2026, merge commit `d9b2e16` (I). **Limpieza final:** hecha el 20/11/2026 (J), salvo K8 y la
+  rama `14.0-pns-ai-3973` (M7).
 - **Qué se despliega:** el portado de los parches de Seges a 3.1.973 ([plan](plan_correccion_pns_ai_3973.md), fases 1 a
   4, parches 35 a 39 y pruebas con toda la rama), ya subido al staging ([staging_3973.md](staging_3973.md)). Módulos:
   `pns_base` 14.0.1.2.32 → 14.0.1.2.69, `pns_ai_mcp` 14.0.3.1.782 → 14.0.3.1.973 y `pns_ai_chatboo` 14.0.2.1.453 →
@@ -62,6 +64,8 @@ nuevas (`ld_*`).
 4. F. Limpieza (F0, F1 y F2)
 5. G. Resultado del despliegue
 6. H. Uso real
+7. I. Merge en 14.0
+8. J. Limpieza final
 - Anexo A. Ensayo
 - Anexo B. Tandas del ensayo en el repo
 
@@ -1323,6 +1327,10 @@ Operaciones que cambian el VPS: las decide y hace quien administra el VPS.
    hacia delante.
 5. **Las copias de LIYBEN anteriores** (`/opt/odoo/backups`, 15 y 16/10) no se tocan.
 
+**Desde I y J (20/11/2026), E ya no aplica:** el despliegue está hecho y el clon del VPS está en `14.0` / `d9b2e16`;
+la rama `14.0-pns-ai-3` ya no existe en el clon (K1) ni en GitHub (K9). `578859b` sigue en la historia de `14.0`. Las
+copias de L3 se conservan (K5), pero no son una vuelta atrás limpia desde el uso real (H).
+
 ## 4. F. Limpieza
 
 - **Se quedan** (se anotan en G para la limpieza final): la rama `14.0-pns-ai-3` del clon (hasta el merge, punto 3 del
@@ -1549,6 +1557,7 @@ Horas del VPS en UTC; las del equipo (E0, E1, L3, F1), locales (UTC + 1). Salida
 - **Al uso real:** Chatboo y el botón Canvas en la interfaz (L1.2 y L7 no aplicaron); la ficha 26 (D61); las claves MCP,
   si hacen falta (D60); el proveedor 1 sigue inactivo, así que nadie tiene Diseño en activo (D62); opcional, identificar
   las 3 traducciones de más. **Hecho el 20/11/2026: ver H.**
+- **Limpieza final (VPS y equipo):** hecha el 20/11/2026 (J), salvo K8.
 
 **Fila de la §6.2 de la [instalación](instalacion_liyben_pns_ai.md):** «Despliegue de las correcciones», hecho el
 20/11/2026 con el commit `3df4307` (este apartado).
@@ -1668,8 +1677,9 @@ terminaron con su línea final.
 - **Ficha 26:** reproducción en el laboratorio antes del informe (punto 5).
 - **Limpieza final (punto 4):** lo de G, más `~/pns_ai_3973/liyben/uso/`. **Las copias de L3 se conservan hasta la
   limpieza final**; desde el uso real ya no son una vuelta atrás limpia (restaurarlas perdería lo hecho después).
+  → Hecha el 20/11/2026 (J): las salidas de `uso/` se quedan; las copias de L3 también (K5).
 - **D62:** el proveedor 1 sigue inactivo (nadie con Diseño activo) hasta que se definan los proveedores.
-- **Siguiente:** el merge (punto 3).
+- **Siguiente:** el merge (punto 3): hecho el 20/11/2026 (I).
 
 **Lecciones del uso real:**
 - Un «después» por SQL vale para el momento en que se toma: L7 fue posterior a L6 y en ella se guardó la ficha de un
@@ -1680,6 +1690,237 @@ terminaron con su línea final.
 - Antes de anunciar un botón en un «Esperado» de interfaz, mirar en el código dónde se pinta.
 - Una decisión que asigna una prueba a un entorno (D61 → uso real) se contrasta con lo que ese entorno permite (no hay
   usuario sin AI Administrator) y con las decisiones anteriores (decisión 5: laboratorio) antes de prepararla.
+
+---
+
+## 7. I. Merge en 14.0 (20/11/2026)
+
+**Hecho el 20/11/2026, de 13:45 a 14:19 hora local** (Sergio; tandas y contraste de Claude). Punto 3 del orden: integrar
+`14.0-pns-ai-3973` en `14.0` con merge commit y volver el clon del VPS a `14.0`
+([plan de corrección](plan_correccion_pns_ai.md), §3; [instalación](instalacion_liyben_pns_ai.md), §4 y §6.2).
+**Resultado:** `14.0` en el merge commit **`d9b2e165b6d8069417b6b4e0329fa0f5be36c52b`** (PR #2; padres `59bd6af`, la
+`14.0` de antes, y `2b2f5e7`, la cabeza de la rama; 180 commits nuevos en `14.0`; árbol igual al de `2b2f5e7`). El clon
+del VPS, en `14.0` / `d9b2e16`, sin parar el web y sin `-u`: los `pns_*` montados siguen siendo 688 / `0dc381e0…` y
+solo cambiaron 7 archivos de `docs/`. LIYBEN, sin cambios (U0 v3 y v4 con el mismo estado por SQL). Hubo una incidencia
+en GitHub, resuelta con decisión de Sergio: el PR #1 se fusionó en `main` por error (abajo).
+
+**Estado de partida (13:26-13:27, solo lectura).** Equipo: `origin/14.0` = `14.0` local = `59bd6af` (08/10), antecesor
+de la rama; 0 commits de `14.0` fuera de la rama; entran 179; `origin/14.0-pns-ai-3` y `f63d5a1` antecesores. Cambian de
+`14.0` a la rama 887 archivos: `CLAUDE.md`, `docs` 135, `pns_ai_chatboo` 163, `pns_ai_mcp` 535 y `pns_base` 53
+(`_fabricante` no lo sigue git). Clon del VPS: `14.0-pns-ai-3973` / `3df4307`, limpio; **superficial**; refspec solo de
+`14.0`; `14.0` y `origin/14.0` del clon en `f63d5a1` (02/09), antecesor de `3df4307`; `.git` del UID 101.
+
+**Decisión de Sergio (13:28; las recomendaciones de Claude):**
+
+| | Decisión |
+|---|---|
+| D68 | **Merge en 14.0 y vuelta del clon.** M1: PR en GitHub (base `14.0`, origen la rama) con «Create a merge commit», sin «Delete branch». M2: solo si `origin/14.0` es antecesor de la rama, sin commits de `14.0` fuera y con el árbol 688 / `0dc381e0…` (cumplido). M3: en el VPS, como el UID 101, `fetch` (refspec del clon, sin `--depth`), compuertas, `update-ref refs/heads/14.0 <merge> <f63d5a1>` y `checkout 14.0`: un solo cambio de árbol, sin pasar por `f63d5a1`; `.git/shallow` igual antes y después. M4: sin parar el web ni `-u`. M5: las ramas `14.0-pns-ai-3` y `14.0-pns-ai-3973` (clon y GitHub), hasta la limpieza final. M6: tandas `lm_e`, `lm_v`, U0 v3 antes y U0 v4 después. M7: los commits de esto, en la rama; segundo merge commit al terminar la limpieza final (el VPS no necesita traerlo) |
+| D68 (b) | **PR #1 en `main` (14:02):** opción B, devolver `main` de GitHub y la local a `0447995` con `--force-with-lease` (no el «Revert» del PR). **Rama por defecto** de `third_party` en GitHub: `14.0` (14:19; la cambia Sergio) |
+
+| Paso | Hora | Salida | Resultado |
+|---|---|---|---|
+| `lm_e antes` | 13:45:55 | `lm_e-antes-20261120-134555.txt` | `TODO OK` |
+| PR #1 | 13:53:40 | — | **Fusionado en `main` por error** (la base que propone GitHub es la rama por defecto): merge `fb2e878`, padres `0447995` («Initial commit», 24/03/2023) y `2b2f5e7`; 241 commits nuevos en `main`. `14.0`, la rama y el VPS, sin cambios. Desktop adelantó la `main` local a `fb2e878` en el «Fetch» de las 13:54 |
+| `lm_main comprobar` | 14:04:50 | `lm_main-comprobar-20261120-140450.txt` | `TODO OK`: `main` (GitHub, copia y local) en `fb2e878`; `0447995` solo en su historia; `14.0` y la rama sin cambios |
+| `lm_main APLICAR` | 14:05:32 | `lm_main-APLICAR-20261120-140532.txt` | `TODO OK`: `+ fb2e878...0447995 … -> main (forced update)`; `main` local con `update-ref` al mismo; `14.0` y la rama sin cambios. El PR #1 sigue como «Merged» (GitHub no lo deshace) |
+| `lm_e antes` | 14:06:42 | `lm_e-antes-20261120-140642.txt` | `TODO OK` |
+| PR #2 | 14:09:27 | — | Abierto con `compare/14.0...14.0-pns-ai-3973`: base `14.0`, «Able to merge», 179 commits y 887 archivos (= lo medido); «Create a merge commit», sin «Delete branch»: **`d9b2e16`** |
+| `lm_e despues` | 14:12:39 | `lm_e-despues-20261120-141239.txt`, `merge.txt` (`a5d08e6c…9fc3`) | `TODO OK`: dos padres (`59bd6af`, `2b2f5e7`), árbol = el de la rama, 180 commits, la rama sigue en GitHub, árbol de los módulos 688 / `0dc381e0…`. Sin «Pull»: Desktop ya había adelantado la `14.0` local en el «Fetch» |
+| U0 v3 | 14:13:29 | `uso/u0-20261120-141329.txt`, `u0_estado-…` | `TODO OK`; `u0_estado` = el de las 12:57 (`7850d505…5c9a`). INFO nuevo: 2 Traceback (abajo) |
+| `lm_e enviar` | 14:14:07 | `lm_e-enviar-20261120-141407.txt` | `TODO OK`: `/tmp/liyben_merge` (700) con `lm_v.sh` y `merge.txt`, huellas iguales |
+| `lm_v comprobar` | 13:14:46 UTC | `vps/lm_v-comprobar-20261120-131446.txt` | `TODO OK`; `.git/shallow` `d4279572…3199`; 0 archivos del árbol de trabajo de otro dueño; `ls-remote` como el UID 101: `d9b2e16` y `2b2f5e7` |
+| `lm_v APLICAR` | 13:15:01 UTC | `vps/lm_v-APLICAR-20261120-131501.txt` | `TODO OK`: `fetch` `f63d5a1..d9b2e16`; compuertas (padres, `3df4307` y `f63d5a1` antecesores, nada fuera de `docs/`, 7 de `docs/`, árbol del merge, `.git/shallow`); `update-ref` y `checkout 14.0` a las 13:15:04; después, clon limpio y `0|0`, árbol montado 688 / `0dc381e0…`, `.git/shallow` y dueños iguales, ramas de M5, web en marcha, log sin ERROR ni Traceback, `/web/login` 200 y `/mcp` 404 |
+| U0 v4 | 14:15:30 | `uso/u0-20261120-141530.txt`, `u0_estado-…` | `TODO OK`: clon en `14.0` / `d9b2e16`; `u0_estado` igual (`7850d505…5c9a`); log sin nada nuevo salvo 13 líneas |
+| `lm_e recoger` | 14:15:54 | `lm_e-recoger-20261120-141554.txt` | **1 FALLO, nada copiado ni borrado:** la segunda conexión SSH de la tanda, «Connection refused» (seguramente un límite de conexiones del VPS: U0 v4 abrió 4 a las 14:15:30) |
+| Recogida a mano | 14:18-14:19 | `merge/vps/` (4 archivos) | Huellas en el VPS (sesión abierta) = las copiadas con un solo `scp`: `lm_v-APLICAR-…` `40beb512…012c`, `lm_v-comprobar-…` `5916cf43…e3ac`, `lm_v.sh` `139a5aaf…03eb`, `merge.txt` `a5d08e6c…9fc3`. `/tmp/liyben_merge` borrada en la sesión del VPS |
+
+Horas del equipo, locales (UTC + 1); las del VPS, en UTC. Salidas en `~/pns_ai_3973/liyben/merge/` (700) y, las de
+U0, en `~/pns_ai_3973/liyben/uso/`.
+
+**INFO: 2 Traceback en el log desde L5** (U0 v3 y v4; posteriores a U0 v3 de las 12:57, anteriores al cambio del clon;
+última hora 13:13:17 UTC). Un WARNING de `odoo.addons.http_routing.models.ir_http` con dos trazas encadenadas (la
+segunda, `AccessError`): al construir la URL (`slug`) de un registro, la lectura no estaba permitida
+(`http_routing/models/ir_http.py:94`, `:251` y `:542`; `website/models/ir_http.py:440`). Del core, sin pasar por los
+`pns_*`; ningún ERROR ni CRITICAL. No se ha buscado la petición.
+
+**Tandas del merge** (en el repo, en la versión ejecutada; las del equipo se lanzan desde `~/Descargas`):
+
+| Archivo | Líneas | SHA-256 | Qué hace |
+|---|---|---|---|
+| [`lm_e.sh`](liyben_3973/lm_e.sh) | 149 | `0f6e103c829d9837620a47c836ee5eeb5e2da4f2c27e17299e6ade22d9639334` | Equipo: `antes` (M2), `despues` (merge commit y `merge.txt`), `enviar` (`/tmp/liyben_merge`) y `recoger` (copia y borrado; su FALLO, arriba) |
+| [`lm_v.sh`](liyben_3973/lm_v.sh) | 130 | `139a5aaf83c9b184bd120a01ea681ddda1694bece5129c4d3a1eee0996bb03eb` | VPS: `comprobar` y `APLICAR` (M3) |
+| [`lm_main.sh`](liyben_3973/lm_main.sh) | 82 | `08cb34ffac22b6d73f457eee8dd9fbe0cebefb638d66a1fea22cf5abd7d315fa` | Equipo: `main` de GitHub y la local a `0447995` (`--force-with-lease` y `update-ref`) |
+| [`lu_u0_v4.sh`](liyben_3973/lu_u0_v4.sh) | 161 | `16a9d67f1871d97419a16c7d6fe61e2cc4c23ededabb8cba97bf0f4717e12454` | U0 v3 con la rama `14.0` y el commit de `merge.txt` |
+
+Todas se probaron en el entorno de Claude con git real (remota `bare`, equipo con clon completo, clon del VPS
+superficial del UID 101; `sudo`, `docker`, `curl`, `ssh` y `scp` simulados; los PR con `merge --no-ff`), con positivos
+y negativos. No se probó contra un SSH real: el límite de conexiones no se vio hasta `recoger`.
+
+**Lo que queda:**
+- **Limpieza final (punto 4):** lo de G y H, más `~/pns_ai_3973/liyben/merge/`; las ramas `14.0-pns-ai-3` y
+  `14.0-pns-ai-3973` (clon del VPS y GitHub) y `refs/remotes/origin/14.0-pns-ai-3*` del clon (M5). Al acabarla, segundo
+  merge commit de la rama en `14.0` (M7). → Hecha el 20/11/2026 (J), salvo K8 y M7 (con el borrado de
+  `14.0-pns-ai-3973`).
+- **Ficha 26:** reproducción en el laboratorio antes del informe (punto 5).
+- **Siguiente:** la limpieza final (punto 4).
+
+**Lecciones del merge:**
+- GitHub propone como base de un PR la rama por defecto del repo (aquí `main`, solo con «Initial commit»): antes de
+  crear y antes de fusionar se comprueba la base y el número de commits en la página; el enlace
+  `compare/<base>...<rama>` la fija. Con la rama por defecto en `14.0`, el riesgo baja.
+- GitHub Desktop adelanta en el «Fetch» las ramas locales que pueden avanzar sin conflicto (`main` a las 13:54, `14.0`
+  tras el merge): no sale «Pull origin». La comprobación es la de la tanda, no el botón.
+- Un error en una rama remota se deshace con un push con `--force-with-lease` al valor medido, en una tanda con
+  `comprobar` y `APLICAR`; el registro del PR se queda.
+- Las tandas que abren muchas conexiones SSH seguidas pueden chocar con un límite del VPS: reutilizar una sola
+  conexión y probarla contra un SSH real, o dejar tiempo entre tandas.
+- La huella del estado por SQL de U0 sirve también para demostrar que un cambio de código o de documentación no toca
+  la BD (igual antes y después).
+
+---
+
+## 8. J. Limpieza final (20/11/2026)
+
+**Hecha el 20/11/2026, de 14:44 a 17:01 hora local** (Sergio; tandas y contraste de Claude). Punto 4 del orden: lo que
+G, H e I dejaron para la limpieza final, más el staging (plan de staging §9; plan de corrección §3, punto 2).
+**Resultado:** en el VPS, el clon de `third_party` solo con `14.0` y `origin/14.0` en `d9b2e16` (K1) y el staging
+borrado entero: `pns_demo` con sus contenedores, volúmenes y red, el sitio de Nginx, el certificado, la carpeta
+`/opt/odoo/pns_staging` y los 11 `/tmp/pns_*` (K3), con copia previa al equipo de lo que se borraba y los documentos
+citan. DNS de `pns.liyben.com` y clave de Gemini del staging, quitados por Sergio (K4). En el equipo, la copia de Y1,
+`tandas/` del ensayo, el laboratorio `lab_liyben_3973` y su imagen, borrados (K5 a K7). En GitHub, la rama
+`14.0-pns-ai-3`, borrada (K9). LIYBEN, sin cambios (U0 v4 con el mismo estado por SQL). **Quedan:** K8 (restos del
+staging en el equipo, al cierre de la ficha 26) y el segundo merge commit con el borrado de `14.0-pns-ai-3973` (M7).
+
+**Estado de partida (inventario, 14:44-15:02, solo lectura).**
+- **GitHub:** ramas `11.0`, `14.0`, `14.0-analisis-pns-ai`, `14.0-pns-ai-3879`, `14.0-pns-ai-correcciones`, `17.0` y
+  `main`, fuera de la limpieza (no se tocan); `14.0-pns-ai-3` (en `884d33f`, antecesor de `d9b2e16`) y
+  `14.0-pns-ai-3973`.
+- **VPS:** proyectos de Compose `odoo` (LIYBEN), `odoo_legacy_refrimar_liyben_com`, `odoo_legacy_fumihogar_liyben_com` y
+  `pns_staging`. El volumen anónimo `4f75fe5b…` es de `odoo14_server` (se queda). `odoo14_pns` usa `odoo-web:latest`, la
+  imagen de LIYBEN: no se borra ninguna imagen. Clon de `third_party` en `14.0` / `d9b2e16`, con las ramas
+  `14.0-pns-ai-3` (`578859b`) y `14.0-pns-ai-3973` (`3df4307`) y sus `refs/remotes`, las dos antecesoras de `d9b2e16`.
+- **Equipo:** otros laboratorios, imágenes y BD (`lab_pns_ai`, `_3879`, `_973`, `_3973`, `cc0060e`, `third_party_14`…),
+  fuera de la limpieza. Copias con datos: la de Y1, las dos de L3, `staging/pns_demo_antes_3973-20261118-1744.dump` y
+  `fase4/cc0060e/p15/pns_demo_20261118-1329.dump`. Contexto activo de `odoo-dev 14`: `lab_liyben_3973`.
+
+**Decisión de Sergio (14:46, las recomendaciones de Claude; ajustes a las 15:02):**
+
+| | Qué | Decisión | Estado |
+|---|---|---|---|
+| K1 | Clon del VPS: ramas `14.0-pns-ai-3` y `14.0-pns-ai-3973` y sus `refs/remotes` | `branch -d` y `update-ref -d` con el valor medido, como el UID 101; sin `gc` | **Hecho** (CLON, 15:23:36 UTC): quedan `14.0` y `origin/14.0` en `d9b2e16`; árbol 688 / `0dc381e0…`, `.git/shallow` y dueños, iguales; los commits siguen en el clon |
+| K2 | `/opt/odoo/backups` (15 y 16/10) y `odoo.conf.bak-20261016` | No se tocan (son la vuelta atrás de la instalación, §7) | — |
+| K3 | Staging, §9 del plan de staging, puntos 1 a 4 y 7 | Tanda con corte entre pasos. Antes de borrar, copia al equipo de los 6 archivos de diagnóstico e instalación de `/opt/odoo/pns_staging` (no citados), los 11 `/tmp/pns_*` de E1′ a E4′ de la 3879 (citados) y el sitio de Nginx; después, la carpeta entera (11 `addons_*`) y todos los `/tmp/pns_*`. Sin copia de `pns_demo` (N9). No se borra ninguna imagen | **Hecho:** DOCKER 15:31:41, NGINX 15:32:17, CERT 15:40:32 y BORRAR 15:42:15 UTC. Disco del VPS: de 9,4 a 9,7 GB libres |
+| K4 | DNS de `pns.liyben.com` y clave de Gemini del staging (§9, puntos 5 y 6; plan de corrección §3, punto 2) | A mano, Sergio | **Hecho** (confirmado a las 17:01; hora exacta no anotada) |
+| K5 | Copias con datos reales en el equipo | LIYBEN **no tiene copia fuera del VPS** (Sergio): se conservan las dos de L3; se borra la de Y1 (`LIYBEN-20261119-124423.dump`) | **Hecho** 16:52 (L3 intactas, en 600; `~/pns_ai_3973/liyben` ocupa ahora 638 MB) |
+| K6 | Salidas de texto y `~/pns_ai_3973/liyben/tandas/` | Las salidas se quedan donde están; `tandas/` (15 tandas, iguales byte a byte a las del repo) se borra | **Hecho** 16:52 |
+| K7 | Laboratorio `~/GitHub/lab_liyben_3973` e imagen `odoo-dev:14-lab_liyben_3973` (4,54 GB) | Antes, cambio de contexto: `arrancar` de `lab_pns_ai_3973` y «Al acabar corto» (registro de laboratorios); después, borrado | **Hecho:** contexto a las 16:50 (15:50:39 UTC); borrado a las 16:52 |
+| K8 | Restos del staging en el equipo: copia de T3 y `~/pns_ai_3973/staging/`, `p15_pns_demo_14`, `p15b_pns_demo_14`, la copia de P-15 y el laboratorio `cc0060e` | Aplazado al cierre de la ficha 26 (punto 5: puede hacer falta el core `cc0060e`) | Pendiente |
+| K9 | Ramas de GitHub | `14.0-pns-ai-3`: tanda con `--force-with-lease`; `14.0-pns-ai-3973`: tras el segundo merge commit | `14.0-pns-ai-3` **borrada** a las 16:55:08 (GitHub y local); `14.0-pns-ai-3973`, pendiente (M7) |
+| M7 | Segundo merge commit (D68) | Lo elige Claude: J y los [DOC] lo dejan pendiente con sus compuertas; el hash y el borrado de la rama van al traspaso y al primer [DOC] del punto 5, en una rama nueva desde `14.0` (sin commit directo en `14.0`) | Pendiente |
+
+**Ejecución.** Horas del VPS en UTC; las del equipo, locales (UTC + 1). Las tandas del equipo se lanzan desde
+`~/Descargas`; `lk_v.sh`, en la sesión SSH interactiva del VPS, desde `/tmp/liyben_limpieza` (700), que crea
+`lk_e enviar`. Cada modo de `lk_e.sh` abre una sola conexión SSH (lección de I).
+
+| Paso | Hora | Resultado |
+|---|---|---|
+| Inventario (equipo y VPS, 2 bloques) | 14:44-15:02 | Arriba, «Estado de partida» |
+| `lk_e enviar` (v1) | 16:13:47 | `TODO OK` |
+| `lk_v comprobar` (v1) | 15:14:03 | `TODO OK` |
+| `lk_v CLON` (v1) | 15:16:32 | **1 FALLO, nada escrito:** la foto de lo que no se toca, distinta (abajo). `/tmp/liyben_limpieza` borrada a mano (16:22) |
+| `lk_e enviar` y `lk_v comprobar` (v2) | 16:22 / 15:23:03 | `TODO OK` |
+| `lk_v CLON` (v2) | 15:23:34 | Clon hecho (todas sus comprobaciones `OK`); **1 FALLO**: fumihogar `/web/login` 503 (abajo) |
+| Diagnóstico | 15:24-15:25 | fumihogar 200 seis veces seguidas, 0 reinicios; nada en `error.log` de Nginx (los errores de cada sitio van a `<sitio>-error.log`) |
+| `lk_e actualizar` (v2 → v3) | 16:31:33 | `TODO OK`. v3: los códigos de refrimar y fumihogar pasan a INFO; DOCKER acepta ese CLON (abajo) |
+| `lk_v DOCKER` (v3) | 15:31:39 | `TODO OK` (INFO: CLON aceptado): `docker compose down -v` en `/opt/odoo/pns_staging`; 2 contenedores (`odoo14_pns`, `odoo14_pns_db`), 3 volúmenes (`pns_staging_db-data`, `pns_staging_odoo-data` y el anónimo `55490707…`) y 1 red |
+| `lk_v NGINX` (v3) | 15:32:15 | Sitio quitado, `nginx -t` y recarga `OK`; **1 FALLO**: LIYBEN `/web/login` 503 (también refrimar y fumihogar) |
+| Diagnóstico | 15:33-15:35 | **Causa: `limit_req`** de Nginx (abajo). `/web`, sin límite: LIYBEN 303, refrimar 303, fumihogar 200 |
+| `lk_e actualizar` (v3 → v4) | 16:40:23 | `TODO OK`. v4: `/web` en vez de `/web/login`; CERT acepta ese NGINX (abajo) |
+| `lk_v CERT` (v4) | 15:40:29 | `TODO OK` (INFO: NGINX aceptado): `certbot delete --cert-name pns.liyben.com`; sin renovación; los otros 3 certificados, iguales (nombre y caducidad); `nginx -t` `OK` |
+| `lk_v lista` / `lk_e recoger` | 15:41 / 16:41:30 | 30 archivos, huella de la lista `b97757c6…ea63`; copia al equipo con `TODO OK` (salvar/: originales = copias, 17 más el sitio de Nginx); código para BORRAR `dbd3a670…5eb9` |
+| `lk_v BORRAR` (v4) | 15:42:13 | `TODO OK` (salida solo en pantalla): `/opt/odoo/pns_staging`, los 11 `/tmp/pns_*` y `/tmp/liyben_limpieza`, borrados; clon (referencias, árbol y `status`) sin cambios |
+| U0 v4 | 16:45:44 | `TODO OK`; `u0_estado` `7850d505…5c9a`, igual que a las 12:57 y a las 14:15 (H e I). INFO abajo |
+| Cambio de contexto (K7) | 16:50 | `arrancar` de `lab_pns_ai_3973` y «Al acabar corto»: log `servidor-20261120-165046.log`, 6 líneas, todas `?` (15:50:39 UTC); nadie entró; C OK |
+| `lk_l comprobar` / `BORRAR` | 16:51:09 / 16:52:05 | `TODO OK` / **1 FALLO de la comprobación** de después de la imagen (abajo); verificado aparte: imagen borrada |
+| `lk_g comprobar` / `BORRAR` | 16:53:34 / 16:55:06 | `TODO OK` / `TODO OK`: `push --force-with-lease` del borrado de `14.0-pns-ai-3` al hash medido (`884d33f`) y `git branch -d` de la local. Antes, sin PR abiertos desde la rama (Sergio). `14.0` de GitHub y `14.0-pns-ai-3973`, sin cambios |
+| K4 | antes de las 17:01 | Hecho por Sergio |
+
+**Salidas.** Equipo: `~/pns_ai_3973/liyben/limpieza/` (700): `lk_e-*`, `lk_l-*`, `lk_g-*`, `otras_imagenes.txt` y
+`vps/`, con las 30 del VPS (salidas de `lk_v` v2 a v4, foto, códigos, `n101.txt`, `shallow.sha256`, `lk_v.sh` v4 y
+`salvar/`). En `vps/salvar/`: `pns_staging/` (`diag_bloqueo_20261016.txt`, `diag_bloqueo_20261016_b.txt`,
+`diag_bloqueo_20261016_b_odoo.log`, `diag_bloqueo_20261016_odoo.log`, `instalacion_1_ai_engine.log`,
+`instalacion_2_chatboo.log`), `tmp/` (los 11 `pns_*` de E1′, E2′ y E4′ que citan
+[staging_e1_3879.md](staging_e1_3879.md) a [staging_e4_3879.md](staging_e4_3879.md) y
+[diagnostico_r6_staging_e1p.md](diagnostico_r6_staging_e1p.md)), `nginx/pns_liyben_com.conf` y
+`originales.sha256`. Las salidas de `lk_v comprobar` y CLON v1 se borraron con la carpeta (están en la conversación del
+20/11). Las de `lk_v BORRAR`, solo en pantalla (borra la carpeta de las salidas).
+
+**Incidencias (las cuatro, sin efecto en lo que no se tocaba):**
+- **CLON v1: foto distinta sin cambio real.** `docker inspect` no da los montajes (`.Mounts`) en orden fijo: dos fotos
+  seguidas daban huellas distintas, sin ningún reinicio. v2 ordena los montajes y añade los reinicios a la foto. Nada se
+  había escrito (la foto se compara antes de tocar el clon).
+- **CLON v2: 503 puntual de fumihogar (Odoo 8)** en los códigos HTTP de después; LIYBEN dio 200 y 404 y el clon quedó
+  hecho. v3 (D69): los códigos de refrimar y fumihogar pasan a INFO, y DOCKER acepta ese CLON **y solo ese** (un solo
+  FALLO, el de los códigos, con LIYBEN 200 y 404), anotado como INFO en su salida.
+- **NGINX v3: LIYBEN `/web/login` 503.** Nginx de LIYBEN tiene `limit_req` (zona `odoo_login`, `odoo.conf:5`, 5 r/m por
+  IP, `burst=5 nodelay`), compartida por `/web/login` y `/xmlrpc` de los tres sitios: las consultas seguidas desde el
+  propio VPS lo agotaron (8 respuestas 503 en 20 minutos, todas de las tandas). El sitio ya estaba quitado y la recarga,
+  hecha. v4 (D69): las comprobaciones de salud usan `/web` (LIYBEN 303, `/mcp` 404; refrimar 303, fumihogar 200, medidos
+  a las 15:35 UTC), y CERT acepta ese NGINX **y solo ese** (un solo FALLO, el `/web/login` de LIYBEN a 503, con `/mcp`
+  404 y `nginx -t`, recarga y sitio quitado `OK`).
+- **`lk_l BORRAR`: 1 FALLO de la comprobación, no del borrado.** `docker image inspect -f ok … || echo no` de una imagen
+  que no existe escribe una línea vacía y el resultado no era `no`. Verificado aparte: 0 imágenes con ese nombre y con
+  ese ID; las otras 7 imágenes `odoo-dev:14`, iguales a las de `comprobar` (`otras_imagenes.txt`).
+
+**U0 v4 (16:45:44): INFO.** Traceback 7 en el log desde L5: 6 de `http_routing`/`slug` con `AccessError`, del core (I),
+y **1 ERROR de `auto_backup` a las 13:44:32 UTC** (`dump_db` → `exec_pg_command` falló): anterior a la limpieza. LIYBEN
+tiene el módulo OCA `auto_backup` y su copia del 20/11 falló. Infraestructura (D15); no investigado. `call_button` 8.
+
+**Lo que queda:**
+- **K8** (restos del staging en el equipo): al cierre de la ficha 26, antes del informe (punto 5).
+- **M7:** segundo merge commit de `14.0-pns-ai-3973` en `14.0`, con estas compuertas: PR #3 abierto con
+  `compare/14.0...14.0-pns-ai-3973` (base `14.0` y número de commits comprobados en la página; solo `docs/`), «Create a
+  merge commit», sin «Delete branch», con tanda de antes y después; luego, el borrado de `14.0-pns-ai-3973` en GitHub y
+  en local (`--force-with-lease` al hash medido), con GitHub Desktop en `14.0`. El VPS no lo necesita (D68, M7). El hash
+  va al traspaso y al primer [DOC] del punto 5.
+- **Copias de L3:** se conservan (LIYBEN no tiene copia fuera del VPS, K5).
+- **`/opt/odoo/backups` y `odoo.conf.bak-20261016`:** no se tocan (K2).
+- **`auto_backup` de LIYBEN:** la copia del 20/11 falló (D15).
+- **Ficha 26:** reproducción en el laboratorio antes del informe (punto 5).
+- **Los restos anotados en los documentos de la 3879** («Restos para la limpieza final» de E2′ a E4′; la contraseña de
+  `admin` de `pns_demo`, fila 15 de `docs/specs/estado_hallazgos_3879.md`): resueltos con K3 (sin `pns_demo`, sin
+  `addons_*`, sin `/tmp/pns_*`). Esos documentos no se reescriben.
+- **Siguiente:** M7.
+
+**Lecciones de la limpieza:**
+- `docker inspect` no devuelve `.Mounts` en orden fijo: una huella de contenedores ordena los montajes (y la simulación
+  de las pruebas baraja el orden).
+- Nginx de LIYBEN tiene `limit_req` (5 r/m por IP, zona compartida por `/web/login` y `/xmlrpc` de los tres sitios): las
+  comprobaciones de salud usan `/web`, nunca `/web/login`, y antes de elegir la URL se mira la configuración del proxy.
+  Los logs de error de Nginx son por sitio.
+- `docker image inspect` de una imagen que no existe escribe una línea vacía en la salida estándar: la ausencia se
+  comprueba con `docker image ls`, no con `inspect || echo`.
+- Una compuerta que exige el `TODO OK` del paso anterior necesita una regla de aceptación explícita y estrecha cuando el
+  paso hizo su trabajo y solo falló una comprobación ajena (CLON y NGINX): se escribe en la tanda y se anota como INFO.
+- Una tanda con `BORRAR` exige un código que solo da la copia al equipo con `TODO OK`, no una huella que ya se conoce
+  antes de copiar.
+
+**Tandas de la limpieza** (en el repo, en la versión ejecutada; `lk_v.sh`, en el VPS; las demás, en el equipo):
+
+| Archivo | Líneas | SHA-256 | Qué hace |
+|---|---|---|---|
+| [`lk_v.sh`](liyben_3973/lk_v.sh) | 307 | `afa44c94e582544125634ca567383e4cb7bb4de3560e296ae48bc3db6faf817b` | v4. VPS: `comprobar` (foto y copias en `salvar/`), CLON (K1), DOCKER, NGINX, CERT (K3.1 a K3.3), `lista` y `BORRAR <código>` (K3.4), con las reglas de aceptación de CLON y NGINX |
+| [`lk_e.sh`](liyben_3973/lk_e.sh) | 84 | `4660d83aae88e00512789726745477875972d457d363beb219d976a3b2894f67` | v4. Equipo: `enviar`, `actualizar` (de la v3 de `lk_v.sh` a la v4) y `recoger <huella>`, una conexión SSH por modo; `recoger` da el código de BORRAR |
+| [`lk_l.sh`](liyben_3973/lk_l.sh) | 95 | `eb3ec539ea9a779a8c439e3b44e68d2877dc268c02f37555abdb1298ea82e758` | Equipo, sin red: `comprobar` / `BORRAR` de K5, K6 y K7 |
+| [`lk_g.sh`](liyben_3973/lk_g.sh) | 64 | `3036225af9c1cdf44af7feea30dd53fde8d2b65236e5e762340801b169a99b09` | Equipo: `comprobar` / `BORRAR` de la rama `14.0-pns-ai-3` de GitHub y la local (K9) |
+
+Las versiones anteriores no entran (solo su huella; no se conservan): `lk_v.sh` v1 (268 líneas, `3b8593ff…cae7`), v2
+(270, `075792c4…3950`) y v3 (286, `6f2b98815b259045dc5caeaef921fe8a3f3a105172b276bc67d7121105818841`, la que exige
+`lk_e actualizar`); `lk_e.sh` v1 (70, `babb4f50…220e`), v2 (70, `6998ba45…2a9f`) y v3 (84, `8c5e1fda…8498`). Notas:
+el comentario de uso de `lk_e.sh` no nombra `actualizar` (el `case` sí); `lk_l.sh` tiene la comprobación de la imagen
+de la incidencia de arriba. Todas se probaron en el entorno de Claude (git real; `docker`, `sudo`, `nginx`, `certbot`,
+`systemctl`, `curl` y `ssh` simulados con estado, montajes barajados y, desde la v4, `limit_req`), con positivos y
+negativos; la prueba P4 reproduce el recorrido real v2 → v3 → v4 (la v2, reconstruida con su huella exacta).
 
 ---
 

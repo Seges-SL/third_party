@@ -1076,6 +1076,11 @@ tb && /^[A-Za-z_][A-Za-z0-9_.]*(:|$)/ { e = $0; m = e; sub(/:.*/, "", e); sub(/^
 
 ### Lo que queda para la limpieza final del staging
 
+**Limpieza final (20/11/2026, D69; J de [liyben_3973.md](liyben_3973.md)):** hecho lo de `pns_demo` (borrada entera,
+sin copia, N9), lo del VPS (`/opt/odoo/pns_staging` borrada entera, con `addons_antes_3973`) y las salidas, que siguen
+en el equipo. **Queda (K8), al cierre de la ficha 26:** la copia de T3 y `~/pns_ai_3973/staging/`, y lo del
+laboratorio (`p15_pns_demo_14`, `p15b_pns_demo_14`, la copia de P-15 y el laboratorio `cc0060e`).
+
 - **`pns_demo`:** operaciones 35 (cancelada) y 36 (ejecutada); `mail.message` 205 en el contacto 29; las sesiones de
   Chatboo de `admin` de los dos turnos: las de `user_id` 2 creadas desde `StartedAt` (16:52:46). Sus ids se sacan en la
   limpieza final.
