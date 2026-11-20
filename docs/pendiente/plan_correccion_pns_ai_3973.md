@@ -984,7 +984,8 @@ uso real, en G de [liyben_3973.md](liyben_3973.md).
 - **Chatboo:** responde con el proveedor 2 (Qwen3.5-9B); sin botón Canvas, porque nadie con Diseño está activo (D62).
 - **Cadena de Chatboo:** quitada en L7 y añadida de nuevo (fila 3, igual a la 2 salvo el id); sin efecto. Se queda.
 - **D60:** las claves MCP no se regeneran; la generada durante U1 se borró. Los tres usuarios MCP, sin clave.
-- **D61, ficha 26:** no aplica en LIYBEN. **Pendiente antes del informe (punto 5):** reproducirla en el laboratorio con
+- **D61, ficha 26:** no aplica en LIYBEN. **Hecha el 20/11/2026: no reproducida; fuera del informe (D70, «Punto 5:
+  ficha 26 en el laboratorio», abajo).** Lo previsto: reproducirla en el laboratorio con
   `odoo-dev 14 shell` y `rollback`, con un usuario que no sea AI Administrator, marcando solo la casilla y la casilla
   junto con otra, y mirando el grupo antes del `rollback` (segunda ronda, decisión 5; fila 2.9 de
   [decisiones_pendientes_hallazgos_3879.md](decisiones_pendientes_hallazgos_3879.md)). Antes, decidir la BD: la copia
@@ -1019,8 +1020,57 @@ uso real, en G de [liyben_3973.md](liyben_3973.md).
   `14.0-pns-ai-3973` borrada (M7 y K9).
 - **LIYBEN:** sin cambios (U0 v4, mismo estado por SQL). INFO: la copia de `auto_backup` del 20/11 falló (D15).
 - **Pendiente:** K8 (restos del staging en el equipo, al cierre de la ficha 26).
-- **Siguiente:** punto 5, en la rama `14.0-pns-ai-informe` (desde `14.0` en `d8cb3f0`): la ficha 26 en el laboratorio
-  (`lab_pns_ai_cc0060e_14`, core `cc0060e`), K8 y la 2.ª entrega del informe al fabricante.
+- **Siguiente:** punto 5, en la rama `14.0-pns-ai-informe` (desde `14.0` en `d8cb3f0`): la ficha 26 (hecha, abajo), K8
+  y la 2.ª entrega del informe al fabricante.
+
+**Punto 5: ficha 26 en el laboratorio (20/11/2026; D70, decisiones de Sergio: las recomendaciones de Claude, salvo la
+última, suya).** Tandas en [`informe_3973/`](informe_3973/).
+- **Qué:** la casilla AI Conversational de Usuarios MCP, guardada, ¿cambia el grupo? (ficha 26 de la
+  [hoja de E4′](e4_hoja_3879.md); segunda ronda, decisión 5; fila 2.9 de
+  [decisiones_pendientes_hallazgos_3879.md](decisiones_pendientes_hallazgos_3879.md)). Observación original: subida de
+  E2′ al staging (29/10/2026, 3.1.879): al preparar `e2p_writer`, usuario nuevo, marcar la casilla y guardar no dejó el
+  grupo puesto ([staging_e2_3879.md](staging_e2_3879.md), D.0).
+- **BD:** `lab_pns_ai_cc0060e_14` (core `cc0060e`, el de LIYBEN; instalación limpia de la rama en `52a3a5e`, sin
+  cambios en los módulos hasta `d5f5f6f`; 0 AI Administrators). `odoo-dev 14 shell --bd` con el web parado (excepción
+  de D52) y todo con `rollback`: huella de `res_groups_users_rel`, `ai_mcp_user` y `write_date` de `res_users` desde otro
+  cursor de solo lectura, igual antes y después en las tres ejecuciones.
+- **Cambio de contexto** de `lab_pns_ai_3973` a `lab_pns_ai_cc0060e` (`f26_ctx.sh`): `arrancar` y «Al acabar corto»,
+  C OK ([registro de laboratorios](lab_procedimiento_3973.md)).
+- **Actor:** `admin` (id 2, Ajustes) con AI Administrator añadido dentro de la transacción, sin `su` (la ACL de
+  `ai.mcp.user` solo deja escribir a AI Administrator; como en el staging). **Usuario:** `seges_int` (id 8, solo
+  usuario interno). Sin motor, lienzo ni skills (decisión 5).
+
+| Caso | Qué se guarda y cómo | Resultado |
+|---|---|---|
+| A1 | Solo la casilla, `write` (fila MCP creada antes en la transacción) | Grupo puesto |
+| A2 | Solo la casilla, `odoo.tests.common.Form` sobre `pns_ai_mcp.view_mcp_user_form` | Grupo puesto; el formulario la muestra marcada |
+| B1 | La casilla y AI Writer, `write` | Los dos grupos puestos |
+| B2 | Las dos, `Form` | Los dos grupos puestos |
+| C1 | `create` de la fila con la casilla marcada (la interfaz no lo permite: lista con `create="0"`) | Grupo puesto |
+| C2 | El camino real de un usuario nuevo: `admin` abre la lista (`web_search_read` con `ensure_all_users` crea las 3 filas) y guarda la casilla con el `Form` | Grupo puesto |
+
+- En los seis casos: casilla releída tras invalidar, `True`; grupo en `res_groups_users_rel` y en `groups_id`; log
+  «added to group» 1 (2 en B).
+- **Resultado: no reproducida en 3.1.973.** Lo observado con 3.1.879 queda sin causa. Probarlo en la interfaz real
+  (con `arrancar` y AI Administrator con commit en la BD del laboratorio) no se hace.
+- **D70 (Sergio, 20/11/2026 a las 20:34):** la ficha 26 **sale del informe** al fabricante. Actualizados: la fila 2.9,
+  la ficha 26 de la hoja de E4′, la §3 (punto 2) y la tabla de E4′ del
+  [plan de la 3879](plan_correccion_pns_ai_3879.md) y el [estado de los hallazgos](../specs/estado_hallazgos_3879.md).
+- **Ejecución:** `f26_ctx.sh` `comprobar` 18:22:39 y `CAMBIAR` 18:23:00; `f26_lab.sh` `leer` 19:14:31, `REPRODUCIR`
+  19:14:57 y `CREAR` 20:32:55; todo TODO OK. Salidas `f26_*` y `arrancar-*` en `~/pns_ai_3973/informe/`.
+- **Tandas:**
+
+| Archivo | Líneas | SHA-256 | Estado |
+|---|---|---|---|
+| [`f26_ctx.sh`](informe_3973/f26_ctx.sh) | 97 | `244a05d1fa85c6b9a0ae3f12e572be5e86e280f4a14cfe503255d2458e65981e` | ejecutada |
+| [`f26_lab.sh`](informe_3973/f26_lab.sh) v2 | 302 | `01b800c40d2a7ca1f41756d8945927caff9286ea290b6516e3f77b59512a2613` | la final (`leer`, `REPRODUCIR`, `CREAR`) |
+| `f26_lab.sh` v1 | 255 | `432100c9…f074` | solo huella (`leer` y `REPRODUCIR`, iguales en la v2) |
+
+  Probadas en el entorno de Claude: `f26_ctx.sh` con dobles de `odoo-dev` y `docker` con estado y el `lab_cdp.py` del
+  repo (positivo y 12 negativos); `f26_lab.sh`, la parte bash con un doble de `odoo-dev shell` (positivos de los tres
+  modos y negativos) y el Python solo compilado (sin Odoo; se validó en el equipo).
+- **Siguiente:** K8, con la vuelta al contexto `lab_pns_ai_3973` antes de borrar el laboratorio `cc0060e`; después, la
+  2.ª entrega del informe.
 
 **Despliegue en LIYBEN (19 y 20/11/2026; decisiones de Sergio: las recomendaciones de Claude).** Documento:
 [liyben_3973.md](liyben_3973.md), con sus tandas y el SQL en [`liyben_3973/`](liyben_3973/). Antes se hizo un ensayo

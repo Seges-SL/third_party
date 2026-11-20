@@ -1674,7 +1674,8 @@ probaron en el entorno de Claude con SSH, Docker, git y curl simulados (positivo
 terminaron con su línea final.
 
 **Lo que queda:**
-- **Ficha 26:** reproducción en el laboratorio antes del informe (punto 5).
+- **Ficha 26:** reproducción en el laboratorio antes del informe (punto 5). → Hecha el 20/11/2026: no reproducida;
+  fuera del informe (D70; plan de la 3973, «Punto 5: ficha 26 en el laboratorio»).
 - **Limpieza final (punto 4):** lo de G, más `~/pns_ai_3973/liyben/uso/`. **Las copias de L3 se conservan hasta la
   limpieza final**; desde el uso real ya no son una vuelta atrás limpia (restaurarlas perdería lo hecho después).
   → Hecha el 20/11/2026 (J): las salidas de `uso/` se quedan; las copias de L3 también (K5).
@@ -1761,7 +1762,8 @@ y negativos. No se probó contra un SSH real: el límite de conexiones no se vio
   `14.0-pns-ai-3973` (clon del VPS y GitHub) y `refs/remotes/origin/14.0-pns-ai-3*` del clon (M5). Al acabarla, segundo
   merge commit de la rama en `14.0` (M7). → Hecha el 20/11/2026 (J), salvo K8; M7 y el borrado de
   `14.0-pns-ai-3973`, también hechos (J).
-- **Ficha 26:** reproducción en el laboratorio antes del informe (punto 5).
+- **Ficha 26:** reproducción en el laboratorio antes del informe (punto 5). → Hecha el 20/11/2026: no reproducida;
+  fuera del informe (D70; plan de la 3973, «Punto 5: ficha 26 en el laboratorio»).
 - **Siguiente:** la limpieza final (punto 4).
 
 **Lecciones del merge:**
@@ -1815,7 +1817,7 @@ el segundo merge commit (M7, `d8cb3f0`, PR #3) y el borrado de `14.0-pns-ai-3973
 | K5 | Copias con datos reales en el equipo | LIYBEN **no tiene copia fuera del VPS** (Sergio): se conservan las dos de L3; se borra la de Y1 (`LIYBEN-20261119-124423.dump`) | **Hecho** 16:52 (L3 intactas, en 600; `~/pns_ai_3973/liyben` ocupa ahora 638 MB) |
 | K6 | Salidas de texto y `~/pns_ai_3973/liyben/tandas/` | Las salidas se quedan donde están; `tandas/` (15 tandas, iguales byte a byte a las del repo) se borra | **Hecho** 16:52 |
 | K7 | Laboratorio `~/GitHub/lab_liyben_3973` e imagen `odoo-dev:14-lab_liyben_3973` (4,54 GB) | Antes, cambio de contexto: `arrancar` de `lab_pns_ai_3973` y «Al acabar corto» (registro de laboratorios); después, borrado | **Hecho:** contexto a las 16:50 (15:50:39 UTC); borrado a las 16:52 |
-| K8 | Restos del staging en el equipo: copia de T3 y `~/pns_ai_3973/staging/`, `p15_pns_demo_14`, `p15b_pns_demo_14`, la copia de P-15 y el laboratorio `cc0060e` | Aplazado al cierre de la ficha 26 (punto 5: puede hacer falta el core `cc0060e`) | Pendiente |
+| K8 | Restos del staging en el equipo: copia de T3 y `~/pns_ai_3973/staging/`, `p15_pns_demo_14`, `p15b_pns_demo_14`, la copia de P-15 y el laboratorio `cc0060e` | Aplazado al cierre de la ficha 26 (punto 5: puede hacer falta el core `cc0060e`) | Pendiente; la ficha 26, cerrada el 20/11 (D70): K8 ya puede hacerse |
 | K9 | Ramas de GitHub | `14.0-pns-ai-3`: tanda con `--force-with-lease`; `14.0-pns-ai-3973`: tras el segundo merge commit | `14.0-pns-ai-3` **borrada** a las 16:55:08 (GitHub y local); `14.0-pns-ai-3973` **borrada** a las 17:47:28 (GitHub y local; estaba en `3a9b111`), tras M7 |
 | M7 | Segundo merge commit (D68) | Lo elige Claude: J y los [DOC] lo dejan pendiente con sus compuertas; el hash y el borrado de la rama van al traspaso y al primer [DOC] del punto 5, en una rama nueva desde `14.0` (sin commit directo en `14.0`) | **Hecho** (`lk_m.sh`): PR #3, merge commit `d8cb3f0f8cfcd4caed71139f6849351a20160e2a` a las 17:45:59, padres `d9b2e16` y `3a9b111`; 5 commits y 15 archivos, solo `docs/`. Rama borrada (K9). El VPS no lo necesita (D68): su clon sigue en `d9b2e16` |
 
@@ -1883,18 +1885,19 @@ y **1 ERROR de `auto_backup` a las 13:44:32 UTC** (`dump_db` → `exec_pg_comman
 tiene el módulo OCA `auto_backup` y su copia del 20/11 falló. Infraestructura (D15); no investigado. `call_button` 8.
 
 **Lo que queda:**
-- **K8** (restos del staging en el equipo): al cierre de la ficha 26, antes del informe (punto 5).
+- **K8** (restos del staging en el equipo): al cierre de la ficha 26, antes del informe (punto 5). La ficha 26 se
+  cerró el 20/11 (D70): K8 es lo siguiente.
 - **M7:** hecho (arriba: `d8cb3f0`, PR #3, y `14.0-pns-ai-3973` borrada). Este registro va en el primer [DOC] del
   punto 5, en la rama `14.0-pns-ai-informe`, creada desde `14.0` en `d8cb3f0`.
 - **Copias de L3:** se conservan (LIYBEN no tiene copia fuera del VPS, K5).
 - **`/opt/odoo/backups` y `odoo.conf.bak-20261016`:** no se tocan (K2).
 - **`auto_backup` de LIYBEN:** la copia del 20/11 falló (D15).
-- **Ficha 26:** reproducción en el laboratorio antes del informe (punto 5).
+- **Ficha 26:** reproducción en el laboratorio antes del informe (punto 5). → Hecha el 20/11/2026: no reproducida;
+  fuera del informe (D70; plan de la 3973, «Punto 5: ficha 26 en el laboratorio»).
 - **Los restos anotados en los documentos de la 3879** («Restos para la limpieza final» de E2′ a E4′; la contraseña de
   `admin` de `pns_demo`, fila 15 de `docs/specs/estado_hallazgos_3879.md`): resueltos con K3 (sin `pns_demo`, sin
   `addons_*`, sin `/tmp/pns_*`). Esos documentos no se reescriben.
-- **Siguiente:** punto 5: ficha 26 en el laboratorio (`lab_pns_ai_cc0060e_14`, core `cc0060e`), K8 y la 2.ª entrega
-  del informe al fabricante.
+- **Siguiente:** punto 5: K8 y la 2.ª entrega del informe al fabricante (la ficha 26, hecha el 20/11: D70).
 
 **Lecciones de la limpieza:**
 - `docker inspect` no devuelve `.Mounts` en orden fijo: una huella de contenedores ordena los montajes (y la simulación
