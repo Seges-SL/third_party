@@ -11,6 +11,9 @@ import requests
 
 _logger = logging.getLogger(__name__)
 
+# What a stdio child needs to find its interpreter and write temp files.
+_STDIO_INHERITED_ENV = ('PATH', 'HOME', 'LANG', 'LC_ALL', 'TMPDIR', 'TZ')
+
 # JSON-RPC 2.0 counter (module-level, not critical if shared between threads).
 _request_id = 0
 
@@ -63,6 +66,8 @@ class MCPClient:
         self.timeout = server_record.timeout or 30
         self._auth_token = auth_token
         self._process = None  # subprocess for stdio
+        self._stderr = None
+        self._stdout_buf = b''
         self._session = None  # requests session for SSE
         self._server_info = None
 
@@ -76,7 +81,7 @@ class MCPClient:
         }
         auth_type = self.server.auth_type
         token = self._auth_token if self._auth_token is not None else (
-            self.server.auth_token or '')
+            self.server.sudo().auth_token or '')
         if auth_type == 'bearer' and token:
             headers['Authorization'] = f'Bearer {token}'
         elif auth_type == 'api_key' and token:
@@ -95,12 +100,20 @@ class MCPClient:
         if not self._session:
             self._session = requests.Session()
         try:
+            # Seges: parche 19 (PNS-17, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            # A redirect would carry the auth header to another host.
             resp = self._session.post(
                 url,
                 json=payload,
                 headers=self._build_headers(),
                 timeout=self.timeout,
+                allow_redirects=False,
             )
+            if resp.is_redirect:
+                location = resp.headers.get('Location') or '?'
+                raise MCPClientError(
+                    f"MCP server '{self.server.code}' answered with a redirect "
+                    f"to {location}. Set the final URL in the server.")
             resp.raise_for_status()
         except requests.RequestException as e:
             raise MCPClientError("HTTP request to '%s' failed: %s" % (url, e))
@@ -138,31 +151,71 @@ class MCPClient:
             raise MCPClientError(
                 "No command configured for stdio server '%s'" % self.server.code)
         try:
-            args_json = json.loads(self.server.command_args or '[]')
+            args_json = json.loads(self.server.sudo().command_args or '[]')
         except (json.JSONDecodeError, TypeError):
             args_json = []
         try:
-            env_json = json.loads(self.server.env_vars or '{}')
+            env_json = json.loads(self.server.sudo().env_vars or '{}')
         except (json.JSONDecodeError, TypeError):
             env_json = {}
 
         import os
-        env = dict(os.environ)
-        env.update(env_json)
+        import tempfile
+        # Odoo's own environment (database password, secrets) stays home.
+        env = {k: os.environ[k] for k in _STDIO_INHERITED_ENV if k in os.environ}
+        if isinstance(env_json, dict):
+            env.update({str(k): str(v) for k, v in env_json.items()})
 
         full_cmd = [cmd] + (args_json if isinstance(args_json, list) else [])
+        # A pipe nobody reads fills up and freezes the child.
+        self._stderr = tempfile.TemporaryFile()
+        self._stdout_buf = b''
         try:
             self._process = subprocess.Popen(
                 full_cmd,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=self._stderr,
                 env=env,
             )
         except (OSError, FileNotFoundError) as e:
+            self._stderr.close()
+            self._stderr = None
             raise MCPClientError(
                 "Failed to start stdio server '%s' (cmd: %s): %s" % (
                     self.server.code, ' '.join(full_cmd), e))
+
+    def _stdio_stderr_tail(self):
+        if not self._stderr:
+            return ''
+        try:
+            self._stderr.seek(0)
+            return self._stderr.read()[-500:].decode('utf-8', errors='replace')
+        except Exception:
+            return ''
+
+    def _stdio_readline(self):
+        """One stdout line, or MCPClientError after ``self.timeout`` seconds."""
+        import os
+        import selectors
+        import time
+        fd = self._process.stdout.fileno()
+        deadline = time.monotonic() + (self.timeout or 30)
+        with selectors.DefaultSelector() as sel:
+            sel.register(fd, selectors.EVENT_READ)
+            while b'\n' not in self._stdout_buf:
+                left = deadline - time.monotonic()
+                if left <= 0 or not sel.select(left):
+                    raise MCPClientError(
+                        "stdio server '%s' did not answer within %s s."
+                        % (self.server.code, self.timeout or 30))
+                chunk = os.read(fd, 65536)
+                if not chunk:
+                    break
+                self._stdout_buf += chunk
+        line, _sep, rest = self._stdout_buf.partition(b'\n')
+        self._stdout_buf = rest
+        return line
 
     def _stdio_send(self, payload):
         """Send a JSON-RPC message via stdin and read the response from stdout."""
@@ -174,20 +227,18 @@ class MCPClient:
             self._process.stdin.flush()
         except (BrokenPipeError, OSError) as e:
             raise MCPClientError("Failed to write to stdio: %s" % e)
+        if 'id' not in payload:
+            # A notification has no answer: waiting for one hangs the worker.
+            return None
 
-        # Read one line from stdout (JSON-RPC response).
         try:
-            line = self._process.stdout.readline()
-        except (OSError,) as e:
+            line = self._stdio_readline()
+        except OSError as e:
             raise MCPClientError("Failed to read from stdio: %s" % e)
         if not line:
-            stderr = ''
-            try:
-                stderr = self._process.stderr.read().decode('utf-8', errors='replace')
-            except Exception:
-                pass
             raise MCPClientError(
-                "stdio process closed without response. stderr: %s" % stderr[:500])
+                "stdio process closed without response. stderr: %s"
+                % self._stdio_stderr_tail())
         try:
             return json.loads(line.decode('utf-8'))
         except (ValueError, json.JSONDecodeError):
@@ -339,3 +390,9 @@ class MCPClient:
                 except Exception:
                     pass
             self._process = None
+        if self._stderr:
+            try:
+                self._stderr.close()
+            except Exception:
+                pass
+            self._stderr = None

@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-import base64
+"""Import external API servers (MCP / OpenAPI) from JSON."""
+
 import logging
 
 from odoo import models, fields, _
 from odoo.exceptions import UserError
 
 from ..utils import mcp_ui
+from ..utils.compat import binary_bytes
 from ..utils.portable_io import import_vals_from_dict
 
 _logger = logging.getLogger(__name__)
@@ -37,7 +39,7 @@ class ImportExternalServersWizard(models.TransientModel):
       - Match key: ``code``.
       - URL whitelist is a separate model — never mixed into this import.
     """
-    _name = 'pns_ai_mcp.import_external_servers_wizard'
+    _name = 'ai.import.external.servers.wizard'
     _inherit = ['pns.operation.report.wizard']
     _description = 'Wizard to import External API Servers from JSON'
 
@@ -56,7 +58,7 @@ class ImportExternalServersWizard(models.TransientModel):
             raise UserError(_("Please upload a JSON file."))
 
         try:
-            raw = base64.b64decode(self.json_file)
+            raw = binary_bytes(self.json_file)
             data, extract_warnings = mcp_ui.extract_json_from_upload(raw)
         except (ValueError, Exception) as e:
             raise UserError(_("Error reading the file: %s") % e)
@@ -64,6 +66,9 @@ class ImportExternalServersWizard(models.TransientModel):
         rows = _normalize_server_rows(data)
         Server = self.env['ai.api.server']
         created = updated = skipped = 0
+        created_names = []
+        updated_names = []
+        skipped_names = []
         errors = []
         warnings = list(extract_warnings)
         if not rows:
@@ -86,6 +91,7 @@ class ImportExternalServersWizard(models.TransientModel):
                 )
                 if existing and not self.replace_existing:
                     skipped += 1
+                    skipped_names.append(code)
                     continue
 
                 vals, field_warnings = import_vals_from_dict(Server, entry)
@@ -97,11 +103,13 @@ class ImportExternalServersWizard(models.TransientModel):
                     vals['name'] = entry.get('name') or code
 
                 if existing:
-                    existing.write(vals)
+                    existing.write(existing._keep_secrets_on_import(vals))
                     updated += 1
+                    updated_names.append(code)
                 else:
                     Server.create(vals)
                     created += 1
+                    created_names.append(code)
             except Exception as e:
                 errors.append("%s: %s" % (code, e))
                 _logger.error("External server import error for %s: %s", code, e)
@@ -113,4 +121,7 @@ class ImportExternalServersWizard(models.TransientModel):
             skipped=skipped,
             errors=errors,
             warnings=warnings,
+            created_names=created_names,
+            updated_names=updated_names,
+            skipped_names=skipped_names,
         )

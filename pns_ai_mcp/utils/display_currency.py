@@ -61,8 +61,62 @@ CURRENCY_SELECTION = [
 ]
 
 
+# ISO code -> symbol. Missing entry → show code + amount (prefix).
+CURRENCY_SYMBOLS = {
+    'USD': '$',
+    'EUR': '€',
+    'GBP': '£',
+    'JPY': '¥',
+    'CNY': '¥',
+    'INR': '₹',
+    'RUB': '₽',
+    'TRY': '₺',
+    'KRW': '₩',
+    'ILS': '₪',
+    'BRL': 'R$',
+    'CAD': 'CA$',
+    'AUD': 'A$',
+    'NZD': 'NZ$',
+    'MXN': 'MX$',
+    'SGD': 'S$',
+    'HKD': 'HK$',
+    'ARS': 'AR$',
+    'CLP': 'CL$',
+    'COP': 'COL$',
+    'SEK': 'kr',
+    'NOK': 'kr',
+    'DKK': 'kr',
+    'PLN': 'zł',
+}
+
+
 def currency_codes():
     return [row[0] for row in CURRENCY_SELECTION]
+
+
+def format_amount_with_symbol(code, amount):
+    """Compact cost label: amount + space + symbol, or ISO code when no symbol."""
+    try:
+        n = float(amount)
+    except (TypeError, ValueError):
+        return '-'
+    if n < 0:
+        return '-'
+    iso = normalize_currency(code)
+    zero = n == 0
+    if zero or n >= 0.01:
+        fmt = '%.2f' % n
+    else:
+        # Two significant digits: a cheap call is never painted as 0.
+        import math
+        decimals = min(8, max(4, 1 - math.floor(math.log10(n))))
+        fmt = '%.*f' % (decimals, n)
+        if decimals > 4:
+            fmt = fmt.rstrip('0')
+    sym = CURRENCY_SYMBOLS.get(iso)
+    if not sym:
+        return '%s %s' % (iso, fmt)
+    return '%s %s' % (fmt, sym)
 
 
 def normalize_currency(code):
@@ -74,7 +128,7 @@ def normalize_currency(code):
 
 
 def get_display_currency(env):
-    """Global Chatboo cost-chip currency from AI Engine settings."""
+    """Global cost-chip currency from AI Engine settings."""
     try:
         raw = env['ir.config_parameter'].sudo().get_param(
             ICP_DISPLAY_CURRENCY, 'USD',

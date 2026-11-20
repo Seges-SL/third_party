@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+    <record id="ai_provider_role_conversation" model="ai.provider.role">
+        <field name="code">conversation</field>
+        <field name="module_bg_color">#17a2b8</field>
+        <field name="module_fg_color">#ffffff</field>
+        <field name="name">Conversation</field>
+        <field name="sequence">10</field>
+        <field name="accepts">text</field>
+        <field name="description">Holds the dialogue: the ordinary text turn of a chat. A provider with no role does the same.</field>
+    </record>
+    <record id="ai_provider_role_audio" model="ai.provider.role">
+        <field name="code">audio</field>
+        <field name="module_bg_color">#6f42c1</field>
+        <field name="module_fg_color">#ffffff</field>
+        <field name="name">Audio</field>
+        <field name="sequence">20</field>
+        <field name="accepts">audio</field>
+        <field name="description">Turns a voice clip into text. Saving it sends a silent clip to check the model answers speech.</field>
+    </record>
+    <record id="ai_provider_role_vision" model="ai.provider.role">
+        <field name="code">vision</field>
+        <field name="module_bg_color">#28a745</field>
+        <field name="module_fg_color">#ffffff</field>
+        <field name="name">Vision</field>
+        <field name="sequence">30</field>
+        <field name="accepts">image</field>
+        <field name="description">Reads a photo or a scanned page.</field>
+    </record>
+    <record id="ai_provider_role_video" model="ai.provider.role">
+        <field name="code">video</field>
+        <field name="module_bg_color">#fd7e14</field>
+        <field name="module_fg_color">#ffffff</field>
+        <field name="name">Video</field>
+        <field name="sequence">40</field>
+        <field name="accepts">video</field>
+        <field name="description">Reads a video clip.</field>
+    </record>
+    <record id="ai_provider_role_decision" model="ai.provider.role">
+        <field name="code">decision</field>
+        <field name="module_bg_color">#343a40</field>
+        <field name="module_fg_color">#ffffff</field>
+        <field name="name">Decision</field>
+        <field name="sequence">50</field>
+        <field name="accepts">text</field>
+        <field name="description">Answers a closed Choice (yes or none, with a confidence). The protocol must be able to choose. Nobody holding it means no.</field>
+    </record>
+    <record id="ai_provider_role_design" model="ai.provider.role">
+        <field name="code">design</field>
+        <field name="module_bg_color">#1565c0</field>
+        <field name="module_fg_color">#ffffff</field>
+        <field name="name">Design</field>
+        <field name="sequence">60</field>
+        <field name="accepts">text</field>
+        <field name="fallback_id" ref="ai_provider_role_conversation"/>
+        <field name="description">Lays out a page from the data of a turn. Nobody holding it: Conversation answers.</field>
+    </record>
+    <record id="ai_provider_role_parser" model="ai.provider.role">
+        <field name="code">parser</field>
+        <field name="module_bg_color">#5c6bc0</field>
+        <field name="module_fg_color">#ffffff</field>
+        <field name="name">Parser</field>
+        <field name="sequence">70</field>
+        <field name="accepts">text</field>
+        <field name="fallback_id" ref="ai_provider_role_conversation"/>
+        <field name="description">Turns a short phrase into the fields of a contract (JSON), such as the arguments of a slash. A small model without reasoning is enough. Nobody holding it: Conversation answers.</field>
+    </record>
+</odoo>

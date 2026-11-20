@@ -3,12 +3,10 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """MCP tool to query contexts; the system_prompt case returns the discovery bundle."""
 
-import json
 import logging
 from .mcp_decorators import mcp_tool
 from .controller_helpers import tool_env
 from ..utils.agent_identity import foreign_identity_on_demand_message
-from ..utils.system_info import resource_system_info
 
 _logger = logging.getLogger(__name__)
 
@@ -43,21 +41,21 @@ def refuse_foreign_identity_pack(controller, env, context_code):
 
 def generate_contexts_index_core(available_contexts, max_desc_len=200):
     """
-    Genera un índice compacto de contextos disponibles con estructura por prioridades.
+    Builds a compact index of the available contexts, structured by priority.
     
     Args:
-        available_contexts: Lista de registros de contextos (mcp_context)
-        max_desc_len: Longitud máxima de descripción por contexto (por defecto 80)
+        available_contexts: List of context records (mcp_context)
+        max_desc_len: Max description length per context (default 80)
     
     Returns:
-        str: Índice compacto en formato texto estructurado
+        str: Compact index as structured text
     """
-    lines = ["=== CONTEXTOS DISPONIBLES ==="]
-    lines.append("Usa get_context(context_name='...') para obtener el contenido completo de un contexto.")
-    lines.append("Alternativa: puedes usar prompts/get directamente si prefieres el método estándar MCP.")
+    lines = ["=== AVAILABLE CONTEXTS ==="]
+    lines.append("Use get_context(context_name='...') to read the full content of a context.")
+    lines.append("Alternative: prompts/get, the standard MCP method.")
     lines.append("")
     
-    # Separar contextos por nivel de directiva
+    # Split contexts by directive level
     mandatory = []
     prohibited = []
     required = []
@@ -69,20 +67,20 @@ def generate_contexts_index_core(available_contexts, max_desc_len=200):
     for context in available_contexts:
         context_code = context.code
         
-        # FILTRAR VARIANTES por el campo explícito base_code (no por regex del code)
+        # FILTER VARIANTS by the explicit base_code field (not by a regex on code)
         base_name = context.base_code or context_code
         
         if base_name in seen_bases:
             continue
         seen_bases.add(base_name)
         
-        description = context.description or f'Contexto: {base_name}'
+        description = context.description or f'Context: {base_name}'
         
         # Add auto-resolve hint if it's a base for multiple variants
         if base_name != context_code:
             description += " [AUTO-RESOLVED]"
         
-        # Truncar descripción si es necesario
+        # Truncate the description if needed
         if len(description) > max_desc_len:
             truncated = description[:max_desc_len - 3]
             last_space = truncated.rfind(' ')
@@ -92,7 +90,7 @@ def generate_contexts_index_core(available_contexts, max_desc_len=200):
         
         entry = f"- [ID]: {base_name} | {description}"
         
-        # Detectar nivel de directiva desde la descripción (buscar tags exactos)
+        # Detect the directive level from the description (look for exact tags)
         desc_upper = description.upper()
         if '[MANDATORY]' in desc_upper:
             mandatory.append(entry)
@@ -107,8 +105,8 @@ def generate_contexts_index_core(available_contexts, max_desc_len=200):
         else:
             others.append(entry)
     
-    # Generar índice estructurado siguiendo jerarquía
-    lines.append("Para Consultar: use get_context(context_name='ID')")
+    # Build the structured index following the hierarchy
+    lines.append("To read one: get_context(context_name='ID')")
     lines.append("")
 
     if mandatory:
@@ -141,7 +139,7 @@ def generate_contexts_index_core(available_contexts, max_desc_len=200):
         lines.extend(others)
     
     lines.append("")
-    lines.append("--- FINAL DEL ÍNDICE ---")
+    lines.append("--- END OF INDEX ---")
     return "\n".join(lines)
 
 
@@ -155,6 +153,7 @@ from ..utils.context_utils import strip_xml_metadata
     description='[MANDATORY] Retrieves the content of a specific context on demand. ⚠️ CRITICAL: Use this tool to list or load knowledge packs. Relaxaicode on ai.context is rejected. FIRST, call get_context(context_name="contexts_index_core") to see the REGISTRY of available IDs. Then, call this tool with a real ID from that list. DO NOT GUESS names. DO NOT USE PLACEHOLDERS. Do not dump pack XML; answer from what is already injected, in prose.',
     is_write=False,
     validate_schema=True,
+    expose_mcp=False,
     input_schema={
         "type": "object",
         "properties": {
@@ -172,17 +171,17 @@ from ..utils.context_utils import strip_xml_metadata
 )
 def tool_get_context(controller, arguments: dict) -> dict:
     """
-    Tool: Obtiene el contenido de un contexto específico bajo demanda.
+    Tool: Gets the content of a specific context on demand.
     
     Args:
-        controller: Instancia del controlador MCP
-        arguments: Diccionario con los argumentos:
-            - context_name (str, requerido): Nombre del contexto a consultar
-                Ejemplos: 'relaxaicode_accounting_searches', 'relaxaicode_calendar_events', 
-                'corporative_terms', 'relaxaicode_filters', etc.
+        controller: MCP controller instance
+        arguments: Dictionary with the arguments:
+            - context_name (str, required): Name of the context to look up
+                Examples: 'relaxaicode_accounting_searches', 'relaxaicode_calendar_events', 
+                'corporate_terms', 'relaxaicode_filters', etc.
     
     Returns:
-        dict: Contenido del contexto solicitado en formato MCP estándar
+        dict: Content of the requested context in standard MCP format
     """
     context_name = arguments.get('context_name')
     
@@ -220,33 +219,15 @@ def tool_get_context(controller, arguments: dict) -> dict:
         except Exception as e:
             _logger.error("MCP: Error generating contexts index: %s", str(e))
 
-    # Special case: system://info bridge
-    # Some LLMs try to access the resource via get_context. bridging detailed system info.
-    if context_name == 'system://info':
-        try:
-            env = tool_env(controller, sudo=True)
-            info = resource_system_info(env)
-            return {
-                'content': [
-                    {
-                        'type': 'text',
-                        'text': f"### [Resource: system://info]\n{json.dumps(info, indent=2)}"
-                    }
-                ]
-            }
-        except Exception as e:
-             _logger.error("MCP: Error getting system info in tool: %s", str(e))
-             # Fallback to standard error
-
     # Special case: system_prompt = Discovery Bundle
-    # El Router carga prompts críticos vía get_context; prompts/get usa otra ruta.
-    # Ambas deben devolver el mismo bundle (core+locale+domain según locale).
+    # The Router loads critical prompts via get_context; prompts/get uses another route.
+    # Both must return the same bundle (core+locale+domain by locale).
     if context_name == 'system_prompt':
         try:
             env = tool_env(controller, sudo=True)
             if 'ai.context' not in env:
                 raise ValueError("mcp_context model not available")
-            # Siempre cascada intrínseca (User > Compañía > Default). No payload/router.
+            # Always the intrinsic cascade (User > Company > Default). No payload/router.
             user_lang = controller._get_user_locale()
             mcp_agent = controller._get_mcp_agent_code() if hasattr(controller, '_get_mcp_agent_code') else ''
             if not mcp_agent:
@@ -295,7 +276,7 @@ def tool_get_context(controller, arguments: dict) -> dict:
         if blocked:
             return blocked
         if 'ai.context' in env:
-            # Siempre cascada intrínseca (User > Compañía > Default). No payload/router.
+            # Always the intrinsic cascade (User > Company > Default). No payload/router.
             user_lang = controller._get_user_locale()
 
             # Extract base name (remove _ES, _FR, _es_ES, etc. if present)
@@ -310,7 +291,7 @@ def tool_get_context(controller, arguments: dict) -> dict:
                 
                 # Record usage
                 try:
-                    env['ai.context'].record_context_usage(context.code)
+                    env['ai.context']._record_context_usage(context.code)
                 except Exception as e:
                     _logger.warning("MCP: Error recording context usage: %s", str(e))
                 
@@ -340,7 +321,7 @@ def tool_get_context(controller, arguments: dict) -> dict:
             }
         }
     
-    # Si no se encontró en ningún lugar - mensaje de error mejorado con HINT semántico
+    # Not found anywhere - better error message with a semantic HINT
     return {
         'error': {
             'code': -32602,
@@ -349,54 +330,3 @@ def tool_get_context(controller, arguments: dict) -> dict:
             'system_hint': "SYSTEM HINT: The requested documentation context does not exist. You MUST use 'relaxaicode' to query the Odoo database directly for this information."
         }
     }
-
-
-@mcp_tool(
-    name='get_corporative_terms',
-    description='Gets corporate terms glossary automatically detecting user language. Returns context based on Odoo user language preference (e.g., corporative_terms_es_ES, corporative_terms_en_US). [REQUIRED] Use this instead of get_context("corporative_terms_{locale}") where {locale} is user_lang.',
-    is_write=False,
-    validate_schema=True
-)
-def tool_get_corporative_terms(controller, arguments: dict) -> dict:
-    """
-    Tool: Gets corporate terms glossary with automatic language detection.
-    
-    Automatically detects the Odoo user's language preference and returns the appropriate
-    corporative_terms context (ES for Spanish, EN for English).
-    
-    Args:
-        controller: MCP controller instance
-        arguments: Dictionary (empty, no parameters required)
-    
-    Returns:
-        dict: Content of the corporative_terms context in the user's language
-    """
-    try:
-        # Use the same locale resolution logic as _resolve_locale_placeholders
-        # This provides proper fallback: MCP user -> request.env.user -> 'en_US'
-        user_lang = controller._get_user_locale()
-        
-        # Use user_lang directly to construct context name (e.g., 'es_ES' -> 'corporate_terms_es_ES')
-        # This works with the {locale} resolution system and uses the same fallback logic
-        context_code = f'corporate_terms_{user_lang}'
-        
-        # Detect language for logging
-        if user_lang.startswith('en'):
-            detected_lang = 'English'
-        else:
-            detected_lang = 'Spanish'
-        
-        _logger.info("MCP: Detected user language: %s, using context: %s", user_lang, context_code)
-        
-        # Use get_context internally with the detected context code
-        # The {locale} placeholder will be resolved automatically when serving the context
-        return tool_get_context(controller, {'context_name': context_code})
-        
-    except Exception as e:
-        _logger.exception("MCP: Error in get_corporative_terms: %s", str(e))
-        # Fallback uses the same logic (will default to 'en_US' via _get_user_locale)
-        try:
-            fallback_lang = controller._get_user_locale()
-        except:
-            fallback_lang = 'en_US'  # Ultimate fallback
-        return tool_get_context(controller, {'context_name': f'corporative_terms_{fallback_lang}'})

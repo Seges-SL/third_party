@@ -1,0 +1,304 @@
+# Instalación en LIYBEN: pns_base 1.2.32, pns_ai_mcp 3.1.782 y pns_ai_chatboo 2.1.453 (Odoo 14)
+
+- **Rama:** `14.0-pns-ai-3` (commit `578859b`) · **Fecha de la instalación:** 2026-10-16, Sergio con
+  Claude · **Reunión de seguimiento:** lunes 19/10/2026 (guion en el §5).
+- **Entorno:** base de datos **LIYBEN**, servicio **`odoo14_server`** (imagen `odoo-web`) con su
+  PostgreSQL **`odoo14_db`**, dominio `https://liyben.com`. Es el VPS del staging (plan de staging, §1).
+- **Origen:** [plan de staging](plan_staging_pns_ai.md), §8 (camino A, N6), con las condiciones de N7.
+  Configuración según la [guía de configuración](../specs/guia_configuracion_pns_ai.md); este registro
+  remite a sus secciones (§) y no las copia.
+- **Otras fuentes:** [decisiones](pns_ai_decisiones.md) (N2, N3, N4, N6, N7, N8, N11, N12, D2, D9, D10,
+  D20, D46, PB-2), [parches](parches_pns_ai.md) (1 a 6) y [seguimiento](seguimiento_informe_pns_ai.md).
+- **Actualizado el 20/10/2026** con la reunión del 19/10/2026 (§6).
+- Lo que no tiene respaldo en lo comprobado está marcado **«Pendiente»** (§6).
+- **Sin secretos en este registro:** ni contraseñas, ni claves MCP, ni claves de proveedor, ni PIN.
+
+## Índice
+
+1. Resumen
+2. Comprobaciones previas (solo lectura)
+3. Ejecución (16/10/2026)
+4. Decisiones provisionales (16/10/2026)
+5. Guion para la reunión del lunes
+6. Pendiente
+7. Vuelta atrás
+
+---
+
+## 1. Resumen
+
+Instalación **nueva** (no actualización; los `pns_*` de 3.1.486 se desinstalaron el 15/10/2026) de
+`pns_base` 1.2.32, `pns_ai_mcp` 3.1.782 y `pns_ai_chatboo` 2.1.453 con los **parches 1 a 6** (N2
+revisada), desplegados con la rama `14.0-pns-ai-3` en el clon de `third_party` del VPS (opción B, §4).
+
+| Paso | Resultado |
+|---|---|
+| Comprobaciones previas (§2) | CONFORME, con dos observaciones: usuarios de portal activos (§4) y gestor de bases de datos con el valor por defecto (infraestructura, no se toca) |
+| Copia previa de la BD y del filestore (§3.1) | HECHA |
+| Código: rama `14.0-pns-ai-3` en `578859b` (§3.2) | CONFORME |
+| Nginx: `/chatboo/stream` y `/mcp` (§3.3) | CONFORME |
+| Instalación y log (§3.4) | CONFORME |
+| Retención, política de URL y grupos (§3.5) | CONFORME |
+| Claves MCP (§3.5) | HECHA en la reunión del 19/10/2026 (§6) |
+| Proveedor y cadena del agente | HECHA en la reunión: Gemini y OVH, con failover (§6) |
+| Verificación con el proveedor (parches 5 y 6) | No se hizo (§6) |
+
+Tras la reunión del 19/10/2026, Seges corrige los PNS en la rama y mantiene la 3.1.782 (decisiones
+N11 y N12). LIYBEN recibe cada entrega del [plan de corrección](plan_correccion_pns_ai.md) después de
+validarla en el staging. **Decisión del 20/10/2026:** LIYBEN se actualiza de una vez, al terminar
+todas las entregas y con todo validado en el staging (registro en el §6.2).
+
+---
+
+## 2. Comprobaciones previas (solo lectura)
+
+### 2.1 Servicios y base de datos (D9)
+
+- `odoo14_server` (imagen `odoo-web`) y `odoo14_db` (**PostgreSQL 15.18**).
+- En `odoo14_db` solo existe la base de datos **LIYBEN**: el parche de `http_patch.py` no alcanza a
+  otras bases (D9; guía §3). **Conforme.**
+
+### 2.2 `odoo.conf` (guía §4.3, D15)
+
+| Parámetro | Valor |
+|---|---|
+| `workers` | 2 |
+| `limit_time_real` | 2400 |
+| `limit_time_cpu` | 1200 |
+| `limit_memory_hard` | ~2 GB |
+| `proxy_mode` | `True` |
+| `dbfilter` / `list_db` | sin definir |
+
+**Observación de infraestructura (no se toca):** sin `dbfilter` ni `list_db`, con una sola base de
+datos, el gestor de bases de datos queda con el valor por defecto.
+
+### 2.3 Código
+
+- `/opt/odoo/addons/custom/third_party` es un **clon propio de `Seges-SL/third_party`**, rama `14.0`
+  (`f63d5a1`), limpio, clonado solo con la rama `14.0` (`remote.origin.fetch = refs/heads/14.0`).
+- Propietario: **UID 101** (`odoo` dentro del contenedor; en el host se ve como `messagebus`).
+- `/opt/odoo` es a su vez un repositorio de infraestructura (`odoo-infra-14`).
+- La rama `14.0-pns-ai-3` frente a `f63d5a1`, **fuera de `pns_*` y `docs/`**: solo `.claude/`,
+  `.vscode/`, `.pylintrc`, `ruff.toml`, `CLAUDE.md` y `.gitignore`. **Ningún módulo de LIYBEN cambia.**
+
+### 2.4 Módulos y usuarios
+
+- `pns_*` desinstalados desde el 15/10/2026 (plan de staging, §2.4).
+- **PB-2:** ningún módulo de LIYBEN (OCA/web, LIYBEN, `vertical-instaladores`) sobrescribe
+  `_notifyInvalidFields` ni `_saveMultipleRecords`. **Conforme.**
+- **Usuarios de portal activos: 18.** Último acceso del más reciente: 12/2024 (la mayoría, 2023).
+  Registro web: `b2b` (solo por invitación). Desviación de N7: ver §4.
+
+### 2.5 Proxy y disco
+
+- Nginx de `liyben.com` (`/etc/nginx/conf.d/odoo.conf`, upstream `odoo`): **no tenía**
+  `/chatboo/stream` ni `/mcp`.
+- Logs: `/mcp` solo recibía escaneos automáticos (GET 404) y dos 200 aislados sin patrón de cliente
+  MCP.
+- Disco: **11 GB libres** (86 % ocupado).
+
+---
+
+## 3. Ejecución (16/10/2026)
+
+### 3.1 Copia previa
+
+En `/opt/odoo/backups`:
+
+| Archivo | Tamaño | Comprobación |
+|---|---|---|
+| `LIYBEN_antes_instalar_pns_20261016.dump` | 46 MB | `pg_restore -l` correcto |
+| `LIYBEN_filestore_20261016.tar.gz` | 431 MB | — |
+
+El filestore está en `/opt/odoo/odoo-web-data/.local/share/Odoo/filestore/LIYBEN` (`data_dir` por
+defecto).
+
+### 3.2 Código: rama `14.0-pns-ai-3` en el clon (opción B)
+
+1. Todas las órdenes de git **como el UID 101** (`sudo -u messagebus env HOME=/tmp git …`), para no
+   cambiar el propietario de los archivos.
+2. `fetch` con refspec explícito, porque el clon solo sigue `14.0`:
+   `origin 14.0-pns-ai-3:refs/remotes/origin/14.0-pns-ai-3`.
+3. `checkout -b 14.0-pns-ai-3 578859b` **sin `--track`** (el `--track` falla por el mismo motivo).
+4. Comprobaciones (**conformes**):
+   - rama `14.0-pns-ai-3` en `578859b`, `status` limpio;
+   - **10 líneas** de «Seges: parche de compatibilidad» (orden de la cabecera de
+     [parches_pns_ai.md](parches_pns_ai.md));
+   - hashes de árbol de `pns_base`, `pns_ai_mcp` y `pns_ai_chatboo` **iguales a los de `63ee2dc`**
+     (lo validado en staging).
+5. La rama `14.0` **no se ha tocado**.
+
+### 3.3 Nginx (guía §4.3, D20)
+
+1. Copia: `/etc/nginx/conf.d/odoo.conf.bak-20261016`.
+2. En el `server` HTTPS de `liyben.com`, **antes de `location /`**:
+   - `location ^~ /chatboo/stream`: `proxy_pass http://odoo`, `proxy_buffering off`,
+     `proxy_cache off`, `gzip off`, `proxy_read_timeout 900s`;
+   - `location ^~ /mcp { return 404; }` (D20: sin cliente MCP externo).
+3. `nginx -t` correcto y recarga (`reload`).
+4. Comprobado: `POST /mcp` → 404; `liyben.com/web/login` → 200; `pns.liyben.com/web/login` → 200.
+
+### 3.4 Instalación (guía §6)
+
+1. Reinicio de `odoo14_server` sin errores.
+2. Instalación de **AI Engine** y **Chatboo** desde Aplicaciones; nuevo reinicio.
+3. Comprobaciones (**conformes**):
+   - módulos `installed` en `14.0.1.2.32`, `14.0.3.1.782` y `14.0.2.1.453`;
+   - **seis crons activos** con `numbercall` -1 (intervalos 5 min, 1 h, 1 h, 1 día, 5 min, 1 h);
+   - 0 proveedores;
+   - log sin `Traceback`, `ERROR` ni `CRITICAL`.
+
+### 3.5 Configuración (guía §7, §9 y §11)
+
+| Ajuste | Valor |
+|---|---|
+| `pns_ai_mcp.log_retention_days` | 30 |
+| `pns_ai_chatboo.history_retention_days` | 30 |
+| `url_access_policy` | `whitelist_only` |
+
+- **Usuarios:** `fran.odoo@seges.es` y `sguerrero@liyben.com` con `group_system`, `group_ai_admin`,
+  `group_ai_writer`, `group_ai_external_url` y `group_ai_conversational`.
+- Hay un **tercer `ai.mcp.user`** (`soporte@liyben.com`) sin clave ni PIN.
+- **Claves MCP: Pendiente** (§5 a).
+- **Ningún PIN generado** (N4).
+
+---
+
+## 4. Decisiones provisionales (16/10/2026)
+
+Decisiones de Sergio, provisionales hasta la reunión (§5 f).
+
+| Tema | Decisión provisional | Impacto | A decidir en la reunión |
+|---|---|---|---|
+| **Usuarios de portal** (N7) | Se mantienen los 18 | Desviación de la condición «sin portal» de N7 (N3 b; guía §2.1). PNS-83 cubierto porque no se usa la mesa de PIN; **PNS-90 y PNS-91 abiertos** | Propuesta: **archivarlos** (sin acceso desde 12/2024). Antes de la demo, la consulta del §5 e) |
+| **Proveedor** (N8, D10) | Gemini `gemini-3.5-flash-lite` | **D10 pendiente:** datos reales de LIYBEN hacia un proveedor externo; condiciones de uso de datos del nivel gratuito por comprobar | Propuesta: clave nueva en otro proyecto de Google y cadena con dos proveedores (`3.5-flash-lite` y, de respaldo, `3.5-flash`) |
+| **Despliegue del código** | Rama `14.0-pns-ai-3` en el clon (opción B, §3.2) | El clon no está en `14.0` | Integrar la rama en `14.0` (PR) y volver el clon a `14.0` |
+
+---
+
+## 5. Guion para la reunión del lunes
+
+En este orden. Los pasos a) a d) se hacen en la interfaz de LIYBEN o en el VPS; e) es solo lectura.
+
+**a) Claves MCP.** Si no están generadas, generarlas con el **asistente de la ficha** del usuario MCP
+(guía §7.1). **Nunca «Regenerate PIN»** (N4; incidencia del staging, plan de staging §6.1).
+
+**b) Proveedor y cadena del agente (guía §8 y §8.1).**
+1. Clave de Gemini (según lo que se decida en el §4).
+2. Dos proveedores **creados desde cero**, cada uno con:
+   - protocolo `openai`;
+   - endpoint `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`;
+   - capacidades **Conversation + Vision**, sin audio;
+   - **Test Connection** correcto.
+3. Cadena del agente Chatboo: primero **Flash Lite** y después **Flash**.
+
+**c) Lista blanca (guía §9).** Borrar los dos dominios de Open-Meteo de la lista blanca (quedan 2
+activos).
+
+**d) Verificación.**
+1. Una pregunta con **consulta de datos** (parche 5).
+2. Una **imagen pequeña adjunta**, fin de turno **sin recargar** la página, y después esta consulta
+   (parche 6). Criterio: **ninguna fila `idle in transaction` ni esperas de lock**.
+
+```bash
+docker exec -i odoo14_db sh -c 'psql -U "$POSTGRES_USER" -d LIYBEN' <<'SQL'
+SELECT pid, state, xact_start, wait_event_type, wait_event, pg_blocking_pids(pid) AS bloqueado_por, left(query,120) AS query FROM pg_stat_activity WHERE datname='LIYBEN' AND state <> 'idle' ORDER BY xact_start;
+SQL
+```
+
+**e) Detección de uso por portal antes de la demo.** Filas creadas o modificadas por usuarios de
+portal (solo lectura). Criterio: sin filas.
+
+```bash
+docker exec -i odoo14_db sh -c 'psql -U "$POSTGRES_USER" -d LIYBEN -At' <<'SQL'
+SELECT 'fetch_cache', c.id, c.create_date, c.write_date FROM ai_fetch_cache c JOIN res_users u ON u.id IN (c.create_uid, c.write_uid) WHERE u.share;
+SELECT 'whitelist', w.id, w.create_date, w.write_date FROM ai_url_whitelist w JOIN res_users u ON u.id IN (w.create_uid, w.write_uid) WHERE u.share;
+SQL
+```
+
+**f) Decisiones para el jefe.**
+- **D10:** proveedor y datos reales de LIYBEN.
+- **D46:** quién tiene acceso.
+- **Usuarios de portal** (N7): mantenerlos o archivarlos (§4).
+- **Proveedor definitivo:** OVH en estudio (N8).
+- **Presupuesto.**
+- **Envío del informe al fabricante** (D2).
+- **Limpieza del staging** (plan de staging, §9).
+
+Anotar el resultado de cada paso en este documento (§6).
+
+---
+
+## 6. Resultados de la reunión y pendiente
+
+### 6.1 Reunión del 19/10/2026
+
+Detalle y decisiones en [decisiones](pns_ai_decisiones.md), §10.
+
+| Paso del guion (§5) | Resultado |
+|---|---|
+| a) Claves MCP | Generadas para `fran.odoo@seges.es` y `sguerrero@liyben.com` (con el asistente; sin PIN) |
+| b) Proveedor y cadena | Gemini (nivel gratuito) y OVH configurados. Cadena del agente con failover: primero Gemini y después OVH |
+| c) Lista blanca (Open-Meteo) | No se registró |
+| d) Verificación (parches 5 y 6, `pg_stat_activity`) | No se hizo |
+| e) Uso por portal | No se hizo |
+| f) Decisiones | D10 aceptada (proveedores actuales y futuros); D46 y D4: clave MCP y AI Administrator solo para los dos usuarios; portal: se archivan los 18 (la cifra del 16/10 suma 10 usuarios de portal y 8 externos sin grupo de portal; se archivaron los 18 el 23/10/2026, ver §6.2); D12: sin tope por ahora; D2: informe al final, sin código; D15: más adelante; limpieza del staging al terminar el plan de corrección; Seges corrige los PNS (N11) y mantiene la 3.1.782 (N12) |
+
+### 6.2 Pendiente
+
+| Tema | Estado | Dónde |
+|---|---|---|
+| Archivar los 18 usuarios de portal | Hecho el 23/10/2026, 14:17 (interfaz, usuario soporte@liyben.com). Comprobado por SQL: 0 usuarios externos activos. IDs: de portal, 8, 9, 11, 12, 13, 14, 15, 16, 27 y 28; externos sin grupo de portal, 10, 17, 19, 20, 21, 22, 23 y 24 | N7 |
+| Despliegue de las correcciones (parches 7 en adelante) | Al terminar el plan, de una vez y con todo validado en el staging (se registra aquí: commit, fecha y comprobación). **Hecho el 20/11/2026:** rama `14.0-pns-ai-3973`, commit `3df4307129a44719a27dd30c12dd479ab0335a6b` (D58), ensayado sobre una copia de LIYBEN el 19/11 (D56). LIYBEN en 14.0.1.2.69 / 14.0.3.1.973 / 14.0.2.1.587; corte del servicio de 10:42:25 a 10:55:23 UTC (12 min 58 s); E0 a L8, F1 y F2 con `TODO OK`. Comprobación: «antes» y «después» por SQL (L0 y L6), log del `-u` y del arranque (L4, L8) e interfaz (L7). Resultado, INFO y lo que queda, en G del documento | [plan de corrección](plan_correccion_pns_ai.md), §3; [documento de despliegue](liyben_3973.md); [plan de la 3973](plan_correccion_pns_ai_3973.md), «Tras el `-u`» |
+| En el despliegue: copia completa antes del `-u` (D57) | BD y filestore por SSH al equipo, con el web parado, antes de D50, del `checkout` y del `-u`. Hecha el 20/11/2026 (`LIYBEN-antes-20261120-114331.dump` y `LIYBEN-filestore-antes-20261120-114331.tar`, en el equipo; se conservan al menos hasta terminar el uso real). **Tras el uso real (20/11/2026):** se conservan hasta la limpieza final; ya no son una vuelta atrás limpia (restaurarlas perdería lo hecho después) | [documento de despliegue](liyben_3973.md), L3 y H |
+| En el despliegue: AI Administrators (D64) y ficha 26 (D61) | Se quedan los 3 (ids 2, 6 y 7). El 2 no tiene AI Conversational y lo gana fijo en el `-u` (no se puede quitar). La ficha 26 (usuario sin AI Administrator) pasa al uso real; en el despliegue, solo el SQL de AI Conversational (L0 y L6). Hecho el 20/11/2026: los 3 con AI Conversational (L6, P-11 `3|0`). **Ficha 26 en el uso real (20/11/2026): no aplica en LIYBEN.** Los tres internos activos (2, 6 y 7) son AI Administrators y tienen AI Conversational por la implicación; reproducirla exigiría crear un usuario o quitar un grupo en producción. Pasa al laboratorio, con `shell` y `rollback` y un usuario sin AI Administrator, antes del informe (decisión 5; decisión de Sergio, opción c) | [documento de despliegue](liyben_3973.md), L0, L6 y H |
+| Claves MCP (D60) | Revocadas el 27/10/2026; no se regeneran en el despliegue (Nginx da 404 en `/mcp`, D20). **Uso real (20/11/2026):** se mantiene que no se regeneran. Una clave generada durante U1 (usuario MCP 3, usuario 6, 11:45:14 UTC) se borró a las 11:55:13 con el asistente (decisión de Sergio, opción b); comprobado por SQL sin leer el hash: los tres usuarios MCP en «Not generated» y sin hash | [documento de despliegue](liyben_3973.md), H |
+| Uso real | **Hecho el 20/11/2026:** Chatboo responde con el proveedor 2 y sin botón Canvas (D62: el proveedor 1, único con Diseño, sigue inactivo); cadena de Chatboo con la fila 3 (quitada en L7 y añadida de nuevo, sin efecto); las 3 traducciones de más, identificadas (un módulo OCA no instalado) | [documento de despliegue](liyben_3973.md), H |
+| Antes del `-u`: D50, vaciar los 7 tokens de registro; antes, comprobar en `cc0060e` qué hace `signup_cancel` de `auth_signup` | Comprobado el 19/11/2026: se vacían los 8 (los 7 de la 3b y un `reset` caducado de un interno) con `liyben_3973/d50_vaciar.sh` (`d50_vaciar VACIAR`) justo antes del `-u`; ensayo en LIYBEN OK (D50, Sergio, 18/11/2026; detalle en «D50 hecho»). Vaciados el 20/11/2026 a las 10:46:55 UTC (L4: 8 vaciados, `COMMIT`, 0 después) | [plan_correccion_pns_ai_3973.md](plan_correccion_pns_ai_3973.md), «Tras el `-u`» |
+| Integrar en `14.0` (merge commit) y volver el clon a `14.0` | Al terminar el plan de corrección | §4; plan de corrección §3 |
+| Limpieza del staging | Al terminar el plan de corrección | plan de staging, §9 |
+| D15 (infraestructura) | Se decide más adelante | decisiones, D15 |
+
+**Archivado de los usuarios externos (23/10/2026).** La cifra «18» del 16/10 (§2.4) suma:
+
+- **10 usuarios de portal** (`base.group_portal`): IDs 8, 9, 11, 12, 13, 14, 15, 16, 27 y 28.
+- **8 usuarios externos (share) sin grupo de portal**, con `base.group_public` y grupos de opciones de
+  presentación, con contraseña y sin conexiones desde 07/2023: IDs 10, 17, 19, 20, 21, 22, 23 y 24.
+
+Ninguno de los 18 se había conectado en los últimos 90 días. `ai_fetch_cache` y `ai_url_whitelist` no
+tenían filas creadas por usuarios externos.
+
+Procedimiento seguido:
+
+1. **Antes:** consulta de solo lectura con los usuarios, su última conexión, sus grupos y sus filas en
+   `ai_fetch_cache` y `ai_url_whitelist`.
+2. **Interfaz:** Ajustes › Usuarios › archivar los 18.
+3. **No borrar nunca:** hay borrados en cascada y `ai_change_journal` tiene `restrict`.
+4. **Después:** comprobar por SQL que no queda ningún usuario externo activo (activos, solo los 3
+   internos).
+
+Lo que **no** hace archivar:
+
+- Las claves `ai.mcp.user` se conservan, pero `/mcp` rechaza a los usuarios inactivos.
+- El contacto sigue activo.
+- Los seguidores siguen recibiendo correo.
+- Los enlaces con `access_token` siguen abriendo.
+
+**Aparcado (decide el jefe):** retirar a esos contactos como seguidores e invalidar los `access_token`
+de sus documentos. Archivar no lo hace y no afecta a `pns_*`.
+
+---
+
+## 7. Vuelta atrás
+
+Operaciones destructivas: se describen, no se dan listas para pegar. Las decide y hace quien administra
+el VPS.
+
+1. **Base de datos:** restaurar `LIYBEN_antes_instalar_pns_20261016.dump` y el filestore de
+   `LIYBEN_filestore_20261016.tar.gz` (§3.1); o, como alternativa, desinstalar los módulos.
+2. **Código:** `git checkout 14.0` en el clon, **como el UID 101** (§3.2).
+3. **Nginx:** restaurar `/etc/nginx/conf.d/odoo.conf.bak-20261016`, comprobar con `nginx -t` y, solo si
+   es correcto, recargar.
+4. **Odoo:** reiniciar `odoo14_server`.
+5. **Usuarios externos archivados (§6.2):** se deshace desarchivando esos IDs (Ajustes › Usuarios ›
+   filtro «Archivados» › Desarchivar).

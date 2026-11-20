@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-# Archivo: utils/ui_feedback.py
-# Descripción: Informes HTML y notificaciones cliente genéricas (import/restore/export).
+"""Generic HTML reports and client notifications (import / restore / export)."""
 
 import html as html_lib
+
+from odoo import _
 
 
 def _e(text):
@@ -12,7 +13,7 @@ def _e(text):
 
 
 def derive_result_status(errors, success_count, extra_warnings=None):
-    """Clave de estado para vistas XML: success | warning | danger."""
+    """Status key for XML views: success | warning | danger."""
     errors = list(errors or [])
     extra_warnings = list(extra_warnings or [])
     if errors and not success_count:
@@ -31,7 +32,7 @@ def derive_operation_status(
     success_text,
     extra_warnings=None,
 ):
-    """Devuelve (alert_class, fa_icon, status_text, notification_type)."""
+    """Return (alert_class, fa_icon, status_text, notification_type)."""
     status = derive_result_status(errors, success_count, extra_warnings=extra_warnings)
     if status == 'danger':
         return 'alert-danger', 'fa-times-circle', failed_text, 'danger'
@@ -70,9 +71,9 @@ def build_operation_report_html(
     max_errors=10,
     max_warnings=10,
 ):
-    """Informe HTML estándar para wizards de operación masiva.
+    """Standard HTML report for bulk-operation wizards.
 
-    sections: lista de {'title': str, 'rows': [(label, value), ...]}
+    sections: list of {'title': str, 'rows': [(label, value), ...]}
     """
     html = '<div style="font-size:13px;">'
     if title:
@@ -93,14 +94,14 @@ def build_operation_report_html(
 
     warnings = list(warnings or [])
     if warnings:
-        html += '<h6>%s</h6><ul>' % _e('Warnings')
+        html += '<h6>%s</h6><ul>' % _e(_('Warnings'))
         for warning in warnings[:max_warnings]:
             html += '<li>%s</li>' % _e(warning)
         html += '</ul>'
 
     errors = list(errors or [])
     if errors:
-        html += '<h6>%s</h6><ul>' % _e('Errors')
+        html += '<h6>%s</h6><ul>' % _e(_('Errors'))
         for error in errors[:max_errors]:
             html += '<li>%s</li>' % _e(error)
         html += '</ul>'
@@ -113,14 +114,14 @@ def build_operation_report_html(
 
 
 def build_plain_operation_message(header, rows, errors=None, max_errors=5):
-    """Texto plano para toasts (display_notification)."""
+    """Plain text for toasts (display_notification)."""
     lines = [header]
     for label, value in rows or []:
         lines.append('%s: %s' % (label, value))
     errors = list(errors or [])
     if errors:
         lines.append('')
-        lines.append('Errors (%s):' % len(errors))
+        lines.append(_('Errors (%s):') % len(errors))
         for err in errors[:max_errors]:
             lines.append('  • %s' % err)
     return '\n'.join(lines)
@@ -134,7 +135,7 @@ def client_notification(
     sticky=True,
     reload=False,
 ):
-    """Acción ir.actions.client display_notification con reglas PNS por defecto."""
+    """ir.actions.client display_notification action with the PNS defaults."""
     params = {
         'title': title,
         'message': message,

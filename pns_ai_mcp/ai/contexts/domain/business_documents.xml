@@ -3,7 +3,7 @@
     <metadata>
         <code>business_documents</code>
         <tipo>domain</tipo>
-        <description>Read, create and modify business documents (quotations, orders, invoices, pickings)</description>
+        <description>Read, create and modify business documents (quotations, orders, invoices, pickings); a vendor bill proposed from a supplier's invoice or receipt attached to the conversation; a card terminal slip checked against the bills already booked</description>
     </metadata>
 
     <domain_knowledge>
@@ -52,6 +52,128 @@
                         field exists (field in env[line_model]._fields).
                         Do not write the product list price. Cite only the
                         document header, not the product and not the line.
+                    </convention>
+                </conventions>
+            </document>
+            <document type="vendor_bill" model="account.move">
+                <!-- A supplier's bill attached to the conversation (PDF, spreadsheet,
+                     scan or photo already transcribed) becomes a draft vendor bill
+                     the person confirms. Nothing is posted here. -->
+                <conventions>
+                    <convention name="from_attached_document">
+                        The source is the attached document (documents(),
+                        read_document(name)).                         Read from it: the issuer (name,
+                        tax id if printed, address), the supplier's invoice
+                        number, the bill date, the currency, each tax printed
+                        (its name or rate, the base it applies to, its amount),
+                        any withholding, and the total. Tax names differ by
+                        country (VAT, GST, HST, sales tax, IVA, consumption
+                        tax, …): a tax is whatever the document prints as one.
+                        The buyer printed on the document is the user's own
+                        company: never the vendor. What is not printed is not
+                        invented: say what is missing.
+                    </convention>
+                    <convention name="vendor_lookup">
+                        Before proposing, look the issuer up in res.partner by
+                        tax id when the document prints one (vat, compared
+                        without spaces, dashes or the country prefix), then by
+                        name (ilike on the significant words). Many countries
+                        do not print the issuer's tax id on bills or receipts:
+                        a name match is then normal, not a warning. One match
+                        is partner_id. No match: the first
+                        step of the same plan creates the contact (name, vat,
+                        street, zip, city, country_id, supplier_rank=1 when the
+                        field exists) with ref='vendor', and the bill step uses
+                        "partner_id": "$vendor". Never create a contact that
+                        already exists; several matches are a question, not a
+                        guess.
+                    </convention>
+                    <convention name="draft_bill">
+                        One create of account.move: move_type='in_invoice'
+                        ('in_refund' for a credit note), partner_id,
+                        invoice_date, ref = the supplier's invoice number, and
+                        invoice_line_ids in the same vals (command 0), one line
+                        per distinct base: name = the concept printed on the
+                        document (or the invoice number), quantity 1,
+                        price_unit = that base, tax_ids = the company's purchase
+                        taxes that reproduce what the document prints on that
+                        base, account_id = the expense account the last posted
+                        bills of that vendor used; without history, the expense
+                        account most used on the company's posted vendor bills;
+                        without any, leave account_id out and Odoo fills its
+                        default. Always a draft: never post, never register a
+                        payment.
+                    </convention>
+                    <convention name="taxes">
+                        Taxes are account.tax with type_tax_use='purchase' and
+                        active, of the company. One tax printed on a base: the
+                        tax whose amount is that rate. Several taxes printed on
+                        the same base (GST + PST, CGST + SGST, state + county
+                        sales tax, …): either one group tax
+                        (amount_type='group') whose children match those rates,
+                        or the several taxes together in tax_ids of that one
+                        line; never one line per tax, that would count the
+                        base twice. A document with no tax at all: a line
+                        without tax_ids, and say so. A printed withholding
+                        (retención, ritenuta, TDS, …): a purchase tax with a
+                        negative amount equal to that rate, in tax_ids of the
+                        line; if the company has none, leave it out, say it,
+                        and note the total will differ from the document by
+                        that amount. When no tax of the company reproduces the
+                        printed amounts, propose the line without tax_ids and
+                        say which tax is missing; never pick a tax whose
+                        figures do not match the document.
+                    </convention>
+                    <convention name="currency">
+                        A document in a currency other than the company's
+                        (env.company.currency_id) sets currency_id on the
+                        account.move to that res.currency (active, by ISO
+                        code or symbol as printed), and the amounts stay as
+                        printed. Never convert them.
+                    </convention>
+                    <convention name="duplicates_first">
+                        Before proposing, search bills of that vendor
+                        (partner_id child_of, state != 'cancel') with the same
+                        ref, or the same amount_total and invoice_date. If one
+                        exists, name it and propose nothing for that document
+                        unless the person insists.
+                    </convention>
+                    <convention name="one_plan_per_document">
+                        Several attached documents: one plan per document. The
+                        vendor step and the bill step of one document go in the
+                        same plan; two bills never do. The plan title names the
+                        file, the vendor and the total, so the person knows what
+                        each Confirm does.
+                    </convention>
+                    <convention name="receipt">
+                        A till receipt (simplified invoice) is a vendor bill
+                        too: the shop is the vendor, the receipt number is ref,
+                        the receipt date is invoice_date. A receipt that
+                        prints subtotal and tax apart is read as a bill. One
+                        that prints only a tax-inclusive total and the rate
+                        («tax incl.», «IVA incluido», «税込» and the like):
+                        base = total / (1 + rate), tax = total - base, one
+                        line. When it prints neither a breakdown nor a rate,
+                        ask which rate before proposing; never guess the rate.
+                        A receipt without the shop's tax id gets its vendor by
+                        name.
+                    </convention>
+                    <convention name="card_slip">
+                        A card terminal slip (merchant, amount, card ending,
+                        authorisation code, no tax id, no tax breakdown) is proof
+                        of a payment, not a bill. Never create a bill from it.
+                        Search bills (in_invoice, state != 'cancel') with that
+                        amount_total and that date, or the day before or after,
+                        and whose partner name shares the merchant's significant
+                        words; answer whether one is booked and whether it is
+                        paid (payment_state). None: say the slip proves the
+                        payment and the receipt or invoice is still needed to
+                        book the expense. No plan.
+                    </convention>
+                    <convention name="questions">
+                        «Is this one already booked?» is a read: answer with the
+                        matching bills, or none, and no plan. «Create the
+                        contact» is the vendor step alone.
                     </convention>
                 </conventions>
             </document>

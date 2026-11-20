@@ -49,7 +49,7 @@ def _looks_like_data_dump(text):
         return True
     if s.count('{') + s.count('[') >= 2:
         return True
-    # Una barra de progreso es una sola frase; varias oraciones = rumiar detalle.
+    # A progress bar is a single phrase; several sentences = chewing over detail.
     if sum(s.count(c) for c in '.!?。') >= 2:
         return True
     return False
@@ -82,14 +82,17 @@ def user_visible_round_text(content, has_tool_calls):
 
 def should_block_progress_as_final(
     content, *, has_tool_calls, has_pending_retry, rounds_left,
+    has_hidden_reasoning=False,
 ):
-    """True when progress chatter must not end the turn after a tool failure.
+    """True when progress chatter must not end the turn.
 
-    Invariant: after a retryable tool error, a short progress-shaped line
-    without tool_calls is not a user answer (e.g. «Corrijo… y vuelvo a
-    generar el mapa» with no second relaxaicode call).
+    After a retryable tool error, or when the model hid a reasoning
+    channel (OpenRouter ``reasoning`` / ``<think>``) and only a short
+    progress line landed in ``content``, that line is not the answer.
     """
-    if has_tool_calls or not has_pending_retry or not rounds_left:
+    if has_tool_calls or not rounds_left:
+        return False
+    if not has_pending_retry and not has_hidden_reasoning:
         return False
     return pretool_progress_status(content) is not None
 
@@ -99,14 +102,25 @@ def should_block_progress_as_final(
 # without collapsing to the greeting one-liner. Longer stall essays still bounce.
 _FINISHED_PROSE_MAX_CHARS = 1200
 
+PROGRESS_FILLER_NUDGE = (
+    "STOP: that line is not the answer the user should read. "
+    "Write the reply now. Do not describe that you are still composing. "
+    "If this turn is a greeting, who-you-are, or scope/limits, answer in "
+    "prose. If it needs data or an action, call a tool."
+)
+
 NO_TOOL_FINAL_NUDGE = (
-    "STOP: if the user asked for Odoo data or an action, call a tool NOW "
-    "(propose_safe_operations for supervised writes including op=action, or "
-    "relaxaicode for reads). Do not repeat a previous assistant reply and "
-    "do not re-introduce yourself. If this turn is only a greeting, "
-    "who-you-are, or scope/limits (no data/action), write a FRESH prose "
-    "reply for THIS question — do not collapse it to the greeting "
-    "one-liner, do not refuse, and do not add a policy line."
+    "STOP: the user may have agreed to what YOU just offered, not started "
+    "a new request. If that offer was Odoo data or an action, or if this "
+    "message asks for data/action, call a tool NOW "
+    "(safe_plan_request for supervised writes including op=action, or "
+    "relaxaicode for reads). Do not parse a short assent as a query. "
+    "Do not repeat a previous assistant reply and do not re-introduce "
+    "yourself. If this turn is only a greeting, who-you-are, scope/limits, "
+    "or they answered a conversational question you asked (no data/action "
+    "offered), write a FRESH prose reply for THIS question — do not "
+    "collapse it to the greeting one-liner, do not refuse, and do not "
+    "add a policy line."
 )
 
 # International file-type tokens (not locale words). Same family as export.
@@ -116,12 +130,43 @@ _WORK_FILE_RE = re.compile(
 _WORD_RE = re.compile(r'[^\W_]+', re.UNICODE)
 _MD_MARK_RE = re.compile(r'[*_`#]+')
 
+# Question-mark glyphs (not locale words). Same family as file-type tokens.
+# ASCII, inverted, fullwidth, Arabic. Not ';' (shares the glyph with semicolon).
+_QUESTION_MARK_GLYPHS = frozenset('?¿？؟')
 
-def user_turn_looks_like_work(user_message):
+
+def _has_question_mark_glyph(text):
+    return bool(text) and not _QUESTION_MARK_GLYPHS.isdisjoint(text)
+
+
+def _last_assistant_text(prior_assistant):
+    if not prior_assistant:
+        return ''
+    if isinstance(prior_assistant, str):
+        return strip_think_blocks(prior_assistant).strip()
+    for item in reversed(list(prior_assistant)):
+        if isinstance(item, dict):
+            text = item.get('content') or ''
+        else:
+            text = item or ''
+        text = strip_think_blocks(text).strip()
+        if text:
+            return text
+    return ''
+
+
+def user_turn_looks_like_work(user_message, prior_assistant=None):
     """True when the utterance is shaped like data/action, not a greeting.
 
     Structural only: digits, file-type tokens, slash commands, or a
-    multi-token statement with no ``?``. No language word list.
+    multi-token statement with no question-mark glyph. No language word list.
+
+    Exception: a statement that answers the last assistant bubble (that
+    bubble has a question-mark glyph) is not work-shaped unless it also
+    has a hard marker. The words are assent, not a new query. If the
+    offer was instance data or an action, the model still calls a tool
+    because of the offer — the gate must not treat the assent as the
+    request text.
     """
     raw = (user_message or '').strip()
     if not raw:
@@ -133,7 +178,9 @@ def user_turn_looks_like_work(user_message):
     if raw.lstrip().startswith('/') or re.search(r'\s/\w', raw):
         return True
     tokens = _WORD_RE.findall(raw)
-    if len(tokens) >= 3 and '?' not in raw and '？' not in raw:
+    if len(tokens) >= 3 and not _has_question_mark_glyph(raw):
+        if _has_question_mark_glyph(_last_assistant_text(prior_assistant)):
+            return False
         return True
     return False
 
@@ -168,6 +215,51 @@ def is_prior_prose_echo(content, prior_texts, *, min_chars=40):
     return False
 
 
+def prior_turn_has_delivered_body(prior_assistant):
+    """True when the last assistant bubble already delivered a body.
+
+    Structural only: a markdown table, or prose longer than a greeting /
+    scope list. A follow-up can then close without a tool (the read
+    already happened). A who-are-you bubble does not qualify.
+    """
+    last = _last_assistant_text(prior_assistant)
+    if not last:
+        return False
+    if '|---' in last or '| ---' in last:
+        return True
+    return len(last) > _FINISHED_PROSE_MAX_CHARS
+
+
+_DISPLACED_THIN_CHARS = 280
+
+
+def recover_displaced_turn_body(messages, current, *, thin_limit=_DISPLACED_THIN_CHARS):
+    """Reuse this turn's earlier assistant body when a thin closer replaced it.
+
+    Same job as ``recover_turn_report_body``, without a report outline:
+    a bounced first-round table must not lose to «tell me the next step».
+    """
+    current = strip_think_blocks(current or '').strip()
+    if current and len(current) > thin_limit:
+        return current
+    best = ''
+    for msg in messages or []:
+        if not isinstance(msg, dict) or msg.get('role') != 'assistant':
+            continue
+        text = strip_think_blocks(msg.get('content') or '').strip()
+        if not text or text == current:
+            continue
+        if pretool_progress_status(text) is not None:
+            continue
+        if len(text) > len(best):
+            best = text
+    if not best or len(best) <= len(current):
+        return current
+    if current and current not in best:
+        return best.rstrip() + '\n\n' + current
+    return best
+
+
 def announced_tool_names(content, tool_names):
     """True when prose cites a schema tool name but issued no tool_calls."""
     s = (content or '').lower()
@@ -183,6 +275,7 @@ def announced_tool_names(content, tool_names):
 def should_block_no_tool_as_final(
     *, has_tool_calls, is_first_round, rounds_left, has_tools,
     content='', tool_names=(), user_message='', prior_assistant=(),
+    inline_file_text=False,
 ):
     """True when round 1 with tools in the payload has zero tool_calls.
 
@@ -191,10 +284,18 @@ def should_block_no_tool_as_final(
     CRUD and op=action share the same horn.
 
     Shape exception (language-agnostic): on a non-work utterance, finished
-    prose that does not name a tool is a greeting, who-are-you, or
-    scope/limits answer and may close (up to ``_FINISHED_PROSE_MAX_CHARS``).
-    Work-shaped utterances, prior-bubble echoes, progress one-liners,
-    tool-name mentions, and long stall essays still bounce.
+    prose that does not name a tool is a greeting, who-are-you,
+    scope/limits, or an answer to the last assistant question and may
+    close (up to ``_FINISHED_PROSE_MAX_CHARS``).
+    Work-shaped utterances, prior-bubble echoes, tool-name mentions,
+    and long stall essays still bounce. A one-line reply on a non-work
+    turn (assent to the last question) may close; the same one-liner
+    on a work turn still bounces because the turn is work-shaped.
+
+    File text already in the prompt, or a prior bubble that already
+    delivered a body, is the read: a long no-tool reply is that answer
+    (not a missing ORM call). Progress one-liners and tool-name teases
+    still bounce.
     """
     if (
         not has_tools
@@ -206,11 +307,21 @@ def should_block_no_tool_as_final(
     text = strip_think_blocks(content or '').strip()
     if announced_tool_names(text, tool_names):
         return True
-    if pretool_progress_status(text):
-        return True
     if is_prior_prose_echo(text, prior_assistant):
         return True
-    if user_turn_looks_like_work(user_message):
+    already_read = inline_file_text or prior_turn_has_delivered_body(
+        prior_assistant,
+    )
+    if already_read and text:
+        if pretool_progress_status(text) is not None:
+            return True
+        # Greeting one-liners stay under the status-bar bound; a file
+        # or follow-up answer is longer and is already the read.
+        if len(text) > _STATUS_MAX_CHARS:
+            return False
+    if user_turn_looks_like_work(
+        user_message, prior_assistant=prior_assistant,
+    ):
         return True
     if text and len(text) <= _FINISHED_PROSE_MAX_CHARS:
         return False

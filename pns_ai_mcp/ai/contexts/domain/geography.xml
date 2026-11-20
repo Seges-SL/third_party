@@ -4,10 +4,10 @@
         <code>geography</code>
         <tipo>domain</tipo>
         <description>Geographic knowledge - country/province/city model, administrative levels (region is NOT a state), resolution funnel, and HONEST handling of missing geo data (report, never invent)</description>
-        <version>1.1</version>
+        <version>1.2</version>
         <created_at>2026-07-13</created_at>
         <created_by>Administrator</created_by>
-        <modified_at>2026-07-13</modified_at>
+        <modified_at>2026-09-20</modified_at>
         <modified_by>Administrator</modified_by>
     </metadata>
 
@@ -40,6 +40,7 @@
                 <rule>Match place names PRECISELY. Use an anchored/exact match — e.g. ('name', '=ilike', term) — NEVER a bare substring ('name', 'ilike', term) with limit=1, which grabs the first unrelated row that merely CONTAINS the text (real failures: 'linares' -&gt; "Embalse de Linares" in Segovia; 'ronda' -&gt; "Artatza Foronda" in Álava).</rule>
                 <rule>Filter by country when known (e.g. ('country_id.code', '=', 'ES')) to avoid homonyms in other countries.</rule>
                 <rule>If a term returns 0 matches, or MORE than one plausible match, do NOT pick one at random: report that item as "no encontrada" / "ambigua". A per-item "no encontrada" is a correct, expected outcome — never disguise it, and NEVER claim "all found" or "all have a province assigned" when some items did not resolve.</rule>
+                <rule>When the term is ambiguous, SHOW the candidates instead of only naming the problem: rows with `id`, the place name and what separates them (country, parent state), so the user can point at one. A homonym in two countries and a bilingual spelling are the usual cases. See the core rule on ambiguous records.</rule>
                 <rule>Preserve the user's spelling in the report. If a term looks like a typo (e.g. "úbda" for "Úbeda"), say so instead of silently matching something else.</rule>
             </name_matching>
             <resolution_funnel>
@@ -51,9 +52,9 @@
 
             <missing_data severity="critical">
                 <rule>ABSENT DATA IS A VALID, REPORTABLE ANSWER. Before grouping, filtering or ranking by a geographic dimension, remember the field may be EMPTY on the records.</rule>
-                <rule>If the requested dimension is not populated (e.g. partners with state_id unset), SAY SO explicitly (e.g. "los clientes no tienen provincia asignada — el campo state_id está vacío"). Do NOT invent provinces, do NOT infer them from the name/city/zip, and do NOT silently drop the dimension and return an unrelated list as if it answered the question.</rule>
+                <rule>If the requested dimension is not populated (e.g. partners with state_id unset), SAY SO explicitly (e.g. "the customers have no province set — the state_id field is empty"). Do NOT invent provinces, do NOT infer them from the name/city/zip, and do NOT silently drop the dimension and return an unrelated list as if it answered the question.</rule>
                 <rule>Distinguish two different outcomes and word them differently: (a) FILTER MATCHED NOTHING = the province exists but no record falls in it; (b) FIELD NOT POPULATED = the field is empty across the data, so the grouping cannot be done at all. NEVER present (b) as if it were (a), and never disguise (b) with fabricated rows.</rule>
-                <rule>When a grouping is impossible due to missing data, state it clearly and, only if genuinely useful, offer what CAN be answered with the data that DOES exist (e.g. "puedo darte el ranking global sin desglose por provincia"). Never fabricate the missing breakdown to look complete.</rule>
+                <rule>When a grouping is impossible due to missing data, state it clearly and, only if genuinely useful, offer what CAN be answered with the data that DOES exist (e.g. "I can give you the overall ranking without a breakdown by province"). Never fabricate the missing breakdown to look complete.</rule>
                 <coverage_check>Good practice: when asked to group by a geo dimension, first measure COVERAGE (how many records have that field set, e.g. search_count with the field != False). If coverage is 0 or very low, lead with that fact instead of returning a misleading or empty table.</coverage_check>
             </missing_data>
 

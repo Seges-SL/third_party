@@ -1,3 +1,8 @@
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+ *
+ * Apps field widget: embed the module's local static/description/index.html.
+ */
 odoo.define('pns_base.pns_module_index', function (require) {
     "use strict";
 
@@ -19,6 +24,7 @@ odoo.define('pns_base.pns_module_index', function (require) {
                 class: 'pns_module_index_iframe',
                 frameborder: '0',
                 title: 'Index',
+                sandbox: 'allow-same-origin allow-popups allow-popups-to-escape-sandbox',
             }));
         },
     });

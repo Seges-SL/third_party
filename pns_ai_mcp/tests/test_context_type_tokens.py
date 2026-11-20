@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2026 Patanegra Soft <https://patanegra.com>
+"""Type dropdown must show hub tokens, not translated Domain/Locale."""
+
 from odoo.tests import tagged, TransactionCase
 
 from odoo.addons.pns_ai_mcp.utils import context_roles

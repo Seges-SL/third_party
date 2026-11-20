@@ -1,7 +1,13 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com> */
+/**
+ * Export utilities for Chatboo messages (PDF, Excel, Word, clipboard).
+ */
 odoo.define('pns_ai_chatboo.export', function (require) {
     "use strict";
 
     var _t = require('web.core')._t;
+    var formatters = require('pns_ai_chatboo.formatters');
 
     /**
      * pns_ai_chatboo.export — Export utilities for Chatboo messages.
@@ -38,7 +44,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
 
         rows.forEach(function (row) {
             var cells = Array.from(row.querySelectorAll('th, td')).filter(function (cell) {
-                return !(cell.classList && cell.classList.contains('o_chatboo_noexport'));
+                return !(cell.classList && cell.classList.contains('o_ai_noexport'));
             });
             var rowData = cells.map(function (cell) {
                 return cell.textContent.trim().replace(/\|/g, '\\|');
@@ -69,7 +75,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         if (!html) return '';
 
         var tempDiv = document.createElement('div');
-        tempDiv.innerHTML = html;
+        tempDiv.innerHTML = formatters.sanitizeHtml(html);
 
         var markdown = '';
 
@@ -352,7 +358,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
 
     /**
      * Convert Markdown to HTML (legacy helper for copy/export paths).
-     * Uses Showdown if available, falls back to basic regex conversion.
+     * Uses ChatbooMarkdown if available, falls back to basic regex conversion.
      *
      * @param {string} markdown - Markdown source
      * @returns {string} HTML string
@@ -360,18 +366,17 @@ odoo.define('pns_ai_chatboo.export', function (require) {
     function markdownToHTML(markdown) {
         if (!markdown) return '';
 
-        if (typeof showdown !== 'undefined') {
+        if (typeof ChatbooMarkdown !== 'undefined') {
             try {
-                var converter = new showdown.Converter({
+                return formatters.sanitizeHtml(ChatbooMarkdown.toHtml(markdown, {
                     tables: true,
                     strikethrough: true,
                     tasklists: true,
                     simpleLineBreaks: false,
-                    openLinksInNewWindow: true
-                });
-                return converter.makeHtml(markdown);
+                    openLinksInNewWindow: true,
+                }));
             } catch (e) {
-                console.warn('Error converting Markdown with Showdown, using fallback:', e);
+                console.warn('Error converting Markdown with ChatbooMarkdown, using fallback:', e);
             }
         }
 
@@ -390,7 +395,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         if (!html.startsWith('<')) {
             html = '<p>' + html + '</p>';
         }
-        return html;
+        return formatters.sanitizeHtml(html);
     }
 
     /**
@@ -415,7 +420,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
     }
 
     var AXIS_SLASHES = {
-        'painter-local': 1, 'painter-free': 1,
+        'compose-agent': 1, 'compose-model': 1,
         'foot-verbose': 1, 'foot-laconic': 1,
         'show-table': 1, 'show-chart': 1,
     };
@@ -488,13 +493,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         if (msg.original_content) {
             return msg.original_content;
         }
-        var tempDiv = document.createElement('div');
-        if (msg.content) {
-            tempDiv.innerHTML = msg.content;
-        } else {
-            return '';
-        }
-        return tempDiv.textContent || tempDiv.innerText || '';
+        return msg.content ? formatters.textOfHtml(msg.content) : '';
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -534,9 +533,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
                 if (userMsg.original_content) {
                     userPrompt = userMsg.original_content;
                 } else if (userMsg.content) {
-                    var tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = userMsg.content;
-                    userPrompt = tempDiv.textContent || tempDiv.innerText || '';
+                    userPrompt = formatters.textOfHtml(userMsg.content);
                 }
                 break;
             }
@@ -554,6 +551,9 @@ odoo.define('pns_ai_chatboo.export', function (require) {
     function sessionFileHref(file) {
         var url = (file && file.url) || '';
         if (!url || sessionFileIsInline(file)) {
+            return url;
+        }
+        if (/^(blob:|data:)/i.test(url)) {
             return url;
         }
         var name = String((file && file.name) || 'download').replace(/[\\/]/g, '_');
@@ -700,7 +700,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
                 .replace(/\n/g, '\r\n')
                 .trim();
         } else {
-            // Misma fuente que el chat (HTML formateado), no el raw del último payload.
+            // Same source as the chat (formatted HTML), not the raw last payload.
             var clipPlain = clipDataToTsv(msg.clip_data);
             if (clipPlain) {
                 textToCopy = clipPlain;
@@ -719,17 +719,13 @@ odoo.define('pns_ai_chatboo.export', function (require) {
                     if (contentDiv) {
                         var innerHTML = contentDiv.innerHTML;
                         var tempDivForBr = document.createElement('div');
-                        tempDivForBr.innerHTML = innerHTML.replace(/<br\s*\/?>/gi, '\n');
+                        tempDivForBr.innerHTML = formatters.sanitizeHtml(innerHTML.replace(/<br\s*\/?>/gi, '\n'));
                         textToCopy = tempDivForBr.textContent || tempDivForBr.innerText || '';
                     } else {
-                        var tempDivFallback = document.createElement('div');
-                        tempDivFallback.innerHTML = msg.content || '';
-                        textToCopy = tempDivFallback.textContent || tempDivFallback.innerText || '';
+                        textToCopy = formatters.textOfHtml(msg.content || '');
                     }
                 } else {
-                    var tempDivFallback2 = document.createElement('div');
-                    tempDivFallback2.innerHTML = msg.content || '';
-                    textToCopy = tempDivFallback2.textContent || tempDivFallback2.innerText || '';
+                    textToCopy = formatters.textOfHtml(msg.content || '');
                 }
             }
             }
@@ -747,7 +743,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
     /**
      * Download message as structured PDF report (jsPDF + AutoTable).
      *
-     * Uses the same HTML / data-chatboo-dataset as the chat render and Excel export.
+     * Uses the same HTML / data-ai-dataset as the chat render and Excel export.
      *
      * @param {Event} ev - Click event with data-msg-index
      * @param {ExportContext} ctx - Component context
@@ -804,13 +800,13 @@ odoo.define('pns_ai_chatboo.export', function (require) {
             inner = sourceEl.cloneNode(true);
         } else {
             inner = document.createElement('div');
-            inner.className = 'o_chatboo_content o_chatboo_prose';
-            inner.innerHTML = fallbackHtml || '';
+            inner.className = 'o_chatboo_content o_ai_prose';
+            inner.innerHTML = formatters.sanitizeHtml(fallbackHtml || '');
         }
         var kill = inner.querySelectorAll(
-            '.o_chatboo_chart_toolbar, .o_chatboo_export_bar,' +
-            ' .o_chatboo_card_resize, .o_chatboo_card_width_reset,' +
-            ' .o_chatboo_copy_btn, .o_chatboo_noexport, .o_chatboo_ts'
+            '.o_ai_chart_toolbar, .o_ai_export_bar,' +
+            ' .o_chatboo_card_resize, .o_chatboo_card_resize_guide, .o_chatboo_card_width_reset,' +
+            ' .o_ai_copy_btn, .o_ai_noexport, .o_ai_ts'
         );
         for (var i = 0; i < kill.length; i++) {
             if (kill[i].parentNode) {
@@ -826,6 +822,19 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         host.appendChild(inner);
         document.body.appendChild(host);
         return host;
+    }
+
+    var AI_CREATOR = 'Chatboo (AI system)';
+    var AI_KEYWORD = 'ai-generated';
+
+    /**
+     * EU AI Act art. 50.2: a machine-readable mark that the file comes from an
+     * AI system. Document properties only; the page does not change.
+     */
+    function markAiPdf(doc) {
+        if (doc && typeof doc.setProperties === 'function') {
+            doc.setProperties({ creator: AI_CREATOR, keywords: AI_KEYWORD });
+        }
     }
 
     /**
@@ -876,9 +885,10 @@ odoo.define('pns_ai_chatboo.export', function (require) {
             page += 1;
         }
         var filename = generateFilename(msgIndex, 'pdf', ctx);
+        markAiPdf(pdf);
         pdf.save(filename);
         if (ctx.notification) {
-            ctx.notification({ message: 'PDF descargado: ' + filename, type: 'success', sticky: false });
+            ctx.notification({ message: _t("PDF downloaded: ") + filename, type: 'success', sticky: false });
         }
     }
 
@@ -1314,7 +1324,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
             return block._chatbooChart;
         }
         var surface = (host || block) && (host || block).querySelector
-            ? (host || block).querySelector('.o_chatboo_echarts_surface')
+            ? (host || block).querySelector('.o_ai_echarts_surface')
             : null;
         if (surface && window.echarts && typeof window.echarts.getInstanceByDom === 'function') {
             return window.echarts.getInstanceByDom(surface);
@@ -1351,7 +1361,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         if (!host) {
             return false;
         }
-        var block = host.closest ? host.closest('.o_chatboo_table_block') : null;
+        var block = host.closest ? host.closest('.o_ai_table_block') : null;
         if (resolveBlockChartInstance(block, host)) {
             return true;
         }
@@ -1371,7 +1381,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
             return out;
         }
         var api = window.ChatbooCharts;
-        var blocks = sourceEl.querySelectorAll('.o_chatboo_table_block');
+        var blocks = sourceEl.querySelectorAll('.o_ai_table_block');
         var i;
         if (blocks.length && api && typeof api.snapshotPng === 'function') {
             for (i = 0; i < blocks.length; i++) {
@@ -1379,16 +1389,16 @@ odoo.define('pns_ai_chatboo.export', function (require) {
                 if (!snap) {
                     continue;
                 }
-                var mode = blocks[i].getAttribute('data-chatboo-show-mode');
+                var mode = blocks[i].getAttribute('data-ai-show-mode');
                 var before = mode === 'show-chart' || mode === 'chart-table';
                 out.push({ dataUrl: snap, before: before });
             }
             return out;
         }
-        var hosts = sourceEl.querySelectorAll('.o_chatboo_chart_host');
+        var hosts = sourceEl.querySelectorAll('.o_ai_chart_host');
         for (i = 0; i < hosts.length; i++) {
             var host = hosts[i];
-            var block = host.closest ? host.closest('.o_chatboo_table_block') : null;
+            var block = host.closest ? host.closest('.o_ai_table_block') : null;
             var png = chartInstancePng(resolveBlockChartInstance(block, host));
             if (!png) {
                 var canvas = largestChartCanvas(host);
@@ -1402,7 +1412,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
             if (!png) {
                 continue;
             }
-            var hostMode = block && block.getAttribute('data-chatboo-show-mode');
+            var hostMode = block && block.getAttribute('data-ai-show-mode');
             out.push({
                 dataUrl: png,
                 before: hostMode === 'show-chart' || hostMode === 'chart-table',
@@ -1417,12 +1427,12 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         }
         return !!(
             img.closest('table') ||
-            img.closest('.o_chatboo_table_block') ||
-            img.closest('.o_chatboo_chart_host') ||
-            img.closest('.o_chatboo_noexport') ||
+            img.closest('.o_ai_table_block') ||
+            img.closest('.o_ai_chart_host') ||
+            img.closest('.o_ai_noexport') ||
             img.closest('.o_chatboo_file_banner') ||
             img.closest('.o_chatboo_file_banner_card') ||
-            img.closest('.o_chatboo_export_bar')
+            img.closest('.o_ai_export_bar')
         );
     }
 
@@ -1465,7 +1475,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
             return [];
         }
         var host = document.createElement('div');
-        host.innerHTML = html;
+        host.innerHTML = formatters.sanitizeHtml(html);
         return collectStandaloneImageFigures(host);
     }
 
@@ -1690,7 +1700,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
                         triggerBlobDownload(built.blob, built.filename || extras.title || 'export.pdf');
                         if (ctx.notification) {
                             ctx.notification({
-                                message: 'PDF descargado: ' + (built.filename || 'export.pdf'),
+                                message: _t("PDF downloaded: ") + (built.filename || 'export.pdf'),
                                 type: 'success',
                                 sticky: false,
                             });
@@ -1857,6 +1867,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
                     return typeof b === 'string' ? b : (b.text || '');
                 }).join('\n') : '');
             if (opts.returnBlob) {
+                markAiPdf(doc);
                 return doc.output('blob');
             }
             generateTextPDF(doc, md, msgIndex, ctx);
@@ -2064,12 +2075,14 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         }
 
         if (opts.returnBlob) {
+            markAiPdf(doc);
             return doc.output('blob');
         }
         var filename = generateFilename(msgIndex, 'pdf', ctx);
+        markAiPdf(doc);
         doc.save(filename);
         if (ctx.notification) {
-            ctx.notification({ message: 'PDF descargado: ' + filename, type: 'success', sticky: false });
+            ctx.notification({ message: _t("PDF downloaded: ") + filename, type: 'success', sticky: false });
         }
     }
 
@@ -2105,15 +2118,16 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         });
 
         var filename = generateFilename(msgIndex, 'pdf', ctx);
+        markAiPdf(doc);
         doc.save(filename);
 
         if (ctx.notification) {
-            ctx.notification({ message: 'PDF descargado: ' + filename, type: 'success', sticky: false });
+            ctx.notification({ message: _t("PDF downloaded: ") + filename, type: 'success', sticky: false });
         }
     }
 
     /**
-     * HTML visible en el chat (misma fuente que Chart.js / burbuja).
+     * HTML visible in the chat (same source as Chart.js / bubble).
      *
      * @param {Object} msg
      * @returns {string}
@@ -2178,34 +2192,14 @@ odoo.define('pns_ai_chatboo.export', function (require) {
     function htmlToPlainExportText(html) {
         if (!html) return '';
         var tempDiv = document.createElement('div');
-        tempDiv.innerHTML = String(html).replace(/<br\s*\/?>/gi, '\n');
-        var skip = tempDiv.querySelectorAll('.o_chatboo_noexport');
+        tempDiv.innerHTML = formatters.sanitizeHtml(String(html).replace(/<br\s*\/?>/gi, '\n'));
+        var skip = tempDiv.querySelectorAll('.o_ai_noexport');
         for (var i = 0; i < skip.length; i++) {
             if (skip[i].parentNode) {
                 skip[i].parentNode.removeChild(skip[i]);
             }
         }
         return (tempDiv.textContent || tempDiv.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
-    }
-
-    function excelSheetName(title, index, used) {
-        var base = String(title || ('Datos ' + (index + 1)))
-            .replace(/[\\\/\?\*\[\]]/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .substring(0, 31);
-        if (!base) {
-            base = 'Datos ' + (index + 1);
-        }
-        var name = base;
-        var n = 1;
-        while (used[name]) {
-            var suffix = '_' + n;
-            name = (base.substring(0, Math.max(1, 31 - suffix.length)) + suffix).substring(0, 31);
-            n += 1;
-        }
-        used[name] = true;
-        return name;
     }
 
     function datasetRowsToAoa(rows, opts) {
@@ -2266,11 +2260,11 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         }
         var rows = table.querySelectorAll('tr');
         rows.forEach(function (row) {
-            if (row.classList && row.classList.contains('o_chatboo_ficha_title')) {
+            if (row.classList && row.classList.contains('o_ai_ficha_title')) {
                 return;
             }
             var cells = Array.from(row.querySelectorAll('th, td')).filter(function (cell) {
-                return !(cell.classList && cell.classList.contains('o_chatboo_noexport'));
+                return !(cell.classList && cell.classList.contains('o_ai_noexport'));
             }).map(function (cell) {
                 if (withImages) {
                     var img = cell.querySelector && cell.querySelector('img');
@@ -2302,7 +2296,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
             if (/^H[1-6]$/i.test(prev.tagName)) {
                 return (prev.textContent || '').trim();
             }
-            if (prev.classList && prev.classList.contains('o_chatboo_table_block')) {
+            if (prev.classList && prev.classList.contains('o_ai_table_block')) {
                 break;
             }
             if (prev.querySelector && prev.querySelector('table')) {
@@ -2314,7 +2308,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
     }
 
     /**
-     * Section title from ficha thead row (preferred over preceding h3).
+     * Section title from record-card thead row (preferred over preceding h3).
      *
      * @param {Element} el - table block or table
      * @returns {string}
@@ -2323,7 +2317,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         if (!el || !el.querySelector) {
             return '';
         }
-        var tr = el.querySelector('tr.o_chatboo_ficha_title');
+        var tr = el.querySelector('tr.o_ai_ficha_title');
         if (!tr) {
             return '';
         }
@@ -2336,7 +2330,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
             return titled;
         }
         if (el && el.querySelector) {
-            var h = el.querySelector('.o_chatboo_block_title');
+            var h = el.querySelector('.o_ai_block_title');
             if (h) {
                 return (h.textContent || h.innerText || '').replace(/\s+/g, ' ').trim();
             }
@@ -2359,9 +2353,9 @@ odoo.define('pns_ai_chatboo.export', function (require) {
             return '';
         }
         var root = document.createElement('div');
-        root.innerHTML = html;
+        root.innerHTML = formatters.sanitizeHtml(html);
         var h = root.querySelector(
-            'h1.o_chatboo_prose_h, .o_chatboo_prose_host h1, h1'
+            'h1.o_ai_prose_h, .o_ai_prose_host h1, h1'
         );
         return h ? (h.textContent || '').replace(/\s+/g, ' ').trim() : '';
     }
@@ -2434,17 +2428,15 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         if (!text.trim()) {
             return [];
         }
-        if (typeof showdown !== 'undefined') {
+        if (typeof ChatbooMarkdown !== 'undefined') {
             try {
-                var converter = new showdown.Converter({
+                return normalizeProseBlocks(htmlFragmentToProseBlocks(ChatbooMarkdown.toHtml(text, {
                     tables: false,
                     strikethrough: true,
                     simplifiedAutoLink: true,
-                    ghCompatibleHeaderId: true,
-                });
-                return normalizeProseBlocks(htmlFragmentToProseBlocks(converter.makeHtml(text)));
+                })));
             } catch (e) {
-                console.warn('Showdown prose parse failed, using line parser:', e);
+                console.warn('ChatbooMarkdown prose parse failed, using line parser:', e);
             }
         }
         var blocks = [];
@@ -2502,9 +2494,9 @@ odoo.define('pns_ai_chatboo.export', function (require) {
             return blocks;
         }
         var root = document.createElement('div');
-        root.innerHTML = html;
+        root.innerHTML = formatters.sanitizeHtml(html);
         var skip = root.querySelectorAll(
-            '.o_chatboo_table_block, .o_chatboo_noexport, table, h3.o_chatboo_result_title, h3.pns-result-title, .pns-result-title'
+            '.o_ai_table_block, .o_ai_noexport, table, h3.o_ai_result_title, h3.pns-result-title, .pns-result-title'
         );
         for (var i = 0; i < skip.length; i++) {
             if (skip[i].parentNode) {
@@ -2538,8 +2530,8 @@ odoo.define('pns_ai_chatboo.export', function (require) {
                 return;
             }
             if (node.classList && (
-                node.classList.contains('o_chatboo_table_block') ||
-                node.classList.contains('o_chatboo_noexport')
+                node.classList.contains('o_ai_table_block') ||
+                node.classList.contains('o_ai_noexport')
             )) {
                 return;
             }
@@ -2718,7 +2710,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
 
     /**
      * JSON rows stored on the message when the table is not painted
-     * (named download). Same shape as data-chatboo-dataset.
+     * (named download). Same shape as data-ai-dataset.
      *
      * @param {*} clip
      * @returns {Array<Object>}
@@ -2743,12 +2735,34 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         return '';
     }
 
+    function clipExcelFormulas(clip) {
+        if (!clip || typeof clip !== 'object' || Array.isArray(clip)) {
+            return null;
+        }
+        var raw = clip.excel_formulas || clip.__excel_formulas__;
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+            return null;
+        }
+        return raw;
+    }
+
     function clipDataToSections(clip, opts) {
         var aoa = datasetRowsToAoa(clipRows(clip), opts);
         if (!aoa.length) {
             return [];
         }
-        return [{ title: clipDataTitle(clip), aoa: aoa }];
+        var section = { title: clipDataTitle(clip), aoa: aoa };
+        var formulas = clipExcelFormulas(clip);
+        if (formulas) {
+            section.formulas = formulas;
+            if (Array.isArray(clip.rows) && clip.rows.length) {
+                section.rows = clip.rows;
+            }
+            if (clip.column_labels && typeof clip.column_labels === 'object') {
+                section.labels = clip.column_labels;
+            }
+        }
+        return [section];
     }
 
     function aoaToMarkdown(aoa) {
@@ -2783,6 +2797,18 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         return parts.join('\n\n');
     }
 
+    function clipCellText(cell) {
+        var text = pdfCellText(cell);
+        var shown = text.replace(/^\s+/, '');
+        if (/^[+-]?\d+(?:\.\d+)?$/.test(shown)) {
+            return text;
+        }
+        if (/^[=+\-@]/.test(shown)) {
+            return "'" + text;
+        }
+        return text;
+    }
+
     function clipDataToTsv(clip) {
         var sections = clipDataToSections(clip);
         if (!sections.length || !sections[0].aoa) {
@@ -2790,23 +2816,9 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         }
         return sections[0].aoa.map(function (row) {
             return (row || []).map(function (c) {
-                return pdfCellText(c);
+                return clipCellText(c);
             }).join('\t');
         }).join('\n');
-    }
-
-    function visibleContentHasTable(msg, ev) {
-        var html = '';
-        if (msg && msg.formatted_html) {
-            html = String(msg.formatted_html);
-        } else if (msg && msg.content && String(msg.content).indexOf('<') !== -1) {
-            html = String(msg.content);
-        }
-        if (html && /<table[\s>]/i.test(html)) {
-            return true;
-        }
-        var el = ev && resolveBubbleContentNode(ev);
-        return !!(el && el.querySelector && el.querySelector('table'));
     }
 
     /**
@@ -2831,16 +2843,19 @@ odoo.define('pns_ai_chatboo.export', function (require) {
             return sections;
         }
         var root = document.createElement('div');
-        root.innerHTML = html;
-        var blocks = root.querySelectorAll('.o_chatboo_table_block[data-chatboo-dataset]');
+        root.innerHTML = formatters.sanitizeHtml(html);
+        var blocks = root.querySelectorAll('.o_ai_table_block[data-ai-dataset]');
         if (blocks.length) {
             for (var i = 0; i < blocks.length; i++) {
                 var block = blocks[i];
+                var parsedRows = [];
                 var aoa = [];
                 try {
-                    aoa = datasetRowsToAoa(JSON.parse(block.getAttribute('data-chatboo-dataset')), opts);
+                    parsedRows = JSON.parse(block.getAttribute('data-ai-dataset') || '[]');
+                    aoa = datasetRowsToAoa(parsedRows, opts);
                 } catch (e) {
                     aoa = [];
+                    parsedRows = [];
                 }
                 if (!aoa.length) {
                     aoa = htmlTableToAoa(block.querySelector('table'), opts);
@@ -2858,7 +2873,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
             if (!aoa2.length) {
                 continue;
             }
-            var host = table.closest ? table.closest('.o_chatboo_table_block') : null;
+            var host = table.closest ? table.closest('.o_ai_table_block') : null;
             sections.push({
                 title: blockTitleFromEl(host || table),
                 aoa: aoa2,
@@ -2867,9 +2882,10 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         return sections;
     }
 
-    function sectionsForServer(sections) {
-        return (sections || []).map(function (section) {
-            return {
+    function sectionsForServer(sections, clip) {
+        var formulas = clipExcelFormulas(clip);
+        return (sections || []).map(function (section, idx) {
+            var out = {
                 title: section.title || '',
                 aoa: (section.aoa || []).map(function (row) {
                     return (row || []).map(function (cell) {
@@ -2880,6 +2896,30 @@ odoo.define('pns_ai_chatboo.export', function (require) {
                     });
                 }),
             };
+            var map = formulas || section.formulas || null;
+            if (map) {
+                out.formulas = map;
+            }
+            if (
+                idx === 0
+                && formulas
+                && clip
+                && Array.isArray(clip.rows)
+                && clip.rows.length
+                && typeof clip.rows[0] === 'object'
+                && !(out.aoa && out.aoa.length > 1)
+            ) {
+                out.rows = clip.rows;
+                if (clip.column_labels && typeof clip.column_labels === 'object') {
+                    out.labels = clip.column_labels;
+                }
+            } else if (section.rows && section.rows.length) {
+                out.rows = section.rows;
+                if (section.labels) {
+                    out.labels = section.labels;
+                }
+            }
+            return out;
         });
     }
 
@@ -2989,7 +3029,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
             Promise.resolve(ctx.rpc({
                 route: '/chatboo/export/xlsx',
                 params: {
-                    sections: sectionsForServer(sections),
+                    sections: sectionsForServer(sections, msg.clip_data),
                     filename: filename,
                 },
             })).then(function (res) {
@@ -3002,7 +3042,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
                 );
                 if (ctx.notification) {
                     ctx.notification({
-                        message: 'Excel descargado: ' + (res.filename || filename),
+                        message: _t("Excel downloaded: ") + (res.filename || filename),
                         type: 'success',
                         sticky: false,
                     });
@@ -3032,13 +3072,18 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         'td{padding:5px 8px;border:0.5pt solid #c8c8c8;color:#282828;vertical-align:middle;}' +
         'tr:nth-child(even) td{background:#f8f9fa;}' +
         'td img{max-width:72px;max-height:72px;}' +
-        'table.o_chatboo_word_figure,table.o_chatboo_word_figure td,table.o_chatboo_word_figure th{border:none !important;background:transparent;padding:0;}' +
-        'table.o_chatboo_word_figure td img{max-width:100%;max-height:none;width:100%;height:auto;}'
+        'table.o_ai_word_figure,table.o_ai_word_figure td,table.o_ai_word_figure th{border:none !important;background:transparent;padding:0;}' +
+        'table.o_ai_word_figure td img{max-width:100%;max-height:none;width:100%;height:auto;}'
     );
 
     function escapeWordText(s) {
         return String(s || '')
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function escapeWordAttr(s) {
+        return escapeWordText(s)
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function wrapWordHtml(title, body, landscape) {
@@ -3048,7 +3093,8 @@ odoo.define('pns_ai_chatboo.export', function (require) {
             : '@page{size:210mm 297mm;mso-page-orientation:portrait;margin:18mm;}';
         return '<html xmlns:o="urn:schemas-microsoft-com:office:office" '
             + 'xmlns:w="urn:schemas-microsoft-com:office:word">'
-            + '<head><meta charset="utf-8"/><title>' + t + '</title>'
+            + '<head><meta charset="utf-8"/><meta name="generator" content="' + AI_CREATOR + '"/>'
+            + '<meta name="keywords" content="' + AI_KEYWORD + '"/><title>' + t + '</title>'
             + '<style>' + page + WORD_STYLE + '</style></head><body>' + body + '</body></html>';
     }
 
@@ -3057,13 +3103,13 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         if (sourceEl) {
             host.appendChild(sourceEl.cloneNode(true));
         } else {
-            host.innerHTML = fallbackHtml || '';
+            host.innerHTML = formatters.sanitizeHtml(fallbackHtml || '');
         }
         var kill = host.querySelectorAll(
-            '.o_chatboo_chart_toolbar, .o_chatboo_export_bar,'
-            + ' .o_chatboo_card_resize, .o_chatboo_card_width_reset,'
-            + ' .o_chatboo_copy_btn, .o_chatboo_noexport, .o_chatboo_ts, script,'
-            + ' .o_chatboo_chart_host, .o_chatboo_echarts_surface,'
+            '.o_ai_chart_toolbar, .o_ai_export_bar,'
+            + ' .o_chatboo_card_resize, .o_chatboo_card_resize_guide, .o_chatboo_card_width_reset,'
+            + ' .o_ai_copy_btn, .o_ai_noexport, .o_ai_ts, script,'
+            + ' .o_ai_chart_host, .o_ai_echarts_surface,'
             + ' .echarts-tooltip, div[class*="echarts-tooltip"]'
         );
         for (var i = 0; i < kill.length; i++) {
@@ -3087,8 +3133,8 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         }
         var clone = host.cloneNode(true);
         var remove = clone.querySelectorAll(
-            'table, .o_chatboo_table_block, .o_chatboo_chart_host,'
-            + ' .o_chatboo_chart_toolbar, .o_chatboo_echarts_surface,'
+            'table, .o_ai_table_block, .o_ai_chart_host,'
+            + ' .o_ai_chart_toolbar, .o_ai_echarts_surface,'
             + ' .echarts-tooltip, div[class*="echarts-tooltip"]'
         );
         for (var i = 0; i < remove.length; i++) {
@@ -3120,7 +3166,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
             (row || []).forEach(function (cell) {
                 var img = pdfCellImg(cell);
                 if (img) {
-                    html += '<td><img src="' + img + '" alt=""/></td>';
+                    html += '<td><img src="' + escapeWordAttr(img) + '" alt=""/></td>';
                 } else {
                     html += '<td>' + escapeWordText(pdfCellText(cell)) + '</td>';
                 }
@@ -3129,10 +3175,6 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         });
         html += '</tbody></table>';
         return html;
-    }
-
-    function triggerWordDownload(html, filename) {
-        triggerBlobDownload(new Blob(['\ufeff', html], { type: 'application/msword' }), filename);
     }
 
     function triggerBlobDownload(blob, filename) {
@@ -3206,10 +3248,10 @@ odoo.define('pns_ai_chatboo.export', function (require) {
             if (c.figure && c.width) {
                 w = Math.min(fullW, Math.max(120, c.width));
             }
-            var block = '<table class="o_chatboo_word_figure" width="' + w + '"'
+            var block = '<table class="o_ai_word_figure" width="' + w + '"'
                 + ' style="width:' + w + 'px;border:none;border-collapse:collapse;">'
                 + '<tr><td style="border:none;padding:0;">'
-                + '<img src="' + c.dataUrl + '" width="' + w + '" alt=""'
+                + '<img src="' + escapeWordAttr(c.dataUrl) + '" width="' + w + '" alt=""'
                 + ' style="width:' + w + 'px;max-width:' + w + 'px;height:auto;"/>'
                 + '</td></tr></table>';
             if (c.figure) {
@@ -3263,10 +3305,10 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         host.setAttribute('aria-hidden', 'true');
         host.style.cssText = 'position:absolute;left:-99999px;top:0;width:' + width + 'px;height:420px;overflow:hidden;';
         var block = document.createElement('div');
-        block.className = 'o_chatboo_table_block';
-        block.setAttribute('data-chatboo-dataset', JSON.stringify(rows));
-        block.setAttribute('data-chatboo-show-mode', 'show-chart');
-        block.setAttribute('data-chatboo-chart-engine', 'echarts');
+        block.className = 'o_ai_table_block';
+        block.setAttribute('data-ai-dataset', JSON.stringify(rows));
+        block.setAttribute('data-ai-show-mode', 'show-chart');
+        block.setAttribute('data-ai-chart-engine', 'echarts');
         host.appendChild(block);
         document.body.appendChild(host);
         try {
@@ -3322,12 +3364,12 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         if (!el || !el.querySelector) {
             return [];
         }
-        var block = el.querySelector('.o_chatboo_table_block[data-chatboo-dataset]');
+        var block = el.querySelector('.o_ai_table_block[data-ai-dataset]');
         if (!block) {
             return [];
         }
         try {
-            var parsed = JSON.parse(block.getAttribute('data-chatboo-dataset') || '[]');
+            var parsed = JSON.parse(block.getAttribute('data-ai-dataset') || '[]');
             return Array.isArray(parsed) ? parsed : [];
         } catch (e) {
             return [];
@@ -3343,7 +3385,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         if (!sourceEl || !sourceEl.querySelector) {
             return null;
         }
-        var block = sourceEl.querySelector('.o_chatboo_table_block');
+        var block = sourceEl.querySelector('.o_ai_table_block');
         return (block && block._chatbooChartMeta) || null;
     }
 
@@ -3493,6 +3535,11 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         if (!(charts && charts.length) && clipIncludeChart(clip) === false) {
             return [];
         }
+        var painted = sourceEl && sourceEl.querySelector
+            && sourceEl.querySelector('.o_chatboo_series_stats');
+        if (!painted) {
+            return [];
+        }
         var api = window.ChatbooCharts;
         var live = metaFromPaintedBlock(sourceEl);
         if (live && api && typeof api.statsAoa === 'function') {
@@ -3526,7 +3573,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
     function buildHtmlDocument(title, sections, charts, richFallback, statsHtml, landscape, proseHtml) {
         var body = composeHtmlBody(title, sections, charts, richFallback, statsHtml, landscape, proseHtml);
         var t = escapeWordText(title || '');
-        return '<!DOCTYPE html><html><head><meta charset="utf-8"/><title>' + t + '</title>'
+        return '<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="generator" content="' + AI_CREATOR + '"/><meta name="keywords" content="' + AI_KEYWORD + '"/><title>' + t + '</title>'
             + '<style>' + WORD_STYLE + '</style></head><body>' + body + '</body></html>';
     }
 
@@ -3604,11 +3651,14 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         });
     }
 
-    function fulfillPendingSessionDocuments(msg, sourceEl, ctx) {
+    function fulfillPendingSessionDocuments(msg, sourceEl, ctx, onlyChip) {
         if (!msg || !ctx || !ctx.sessionId || typeof ctx.rpc !== 'function') {
             return Promise.resolve();
         }
         var pending = (msg.files || []).filter(isPendingFulfillChip);
+        if (onlyChip) {
+            pending = pending.filter(function (c) { return c === onlyChip; });
+        }
         if (!pending.length) {
             return Promise.resolve();
         }
@@ -3620,7 +3670,7 @@ odoo.define('pns_ai_chatboo.export', function (require) {
         var prose = exportProseFromMessage(msg, exportHtml);
         var statsAoa = resolveExportStatsAoa(msg.clip_data, sourceEl, charts);
         var statsHtml = statsAoaToWordHtml(statsAoa);
-        var chain = Promise.resolve();
+        var chain = resolveSectionImages(sections);
         pending.forEach(function (chip) {
             chain = chain.then(function () {
                 var kind = kindFromChip(chip);

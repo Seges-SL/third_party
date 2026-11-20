@@ -12,4 +12,4 @@ from . import models
 from .hooks import post_init_hook, uninstall_hook
 from . import wizard
 from . import controllers
-from . import http_patch  # noqa: F401 - Parche para POST /mcp/sse con application/json
+from . import http_patch  # noqa: F401 - Patch for POST /mcp/sse with application/json

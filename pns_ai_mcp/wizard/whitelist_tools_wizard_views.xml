@@ -2,7 +2,7 @@
 <odoo>
     <record id="view_whitelist_tools_wizard_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.whitelist.tools.wizard.form</field>
-        <field name="model">pns_ai_mcp.whitelist.tools.wizard</field>
+        <field name="model">ai.whitelist.tools.wizard</field>
         <field name="arch" type="xml">
             <form string="Whitelist Tools">
                 <div class="alert alert-info mb-0" role="alert">
@@ -24,7 +24,7 @@
     <record id="action_whitelist_tools_wizard" model="ir.actions.act_window">
         <field name="name">Whitelist Tools</field>
         <field name="type">ir.actions.act_window</field>
-        <field name="res_model">pns_ai_mcp.whitelist.tools.wizard</field>
+        <field name="res_model">ai.whitelist.tools.wizard</field>
         <field name="view_mode">form</field>
         <field name="view_id" ref="view_whitelist_tools_wizard_form"/>
         <field name="target">new</field>

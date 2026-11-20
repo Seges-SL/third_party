@@ -1,11 +1,16 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Odoo TransactionCase / HttpCase suite for pns_ai_mcp."""
+
+from . import _offline
 from . import test_bundle_locale
 from . import test_mcp_http
 from . import test_mcp_agent
 from . import test_agent_context_inheritance
 from . import test_knowledge_ownership
+from . import test_skill_capture_replace
+from . import test_set_skill_parameters
 from . import test_context_unlink
 from . import test_required_context_pin
 from . import test_identity_pack_isolation
@@ -16,9 +21,49 @@ from . import test_relaxaicode_render_locale
 from . import test_relaxaicode_model_stamp
 from . import test_relaxaicode_imports
 from . import test_relaxaicode_sandbox_escapes_e2e
+from . import test_skill_box_a
+from . import test_sandbox_live_handles
+from . import test_required_fields_live
 from . import test_safe_plan_atomicity
+from . import test_paap_core
 from . import test_friendly_skill_error
 from . import test_presentation_mode
 from . import test_system_action
-from . import test_chatboo_pending_cards
+from . import test_pending_cards
+from . import test_change_journal
 from . import test_change_journal_menu
+from . import test_session_download
+from . import test_flow_legend
+from . import test_server_identity_detection
+from . import test_sandbox_secret_read
+from . import test_one_company_live
+from . import test_key_of_settings_admin
+# Seges: tests de la fase 2a sobre 3.1.973 (parches 12, 16, 17, 21, 32 y 33; 13, 30 y 31 retirados, como no regresión). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_user_groups
+from . import test_seges_safe_operation
+from . import test_seges_verification
+from . import test_seges_change_journal
+from . import test_seges_import_preview
+from . import test_seges_e4p
+# Seges: tests de la fase 2b sobre 3.1.973 (parches 15, 19 y 22; 10, 13 y 14 retirados, como no regresión). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_rpc_access
+from . import test_seges_sandbox_side_effects
+from . import test_seges_fetch_redirect
+# Seges: tests de la fase 2c sobre 3.1.973 (parche 36). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_review_views
+# Seges: tests de la fase 3a sobre 3.1.973 (parche 24; 23 retirado, como no regresión). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_identity_su
+from . import test_seges_sandbox_env
+from . import test_seges_format_guard
+from . import test_seges_facade_class
+# Seges: tests de la fase 3b sobre 3.1.973 (parche 18: confirmación de V1 a V4, O1, B y B2). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_box_a_vias
+from . import test_seges_sandbox_credentials
+# Seges: tests de la fase 3b sobre 3.1.973 (parche 37: flush antes de abrir la caja A). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_box_a_flush
+# Seges: tests del parche 38 (PNS-105). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_side_cursor_commit
+# Seges: test de confirmación del anexo de PNS-26, sin parche. Ver docs/pendiente/propuesta_fase3_3973.md
+from . import test_seges_verify_execute_40001
+# Seges: tests del parche 35 (NUEVO-2). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_migration_gc_crons

@@ -3,7 +3,7 @@
     <data noupdate="0">
         <record id="view_mcp_context_stats_wizard_form_v2" model="ir.ui.view">
             <field name="name">pns_ai_mcp.context_stats_wizard.form.v2</field>
-            <field name="model">pns_ai_mcp.context_stats_wizard</field>
+            <field name="model">ai.context.stats.wizard</field>
             <field name="arch" type="xml">
                 <form string="Context Statistics" class="o_mcp_context_stats_form">
                     <group col="2" class="o_mcp_context_stats_flags mb-0">
@@ -26,7 +26,7 @@
         <record id="action_mcp_context_stats" model="ir.actions.act_window">
             <field name="name">Context Statistics</field>
             <field name="type">ir.actions.act_window</field>
-            <field name="res_model">pns_ai_mcp.context_stats_wizard</field>
+            <field name="res_model">ai.context.stats.wizard</field>
             <field name="view_mode">form</field>
             <field name="target">new</field>
         </record>

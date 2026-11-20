@@ -20,9 +20,10 @@ or dangerous to express safely as raw CRUD (e.g. ACL least-privilege
 enforcement). The LLM only ever sees a closed vocabulary of ``code``
 values, exactly like it only sees a closed vocabulary of CRUD verbs.
 """
-from odoo import api, fields, models
-from odoo.exceptions import ValidationError
-from odoo.addons.pns_base.utils.compat import user_has_group
+# Seges: parche 32 (PNS-97, seguridad). Ver docs/pendiente/parches_pns_ai.md
+from odoo import _, api, fields, models
+from odoo.exceptions import AccessError, ValidationError
+from odoo.addons.pns_base.utils.compat import ODOO_VERSION, user_has_group
 
 
 class AiTrustedAction(models.Model):
@@ -74,10 +75,46 @@ class AiTrustedAction(models.Model):
     )
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        ('code_uniq', 'unique(code)',
-         'A trusted action with this code is already registered.'),
-    ]
+    if ODOO_VERSION >= 19:
+        _code_uniq = models.Constraint(
+            'unique(code)',
+            'A trusted action with this code is already registered.',
+        )
+    else:
+        _sql_constraints = [
+            ('code_uniq', 'unique(code)', 'A trusted action with this code is already registered.'),
+        ]
+
+    # Seges: parche 32 (PNS-97, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    def _check_settings_admin(self):
+        """A trusted action names a method that runs as whoever confirms the
+        plan: only Settings (or the system, as when loading data) defines it.
+        Inside a supervised plan, who proposed and confirmed it count too,
+        even in sudo()."""
+        from ..utils.privilege_cusp import settings_admin_error
+        ctx = self.env.context
+        in_plan = (ctx.get('ai_journal_user_id')
+                   or ctx.get('ai_journal_confirmed_by_uid'))
+        if not self.env.is_system() or (
+                in_plan and settings_admin_error(self.env)):
+            raise AccessError(_(
+                'Only a Settings administrator can change trusted actions.'))
+
+    # Seges: parche 32 (PNS-97, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    @api.model_create_multi
+    def create(self, vals_list):
+        self._check_settings_admin()
+        return super().create(vals_list)
+
+    # Seges: parche 32 (PNS-97, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    def write(self, vals):
+        self._check_settings_admin()
+        return super().write(vals)
+
+    # Seges: parche 32 (PNS-97, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    def unlink(self):
+        self._check_settings_admin()
+        return super().unlink()
 
     @api.model
     def _get(self, code):
@@ -109,16 +146,23 @@ class AiTrustedAction(models.Model):
             )
         return method
 
-    def preview(self, **args):
+    def _preview(self, **args):
         """Human-readable summary for the Confirm toast. Never mutates."""
         self.ensure_one()
         return self._resolve_method('preview_method')(**args)
 
-    def apply(self, **args):
+    def _apply(self, **args):
         """Perform the action. Runs in the SAME transaction/cursor as any
         other Safe Plan step, so the atomicity guarantee in
-        ``mcp_safe_operation.execute_plan_now`` covers it automatically."""
+        ``safe_operation.execute_plan_now`` covers it automatically.
+
+        The apply methods work in ``sudo``, so the group check lives here and
+        not in a caller: whoever reaches this method is checked."""
         self.ensure_one()
+        if not self.user_has_required_groups(self.env.user):
+            raise PermissionError(
+                'Missing required group for trusted action %r' % self.code
+            )
         return self._resolve_method('apply_method')(**args)
 
     def user_has_required_groups(self, user):

@@ -3,295 +3,27 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Data-formatting helpers for the MCP server."""
 
+import importlib.util
 import logging
+from pathlib import Path
 
 _logger = logging.getLogger(__name__)
 
 
-def format_currency(value):
-    """Formatea un valor como moneda"""
-    if value is None:
-        return "-"
-    return f"{value:,.2f} €"
+def _load_ai_disclosure():
+    path = Path(__file__).resolve().parents[1] / 'utils' / 'ai_disclosure.py'
+    spec = importlib.util.spec_from_file_location('_ae_ai_disclosure', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
-def format_percentage(value):
-    """Formatea un valor como porcentaje"""
-    if value is None:
-        return "-"
-    return f"{value:.2f}%"
+_ai = _load_ai_disclosure()
+mark_ai_workbook = _ai.mark_ai_workbook
 
-
-def format_data_as_html_table(data, title, columns_config):
-    """
-    Formatea datos tabulares como HTML
-    
-    Args:
-        data: Lista de diccionarios con los datos
-        title: Título del reporte
-        columns_config: Lista de tuplas (key, label, formatter, align)
-            formatter puede ser: 'currency', 'percentage', 'number', 'text', None
-            align puede ser: 'left', 'right', 'center'
-    """
-    from datetime import datetime
-    
-    generation_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    # Generar filas
-    rows_html = []
-    for idx, row_data in enumerate(data, 1):
-        cells = []
-        for key, label, formatter, align in columns_config:
-            value = row_data.get(key, '')
-            
-            # Aplicar formateo
-            if formatter == 'currency':
-                formatted_value = format_currency(value)
-            elif formatter == 'percentage':
-                formatted_value = format_percentage(value)
-            elif formatter == 'number':
-                formatted_value = f"{value:,.0f}" if value is not None else "-"
-            else:
-                formatted_value = str(value) if value is not None else "-"
-            
-            align_class = f"text-{align}" if align else ""
-            cells.append(f'<td class="{align_class}">{formatted_value}</td>')
-        
-        row_html = f'                    <tr>\n                        <td class="text-center">{idx}</td>\n' + '\n                        '.join(cells) + '\n                    </tr>'
-        rows_html.append(row_html)
-    
-    # Generar encabezados
-    headers = ['<th>#</th>']
-    for key, label, formatter, align in columns_config:
-        align_class = f' class="text-{align}"' if align else ""
-        headers.append(f'<th{align_class}>{label}</th>')
-    
-    html_content = f"""<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title}</title>
-    <style>
-        * {{
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }}
-        body {{
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px;
-            min-height: 100vh;
-        }}
-        .container {{
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            overflow: hidden;
-        }}
-        .header {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }}
-        .header h1 {{
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }}
-        .table-container {{
-            padding: 30px;
-            overflow-x: auto;
-        }}
-        table {{
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.95em;
-        }}
-        thead {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }}
-        th {{
-            padding: 15px;
-            text-align: left;
-            font-weight: 600;
-            text-transform: uppercase;
-            font-size: 0.85em;
-            letter-spacing: 0.5px;
-        }}
-        tbody tr {{
-            border-bottom: 1px solid #e9ecef;
-        }}
-        tbody tr:hover {{
-            background-color: #f8f9fa;
-        }}
-        tbody tr:nth-child(even) {{
-            background-color: #fafbfc;
-        }}
-        td {{
-            padding: 12px 15px;
-        }}
-        .text-right {{
-            text-align: right;
-        }}
-        .text-center {{
-            text-align: center;
-        }}
-        .footer {{
-            padding: 20px 30px;
-            background: #f8f9fa;
-            text-align: center;
-            color: #6c757d;
-            font-size: 0.9em;
-            border-top: 2px solid #e9ecef;
-        }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>{title}</h1>
-        </div>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-{''.join(headers)}
-                    </tr>
-                </thead>
-                <tbody>
-{''.join(rows_html)}
-                </tbody>
-            </table>
-        </div>
-        <div class="footer">
-            Generado el {generation_date} | Sistema MCP Odoo
-        </div>
-    </div>
-</body>
-</html>"""
-    return html_content
-
-
-def format_data_as_csv(data, columns_config):
-    """
-    Formatea datos tabulares como CSV
-    
-    Args:
-        data: Lista de diccionarios con los datos
-        columns_config: Lista de tuplas (key, label, formatter, align)
-    """
-    import csv
-    import io
-    
-    output = io.StringIO()
-    writer = csv.writer(output, delimiter=';')
-    
-    # Encabezados
-    headers = ['#']
-    for key, label, formatter, align in columns_config:
-        headers.append(label)
-    writer.writerow(headers)
-    
-    # Datos
-    for idx, row_data in enumerate(data, 1):
-        row = [idx]
-        for key, label, formatter, align in columns_config:
-            value = row_data.get(key, '')
-            
-            # Aplicar formateo
-            if formatter == 'currency':
-                formatted_value = f"{value:,.2f}" if value is not None else "-"
-            elif formatter == 'percentage':
-                formatted_value = f"{value:.2f}%" if value is not None else "-"
-            elif formatter == 'number':
-                formatted_value = f"{value:,.0f}" if value is not None else "-"
-            else:
-                formatted_value = str(value) if value is not None else ""
-            
-            row.append(formatted_value)
-        
-        writer.writerow(row)
-    
-    return output.getvalue()
-
-
-def format_data_as_xml(data, root_name, item_name, columns_config):
-    """
-    Formatea datos tabulares como XML
-    
-    Args:
-        data: Lista de diccionarios con los datos
-        root_name: Nombre del elemento raíz
-        item_name: Nombre del elemento para cada fila
-        columns_config: Lista de tuplas (key, label, formatter, align)
-    """
-    import xml.etree.ElementTree as ET
-    from datetime import datetime
-    
-    # Crear elemento raíz
-    root = ET.Element(root_name)
-    root.set('generated', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    root.set('total_items', str(len(data)))
-    
-    # Añadir metadatos
-    metadata = ET.SubElement(root, 'metadata')
-    ET.SubElement(metadata, 'columns')
-    for key, label, formatter, align in columns_config:
-        col_elem = ET.SubElement(metadata.find('columns'), 'column')
-        col_elem.set('key', key)
-        col_elem.set('label', label)
-        if formatter:
-            col_elem.set('formatter', formatter)
-        if align:
-            col_elem.set('align', align)
-    
-    # Añadir datos
-    items = ET.SubElement(root, 'items')
-    for idx, row_data in enumerate(data, 1):
-        item = ET.SubElement(items, item_name)
-        item.set('index', str(idx))
-        
-        for key, label, formatter, align in columns_config:
-            value = row_data.get(key, '')
-            
-            # Aplicar formateo
-            if formatter == 'currency':
-                formatted_value = f"{value:,.2f}" if value is not None else ""
-            elif formatter == 'percentage':
-                formatted_value = f"{value:.2f}" if value is not None else ""
-            elif formatter == 'number':
-                formatted_value = f"{value:,.0f}" if value is not None else ""
-            else:
-                formatted_value = str(value) if value is not None else ""
-            
-            # Usar nombre válido para XML (sin espacios ni caracteres especiales)
-            xml_key = key.replace(' ', '_').replace('-', '_')
-            field = ET.SubElement(item, xml_key)
-            field.text = formatted_value
-            field.set('label', label)
-            if formatter:
-                field.set('formatter', formatter)
-            if align:
-                field.set('align', align)
-    
-    # Convertir a string XML con indentación
-    try:
-        ET.indent(root, space="  ")
-    except AttributeError:
-        # ET.indent no disponible en Python < 3.9, usar alternativa
-        pass
-    
-    xml_string = ET.tostring(root, encoding='unicode', xml_declaration=True)
-    return xml_string
-
-
-def format_data_as_excel(data, columns_config, title="Reporte",
-                         include_row_index=True, caption=None, widths=None):
+def format_data_as_excel(data, columns_config, title="Report",
+                         include_row_index=True, caption=None, widths=None,
+                         cell_formulas=None, number_style=None):
     """One-sheet wrapper around ``format_excel_workbook``."""
     return format_excel_workbook([{
         'data': data,
@@ -300,6 +32,8 @@ def format_data_as_excel(data, columns_config, title="Reporte",
         'include_row_index': include_row_index,
         'caption': caption,
         'widths': widths,
+        'cell_formulas': cell_formulas or {},
+        'number_style': number_style,
     }])
 
 
@@ -321,16 +55,24 @@ def format_excel_workbook(sheets):
             else:
                 ws = wb.create_sheet()
             _fill_excel_sheet(ws, spec)
+        mark_ai_workbook(wb)
         output = io.BytesIO()
         wb.save(output)
         output.seek(0)
         return output.getvalue()
     except ImportError:
-        _logger.error("MCP: openpyxl no está instalado. Instala con: pip install openpyxl")
-        raise Exception("openpyxl no está instalado. Instala con: pip install openpyxl")
+        _logger.error("MCP: openpyxl is not installed. Install it with: pip install openpyxl")
+        raise Exception("openpyxl is not installed. Install it with: pip install openpyxl")
     except Exception as e:
-        _logger.error("MCP: Error generando Excel: %s", e)
-        raise Exception("Error generando Excel: %s" % e)
+        _logger.error("MCP: Error generating Excel: %s", e)
+        raise Exception("Error generating Excel: %s" % e)
+
+
+def _excel_safe_text(text):
+    """Text a spreadsheet would read as a formula goes out quoted as text."""
+    if text and text.lstrip(' \t')[:1] in ('=', '+', '-', '@'):
+        return "'" + text
+    return text
 
 
 def _fill_excel_sheet(ws, spec):
@@ -343,6 +85,19 @@ def _fill_excel_sheet(ws, spec):
     include_row_index = bool(spec.get('include_row_index'))
     caption = (spec.get('caption') or '').strip()
     widths = spec.get('widths')
+    # {(excel_row, excel_col): '=…'}; positions count the row index column.
+    cell_formulas = spec.get('cell_formulas') or {}
+    style = spec.get('number_style') or {}
+    env = spec.get('env')
+    image_keys = {
+        cfg[0] for cfg in columns_config
+        if any(
+            isinstance(row, dict) and _pdf_is_image_ref(row.get(cfg[0]))
+            for row in data
+        )
+    }
+    int_fmt = style.get('int_format') or '#,##0'
+    float_fmt = style.get('float_format') or '#,##0.00'
     ws.title = str(title)[:31] or 'Export'
 
     header_fill = PatternFill(start_color="667eea", end_color="764ba2", fill_type="solid")
@@ -386,14 +141,40 @@ def _fill_excel_sheet(ws, spec):
     for row_offset, row_data in enumerate(data, 1):
         row_idx = header_row + row_offset
         if include_row_index:
-            ws.cell(row=row_idx, column=1, value=row_offset).border = border
-            ws.cell(row=row_idx, column=1).alignment = center_align
+            idx_cell = ws.cell(row=row_idx, column=1, value=row_offset)
+            idx_cell.border = border
+            idx_cell.alignment = center_align
+            idx_cell.number_format = int_fmt
 
         for col_off, (key, label, formatter, align) in enumerate(columns_config):
             col_idx = data_col0 + col_off
             value = row_data.get(key, '') if isinstance(row_data, dict) else ''
             cell = ws.cell(row=row_idx, column=col_idx)
             cell.border = border
+            compiled = cell_formulas.get((row_idx, col_idx))
+            if compiled:
+                cell.value = compiled
+                if formatter == 'currency':
+                    cell.number_format = '#,##0.00 €'
+                    cell.alignment = right_align
+                elif formatter == 'percentage':
+                    cell.number_format = '0.00%'
+                    cell.alignment = center_align
+                else:
+                    cell.number_format = float_fmt
+                    cell.alignment = (
+                        center_align if formatter == 'number' else right_align
+                    )
+                continue
+            if key in image_keys:
+                ws.row_dimensions[row_idx].height = _XLSX_IMG_ROW_PT
+                photo = _excel_photo_png(value, env)
+                if photo:
+                    _excel_put_photo(
+                        ws, photo, row_idx, col_idx,
+                        _excel_photo_col_chars(label),
+                    )
+                continue
             if formatter == 'currency':
                 cell.value = float(value) if value is not None and value != '' else 0.0
                 cell.number_format = '#,##0.00 €'
@@ -407,6 +188,7 @@ def _fill_excel_sheet(ws, spec):
                 cell.alignment = center_align
             elif formatter == 'number':
                 cell.value = int(value) if value is not None and value != '' else 0
+                cell.number_format = int_fmt
                 cell.alignment = center_align
             else:
                 if isinstance(value, bool):
@@ -414,15 +196,19 @@ def _fill_excel_sheet(ws, spec):
                     cell.alignment = center_align
                 elif isinstance(value, int):
                     cell.value = value
+                    cell.number_format = int_fmt
                     cell.alignment = right_align
                 elif isinstance(value, float):
                     if value != value or value in (float('inf'), float('-inf')):
                         cell.value = ''
                     else:
                         cell.value = value
+                        cell.number_format = float_fmt
                     cell.alignment = right_align
                 else:
-                    cell.value = str(value) if value is not None else ''
+                    cell.value = _excel_safe_text(
+                        str(value) if value is not None else '',
+                    )
                     if align == 'center':
                         cell.alignment = center_align
                     elif align == 'right':
@@ -434,7 +220,9 @@ def _fill_excel_sheet(ws, spec):
         ws.column_dimensions[get_column_letter(1)].width = 5
     for col_off, (key, label, formatter, align) in enumerate(columns_config):
         col_idx = data_col0 + col_off
-        if widths and col_off < len(widths):
+        if key in image_keys:
+            width = _excel_photo_col_chars(label)
+        elif widths and col_off < len(widths):
             width = widths[col_off]
         elif formatter == 'currency':
             width = 15
@@ -449,12 +237,67 @@ def _fill_excel_sheet(ws, spec):
     ws.freeze_panes = 'A%d' % (header_row + 1)
 
 
+_XLSX_IMG_PX = 48
+_XLSX_IMG_ROW_PT = 40
+_XLSX_IMG_COL_CHARS = 9
+_XLSX_EMU_PER_PX = 9525
 
-# Structural image-column hints (field shape, not a business glossary).
-_PDF_IMG_KEY_HINTS = (
-    'image', 'logo', 'avatar', 'photo',
-    'map_osm', 'map_gm', 'mapthumb', 'staticmap',
-)
+
+def _excel_photo_col_chars(label):
+    """Width (characters) of a photo column: the photo or its header."""
+    return max(len(str(label or '')), _XLSX_IMG_COL_CHARS)
+
+
+def _excel_photo_offsets(col_chars, width_px, height_px):
+    """EMU offsets that centre a photo in its cell (column chars, photo row)."""
+    col_px = int(float(col_chars) * 7 + 5)
+    row_px = int(_XLSX_IMG_ROW_PT * 96 / 72)
+    dx = max(0, (col_px - int(width_px)) // 2)
+    dy = max(0, (row_px - int(height_px)) // 2)
+    return dx * _XLSX_EMU_PER_PX, dy * _XLSX_EMU_PER_PX
+
+
+
+def _excel_photo_png(value, env=None):
+    """``(png_bytes, width_px, height_px)`` for a photo cell, or None."""
+    raw = _pdf_image_bytes(value, env=env) if _pdf_is_image_ref(value) else None
+    if not raw:
+        return None
+    try:
+        from io import BytesIO
+        from PIL import Image as PilImage
+        pil = PilImage.open(BytesIO(raw))
+        pil.load()
+        if pil.mode not in ('RGB', 'RGBA'):
+            pil = pil.convert('RGBA')
+        pil.thumbnail((_XLSX_IMG_PX, _XLSX_IMG_PX))
+        buf = BytesIO()
+        pil.save(buf, format='PNG')
+        return buf.getvalue(), pil.width, pil.height
+    except Exception:
+        _logger.debug('MCP: xlsx image skipped', exc_info=True)
+        return None
+
+
+def _excel_put_photo(ws, photo, row, col, col_chars):
+    """Centre ``(png, w, h)`` in the 1-based cell. The cell never gets the URL."""
+    from io import BytesIO
+    from openpyxl.drawing.image import Image as XlImage
+    from openpyxl.drawing.spreadsheet_drawing import AnchorMarker, OneCellAnchor
+    from openpyxl.drawing.xdr import XDRPositiveSize2D
+    png, width, height = photo
+    dx, dy = _excel_photo_offsets(col_chars, width, height)
+    img = XlImage(BytesIO(png))
+    img.anchor = OneCellAnchor(
+        _from=AnchorMarker(col=col - 1, colOff=dx, row=row - 1, rowOff=dy),
+        ext=XDRPositiveSize2D(
+            int(width) * _XLSX_EMU_PER_PX, int(height) * _XLSX_EMU_PER_PX,
+        ),
+    )
+    ws.add_image(img)
+
+
+
 _PDF_B64_IMG_PREFIXES = (
     ('iVBORw', 'png'),
     ('/9j/', 'jpeg'),
@@ -480,11 +323,6 @@ def _pdf_regexes():
             r'^data:image/([^;]+);base64,(.+)$', re.I | re.DOTALL,
         )
     return _PDF_IMG_SRC_RE, _PDF_WEB_IMAGE_RE, _PDF_DATA_URI_RE
-
-
-def _pdf_looks_image_key(key):
-    key_l = str(key or '').lower()
-    return any(hint in key_l for hint in _PDF_IMG_KEY_HINTS)
 
 
 def _pdf_is_image_ref(value):
@@ -588,12 +426,6 @@ def _pdf_image_bytes(value, key=None, env=None):
             return _pdf_decode_b64(text)
     if web_re.search(text) or text.startswith('/web/image/'):
         return _pdf_image_from_env(text, env)
-    if _pdf_looks_image_key(key) and (
-        text.startswith('http') or text.startswith('/')
-    ):
-        if web_re.search(text) or text.startswith('/web/image/'):
-            return _pdf_image_from_env(text, env)
-        return None
     return None
 
 
@@ -611,7 +443,7 @@ def _pdf_flowable_image(raw, max_side):
     else:
         height = max_side
         width = max_side * float(iw) / float(ih)
-    return Image(reader, width=width, height=height)
+    return Image(BytesIO(raw), width=width, height=height)
 
 
 def _pdf_paragraph(text, style):
@@ -717,9 +549,9 @@ def _pdf_chart_drawing(spec, width, height):
     return drawing
 
 
-def format_data_as_pdf(data, columns_config, title="Reporte", landscape=True,
+def format_data_as_pdf(data, columns_config, title="Report", landscape=True,
                        env=None, chart_series=None):
-    """Tabular PDF with Chatboo table tokens (no row #, no MCP footer).
+    """Tabular PDF with the chat table tokens (no row #, no MCP footer).
 
     Cells that are photos (data-URI, raw base64, /web/image via env) become
     thumbnails. Rows split between pages; a photo stays inside its row.
@@ -731,7 +563,7 @@ def format_data_as_pdf(data, columns_config, title="Reporte", landscape=True,
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import cm
         from reportlab.platypus import (
-            KeepTogether, SimpleDocTemplate, Spacer, Table, TableStyle,
+            SimpleDocTemplate, Spacer, Table, TableStyle,
         )
         import io
 
@@ -744,11 +576,14 @@ def format_data_as_pdf(data, columns_config, title="Reporte", landscape=True,
             leftMargin=1 * cm,
             topMargin=1.4 * cm,
             bottomMargin=1 * cm,
+            creator=_ai.AI_GENERATOR,
+            keywords=_ai.AI_KEYWORD,
+            subject=_ai.AI_DESCRIPTION,
         )
 
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle(
-            'ChatbooPdfTitle',
+            'AiPdfTitle',
             parent=styles['Heading1'],
             fontName='Helvetica-Bold',
             fontSize=14,
@@ -758,7 +593,7 @@ def format_data_as_pdf(data, columns_config, title="Reporte", landscape=True,
             alignment=0,
         )
         cell_style = ParagraphStyle(
-            'ChatbooPdfCell',
+            'AiPdfCell',
             parent=styles['Normal'],
             fontName='Helvetica',
             fontSize=8,
@@ -766,7 +601,7 @@ def format_data_as_pdf(data, columns_config, title="Reporte", landscape=True,
             textColor=colors.HexColor('#282828'),
         )
         head_style = ParagraphStyle(
-            'ChatbooPdfHead',
+            'AiPdfHead',
             parent=cell_style,
             fontName='Helvetica-Bold',
             textColor=colors.HexColor('#1a1a1a'),
@@ -802,7 +637,7 @@ def format_data_as_pdf(data, columns_config, title="Reporte", landscape=True,
                 if raw:
                     flow = _pdf_flowable_image(raw, thumb)
                     if flow is not None:
-                        row.append(KeepTogether([flow]))
+                        row.append(flow)
                         has_image = True
                         continue
                 if _pdf_is_image_ref(value):
@@ -859,7 +694,7 @@ def format_data_as_pdf(data, columns_config, title="Reporte", landscape=True,
         buffer.seek(0)
         return buffer.getvalue()
     except ImportError:
-        raise Exception("reportlab no está instalado. Instala con: pip install reportlab")
+        raise Exception("reportlab is not installed. Install it with: pip install reportlab")
     except Exception as e:
-        raise Exception(f"Error generando PDF: {str(e)}")
+        raise Exception(f"Error generating PDF: {str(e)}")
 

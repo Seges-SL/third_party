@@ -38,7 +38,7 @@
             <term key="Ubicación, Ubicaciones, Dirección, Direcciones">res.partner (use location_search pattern)</term>
             <term key="Provincia, Provincias, País, Países, Estado, Comunidad Autónoma, Región, Regiones, Geografía, Geográfico">→ geography (modelo: provincia=state_id, país=country_id, embudo de resolución; y manejo HONESTO de datos ausentes: si el campo está vacío, reportarlo — nunca inventar ni inferir la provincia)</term>
             <term key="Departamento, Departamentos">hr.department</term>
-            <term key="Equipo de Ventas, Equipos de Ventas, Área de Negocio, Áreas de Negocio">crm.team (module: sales/crm)</term>
+            <term key="Equipo de Ventas, Equipos de Ventas">crm.team (module: sales/crm)</term>
             <term key="Filtro, Filtros, Vista Personalizada, Vistas Personalizadas">ir.filters</term>
             <term key="Centro de Coste, Centros de Coste, Analítica, Cuenta Analítica, Cuentas Analíticas">account.analytic.account (cost center)</term>
             <term key="Grupo Analítico, Grupos Analíticos">account.analytic.group (aggregates analytic accounts)</term>

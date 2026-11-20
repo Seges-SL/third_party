@@ -4,10 +4,10 @@
     Admins keep full CRUD menus under group_ai_admin.
 -->
 <odoo>
-    <menuitem id="menu_mcp_contexts_writer"
+    <menuitem id="menu_ai_context_writer"
               name="My Contexts"
               parent="pns_ai_mcp.menu_ai_knowledge"
-              action="action_mcp_contexts_writer"
+              action="action_ai_context_writer"
               sequence="40"
               groups="pns_ai_mcp.group_ai_writer"/>
 

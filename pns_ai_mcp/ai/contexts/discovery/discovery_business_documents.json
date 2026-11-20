@@ -20,9 +20,17 @@
     "purchase.order",
     "order lines",
     "create quotation",
+    "modify quotation",
     "add line",
     "discount",
     "global discount",
-    "modify quotation"
+    "vendor bill",
+    "supplier invoice",
+    "attached invoice",
+    "register this invoice",
+    "already booked",
+    "receipt",
+    "till receipt",
+    "card slip"
   ]
 }

@@ -1,3 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_chatboo_session_user,chatboo.session.user,model_chatboo_session,base.group_user,1,1,1,1
-access_chatboo_async_request_user,chatboo.async.request.user,model_chatboo_async_request,base.group_user,1,1,1,0
+access_chatboo_async_request_user,chatboo.async.request.user,model_chatboo_async_request,base.group_user,1,0,0,0
+access_chatboo_canvas_page_user,chatboo.canvas.page.user,model_chatboo_canvas_page,base.group_user,1,1,1,1
+access_chatboo_canvas_job_user,chatboo.canvas.job.user,model_chatboo_canvas_job,base.group_user,1,0,0,0

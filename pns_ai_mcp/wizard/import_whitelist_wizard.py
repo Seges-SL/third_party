@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-import base64
+"""Import URL whitelist entries from JSON."""
+
 import json
 import logging
 
@@ -9,6 +10,7 @@ from odoo import api, models, fields, _
 from odoo.exceptions import UserError
 
 from ..utils import mcp_ui
+from ..utils.compat import binary_bytes
 
 _logger = logging.getLogger(__name__)
 
@@ -26,7 +28,7 @@ class ImportWhitelistWizard(models.TransientModel):
     With 'Replace existing' checked (default), entries with the same domain
     are updated.  Otherwise existing domains are skipped.
     """
-    _name = 'pns_ai_mcp.import_whitelist_wizard'
+    _name = 'ai.import.whitelist.wizard'
     _inherit = ['pns.operation.report.wizard']
     _description = 'Wizard to import URL Whitelist from JSON'
 
@@ -58,13 +60,16 @@ class ImportWhitelistWizard(models.TransientModel):
             raise UserError(_("Please upload a JSON file."))
 
         try:
-            raw = base64.b64decode(self.json_file)
+            raw = binary_bytes(self.json_file)
             data, extract_warnings = mcp_ui.extract_json_from_upload(raw)
         except (ValueError, Exception) as e:
             raise UserError(_("Error reading the file: %s") % e)
 
         Whitelist = self.env['ai.url.whitelist']
         created = updated = skipped = 0
+        created_names = []
+        updated_names = []
+        skipped_names = []
         errors = []
         warnings = list(extract_warnings)
 
@@ -79,6 +84,7 @@ class ImportWhitelistWizard(models.TransientModel):
                 )
                 if existing and not self.replace_existing:
                     skipped += 1
+                    skipped_names.append(domain)
                     continue
 
                 vals = {'domain': domain}
@@ -95,9 +101,11 @@ class ImportWhitelistWizard(models.TransientModel):
                 if existing:
                     existing.write(vals)
                     updated += 1
+                    updated_names.append(domain)
                 else:
                     Whitelist.create(vals)
                     created += 1
+                    created_names.append(domain)
             except Exception as e:
                 errors.append("%s: %s" % (domain, e))
                 _logger.error("Whitelist import error for %s: %s", domain, e)
@@ -109,4 +117,7 @@ class ImportWhitelistWizard(models.TransientModel):
             skipped=skipped,
             errors=errors,
             warnings=warnings,
+            created_names=created_names,
+            updated_names=updated_names,
+            skipped_names=skipped_names,
         )

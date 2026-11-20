@@ -1,8 +1,9 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com> */
 /**
- * Chatboo SVG cards — hydrate data-chatboo-card JSON (clock / fact / link).
+ * Chatboo SVG cards — hydrate data-ai-card JSON (clock / fact / link / form).
  * Clock/fact: click opens/downloads the SVG (blob), like a PDF chip.
  * Link: real <a> banner (same gesture as the map card).
- * SPDX-License-Identifier: Apache-2.0
  */
 (function (global) {
     "use strict";
@@ -253,7 +254,7 @@
             sub = escapeXml(host);
         }
         var mark =
-            '<svg class="o_chatboo_link_banner_mark" viewBox="0 0 120 72" ' +
+            '<svg class="o_ai_link_banner_mark" viewBox="0 0 120 72" ' +
             'aria-hidden="true" focusable="false">' +
             '<rect x="22" y="18" width="44" height="36" rx="8" fill="none" ' +
             'stroke="#0d6efd" stroke-width="3"/>' +
@@ -261,14 +262,14 @@
             'stroke="#5b6b7a" stroke-width="3"/>' +
             "</svg>";
         return (
-            '<a class="o_chatboo_link_banner_card" href="' + escapeXml(href) +
+            '<a class="o_ai_link_banner_card" href="' + escapeXml(href) +
             '" target="_blank" rel="noopener noreferrer" title="' + title + '">' +
-            '<span class="o_chatboo_link_banner_preview" aria-hidden="true">' +
+            '<span class="o_ai_link_banner_preview" aria-hidden="true">' +
             mark + "</span>" +
-            '<span class="o_chatboo_link_banner_meta">' +
-            '<span class="o_chatboo_link_banner_title">' + title + "</span>" +
-            (sub ? '<span class="o_chatboo_link_banner_host">' + sub + "</span>" : "") +
-            '<span class="o_chatboo_link_banner_cta">Abrir ' +
+            '<span class="o_ai_link_banner_meta">' +
+            '<span class="o_ai_link_banner_title">' + title + "</span>" +
+            (sub ? '<span class="o_ai_link_banner_host">' + sub + "</span>" : "") +
+            '<span class="o_ai_link_banner_cta">Abrir ' +
             '<i class="fa fa-external-link" aria-hidden="true"></i></span>' +
             "</span></a>"
         );
@@ -319,7 +320,7 @@
         if (!el || el.getAttribute("data-chatboo-card-ready") === "1") {
             return;
         }
-        var raw = el.getAttribute("data-chatboo-card");
+        var raw = el.getAttribute("data-ai-card");
         if (!raw) {
             return;
         }
@@ -329,8 +330,29 @@
         } catch (e) {
             return;
         }
+        if (String(card.kind || "").toLowerCase() === "form") {
+            var open = el.querySelector(".o_ai_form_card_open");
+            if (!open) {
+                return;
+            }
+            open.addEventListener("click", function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                el.dispatchEvent(new CustomEvent("chatboo-open-form", {
+                    bubbles: true,
+                    detail: {
+                        action: card.action || null,
+                        model: card.model || null,
+                        res_id: card.res_id || null,
+                        values: card.values || null,
+                    },
+                }));
+            });
+            el.setAttribute("data-chatboo-card-ready", "1");
+            return;
+        }
         if (String(card.kind || "").toLowerCase() === "link") {
-            if (el.querySelector(".o_chatboo_link_banner_card")) {
+            if (el.querySelector(".o_ai_link_banner_card")) {
                 el.setAttribute("data-chatboo-card-ready", "1");
                 return;
             }
@@ -338,7 +360,7 @@
             if (!banner) {
                 return;
             }
-            el.classList.add("o_chatboo_link_banner");
+            el.classList.add("o_ai_link_banner");
             el.innerHTML = banner;
             el.setAttribute("data-chatboo-card-ready", "1");
             return;
@@ -367,7 +389,7 @@
         if (!root || !root.querySelectorAll) {
             return;
         }
-        var nodes = root.querySelectorAll(".o_chatboo_svg_card[data-chatboo-card]");
+        var nodes = root.querySelectorAll(".o_ai_svg_card[data-ai-card]");
         var i;
         for (i = 0; i < nodes.length; i++) {
             hydrateOne(nodes[i]);

@@ -1,30 +1,33 @@
 ---
 code: email
 tipo: domain
-description: Correos en Odoo — mail.mail (bandeja enviados/recibidos) vs mail.message (tracking pns_delivery_status)
-version: 1.1
+description: Email in Odoo — mail.mail (mailbox) vs mail.notification (delivery)
+version: 1.3
 ---
 
-# Correos electrónicos (mail.mail + mail.message)
+# Email (mail.mail + mail.notification)
 
-Hay **dos** modelos. Mezclarlos produce “no hay correos” cuando la bandeja sí los muestra.
+There are **two** models. Mixing them up produces "there are no emails" while the mailbox does show them.
 
-| Pregunta del usuario | Modelo | Campos útiles |
+| User question | Model | Useful fields |
 |---|---|---|
-| ¿Hay correos **a/desde** un dominio o dirección? (bandeja Enviados/Recibidos) | **`mail.mail`** | `email_to`, `email_from`, `subject`, `state`, `date` / `create_date`, `mail_message_id` |
-| ¿Estado de entrega/apertura/rebote? | **`mail.message`** | `message_type='email'`, `pns_delivery_status`, `date`, `email_from` |
+| Are there emails **to/from** a domain or address? (Sent/Received mailbox) | **`mail.mail`** | `email_to`, `email_from`, `subject`, `state`, `date` / `create_date`, `mail_message_id` |
+| Delivery status / bounce? | **`mail.notification`** | `notification_type='email'`, `notification_status`, `mail_message_id`, `res_partner_id` |
 
-**Trampa habitual:** buscar solo en `mail.message` con `partner_ids` / `author_id`.
-Los **enviados** suelen tener el destinatario en `mail.mail.email_to` (texto), **sin**
-rellenar `mail.message.partner_ids` ni `mail.message.email_to`. Resultado: 0 filas
-aunque la UI de correos muestre varios Enviados.
+**Common trap:** searching only `mail.message` with `partner_ids` / `author_id`.
+**Sent** emails usually carry the recipient in `mail.mail.email_to` (text), **without**
+filling `mail.message.partner_ids` or `mail.message.email_to`. Result: 0 rows
+even though the email UI shows several Sent.
 
-## 1. Listar correos por dirección o dominio (bandeja)
+NEVER invent a field named `pns_delivery_status`. If this instance added a
+custom tracking field, discover it from `_fields` before using it.
+
+## 1. List emails by address or domain (mailbox)
 
 ```python
-# PREFERRED for “correos a X / con Y / dominio Z”
-# Sustituir DOMINIO/DIRECCION por lo que diga el usuario (p.ej. dominio o email)
-needle = 'DOMINIO_O_DIRECCION'
+# PREFERRED for "emails to X / with Y / domain Z"
+# Replace DOMAIN_OR_ADDRESS with what the user said (e.g. a domain or an email)
+needle = 'DOMAIN_OR_ADDRESS'
 mails = env['mail.mail'].search([
     '|',
     ('email_to', 'ilike', needle),
@@ -41,60 +44,66 @@ result = [{
 } for m in mails]
 ```
 
-`state` en **`mail.mail`**: `outgoing` / `sent` / `received` / `exception` / `cancel`
-(no confundir con `pns_delivery_status`).
+`state` on **`mail.mail`**: `outgoing` / `sent` / `received` / `exception` / `cancel`
+(that is the outgoing queue, not the bounce table).
 
-## 2. Tracking de entrega (apertura / rebote)
+## 2. Delivery tracking (sent / bounced)
 
-**Modelo:** `mail.message`  
-**Campo:** `pns_delivery_status` (Char)  
-Filtrar SIEMPRE `message_type = 'email'`.
+**Model:** `mail.notification`  
+**Field:** `notification_status`  
+ALWAYS filter `notification_type = 'email'`.
 
-| Valor | Significado |
-|-------|-------------|
-| `sent` | Enviado |
-| `opened` | Abierto |
-| `clicked` | Clic en enlace |
-| `bounced` | Rebotado |
-| `error` | Error de envío |
-
-```python
-[('message_type', '=', 'email')]
-[('message_type', '=', 'email'), ('pns_delivery_status', '=', 'opened')]
-[('message_type', '=', 'email'), ('pns_delivery_status', 'in', ['bounced', 'error'])]
-```
-
-Puente desde un `mail.mail` encontrado:
+| Value | Meaning |
+|-------|---------|
+| `ready` | Waiting to be sent |
+| `sent` | Sent |
+| `bounce` | Bounced |
+| `exception` | Sending error |
+| `canceled` | Canceled |
 
 ```python
-msg = mail.mail_message_id  # puede ser vacío
-status = msg.pns_delivery_status if msg else None
+[('notification_type', '=', 'email')]
+[('notification_type', '=', 'email'), ('notification_status', '=', 'bounce')]
+[('notification_type', '=', 'email'), ('notification_status', 'in', ['bounce', 'exception'])]
 ```
 
-## 3. Contar tracking por estado en un periodo
+Bridge from a `mail.mail` you found:
+
+```python
+msg = mail.mail_message_id  # may be empty
+notes = env['mail.notification'].search([
+    ('mail_message_id', '=', msg.id),
+    ('notification_type', '=', 'email'),
+]) if msg else env['mail.notification']
+statuses = notes.mapped('notification_status')
+```
+
+Open / click tracking is not a standard `mail.message` field. If the user
+asked for opens, look for a real field on this instance; do not invent one.
+
+## 3. Count tracking by status over a period
 
 ```python
 start_date = date(date.today().year, date.today().month, 1).strftime('%Y-%m-%d')
 end_date = date.today().strftime('%Y-%m-%d')
-lines = env['mail.message'].search([
-    ('message_type', '=', 'email'),
-    ('date', '>=', start_date),
-    ('date', '<=', end_date),
-    ('pns_delivery_status', '!=', False),
+notes = env['mail.notification'].search([
+    ('notification_type', '=', 'email'),
+    ('mail_message_id.create_date', '>=', start_date),
+    ('mail_message_id.create_date', '<=', end_date),
 ])
 counts = {}
-for m in lines:
-    v = m.pns_delivery_status
+for note in notes:
+    v = note.notification_status
     counts[v] = counts.get(v, 0) + 1
 result = counts
 ```
 
-## Reglas críticas
+## Critical rules
 
-- “Correos con / a / de &lt;contacto o dominio&gt;” → **`mail.mail`** + `email_to` /
-  `email_from` (`ilike`). No digas “no hay” sin haber buscado ahí.
-- Tracking abierto/rebote → **`mail.message`** + `pns_delivery_status` (nunca
-  `mail.message.state`).
-- NO uses solo `partner_ids` / `author_id` para concluir que no hay correo con
-  un destinatario externo.
-- `pns_delivery_status` puede estar vacío en mensajes no rastreados.
+- "Emails with / to / from &lt;contact or domain&gt;" → **`mail.mail`** + `email_to` /
+  `email_from` (`ilike`). Do not say "there are none" without searching there.
+- Send / bounce tracking → **`mail.notification`** + `notification_status`
+  (never an invented field on `mail.message`).
+- Do NOT rely only on `partner_ids` / `author_id` to conclude there is no email with
+  an external recipient.
+- A notification may not exist if the email did not go through the Odoo bus.

@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Contrato del sandbox RelaxAICode sobre imports de red.
+"""RelaxAICode sandbox contract for network imports.
 
-`urllib.parse` son funciones puras de texto (quote, urlencode, urlparse...) para
-COMPONER/TROCEAR URLs, sin red ni FS: se permite SOLO la forma
-`from urllib.parse import <nombre>`. Todo lo demás de red sigue prohibido, y
-`import urllib.parse` también (ligaría el paquete `urllib`, desde el que se
-alcanzaría urllib.request).
+``urllib.parse`` is pure text (quote, urlencode, urlparse…) to compose or
+split URLs, with no network or FS: only ``from urllib.parse import <name>``
+is allowed. Other network imports stay forbidden, including
+``import urllib.parse`` (that binds the ``urllib`` package, from which
+``urllib.request`` is reachable).
 """
 from odoo.tests import tagged, TransactionCase
 
@@ -19,7 +19,7 @@ from odoo.addons.pns_ai_mcp.controllers.context_builder import guarded_import
 
 @tagged('post_install', '-at_install', 'pns_ai_mcp')
 class TestRelaxAICodeImports(TransactionCase):
-    """Frontera de red del sandbox: urllib.parse sí (from-import), red no."""
+    """Sandbox network boundary: urllib.parse yes (from-import), network no."""
 
     def _ok(self, code):
         is_valid, err, _req = validate_relaxaicode_source_ast(code)
@@ -46,15 +46,15 @@ class TestRelaxAICodeImports(TransactionCase):
             self.assertFalse(is_valid, "Debería bloquearse: %s" % code)
 
     def test_guarded_import_only_allows_urllib_parse_from_form(self):
-        # from urllib.parse import quote -> permitido y funcional
+        # from urllib.parse import quote -> allowed and working
         mod = guarded_import('urllib.parse', None, None, ['quote'], 0)
         self.assertEqual(mod.quote('Nueva York'), 'Nueva%20York')
 
-        # import urllib.parse (fromlist vacío) -> bloqueado
+        # import urllib.parse (empty fromlist) -> blocked
         with self.assertRaises(ImportError):
             guarded_import('urllib.parse', None, None, None, 0)
 
-        # red / paquete urllib -> bloqueado
+        # network / urllib package -> blocked
         for name, fromlist in (
             ('urllib', None),
             ('urllib.request', None),

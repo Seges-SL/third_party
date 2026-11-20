@@ -8,6 +8,37 @@ share the same object. No host / vendor name checks.
 """
 from __future__ import annotations
 
+from contextvars import ContextVar
+
+# Satellite spend (Design, skill params, …) of the open turn.
+# The engine binds it at turn start so helpers that do not hold the
+# AgentEngine instance can still fold their usage into the footer.
+_turn_side_usage = ContextVar('pns_turn_side_usage', default=None)
+
+
+def bind_turn_side_usage():
+    """Open an empty bag for this turn. Returns a token for ``reset``."""
+    return _turn_side_usage.set({})
+
+
+def reset_turn_side_usage(token):
+    if token is None:
+        return
+    _turn_side_usage.reset(token)
+
+
+def note_turn_side_usage(usage):
+    """Fold one satellite completion into the open turn, if any."""
+    bag = _turn_side_usage.get()
+    if bag is None:
+        return
+    add_usage(bag, usage)
+
+
+def bound_turn_side_usage():
+    bag = _turn_side_usage.get()
+    return dict(bag) if isinstance(bag, dict) else {}
+
 
 def _as_int(value):
     if value is None or value is False:
@@ -48,19 +79,11 @@ def extract_cost(usage):
     return n / 1e10
 
 
-def advertise_cost(usage, on_premise=False):
-    """Return a usage dict that Chatboo can price.
-
-    Cloud / unknown (default): leave cost as reported (or absent → UI "-").
-    On premises: if the gateway omitted cost, advertise ``cost=0.0`` so the
-    chip shows 0. If it did report a cost (tokens, electricity, …), keep it.
-    """
+def advertise_cost(usage):
+    """Return a usage dict. Missing cost stays missing; a reported 0 stays 0."""
     if not isinstance(usage, dict):
         usage = {}
-    out = dict(usage)
-    if on_premise and extract_cost(out) is None:
-        out['cost'] = 0.0
-    return out
+    return dict(usage)
 
 
 def usage_has_tokens(usage):
@@ -96,6 +119,9 @@ def normalize_usage(usage):
     completion = _as_int(
         usage.get('completion_tokens') or usage.get('output_tokens'),
     )
+    created = _as_int(usage.get('cache_creation_input_tokens'))
+    if created:
+        prompt += created
     total = _as_int(usage.get('total_tokens')) or (
         (prompt + completion) if (prompt or completion) else 0
     )
@@ -114,6 +140,8 @@ def normalize_usage(usage):
         out['total_tokens'] = total
     if cached:
         out['cached_tokens'] = cached
+    if created:
+        out['cache_creation_tokens'] = created
     cost = extract_cost(usage)
     if cost is not None:
         out['cost'] = cost
@@ -127,9 +155,42 @@ def add_usage(acc, usage):
         return acc if isinstance(acc, dict) else {}
     if not isinstance(acc, dict):
         acc = {}
-    for key in ('prompt_tokens', 'completion_tokens', 'total_tokens', 'cached_tokens'):
+    for key in (
+        'prompt_tokens', 'completion_tokens', 'total_tokens',
+        'cached_tokens', 'cache_creation_tokens',
+    ):
         if key in piece:
             acc[key] = int(acc.get(key) or 0) + int(piece[key])
     if 'cost' in piece:
         acc['cost'] = float(acc.get('cost') or 0.0) + float(piece['cost'])
     return acc
+
+
+def usage_since(now, before):
+    """What ``now`` has on top of ``before``, both running totals."""
+    later = normalize_usage(now)
+    earlier = normalize_usage(before)
+    out = {}
+    for key in (
+        'prompt_tokens', 'completion_tokens', 'total_tokens',
+        'cached_tokens', 'cache_creation_tokens',
+    ):
+        delta = int(later.get(key) or 0) - int(earlier.get(key) or 0)
+        if delta > 0:
+            out[key] = delta
+    cost = float(later.get('cost') or 0.0) - float(earlier.get('cost') or 0.0)
+    if cost > 0:
+        out['cost'] = cost
+    return out
+
+
+def usage_log_fields(usage):
+    """Token + USD fields for ``ai.log._create_log_entry``."""
+    piece = advertise_cost(normalize_usage(usage or {}))
+    ptok = piece.get('prompt_tokens')
+    ctok = piece.get('completion_tokens')
+    ttok = piece.get('total_tokens') or (
+        ((ptok or 0) + (ctok or 0)) or None
+    )
+    cost_usd = extract_cost(piece)
+    return ptok, ctok, ttok, cost_usd

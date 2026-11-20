@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (C) 2026 Patanegra Soft <https://patanegra.com>
+# Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """When a session file or clip rows exist, an empty bubble is still a turn."""
 
 

@@ -1,13 +1,16 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-from odoo.exceptions import UserError
+"""MCP bare-agent code resolution and delete guards."""
+
+from odoo.addons.base.models.ir_model import MODULE_UNINSTALL_FLAG
+from odoo.exceptions import AccessError, UserError
 from odoo.tests import tagged, TransactionCase
 
 from odoo.addons.pns_ai_mcp.models.ai_agent_consumer import MCP_BARE_AGENT_CODE
 from odoo.addons.pns_ai_mcp.tests._helpers import create_test_user, ensure_test_agents
 from odoo.addons.pns_ai_mcp.utils.ai_agent_registry import (
-    CHATBOO_AGENT_CODE,
+    ADMIN_AGENT_CODE,
     FEATURE_AGENT_CODES,
 )
 
@@ -18,10 +21,6 @@ class TestMcpAgent(TransactionCase):
     def setUp(self):
         super().setUp()
         ensure_test_agents(self.env)
-
-    def test_get_mcp_bare_agent_code(self):
-        Agent = self.env['ai.agent']
-        self.assertEqual(Agent.get_mcp_bare_agent_code(), MCP_BARE_AGENT_CODE)
 
     def test_resolve_mcp_agent_none_is_bare(self):
         Agent = self.env['ai.agent']
@@ -58,11 +57,31 @@ class TestMcpAgent(TransactionCase):
         with self.assertRaises(UserError):
             agent.unlink()
 
+    def test_module_uninstall_removes_its_agent_and_links(self):
+        provider = self.env['ai.provider'].create({
+            'name': 'Uninstall test provider',
+            'protocol': 'openai',
+        })
+        agent = self.env['ai.agent'].create({
+            'name': 'Uninstall test agent',
+            'code': 'pns_uninstall_test_agent',
+            'origin': 'module',
+            'agent_type': 'inference',
+        })
+        link = self.env['ai.agent.provider'].create({
+            'agent_id': agent.id, 'provider_id': provider.id, 'priority': 1,
+        })
+        with self.assertRaises(UserError):
+            agent.unlink()
+        agent.with_context(**{MODULE_UNINSTALL_FLAG: True}).unlink()
+        self.assertFalse(agent.exists())
+        self.assertFalse(link.exists())
+
     def test_resolve_inference_via_feature_key(self):
         Agent = self.env['ai.agent']
         self.assertEqual(
-            Agent.resolve_inference_agent_code(None, consumer_key='chatboo'),
-            CHATBOO_AGENT_CODE,
+            Agent.resolve_inference_agent_code(None, consumer_key='admin'),
+            ADMIN_AGENT_CODE,
         )
 
     def test_resolve_inference_missing_code_raises(self):
@@ -70,8 +89,20 @@ class TestMcpAgent(TransactionCase):
         with self.assertRaises(UserError):
             Agent.resolve_inference_agent_code(None)
 
-    def test_feature_agent_codes_chatboo(self):
-        self.assertEqual(FEATURE_AGENT_CODES['chatboo'], CHATBOO_AGENT_CODE)
+    def test_feature_agent_codes_admin(self):
+        self.assertEqual(FEATURE_AGENT_CODES, {'admin': ADMIN_AGENT_CODE})
+
+    def test_admin_agent_exists_inference(self):
+        agent = self.env['ai.agent'].search([
+            ('code', '=', ADMIN_AGENT_CODE),
+            ('active', '=', True),
+        ], limit=1)
+        self.assertTrue(
+            agent,
+            'AI agent pns_ai_admin missing — upgrade pns_ai_mcp (-u).',
+        )
+        self.assertEqual(agent.agent_type, 'inference')
+        self.assertEqual(agent.origin, 'module')
 
     def test_settings_open_module_endpoint_agents(self):
         settings = self.env['res.config.settings'].create({})
@@ -112,14 +143,15 @@ class TestMcpAgent(TransactionCase):
         self.assertEqual(action['res_id'], agent.id)
 
     def test_get_providers_for_agent_without_admin_acl(self):
-        """Chatboo users must resolve provider chains without AI Administrator."""
+        """Plain users must resolve provider chains without AI Administrator."""
         agent = self.env['ai.agent'].search([
-            ('code', '=', CHATBOO_AGENT_CODE), ('active', '=', True),
+            ('code', '=', ADMIN_AGENT_CODE), ('active', '=', True),
         ], limit=1)
-        self.assertTrue(agent, 'chatboo agent must exist')
+        self.assertTrue(agent, 'admin agent must exist')
         if not agent.provider_ids:
-            provider = self.env['ai.provider'].search([], limit=1)
-            self.assertTrue(provider, 'need at least one ai.provider for test')
+            provider = self.env['ai.provider'].search([], limit=1) or self.env['ai.provider'].create({
+                'name': 'Test provider', 'protocol': 'openai',
+            })
             self.env['ai.agent.provider'].sudo().create({
                 'agent_id': agent.id,
                 'provider_id': provider.id,
@@ -128,17 +160,26 @@ class TestMcpAgent(TransactionCase):
 
         plain_user = create_test_user(self.env, prefix='ai_plain_user')
         engine = self.env['ai.execution.engine'].with_user(plain_user)
-        providers = engine.get_providers_for_agent(CHATBOO_AGENT_CODE)
+        providers = engine.get_providers_for_agent(ADMIN_AGENT_CODE)
         self.assertTrue(providers, 'plain user should resolve providers')
-        resolved = engine.resolve_provider(CHATBOO_AGENT_CODE)
+        resolved = engine._resolve_provider(ADMIN_AGENT_CODE)
         self.assertTrue(resolved)
+
+        # Entering the agent form reads the One2many; that is not admin-only.
+        agent_as_user = agent.with_user(plain_user)
+        links = agent_as_user.provider_ids
+        self.assertTrue(links)
+        links.read(['provider_id', 'priority', 'active'])
+        with self.assertRaises(AccessError):
+            links[0].write({'priority': 99})
 
     def test_api_key_for_inference_without_admin_acl(self):
         """Inference must read provider credentials without exposing them in UI."""
         from odoo.addons.pns_ai_mcp.utils.compat import invalidate_recordset_fields
 
-        provider = self.env['ai.provider'].search([], limit=1)
-        self.assertTrue(provider, 'need at least one ai.provider for test')
+        provider = self.env['ai.provider'].search([], limit=1) or self.env['ai.provider'].create({
+            'name': 'Test provider', 'protocol': 'openai',
+        })
         provider.sudo().write({'api_key': 'test-secret-key'})
         invalidate_recordset_fields(provider, ['api_key'])
 

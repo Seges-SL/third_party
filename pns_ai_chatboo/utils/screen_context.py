@@ -10,7 +10,7 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
-# Campos opcionales a incluir si existen en el modelo (sin hardcodear por app).
+# Optional fields to include if the model has them (not hardcoded per app).
 _CANDIDATE_SUMMARY_FIELDS = (
     'state',
     'stage_id',
@@ -197,7 +197,7 @@ def _parse_domain(raw_domain):
 
 
 def _append_list_view_stats(env, Model, action, lines):
-    """Add search_count for list/kanban views (answers «¿cuántos registros?»)."""
+    """Add search_count for list/kanban views (answers «how many records?»)."""
     view_type = (action.get('view_type') or '').lower()
     if view_type not in ('list', 'tree', 'kanban'):
         return

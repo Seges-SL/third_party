@@ -1,3 +1,9 @@
+/**
+ * Context-window (tokens) dropdown: curated 1K–2M ladder, plus off-grid stored values.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+ */
 odoo.define('pns_ai_mcp.ContextWindowComboWidget', function (require) {
     "use strict";
     // Context window (tokens) as a plain dropdown <select>. Options are a
@@ -67,10 +73,10 @@ odoo.define('pns_ai_mcp.ContextWindowComboWidget', function (require) {
         },
 
         _onChangeSelect: function () {
-            // OJO: _setValue -> field_utils.parse.integer espera una CADENA
-            // (hace value.replace(...)). Si le pasamos un Number, lanza y el
-            // campo se marca como "inválido" (label en rojo). Pasamos el string
-            // tal cual del <select> y que Odoo lo parsee.
+            // NOTE: _setValue -> field_utils.parse.integer expects a STRING
+            // (it does value.replace(...)). If we pass a Number, it throws and the
+            // field is marked "invalid" (red label). We pass the string
+            // as is from the <select> and let Odoo parse it.
             var raw = this.$select.val();
             this._setValue(raw === '' ? false : raw);
         },

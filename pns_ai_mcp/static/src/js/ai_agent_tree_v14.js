@@ -1,6 +1,9 @@
-// -*- coding: utf-8 -*-
-// Operations button for AI Agents list (Odoo 14).
-// Model: 'ai.agent'.
+/**
+ * Tools button for the AI Agents list (Odoo 14).
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+ */
 odoo.define('pns_ai_mcp.ai_agent_tree', function (require) {
     "use strict";
 

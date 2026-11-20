@@ -9,8 +9,6 @@ matching the headings the skill already provided.
 """
 from __future__ import annotations
 
-_NEUTRAL_RECO_STUB = 'Revisar las tablas anteriores.'
-
 
 def _heading_label(heading):
     return (heading or '').lstrip('#').strip().lower()
@@ -59,8 +57,8 @@ def is_report_closer(text, outline=None):
     """True when the text never opened the report (warm footer / aside).
 
     After tools the model is told to write 1–2 warm sentences. That must
-    not be treated as a truncated report (which used to spawn
-    ``Pendiente de narrativa`` stubs and wipe the real prose).
+    not be treated as a truncated report (which used to spawn empty
+    headings and wipe the real prose).
     """
     body = (text or '').strip()
     if not body:
@@ -149,22 +147,90 @@ def ensure_report_completion(
         chunks.append(heading)
         chunks.append('')
         if stub_label and _heading_label(heading) == stub_label:
-            if stub:
-                for b in stub:
-                    chunks.append('- %s' % b)
-            else:
-                chunks.append('- %s' % _NEUTRAL_RECO_STUB)
+            for b in stub:
+                chunks.append('- %s' % b)
             if closing and isinstance(closing, str) and closing.strip():
                 chunks.append(closing.strip())
                 need_closing = False
-        else:
-            chunks.append(
-                '_Pendiente de narrativa; cifras en las tablas anteriores._'
-            )
-        chunks.append('')
+            if stub or closing:
+                chunks.append('')
 
     if need_closing and closing and isinstance(closing, str) and closing.strip():
         chunks.append(closing.strip())
         chunks.append('')
 
     return '\n'.join(chunks).rstrip() + '\n', True
+
+
+def contract_from_payload(payload):
+    """Narrative contract from a free-text tool result, or None.
+
+    Same keys the slash report handoff stores. A listing without
+    ``report_outline`` stays a listing.
+    """
+    if not isinstance(payload, dict):
+        return None
+    outline = payload.get('report_outline')
+    if not isinstance(outline, (list, tuple)):
+        return None
+    headings = [h.strip() for h in outline if isinstance(h, str) and h.strip()]
+    if not headings:
+        return None
+    closing = payload.get('closing_required')
+    stub = payload.get('recommendations_stub')
+    heading = payload.get('recommendations_heading')
+    return {
+        'report_outline': headings,
+        'closing_required': closing if isinstance(closing, str) else None,
+        'recommendations_stub': stub if isinstance(stub, (list, tuple)) else None,
+        'recommendations_heading': heading if isinstance(heading, str) else None,
+    }
+
+
+_LISTING_FOLLOWUP = (
+    'The main document is ALREADY on screen '
+    '(%s row(s) rendered). Further tool calls may only '
+    'IMPROVE it (previous_result / raw_data) or add a '
+    'minor document. FORBIDDEN: a standalone dump that '
+    'replaces or hides it. If that number is 0 or FAR '
+    'below what was asked (e.g. they asked for "the 50" '
+    'and there are 0 or a few), do NOT claim they are '
+    'all there: your filter is almost certainly wrong '
+    '(watch region vs province). Fix the code and CALL '
+    'the tool AGAIN. If the rows match the request, write '
+    '1–2 WARM closing sentences in the user\'s language and '
+    'do NOT repeat the table. FORBIDDEN in that closing: '
+    'figures, amounts, dates, years, periods, proper '
+    'names, totals or numeric "insights" — the visible '
+    'artifact is the source of truth; the footer may only '
+    'welcome or offer help (another period…), WITHOUT '
+    'naming the year or the period.'
+)
+
+_REPORT_FOLLOWUP = (
+    'The tables are already on screen (%s row(s)). '
+    'report_outline is set. Write the prose NOW, with these '
+    'headings in this order:\n%s\n'
+    'Cite only figures already in those tables. Do not invent '
+    'figures. Do not paste the table again. Do not call the '
+    'tool again if the rows cover the request.'
+)
+
+
+def followup_note_after_tables(row_label, report_contract=None):
+    """Second-round note after the server painted the tables.
+
+    A payload with ``report_outline`` may cite those figures. A listing
+    keeps the short close with no figures.
+    """
+    outline = None
+    if isinstance(report_contract, dict):
+        outline = report_contract.get('report_outline')
+    headings = []
+    if isinstance(outline, (list, tuple)):
+        headings = [h.strip() for h in outline if isinstance(h, str) and h.strip()]
+    label = row_label if row_label is not None else '?'
+    if headings:
+        titles = '\n'.join('- %s' % h for h in headings)
+        return _REPORT_FOLLOWUP % (label, titles)
+    return _LISTING_FOLLOWUP % label

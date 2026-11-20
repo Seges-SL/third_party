@@ -16,9 +16,10 @@ _logger = logging.getLogger(__name__)
 # Keys copied into a tables[] entry (presentation contract, not domain).
 _BLOCK_KEYS = (
     'data', 'groups', 'sections', 'tables', 'formatted_text',
-    'map_url', 'map_pins', 'pins_url', 'summary', 'title', 'name',
+    'page_url', 'map_url', 'map_pins', 'pins_url', 'summary', 'title', 'name',
     'geo_coords', 'geo_thumbs', 'notices',
     '__model', '__subtle_zebra__', '__no_charts__', '__row_links__',
+    '__excel_formulas__',
 )
 
 
@@ -36,12 +37,13 @@ def is_extraction_probe(payload):
 
 
 def has_presentable_content(payload):
-    """Something the renderer / banner can show (rows, HTML, map card, …)."""
+    """Something the renderer / banner can show (rows, HTML, page card, …)."""
     if not isinstance(payload, dict):
         return False
     if payload.get('formatted_text'):
         return True
-    if payload.get('map_url') or payload.get('map_pins') or payload.get('pins_url'):
+    from .result_page import has_page_url
+    if has_page_url(payload) or payload.get('map_pins'):
         return True
     for key in ('data', 'groups', 'sections', 'tables'):
         val = payload.get(key)
@@ -60,6 +62,9 @@ def is_basket_presentable(payload):
         return False
     if not has_presentable_content(payload):
         return False
+    from .result_page import has_page_url
+    if has_page_url(payload) or payload.get('map_pins'):
+        return True
     # Align with retorno_directo: explicit user-facing, presentation phase,
     # or trusted formatted_text ready for chat.
     if (
@@ -238,6 +243,7 @@ def render_basket_html(basket, *, fallback_html=None, env=None, render_context=N
         _logger.debug('turn_presentation_basket: merge produced no HTML')
         return fallback_html
     try:
-        return wrap_bare_images_clickable(html)
+        image_env = rcx.get('env') if isinstance(rcx, dict) else None
+        return wrap_bare_images_clickable(html, env=image_env or env)
     except Exception:
         return html

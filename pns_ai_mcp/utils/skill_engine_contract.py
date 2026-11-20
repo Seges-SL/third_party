@@ -18,32 +18,25 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-# Front-matter keys the importer / constrain understands.
-SKILL_FRONT_MATTER_KEYS = frozenset((
-    'skill',
-    'code',
-    'artifact',
-    'name',
-    'description',
-    'agent_codes',
-    'agent_code',
-    'version',
-    'painter',
-    'formatting_mode',
-    'param_schema',
-    'arg_hint',
-    'args_policy',
-    'triggers',
-    'sequence',
-    'active',
-    'context_codes',
-    'requires',
-))
+# Where the skill import reads its front-matter: (folder, file, function or
+# None for the whole file). The keys are the ones these readers cite.
+_FRONT_MATTER_READERS = (
+    ('models', 'ai_skill.py', None),
+    ('models', 'ai_skill_disk.py', None),
+    ('utils', 'skill_files.py', None),
+    ('utils', 'skill_engine_contract.py', None),
+    ('models', 'ai_context_disk.py', '_explicit_agent_codes_from_metadata'),
+)
+
+_META_KEY_IN_SOURCE = re.compile(
+    r"""\bmeta(?:data)?\)?(?:\s+or\s+\{\}\))?\s*(?:\.get\(\s*|\[\s*)['"]([a-z_]+)['"]"""
+    r"""|['"]([a-z_]+)['"]\s+in\s+meta\b"""
+)
 
 # Capabilities a skill may list in ``requires:`` (comma-separated).
 SKILL_ENGINE_CAPABILITIES = frozenset((
-    'painter-local',
-    'painter-free',
+    'compose-agent',
+    'compose-model',
     'report_outline',
     'closing_required',
     'recommendations_stub',
@@ -92,13 +85,14 @@ _NOT_RESULT_PROTOCOL = frozenset((
     '__traceback__',
 ))
 
-# This file is the scanner, not a source of protocol names.
+# This file is the scanner, not a source of protocol names. The sandbox
+# guards (``validators*.py``) list forbidden dunders, not protocol ones.
 _SKIP_ENGINE_FILES = frozenset((
     'skill_engine_contract.py',
-    'validators.py',
     'context_builder.py',
     'controller_helpers.py',
 ))
+_SKIP_ENGINE_STEM = 'validators'
 
 _DUNDER_IN_SOURCE = re.compile(
     r"""(?:['"])(__[a-z0-9_]+__)(?:['"])"""
@@ -113,7 +107,7 @@ def _engine_scan_files():
         if not folder.is_dir():
             continue
         for path in sorted(folder.glob('*.py')):
-            if path.name in _SKIP_ENGINE_FILES:
+            if path.name in _SKIP_ENGINE_FILES or path.stem.split('_')[0] == _SKIP_ENGINE_STEM:
                 continue
             found.append(path)
     return found
@@ -143,6 +137,32 @@ def published_result_dunders():
 
 
 SKILL_RESULT_DUNDERS = published_result_dunders()
+
+
+def _function_source(text, name):
+    head = '\n    def %s(' % name
+    if head not in text:
+        return ''
+    return text.split(head, 1)[1].split('\n    def ', 1)[0]
+
+
+def published_front_matter_keys():
+    """Front-matter keys the skill readers already cite."""
+    common = Path(__file__).resolve().parents[1]
+    found = set()
+    for folder, filename, function in _FRONT_MATTER_READERS:
+        try:
+            text = (common / folder / filename).read_text(encoding='utf-8')
+        except OSError:
+            continue
+        if function:
+            text = _function_source(text, function)
+        for match in _META_KEY_IN_SOURCE.finditer(text):
+            found.add(match.group(1) or match.group(2))
+    return frozenset(found)
+
+
+SKILL_FRONT_MATTER_KEYS = published_front_matter_keys()
 
 
 def parse_requires(raw):

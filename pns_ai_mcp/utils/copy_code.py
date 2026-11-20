@@ -7,7 +7,7 @@
 def next_copy_code(base, taken):
     """First code derived from ``base`` that is not in ``taken``.
 
-    ``cdmon`` → ``cdmon_copy``; if that exists, ``cdmon_copy2``, …
+    ``alpha`` → ``alpha_copy``; if that exists, ``alpha_copy2``, …
     """
     root = (base or 'server').strip() or 'server'
     taken = set(taken or ())

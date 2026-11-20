@@ -3,7 +3,7 @@ skill: dashboard
 name: Business dashboard
 description: Nine chart cards — team (or journal), top customers and trend for month, quarter and YTD from posted customer invoices.
 agent_codes: pns_ai_chatboo
-version: 1.4
+version: 1.5
 args_policy: none
 sequence: 45
 active: true

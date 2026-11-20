@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com> */
 /**
  * Chatboo SSE stream protocol — shared between owl1 and owl2 clients.
  *
@@ -7,12 +9,12 @@
  *   - status, done, verification, error → handled by stack-specific UI code
  *
  * Loaded as a plain script (global ChatbooSse). Deploy copies common/ into the
- * stack addon via i.sh before Odoo loads assets.
+ * stack addon by the installer before Odoo loads assets.
  */
 (function (global) {
     "use strict";
 
-    var FOOTER_OPEN = '<div class="mt-2 o_chatboo_prose_host o_chatboo_prose" style="font-size:0.97em;">';
+    var FOOTER_OPEN = '<div class="mt-2 o_ai_prose_host o_ai_prose" style="font-size:0.97em;">';
     var FOOTER_CLOSE = "</div>";
 
     /**
@@ -113,7 +115,7 @@
         if (!s) {
             return false;
         }
-        // Lead markers, or prose prefix + glued heading (e.g. "fuerzo….## Análisis")
+        // Lead markers, or prose prefix + glued heading (e.g. "effort….## Analysis")
         if (/^(#{1,6}\s|\*\*|[-*+]\s|\d+\.\s|\|)/.test(s)) {
             return true;
         }
@@ -122,10 +124,10 @@
     }
 
     /**
-     * Insert newlines before glued ATX headers (e.g. "texto.## Título").
+     * Insert newlines before glued ATX headers (e.g. "text.## Title").
      * Showdown needs a line break; the model often streams without one.
      * Do NOT touch pipe characters: a global "|…|" rewrite shreds Markdown
-     * tables (`| Año | Ventas |` → broken rows / stray #).
+     * tables (`| Year | Sales |` → broken rows / stray #).
      * @param {string} md
      * @returns {string}
      */
@@ -278,20 +280,80 @@
     }
 
     /**
+     * A model sometimes writes an HTML table in the middle of a paragraph.
+     * Showdown only keeps a table that starts its own line; otherwise the
+     * tags are shown as text. Lift each table out and keep table tags only.
+     * @param {string} md
+     * @returns {string}
+     */
+    function liftHtmlTables(md) {
+        return String(md || "").replace(/<table\b[\s\S]*?<\/table>/gi, function (block) {
+            var safe = sanitizeModelTable(block);
+            if (!safe) {
+                return "";
+            }
+            return "\n\n" + safe + "\n\n";
+        });
+    }
+
+    function sanitizeModelTable(html) {
+        var s = String(html || "");
+        s = s.replace(/<script\b[\s\S]*?<\/script>/gi, "");
+        s = s.replace(/<style\b[\s\S]*?<\/style>/gi, "");
+        s = s.replace(/<!--[\s\S]*?-->/g, "");
+        s = s.replace(/<\/?([a-zA-Z0-9]+)(?:\s[^<>]*)?>/g, function (full, tag) {
+            var name = String(tag || "").toLowerCase();
+            var closing = full.charAt(1) === "/";
+            if (name === "br") {
+                return "<br>";
+            }
+            if (name !== "table" && name !== "thead" && name !== "tbody"
+                    && name !== "tfoot" && name !== "tr" && name !== "th"
+                    && name !== "td") {
+                return "";
+            }
+            if (closing) {
+                return "</" + name + ">";
+            }
+            if (name === "table") {
+                return '<table class="table table-sm table-striped">';
+            }
+            return "<" + name + ">";
+        });
+        if (s.indexOf("<table") < 0 || s.indexOf("</table>") < 0) {
+            return "";
+        }
+        return s;
+    }
+
+    /**
+     * The history stub is for the model, not the bubble. Some models copy
+     * ``[On-screen artifact …]`` into the answer. Drop that line.
+     * @param {string} md
+     * @returns {string}
+     */
+    function stripOnScreenStubs(md) {
+        return String(md || "").replace(/\[On-screen artifact[^\]]*\]/g, "");
+    }
+
+    /**
      * Prepare model Markdown for display: unwrap non-code fences, normalize headers.
      * Tabular data must arrive via SSE replace (server HTML), not client parsers.
+     * A raw HTML table written inside a paragraph is lifted so it can render.
      * @param {string} md
      * @returns {{ markdown: string }}
      */
     function prepareMarkdownForDisplay(md) {
         return {
-            markdown: normalizeGluedMarkdown(unwrapNonCodeFences(md || "")),
+            markdown: normalizeGluedMarkdown(
+                liftHtmlTables(stripOnScreenStubs(unwrapNonCodeFences(md || "")))
+            ),
         };
     }
 
     /**
      * Split server HTML table + trailing Markdown prose (common after data_rendered).
-     * Production pattern: `...</div>## Análisis…` (no newline). Returns null if
+     * Production pattern: `...</div>## Analysis…` (no newline). Returns null if
      * there is no clear HTML body + markdown tail.
      * @param {string} text
      * @returns {{ html: string, md: string }|null}
@@ -302,7 +364,7 @@
             return null;
         }
         if (s.indexOf("<table") < 0 && s.indexOf("table-responsive") < 0
-                && s.indexOf("o_chatboo_data_table") < 0) {
+                && s.indexOf("o_ai_data_table") < 0) {
             return null;
         }
         var marker = "</div>";
@@ -360,6 +422,8 @@
         isDiagnosticJsonDump: isDiagnosticJsonDump,
         unwrapNonCodeFences: unwrapNonCodeFences,
         unwrapBusinessDataFences: unwrapBusinessDataFences,
+        liftHtmlTables: liftHtmlTables,
+        stripOnScreenStubs: stripOnScreenStubs,
         prepareMarkdownForDisplay: prepareMarkdownForDisplay,
         splitHtmlAndMarkdownTail: splitHtmlAndMarkdownTail,
         mergeHtmlWithFooter: mergeHtmlWithFooter,

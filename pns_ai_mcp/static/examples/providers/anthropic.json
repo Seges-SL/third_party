@@ -1,0 +1,20 @@
+{
+  "what": "pns.ai.config.backup",
+  "providers": [
+    {
+      "name": "Anthropic",
+      "active": false,
+      "protocol": "anthropic",
+      "endpoint": "https://api.anthropic.com/v1/messages",
+      "selected_model": "claude-opus-4-8",
+      "roles": [],
+      "temperature": 0.7,
+      "temperature_support": "no",
+      "usage_support": "unknown",
+      "stt_support": "unknown",
+      "context_window": 32768,
+      "footmode": "foot-verbose",
+      "compose": "compose-agent"
+    }
+  ]
+}

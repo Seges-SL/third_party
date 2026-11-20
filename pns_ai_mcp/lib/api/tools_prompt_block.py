@@ -9,7 +9,7 @@ appear here.
 from __future__ import annotations
 
 TOOLS_PROMPT_HEADER = (
-    'External API servers callable via propose_safe_operations → api_call. '
+    'External API servers callable via safe_plan_request → api_call. '
     'Use ONLY these exact server codes and tool names; never invent tools '
     '(e.g. do NOT use search_read/list_tools unless listed below). '
     'Server codes are instance-specific (they may have suffixes); there is '

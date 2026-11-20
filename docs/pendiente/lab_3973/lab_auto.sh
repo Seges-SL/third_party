@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+# Laboratorio automatizado de lab_pns_ai_3973 (procedimiento fijo:
+# docs/pendiente/lab_procedimiento_3973.md). Arranca, entra con Chrome
+# headless, hace C tras la entrada, visita las rutas y, pase lo que pase
+# (también con Ctrl+C o un error), guarda el log, hace C sobre él y para.
+#
+# Uso (desde cualquier carpeta):
+#   lab_auto.sh <salida> [--lab CARPETA] [--bd BD] [--pintado]
+#               [--escenario p34|tarjeta] [--visible] [--espera-turno N]
+#               [--descarga RUTA]... [RUTA...]
+# --lab y --bd (D44, 17/11/2026): carpeta de ~/GitHub desde la que se arranca y
+# BD esperada (login, sesión, C, guardas y SQL). Por defecto, lab_pns_ai_3973 y
+# lab_pns_ai_3973_14. La C del log guardado espera la BD indicada.
+# --escenario tarjeta (D47): reintento de la tarjeta tras too_soon, con el clic
+# FORZADO antes de 5 s; antes, tarjeta_plantar.sh (y lanzarlo antes de 15 min).
+# --pintado (parche 34, L1): pintado del aviso por el formatContent real del
+# cliente, antes de las rutas; sin modelo y sin escribir en la BD.
+# --escenario p34 (parche 34, L2): turnos reales con el proveedor, con dos
+# pausas en esta terminal y SQL de solo lectura. --visible: Chrome se ve.
+# Requiere LAB_LOGIN y LAB_PASSWORD exportadas. «Antes de arrancar» (estado y
+# bd-lista) se hace a mano antes de lanzarlo.
+#
+# Códigos de salida (un código por causa; los de 1 a 8, 11, 12 y 20 son los
+# de lab_cdp.py):
+#    0 todo como se espera            10 web ya en marcha o docker no responde
+#    1 incidencias de medición        11 faltan LAB_LOGIN o LAB_PASSWORD (no arranca)
+#    3 otra BD                        12 argumentos o rutas no válidos (no arranca)
+#    4 el servidor no responde        13 no existe la carpeta del laboratorio (no arranca)
+#    5 falla el login                 14 falla «odoo-dev 14 arrancar»
+#    6 error de Chrome (CDP)          20 error interno de lab_cdp.py
+#    7 «Al acabar» incompleto        130 Ctrl+C o TERM
+#    8 no concluyente (--pintado no encuentra el formateador del cliente, un
+#      paso de --escenario p34 no prueba nada, o en --escenario tarjeta el chat
+#      no se abre o la tarjeta no se pinta)
+#    9 --escenario p34: condición o paso manual no confirmado por SQL;
+#      --escenario tarjeta: la operación plantada no está lista (no se pulsa)
+# Prioridad si coinciden: 7, después 3, después el código de la navegación.
+set -uo pipefail
+
+AQUI=$(cd "$(dirname "$0")" && pwd)
+LAB_NOMBRE=lab_pns_ai_3973
+BD=lab_pns_ai_3973_14
+
+motivo() {
+    case "$1" in
+        0) echo "todo como se espera" ;;
+        1) echo "incidencias de medición (detalle por ruta en la salida)" ;;
+        3) echo "otra BD (seguir «Si aparece otra BD»)" ;;
+        4) echo "el servidor no responde" ;;
+        5) echo "falla el login" ;;
+        6) echo "error de Chrome (CDP)" ;;
+        7) echo "«Al acabar» incompleto (log no guardado, sin líneas de Odoo o falla parar)" ;;
+        8) echo "no concluyente: el pintado no encontró el formateador o un paso del escenario no prueba nada" ;;
+        9) echo "escenario: condición o paso manual no confirmado por SQL (o la operación de la tarjeta no está lista)" ;;
+        10) echo "el contenedor web ya está en marcha (o docker no responde): no se arranca" ;;
+        11) echo "faltan LAB_LOGIN o LAB_PASSWORD: no se arranca" ;;
+        12) echo "argumentos o rutas no válidos: no se arranca" ;;
+        13) echo "no existe $LAB: no se arranca" ;;
+        14) echo "falla «odoo-dev 14 arrancar»" ;;
+        20) echo "error interno de lab_cdp.py" ;;
+        130) echo "Ctrl+C o TERM" ;;
+        *) echo "código no previsto" ;;
+    esac
+}
+
+[ $# -ge 1 ] || { echo "Uso: lab_auto.sh <carpeta de salida> [--lab CARPETA] [--bd BD] [--pintado] [--escenario p34|tarjeta] [--visible] [--espera-turno N] [--descarga RUTA]... [RUTA...]"; exit 12; }
+SALIDA=$1
+shift
+# --lab y --bd se leen aquí y se pasan a lab_cdp.py; el resto, tal cual.
+RESTO=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --lab|--bd)
+            [ $# -ge 2 ] || { echo "Falta el valor de $1."; exit 12; }
+            if [ "$1" = --lab ]; then LAB_NOMBRE=$2; else BD=$2; fi
+            shift 2 ;;
+        --lab=*) LAB_NOMBRE=${1#--lab=}; shift ;;
+        --bd=*) BD=${1#--bd=}; shift ;;
+        *) RESTO+=("$1"); shift ;;
+    esac
+done
+[[ "$LAB_NOMBRE" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]*$ ]] && [[ "$LAB_NOMBRE" != *..* ]] || {
+    echo "--lab no válido (solo el nombre de una carpeta de ~/GitHub): $LAB_NOMBRE"; exit 12; }
+[[ "$BD" =~ ^[a-z0-9_]+$ ]] || { echo "--bd no válida (minúsculas, cifras y _): $BD"; exit 12; }
+LAB=~/GitHub/$LAB_NOMBRE
+SELECCION=(--lab "$LAB_NOMBRE" --bd "$BD")
+[ -n "${LAB_LOGIN:-}" ] && [ -n "${LAB_PASSWORD:-}" ] || {
+    echo "Faltan LAB_LOGIN y LAB_PASSWORD (exportadas en esta terminal)."; exit 11; }
+# Las guardas de las rutas, antes de preguntar y de arrancar nada.
+python3 -I "$AQUI/lab_cdp.py" rutas "${SELECCION[@]}" ${RESTO[@]+"${RESTO[@]}"}
+RC=$?
+[ "$RC" = 0 ] || exit "$RC"
+mkdir -p "$SALIDA" || exit 12
+cd "$LAB" 2>/dev/null || { echo "No existe $LAB."; exit 13; }
+echo "Laboratorio: $LAB · BD esperada: $BD"
+
+# Desde el 17/11/2026 lo comprueba el script (antes se preguntaba): en el
+# segundo intento de L2, «web» seguía en marcha aunque la respuesta fue «s».
+NOMBRES=$(docker ps --format '{{.Names}}' 2>/dev/null) || {
+    echo "No se arranca: «docker ps» no responde."; exit 10; }
+if printf '%s\n' "$NOMBRES" | grep -qx 'odoo-dev-14-web-1'; then
+    echo "No se arranca: el contenedor odoo-dev-14-web-1 está en marcha. Primero «Al acabar» del laboratorio anterior (guardar el log, C y «odoo-dev 14 parar»)."
+    exit 10
+fi
+echo "Contenedor web parado (docker ps): se arranca."
+
+HECHO=0
+al_acabar() {
+    local rc=$?
+    [ "$HECHO" = 1 ] && return
+    HECHO=1
+    local acabar_ok=1 rc_c final
+    echo
+    echo "== Al acabar: guardar el log, C y parar"
+    LOG_LAB=~/odoo-dev/14.0/logs/servidor-$(date +%Y%m%d-%H%M%S).log
+    if odoo-dev 14 log all > "$LOG_LAB"; then
+        wc -l "$LOG_LAB"
+    else
+        echo "No se pudo guardar el log."
+        acabar_ok=0
+    fi
+    python3 -I "$AQUI/lab_cdp.py" c "${SELECCION[@]}" < "$LOG_LAB"
+    rc_c=$?
+    if [ "$rc" = 14 ] && [ "$rc_c" = 7 ]; then
+        # Si «arrancar» falló, que el log no tenga líneas de Odoo es lo esperable.
+        echo "(Log sin líneas de Odoo tras el fallo de arrancar: no cuenta como «Al acabar» incompleto.)"
+        rc_c=0
+    fi
+    odoo-dev 14 parar || { echo "Falló «odoo-dev 14 parar»."; acabar_ok=0; }
+    echo "Log guardado: $(basename "$LOG_LAB") (no se imprime ni se copia a la documentación)"
+    final=$rc
+    if [ "$acabar_ok" = 0 ] || [ "$rc_c" = 7 ]; then
+        final=7
+    elif [ "$rc_c" = 3 ]; then
+        final=3
+    elif [ "$rc_c" != 0 ] && [ "$final" = 0 ]; then
+        final=$rc_c
+    fi
+    echo "Navegación: $rc ($(motivo "$rc")) · C del log guardado: $rc_c"
+    echo "Código final $final: $(motivo "$final")"
+    exit "$final"
+}
+trap al_acabar EXIT
+trap 'exit 130' INT TERM
+
+echo "== Arranque"
+odoo-dev 14 arrancar || exit 14
+python3 -I "$AQUI/lab_cdp.py" navegar --salida "$SALIDA" "${SELECCION[@]}" ${RESTO[@]+"${RESTO[@]}"}
+CODIGO=$?
+echo "lab_cdp.py terminó con el código $CODIGO ($(motivo "$CODIGO"))"
+exit "$CODIGO"

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ai_provider_catalogue_copy_form" model="ir.ui.view">
+        <field name="name">ai.provider.catalogue.copy.form</field>
+        <field name="model">ai.provider.catalogue.copy</field>
+        <field name="arch" type="xml">
+            <form string="Model catalogue">
+                <div class="o_field_text_copy_container" style="position: relative;">
+                    <a href="#" class="btn btn-sm btn-link o_field_text_copy_btn"
+                       role="button"
+                       style="position: absolute; top: 0; right: 8px; z-index: 10; text-decoration: none;"
+                       title="Copy to clipboard">
+                        <i class="fa fa-copy" title="Copy to clipboard"/>
+                    </a>
+                    <field name="catalogue_json" nolabel="1" readonly="1" widget="text"
+                           class="o_field_text_copy_target"/>
+                </div>
+                <footer>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

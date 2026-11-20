@@ -1,29 +1,27 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""PNS AI MCP - URL Whitelist. PATANEGRA Soft (https://patanegra.com).
+"""Typed instance-level URL whitelist with temporal validity.
 
-Part of Patanegra Soft Suite (`pns_suite`), distributed via Patanegra Soft Hub.
-Egress control of the Patanegra Application Agent Protocol (PAAP): a TYPED
-instance-level whitelist with temporal validity governing every domain the AI
-may reach. The ``kind`` field says WHICH egress channel the entry authorizes:
-  - web:     fetch_url (safe GET/QUERY requests).
+``kind`` says which egress channel the entry authorizes:
+  - web:     fetch_url (safe GET/QUERY requests) and pictures from that
+             site shown in assistant answers (``/pns_ai_mcp/remote_image``).
   - mcp:     external MCP servers (ai.api.server, api_type='mcp').
   - openapi: external OpenAPI servers (ai.api.server, api_type='openapi').
-Matching requires the kind to coincide: whitelisting a domain for plain web
-fetches does NOT authorize it as an API server, and vice versa.
+Matching requires the kind to coincide: a web entry does not authorize an
+API server, and vice versa.
 
-Access policy (Settings -> URL access policy):
-  - whitelist_only: only listed domains; anything else is blocked unless an AI
-    Administrator confirms adding the domain and executes.
+Access policy (Settings → URL access policy):
+  - whitelist_only: only listed domains; anything else is blocked unless an
+    AI Administrator confirms adding the domain and executes.
   - open: any domain is allowed and added to the list on access.
-The user permission (group_ai_external_url) is independent: without it fetch_url
-cannot even be proposed. This whitelist is the instance-level layer.
-Licensed under the Apache License 2.0 - see LICENSE.
+``group_ai_external_url`` is independent: without it fetch_url cannot even
+be proposed. This whitelist is the instance-level layer.
 """
 
 import logging
 from odoo import api, fields, models, _
+from odoo.addons.pns_base.utils.compat import ODOO_VERSION
 
 from ..utils import mcp_ui
 from ..utils.import_export_guard import ensure_ai_admin
@@ -95,10 +93,15 @@ class URLWhitelist(models.Model):
         readonly=True,
     )
 
-    _sql_constraints = [
-        ('domain_kind_unique', 'UNIQUE(domain, kind)',
-         'This domain is already in the whitelist for that kind.'),
-    ]
+    if ODOO_VERSION >= 19:
+        _domain_kind_unique = models.Constraint(
+            'UNIQUE(domain, kind)',
+            'This domain is already in the whitelist for that kind.',
+        )
+    else:
+        _sql_constraints = [
+            ('domain_kind_unique', 'UNIQUE(domain, kind)', 'This domain is already in the whitelist for that kind.'),
+        ]
 
     @api.model
     def _match_whitelist_entry(self, hostname, kind='web'):
@@ -168,12 +171,22 @@ class URLWhitelist(models.Model):
         return self.is_url_access_open()
 
     @api.model
+    def may_show_remote_image(self, hostname):
+        """True if Odoo may fetch a picture from *hostname* for the page.
+
+        Only an explicit web whitelist entry qualifies. The open URL policy
+        does not stretch to pictures: those reach the user's browser, and a
+        host that was never listed is not fetched.
+        """
+        return self.is_domain_whitelisted(hostname, kind='web')
+
+    @api.model
     def _fetch_url_access_status(self, hostname, user=None):
         """Return how a hostname is treated for fetch_url.
 
         allowed              — whitelisted, active and within valid window
         needs_reactivation   — row exists but active=False; admin may confirm to reactivate
-        open_add             — open policy: access + auto-add to whitelist
+        open_add             — open policy: access without adding to the list
         admin_add            — whitelist_only: admin may confirm add + access
         denied               — whitelist_only: blocked for non-admins
         """
@@ -225,7 +238,7 @@ class URLWhitelist(models.Model):
         return True, None
 
     @api.model
-    def ensure_domain_whitelisted(self, hostname, notes='', kind='web'):
+    def _ensure_domain_whitelisted(self, hostname, notes='', kind='web'):
         """Add hostname to the whitelist for *kind*, or reactivate a disabled row."""
         hostname = (hostname or '').lower().strip()
         if not hostname or self.is_domain_whitelisted(hostname, kind=kind):
@@ -307,14 +320,14 @@ class URLWhitelist(models.Model):
         The key field for matching is ``domain`` (case-insensitive).
 
         Returns:
-            dict: Odoo action opening ``pns_ai_mcp.import_whitelist_wizard``
+            dict: Odoo action opening ``ai.import.whitelist.wizard``
                   as a modal dialog.
         """
         ensure_ai_admin(self.env)
         return {
             'type': 'ir.actions.act_window',
             'name': _('Import URL Whitelist'),
-            'res_model': 'pns_ai_mcp.import_whitelist_wizard',
+            'res_model': 'ai.import.whitelist.wizard',
             'view_mode': 'form',
             'views': [[False, 'form']],
             'target': 'new',

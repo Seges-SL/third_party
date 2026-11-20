@@ -42,7 +42,7 @@
             <term key="Employee, Staff">hr.employee (module: hr, NOT res.partner)</term>
             <term key="NIF, CIF, DNI, Tax ID, Identification ID">Synonyms for identification/tax number. res.partner: use vat. hr.employee: use identification_id. Choose field by model.</term>
             <term key="Department">hr.department</term>
-            <term key="Sales Team, Business Area">crm.team (module: sales/crm)</term>
+            <term key="Sales Team">crm.team (module: sales/crm)</term>
             
             <!-- Analytics & Reporting -->
             <term key="Filter, Custom View">ir.filters</term>

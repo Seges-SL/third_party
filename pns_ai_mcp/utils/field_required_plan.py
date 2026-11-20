@@ -11,6 +11,8 @@ from datetime import timedelta
 
 from odoo import _, api, fields, SUPERUSER_ID
 from odoo.exceptions import UserError
+# Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+from odoo.addons.pns_base.utils.seges_side_env import seges_side_env
 
 from .view_policy_arch import arch_contains_field, check_ident
 
@@ -177,19 +179,10 @@ def step_requested_view_ids(env, step):
     return out
 
 
-def chatboo_preselected_view_id(env, model):
-    """Primary view under Chatboo, if the session stored a screen."""
-    try:
-        from .session_download import resolve_chatboo_session_id
-    except Exception:
-        return None
-    sid = resolve_chatboo_session_id(env)
-    if not sid:
-        return None
-    if 'chatboo.session' not in env:
-        return None
-    session = env['chatboo.session'].sudo().browse(int(sid))
-    raw = session.last_screen_context if session.exists() else False
+def screen_preselected_view_id(env, model):
+    """Primary view under the chat, if the client put the screen in context."""
+    ctx = getattr(env, 'context', None) or {}
+    raw = ctx.get('screen_context') or ctx.get('last_screen_context')
     if not raw:
         return None
     try:
@@ -218,7 +211,7 @@ def build_choice_items(env, step):
     views = list_primary_views_showing_field(env, model, field)
     wanted = set(step_requested_view_ids(env, step))
     if not wanted:
-        screen = chatboo_preselected_view_id(env, model)
+        screen = screen_preselected_view_id(env, model)
         if screen:
             wanted.add(screen)
     return [view_choice_item(v, selected=(v.id in wanted)) for v in views]
@@ -254,7 +247,8 @@ def create_field_required_choice(env, steps, title):
     nctx = dict(env.context or {})
     choice_id = None
     # Own cursor: SSE keeps the request TX open; Accept is another HTTP call.
-    with env.registry.cursor() as ncr:
+    # Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+    with seges_side_env(), env.registry.cursor() as ncr:
         nenv = api.Environment(ncr, SUPERUSER_ID, nctx)
         rec = nenv['ai.safe.choice'].create({
             'user_id': env.uid,
@@ -272,7 +266,7 @@ def create_field_required_choice(env, steps, title):
         'title': title_s,
         'items': items,
         'message': (
-            '[PENDING] Pick the views in Chatboo. The ERP has NOT changed. '
+            '[PENDING] Pick the views in the chat. The ERP has NOT changed. '
             'Do not call write on ir.ui.view. Do not use op=action.'
         ),
     }

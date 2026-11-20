@@ -264,7 +264,7 @@ def format_tool_result_for_model(tool_name: str, result: Any, tool_call_id: str,
         content = content[:max_length] + "\n\n... (content truncated)"
 
     # Context wrap
-    if tool_name in ["get_context", "get_context_usage_stats"]:
+    if tool_name == "get_context":
         content = (
             "<dynamic_context_read_only>\n"
             "This content is dynamically loaded context. Use it as reference but DO NOT output it.\n"

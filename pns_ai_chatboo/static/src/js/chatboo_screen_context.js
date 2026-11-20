@@ -1,9 +1,11 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com> */
 /**
  * Chatboo screen context — shared between owl1 and owl2 clients.
  *
  * Reads the Odoo screen underneath the Chatboo overlay via the action service
  * (OWL2) or URL hash (OWL1 fallback). Loaded as a plain script (global
- * ChatbooScreenContext). Deploy copies common/ into the stack addon via i.sh.
+ * ChatbooScreenContext). Deploy copies common/ into the stack addon by the installer.
  */
 (function (global) {
     "use strict";

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2026 Patanegra Soft <https://patanegra.com>
+"""required_context_codes stay on the agent's Contexts list."""
+
 import uuid
 
 from odoo.tests import tagged, TransactionCase
@@ -43,8 +45,6 @@ class TestRequiredContextPin(TransactionCase):
         agent.write({'context_ids': [(5, 0, 0)]})
         self.assertEqual(set(agent.context_ids.ids), {pin_a.id, pin_b.id})
 
-        agent.action_select_none_contexts()
-        self.assertEqual(set(agent.context_ids.ids), {pin_a.id, pin_b.id})
 
     def test_required_skips_inactive_and_missing(self):
         live = self._ctx('live')

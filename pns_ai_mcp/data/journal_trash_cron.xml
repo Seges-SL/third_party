@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Empties journal trash older than pns_ai_mcp.journal_trash_days
+         (default 30; 0 = never emptied on its own). Stack owl1 (Odoo 14): numbercall=-1. -->
+    <record id="ir_cron_ai_journal_trash" model="ir.cron">
+        <field name="name">AI: empty change trash older than retention</field>
+        <field name="model_id" ref="model_ai_change_journal"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_empty_journal_trash()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="numbercall">-1</field>
+        <field name="doall" eval="False"/>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>

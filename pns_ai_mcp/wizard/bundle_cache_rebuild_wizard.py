@@ -7,7 +7,7 @@ After the user clicks "Rebuild cache" on an agent form, this wizard
 shows an HTML report with before/after sizes, timestamps, and the
 list of contexts that were assembled.
 
-Model: ``pns_ai_mcp.agent.cache.rebuild.wizard``
+Model: ``ai.agent.cache.rebuild.wizard``
 """
 from odoo import api, fields, models
 
@@ -18,7 +18,7 @@ class AIAgentCacheRebuildWizard(models.TransientModel):
     Inherits ``pns.operation.report.wizard`` which provides the
     ``result_html`` field and the standard report layout.
     """
-    _name = 'pns_ai_mcp.agent.cache.rebuild.wizard'
+    _name = 'ai.agent.cache.rebuild.wizard'
     _inherit = ['pns.operation.report.wizard']
     _description = 'Agent cache rebuild result'
 

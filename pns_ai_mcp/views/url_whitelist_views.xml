@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Safe Plan URL Whitelist — CRUD de dominios de confianza para fetch_url.
-    Dominios aquí = 🟢 (fast-track). Dominios fuera = 🔴 (cooldown 5s + warning).
+    Safe Plan URL Whitelist — CRUD of trusted domains for fetch_url.
+    Domains here = 🟢 (fast-track). Domains outside = 🔴 (cooldown 5s + warning).
 -->
 <odoo>
     <record id="view_url_whitelist_tree" model="ir.ui.view">

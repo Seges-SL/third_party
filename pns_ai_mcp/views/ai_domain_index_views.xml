@@ -7,7 +7,7 @@
         <field name="name">ai.context.discover.tree</field>
         <field name="model">ai.context</field>
         <field name="arch" type="xml">
-            <tree string="Domain Discovery" create="false" delete="1" edit="false"
+            <tree string="Discovery" create="false" delete="1" edit="false"
                   class="o_pns_list">
                 <field name="discovery_priority" optional="show"/>
                 <field name="code" optional="show"/>
@@ -54,7 +54,7 @@
     </record>
 
     <record id="action_ai_domain_discovery" model="ir.actions.act_window">
-        <field name="name">Domain Discovery</field>
+        <field name="name">Discovery</field>
         <field name="res_model">ai.context</field>
         <field name="view_mode">tree,form</field>
         <field name="view_id" ref="view_ai_discover_context_tree"/>
@@ -64,10 +64,13 @@
     </record>
 
     <menuitem id="menu_ai_domain_discovery"
-              name="Domain Discovery"
+              name="Discovery"
               parent="pns_ai_mcp.menu_ai_knowledge"
               action="action_ai_domain_discovery"
               sequence="7"
               groups="pns_ai_mcp.group_ai_admin"/>
+    <record id="menu_ai_domain_discovery" model="ir.ui.menu">
+        <field name="name">Discovery</field>
+    </record>
 
 </odoo>

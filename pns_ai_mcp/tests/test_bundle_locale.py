@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Locale variants when assembling an agent's context parts."""
+
 from odoo.tests import tagged, TransactionCase
 
 from odoo.addons.pns_ai_mcp.tests._helpers import (
@@ -26,7 +28,7 @@ class TestAgentLocale(TransactionCase):
         return self.env['ai.agent']
 
     def _create_context(self, code, context_type='domain', content=None, locale=None):
-        """Crea contexto de test; locale explícito (el modelo ya no lo infiere del code)."""
+        """Create a test context; explicit locale (the model no longer infers it from the code)."""
         if locale is None:
             locale = locale_from_code(code) or False
         ctx = self.Context.create({
@@ -73,7 +75,7 @@ class TestAgentLocale(TransactionCase):
             + len(strip_xml_metadata(es.content).encode('utf-8'))
         )
         self.assertLess(len(parts[0].encode('utf-8')), two_stripped)
-        content = agent._build_content(user_locale='es_ES')
+        content = agent._build_shared_content(user_locale='es_ES')
         self.assertIn('demo_balance_es_ES', content)
         self.assertNotIn('demo_balance_de_DE', content)
 
@@ -100,7 +102,7 @@ class TestAgentLocale(TransactionCase):
         })
         agent = create_test_agent(self.env, 'test_xcut_agent', name='No members')
         self.assertFalse(agent.context_ids)
-        content = agent._build_content(user_locale='en_US')
+        content = agent._build_shared_content(user_locale='en_US')
         self.assertIn('demo_sys_rule', content)
         self.assertIn(str(sys_ctx.id), agent._context_signature())
 
@@ -228,7 +230,7 @@ class TestAgentLocale(TransactionCase):
         )
         if not ctx:
             self.skipTest('hr_payroll_accounting_present not imported')
-        # Match por nombre (AST inline); address_home_id solo como prohibido.
+        # Match by name (inline AST); address_home_id only as forbidden.
         self.assertIn('name_to_emp', ctx.content)
         self.assertIn('address_home_id', ctx.content)
         self.assertIn('has_breakdown', ctx.content)

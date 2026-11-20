@@ -11,6 +11,12 @@ cache — a stored list would leave zombie helpers after uninstall.
 """
 import logging
 
+# Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
+try:
+    from .seges_box_a_cache import box_a_cursor, forget_after_helper
+except ImportError:  # loaded by file, without its package (host unit path)
+    box_a_cursor = forget_after_helper = None
+
 _logger = logging.getLogger(__name__)
 
 PROVIDER_FLAG = '_sandbox_helper_provider'
@@ -86,5 +92,18 @@ def collect_sandbox_helpers(env, occupied=None):
                     key, model_name,
                 )
                 continue
-            collected[key] = value
+            # Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            collected[key] = _seges_box_a_helper(env, value)
     return collected
+
+
+# Seges: parche 18 (PNS-19, seguridad). Ver docs/pendiente/parches_pns_ai.md
+def _seges_box_a_helper(env, helper):
+    """In box A, the helper forgets the secret columns when it ends (B2).
+
+    A helper runs as sudo (``rec.sudo()`` above) and what it reads stays in
+    the thread cache, which the sandbox shares.
+    """
+    if box_a_cursor is None or not box_a_cursor(getattr(env, 'cr', None)):
+        return helper
+    return forget_after_helper(env, helper)

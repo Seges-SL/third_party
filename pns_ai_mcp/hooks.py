@@ -3,15 +3,16 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Install / uninstall / factory-knowledge re-seed for pns_ai_mcp.
 
-- Install: factory knowledge + first-install shells (providers, APIs,
-  whitelist, ICP).
+- Install: factory knowledge + first-install shells (weather whitelist,
+  ICP). No LLM provider ships: the instance adds its own.
 - Reinstall / ``-u``: ``maybe_sync_factory_knowledge`` (version stamp)
-  reseeds this addon's factory contexts and system skills. User-owned
-  rows stay.
+  reseeds this addon's factory contexts and system skills. One worker
+  holds the lock. Disk wins on text; the instance ``active`` flag stays.
+  A factory row whose file is gone is unlinked. User-owned rows stay.
 - Uninstall: drop factory rows of this module.
 
-One-shot leftover wipes and translation overwrites live in versioned
-``migrations/``, not here.
+Translations come from ``i18n/*.po``. Leftover Spanish after a rename:
+Settings → Languages → Reload. Do not patch ``ir.translation`` here.
 """
 
 from odoo import api, SUPERUSER_ID
@@ -22,6 +23,8 @@ _logger = logging.getLogger(__name__)
 # Stamp is every installed module that ships ai/contexts or ai/skills
 # (see knowledge_stamp.module_has_ai_knowledge). No fixed name list.
 ICP_FACTORY_STAMP = 'pns_ai.factory_knowledge_stamp'
+# One worker reseeds; the other eleven must not write the same rows.
+FACTORY_SYNC_LOCK_KEY = 87421032
 
 
 def post_init_hook(*args):
@@ -43,10 +46,11 @@ def post_init_hook(*args):
 
 
 def _load_first_install_data(env):
-    """LLM / API / whitelist / ICP shells. ``post_init`` only — never on ``-u``.
+    """Weather whitelist / ICP shells. ``post_init`` only — never on ``-u``.
 
     These XML files stay off the manifest ``data:`` list on purpose: a new
     file there would create xmlids on upgrade of an already-installed engine.
+    No example MCP/OpenAPI servers and no LLM providers.
     """
     import inspect
     import os
@@ -58,8 +62,6 @@ def _load_first_install_data(env):
         _logger.warning('MCP: first-install data skipped (module path missing)')
         return
     files = (
-        'data/ai_provider_data.xml',
-        'data/external_server_openapi_data.xml',
         'data/url_whitelist_data.xml',
         'data/instance_defaults_data.xml',
     )
@@ -96,10 +98,37 @@ def _load_first_install_data(env):
         )
 
 
-def uninstall_hook(cr, registry):
-    """Remove factory knowledge owned by this module (not user-owned rows)."""
-    env = api.Environment(cr, SUPERUSER_ID, {})
+def uninstall_hook(*args):
+    """Remove factory knowledge owned by this module (not user-owned rows).
+
+    Signature: Odoo 14 ``(cr, registry)`` · Odoo 17+ ``(env,)``.
+    """
+    from odoo.release import version_info
+
+    if version_info[0] >= 17:
+        env = args[0]
+    else:
+        cr, registry = args
+        env = api.Environment(cr, SUPERUSER_ID, {})
     uninstall_factory_knowledge_for_module(env, 'pns_ai_mcp')
+    _drop_skill_prefix_icp(env)
+
+
+def _drop_skill_prefix_icp(env):
+    """Drop product-owned prefix keys so a later install reseeds factory defaults."""
+    if 'ir.config_parameter' not in env:
+        return
+    from .utils.skill_code_prefix import (
+        ICP_SKILL_CODE_PREFIX,
+        ICP_SKILL_COMMAND_PREFIX,
+    )
+    ICP = env['ir.config_parameter'].sudo()
+    rows = ICP.search([
+        ('key', 'in', (ICP_SKILL_CODE_PREFIX, ICP_SKILL_COMMAND_PREFIX)),
+    ])
+    if rows:
+        rows.unlink()
+        _logger.info('MCP: dropped skill prefix ICP keys on uninstall')
 
 
 def uninstall_factory_knowledge_for_module(env, module_name):
@@ -215,10 +244,25 @@ def factory_knowledge_stamp(env):
 
 
 def maybe_sync_factory_knowledge(env, reason='registry'):
-    """Sync when the knowledge-module version stamp changed (e.g. after ``-u``)."""
+    """Sync when the knowledge-module version stamp changed (e.g. after ``-u``).
+
+    Takes a transaction advisory lock so twelve HTTP workers do not reseed
+    the same rows. The winner re-reads the stamp under the lock. Content
+    comes from disk; a row's ``active`` flag is left to the instance.
+    """
     if 'ir.config_parameter' not in env or 'ai.context' not in env:
         return False
     try:
+        env.cr.execute(
+            'SELECT pg_try_advisory_xact_lock(%s)',
+            (FACTORY_SYNC_LOCK_KEY,),
+        )
+        if not env.cr.fetchone()[0]:
+            _logger.info(
+                'MCP: factory sync skipped, another worker holds the lock (%s)',
+                reason,
+            )
+            return False
         stamp = factory_knowledge_stamp(env)
         ICP = env['ir.config_parameter'].sudo()
         prev = (ICP.get_param(ICP_FACTORY_STAMP, '') or '').strip()

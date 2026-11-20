@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- This addon only. Neighbors (Chatboo, Geo, ACL, tenant packs) seed
+<!-- This addon only. Neighbors (hosts, domain packs, tenant packs) seed
      themselves. The engine never scans skills/custom/ nor other addons. -->
 <odoo>
     <data noupdate="0">

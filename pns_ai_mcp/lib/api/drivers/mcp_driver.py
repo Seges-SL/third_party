@@ -5,7 +5,7 @@
 mcp_driver.py — API driver for MCP servers (api_type='mcp').
 
 Thin adapter over MCPClient; supports binary content blocks (image/resource/
-JSON-with-base64) for document downloads such as Sesame DownloadDocument.
+JSON-with-base64) for document downloads.
 """
 
 import logging
@@ -28,15 +28,16 @@ class MCPDriver(APIDriver):
     def discover(self, server):
         from odoo.addons.pns_ai_mcp.utils.mcp_client import MCPClientError
         warnings = []
+        client = self._client(server)
         try:
-            client = self._client(server)
             client.connect()
             tools = client.list_tools()
             resources = self._optional(client.list_resources, 'resources/list', warnings)
             prompts = self._optional(client.list_prompts, 'prompts/list', warnings)
-            client.close()
         except MCPClientError as e:
             raise APIDriverError(str(e))
+        finally:
+            client.close()
         return {
             'tools': tools,
             'resources': resources,
@@ -56,12 +57,13 @@ class MCPDriver(APIDriver):
 
     def test_connection(self, server):
         from odoo.addons.pns_ai_mcp.utils.mcp_client import MCPClientError
+        client = self._client(server)
         try:
-            client = self._client(server)
             info = client.connect()
-            client.close()
         except MCPClientError as e:
             raise APIDriverError(str(e))
+        finally:
+            client.close()
         name = info.get('serverInfo', {}).get('name', '?') if info else '?'
         return 'MCP server: %s' % name
 
@@ -69,13 +71,14 @@ class MCPDriver(APIDriver):
         from odoo.addons.pns_ai_mcp.utils.mcp_client import MCPClientError
         from ....utils.session_download import extract_binary_from_mcp_blocks
         arguments = dict(arguments or {})
+        client = self._client(server, auth_token=auth_token)
         try:
-            client = self._client(server, auth_token=auth_token)
             client.connect()
             content = client.call_tool(tool_name, arguments)
-            client.close()
         except MCPClientError as e:
             raise APIDriverError(str(e))
+        finally:
+            client.close()
 
         binary = extract_binary_from_mcp_blocks(
             content, tool_name=tool_name, arguments=arguments,

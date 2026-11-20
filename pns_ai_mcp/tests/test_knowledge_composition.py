@@ -1,17 +1,20 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2026 Patanegra Soft <https://patanegra.com>
+"""Skill @module pull matches contexts; live rows show four origin tokens."""
+
 import uuid
+from unittest.mock import patch
 
 from odoo.tests import tagged, TransactionCase
 
 from odoo.addons.pns_ai_mcp.tests._helpers import create_test_agent
 
-ORIGIN_TOKENS = [
-    ('native', 'native'),
-    ('imported', 'imported'),
-    ('pinned', 'pinned'),
-    ('extra', 'extra'),
+ORIGIN_SELECTION = [
+    ('own', 'Own'),
+    ('imported', 'Imported'),
+    ('inserted', 'Inserted'),
+    ('extra', 'Extra'),
 ]
 
 
@@ -39,22 +42,6 @@ class TestKnowledgeComposition(TransactionCase):
             pack_exclusive=True,
         ))
 
-    def test_default_skill_codes_at_module_includes_empty_agent_codes(self):
-        """@pns_ai_chatboo pulls factory skills that omit agent_codes."""
-        Mod = self.env['ir.module.module']
-        if not Mod.search([
-            ('name', '=', 'pns_ai_chatboo'),
-            ('state', '=', 'installed'),
-        ], limit=1):
-            self.skipTest('pns_ai_chatboo not installed')
-        agent = create_test_agent(
-            self.env,
-            'demo_skill_drawer_%s' % uuid.uuid4().hex[:8],
-            default_skill_codes='@pns_ai_chatboo',
-        )
-        codes = self.env['ai.skill'].default_skill_codes_for_agent(agent.code)
-        self.assertIn('sys_info', codes)
-
     def _make_ctx(self, source_module, suffix):
         return self.env['ai.context'].create({
             'code': 'comp_%s_%s' % (suffix, uuid.uuid4().hex[:8]),
@@ -65,22 +52,36 @@ class TestKnowledgeComposition(TransactionCase):
             'active': True,
         })
 
+    def _seed_and_pin(self, agent):
+        """Two made-up packs: one in the agent's factory seed, one only live.
+
+        Installed packs extend the seed, so the real one depends on the instance.
+        """
+        hexa = uuid.uuid4().hex[:8]
+        seed_mod, pin_mod = 'pns_demo_seed_%s' % hexa, 'pns_demo_pin_%s' % hexa
+        seed = {
+            'default_context_codes': '@pns_ai_mcp\n@%s' % seed_mod,
+            'required_context_codes': 'self_mcp',
+        }
+        patcher = patch.object(
+            type(agent), '_module_factory_seed', lambda self: dict(seed),
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return seed_mod, pin_mod
+
     def test_composition_origin_four_tokens(self):
         Agent = self.env['ai.agent']
         mcp = Agent.search([('code', '=', 'pns_ai_mcp')], limit=1)
         if not mcp:
             self.skipTest('MCP agent missing')
-        native_ctx = self._make_ctx('pns_ai_mcp', 'native')
-        imported_ctx = self._make_ctx('pns_geo', 'imported')
-        pin_ctx = self._make_ctx('occ_custom_ai', 'pinned')
+        seed_mod, pin_mod = self._seed_and_pin(mcp)
+        native_ctx = self._make_ctx('pns_ai_mcp', 'own')
+        imported_ctx = self._make_ctx(seed_mod, 'imported')
+        pin_ctx = self._make_ctx(pin_mod, 'inserted')
         extra_ctx = self._make_ctx('pns_other', 'extra')
         empty_ctx = self._make_ctx(False, 'unstamped')
-        seed = mcp._module_factory_seed() or {}
-        live = '%s\n%s\n@occ_custom_ai\n%s' % (
-            mcp.default_context_codes or '',
-            seed.get('default_context_codes') or '',
-            empty_ctx.code,
-        )
+        live = '@pns_ai_mcp\n@%s\n@%s\n%s' % (seed_mod, pin_mod, empty_ctx.code)
         mcp.write({
             'default_context_codes': live,
             'context_ids': [
@@ -90,13 +91,13 @@ class TestKnowledgeComposition(TransactionCase):
         })
         ctx = {'composition_agent_id': mcp.id}
         self.assertEqual(
-            native_ctx.with_context(**ctx).composition_origin, 'native',
+            native_ctx.with_context(**ctx).composition_origin, 'own',
         )
         self.assertEqual(
             imported_ctx.with_context(**ctx).composition_origin, 'imported',
         )
         self.assertEqual(
-            pin_ctx.with_context(**ctx).composition_origin, 'pinned',
+            pin_ctx.with_context(**ctx).composition_origin, 'inserted',
         )
         self.assertEqual(
             extra_ctx.with_context(**ctx).composition_origin, 'extra',
@@ -111,15 +112,12 @@ class TestKnowledgeComposition(TransactionCase):
         mcp = Agent.search([('code', '=', 'pns_ai_mcp')], limit=1)
         if not mcp:
             self.skipTest('MCP agent missing')
+        seed_mod, pin_mod = self._seed_and_pin(mcp)
         extra_ctx = self._make_ctx('pns_other', 'ord_x')
-        pin_ctx = self._make_ctx('occ_custom_ai', 'ord_p')
+        pin_ctx = self._make_ctx(pin_mod, 'ord_p')
         native_ctx = self._make_ctx('pns_ai_mcp', 'ord_n')
-        imported_ctx = self._make_ctx('pns_geo', 'ord_i')
-        seed = mcp._module_factory_seed() or {}
-        live = '%s\n%s\n@occ_custom_ai' % (
-            mcp.default_context_codes or '',
-            seed.get('default_context_codes') or '',
-        )
+        imported_ctx = self._make_ctx(seed_mod, 'ord_i')
+        live = '@pns_ai_mcp\n@%s\n@%s' % (seed_mod, pin_mod)
         mcp.write({
             'default_context_codes': live,
             'context_ids': [
@@ -129,13 +127,13 @@ class TestKnowledgeComposition(TransactionCase):
         })
         ctx = {'composition_agent_id': mcp.id}
         self.assertEqual(
-            native_ctx.with_context(**ctx).composition_origin, 'native',
+            native_ctx.with_context(**ctx).composition_origin, 'own',
         )
         self.assertEqual(
             imported_ctx.with_context(**ctx).composition_origin, 'imported',
         )
         self.assertEqual(
-            pin_ctx.with_context(**ctx).composition_origin, 'pinned',
+            pin_ctx.with_context(**ctx).composition_origin, 'inserted',
         )
         self.assertEqual(
             extra_ctx.with_context(**ctx).composition_origin, 'extra',
@@ -153,10 +151,10 @@ class TestKnowledgeComposition(TransactionCase):
         mcp = Agent.search([('code', '=', 'pns_ai_mcp')], limit=1)
         if not mcp:
             self.skipTest('MCP agent missing')
-        pin_ctx = self._make_ctx('occ_custom_ai', 'pinrest')
+        pin_ctx = self._make_ctx('acme_custom', 'pinrest')
         mcp.write({
             'default_context_codes': (
-                (mcp.default_context_codes or '') + '\n@occ_custom_ai'
+                (mcp.default_context_codes or '') + '\n@acme_custom'
             ),
             'context_ids': [(4, pin_ctx.id)],
         })
@@ -174,15 +172,15 @@ class TestKnowledgeComposition(TransactionCase):
         mcp.write({
             'default_context_codes': (mcp.default_context_codes or '') + '\n%s' % native_ctx.code,
             'context_ids': [(4, native_ctx.id), (4, extra_ctx.id)],
-            'link_show_native': True,
+            'link_show_own': True,
             'link_show_imported': True,
-            'link_show_pinned': True,
+            'link_show_inserted': True,
             'link_show_extra': False,
         })
         self.assertIn(native_ctx, mcp.context_ids_shown)
         self.assertNotIn(extra_ctx, mcp.context_ids_shown)
         self.assertIn(extra_ctx, mcp.context_ids)
-        mcp.with_context(link_show_token='extra').action_toggle_link_show()
+        mcp.link_show_extra = True
         self.assertTrue(mcp.link_show_extra)
         self.assertIn(extra_ctx, mcp.context_ids_shown)
         mcp.context_ids_shown = mcp.context_ids_shown - extra_ctx
@@ -195,51 +193,18 @@ class TestKnowledgeComposition(TransactionCase):
         mcp.context_ids_shown = remaining
         self.assertIn(extra_ctx, mcp.context_ids)
 
-    def test_composition_origin_fields_get_uses_tokens(self):
-        info = self.env['ai.context'].fields_get(['composition_origin'])
-        selection = info['composition_origin']['selection']
-        self.assertEqual(selection, ORIGIN_TOKENS)
-        labels = [label for _key, label in selection]
-        self.assertEqual(labels, ['native', 'imported', 'pinned', 'extra'])
-        self.assertNotIn('Native', labels)
-        self.assertNotIn('Added', labels)
-        self.assertNotIn('Nativo', labels)
-        skill_info = self.env['ai.skill'].fields_get(['composition_origin'])
-        self.assertEqual(
-            skill_info['composition_origin']['selection'],
-            ORIGIN_TOKENS,
-        )
-        self.assertEqual(info['composition_origin']['string'], 'Origin')
-        self.assertEqual(skill_info['composition_origin']['string'], 'Origin')
-
-    def test_chatboo_mcp_pack_is_imported(self):
-        Agent = self.env['ai.agent']
-        chatboo = Agent.search([('code', '=', 'pns_ai_chatboo')], limit=1)
-        if not chatboo:
-            self.skipTest('Chatboo agent missing')
-        ctx = {'composition_agent_id': chatboo.id}
-        corp = self.env['ai.context'].search([
-            ('code', '=', 'corporate_terms'),
-        ], limit=1)
-        _codes, packs = chatboo._default_context_tokens()
-        if corp and 'pns_ai_mcp' in packs:
+    def test_composition_origin_labels_are_the_model_labels(self):
+        """The cell shows the model label, like the filter chip; no token override."""
+        for model in ('ai.context', 'ai.skill'):
+            info = self.env[model].with_context(lang='en_US').fields_get(
+                ['composition_origin'],
+            )['composition_origin']
+            # Odoo 20 hands the selection back as tuples, older series as lists.
             self.assertEqual(
-                corp.with_context(**ctx).composition_origin, 'imported',
+                [tuple(item) for item in info['selection']],
+                [tuple(item) for item in ORIGIN_SELECTION],
             )
-        self_chat = self.env['ai.context'].search([
-            ('code', '=', 'self_chatboo'),
-        ], limit=1)
-        if self_chat:
-            self.assertEqual(
-                self_chat.with_context(**ctx).composition_origin, 'native',
-            )
-        sys_info = self.env['ai.skill'].search([
-            ('code', '=', 'sys_info'),
-        ], limit=1)
-        if sys_info:
-            self.assertEqual(
-                sys_info.with_context(**ctx).composition_origin, 'native',
-            )
+            self.assertEqual(info['string'], 'Origin')
 
     def test_composition_locked_required_code(self):
         Agent = self.env['ai.agent']
@@ -253,6 +218,6 @@ class TestKnowledgeComposition(TransactionCase):
             self.skipTest('self_mcp missing')
         ctx = {'composition_agent_id': mcp.id}
         self.assertEqual(
-            self_mcp.with_context(**ctx).composition_origin, 'native',
+            self_mcp.with_context(**ctx).composition_origin, 'own',
         )
         self.assertTrue(self_mcp.with_context(**ctx).composition_locked)

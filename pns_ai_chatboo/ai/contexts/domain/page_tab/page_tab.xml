@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <metadata>
+        <code>page_tab</code>
+        <tipo>domain</tipo>
+        <description>Answer as a page in its own browser tab (page_url), not as a chat table</description>
+        <version>1.2</version>
+        <agent_codes>pns_ai_chatboo</agent_codes>
+    </metadata>
+
+    <domain_knowledge>
+# Page in its own tab (page_tab)
+
+The answer the user asked for is **a page**, not a message in this chat. A
+page lives in its own browser tab. The chat shows **only** the page card
+(the same way a map shows only the map card). Do not write the answer in
+the bubble: no report, no table, no pasted HTML. The click opens the page.
+
+## How
+Do the data work as usual. Then, in the **same** `relaxaicode` that returns
+the rows, put the url of the page on that result. Pass those rows into
+`page_url`. A call with no rows does not lay the page out (the server
+waits and uses the rows when they exist). Do not call `page_url` on an
+empty `data` and then ship a second table without the url::
+
+    rows = [...]                     # the rows of this answer
+    result = {
+        'data': rows,
+        'summary': '…',
+        'page_url': page_url(rows, 'what they asked for the page'),
+    }
+
+- `page_url(rows, instruction)` returns a url, the same way `map_pins_url`
+  does. `rows` are the rows of this answer. Design returns a template;
+  the server fills `const DATA` from those rows.
+- A brand new page passes `new=True`.
+- The server paints the link from `page_url`. Nothing else is needed.
+
+## Changing the page already open
+"Add this", "remove that", "make it dark", "group the cards by brand": a
+change to the open page uses `page_edit`. It reuses the same tab and Design
+writes only the changes, so it takes seconds instead of minutes::
+
+    result = {
+        'summary': '…',
+        'page_url': page_edit('what to change on the page'),
+    }
+
+- When the figures are already on the page (layout, colours, order, a
+  column or section to hide, a chart of what is shown), call it **without
+  rows** and do **not** query the data again.
+- When the change needs figures the page does not have, query them and
+  pass them: `page_edit('add the mileage per driver', rows)`.
+- A different subject or "a new page" is not a change: that is `page_url`
+  with `new=True`.
+- `page_edit` returns an empty string when no page is open. Then lay the
+  page out with `page_url(rows, …, new=True)`.
+
+## Hard rules
+- Do **not** write the page yourself: no hand-written HTML, no style block,
+  no `__untrusted_html_preview__`. The template is returned by the design
+  provider inside `page_url`, not by you.
+- Do **not** deliver the same answer as only a chat table. If a page was
+  asked for, the result carries `page_url`.
+- Figures come from `rows`. Pass them into `page_url`. Design returns a
+  reusable template (`const DATA`, and `const TITLE` when it writes one).
+  The server always writes this run's rows into that slot — the first
+  turn and a later slash do the same. Design may use a short sample or
+  fictional rows with the same keys. The server only writes
+  `#pns-page-rows` if the template has no slot. Never invent a number.
+- A plain data question stays in the chat and does **not** call `page_url`.
+  Intent is semantic, not a fixed phrase list.
+
+## When there is no page (soft fail)
+`page_url` returns an **empty string** when the page could not be laid out.
+That is not an error and it does not stop this answer::
+
+    href = page_url(rows, 'what they asked for the page')
+    result = {'data': rows, 'summary': '…'}
+    if href:
+        result['page_url'] = href
+
+If the url is empty, keep the rows. Do **not** invent a reason — not Design,
+not a missing provider, not a missing tick. The server already wrote the
+cause in Historial IA. Do not retry `page_url`, do not lay the page out
+yourself, and do not ask another provider for it.
+
+If `page_url` is not among the sandbox helpers at all, the canvas is not
+installed: answer in the chat and say so.
+    </domain_knowledge>
+</context>

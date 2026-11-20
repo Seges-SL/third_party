@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <templates>
     <t t-name="pns_ai_chatboo.chatboo_systray_item">
-        <li class="o_chatboo_systray_item o_mail_systray_item" style="display: none;">
+        <li class="o_chatboo_systray_item o_mail_systray_item" data-pns-layer-toggle="1" style="display: none;">
             <a class="dropdown-toggle o-no-caret" role="button"
                title="Chatboo" aria-label="Open Chatboo AI" tabindex="0">
                 <img src="/pns_ai_chatboo/static/description/icon.png" style="height: 22px; width: 22px; vertical-align: middle; padding-bottom: 2px;" alt="Chatboo"/>

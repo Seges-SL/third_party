@@ -1,9 +1,10 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com> */
 /**
  * Chatboo charts v2 — hydrate Chart.js or ECharts under server-rendered tables.
- * Engine: data-chatboo-chart-engine="echarts"|"chartjs" (default chartjs),
+ * Engine: data-ai-chart-engine="echarts"|"chartjs" (default chartjs),
  * or window.CHATBOO_CHART_ENGINE for global override (spike / QA).
- * Source of truth: data-chatboo-dataset JSON (not formatted DOM cells).
- * SPDX-License-Identifier: Apache-2.0
+ * Source of truth: data-ai-dataset JSON (not formatted DOM cells).
  */
 (function (global) {
     "use strict";
@@ -17,20 +18,68 @@
     var SHOW_MODE_TABLE_ONLY = "table";
     var ENGINE_CHARTJS = "chartjs";
     var ENGINE_ECHARTS = "echarts";
-    // Ratio para decidir barra vs línea en modo combinado (no eje).
+    // Ratio to pick bar vs line in combined mode (not the axis).
     var SCALE_RATIO_DUAL = 3;
-    // Solo magnitudes absolutas extremas (p.ej. € vs nº) → 2º eje.
-    // Umbral bajo (3) hacía dual Facturación/Salarios (~4–5×) y mentía la comparación.
+    // Only extreme absolute gaps (e.g. € vs counts) → 2nd axis.
+    // A low threshold (3) split Revenue/Salaries (~4–5×) and misled the comparison.
     var SCALE_RATIO_DUAL_EXTREME = 50;
     var SKIP_KEYS = { id: 1, __model: 1 };
-    // Columnas ratio/% → eje derecho cuando conviven con importes absolutos.
+    // Ratio/% columns → right axis when shown with absolute amounts.
     var RATIO_KEY_RE =
         /%|percent|pct\b|ratio|tasa|margen|índice|indice|\bshare\b|\bpeso\b/i;
-    // Auto-chart Y: solo forma de clave (dinero / % / contador), sin dominio de negocio.
+    // Auto-chart Y: key shape only (money / % / count), no business domain.
     var MONEY_KEY_RE =
         /amount|total|importe|monto|saldo|balance|revenue|ingreso|precio|price|coste|cost\b|debe|haber|beneficio|deuda|pend|subtotal|neto|gasto|expense|sales?|venta|factur|payroll|n[oó]mina|salary|sueldo|wage|pago|payment|cobro|recib|honor/i;
     var COUNT_KEY_RE =
         /\bcount\b|qty|cantidad|n[uú]mero|\bnum\b|n[º°]|uds?\b|units?|horas?|hours?|d[ií]as?|days?|\bitems?\b|\bn\b/i;
+
+    var ChartLib = null;
+    var EchartsLib = null;
+    var showSeriesStats = false;
+
+    function bindEngines(chart, echarts) {
+        if (typeof chart === "function") {
+            ChartLib = chart;
+        }
+        if (echarts) {
+            EchartsLib = echarts;
+        }
+    }
+
+    function setShowSeriesStats(value) {
+        showSeriesStats = !!value;
+    }
+
+    function getShowSeriesStats() {
+        return !!showSeriesStats;
+    }
+
+    // English msgids; the chat client passes them through its own _t().
+    var LABELS = {
+        chart: "Chart",
+        data: "Data",
+        canvas: "Canvas",
+        canvasTitle: "Lay out the tables of this answer as a page",
+        canvasBuilding: "Building the page…",
+        canvasOpen: "Open page",
+        canvasFailed: "No page was built.",
+        canvasCancel: "Building the page. Click to cancel.",
+    };
+
+    function setLabels(labels) {
+        if (!labels || typeof labels !== "object") {
+            return;
+        }
+        Object.keys(LABELS).forEach(function (key) {
+            if (typeof labels[key] === "string" && labels[key]) {
+                LABELS[key] = labels[key];
+            }
+        });
+    }
+
+    function label(key) {
+        return LABELS[key] || key;
+    }
 
     var TIME_KEY_RE = /^(year|año|ano|periodo|period|fecha|date|mes|month|trimestre|quarter|semana|week|h[12]|q[1-4]|m\d{1,2})$/i;
     var TIME_VAL_RE = /^(?:(?:19|20)\d{2}|h[12]|q[1-4]|m(?:0?[1-9]|1[0-2])|(?:19|20)\d{2}[-/]\d{1,2}(?:[-/]\d{1,2})?)$/i;
@@ -287,8 +336,8 @@
     }
 
     /**
-     * Métrica dominante = columna que ordena la tabla CON variación real.
-     * Pondera monotonía × log(rango) para no elegir columnas casi planas.
+     * Dominant metric = axis / title (does not reorder series).
+     * Weighs monotony × log(range) so nearly flat columns are not picked.
      */
     function pickDominantMetric(rows, seriesKeys) {
         if (!seriesKeys.length) {
@@ -321,17 +370,7 @@
         if (seriesKeysArePeriodBuckets(seriesKeys)) {
             return orderPeriodSeriesKeys(seriesKeys);
         }
-        var dominant = pickDominantMetric(rows, seriesKeys);
-        if (!dominant) {
-            return seriesKeys.slice();
-        }
-        var ordered = [dominant];
-        seriesKeys.forEach(function (k) {
-            if (k !== dominant) {
-                ordered.push(k);
-            }
-        });
-        return ordered;
+        return seriesKeys.slice();
     }
 
     function isRatioLikeKey(key) {
@@ -346,15 +385,15 @@
         return COUNT_KEY_RE.test(String(key || ""));
     }
 
-    /** Serie Y apta para auto-gráfico: dinero, %/ratio o contador (forma de clave). */
+    /** Y series fit for an auto chart: money, %/ratio or count (key shape). */
     function isChartMetricKey(key) {
         return isMoneyLikeKey(key) || isRatioLikeKey(key) || isCountLikeKey(key);
     }
 
     /**
-     * Dual Y solo si mezclamos absolutos + ratio/%, o hueco de escala extremo
-     * (€ vs conteos). Nunca por un ratio moderado entre dos series en la misma
-     * unidad (Facturación vs Salarios): eso infla la serie menor y engaña.
+     * Dual Y only when mixing absolutes + ratio/%, or an extreme scale gap
+     * (€ vs counts). Never for a moderate ratio between two series in the same
+     * unit (Revenue vs Salaries): that inflates the smaller series and misleads.
      */
     function needsDualAxis(series) {
         if (!series || series.length < 2) {
@@ -386,7 +425,7 @@
         return lo > 0 && hi / lo >= SCALE_RATIO_DUAL_EXTREME;
     }
 
-    /** Override desde data-chatboo-dual-axis o toggle UI; null = auto. */
+    /** Override from data-ai-dual-axis or the UI toggle; null = auto. */
     function parseDualAxisAttr(raw) {
         if (raw === null || raw === undefined) {
             return null;
@@ -443,7 +482,7 @@
         if (!meta || !block) {
             return meta;
         }
-        var forced = parseDualAxisAttr(block.getAttribute("data-chatboo-dual-axis"));
+        var forced = parseDualAxisAttr(block.getAttribute("data-ai-dual-axis"));
         if (forced === null && block._chatbooDualAxisForce !== undefined) {
             forced = block._chatbooDualAxisForce;
         }
@@ -480,7 +519,7 @@
         var seriesCandidates = numericKeys.filter(function (k) {
             return k !== categoryKey;
         });
-        // Auto (metricsOnly): solo dinero / % / contador. Petición explícita: todas.
+        // Auto (metricsOnly): money / % / count only. Explicit request: all.
         if (opts.metricsOnly) {
             seriesCandidates = seriesCandidates.filter(isChartMetricKey);
         }
@@ -498,6 +537,7 @@
                 values: seriesValues(rows, key),
             };
         });
+        var dominantKey = pickDominantMetric(rows, seriesKeys) || seriesKeys[0];
         var temporal =
             (isTimeLikeKey(categoryKey) || isTimeLikeValues(rows, categoryKey)) &&
             labels.length >= 3;
@@ -528,7 +568,7 @@
         return {
             categoryKey: categoryKey,
             seriesKeys: seriesKeys,
-            dominantKey: seriesKeys[0],
+            dominantKey: dominantKey,
             labels: labels,
             series: series,
             dualAxis: periodBuckets ? false : needsDualAxis(series),
@@ -629,39 +669,14 @@
         return pivoted.length ? pivoted : null;
     }
 
-    function emptyChartMeta(defaultMode) {
-        return {
-            categoryKey: "",
-            seriesKeys: [],
-            dominantKey: "",
-            labels: [],
-            series: [],
-            dualAxis: false,
-            temporal: false,
-            periodBuckets: false,
-            defaultMode: defaultMode || "bar",
-            pieOk: false,
-            categoricalPieOk: false,
-            stackedOk: false,
-            horizontalOk: false,
-            radarOk: false,
-        };
-    }
-
-    function mountChartTableShell(block) {
-        mountToolbar(block, emptyChartMeta("bar"));
-        setTableCollapsed(block, true);
-        updatePrimaryToggleLabel(block);
-    }
-
     function isPieLikeMode(mode) {
         return mode === "pie" || mode === "donut" || mode === "rose";
     }
 
     /**
-     * Altura del host: más aire vertical en series temporales / multi-serie,
-     * y filas altas en barras horizontales. Sin hardcode de dominio.
-     * Tarjeta dashboard compacta = más baja; maximizada = misma fórmula que chat.
+     * Host height: more vertical room for time / multi-series,
+     * and tall rows for horizontal bars. No domain hardcode.
+     * Compact dashboard card = lower; maximized = same formula as chat.
      */
     function resolveChartHostHeightPx(meta, mode, block) {
         var nLab = meta && meta.labels ? meta.labels.length : 0;
@@ -673,7 +688,7 @@
         var inDash = !!(
             block &&
             block.closest &&
-            block.closest(".o_chatboo_dashboard_card")
+            block.closest(".o_ai_dashboard_card")
         );
         var maximized = !!(
             block &&
@@ -681,16 +696,16 @@
             block.closest(".o_chatboo_dashboard_card_maximized")
         );
 
-        // Solo las tarjetas compactas del grid se quedan bajas y sin scroll.
-        // Maximizada → misma lógica que un gráfico de chat normal.
+        // Only compact grid cards stay low and without scroll.
+        // Maximized → same logic as a normal chat chart.
         if (inDash && !maximized) {
             var body =
-                block.closest && block.closest(".o_chatboo_dashboard_card_body");
+                block.closest && block.closest(".o_ai_dashboard_card_body");
             var toolbar = block.querySelector
-                ? block.querySelector(".o_chatboo_chart_toolbar")
+                ? block.querySelector(".o_ai_chart_toolbar")
                 : null;
             var title = block.querySelector
-                ? block.querySelector(".o_chatboo_block_title, .pns-result-title")
+                ? block.querySelector(".o_ai_block_title, .pns-result-title")
                 : null;
             var bodyH = body && body.clientHeight > 0 ? body.clientHeight : 0;
             var tbH = toolbar && toolbar.offsetHeight ? toolbar.offsetHeight : 34;
@@ -698,12 +713,12 @@
                 title && title.offsetParent !== null ? title.offsetHeight + 6 : 0;
             var avail;
             if (bodyH > 60) {
-                // Padding del body (~16) + margen pequeño.
+                // Body padding (~16) + small margin.
                 avail = bodyH - tbH - titleH - 18;
             } else {
                 avail = Math.min(200, Math.round(vh * 0.22));
             }
-            // Techo bajo: leyenda ECharts va dentro del host; no empujar el body.
+            // Low ceiling: the ECharts legend sits inside the host; do not push the body.
             return Math.max(140, Math.min(avail, 210));
         }
 
@@ -719,7 +734,7 @@
             return Math.max(300, Math.min(hBar, Math.round(vh * 0.72), 680));
         }
 
-        // Cartesian (barras / líneas / combinado / área / stack).
+        // Cartesian (bars / lines / combined / area / stack).
         var h = 360;
         if (nLab > 6) {
             h += Math.min(140, (nLab - 6) * 12);
@@ -743,7 +758,7 @@
         var inDash = !!(
             block &&
             block.closest &&
-            block.closest(".o_chatboo_dashboard_card")
+            block.closest(".o_ai_dashboard_card")
         );
         var maximized = !!(
             block &&
@@ -752,7 +767,7 @@
         );
         host.style.height = px + "px";
         host.style.maxHeight = px + "px";
-        // En tarjeta compacta no forzar minHeight alto (provoca scroll del body).
+        // In a compact card do not force a high minHeight (it scrolls the body).
         host.style.minHeight =
             inDash && !maximized
                 ? Math.min(px, 140) + "px"
@@ -760,23 +775,21 @@
         host.setAttribute("data-chatboo-chart-height", String(px));
     }
 
-    /** Recalcula altura (p. ej. al maximizar/restaurar tarjeta) y pide resize. */
+    /** Recompute height (e.g. on card maximize/restore) and ask for a resize. */
     function relayoutChartsIn(root) {
         if (!root || !root.querySelectorAll) {
             return;
         }
-        var blocks = root.querySelectorAll(".o_chatboo_table_block");
+        var blocks = root.querySelectorAll(".o_ai_table_block");
         var i;
         for (i = 0; i < blocks.length; i++) {
             var block = blocks[i];
             var meta = block._chatbooChartMeta;
-            var host = block.querySelector(".o_chatboo_chart_host");
+            var host = block.querySelector(".o_ai_chart_host");
             if (!meta || !host) {
                 continue;
             }
-            var open =
-                block.getAttribute("data-chatboo-chart-open") === "1" ||
-                isChartTableMode(block);
+            var open = block.getAttribute("data-chatboo-chart-open") === "1";
             if (!open && host.style.display === "none") {
                 continue;
             }
@@ -811,49 +824,49 @@
         var multi = meta.series.length >= 2;
         if (engine === ENGINE_ECHARTS) {
             if (multi && meta.periodBuckets) {
-                opts.push({ v: "bar", t: "Barras agrupadas" });
+                opts.push({ v: "bar", t: _t("Grouped bars") });
                 if (meta.stackedOk) {
-                    opts.push({ v: "stack", t: "Apilado" });
+                    opts.push({ v: "stack", t: _t("Stacked") });
                 }
-                opts.push({ v: "mix", t: "Combinado" });
+                opts.push({ v: "mix", t: _t("Combined") });
             } else if (multi) {
-                opts.push({ v: "mix", t: "Combinado" });
+                opts.push({ v: "mix", t: _t("Combined") });
             }
             if (!meta.periodBuckets || !multi) {
-                opts.push({ v: "bar", t: "Barras" });
+                opts.push({ v: "bar", t: _t("Bars") });
             }
-            opts.push({ v: "line", t: "Líneas" });
+            opts.push({ v: "line", t: _t("Lines") });
             if (multi) {
-                opts.push({ v: "area", t: "Área" });
+                opts.push({ v: "area", t: _t("Area") });
             }
             if (meta.stackedOk && !(multi && meta.periodBuckets)) {
-                opts.push({ v: "stack", t: "Apilado" });
+                opts.push({ v: "stack", t: _t("Stacked") });
             }
             if (meta.horizontalOk) {
-                opts.push({ v: "bar_h", t: "Horizontal" });
+                opts.push({ v: "bar_h", t: _t("Horizontal") });
             }
             if (meta.radarOk) {
-                opts.push({ v: "radar", t: "Radar" });
+                opts.push({ v: "radar", t: _t("Radar") });
             }
             if (meta.categoricalPieOk) {
-                opts.push({ v: "donut", t: "Quesito" }, { v: "pie", t: "Tarta" });
+                opts.push({ v: "donut", t: _t("Donut") }, { v: "pie", t: _t("Pie") });
                 if (meta.labels.length >= 3) {
-                    opts.push({ v: "rose", t: "Rosa" });
+                    opts.push({ v: "rose", t: _t("Rose") });
                 }
             }
         } else {
             if (multi) {
-                opts.push({ v: "mix", t: "Combinado" });
+                opts.push({ v: "mix", t: _t("Combined") });
             }
-            opts.push({ v: "bar", t: "Barras" }, { v: "line", t: "Líneas" });
+            opts.push({ v: "bar", t: _t("Bars") }, { v: "line", t: _t("Lines") });
             if (meta.pieOk) {
-                opts.push({ v: "pie", t: "Tarta" });
+                opts.push({ v: "pie", t: _t("Pie") });
             }
         }
         return opts;
     }
 
-    /** Ciclo corto de rotación (Chart.js / cartesian). */
+    /** Short rotation cycle (Chart.js / cartesian). */
     function rotateCycle(meta) {
         if (!meta || !meta.series || meta.series.length < 2) {
             return ["bar", "line"];
@@ -911,25 +924,25 @@
             if (isPieLikeMode(currentMode)) {
                 return {
                     show: meta.categoricalPieOk,
-                    title: "Rotar quesito / tarta / rosa",
+                    title: _t("Rotate donut / pie / rose"),
                     icon: "pie",
                 };
             }
             return {
                 show: true,
-                title: "Rotar tipo (combinado, apilado, horizontal…)",
+                title: _t("Rotate type (combined, stacked, horizontal…)"),
                 icon: "combo",
             };
         }
         return {
             show: currentMode !== "pie",
-            title: "Rotar combinación (barra/línea por serie)",
+            title: _t("Rotate combination (bar/line per series)"),
             icon: "combo",
         };
     }
 
     /**
-     * Tipo por serie: mix = mayor absMax → barra, resto → línea; mix_inv invierte.
+     * Type per series: mix = largest absMax → bar, rest → line; mix_inv flips it.
      */
     function resolveSeriesTypes(meta, mode) {
         var n = meta.series.length;
@@ -972,7 +985,7 @@
             types.push(loType);
         }
         types[ranked[0].idx] = hiType;
-        // 3 series: la 2ª de mayor escala también barra si no es “pequeña” vs la 1ª.
+        // 3 series: the 2nd largest is also a bar unless it is “small” vs the 1st.
         if (n >= 3 && ranked.length >= 2) {
             var top = ranked[0].m || 1;
             var mid = ranked[1].m;
@@ -1027,13 +1040,13 @@
     }
 
     /**
-     * Chart.js/ECharts, si nació con host 0×0, dejan el surface en unos px.
-     * resize() sin args relee ese box; hay que pasar el tamaño del host.
+     * Chart.js/ECharts born with a 0×0 host leave the surface a few px wide.
+     * resize() without args rereads that box; pass the host size instead.
      */
     function resizeChartToHost(block) {
         var host =
             block && block.querySelector
-                ? block.querySelector(".o_chatboo_chart_host")
+                ? block.querySelector(".o_ai_chart_host")
                 : null;
         var chart = block && block._chatbooChart;
         if (!host || !chart || typeof chart.resize !== "function") {
@@ -1063,7 +1076,7 @@
     function observeChartHost(block) {
         disconnectHostObserver(block);
         var host = block && block.querySelector
-            ? block.querySelector(".o_chatboo_chart_host")
+            ? block.querySelector(".o_ai_chart_host")
             : null;
         if (!host || typeof global.ResizeObserver === "undefined") {
             return;
@@ -1076,13 +1089,13 @@
             ticking = true;
             var kick = function () {
                 ticking = false;
-                resizeChartToHost(block);
+                if (block._chatbooChartLaidOut) {
+                    resizeChartToHost(block);
+                } else {
+                    relayoutChart(block);
+                }
             };
-            if (typeof global.requestAnimationFrame === "function") {
-                global.requestAnimationFrame(kick);
-            } else {
-                setTimeout(kick, 16);
-            }
+            global.requestAnimationFrame(kick);
         });
         try {
             ro.observe(host);
@@ -1183,8 +1196,8 @@
         }
 
         var seriesTypes = resolveSeriesTypes(meta, mode);
-        // Chart.js 4: si el tipo raíz es "line", las barras del dataset casi no se ven.
-        // Raíz = bar si hay alguna barra; si no, line.
+        // Chart.js 4: if the root type is "line", dataset bars barely show.
+        // Root = bar if any bar exists; otherwise line.
         var hasBar = seriesTypes.indexOf("bar") >= 0;
         var rootType = hasBar ? "bar" : "line";
 
@@ -1252,7 +1265,7 @@
                 pointRadius: isLine ? 3 : 0,
                 pointHoverRadius: isLine ? 5 : 0,
                 yAxisID: axisIds[idx],
-                // Menor order = delante; barras detrás de líneas.
+                // Lower order = in front; bars behind lines.
                 order: isLine ? 1 : 2,
             };
         });
@@ -1286,10 +1299,10 @@
     }
 
     /**
-     * Dual Y: dominante + series de la misma magnitud → izquierda;
-     * ratios / contadores (forma de clave) / hueco de escala extremo → derecha.
-     * Invariante: no empujar a y1 toda serie no-dominante (aplasta la pequeña
-     * cuando comparte eje con otra de magnitud alta).
+     * Dual Y: dominant + series of the same magnitude → left;
+     * ratios / counts (key shape) / extreme scale gap → right.
+     * Invariant: do not push every non-dominant series to y1 (it flattens the
+     * small one when it shares an axis with a large one).
      */
     function resolveAxisIds(meta) {
         if (!meta.dualAxis) {
@@ -1297,11 +1310,23 @@
                 return "y";
             });
         }
-        var dom = meta.series.length ? meta.series[0] : null;
+        var dom = null;
+        var i;
+        if (meta.dominantKey) {
+            for (i = 0; i < meta.series.length; i++) {
+                if (meta.series[i].key === meta.dominantKey) {
+                    dom = meta.series[i];
+                    break;
+                }
+            }
+        }
+        if (!dom) {
+            dom = meta.series.length ? meta.series[0] : null;
+        }
         var domMax = dom ? absMax(dom.values) || 1 : 1;
         var domIsCount = dom ? isCountLikeKey(dom.key) : false;
-        return meta.series.map(function (s, idx) {
-            if (idx === 0) {
+        return meta.series.map(function (s) {
+            if (dom && s.key === dom.key) {
                 return "y";
             }
             if (isRatioLikeKey(s.key)) {
@@ -1601,21 +1626,21 @@
     }
 
     function blockChartEngine(block) {
-        var raw = (block.getAttribute("data-chatboo-chart-engine") || "").toLowerCase();
+        var raw = (block.getAttribute("data-ai-chart-engine") || "").toLowerCase();
         if (!raw && global.CHATBOO_CHART_ENGINE) {
             raw = String(global.CHATBOO_CHART_ENGINE).toLowerCase();
         }
-        if (raw === ENGINE_ECHARTS && global.echarts) {
+        if (raw === ENGINE_ECHARTS && EchartsLib) {
             return ENGINE_ECHARTS;
         }
-        if (raw === ENGINE_CHARTJS && typeof global.Chart === "function") {
+        if (raw === ENGINE_CHARTJS && typeof ChartLib === "function") {
             return ENGINE_CHARTJS;
         }
         if (!raw || raw === ENGINE_ECHARTS) {
-            if (typeof global.Chart === "function") {
+            if (typeof ChartLib === "function") {
                 return ENGINE_CHARTJS;
             }
-            if (global.echarts) {
+            if (EchartsLib) {
                 return ENGINE_ECHARTS;
             }
         }
@@ -1624,8 +1649,7 @@
 
     function blockShowMode(block) {
         var sm = (
-            block.getAttribute("data-chatboo-show-mode")
-            || block.getAttribute("data-chatboo-showmode")
+            block.getAttribute("data-ai-show-mode")
             || SHOW_MODE_TABLE_CHART
         ).toLowerCase();
         if (sm === "table-chart") {
@@ -1675,27 +1699,40 @@
         block.setAttribute("data-chatboo-table-collapsed", collapsed ? "1" : "0");
     }
 
+    /** One view at a time: the button names the other one. */
     function updatePrimaryToggleLabel(block) {
+        var open = block.getAttribute("data-chatboo-chart-open") === "1";
+        var controls = block.querySelector(".o_chatboo_chart_controls");
+        if (controls) {
+            controls.style.display = open ? "" : "none";
+        }
         var btn = block.querySelector(".o_chatboo_chart_toggle");
         if (!btn) {
             return;
         }
-        if (isChartTableMode(block)) {
-            var collapsed = block.getAttribute("data-chatboo-table-collapsed") !== "0";
-            btn.textContent = collapsed ? "Ver datos" : "Ocultar datos";
-            btn.setAttribute("aria-pressed", collapsed ? "false" : "true");
-            return;
+        btn.textContent = open ? label("data") : label("chart");
+        btn.setAttribute("aria-pressed", "false");
+    }
+
+    function showChartView(block, meta, mode) {
+        renderChart(block, meta, mode);
+        if (block.getAttribute("data-chatboo-chart-open") === "1") {
+            setTableCollapsed(block, true);
         }
-        var open = block.getAttribute("data-chatboo-chart-open") === "1";
-        btn.textContent = open ? "Ocultar gráfico" : "Gráfico";
-        btn.setAttribute("aria-pressed", open ? "true" : "false");
+        updatePrimaryToggleLabel(block);
+    }
+
+    function showTableView(block) {
+        hideChart(block);
+        setTableCollapsed(block, false);
+        updatePrimaryToggleLabel(block);
     }
 
     function prepareChartSurface(host, engine) {
         host.innerHTML = "";
         if (engine === ENGINE_ECHARTS) {
             var div = document.createElement("div");
-            div.className = "o_chatboo_echarts_surface";
+            div.className = "o_ai_echarts_surface";
             div.style.width = "100%";
             div.style.height = "100%";
             host.appendChild(div);
@@ -1753,7 +1790,7 @@
         return block.getAttribute("data-chatboo-chart-open") === "1";
     }
 
-    /** Marca la burbuja del turno; el ancho lo pone --o-chatboo-card-width (2/3). */
+    /** Marks the turn bubble; --o-chatboo-card-width (2/3) sets the width. */
     function expandChartMessageCanvas(block) {
         if (!block || !shouldExpandChartCanvas(block)) {
             return;
@@ -1772,43 +1809,155 @@
         }
     }
 
-    function scheduleChartResize(block) {
-        var run = function () {
-            var host = block.querySelector(".o_chatboo_chart_host");
-            var meta = block._chatbooChartMeta;
-            if (host && meta) {
-                applyChartHostHeight(
-                    host,
-                    meta,
-                    block._chatbooChartMode || meta.defaultMode,
-                    block
-                );
-            }
-            resizeChartToHost(block);
-        };
-        // rAF + timeouts: OWL/overlay a veces dan host 0×0 en el primer frame.
-        // El ResizeObserver cubre el caso en que el layout llega más tarde.
-        if (typeof global.requestAnimationFrame === "function") {
-            global.requestAnimationFrame(function () {
-                global.requestAnimationFrame(run);
-            });
+    /**
+     * Height and engine size from the host as laid out now. A host with no
+     * width yet (hidden overlay, card not placed) is measured again by the
+     * ResizeObserver when it gets one.
+     */
+    function relayoutChart(block) {
+        var host = block.querySelector(".o_ai_chart_host");
+        var meta = block._chatbooChartMeta;
+        if (host && meta) {
+            block._chatbooChartLaidOut = hostInnerSize(host).w >= MIN_HOST_PX;
+            applyChartHostHeight(
+                host,
+                meta,
+                block._chatbooChartMode || meta.defaultMode,
+                block
+            );
         }
-        setTimeout(run, 0);
-        setTimeout(run, 80);
-        setTimeout(run, 250);
-        setTimeout(run, 800);
+        resizeChartToHost(block);
     }
 
-    /** Solo resize del motor; no cambia altura del host (evita bucles de RO). */
+    /** Engine resize only; host height stays (avoids ResizeObserver loops). */
     function softResizeChartsIn(root) {
         if (!root || !root.querySelectorAll) {
             return;
         }
-        var blocks = root.querySelectorAll(".o_chatboo_table_block");
+        var blocks = root.querySelectorAll(".o_ai_table_block");
         var i;
         for (i = 0; i < blocks.length; i++) {
             resizeChartToHost(blocks[i]);
         }
+    }
+
+    function headerCellLabel(th) {
+        if (!th) {
+            return "";
+        }
+        var t = (th.textContent || "").replace(/[↕▲▼]/g, "");
+        return t.replace(/\s+/g, " ").trim();
+    }
+
+    function tableCategoryColumnIndex(table, categoryKey) {
+        if (!table || !categoryKey) {
+            return -1;
+        }
+        var ths = table.querySelectorAll("thead tr:last-child th");
+        var want = String(categoryKey).replace(/\s+/g, " ").trim();
+        var i;
+        for (i = 0; i < ths.length; i++) {
+            if (ths[i].closest && ths[i].closest("tr.o_ai_ficha_title")) {
+                continue;
+            }
+            if (headerCellLabel(ths[i]) === want) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    function rowsInVisibleTableOrder(block, rows, categoryKey) {
+        if (!block || !rows || !rows.length || !categoryKey) {
+            return rows;
+        }
+        var table = block.querySelector("table.o_ai_data_table");
+        if (!table || !table.tBodies || !table.tBodies[0]) {
+            return rows;
+        }
+        var col = tableCategoryColumnIndex(table, categoryKey);
+        if (col < 0) {
+            return rows;
+        }
+        var leftover = rows.slice();
+        var out = [];
+        var trs = table.tBodies[0].rows;
+        var i;
+        var j;
+        for (i = 0; i < trs.length; i++) {
+            var cell = trs[i].cells[col];
+            if (!cell) {
+                continue;
+            }
+            var label = cell.getAttribute("data-ai-sort");
+            if (label == null || label === "") {
+                label = (cell.textContent || "").trim();
+            }
+            label = String(label);
+            for (j = 0; j < leftover.length; j++) {
+                var v = leftover[j][categoryKey];
+                var s = v === null || v === undefined ? "" : String(v);
+                if (s === label) {
+                    out.push(leftover[j]);
+                    leftover.splice(j, 1);
+                    break;
+                }
+            }
+        }
+        if (!out.length) {
+            return rows;
+        }
+        return out.concat(leftover);
+    }
+
+    function rowsForChart(rows) {
+        if (!Array.isArray(rows)) {
+            return [];
+        }
+        return rows.filter(function (r) { return !(r && r._tfoot); });
+    }
+
+    function applyVisibleRowOrder(block, meta) {
+        if (!meta || !meta.categoryKey || !meta.seriesKeys || !meta.seriesKeys.length) {
+            return meta;
+        }
+        var raw =
+            block && block.getAttribute && block.getAttribute("data-ai-dataset");
+        if (!raw) {
+            return meta;
+        }
+        var rows;
+        try {
+            rows = JSON.parse(raw);
+        } catch (e) {
+            return meta;
+        }
+        if (!Array.isArray(rows) || !rows.length) {
+            return meta;
+        }
+        rows = rowsForChart(rows);
+        if (!rows.length) {
+            return meta;
+        }
+        var ordered = rowsInVisibleTableOrder(block, rows, meta.categoryKey);
+        var next = {};
+        var k;
+        for (k in meta) {
+            if (Object.prototype.hasOwnProperty.call(meta, k)) {
+                next[k] = meta[k];
+            }
+        }
+        next.labels = ordered.map(function (r) {
+            var v = r[meta.categoryKey];
+            return v === null || v === undefined ? "" : String(v);
+        });
+        next.series = meta.seriesKeys.map(function (key) {
+            return {
+                key: key,
+                values: seriesValues(ordered, key),
+            };
+        });
+        return next;
     }
 
     function renderChart(block, meta, mode) {
@@ -1816,8 +1965,9 @@
         if (!engine) {
             return;
         }
+        meta = applyVisibleRowOrder(block, meta);
         expandChartMessageCanvas(block);
-        var host = block.querySelector(".o_chatboo_chart_host");
+        var host = block.querySelector(".o_ai_chart_host");
         if (!host) {
             return;
         }
@@ -1830,8 +1980,8 @@
         if (!mode) {
             mode = meta.defaultMode;
         }
-        // Host visible ANTES de init: si está display:none, ECharts/Chart.js
-        // miden 0×0 y el primer frame sale aplastado ("burruño").
+        // Host visible BEFORE init: with display:none, ECharts/Chart.js
+        // measure 0×0 and the first frame comes out squashed.
         applyChartHostHeight(host, meta, mode, block);
         host.style.display = "";
         void host.offsetHeight;
@@ -1846,14 +1996,14 @@
                 size.w >= MIN_HOST_PX && size.h >= MIN_HOST_PX
                     ? { width: size.w, height: size.h }
                     : undefined;
-            block._chatbooChart = global.echarts.init(surface, null, echartsInit);
+            block._chatbooChart = EchartsLib.init(surface, null, echartsInit);
             block._chatbooChart.setOption(buildEchartsOption(meta, mode), true);
             block._chatbooChartResize = function () {
                 resizeChartToHost(block);
             };
             global.addEventListener("resize", block._chatbooChartResize);
         } else {
-            block._chatbooChart = new global.Chart(
+            block._chatbooChart = new ChartLib(
                 surface.getContext("2d"),
                 buildChartConfig(meta, mode)
             );
@@ -1869,12 +2019,12 @@
         );
         syncRotateControl(block, meta, mode);
         observeChartHost(block);
-        scheduleChartResize(block);
+        relayoutChart(block);
     }
 
     function hideChart(block) {
         destroyChart(block);
-        var host = block.querySelector(".o_chatboo_chart_host");
+        var host = block.querySelector(".o_ai_chart_host");
         if (host) {
             host.style.display = "none";
         }
@@ -1883,7 +2033,7 @@
     }
 
     function rotateSvg() {
-        // Icono tipo “combo chart”: barras + línea (Material-ish).
+        // “Combo chart” icon: bars + line (Material-ish).
         return (
             '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" ' +
             'viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
@@ -1914,19 +2064,19 @@
             return;
         }
         var dual = !!meta.dualAxis;
-        btn.textContent = dual ? "1 eje Y" : "2 ejes Y";
+        btn.textContent = dual ? _t("1 Y axis") : _t("2 Y axes");
         btn.setAttribute(
             "title",
             dual
-                ? "Usar un solo eje Y (misma escala para todas las series)"
-                : "Usar dos ejes Y (útil si mezclas € y %)"
+                ? _t("Use one Y axis (same scale for every series)")
+                : _t("Use two Y axes (useful when mixing € and %)")
         );
         btn.setAttribute("aria-pressed", dual ? "true" : "false");
         btn.setAttribute("aria-label", btn.getAttribute("title"));
     }
 
     function mountToolbar(block, meta) {
-        if (block.querySelector(".o_chatboo_chart_toolbar")) {
+        if (block.querySelector(".o_chatboo_chart_toggle")) {
             return;
         }
         applyDualAxisOverride(meta, block);
@@ -1934,19 +2084,30 @@
         block._chatbooChartMeta = meta;
         var engine = blockChartEngine(block) || ENGINE_CHARTJS;
 
-        var toolbar = document.createElement("div");
-        toolbar.className = "o_chatboo_chart_toolbar o_chatboo_noexport";
+        // The Canvas button may have opened the bar already.
+        var toolbar = ownToolbar(block);
+        if (toolbar) {
+            toolbar.classList.remove("o_chatboo_canvas_bar");
+            toolbar.remove();
+        } else {
+            toolbar = document.createElement("div");
+            toolbar.className = "o_ai_chart_toolbar o_ai_noexport";
+        }
         toolbar.setAttribute("data-engine", engine);
 
         var toggle = document.createElement("button");
         toggle.type = "button";
         toggle.className = "btn btn-sm o_chatboo_chart_toggle";
-        toggle.textContent = "Gráfico";
+        toggle.textContent = label("chart");
         toggle.setAttribute("aria-pressed", "false");
+
+        var controls = document.createElement("span");
+        controls.className = "o_chatboo_chart_controls";
+        controls.style.display = "none";
 
         var select = document.createElement("select");
         select.className = "form-select form-select-sm o_chatboo_chart_type";
-        select.setAttribute("aria-label", "Tipo de gráfico");
+        select.setAttribute("aria-label", _t("Chart type"));
         fillTypeSelect(select, engine, meta, meta.defaultMode);
 
         var rotate = document.createElement("button");
@@ -1959,7 +2120,7 @@
         axisBtn.className = "btn btn-sm o_chatboo_chart_axis";
 
         var host = document.createElement("div");
-        host.className = "o_chatboo_chart_host";
+        host.className = "o_ai_chart_host";
         host.style.display = "none";
 
         function currentMode() {
@@ -1971,21 +2132,15 @@
         }
 
         toggle.addEventListener("click", function () {
-            if (isChartTableMode(block)) {
-                var collapsed = block.getAttribute("data-chatboo-table-collapsed") !== "0";
-                setTableCollapsed(block, !collapsed);
-                updatePrimaryToggleLabel(block);
-                return;
-            }
             if (block.getAttribute("data-chatboo-chart-open") === "1") {
-                hideChart(block);
+                showTableView(block);
             } else {
-                renderChart(block, currentMeta(), currentMode());
+                showChartView(block, currentMeta(), currentMode());
             }
         });
         select.addEventListener("change", function () {
             var v = select.value || meta.defaultMode;
-            // "mix" en el selector = combinado default (no invertido).
+            // "mix" in the selector = default combined (not flipped).
             var mode = v === "mix" ? "mix" : v;
             if (block.getAttribute("data-chatboo-chart-open") === "1") {
                 renderChart(block, currentMeta(), mode);
@@ -2021,9 +2176,9 @@
             }
             m.dualAxis = !m.dualAxis;
             block._chatbooDualAxisForce = m.dualAxis;
-            block.setAttribute("data-chatboo-dual-axis", m.dualAxis ? "1" : "0");
+            block.setAttribute("data-ai-dual-axis", m.dualAxis ? "1" : "0");
             syncAxisToggle(block, m);
-            if (block.getAttribute("data-chatboo-chart-open") === "1" || isChartTableMode(block)) {
+            if (block.getAttribute("data-chatboo-chart-open") === "1") {
                 renderChart(block, m, currentMode());
             }
         });
@@ -2031,48 +2186,14 @@
         syncRotateControl(block, meta, meta.defaultMode);
         syncAxisToggle(block, meta);
 
+        controls.appendChild(select);
+        controls.appendChild(rotate);
+        controls.appendChild(axisBtn);
         toolbar.appendChild(toggle);
-        toolbar.appendChild(select);
-        toolbar.appendChild(rotate);
-        toolbar.appendChild(axisBtn);
-        var ficha = block.querySelector(":scope > .o_chatboo_ficha");
-        var tableWrap =
-            (ficha && ficha.querySelector(".table-responsive")) ||
-            block.querySelector(":scope > .table-responsive") ||
-            block.querySelector(".table-responsive") ||
-            block.querySelector("table");
-        var chartFirst = isChartTableMode(block);
-        // Nunca meter el toolbar entre título y tabla de la ficha.
-        if (ficha && ficha.parentNode === block) {
-            if (chartFirst) {
-                block.insertBefore(toolbar, ficha);
-                block.insertBefore(host, ficha);
-                setTableCollapsed(block, true);
-                updatePrimaryToggleLabel(block);
-            } else {
-                block.insertBefore(toolbar, ficha);
-                block.insertBefore(host, ficha);
-            }
-            return;
-        }
-        var insertBefore = tableWrap;
-        if (!insertBefore || insertBefore.parentNode !== block) {
-            insertBefore = block.firstElementChild;
-        }
-        if (insertBefore && insertBefore.parentNode === block) {
-            if (chartFirst) {
-                block.insertBefore(toolbar, insertBefore);
-                block.insertBefore(host, toolbar.nextSibling);
-                setTableCollapsed(block, true);
-                updatePrimaryToggleLabel(block);
-            } else {
-                block.insertBefore(toolbar, insertBefore.nextSibling);
-                block.insertBefore(host, toolbar.nextSibling);
-            }
-        } else {
-            block.appendChild(toolbar);
-            block.appendChild(host);
-        }
+        toolbar.appendChild(controls);
+        // Title and table (or the chart) first. The buttons stay under them.
+        block.appendChild(host);
+        block.appendChild(toolbar);
     }
 
     function categoryAxisIsTemporal(meta, rows) {
@@ -2088,17 +2209,15 @@
         );
     }
 
-    function shouldAutoMountChartUi(block, meta, rows) {
-        // show-chart / explicit graphic request → always offer the toolbar
-        // (any numeric series, even absurd — user asked).
+    function shouldOfferChart(block, meta, rows) {
+        // show-chart / explicit graphic request → any numeric series
+        // (even absurd — user asked).
         if (isChartTableMode(block)) {
             return true;
         }
-        // Default show-table: temporal X + money/%/count Y only.
-        // Categorical names/areas or code-like numerics (CP, lat…) → table only.
-        if (!categoryAxisIsTemporal(meta, rows)) {
-            return false;
-        }
+        // show-table: the Chart button only for money / % / count Y. X may
+        // be time or a short category list (areas, codes). CP / coords stay
+        // out via key shape.
         if (!meta || !meta.seriesKeys || !meta.seriesKeys.length) {
             return false;
         }
@@ -2108,9 +2227,11 @@
     function mountToolbarOrFallback(block, meta) {
         mountToolbar(block, meta);
         if (isChartTableMode(block)) {
-            renderChart(block, meta, meta.defaultMode);
+            showChartView(block, meta, meta.defaultMode);
         }
-        mountSeriesStats(block, meta);
+        if (showSeriesStats) {
+            mountSeriesStats(block, meta);
+        }
     }
 
     function _t(msgid) {
@@ -2182,6 +2303,15 @@
         return String(Math.round(v * 100) / 100);
     }
 
+    function escapeText(value) {
+        return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
     function statsTableHtml(meta) {
         var model = seriesStatsModel(meta);
         if (!model.length) {
@@ -2207,7 +2337,7 @@
         }
         html += "</tr></thead><tbody>";
         for (i = 0; i < model.length; i++) {
-            html += "<tr><th>" + String(model[i].name || "") + "</th>";
+            html += "<tr><th>" + escapeText(model[i].name || "") + "</th>";
             for (j = 0; j < keys.length; j++) {
                 html += "<td>" + formatStatNumber(model[i].stats[keys[j]]) + "</td>";
             }
@@ -2246,6 +2376,17 @@
         return rows;
     }
 
+    function maybeMountSeriesStats(block, rows, chartMeta) {
+        if (!showSeriesStats) {
+            return;
+        }
+        var statsMeta = analyzeForStats(rows) || chartMeta;
+        if (!statsMeta) {
+            return;
+        }
+        mountSeriesStats(block, statsMeta);
+    }
+
     function mountSeriesStats(block, meta) {
         if (!block || !block.querySelector) {
             return;
@@ -2261,7 +2402,7 @@
         var wrap = document.createElement("div");
         wrap.innerHTML = html;
         var node = wrap.firstChild;
-        var host = block.querySelector(".o_chatboo_chart_host");
+        var host = block.querySelector(".o_ai_chart_host");
         if (host && host.parentNode) {
             if (host.nextSibling) {
                 host.parentNode.insertBefore(node, host.nextSibling);
@@ -2273,11 +2414,837 @@
         block.appendChild(node);
     }
 
+    function parseSortNumber(raw) {
+        var t = String(raw || "").trim();
+        if (!t) {
+            return null;
+        }
+        if (/^-?\d+(\.\d+)?$/.test(t)) {
+            return parseFloat(t);
+        }
+        var compact = t.replace(/\s/g, "");
+        if (/^-?[\d.]+,\d+$/.test(compact)) {
+            return parseFloat(compact.replace(/\./g, "").replace(",", "."));
+        }
+        return null;
+    }
+
+    function cellSortKey(td) {
+        if (!td) {
+            return { n: null, s: "" };
+        }
+        var raw = td.getAttribute("data-ai-sort");
+        if (raw == null || raw === "") {
+            raw = (td.textContent || "").trim();
+        }
+        return { n: parseSortNumber(raw), s: String(raw).toLowerCase() };
+    }
+
+    function compareSortKeys(a, b, dir) {
+        var sign = dir === "desc" ? -1 : 1;
+        if (a.n != null && b.n != null && !isNaN(a.n) && !isNaN(b.n)) {
+            if (a.n < b.n) {
+                return -1 * sign;
+            }
+            if (a.n > b.n) {
+                return 1 * sign;
+            }
+            return 0;
+        }
+        if (a.s < b.s) {
+            return -1 * sign;
+        }
+        if (a.s > b.s) {
+            return 1 * sign;
+        }
+        return 0;
+    }
+
+    function refreshOpenChart(table) {
+        var block = table && table.closest && table.closest(".o_ai_table_block");
+        if (
+            block &&
+            block.getAttribute("data-chatboo-chart-open") === "1" &&
+            block._chatbooChartMeta
+        ) {
+            renderChart(
+                block,
+                block._chatbooChartMeta,
+                block._chatbooChartMode || block._chatbooChartMeta.defaultMode
+            );
+        }
+    }
+
+    function applyTableSort(table, col, dir, secondary) {
+        var tbody = table.tBodies && table.tBodies[0];
+        if (!tbody) {
+            return;
+        }
+        var rows = Array.prototype.slice.call(tbody.rows || []);
+        rows.forEach(function (tr, i) {
+            if (tr.getAttribute("data-chatboo-ord") == null) {
+                tr.setAttribute("data-chatboo-ord", String(i));
+            }
+        });
+        if (dir === "none" || col < 0) {
+            rows.sort(function (a, b) {
+                return (
+                    Number(a.getAttribute("data-chatboo-ord") || 0) -
+                    Number(b.getAttribute("data-chatboo-ord") || 0)
+                );
+            });
+        } else {
+            rows.sort(function (a, b) {
+                var primary = compareSortKeys(
+                    cellSortKey(a.cells[col]),
+                    cellSortKey(b.cells[col]),
+                    dir
+                );
+                if (primary !== 0) {
+                    return primary;
+                }
+                if (
+                    secondary
+                    && secondary.dir
+                    && secondary.dir !== "none"
+                    && secondary.col >= 0
+                ) {
+                    var sec = compareSortKeys(
+                        cellSortKey(a.cells[secondary.col]),
+                        cellSortKey(b.cells[secondary.col]),
+                        secondary.dir
+                    );
+                    if (sec !== 0) {
+                        return sec;
+                    }
+                }
+                return (
+                    Number(a.getAttribute("data-chatboo-ord") || 0) -
+                    Number(b.getAttribute("data-chatboo-ord") || 0)
+                );
+            });
+        }
+        rows.forEach(function (tr) {
+            tbody.appendChild(tr);
+        });
+        var heads = table.querySelectorAll("thead th.o_ai_th_sort");
+        var i;
+        for (i = 0; i < heads.length; i++) {
+            var th = heads[i];
+            var idx = Number(th.getAttribute("data-ai-sort-col"));
+            if (idx === col && dir !== "none") {
+                th.setAttribute(
+                    "aria-sort",
+                    dir === "desc" ? "descending" : "ascending"
+                );
+            } else {
+                th.setAttribute("aria-sort", "none");
+            }
+        }
+        refreshOpenChart(table);
+    }
+
+    function cycleSortOnHeader(table, th) {
+        var col = Number(th.getAttribute("data-ai-sort-col"));
+        if (isNaN(col)) {
+            return;
+        }
+        var state = table._chatbooSort || { col: -1, dir: "none", secondary: null };
+        if (state.col === col) {
+            state.dir =
+                state.dir === "asc"
+                    ? "desc"
+                    : state.dir === "desc"
+                      ? "none"
+                      : "asc";
+            if (state.dir === "none") {
+                state.secondary = null;
+                state.col = -1;
+            }
+        } else {
+            if (state.dir !== "none" && state.col >= 0) {
+                state.secondary = { col: state.col, dir: state.dir };
+            } else {
+                state.secondary = null;
+            }
+            state.col = col;
+            state.dir = "asc";
+        }
+        table._chatbooSort = state;
+        applyTableSort(table, state.col, state.dir, state.secondary);
+    }
+
+    var COL_DRAG_THRESHOLD = 6;
+
+    function tableSectionRows(table) {
+        var rows = [];
+        var collect = function (section) {
+            if (!section) {
+                return;
+            }
+            var r;
+            for (r = 0; r < section.rows.length; r++) {
+                var tr = section.rows[r];
+                if (tr.classList && tr.classList.contains("o_ai_ficha_title")) {
+                    continue;
+                }
+                rows.push(tr);
+            }
+        };
+        collect(table.tHead);
+        var b;
+        for (b = 0; b < (table.tBodies || []).length; b++) {
+            collect(table.tBodies[b]);
+        }
+        collect(table.tFoot);
+        return rows;
+    }
+
+    function moveTableColumn(table, fromIdx, toIdx) {
+        if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0) {
+            return;
+        }
+        var rows = tableSectionRows(table);
+        var r;
+        for (r = 0; r < rows.length; r++) {
+            var cells = rows[r].cells;
+            if (!cells || fromIdx >= cells.length || toIdx >= cells.length) {
+                continue;
+            }
+            var cell = cells[fromIdx];
+            if (!cell) {
+                continue;
+            }
+            if (fromIdx < toIdx) {
+                var ref = cells[toIdx];
+                if (ref && ref.nextSibling) {
+                    rows[r].insertBefore(cell, ref.nextSibling);
+                } else {
+                    rows[r].appendChild(cell);
+                }
+            } else {
+                rows[r].insertBefore(cell, cells[toIdx]);
+            }
+        }
+    }
+
+    function reindexSortCols(table) {
+        var ths = table.querySelectorAll("thead th.o_ai_th_sort");
+        var map = {};
+        var i;
+        for (i = 0; i < ths.length; i++) {
+            var old = Number(ths[i].getAttribute("data-ai-sort-col"));
+            if (!isNaN(old)) {
+                map[old] = i;
+            }
+            ths[i].setAttribute("data-ai-sort-col", String(i));
+        }
+        var state = table._chatbooSort;
+        if (!state) {
+            return;
+        }
+        if (state.col >= 0 && map[state.col] != null) {
+            state.col = map[state.col];
+        }
+        if (state.secondary && state.secondary.col >= 0 && map[state.secondary.col] != null) {
+            state.secondary.col = map[state.secondary.col];
+        }
+    }
+
+    function titleCaseKey(key) {
+        return String(key || "").replace(/_/g, " ").replace(/\S+/g, function (word) {
+            return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        });
+    }
+
+    function matchDatasetKey(label, keys, used) {
+        var want = String(label || "").replace(/\s+/g, " ").trim();
+        var k;
+        for (k = 0; k < keys.length; k++) {
+            if (used[keys[k]]) {
+                continue;
+            }
+            var titled = titleCaseKey(keys[k]).replace(/\s+/g, " ").trim();
+            if (keys[k] === want || titled === want) {
+                return keys[k];
+            }
+        }
+        return "";
+    }
+
+    function rewriteDatasetColumnOrder(table) {
+        var block = table.closest && table.closest(".o_ai_table_block");
+        if (!block) {
+            return;
+        }
+        var raw = block.getAttribute("data-ai-dataset");
+        if (!raw) {
+            return;
+        }
+        var rows;
+        try {
+            rows = JSON.parse(raw);
+        } catch (eParse) {
+            return;
+        }
+        if (!Array.isArray(rows) || !rows.length) {
+            return;
+        }
+        var keys = columnKeys(rows);
+        var ths = table.querySelectorAll("thead th.o_ai_th_sort");
+        var ordered = [];
+        var used = {};
+        var i;
+        var k;
+        for (i = 0; i < ths.length; i++) {
+            var hit = matchDatasetKey(headerCellLabel(ths[i]), keys, used);
+            if (hit) {
+                ordered.push(hit);
+                used[hit] = 1;
+            }
+        }
+        for (k = 0; k < keys.length; k++) {
+            if (!used[keys[k]]) {
+                ordered.push(keys[k]);
+            }
+        }
+        if (!ordered.length) {
+            return;
+        }
+        var next = rows.map(function (row) {
+            if (!row || typeof row !== "object") {
+                return row;
+            }
+            var out = {};
+            var j;
+            for (j = 0; j < ordered.length; j++) {
+                if (Object.prototype.hasOwnProperty.call(row, ordered[j])) {
+                    out[ordered[j]] = row[ordered[j]];
+                }
+            }
+            Object.keys(row).forEach(function (key) {
+                if (!Object.prototype.hasOwnProperty.call(out, key)) {
+                    out[key] = row[key];
+                }
+            });
+            return out;
+        });
+        block.setAttribute("data-ai-dataset", JSON.stringify(next));
+        var meta = block._chatbooChartMeta;
+        if (meta && meta.seriesKeys && meta.seriesKeys.length) {
+            var keep = {};
+            meta.seriesKeys.forEach(function (key) {
+                keep[key] = 1;
+            });
+            var series = [];
+            ordered.forEach(function (key) {
+                if (keep[key]) {
+                    series.push(key);
+                }
+            });
+            meta.seriesKeys.forEach(function (key) {
+                if (series.indexOf(key) < 0) {
+                    series.push(key);
+                }
+            });
+            meta.seriesKeys = series;
+        }
+    }
+
+    function colReorderHost(table) {
+        return (
+            (table.closest && table.closest(".table-responsive"))
+            || table.parentNode
+            || table
+        );
+    }
+
+    function hideColGuide(table) {
+        var host = colReorderHost(table);
+        if (!host) {
+            return;
+        }
+        var guide = host._chatbooColGuide;
+        if (guide && guide.parentNode) {
+            guide.parentNode.removeChild(guide);
+        }
+        host._chatbooColGuide = null;
+    }
+
+    function dropIndexFromClientX(table, clientX) {
+        var ths = table.querySelectorAll("thead th.o_ai_th_sort");
+        var i;
+        for (i = 0; i < ths.length; i++) {
+            var box = ths[i].getBoundingClientRect();
+            if (clientX < box.left + box.width / 2) {
+                return i;
+            }
+        }
+        return ths.length ? ths.length - 1 : 0;
+    }
+
+    function showColGuide(table, toIdx, fromIdx) {
+        var ths = table.querySelectorAll("thead th.o_ai_th_sort");
+        var th = ths[toIdx];
+        var host = colReorderHost(table);
+        if (!th || !host || !host.appendChild) {
+            return;
+        }
+        var guide = host._chatbooColGuide;
+        if (!guide) {
+            guide = global.document.createElement("div");
+            guide.className = "o_chatboo_col_reorder_guide";
+            guide.setAttribute("aria-hidden", "true");
+            host.appendChild(guide);
+            host._chatbooColGuide = guide;
+        }
+        var hostRect = host.getBoundingClientRect();
+        var thRect = th.getBoundingClientRect();
+        var tableRect = table.getBoundingClientRect();
+        var x = fromIdx < toIdx
+            ? thRect.right - hostRect.left + (host.scrollLeft || 0)
+            : thRect.left - hostRect.left + (host.scrollLeft || 0);
+        guide.style.left = x + "px";
+        guide.style.top = (tableRect.top - hostRect.top + (host.scrollTop || 0)) + "px";
+        guide.style.height = tableRect.height + "px";
+    }
+
+    function bindHeaderPointer(table, th) {
+        th.addEventListener("pointerdown", function (ev) {
+            if (ev.button != null && ev.button !== 0) {
+                return;
+            }
+            if (ev.target && ev.target.closest && ev.target.closest("a")) {
+                return;
+            }
+            var fromIdx = Number(th.getAttribute("data-ai-sort-col"));
+            var startX = ev.clientX;
+            var startY = ev.clientY;
+            var dragged = false;
+            var lastTo = fromIdx;
+            var colCount = table.querySelectorAll("thead th.o_ai_th_sort").length;
+            var onMove = function (e) {
+                if (
+                    !dragged
+                    && Math.abs(e.clientX - startX) < COL_DRAG_THRESHOLD
+                    && Math.abs(e.clientY - startY) < COL_DRAG_THRESHOLD
+                ) {
+                    return;
+                }
+                if (colCount < 2 || isNaN(fromIdx)) {
+                    return;
+                }
+                dragged = true;
+                table.classList.add("o_chatboo_col_reordering");
+                th.classList.add("is-dragging");
+                lastTo = dropIndexFromClientX(table, e.clientX);
+                showColGuide(table, lastTo, fromIdx);
+            };
+            var onUp = function () {
+                document.removeEventListener("pointermove", onMove);
+                document.removeEventListener("pointerup", onUp);
+                document.removeEventListener("pointercancel", onUp);
+                hideColGuide(table);
+                th.classList.remove("is-dragging");
+                table.classList.remove("o_chatboo_col_reordering");
+                if (dragged) {
+                    if (lastTo !== fromIdx && !isNaN(fromIdx)) {
+                        moveTableColumn(table, fromIdx, lastTo);
+                        reindexSortCols(table);
+                        rewriteDatasetColumnOrder(table);
+                        refreshOpenChart(table);
+                    }
+                } else {
+                    cycleSortOnHeader(table, th);
+                }
+            };
+            document.addEventListener("pointermove", onMove);
+            document.addEventListener("pointerup", onUp);
+            document.addEventListener("pointercancel", onUp);
+            ev.preventDefault();
+        });
+    }
+
+    function bindSortableTables(root) {
+        if (!root || !root.querySelectorAll) {
+            return;
+        }
+        var tables = root.querySelectorAll("table.o_ai_data_table");
+        var t;
+        for (t = 0; t < tables.length; t++) {
+            var table = tables[t];
+            if (table.getAttribute("data-chatboo-sort-bound") === "1") {
+                continue;
+            }
+            var ths = table.querySelectorAll("thead th.o_ai_th_sort");
+            if (!ths.length) {
+                var plain = table.querySelectorAll(
+                    "thead tr:last-child th"
+                );
+                var p;
+                for (p = 0; p < plain.length; p++) {
+                    if (plain[p].closest("tr.o_ai_ficha_title")) {
+                        continue;
+                    }
+                    plain[p].classList.add("o_ai_th_sort");
+                    plain[p].setAttribute("data-ai-sort-col", String(p));
+                    plain[p].setAttribute("aria-sort", "none");
+                }
+                ths = table.querySelectorAll("thead th.o_ai_th_sort");
+            }
+            if (!ths.length) {
+                continue;
+            }
+            table.setAttribute("data-chatboo-sort-bound", "1");
+            table._chatbooSort = { col: -1, dir: "none", secondary: null };
+            Array.prototype.forEach.call(ths, function (th) {
+                bindHeaderPointer(table, th);
+            });
+        }
+    }
+
+    // ── Canvas: every table of one answer laid out as a page ──
+    // The chat client sets the host only when a provider has the Design
+    // tick. ``rpc(route, params)`` returns a promise; ``sessionId()`` and
+    // ``question(msgIndex)`` read the client state.
+    var CANVAS_POLL_MS = 3000;
+    var CANVAS_WAIT_MS = 7 * 60 * 1000;
+    var canvasHost = null;
+    var canvasJobs = {};
+
+    function setCanvas(host) {
+        canvasHost = host && typeof host.rpc === "function" ? host : null;
+        if (typeof document !== "undefined") {
+            mountCanvasButtons(document);
+        }
+    }
+
+    function messageRowOf(block) {
+        return block && block.closest ? block.closest("[data-msg-index]") : null;
+    }
+
+    function canvasJobKey(row) {
+        var sid = canvasHost && canvasHost.sessionId ? canvasHost.sessionId() : "";
+        return String(sid || "") + ":" + row.getAttribute("data-msg-index");
+    }
+
+    function canvasTablesOf(row) {
+        var out = [];
+        var blocks = row.querySelectorAll(".o_ai_table_block[data-ai-dataset]");
+        for (var i = 0; i < blocks.length; i++) {
+            var rows;
+            try {
+                rows = JSON.parse(blocks[i].getAttribute("data-ai-dataset") || "[]");
+            } catch (e) {
+                continue;
+            }
+            if (!Array.isArray(rows) || !rows.length) {
+                continue;
+            }
+            var head = blocks[i].querySelector(
+                ".o_ai_block_title, .o_ai_ficha_title, .pns-result-title"
+            );
+            out.push({
+                title: head ? (head.textContent || "").replace(/\s+/g, " ").trim() : "",
+                rows: rows,
+            });
+        }
+        return out;
+    }
+
+    /** The answer's own heading, above its tables. */
+    function canvasTitleOf(row) {
+        var head = row.querySelector(".o_ai_result_title, .o_ai_dashboard_title");
+        return head ? (head.textContent || "").replace(/\s+/g, " ").trim() : "";
+    }
+
+    /** Every table of the answer shows the same page, so they share its state. */
+    function paintCanvasRow(row, job) {
+        var buttons = row && row.querySelectorAll
+            ? row.querySelectorAll(".o_chatboo_canvas_btn")
+            : [];
+        for (var i = 0; i < buttons.length; i++) {
+            paintCanvasButton(buttons[i], job);
+        }
+    }
+
+    function paintCanvasButton(btn, job) {
+        if (!btn) {
+            return;
+        }
+        var state = job ? job.state : "";
+        btn.classList.toggle("o_chatboo_canvas_btn--failed", state === "failed");
+        btn.classList.toggle("o_chatboo_canvas_btn--building", state === "building");
+        if (state === "building") {
+            var dots = document.createElement("span");
+            dots.className = "o_chatboo_typing";
+            for (var d = 0; d < 3; d++) {
+                dots.appendChild(document.createElement("span"));
+            }
+            btn.textContent = "";
+            btn.appendChild(dots);
+            btn.appendChild(document.createTextNode(" " + label("canvasBuilding")));
+            btn.setAttribute("title", label("canvasCancel"));
+        } else if (state === "done") {
+            btn.textContent = label("canvasOpen");
+            btn.setAttribute("title", job.url);
+        } else if (state === "failed") {
+            btn.textContent = label("canvas");
+            btn.setAttribute("title", job.error || label("canvasFailed"));
+        } else {
+            btn.textContent = label("canvas");
+            btn.setAttribute("title", label("canvasTitle"));
+        }
+    }
+
+    function waitForCanvas(jobId) {
+        var deadline = Date.now() + CANVAS_WAIT_MS;
+        return new Promise(function (resolve, reject) {
+            function tick() {
+                Promise.resolve(
+                    canvasHost.rpc("/chatboo/canvas/state", { job_id: jobId })
+                ).then(function (st) {
+                    if (!st || st.status !== "ok") {
+                        reject(new Error((st && st.message) || ""));
+                        return;
+                    }
+                    if (st.state === "done") {
+                        resolve(st.url);
+                        return;
+                    }
+                    if (st.state !== "building") {
+                        reject(new Error(st.error || ""));
+                        return;
+                    }
+                    if (Date.now() > deadline) {
+                        reject(new Error(""));
+                        return;
+                    }
+                    global.setTimeout(tick, CANVAS_POLL_MS);
+                }, reject);
+            }
+            global.setTimeout(tick, CANVAS_POLL_MS);
+        });
+    }
+
+    function followCanvas(job) {
+        waitForCanvas(job.jobId).then(function (url) {
+            if (job.cancelled) {
+                return;
+            }
+            job.state = "done";
+            job.url = url;
+            paintCanvasRow(job.row, job);
+        }, function (err) {
+            if (job.cancelled) {
+                return;
+            }
+            job.state = "failed";
+            job.error = (err && err.message) || "";
+            paintCanvasRow(job.row, job);
+        });
+    }
+
+    function startCanvas(row) {
+        if (!canvasHost) {
+            return;
+        }
+        var key = canvasJobKey(row);
+        var job = canvasJobs[key];
+        if (job && job.state === "done") {
+            global.open(job.url, "_blank", "noopener");
+            return;
+        }
+        if (job && job.state === "building") {
+            cancelCanvas(key, job);
+            return;
+        }
+        var sessionId = canvasHost.sessionId ? canvasHost.sessionId() : null;
+        var tables = canvasTablesOf(row);
+        if (!sessionId || !tables.length) {
+            return;
+        }
+        var msgIndex = parseInt(row.getAttribute("data-msg-index"), 10);
+        job = canvasJobs[key] = { state: "building", row: row };
+        paintCanvasRow(row, job);
+        Promise.resolve(canvasHost.rpc("/chatboo/canvas/build", {
+            session_id: sessionId,
+            tables: tables,
+            title: canvasTitleOf(row),
+            question: canvasHost.question ? (canvasHost.question(msgIndex) || "") : "",
+            msg_index: msgIndex,
+        })).then(function (res) {
+            if (!res || res.status !== "ok") {
+                throw new Error((res && res.message) || "");
+            }
+            job.jobId = res.job_id;
+            if (job.cancelled) {
+                cancelCanvasJob(job.jobId);
+                return;
+            }
+            if (res.state === "done") {
+                job.state = "done";
+                job.url = res.url;
+                paintCanvasRow(job.row, job);
+            } else if (res.state === "building") {
+                followCanvas(job);
+            } else {
+                throw new Error(res.error || "");
+            }
+        }).catch(function (err) {
+            if (job.cancelled) {
+                return;
+            }
+            job.state = "failed";
+            job.error = (err && err.message) || "";
+            paintCanvasRow(job.row, job);
+        });
+    }
+
+    /** A click while building asks first, like the chat; yes drops the page on the server. */
+    function cancelCanvas(key, job) {
+        if (!canvasHost.confirmCancel) {
+            return;
+        }
+        canvasHost.confirmCancel(function () {
+            if (canvasJobs[key] === job && job.state === "building") {
+                dropCanvas(key, job);
+            }
+        });
+    }
+
+    function dropCanvas(key, job) {
+        job.cancelled = true;
+        if (canvasJobs[key] === job) {
+            delete canvasJobs[key];
+        }
+        paintCanvasRow(job.row, null);
+        if (job.jobId) {
+            cancelCanvasJob(job.jobId);
+        }
+    }
+
+    function cancelCanvasJob(jobId) {
+        Promise.resolve(canvasHost.rpc("/chatboo/canvas/cancel", {
+            job_id: jobId,
+        })).catch(function () {});
+    }
+
+    /** After a reload, the pages still on their way show their dots again. */
+    var canvasResumed = {};
+
+    function resumeCanvas() {
+        var sessionId = canvasHost && canvasHost.sessionId ? canvasHost.sessionId() : null;
+        if (!sessionId || canvasResumed[sessionId]) {
+            return;
+        }
+        canvasResumed[sessionId] = true;
+        Promise.resolve(canvasHost.rpc("/chatboo/canvas/running", {
+            session_id: sessionId,
+        })).then(function (res) {
+            var jobs = (res && res.status === "ok" && res.jobs) || [];
+            jobs.forEach(function (st) {
+                var key = String(sessionId) + ":" + st.msg_index;
+                if (st.state !== "building" || canvasJobs[key]) {
+                    return;
+                }
+                var row = document.querySelector('[data-msg-index="' + st.msg_index + '"]');
+                var job = canvasJobs[key] = {
+                    state: "building",
+                    jobId: st.job_id,
+                    row: row,
+                };
+                paintCanvasRow(row, job);
+                followCanvas(job);
+            });
+        }).catch(function () {
+            delete canvasResumed[sessionId];
+        });
+    }
+
+    function dropCanvasButton(btn) {
+        var bar = btn.parentNode;
+        btn.remove();
+        if (bar && bar.classList.contains("o_chatboo_canvas_bar") && !bar.children.length) {
+            bar.remove();
+        }
+    }
+
+    function ownToolbar(block) {
+        for (var i = 0; i < block.children.length; i++) {
+            if (block.children[i].classList.contains("o_ai_chart_toolbar")) {
+                return block.children[i];
+            }
+        }
+        return null;
+    }
+
+    function canvasButtonIn(block) {
+        var bar = ownToolbar(block);
+        return bar ? bar.querySelector(".o_chatboo_canvas_btn") : null;
+    }
+
+    /** One page per answer, from every table. Each table carries the button. */
+    function mountCanvasButton(block) {
+        var row = messageRowOf(block);
+        if (!row) {
+            return;
+        }
+        var own = canvasButtonIn(block);
+        if (!canvasHost) {
+            if (own) {
+                dropCanvasButton(own);
+            }
+            return;
+        }
+        if (!canvasTablesOf(row).length) {
+            if (own) {
+                dropCanvasButton(own);
+            }
+            return;
+        }
+        if (own) {
+            return;
+        }
+        var bar = ownToolbar(block);
+        if (!bar) {
+            bar = document.createElement("div");
+            bar.className = "o_ai_chart_toolbar o_chatboo_canvas_bar o_ai_noexport";
+            block.appendChild(bar);
+        }
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn btn-sm o_chatboo_canvas_btn";
+        bar.insertBefore(btn, bar.firstChild);
+        var job = canvasJobs[canvasJobKey(row)];
+        if (job) {
+            job.row = row;
+        }
+        paintCanvasButton(btn, job);
+        btn.addEventListener("click", function () {
+            startCanvas(row);
+        });
+    }
+
+    function mountCanvasButtons(root) {
+        if (!root || !root.querySelectorAll) {
+            return;
+        }
+        if (canvasHost) {
+            resumeCanvas();
+        }
+        var blocks = root.querySelectorAll(".o_ai_table_block[data-ai-dataset]");
+        for (var i = 0; i < blocks.length; i++) {
+            mountCanvasButton(blocks[i]);
+        }
+    }
+
     function hydrateRoot(root) {
         if (!root || !root.querySelectorAll) {
             return;
         }
-        var blocks = root.querySelectorAll(".o_chatboo_table_block[data-chatboo-dataset]");
+        bindSortableTables(root);
+        var blocks = root.querySelectorAll(".o_ai_table_block[data-ai-dataset]");
         for (var i = 0; i < blocks.length; i++) {
             var block = blocks[i];
             if (block.getAttribute("data-chatboo-chart-ready") === "1") {
@@ -2287,7 +3254,7 @@
                 block.setAttribute("data-chatboo-chart-ready", "1");
                 continue;
             }
-            var raw = block.getAttribute("data-chatboo-dataset");
+            var raw = block.getAttribute("data-ai-dataset");
             if (!raw) {
                 continue;
             }
@@ -2298,6 +3265,10 @@
                 continue;
             }
             if (!Array.isArray(rows) || !rows.length) {
+                continue;
+            }
+            rows = rowsForChart(rows);
+            if (!rows.length) {
                 continue;
             }
             var explicitChart = isChartTableMode(block);
@@ -2313,17 +3284,17 @@
                 }
             }
             if (!meta) {
-                if (explicitChart) {
-                    mountChartTableShell(block);
-                }
+                maybeMountSeriesStats(block, rows, null);
                 block.setAttribute("data-chatboo-chart-ready", "1");
                 continue;
             }
             if (isKpiLabelValueMeta(meta)) {
+                maybeMountSeriesStats(block, rows, meta);
                 block.setAttribute("data-chatboo-chart-ready", "1");
                 continue;
             }
-            if (!shouldAutoMountChartUi(block, meta, rows)) {
+            if (!shouldOfferChart(block, meta, rows)) {
+                maybeMountSeriesStats(block, rows, meta);
                 block.setAttribute("data-chatboo-chart-ready", "1");
                 continue;
             }
@@ -2331,13 +3302,14 @@
             mountToolbarOrFallback(block, meta);
             block.setAttribute("data-chatboo-chart-ready", "1");
         }
+        mountCanvasButtons(root);
     }
 
     function destroyInRoot(root) {
         if (!root || !root.querySelectorAll) {
             return;
         }
-        var blocks = root.querySelectorAll(".o_chatboo_table_block");
+        var blocks = root.querySelectorAll(".o_ai_table_block");
         for (var i = 0; i < blocks.length; i++) {
             destroyChart(blocks[i]);
         }
@@ -2387,13 +3359,13 @@
         var surface =
             block &&
             block.querySelector &&
-            block.querySelector(".o_chatboo_echarts_surface");
+            block.querySelector(".o_ai_echarts_surface");
         if (
             surface &&
-            global.echarts &&
-            typeof global.echarts.getInstanceByDom === "function"
+            EchartsLib &&
+            typeof EchartsLib.getInstanceByDom === "function"
         ) {
-            return global.echarts.getInstanceByDom(surface);
+            return EchartsLib.getInstanceByDom(surface);
         }
         return null;
     }
@@ -2413,7 +3385,7 @@
         var raw =
             block &&
             block.getAttribute &&
-            block.getAttribute("data-chatboo-dataset");
+            block.getAttribute("data-ai-dataset");
         if (!raw) {
             return null;
         }
@@ -2424,6 +3396,10 @@
             return null;
         }
         if (!Array.isArray(rows) || !rows.length) {
+            return null;
+        }
+        rows = rowsForChart(rows);
+        if (!rows.length) {
             return null;
         }
         var explicit = isChartTableMode(block);
@@ -2441,7 +3417,7 @@
         if (!meta) {
             return null;
         }
-        if (!explicit && !shouldAutoMountChartUi(block, meta, rows)) {
+        if (!explicit && !shouldOfferChart(block, meta, rows)) {
             return null;
         }
         return meta;
@@ -2455,7 +3431,7 @@
         if (png) {
             return png;
         }
-        var host = block.querySelector && block.querySelector(".o_chatboo_chart_host");
+        var host = block.querySelector && block.querySelector(".o_ai_chart_host");
         png = canvasToPng(largestCanvas(host));
         if (png) {
             return png;
@@ -2470,7 +3446,7 @@
             png = chartInstancePng(resolveChartInstance(block));
             if (!png) {
                 png = canvasToPng(largestCanvas(
-                    block.querySelector && block.querySelector(".o_chatboo_chart_host")
+                    block.querySelector && block.querySelector(".o_ai_chart_host")
                 ));
             }
         } catch (e) {
@@ -2498,6 +3474,7 @@
     }
 
     global.ChatbooCharts = {
+        bindEngines: bindEngines,
         hydrate: hydrateRoot,
         destroyIn: destroyInRoot,
         analyze: analyzeDataset,
@@ -2508,7 +3485,9 @@
         isCountLikeKey: isCountLikeKey,
         isChartMetricKey: isChartMetricKey,
         categoryAxisIsTemporal: categoryAxisIsTemporal,
-        shouldAutoMountChartUi: shouldAutoMountChartUi,
+        shouldOfferChart: shouldOfferChart,
+        setLabels: setLabels,
+        setCanvas: setCanvas,
         resolveHostHeight: resolveChartHostHeightPx,
         relayout: relayoutChartsIn,
         softResize: softResizeChartsIn,
@@ -2517,9 +3496,11 @@
         statsAoa: statsAoa,
         seriesStatsModel: seriesStatsModel,
         mountSeriesStats: mountSeriesStats,
+        setShowSeriesStats: setShowSeriesStats,
+        getShowSeriesStats: getShowSeriesStats,
     };
 
-    // Copiar texto de celda (coords, etc.): data-copy-text en .o_chatboo_cell_copy
+    // Copy cell text (coords, etc.): data-copy-text on .o_ai_cell_copy
     function bindCellCopyOnce() {
         if (global.__chatbooCellCopyBound) {
             return;
@@ -2532,7 +3513,7 @@
                 if (!el || !el.closest) {
                     return;
                 }
-                var btn = el.closest(".o_chatboo_cell_copy");
+                var btn = el.closest(".o_ai_cell_copy");
                 if (!btn) {
                     return;
                 }

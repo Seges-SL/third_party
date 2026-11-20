@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ai_skill_capture_wizard_form_chatboo" model="ir.ui.view">
+        <field name="name">pns_ai_chatboo.skill.capture.wizard.form</field>
+        <field name="model">ai.skill.capture.wizard</field>
+        <field name="inherit_id" ref="pns_ai_mcp.view_ai_skill_capture_wizard_form"/>
+        <field name="arch" type="xml">
+            <field name="from_chat" position="after">
+                <field name="chatboo_session_id" invisible="1"/>
+            </field>
+        </field>
+    </record>
+</odoo>

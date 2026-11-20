@@ -6,11 +6,12 @@
 import secrets
 import string
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 from ..utils import mcp_ui
 from ..utils.import_export_guard import ensure_ai_admin
 from ..utils.api_key import hash_api_key, normalize_to_hash
+from ..utils.key_pin import compact_pin, pin_length, pin_shaped
 from ..utils.portable_io import export_record_dict, import_vals_from_dict
 from ..utils.compat import (
     USER_GROUPS_FIELD,
@@ -39,40 +40,42 @@ class MCPUser(models.Model):
     ========================  ====================================================
     Group                     Capabilities
     ========================  ====================================================
-    **User** (internal user    Read via MCP API key / Chatboo. No CRUD, external
+    **User** (internal user    Read via MCP API key / chat. No CRUD, external
     + MCP API key, no extra    URL or external API until explicitly granted.
     AI groups)
-    **AI Writer**             CRUD via propose_safe_operations + AI content mgmt.
-    **AI External URL**       fetch_url via propose_safe_operations.
-    **AI External API**       api_call (MCP/OpenAPI) via propose_safe_operations.
+    **AI Writer**             CRUD via safe_plan_request + AI content mgmt.
+    **AI External URL**       fetch_url via safe_plan_request.
+    **AI External API**       api_call (MCP/OpenAPI) via safe_plan_request.
     **AI Administrator**      All of the above + infrastructure administration.
     ========================  ====================================================
 
-    API key (usuario MCP — NO confundir con ``ai.provider.api_key``)
+    API key (MCP user — NOT to be confused with ``ai.provider.api_key``)
     ================================================================
 
-    Esta key autentica clientes **externos** contra ``/mcp`` (Cursor, Claude
-    Desktop…). **No** es la credencial del gateway LLM; esa vive en
-    ``ai.provider.api_key`` (solo admins, uso server-side al inferir).
+    This key authenticates **external** clients against ``/mcp`` (Cursor, Claude
+    Desktop…). It is **not** the LLM gateway credential; that one lives in
+    ``ai.provider.api_key`` (admins only, used server-side at inference).
 
-    Chatboo **no** usa el valor de esta key para chatear: va por sesión Odoo +
-    ``AgentEngine`` in-process. Aquí solo importa que exista
-    ``mcp_api_key_hash`` (carnet de acceso UI). Ver ``docs/dos_credenciales_api.md``.
+    An internal host does **not** use this key's value to chat: it goes through the
+    Odoo session + in-process ``AgentEngine``. Here all that matters is that
+    ``mcp_api_key_hash`` exists (UI access pass). See ``docs/dos_credenciales_api.md``.
 
     We are the *verifier* of this credential, so we store only a one-way
     **SHA-256 hash** in ``mcp_api_key_hash``, never the plaintext. The raw key
     is shown to the admin only once, at generation time ("copy it now").
     See ``utils/api_key.py`` and ``docs/decisions/api_key_hashing.md``.
 
-    Without a generated hash, internal AI menus and Chatboo systray stay hidden
+    Without a generated hash, internal AI menus and host systray icons stay hidden
     for that user (external MCP clients also cannot authenticate).
     """
     _name = 'ai.mcp.user'
     _description = 'MCP User'
     _rec_name = 'user_id'
     _order = 'user_id'
+    # The hash moves the access: the same client key works on the target.
+    _pns_secret_fields = ('mcp_api_key_hash',)
 
-    # Relación One2one con res.users (campo único)
+    # One2one relation with res.users (unique field)
     user_id = fields.Many2one(
         'res.users',
         string='User',
@@ -81,7 +84,7 @@ class MCPUser(models.Model):
         index=True
     )
 
-    # Campos relacionados desde el usuario (readonly)
+    # Related fields from the user (readonly)
     name = fields.Char(
         string='Name',
         related='user_id.name',
@@ -105,9 +108,8 @@ class MCPUser(models.Model):
 
     # SHA-256 hash of the authentication token. We NEVER store the plaintext:
     # the raw key is shown once at generation time and then only its hash is
-    # kept. Indexed for O(1) lookup on the MCP endpoint. This hash is what gets
-    # exported/imported to make the key portable across instances (it is not a
-    # usable secret on its own).
+    # kept. Indexed for O(1) lookup on the MCP endpoint. An export carries it
+    # only when the admin says secrets go in the file.
     mcp_api_key_hash = fields.Char(
         string='AI API Key (hash)',
         copy=False,
@@ -133,6 +135,10 @@ class MCPUser(models.Model):
         readonly=True,
         copy=False
     )
+
+    # The temporary key PIN is not stored here, not even as a hash: it is
+    # minted by the browser tab holding the admin's key list, lives only in
+    # that tab, and dies with the list. See ai.key.pin.ask.
 
     # AI permission flags — synced with res.groups (compute + inverse).
     is_mcp_manager = fields.Boolean(
@@ -165,6 +171,14 @@ class MCPUser(models.Model):
         help='Call tools on configured external API servers (MCP or OpenAPI) '
              'via supervised safe plans (api_call).',
     )
+    is_ai_conversational = fields.Boolean(
+        string='AI Conversational',
+        compute='_compute_is_ai_conversational',
+        inverse='_inverse_is_ai_conversational',
+        store=False,
+        help='Open-world AI dialogue (chat, walkie AI, MCP client). '
+             'Does not grant Writer or Administrator.',
+    )
 
     last_mcp_client_label = fields.Char(
         string='Last MCP Client',
@@ -184,7 +198,7 @@ class MCPUser(models.Model):
         copy=False,
     )
 
-    def register_mcp_client(self, label, remote_ip=None):
+    def _register_mcp_client(self, label, remote_ip=None):
         """Persist external MCP client identity (survives worker restarts)."""
         if not label:
             return
@@ -197,7 +211,7 @@ class MCPUser(models.Model):
         self.sudo().write(vals)
 
     @api.model
-    def get_last_mcp_client_label(self, user_id):
+    def _get_last_mcp_client_label(self, user_id):
         if not user_id:
             return None
         mu = self.sudo().search([('user_id', '=', user_id)], limit=1)
@@ -218,13 +232,13 @@ class MCPUser(models.Model):
                 if not user_has_group_direct(record.user_id, group):
                     user_add_group(record.user_id, group)
                     _logger.info(
-                        "MCP: Usuario %s añadido al grupo %s",
+                        "MCP: User %s added to group %s",
                         record.user_id.name, group_xml_id,
                     )
             elif user_has_group_direct(record.user_id, group):
                 user_remove_group(record.user_id, group)
                 _logger.info(
-                    "MCP: Usuario %s eliminado del grupo %s",
+                    "MCP: User %s removed from group %s",
                     record.user_id.name, group_xml_id,
                 )
             invalidate_recordset_fields(record, [field_name])
@@ -284,9 +298,22 @@ class MCPUser(models.Model):
         self._inverse_ai_group_flag('group_ai_external_api', 'is_ai_external_api')
         self._compute_is_ai_external_api()
 
+    @api.depends('user_id')
+    def _compute_is_ai_conversational(self):
+        group = self._ai_security_group('group_ai_conversational')
+        for record in self:
+            if record.user_id and group:
+                record.is_ai_conversational = user_has_group(record.user_id, group)
+            else:
+                record.is_ai_conversational = False
+
+    def _inverse_is_ai_conversational(self):
+        self._inverse_ai_group_flag('group_ai_conversational', 'is_ai_conversational')
+        self._compute_is_ai_conversational()
+
     @api.model
     def user_has_mcp_api_key(self, user=None):
-        """True si el usuario tiene API key MCP activa (hash no vacío)."""
+        """True if the user has an active MCP API key (non-empty hash)."""
         user = user or self.env.user
         for rec in self.sudo().search([('user_id', '=', user.id)]):
             raw = rec.mcp_api_key_hash
@@ -296,46 +323,71 @@ class MCPUser(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        """Sobreescribe create para asegurar que solo se crea un registro por usuario"""
+        """Override create so only one record is created per user"""
         for vals in vals_list:
             if 'user_id' in vals:
-                # Verificar que no existe ya un registro para este usuario
+                # Check there is no record for this user yet
                 existing = self.with_context(mcp_skip_ensure_all_users=True).search(
                     [('user_id', '=', vals['user_id'])], limit=1,
                 )
                 if existing:
                     raise UserError(_('An MCP record already exists for this user'))
         
-        # Filtrar campos que no existen en el modelo para evitar errores
-        # (útil cuando hay contaminación cruzada de otros módulos)
+        # Filter out fields the model does not have, to avoid errors
+        # (useful when other modules leak their fields in)
         model_fields = self._fields
         filtered_vals_list = []
         for vals in vals_list:
             filtered_vals = {k: v for k, v in vals.items() if k in model_fields}
             if len(filtered_vals) != len(vals):
                 extra_fields = set(vals.keys()) - set(filtered_vals.keys())
-                _logger.debug("MCP: Campos ignorados al crear registro: %s", extra_fields)
+                _logger.debug("MCP: Fields ignored on record create: %s", extra_fields)
             filtered_vals_list.append(filtered_vals)
-        
-        return super(MCPUser, self).create(filtered_vals_list)
+        if not self.env.su:
+            for vals in filtered_vals_list:
+                if vals.get('mcp_api_key_hash') and not self._may_set_key_of(
+                    self.env['res.users'].browse(vals.get('user_id') or ()),
+                ):
+                    raise AccessError(_(
+                        'Only a Settings administrator can set the API key of '
+                        'another Settings administrator.'
+                    ))
+
+        records = super(MCPUser, self).create(filtered_vals_list)
+        if any(vals.get('mcp_api_key_hash') for vals in filtered_vals_list):
+            records._forget_app_menu_cache()
+        return records
 
     def write(self, vals):
-        """Sobreescribe write para filtrar campos ajenos al modelo."""
-        # Filtrar campos que no existen en el modelo para evitar errores
-        # (útil cuando hay contaminación cruzada de otros módulos)
+        """Override write to filter out fields foreign to the model."""
+        # Filter out fields the model does not have, to avoid errors
+        # (useful when other modules leak their fields in)
         model_fields = self._fields
         filtered_vals = {k: v for k, v in vals.items() if k in model_fields}
         if len(filtered_vals) != len(vals):
             extra_fields = set(vals.keys()) - set(filtered_vals.keys())
-            _logger.debug("MCP: Campos ignorados al escribir registro: %s", extra_fields)
-        
-        return super(MCPUser, self).write(filtered_vals)
+            _logger.debug("MCP: Fields ignored on record write: %s", extra_fields)
+        # The field is readonly only on screen; an RPC write still lands here.
+        if filtered_vals.get('mcp_api_key_hash') and not self.env.su:
+            self._ensure_key_admin()
+
+        result = super(MCPUser, self).write(filtered_vals)
+        if 'mcp_api_key_hash' in filtered_vals:
+            self._forget_app_menu_cache()
+        return result
+
+    def _forget_app_menu_cache(self):
+        """A host may hide its icon until a key exists. The menu list is cached."""
+        try:
+            self.env['ir.ui.menu'].clear_caches()
+        except Exception:
+            _logger.debug('MCP: menu cache clear skipped', exc_info=True)
 
     @api.model
     def ensure_all_users_have_record(self):
         """
-        Crea registros MCP para todos los usuarios internos activos que no tengan uno.
-        Se llama al abrir la lista (contexto ensure_all_users).
+        Create MCP records for every active internal user that has none.
+        Called when the list opens (ensure_all_users context).
         """
         skip = {'mcp_skip_ensure_all_users': True}
         mcp = self.env['ai.mcp.user'].with_context(**skip)
@@ -352,7 +404,7 @@ class MCPUser(models.Model):
                 created_count += 1
         
         if created_count > 0:
-            _logger.info("MCP: Creados %d registros MCP para usuarios existentes", created_count)
+            _logger.info("MCP: Created %d MCP records for existing users", created_count)
         
         return created_count
 
@@ -371,42 +423,44 @@ class MCPUser(models.Model):
 
     def _do_generate_mcp_api_key(self):
         """
-        Genera una nueva API key usando secrets, guarda SOLO su hash y devuelve
-        el valor en claro UNA sola vez para mostrarlo al admin ("cópialo ahora").
+        Generate a new API key with secrets, store ONLY its hash and return
+        the plaintext value ONCE so the admin sees it ("copy it now").
 
         Returns:
-            str: la API key en claro (no se vuelve a poder recuperar).
+            str: the plaintext API key (it cannot be recovered again).
 
         Raises:
-            UserError: Si falla la generación
+            UserError: If generation fails
         """
         self.ensure_one()
 
-        # Generar API key segura (32 caracteres alfanuméricos)
+        # Generate a secure API key (32 alphanumeric characters)
         alphabet = string.ascii_letters + string.digits
         api_key = ''.join(secrets.choice(alphabet) for _ in range(32))
 
         self._store_api_key_hash(api_key)
-        _logger.info("MCP: API key generada para usuario %s (ID: %s)", self.user_id.name, self.user_id.id)
+        _logger.info("MCP: API key generated for user %s (ID: %s)", self.user_id.name, self.user_id.id)
         return api_key
 
     def action_generate_mcp_api_key(self):
         """
-        Acción pública para generar API key. Llamada desde el wizard.
+        Public action to generate an API key. Called from the wizard.
 
         Returns:
-            str: la API key en claro (mostrar una vez; solo se guarda su hash).
+            str: the plaintext API key (show it once; only its hash is stored).
         """
+        self._ensure_key_admin()
         self.ensure_one()
         return self._do_generate_mcp_api_key()
 
     def set_mcp_api_key(self, raw_key):
-        """Fuerza un valor de API key elegido por el admin (como establecer una
-        contraseña). Se guarda solo el hash; el admin ya conoce el valor.
+        """Force an API key value chosen by the admin (like setting a
+        password). Only the hash is stored; the admin already knows the value.
 
-        Acepta tanto texto plano (se hashea) como un hash ya calculado
-        proveniente de otra instancia (se guarda tal cual).
+        Accepts both plaintext (it gets hashed) and a hash already computed
+        on another instance (stored as is).
         """
+        self._ensure_key_admin()
         self.ensure_one()
         if not raw_key or not str(raw_key).strip():
             raise UserError(_("The API key value cannot be empty"))
@@ -415,21 +469,21 @@ class MCPUser(models.Model):
             'mcp_api_key_state': 'generated',
             'mcp_api_key_generated_date': fields.Datetime.now(),
         })
-        _logger.info("MCP: API key forzada/importada para usuario %s (ID: %s)", self.user_id.name, self.user_id.id)
+        _logger.info("MCP: API key forced/imported for user %s (ID: %s)", self.user_id.name, self.user_id.id)
         return True
 
     def generate_mcp_api_key(self):
         """
-        Abre el wizard para generar API key.
-        Siempre pide confirmación, igual que geopunch_attendance.
+        Open the wizard to generate an API key.
+        It always asks for confirmation, like geopunch_attendance.
         """
         self.ensure_one()
         
-        # Siempre abrir wizard (con o sin API key)
+        # Always open the wizard (with or without an API key)
         return {
             'type': 'ir.actions.act_window',
             'name': 'Generate AI API Key',
-            'res_model': 'pns_ai_mcp.api_key_wizard',
+            'res_model': 'ai.api.key.wizard',
             'view_mode': 'form',
             'target': 'new',
             'context': {
@@ -438,11 +492,11 @@ class MCPUser(models.Model):
         }
 
     def clear_mcp_api_key(self):
-        """Muestra wizard de confirmación para eliminar la API key"""
+        """Show the confirmation wizard to delete the API key"""
         self.ensure_one()
         
         if not self.mcp_api_key_hash:
-            # Si no hay API key, no hacer nada
+            # If there is no API key, do nothing
             return mcp_ui.client_notification(
                 _('Information'),
                 _('This user has no API key.'),
@@ -450,11 +504,11 @@ class MCPUser(models.Model):
                 sticky=False,
             )
         
-        # Mostrar wizard de confirmación
+        # Show the confirmation wizard
         return {
             'type': 'ir.actions.act_window',
-            'name': 'Eliminar API Key MCP',
-            'res_model': 'pns_ai_mcp.api_key_wizard',
+            'name': _('Delete MCP API Key'),
+            'res_model': 'ai.api.key.wizard',
             'view_mode': 'form',
             'target': 'new',
             'context': {
@@ -464,13 +518,13 @@ class MCPUser(models.Model):
         }
 
     def action_import_mcp_api_key(self):
-        """Abre wizard en modo importación para pegar una key existente de otra instancia."""
+        """Open the wizard in import mode to paste an existing key from another instance."""
         self.ensure_one()
         ensure_ai_admin(self.env)
         return {
             'type': 'ir.actions.act_window',
-            'name': 'Importar API Key MCP',
-            'res_model': 'pns_ai_mcp.api_key_wizard',
+            'name': _('Import MCP API Key'),
+            'res_model': 'ai.api.key.wizard',
             'view_mode': 'form',
             'target': 'new',
             'context': {
@@ -480,13 +534,13 @@ class MCPUser(models.Model):
         }
 
     def name_get(self):
-        """Muestra el nombre del usuario relacionado"""
+        """Show the related user's name"""
         result = []
         for record in self:
             if record.user_id:
                 result.append((record.id, record.user_id.name))
             else:
-                result.append((record.id, 'Sin usuario'))
+                result.append((record.id, _('No user')))
         return result
 
     @api.model
@@ -528,9 +582,9 @@ class MCPUser(models.Model):
 
     @api.model
     def web_search_read(self, domain, *args, **kwargs):
-        # Firma agnóstica de versión: Odoo 14/15/16 usan (domain, fields, ...) sin
-        # count_limit; Odoo 17+ usa (domain, specification, ..., count_limit). Solo
-        # interceptamos para autocrear filas y reenviamos los argumentos tal cual.
+        # Version-agnostic signature: Odoo 14/15/16 use (domain, fields, ...) without
+        # count_limit; Odoo 17+ uses (domain, specification, ..., count_limit). We only
+        # intercept to auto-create rows and pass the arguments through as they are.
         self._maybe_ensure_all_users()
         return super(MCPUser, self).web_search_read(domain, *args, **kwargs)
 
@@ -586,7 +640,10 @@ class MCPUser(models.Model):
         # explicitly below so a legacy plaintext value never lands verbatim.
         vals, field_warnings = import_vals_from_dict(
             self, user_data,
-            skip_fields={'user_id', 'mcp_api_key', 'api_key', 'mcp_api_key_hash'},
+            skip_fields={
+                'user_id', 'mcp_api_key', 'api_key', 'mcp_api_key_hash',
+            },
+            key_aliases={'is_ai_admin': 'is_mcp_manager'},
         )
         warnings.extend(field_warnings)
 
@@ -594,57 +651,42 @@ class MCPUser(models.Model):
             vals['mcp_api_key_hash'] = key_hash
             vals['mcp_api_key_state'] = 'generated'
             vals['mcp_api_key_generated_date'] = fields.Datetime.now()
+        else:
+            # A copy without secrets: the key state belongs to a key this file lacks.
+            vals.pop('mcp_api_key_state', None)
+            vals.pop('mcp_api_key_generated_date', None)
 
         return vals, bool(key_hash), warnings
 
-    def _export_user_dict(self):
-        """Export a single user record to a portable dict using dynamic fields."""
+    def _export_user_dict(self, include_secrets=False):
+        """Export a single user record to a portable dict using dynamic fields.
+
+        The AI permission flags are fields with an inverse, so they travel as
+        fields and the import puts the groups back.
+        """
         try:
-            data = export_record_dict(self, skip_fields={'user_id'})
+            return export_record_dict(self, skip_fields={
+                'user_id',
+            }, include_secrets=include_secrets)
         except Exception:
-            data = {'login': self.login or '', 'name': self.name or ''}
-        # Extra: group membership flags (not model fields but useful for portability)
-        try:
-            if self.user_id:
-                data['is_ai_admin'] = self.user_id.has_group('pns_ai_mcp.group_ai_admin')
-                data['is_ai_writer'] = self.user_id.has_group('pns_ai_mcp.group_ai_writer')
-                data['is_ai_external_url'] = self.user_id.has_group(
-                    'pns_ai_mcp.group_ai_external_url')
-                data['is_ai_external_api'] = self.user_id.has_group(
-                    'pns_ai_mcp.group_ai_external_api')
-        except Exception:
-            pass
-        return data
+            return {'login': self.login or '', 'name': self.name or ''}
 
     def action_export_users(self, *args, **kwargs):
-        """Export all MCP users to a JSON file (portable; not Odoo CSV export)."""
+        """Export all MCP users to a JSON file (asks for secrets first)."""
         ensure_ai_admin(self.env)
         del args, kwargs
-        users = self.env['ai.mcp.user'].search([])
-        if not users:
+        if not self.env['ai.mcp.user'].search_count([]):
             return mcp_ui.open_json_export_empty_wizard(
                 self.env,
                 dialog_title=_('Export'),
                 message=_('There are no users to export.'),
             )
-        
-        export_data = [user._export_user_dict() for user in users]
-        
-        filename = mcp_ui.build_export_filename(self.env, 'mcp_users', 'json')
-        attachment = mcp_ui.write_json_attachment(
-            self.env, filename, export_data,
-        )
-        
-        return mcp_ui.open_json_export_wizard(
-            self.env,
-            dialog_title=_('Export result'),
-            summary_text=_('%s user(s) exported.') % len(export_data),
-            count=len(export_data),
-            attachment=attachment,
+        return self.env['pns.export.secrets.wizard'].ask(
+            self.browse(), '_pns_export_all_users',
         )
 
     def action_export_selected(self, *args, **kwargs):
-        """Export selected MCP users to JSON (tree multi-select action)."""
+        """Export selected MCP users to JSON (asks for secrets first)."""
         ensure_ai_admin(self.env)
         del args, kwargs
         if not self:
@@ -653,9 +695,24 @@ class MCPUser(models.Model):
                 dialog_title=_('Export'),
                 message=_('No users selected for export.'),
             )
-        export_data = [user._export_user_dict() for user in self]
+        return self.env['pns.export.secrets.wizard'].ask(
+            self, '_pns_export_selected_users',
+        )
 
-        filename = mcp_ui.build_export_filename(self.env, 'mcp_users_selected', 'json')
+    def _pns_export_all_users(self, include_secrets=False):
+        ensure_ai_admin(self.env)
+        users = self.env['ai.mcp.user'].search([])
+        return users._export_users_file('mcp_users', include_secrets)
+
+    def _pns_export_selected_users(self, include_secrets=False):
+        ensure_ai_admin(self.env)
+        return self._export_users_file('mcp_users_selected', include_secrets)
+
+    def _export_users_file(self, artifact, include_secrets):
+        export_data = [user._export_user_dict(include_secrets) for user in self]
+        filename = mcp_ui.build_export_filename(
+            self.env, artifact, 'json', secrets=include_secrets,
+        )
         attachment = mcp_ui.write_json_attachment(
             self.env, filename, export_data,
         )
@@ -674,9 +731,106 @@ class MCPUser(models.Model):
         return {
             'type': 'ir.actions.act_window',
             'name': _('Import MCP Users'),
-            'res_model': 'pns_ai_mcp.import_users_wizard',
+            'res_model': 'ai.import.users.wizard',
             'view_mode': 'form',
             'views': [[False, 'form']],
             'target': 'new',
         }
+
+    def _ensure_key_admin(self):
+        if self.env.su or self.env.user._is_superuser():
+            return
+        if not self.env.user.has_group('pns_ai_mcp.group_ai_admin'):
+            raise AccessError(_('Only AI Administrators can manage MCP API keys.'))
+        for record in self:
+            if not self._may_set_key_of(record.user_id):
+                raise AccessError(_(
+                    'Only a Settings administrator can set the API key of '
+                    'another Settings administrator.'
+                ))
+
+    @api.model
+    def _may_set_key_of(self, user):
+        """Whether the caller may set *user*'s key.
+
+        A key logs in as its owner, so a Settings administrator's key is set
+        only by the system, by another Settings administrator or by that
+        same person.
+        """
+        env = self.env
+        if env.su or env.user._is_superuser() or not user or user.id == env.uid:
+            return True
+        system = env.ref('base.group_system', raise_if_not_found=False)
+        if not system or not user_has_group(user.sudo(), system):
+            return True
+        return user_has_group(env.user.sudo(), system)
+
+    @api.model
+    def _drop_key_unless_allowed(self, vals, user):
+        """Take the key out of import *vals* if the caller may not set *user*'s.
+
+        The AI permissions stay. Returns the warning for the import report,
+        or an empty string when nothing was taken out.
+        """
+        if not vals.get('mcp_api_key_hash') or self._may_set_key_of(user):
+            return ''
+        for name in ('mcp_api_key_hash', 'mcp_api_key_state', 'mcp_api_key_generated_date'):
+            vals.pop(name, None)
+        return _(
+            "%s is a Settings administrator: the API key was not imported "
+            "(only a Settings administrator can set it). The AI permissions were."
+        ) % user.login
+
+    @api.model
+    def _redeem_key_pin(self, raw, ip=None):
+        """Hand the API key behind a temporary PIN, via the open browser tab.
+
+        The PIN itself is never stored here: the tab holding the admin's key
+        list minted it and answers whose key it stands for. The server only
+        checks the shape, the per-IP budget, and that the supplied key's hash
+        belongs to an MCP user. Spending is not marked here:
+        ``_consume_key_pin`` tells the tab to drop the PIN once the app has
+        logged in. A value that is not PIN-shaped is not an attempt. A correct
+        API key must be checked by the caller first. *ip* is the address the
+        server saw, never one the client sent.
+        """
+        length = pin_length(self.env)
+        raw = compact_pin(raw, length)
+        if not pin_shaped(raw, length):
+            return {'ok': False, 'error': 'invalid', 'counted': False}
+        Block = self.env['ai.key.pin.block'].sudo()
+        if Block._is_blocked(ip):
+            return {'ok': False, 'error': 'blocked', 'counted': False}
+        if not self.env['ai.key.pin.desk'].sudo().any_open():
+            return {'ok': False, 'error': 'no_desk', 'counted': False}
+        got = self.env['ai.key.pin.ask'].sudo()._collect_pin(raw)
+        if got is False:
+            paused = Block._note_failure(ip)
+            return {
+                'ok': False,
+                'error': 'blocked' if paused else 'invalid',
+                'counted': True,
+            }
+        if not got:
+            return {'ok': False, 'error': 'no_desk', 'counted': False}
+        owner = self.sudo().search([
+            ('mcp_api_key_hash', '=', hash_api_key(got)),
+        ], limit=1)
+        if not owner:
+            return {'ok': False, 'error': 'mismatch', 'counted': False}
+        _logger.info(
+            'MCP: temporary PIN handed the API key to an app for user %s',
+            owner.user_id.id,
+        )
+        return {'ok': True, 'api_key': got}
+
+    @api.model
+    def _consume_key_pin(self, raw, user):
+        """Tell the tab to drop the PIN, now the app has logged in with it."""
+        raw = compact_pin(raw, pin_length(self.env))
+        if not raw or not user:
+            return False
+        if 'ai.key.pin.desk' in self.env:
+            self.env['ai.key.pin.desk'].sudo()._notify_pin_spent(raw)
+        return True
 

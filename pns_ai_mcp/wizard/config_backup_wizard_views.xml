@@ -2,7 +2,7 @@
 <odoo>
     <record id="view_config_backup_wizard_form" model="ir.ui.view">
         <field name="name">pns.ai.mcp.config.backup.wizard.form</field>
-        <field name="model">pns_ai_mcp.config_backup_wizard</field>
+        <field name="model">ai.config.backup.wizard</field>
         <field name="arch" type="xml">
             <form string="Import AI configuration">
                 <sheet>
@@ -20,10 +20,11 @@
                     <group>
                         <field name="json_file" filename="filename"/>
                         <field name="filename" invisible="1"/>
+                        <field name="replace_existing"/>
                     </group>
                 </sheet>
                 <footer>
-                    <button name="action_import" string="Import configuration"
+                    <button name="action_preview" string="Review"
                             type="object" class="btn-primary"/>
                     <button string="Cancel" class="btn-secondary" special="cancel"/>
                 </footer>
@@ -34,7 +35,7 @@
     <record id="action_config_backup_wizard" model="ir.actions.act_window">
         <field name="name">Import AI configuration</field>
         <field name="type">ir.actions.act_window</field>
-        <field name="res_model">pns_ai_mcp.config_backup_wizard</field>
+        <field name="res_model">ai.config.backup.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
     </record>

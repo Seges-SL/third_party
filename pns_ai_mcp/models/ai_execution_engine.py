@@ -1,17 +1,18 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""PNS AI MCP - Execution Engine. PATANEGRA Soft (https://patanegra.com).
-
-Part of Patanegra Soft Suite (`pns_suite`), distributed via Patanegra Soft Hub.
-Execution engine of the Patanegra Application Agent Protocol (PAAP): resolves
-the provider, orchestrates the agent turn and handles failover between LLMs.
-Licensed under the Apache License 2.0 - see LICENSE.
-"""
+"""Resolves the provider, runs the agent turn, and failovers between LLMs."""
+import json
 import logging
 
-from odoo import models, _
+from odoo import api, models, _
 from odoo.exceptions import RedirectWarning, UserError
+
+from ..utils.llm_usage import (
+    advertise_cost,
+    normalize_usage,
+    usage_log_fields,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -24,8 +25,8 @@ class _LoggedProviderDriver:
     """Proxy: every successful ``chat_completion`` writes LLM log rows via the engine.
 
     Logging is a property of using a provider through the execution engine —
-    callers (ACL, OCR, Chatboo headless) do not opt in or out. Emits the same
-    ``llm_orchestration`` + ``llm_response`` pair as Chatboo streaming.
+    callers (ACL, OCR, headless hosts) do not opt in or out. Emits the same
+    ``llm_orchestration`` + ``llm_response`` pair as a streaming turn.
     """
 
     def __init__(self, driver, engine, provider, agent_code=None):
@@ -38,7 +39,7 @@ class _LoggedProviderDriver:
         response = self._driver.chat_completion(
             messages=messages, tools=tools, **kwargs,
         )
-        self._engine.log_provider_inference(
+        self._engine._log_provider_inference(
             self._provider,
             messages,
             response,
@@ -61,11 +62,30 @@ _CTX_OVERFLOW_MARKERS = (
 )
 
 
+def _logged_tool_calls(tool_calls):
+    """Each tool call the model asked for, as ``{name, arguments}``.
+
+    Arguments come as the model wrote them, so a call the tool later
+    rejects, repairs or never runs is still on the row.
+    """
+    calls = []
+    for tc in tool_calls or ():
+        fn = (tc.get('function') or {}) if isinstance(tc, dict) else {}
+        args = fn.get('arguments')
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except ValueError:
+                pass
+        calls.append({'name': fn.get('name') or '', 'arguments': args})
+    return calls
+
+
 def _is_context_overflow(error):
-    """True si el error indica que el prompt excede la ventana de contexto.
-    En ese caso el failover es inútil: cualquier proveedor con ventana similar
-    fallará igual (y se pierden segundos probándolos). Mejor abortar con un
-    mensaje claro orientado a la causa real (imágenes/base64 o historial)."""
+    """True if the error says the prompt exceeds the context window.
+    Then failover is useless: any provider with a similar window will fail
+    the same way (and seconds are lost trying them). Better to abort with a
+    clear message pointing at the real cause (images/base64 or history)."""
     text = str(error or '').lower()
     return any(marker in text for marker in _CTX_OVERFLOW_MARKERS)
 
@@ -80,8 +100,8 @@ class AIExecutionEngine(models.AbstractModel):
     Usage::
 
         engine = self.env['ai.execution.engine']
-        response = engine.chat_completion(
-            agent_code='pns_ai_chatboo',
+        response = engine._chat_completion(
+            agent_code='pns_ai_admin',
             messages=[{'role': 'user', 'content': 'Hello!'}],
             tools=[...],  # optional MCP tool definitions
         )
@@ -90,7 +110,7 @@ class AIExecutionEngine(models.AbstractModel):
 
     Failover flow::
 
-        agent 'pns_ai_chatboo' → failovers sorted by priority
+        agent 'pns_ai_admin' → failovers sorted by priority
           → try provider A (priority=1) → HTTP 500 → log failover
           → try provider B (priority=2) → success → return response
 
@@ -98,15 +118,43 @@ class AIExecutionEngine(models.AbstractModel):
     failover, since any provider with a similar context window will fail too.
 
     Key methods:
-      - chat_completion(): Main entry point, tries providers in order
-      - resolve_provider(): Returns the primary provider without calling it
+      - _chat_completion(): Main entry point, tries providers in order
+      - _resolve_provider(): Returns the primary provider without calling it
       - _driver_for_provider(): Instantiates driver + universal inference log
-      - log_provider_llm_request / log_provider_llm_response: universal LLM log rows
-      - log_provider_inference(): headless pair (request+response) via same gate
-      - log_provider_failover(): Persists failover events to MCP logs
+      - _log_provider_llm_request / _log_provider_llm_response: universal LLM log rows
+      - _log_provider_inference(): headless pair (request+response) via same gate
+      - _log_provider_failover(): Persists failover events to MCP logs
     """
     _name = 'ai.execution.engine'
     _description = 'AI routing engine (agent → provider chain with failover)'
+
+    def _bind_log_identity(self, agent_code=None, source_channel=None,
+                           client_label=None):
+        """Agent / door / label from the caller, else the env / request stamp."""
+        ctx = self.env.context or {}
+        try:
+            from ..utils.mcp_logging import request_log_stamp
+            stamp = request_log_stamp()
+        except Exception:
+            stamp = {}
+        code = (
+            agent_code
+            or ctx.get('mcp_agent_code')
+            or stamp.get('agent_code')
+            or ''
+        ).strip() or None
+        door = (
+            source_channel
+            or ctx.get('mcp_source_channel')
+            or stamp.get('source_channel')
+            or 'internal'
+        )
+        label = (
+            client_label
+            or ctx.get('mcp_client_label')
+            or stamp.get('client_label')
+        )
+        return code, door, label
 
     def _get_agent(self, agent_code):
         """Resolve an agent code to an ai.agent record.
@@ -133,6 +181,8 @@ class AIExecutionEngine(models.AbstractModel):
     def get_failovers(self, agent_code):
         """Return active provider failovers for an agent, sorted by priority.
 
+        Skips inactive links and archived ``ai.provider`` records.
+
         Args:
             agent_code: Agent code string.
 
@@ -141,86 +191,183 @@ class AIExecutionEngine(models.AbstractModel):
         """
         agent = self._get_agent(agent_code)
         # Failover links are admin-managed infrastructure; inference clients
-        # (Chatboo, MCP) must resolve the chain without AI Administrator ACL.
-        return agent.sudo().provider_ids.filtered('active').sorted(
-            key=lambda a: (a.priority, a.id),
-        )
+        # (chat, voice, MCP) must resolve the chain without AI Administrator ACL.
+        return agent.sudo().provider_ids.filtered(
+            lambda link: (
+                link.active
+                and link.provider_id
+                and link.provider_id.active
+            ),
+        ).sorted(key=lambda a: (a.priority, a.id))
 
-    def get_providers_for_agent(self, agent_code, provider_id=None):
+    def get_providers_for_agent(self, agent_code, provider_id=None, need=None):
         """Return the ordered list of providers for an agent.
 
         Provider resolution cascade:
-            1. If provider_id is given (user selected in UI) → use it
+            1. If provider_id is given (UI) and it is on this agent's chain
+               (after ticks and ``no_external_failover``) → use it alone
             2. If agent has explicit failovers → use them in priority order
-            3. If there's exactly ONE active provider → use it implicitly
-            4. If no providers exist → clear error message
-            5. If multiple providers but none assigned → error
+            3. If the agent has no chain → use every active system provider
+               (id order). Same rule for every inference agent.
+            4. If no active providers exist → clear error message
 
-        Args:
-            agent_code: Agent code string.
-            provider_id: Optional int. Explicit provider ID from UI selection.
+        ``need`` is an ``ai.provider.role`` code and drops providers that do
+        not hold it. No ``need`` is a text turn. No roles: text only. A
+        photo, a clip, a video, a closed choice or a design needs its own
+        role. An explicit ``provider_id`` obeys the same roles.
 
-        Returns:
-            ai.provider recordset in priority order.
+        A role is looked for in the agent's chain first, then among every
+        active provider; a provider that holds only that role goes first in
+        both. When nobody holds it, the role's fallback is asked the same
+        way (Parser → Conversation), unless this database turned it off. No
+        fallback: an empty chain and a line in the log naming the role and
+        the agent. No new failover
+        link is created.
 
-        Raises:
-            UserError: If no provider can be resolved.
+        Runtime use only: never ``Link.create`` the catalogue. Each inference
+        agent owns its own failover chain. No agent borrows another agent's
+        providers.
         """
-        # 1. UI-driven provider selection (ai.provider has no `active` field;
-        #    `.exists()` already validates the record).
-        if provider_id:
-            provider = self.env['ai.provider'].browse(provider_id).exists()
-            if provider:
-                return provider
-
-        # 2. Explicit failovers
+        # 2. Explicit failovers on this agent
         failovers = self.get_failovers(agent_code)
         if failovers:
-            return failovers.mapped('provider_id')
-
-        # 3. Auto-assign: all active providers, auto-create failovers
-        all_providers = self.env['ai.provider'].search(
-            [], order='id',
-        )
-        if not all_providers:
-            action = self.env.ref('pns_ai_mcp.action_ai_provider', raise_if_not_found=False)
-            msg = _(
-                "No AI providers configured.\n\n"
-                "Create at least one provider with a valid API key "
-                "to start using the AI assistant."
+            found = failovers.mapped('provider_id')
+        else:
+            # 3–4. Active system providers; never Link.create the catalogue.
+            found = self.env['ai.provider'].sudo().search(
+                [('active', '=', True)], order='id',
             )
-            if action:
-                raise RedirectWarning(msg, action.id, _('Set up a Provider'))
-            raise UserError(msg)
-
-        # Single provider → use directly (no failover record needed)
-        if len(all_providers) == 1:
+            if not found:
+                action = self.env.ref(
+                    'pns_ai_mcp.action_ai_provider', raise_if_not_found=False,
+                )
+                msg = _(
+                    "No AI providers configured.\n\n"
+                    "Create at least one provider with a valid API key "
+                    "to start using the AI assistant."
+                )
+                if action:
+                    raise RedirectWarning(msg, action.id, _('Set up a Provider'))
+                raise UserError(msg)
             _logger.info(
-                'AI: auto-using sole provider "%s" for agent "%s"',
-                all_providers.name, agent_code,
+                'AI: using %s system provider(s) for agent "%s" (no chain)',
+                len(found), agent_code,
             )
-            return all_providers
-
-        # Multiple providers → auto-create failover chain for zero-friction
-        agent = self.env['ai.agent'].search(
-            [('code', '=', agent_code)], limit=1,
-        )
-        if agent:
-            Link = self.env['ai.agent.provider']
-            for idx, provider in enumerate(all_providers):
-                Link.sudo().create({
-                    'agent_id': agent.id,
-                    'provider_id': provider.id,
-                    'priority': idx,
-                })
+        Role = self.env['ai.provider.role']
+        asked = set()
+        while True:
+            fitted = found.filtered(lambda provider: provider._fits(need))
+            uncapped = self._without_capped(fitted)
+            chain = self._without_external_after_local(uncapped)
+            # Text stays on the dialogue chain. A role that chain does not
+            # cover uses every active provider that holds it.
+            if not chain and need and need != 'conversation' and failovers:
+                every = self.env['ai.provider'].sudo().search(
+                    [('active', '=', True)], order='id',
+                )
+                fitted = every.filtered(lambda provider: provider._fits(need))
+                uncapped = self._without_capped(fitted)
+                chain = self._without_external_after_local(uncapped)
+            if chain or not need or need == 'conversation':
+                break
+            asked.add(need)
+            role = Role._by_code(need)
+            fallback = role.fallback_id.code if role.use_fallback else None
+            if not fallback or fallback in asked:
+                _logger.info(
+                    'AI: no provider holds role "%s" for agent "%s"',
+                    need, agent_code,
+                )
+                break
             _logger.info(
-                'AI: auto-created failover chain for agent "%s" '
-                'with %d providers',
-                agent_code, len(all_providers),
+                'AI: no provider holds role "%s" for agent "%s"; asking "%s"',
+                need, agent_code, fallback,
             )
-            return all_providers
-        # Fallback: no agent record, just use all in sequence order
-        return all_providers
+            need = fallback
+        chain = self._specialists_first(chain, need)
+        # 1. A UI pick only narrows the chain; an id off the chain is ignored.
+        if provider_id:
+            try:
+                picked = chain.filtered(lambda p: p.id == int(provider_id))
+            except (TypeError, ValueError):
+                picked = chain.browse()
+            if picked:
+                return picked
+        if not chain and fitted and not uncapped:
+            raise UserError(_(
+                'No AI provider has available quota this month.'
+            ))
+        return chain
+
+    @api.model
+    def _specialists_first(self, providers, need):
+        """A provider whose only job is this role goes first.
+
+        One tick means a model chosen for that role alone: cheaper and better
+        at it than a generalist that also holds the dialogue. Declared
+        priority still orders the specialists among themselves, and the
+        generalists among themselves.
+
+        The ordinary text turn is left exactly as the human wrote it: there
+        is no specialist in talking, and that chain is the one they tune.
+        """
+        from ..utils.provider_fit import is_specialist
+
+        if not need or need == 'conversation' or len(providers) < 2:
+            return providers
+        declared = {provider.id: idx for idx, provider in enumerate(providers)}
+        ranked = sorted(
+            providers,
+            key=lambda p: (
+                0 if is_specialist(p._fit_flags(), need) else 1,
+                declared[p.id],
+            ),
+        )
+        return providers.browse([provider.id for provider in ranked])
+
+    @api.model
+    def _without_external_after_local(self, providers):
+        """Drop providers that follow one with ``no_external_failover``."""
+        kept = []
+        stop = False
+        for provider in providers:
+            if stop:
+                continue
+            kept.append(provider.id)
+            if provider.no_external_failover:
+                stop = True
+        return providers.browse(kept)
+
+    @api.model
+    def _without_capped(self, providers):
+        """Skip keys that already hit this month's inference cap."""
+        return providers.filtered(lambda provider: not provider.spend_cap_reached())
+
+    def _choose(self, state, criteria, instructions, agent_code, timeout=3):
+        """Ask that agent's decision chain a closed Choice, in priority order.
+
+        Returns ``(provider, answer)``. The provider is the one that answered;
+        ``answer`` is ``None`` when every provider failed (provider = the
+        last one tried) or there is none (empty provider).
+        """
+        provider = self.env['ai.provider']
+        if not agent_code:
+            return provider, None
+        try:
+            chain = self.get_providers_for_agent(agent_code, need='decision')
+        except (UserError, RedirectWarning):
+            return provider, None
+        for provider in chain:
+            try:
+                return provider, provider._choose(
+                    state, criteria, instructions, timeout=timeout,
+                )
+            except Exception:
+                _logger.info(
+                    'AI engine: decision provider %s failed', provider.name,
+                    exc_info=True,
+                )
+        return provider, None
 
     def _driver_for_provider(self, provider, agent_code=None):
         """Instantiate and configure an LLM driver for a specific provider.
@@ -245,6 +392,7 @@ class AIExecutionEngine(models.AbstractModel):
         """
         from ..lib.llm.drivers import get_llm_driver
 
+        provider.assert_spend_cap()
         driver = get_llm_driver(provider.protocol)
         model_name = (provider.model_id.name if provider.model_id else None) or provider.model_name
         if not model_name:
@@ -254,9 +402,9 @@ class AIExecutionEngine(models.AbstractModel):
         if endpoint and not endpoint.startswith('http'):
             endpoint = 'https://' + endpoint
 
-        # Las tools se ejecutan in-process (ver AgentEngine); la LLM no reentra
-        # en /mcp, así que no se propaga X-Mcp-Token. La API key solo se guarda
-        # hasheada y no es recuperable para reenviarla.
+        # Tools run in-process (see AgentEngine); the LLM does not re-enter
+        # /mcp, so X-Mcp-Token is not passed on. The API key is only stored
+        # hashed and cannot be recovered to send it again.
         extra_headers = {}
 
         driver.initialize({
@@ -264,8 +412,9 @@ class AIExecutionEngine(models.AbstractModel):
             'endpoint': endpoint,
             'api_key': provider._api_key_for_inference(),
             'model_name': model_name,
-            'temperature': provider.temperature or 0.7,
+            'temperature': provider.temperature_for_inference(),
             'send_temperature': provider.temperature_support != 'no',
+            'stt_support': provider.stt_support or 'unknown',
             'context_window': provider.context_window or 32768,
             'extra_headers': extra_headers,
         })
@@ -273,31 +422,71 @@ class AIExecutionEngine(models.AbstractModel):
             driver, self, provider, agent_code=agent_code,
         )
 
-    def log_provider_failover(self, agent_code, failed_provider, next_provider, error,
-                              user_id=None, correlation_id=None, step_seq=None,
-                              source_channel='internal'):
+    def _log_role_without_provider(self, agent_code, need,
+                                  user_id=None, turn=None, turn_step=None,
+                                  source_channel=None, client_label=None):
+        """Persist that no provider carries the tick this call needed.
+
+        The user gets a soft notice inside the turn, but the person who can
+        tick the box reads the log. The row lands on the same turn thread,
+        so the Historial IA shows what was asked and what was missing.
+        """
+        if 'ai.log' not in self.env:
+            return
+        from .ai_log import CAPABILITY_SKIPPED
+        Log = self.env['ai.log'].sudo()
+        role = need or 'conversation'
+        turn, turn_step = self._resolve_log_threading(turn, turn_step)
+        agent_code, source_channel, client_label = self._bind_log_identity(
+            agent_code, source_channel, client_label,
+        )
+        try:
+            Log._create_log_entry(
+                user_id=user_id or self.env.user.id,
+                operation_type='read',
+                tool_name=CAPABILITY_SKIPPED,
+                request_type='LLM',
+                result_summary='No active provider carries the %s tick' % role,
+                prompt_data={'agent_code': agent_code, 'need': role},
+                turn=turn,
+                turn_step=turn_step,
+                source_channel=source_channel,
+                client_label=client_label,
+            )
+        except Exception as exc:
+            _logger.warning(
+                'AI engine: could not log the missing %s provider: %s',
+                role, exc,
+            )
+
+    def _log_provider_failover(self, agent_code, failed_provider, next_provider, error,
+                              user_id=None, turn=None, turn_step=None,
+                              source_channel=None, client_label=None):
         """Persist intra-agent provider failover to MCP logs.
 
-        El llamante (motor de chat) puede pasar el ``user_id`` real del turno y
-        su ``correlation_id``/``step_seq`` para que el failover caiga en el mismo
-        hilo del histórico y con el usuario humano (no Administrator). Si no se
-        pasan, se intenta resolver desde el request (compatibilidad).
+        The caller (chat engine) can pass the turn's real ``user_id`` and its
+        ``correlation_id``/``step_seq`` so the failover lands on the same
+        history thread and under the human user (not Administrator). If they
+        are not passed, it tries to resolve them from the request (compatibility).
         """
         if 'ai.log' not in self.env:
             return
         Log = self.env['ai.log'].sudo()
         err_text = str(error or '')[:500]
-        summary = _('ORCH failover: %s failed → %s') % (
+        summary = 'ORCH failover: %s failed → %s' % (
             failed_provider.name, next_provider.name,
         )
         model_label = (
             next_provider.model_id.name if next_provider.model_id else None
         ) or next_provider.model_name or next_provider.name
-        correlation_id, step_seq = self._resolve_log_threading(
-            correlation_id, step_seq,
+        turn, turn_step = self._resolve_log_threading(
+            turn, turn_step,
+        )
+        agent_code, source_channel, client_label = self._bind_log_identity(
+            agent_code, source_channel, client_label,
         )
         try:
-            Log.create_log_entry(
+            Log._create_log_entry(
                 user_id=user_id or self.env.user.id,
                 operation_type='read',
                 tool_name='provider_failover',
@@ -312,47 +501,59 @@ class AIExecutionEngine(models.AbstractModel):
                     'error': err_text,
                 },
                 agent_llm=model_label,
-                correlation_id=correlation_id,
-                step_seq=step_seq,
-                source_channel=source_channel or 'internal',
+                turn=turn,
+                turn_step=turn_step,
+                source_channel=source_channel,
+                client_label=client_label,
             )
         except Exception as exc:
             _logger.warning('AI engine: could not log failover: %s', exc)
 
-    def _resolve_log_threading(self, correlation_id=None, step_seq=None):
-        """Fill correlation/step from context or HTTP request when omitted.
+    def _resolve_log_threading(self, turn=None, turn_step=None):
+        """Fill turn/step from context or HTTP request when omitted.
 
-        Chatboo turns store ``mcp_correlation_id`` in the env context because
+        Streaming turns store ``mcp_turn`` in the env context because
         the SSE request object can be unbound mid-stream; prefer that over
         inventing a new id (which would orphan recipe-cache rows).
+        A context turn takes its step from the same counter as the engine,
+        so a row written from a job thread (no request) still gets one.
         """
-        if correlation_id is not None:
-            return correlation_id, step_seq
+        if turn is not None:
+            return turn, turn_step
         ctx = self.env.context or {}
-        ctx_corr = ctx.get('mcp_correlation_id')
+        ctx_turn = ctx.get('mcp_turn')
         try:
             from odoo.http import request as http_request
             from ..utils.mcp_correlation import (
-                ensure_turn_correlation, next_step_seq,
+                claim_turn_step, ensure_turn, next_turn_step,
             )
-            if ctx_corr:
-                correlation_id = ctx_corr
+            if ctx_turn:
+                turn = ctx_turn
                 try:
                     if http_request is not None:
-                        if not getattr(http_request, 'mcp_corr_id', None):
-                            http_request.mcp_corr_id = ctx_corr
-                        if not getattr(http_request, 'mcp_step_counter', None):
-                            http_request.mcp_step_counter = {}
-                        step_seq = next_step_seq(http_request, correlation_id)
+                        if not getattr(http_request, 'mcp_turn', None):
+                            http_request.mcp_turn = ctx_turn
                 except Exception:
                     pass
+                turn_step = claim_turn_step(
+                    turn, seed=lambda: self._last_log_step(turn),
+                )
             else:
-                correlation_id = ensure_turn_correlation(http_request)
-                step_seq = next_step_seq(http_request, correlation_id)
+                turn = ensure_turn(http_request)
+                turn_step = next_turn_step(http_request, turn)
         except Exception:
-            if ctx_corr:
-                correlation_id = ctx_corr
-        return correlation_id, step_seq
+            if ctx_turn:
+                turn = ctx_turn
+        return turn, turn_step
+
+    def _last_log_step(self, turn):
+        if not turn or 'ai.log' not in self.env:
+            return 0
+        last = self.env['ai.log'].sudo().search_read(
+            [('turn', '=', turn)], ['turn_step'],
+            order='turn_step desc', limit=1,
+        )
+        return (last[0]['turn_step'] or 0) if last else 0
 
     def _provider_model_label(self, provider, fallback=None):
         if not provider:
@@ -361,24 +562,27 @@ class AIExecutionEngine(models.AbstractModel):
             provider.model_id.name if provider.model_id else None
         ) or provider.model_name or provider.name or fallback
 
-    def log_provider_llm_request(
+    def _log_provider_llm_request(
         self, provider, *, agent_code=None, round_n=None,
         num_messages=0, num_tools=0, model_label=None, prompt_data=None,
-        result_summary=None, user_id=None, correlation_id=None, step_seq=None,
-        source_channel='internal',
+        result_summary=None, user_id=None, turn=None, turn_step=None,
+        source_channel=None, client_label=None,
     ):
         """Universal ORCH → LLM request row (endpoint ``llm_orchestration``).
 
-        Streaming (Chatboo) and headless callers use this — they do not write
+        Streaming and headless callers use this — they do not write
         ``ai.log`` themselves for provider traffic.
         """
         if 'ai.log' not in self.env:
             return
         Log = self.env['ai.log'].sudo()
+        agent_code, source_channel, client_label = self._bind_log_identity(
+            agent_code, source_channel, client_label,
+        )
         agent_code = agent_code or ''
         model_label = model_label or self._provider_model_label(provider)
-        correlation_id, step_seq = self._resolve_log_threading(
-            correlation_id, step_seq,
+        turn, turn_step = self._resolve_log_threading(
+            turn, turn_step,
         )
         data = {
             'agent_code': agent_code,
@@ -392,13 +596,13 @@ class AIExecutionEngine(models.AbstractModel):
         if prompt_data:
             data.update(prompt_data)
         if result_summary is None:
-            result_summary = _('Round %(t)s · %(m)s messages · %(k)s tools') % {
-                't': round_n if round_n is not None else '—',
-                'm': num_messages,
-                'k': num_tools,
-            }
+            result_summary = 'Round %s · %s messages · %s tools' % (
+                round_n if round_n is not None else '—',
+                num_messages,
+                num_tools,
+            )
         try:
-            Log.create_log_entry(
+            Log._create_log_entry(
                 user_id=user_id or self.env.user.id,
                 operation_type='read',
                 tool_name='llm_orchestration',
@@ -406,28 +610,37 @@ class AIExecutionEngine(models.AbstractModel):
                 result_summary=result_summary,
                 prompt_data=data,
                 agent_llm=model_label,
-                correlation_id=correlation_id,
-                step_seq=step_seq,
-                source_channel=source_channel or 'internal',
+                turn=turn,
+                turn_step=turn_step,
+                source_channel=source_channel,
+                client_label=client_label,
             )
         except Exception as exc:
             _logger.warning('AI engine: could not log LLM request: %s', exc)
 
-    def log_provider_llm_response(
+    def _log_provider_llm_response(
         self, provider, *, agent_code=None, content_preview='',
         tool_names=None, model_label=None, prompt_tokens=None,
-        completion_tokens=None, total_tokens=None, result_summary=None,
-        result_data=None, user_id=None, correlation_id=None, step_seq=None,
-        source_channel='internal',
+        completion_tokens=None, total_tokens=None, cost_usd=None,
+        usage=None, result_summary=None,
+        result_data=None, user_id=None, turn=None, turn_step=None,
+        source_channel=None, client_label=None, tool_calls=None,
     ):
-        """Universal LLM → ORCH response row (endpoint ``llm_response``)."""
+        """Universal LLM → ORCH response row (endpoint ``llm_response``).
+
+        The row keeps the text and the tool calls (with their arguments)
+        the model sent back.
+        """
         if 'ai.log' not in self.env:
             return
         Log = self.env['ai.log'].sudo()
+        agent_code, source_channel, client_label = self._bind_log_identity(
+            agent_code, source_channel, client_label,
+        )
         agent_code = agent_code or ''
         model_label = model_label or self._provider_model_label(provider)
-        correlation_id, step_seq = self._resolve_log_threading(
-            correlation_id, step_seq,
+        turn, turn_step = self._resolve_log_threading(
+            turn, turn_step,
         )
         tools = [n for n in (tool_names or []) if n]
         preview = (content_preview or '').strip()
@@ -435,9 +648,17 @@ class AIExecutionEngine(models.AbstractModel):
             if tools:
                 result_summary = 'tool_calls: ' + ', '.join(tools)
             else:
-                result_summary = (preview[:300] if preview else '(sin contenido)')
+                result_summary = (preview[:300] if preview else '(empty)')
+        if result_data is None:
+            calls = _logged_tool_calls(tool_calls)
+            if preview or calls:
+                result_data = {}
+                if preview:
+                    result_data['content'] = preview
+                if calls:
+                    result_data['tool_calls'] = calls
         try:
-            Log.create_log_entry(
+            Log._create_log_entry(
                 user_id=user_id or self.env.user.id,
                 operation_type='read',
                 tool_name='llm_response',
@@ -448,32 +669,131 @@ class AIExecutionEngine(models.AbstractModel):
                     'provider': provider.name if provider else None,
                     'provider_id': provider.id if provider else None,
                 },
-                result_data=result_data if result_data is not None else (
-                    {'content': preview[:400]} if preview else None
-                ),
+                result_data=result_data,
                 agent_llm=model_label,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
                 total_tokens=total_tokens,
-                correlation_id=correlation_id,
-                step_seq=step_seq,
-                source_channel=source_channel or 'internal',
+                cost_usd=cost_usd,
+                usage=usage,
+                turn=turn,
+                turn_step=turn_step,
+                source_channel=source_channel,
+                client_label=client_label,
             )
         except Exception as exc:
             _logger.warning('AI engine: could not log LLM response: %s', exc)
 
-    def log_provider_inference(self, provider, messages, response, tools=None,
-                               agent_code=None, source_channel='internal',
-                               user_id=None, correlation_id=None, step_seq=None):
+    def _log_llm_inference(
+        self,
+        provider,
+        usage,
+        *,
+        endpoint,
+        source_channel=None,
+        user_id=None,
+        agent_code=None,
+        client_label=None,
+        log_mode='single',
+        turn=None,
+        turn_step=None,
+        user_prompt=None,
+        additional_info=None,
+        content_preview='',
+        result_summary=None,
+        status='ok',
+        remote_ip=None,
+        prompt_data=None,
+        result_data=None,
+    ):
+        """Universal gate: headless single row or ORCH↔LLM pair with tokens + USD.
+
+        A single row keeps what the model was sent (``prompt_data``) and what
+        it answered (``result_data``) when the caller has them.
+        """
+        if 'ai.log' not in self.env:
+            return
+        agent_code, source_channel, client_label = self._bind_log_identity(
+            agent_code, source_channel, client_label,
+        )
+        piece = advertise_cost(normalize_usage(usage or {}))
+        if log_mode == 'pair':
+            self._log_provider_inference(
+                provider,
+                [{'role': 'user', 'content': user_prompt or ''}],
+                {
+                    'choices': [{
+                        'message': {
+                            'content': content_preview or '',
+                        },
+                    }],
+                    'usage': piece,
+                },
+                agent_code=agent_code,
+                source_channel=source_channel,
+                client_label=client_label,
+                user_id=user_id,
+                turn=turn,
+                turn_step=turn_step,
+            )
+            return
+        ptok, ctok, ttok, cost_usd = usage_log_fields(piece)
+        model_label = self._provider_model_label(provider)
+        status = (status or 'ok').strip() or 'ok'
+        # Tokens / USD already live in their columns. Result is the payload.
+        if not result_summary:
+            preview = (content_preview or '').strip()
+            result_summary = (preview or status)[:5000]
+        extra = dict(additional_info or {})
+        if cost_usd is not None:
+            extra['cost'] = cost_usd
+        extra['status'] = status
+        try:
+            self.env['ai.log'].sudo()._create_log_entry(
+                user_id=user_id or self.env.user.id,
+                operation_type='read',
+                tool_name=endpoint,
+                request_type='llm',
+                source_channel=source_channel,
+                client_label=client_label,
+                provider_id=provider.id if provider else False,
+                agent_llm=model_label,
+                user_prompt=user_prompt,
+                prompt_data=prompt_data,
+                result_data=result_data,
+                result_summary=result_summary,
+                additional_info=json.dumps(extra, ensure_ascii=False) if extra else None,
+                prompt_tokens=ptok,
+                completion_tokens=ctok,
+                total_tokens=ttok,
+                cost_usd=cost_usd,
+                usage=piece,
+                turn=turn,
+                turn_step=turn_step,
+                remote_ip=remote_ip,
+            )
+        except Exception as exc:
+            _logger.warning(
+                'AI engine: could not log inference (%s): %s',
+                endpoint, exc,
+            )
+
+    def _log_provider_inference(self, provider, messages, response, tools=None,
+                               agent_code=None, source_channel=None,
+                               client_label=None, user_id=None, turn=None,
+                               turn_step=None):
         """Universal trail for a completed non-stream provider call.
 
         Writes the same ORCH→LLM / LLM→ORCH pair as streaming, so headless
-        callers (OCR, ACL naming) and Chatboo share one logging gate.
+        callers (OCR, ACL naming) and streaming hosts share one logging gate.
         """
         n_msgs = len(messages or [])
         n_tools = len(tools or [])
         model_label = self._provider_model_label(provider)
-        self.log_provider_llm_request(
+        agent_code, source_channel, client_label = self._bind_log_identity(
+            agent_code, source_channel, client_label,
+        )
+        self._log_provider_llm_request(
             provider,
             agent_code=agent_code,
             num_messages=n_msgs,
@@ -481,14 +801,16 @@ class AIExecutionEngine(models.AbstractModel):
             model_label=model_label,
             prompt_data={'messages': messages},
             user_id=user_id,
-            correlation_id=correlation_id,
-            step_seq=step_seq,
+            turn=turn,
+            turn_step=turn_step,
             source_channel=source_channel,
+            client_label=client_label,
         )
         # Second row needs its own step when caller passed an explicit first step.
-        resp_step = (step_seq + 1) if step_seq is not None else None
+        resp_step = (turn_step + 1) if turn_step is not None else None
         content = ''
         tool_names = []
+        tool_calls = []
         usage = {}
         try:
             message = (
@@ -502,7 +824,8 @@ class AIExecutionEngine(models.AbstractModel):
                     for part in content
                     if isinstance(part, dict)
                 )
-            for tc in (message.get('tool_calls') or []):
+            tool_calls = message.get('tool_calls') or []
+            for tc in tool_calls:
                 name = (tc.get('function') or {}).get('name')
                 if name:
                     tool_names.append(name)
@@ -510,32 +833,48 @@ class AIExecutionEngine(models.AbstractModel):
         except Exception:
             content = ''
         content = (content or '').strip()
-        ptok = usage.get('prompt_tokens')
-        ctok = usage.get('completion_tokens')
-        ttok = usage.get('total_tokens') or (
-            ((ptok or 0) + (ctok or 0)) or None
-        )
-        self.log_provider_llm_response(
+        piece = advertise_cost(normalize_usage(usage))
+        ptok, ctok, ttok, cost_usd = usage_log_fields(piece)
+        self._log_provider_llm_response(
             provider,
             agent_code=agent_code,
             content_preview=content,
             tool_names=tool_names,
+            tool_calls=tool_calls,
             model_label=model_label,
             prompt_tokens=ptok,
             completion_tokens=ctok,
             total_tokens=ttok,
+            cost_usd=cost_usd,
+            usage=piece,
             user_id=user_id,
-            correlation_id=correlation_id,
-            step_seq=resp_step,
+            turn=turn,
+            turn_step=resp_step,
             source_channel=source_channel,
+            client_label=client_label,
         )
 
-    def chat_completion(self, agent_code, messages, tools=None, **kwargs):
+    @api.model
+    def get_usage_display_context(self):
+        """FX + display currency for usage chips in wizards and banners."""
+        from ..utils.display_currency import get_display_currency
+        fx = self.env['ai.fx.source'].get_usd_fx()
+        return {
+            'display_currency': get_display_currency(self.env),
+            'fx': {
+                'base': fx.get('base') or 'USD',
+                'rates': fx.get('rates') or {},
+                'as_of': fx.get('as_of') or '',
+                'error': fx.get('error') or '',
+            },
+        }
+
+    def _chat_completion(self, agent_code, messages, tools=None, **kwargs):
         """Send a chat completion request, trying providers in priority order.
 
-        Resolves the provider chain via ``get_providers_for_agent`` (auto-wires
-        all providers when the agent has no explicit failovers yet — sole
-        provider or auto-created ``ai.agent.provider`` rows). Then tries each
+        Resolves the provider chain via ``get_providers_for_agent`` (explicit
+        failovers, else every active system provider; no ``Link.create``).
+        Then tries each
         provider until one succeeds. Successful calls are logged by the
         driver proxy (universal — not opt-in per caller).
 
@@ -553,15 +892,22 @@ class AIExecutionEngine(models.AbstractModel):
         """
         agent_code = self.env['ai.agent'].resolve_inference_agent_code(agent_code)
         provider_id = kwargs.pop('provider_id', None)
+        need = kwargs.pop('need', None)
+        if not need:
+            need = 'vision' if kwargs.get('images') else 'conversation'
         # Ensures empty agent chains inherit configured providers (zero-friction).
-        providers = self.get_providers_for_agent(
-            agent_code, provider_id=provider_id,
-        )
+        providers = self.get_providers_for_agent(agent_code, need=need)
+        if provider_id:
+            selected = self.env['ai.provider'].browse(provider_id).exists()
+            if selected and selected.id in providers.ids:
+                providers = selected + providers.filtered(
+                    lambda rec: rec.id != selected.id,
+                )
         last_error = None
         failed_provider = None
         for idx, provider in enumerate(providers):
             if idx > 0 and failed_provider:
-                self.log_provider_failover(
+                self._log_provider_failover(
                     agent_code, failed_provider, provider, last_error,
                 )
             try:
@@ -580,8 +926,8 @@ class AIExecutionEngine(models.AbstractModel):
                 failed_provider = provider
                 if _is_context_overflow(exc):
                     _logger.warning(
-                        'AI engine: agent=%s provider=%s rechazó por desbordamiento '
-                        'de contexto; se aborta SIN failover (inútil).',
+                        'AI engine: agent=%s provider=%s rejected for context '
+                        'overflow; aborting WITHOUT failover (pointless).',
                         agent_code, provider.name,
                     )
                     raise UserError(_(
@@ -599,7 +945,7 @@ class AIExecutionEngine(models.AbstractModel):
             'All providers failed for agent "%s". Last error: %s'
         ) % (agent_code, last_error))
 
-    def resolve_provider(self, agent_code):
+    def _resolve_provider(self, agent_code):
         """Return the first provider in the chain (for callers that resolve explicitly)."""
         agent_code = self.env['ai.agent'].resolve_inference_agent_code(agent_code)
         providers = self.get_providers_for_agent(agent_code)

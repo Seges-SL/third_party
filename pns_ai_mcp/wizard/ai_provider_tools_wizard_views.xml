@@ -2,7 +2,7 @@
 <odoo>
     <record id="view_ai_provider_tools_wizard_form" model="ir.ui.view">
         <field name="name">pns_ai_mcp.provider.tools.wizard.form</field>
-        <field name="model">pns_ai_mcp.provider.tools.wizard</field>
+        <field name="model">ai.provider.tools.wizard</field>
         <field name="arch" type="xml">
             <form string="Providers Tools">
                 <div class="alert alert-info mb-0" role="alert">
@@ -24,7 +24,7 @@
     <record id="action_provider_tools_wizard" model="ir.actions.act_window">
         <field name="name">Providers Tools</field>
         <field name="type">ir.actions.act_window</field>
-        <field name="res_model">pns_ai_mcp.provider.tools.wizard</field>
+        <field name="res_model">ai.provider.tools.wizard</field>
         <field name="view_mode">form</field>
         <field name="view_id" ref="view_ai_provider_tools_wizard_form"/>
         <field name="target">new</field>

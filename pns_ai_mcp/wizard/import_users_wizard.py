@@ -1,21 +1,22 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-import base64
+"""Import MCP users from JSON."""
+
 import json
 import logging
 
 from odoo import api, models, fields, _
 from odoo.exceptions import UserError
 
-from ..utils.compat import format_login_name_line
+from ..utils.compat import binary_bytes, format_login_name_line
 from ..utils import mcp_ui
 
 _logger = logging.getLogger(__name__)
 
 
 class ImportUsersWizard(models.TransientModel):
-    _name = 'pns_ai_mcp.import_users_wizard'
+    _name = 'ai.import.users.wizard'
     _inherit = ['pns.operation.report.wizard']
     _description = 'Wizard to import MCP Users from JSON'
 
@@ -34,7 +35,7 @@ class ImportUsersWizard(models.TransientModel):
             raise UserError(_("Please upload a JSON file."))
 
         try:
-            json_content = base64.b64decode(self.json_file)
+            json_content = binary_bytes(self.json_file)
             json_data, extract_warnings = mcp_ui.extract_json_from_upload(json_content)
         except (ValueError, Exception) as e:
             raise UserError(_("Error reading the file: %s") % e)
@@ -42,6 +43,9 @@ class ImportUsersWizard(models.TransientModel):
         created_count = 0
         updated_count = 0
         skipped_count = 0
+        created_names = []
+        updated_names = []
+        skipped_names = []
         keys_imported_count = 0
         missing_logins = []
         other_errors = []
@@ -84,6 +88,10 @@ class ImportUsersWizard(models.TransientModel):
                 # Report field-level warnings but NEVER skip the user
                 for w in row_warnings:
                     other_errors.append("%s: (warn) %s" % (login, w))
+                key_warning = user_model._drop_key_unless_allowed(vals, odoo_user)
+                if key_warning:
+                    has_key = False
+                    other_errors.append("%s: (warn) %s" % (login, key_warning))
 
                 existing = user_model.search([('user_id', '=', odoo_user.id)], limit=1)
 
@@ -100,6 +108,7 @@ class ImportUsersWizard(models.TransientModel):
                                 except Exception as fe:
                                     other_errors.append("%s: field '%s' failed: %s" % (login, k, fe))
                         updated_count += 1
+                        updated_names.append(login)
                         if has_key:
                             keys_imported_count += 1
                     elif has_key and not (existing.mcp_api_key_hash or '').strip():
@@ -112,9 +121,11 @@ class ImportUsersWizard(models.TransientModel):
                         except Exception as we:
                             other_errors.append("%s: API key write failed: %s" % (login, we))
                         updated_count += 1
+                        updated_names.append(login)
                         keys_imported_count += 1
                     else:
                         skipped_count += 1
+                        skipped_names.append(login)
                 else:
                     try:
                         user_model.sudo().create(vals)
@@ -129,6 +140,7 @@ class ImportUsersWizard(models.TransientModel):
                             other_errors.append("%s: create failed: %s" % (login, ce2))
                             continue
                     created_count += 1
+                    created_names.append(login)
                     if has_key:
                         keys_imported_count += 1
 
@@ -144,5 +156,8 @@ class ImportUsersWizard(models.TransientModel):
             skipped=skipped_count,
             linked=keys_imported_count,
             errors=other_errors,
+            created_names=created_names,
+            updated_names=updated_names,
+            skipped_names=skipped_names,
             detail='\n'.join(missing_logins) if missing_logins else None,
         )

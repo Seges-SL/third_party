@@ -8,6 +8,7 @@ import logging
 from datetime import timedelta
 
 from odoo import api, fields, models
+from odoo.addons.pns_base.utils.compat import ODOO_VERSION
 
 _logger = logging.getLogger(__name__)
 
@@ -47,9 +48,15 @@ class AIFetchCache(models.Model):
         help='After this instant the entry is stale and will be ignored / purged.',
     )
 
-    _sql_constraints = [
-        ('url_hash_unique', 'UNIQUE(url_hash)', 'A cache entry for this URL already exists.'),
-    ]
+    if ODOO_VERSION >= 19:
+        _url_hash_unique = models.Constraint(
+            'UNIQUE(url_hash)',
+            'A cache entry for this URL already exists.',
+        )
+    else:
+        _sql_constraints = [
+            ('url_hash_unique', 'UNIQUE(url_hash)', 'A cache entry for this URL already exists.'),
+        ]
 
     # ── keys ──────────────────────────────────────────────────────
 
@@ -61,7 +68,7 @@ class AIFetchCache(models.Model):
     # ── read / write ──────────────────────────────────────────────
 
     @api.model
-    def get_cached(self, url):
+    def _get_cached(self, url):
         """Return the cached result dict for ``url`` if fresh, else None.
 
         The returned dict mirrors the successful ``_execute_fetch_url`` shape
@@ -89,7 +96,7 @@ class AIFetchCache(models.Model):
         }
 
     @api.model
-    def store(self, url, result, ttl_seconds):
+    def _store(self, url, result, ttl_seconds):
         """Upsert a fresh cache entry for ``url`` from a fetch result dict.
 
         Only successful results with a positive ``ttl_seconds`` are stored.
@@ -125,7 +132,7 @@ class AIFetchCache(models.Model):
     # ── maintenance ───────────────────────────────────────────────
 
     @api.model
-    def gc_expired(self):
+    def _gc_expired(self):
         """Cron entry point: delete expired cache rows."""
         now = fields.Datetime.now()
         stale = self.sudo().search([('expires_at', '<=', now)])

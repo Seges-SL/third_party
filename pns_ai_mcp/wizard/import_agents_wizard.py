@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-import base64
+"""Import AI agents from JSON."""
+
 import json
 import logging
 
@@ -9,12 +10,13 @@ from odoo import api, models, fields, _
 from odoo.exceptions import UserError
 
 from ..utils import mcp_ui
+from ..utils.compat import binary_bytes
 
 _logger = logging.getLogger(__name__)
 
 
 class ImportAgentsWizard(models.TransientModel):
-    _name = 'pns_ai_mcp.import_agents_wizard'
+    _name = 'ai.import.agents.wizard'
     _inherit = ['pns.operation.report.wizard']
     _description = 'Wizard to import AI Agents from JSON'
 
@@ -33,7 +35,7 @@ class ImportAgentsWizard(models.TransientModel):
             raise UserError(_("Please upload a JSON file."))
 
         try:
-            json_content = base64.b64decode(self.json_file)
+            json_content = binary_bytes(self.json_file)
             json_data, extract_warnings = mcp_ui.extract_json_from_upload(json_content)
         except (ValueError, Exception) as e:
             raise UserError(_("Error reading the file: %s") % e)
@@ -45,6 +47,9 @@ class ImportAgentsWizard(models.TransientModel):
         imported_count = 0
         updated_count = 0
         skipped_count = 0
+        created_names = []
+        updated_names = []
+        skipped_names = []
         missing_providers = set()
         errors = []
 
@@ -59,6 +64,7 @@ class ImportAgentsWizard(models.TransientModel):
                 )
                 if existing and not self.replace_existing:
                     skipped_count += 1
+                    skipped_names.append(code)
                     continue
 
                 vals = {
@@ -73,12 +79,14 @@ class ImportAgentsWizard(models.TransientModel):
                     existing.write(vals)
                     agent_rec = existing
                     updated_count += 1
+                    updated_names.append(code)
                     Assignment.with_context(active_test=False).search(
                         [('agent_id', '=', agent_rec.id)]
                     ).unlink()
                 else:
                     agent_rec = Agent.create(vals)
                     imported_count += 1
+                    created_names.append(code)
 
                 for failover_entry in agent_data.get('failovers', []):
                     provider_name = failover_entry.get('provider')
@@ -106,5 +114,8 @@ class ImportAgentsWizard(models.TransientModel):
             updated=updated_count,
             skipped=skipped_count,
             errors=errors,
+            created_names=created_names,
+            updated_names=updated_names,
+            skipped_names=skipped_names,
             detail=', '.join(sorted(missing_providers)) if missing_providers else None,
         )

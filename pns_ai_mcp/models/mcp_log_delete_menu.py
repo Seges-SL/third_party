@@ -12,7 +12,7 @@ class MCPLogDeleteMenu(models.TransientModel):
 
     Philosophy: delete the oldest logs, keep the most recent ones.
     """
-    _name = 'pns_ai_mcp.log_delete_menu'
+    _name = 'ai.log.delete.menu'
     _description = 'AI Log Delete Menu'
 
     delete_all = fields.Boolean(

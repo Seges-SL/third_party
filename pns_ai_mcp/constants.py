@@ -3,15 +3,9 @@
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
 """Centralized constants for pns_ai_mcp."""
 
-# Nombre del servidor MCP para usar en mensajes y comunicaciones
-# Referencia: Centralización similar a sistemas de ciencia ficción (ej: ELEKTRYBAŁT)
-SERVIDOR_MCP_NOMBRE = "servidor MCP"
+# Minutes a pending Safe Plan waits for the human before it expires.
+PENDING_OPERATION_TTL_MINUTES = 15
 
-# Variantes comunes para usar en mensajes
-SERVIDOR_MCP_PREFIJO = "desde servidor MCP"
-SERVIDOR_MCP_ERROR = "Error desde servidor MCP"
-SERVIDOR_MCP_COMPLETADO = "Operación completada desde servidor MCP"
-SERVIDOR_MCP_SOLICITUD = "Solicitud de escritura desde servidor MCP"
-
-# PIN de verificación de escritura
-PIN_EXPIRY_MINUTES = 15  # Tiempo de vida del PIN de verificación
+# Seconds the card of a high-danger plan must stay on screen before Confirm
+# is accepted. The browser shows the same wait; the server enforces it.
+HIGH_CONFIRM_WAIT_SECONDS = 5

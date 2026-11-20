@@ -1,0 +1,95 @@
+FROM odoo:14.0
+
+USER root
+
+# --- 1. FIX DEBIAN BUSTER (EOL) ---
+# Debian 10 es EOL. Cambiamos a archive.debian.org y desactivamos chequeo de fechas
+RUN echo "deb http://archive.debian.org/debian/ buster main" > /etc/apt/sources.list && \
+    echo "deb http://archive.debian.org/debian-security buster/updates main" >> /etc/apt/sources.list && \
+    apt-get -o Acquire::Check-Valid-Until=false update
+
+# --- 2. INSTALACIÓN DE DEPENDENCIAS ---
+# Instalamos git y compiladores necesarios para las librerías de Python
+RUN apt-get -o Acquire::Check-Valid-Until=false install -y \
+    build-essential \
+    python3-dev \
+    libxml2-dev \
+    libxslt1-dev \
+    libldap2-dev \
+    libsasl2-dev \
+    libssl-dev \
+    libffi-dev \
+    libjpeg-dev \
+    zlib1g-dev \
+    git
+
+# --- 3. LIBRERÍAS PYTHON EXTRA ---
+    
+# A. ACTUALIZACIÓN CRÍTICA DE PIP
+# Actualizamos pip para evitar tiempos de compilación largos con librerías modernas
+RUN pip3 install --no-cache-dir --upgrade pip
+
+# B. INSTALACIÓN DE LIBRERÍAS
+# Añade aquí las librerías que requieran tus módulos
+RUN pip3 install --no-cache-dir \
+    openupgradelib \
+    xlrd \
+    pandas \
+    requests \
+    httpx \
+    pydantic
+
+RUN pip3 install --no-cache-dir 'acme' 'astor' 'bokeh==2.3.1' 'boto3' 'cachetools' 'chardet' 'cryptography<36' 'cssselect' 'dateparser' 'dnspython' 'dropbox' 'email-validator' 'endesive' 'extract_msg' 'factur-x<=3.1' 'fdfgen' 'freezegun' 'google-cloud-documentai' 'invoice2data' 'josepy' 'lxml' 'mpld3' 'netifaces' 'nextcloud-api-wrapper' 'num2words' 'numpy-financial<=1.0.0' 'numpy>=1.15' 'odoo-test-helper' 'odoorpc' 'ofxparse' 'openpyxl' 'openupgradelib' 'ovh' 'pandas>=0.25.3' 'paramiko' 'pdf2image' 'phonenumbers' 'plotly==5.4.0' 'premailer' 'psutil' 'py3o.formats' 'py3o.template' 'pyOpenSSL' 'pycountry' 'pycryptodome' 'pyftpdlib' 'pygount' 'pyjwt' 'pyncclient' 'pypdf>=3.1.0,<5.0' 'pysaml2' 'pysftp' 'python-barcode' 'python-jose' 'python-ldap' 'python-magic' 'python-stdnum>=1.16' 'pytz' 'pyyaml' 'pyzbar' 'qrcode' 'regex' 'requests' 'requests_pkcs12' 'sentry_sdk<=1.9.0' 'suds-py3' 'unicodecsv' 'unidecode' 'validators' 'webcolors' 'xlrd' 'xmlschema' 'xmlsig' 'xmltodict' 'zeep' 'zxcvbn' 'html2text' 'raven'
+# --- 4. HARDENING & CLEANUP (Limpieza de Seguridad) ---
+# Borramos las herramientas de desarrollo para reducir la superficie de ataque.
+# Si un atacante entra, no tendrá 'gcc' ni 'git' para escalar privilegios.
+RUN apt-get purge -y --auto-remove \
+    build-essential \
+    python3-dev \
+    git \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /root/.cache
+
+# Restaurar usuario Odoo
+USER odoo
+
+# ---------------------------------------------------------------------------
+# Solo laboratorio cc0060e (D49). No es el Dockerfile de ningún VPS.
+# Sustituye el core del paquete (14.0.20231106) por el del commit cc0060e, el que
+# corre en el staging y en LIYBEN. Misma disposición que el paquete: todo en
+# /usr/lib/python3/dist-packages/odoo y los addons de odoo/addons y de addons/
+# juntos en odoo/addons (Odoo lo añade solo al addons_path: modules/module.py:134).
+# Se borra antes el core anterior (incluidos los theme_* y website_animate del
+# paquete): no quedan restos de 20231106. Sin git (lo purga el paso 4): curl.
+# Librerías: sin cambios (el staging y LIYBEN corren cc0060e con las de 20231106).
+# ---------------------------------------------------------------------------
+USER root
+ARG ODOO_COMMIT=cc0060e889603eb2e47fa44a8a22a70d7d784185
+RUN set -eu; umask 022; \
+    P=/usr/lib/python3/dist-packages/odoo; T=/tmp/odoo-core; mkdir "$T"; \
+    curl -fsSL --retry 3 -o "$T/core.tar.gz" \
+        "https://github.com/odoo/odoo/archive/${ODOO_COMMIT}.tar.gz"; \
+    echo "core.tar.gz SHA-256: $(sha256sum "$T/core.tar.gz" | cut -d' ' -f1)"; \
+    tar -xzf "$T/core.tar.gz" -C "$T" --no-same-owner --no-same-permissions; \
+    S="$T/odoo-${ODOO_COMMIT}"; \
+    test -f "$S/odoo/release.py"; test -d "$S/odoo/addons/base"; test -d "$S/addons/web"; \
+    rm -rf "$P"; \
+    cp -a "$S/odoo" "$P"; \
+    for m in "$S"/addons/*; do \
+        n="$(basename "$m")"; \
+        if [ -e "$P/addons/$n" ]; then echo "colisión en odoo/addons: $n"; exit 1; fi; \
+        cp -a "$m" "$P/addons/"; \
+    done; \
+    chown -R root:root "$P"; chmod -R u=rwX,go=rX "$P"; \
+    rm -rf "$T"; \
+    fallo=0; \
+    for par in fields.py:f915e7114ceb705d models.py:aae6b5a0c3027136 \
+               addons/auth_totp/models/res_users.py:a8bb617ffd88f3b8 \
+               addons/auth_signup/models/res_partner.py:c848abd85790cadd \
+               addons/iap/models/iap_account.py:010ed431f82f5666; do \
+        f="${par%%:*}"; esp="${par##*:}"; h="$(sha256sum "$P/$f" | cut -c1-16)"; \
+        if [ "$h" = "$esp" ]; then r=OK; else r=DISTINTA; fallo=1; fi; \
+        echo "huella odoo/$f $h ($r)"; \
+    done; \
+    test "$fallo" = 0
+USER odoo

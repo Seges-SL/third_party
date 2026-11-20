@@ -15,13 +15,13 @@ import unicodedata
 
 _logger = logging.getLogger(__name__)
 
-# Decorative Chatboo chrome — not a drawing the user asked to keep.
+# Decorative chrome of the rendered card — not a drawing the user asked to keep.
 _DECORATIVE_MARKERS = (
-    'o_chatboo_map_banner_pins',
-    'o_chatboo_link_banner_mark',
-    'o_chatboo_chart_',
-    'o_chatboo_dashboard_',
-    'o_chatboo_export_bar',
+    'o_ai_map_banner_pins',
+    'o_ai_link_banner_mark',
+    'o_ai_chart_',
+    'o_ai_dashboard_',
+    'o_ai_export_bar',
 )
 
 _SVG_OPEN = re.compile(r'<svg\b[^>]*>', re.IGNORECASE)
@@ -58,32 +58,28 @@ def _slug(text):
     return slug[:50]
 
 
-# Structural particles / request verbs / format words — not business nouns.
-_FUNCTION_WORDS = frozenset({
-    'a', 'an', 'the', 'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas',
-    'de', 'del', 'al', 'y', 'o', 'e', 'u', 'en', 'con', 'por', 'para', 'sin',
-    'mi', 'me', 'te', 'se', 'le', 'les', 'nos', 'os', 'tu', 'su', 'my', 'your',
-    'que', 'qué', 'como', 'cómo', 'cual', 'cuál', 'when', 'where', 'what', 'who',
-    'please', 'porfa', 'porfavor', 'pls', 'plz', 'gracias', 'favor',
-    'can', 'could', 'would', 'will', 'want',
-    'quiero', 'quieres', 'quisiera', 'puedes', 'puede', 'podrias', 'podrias',
-    'haz', 'hazme', 'dame', 'dame', 'pasame', 'mandame', 'envia', 'enviame',
-    'make', 'create', 'generate', 'give', 'show', 'need', 'necesito',
-    'draw', 'paint', 'pinta', 'pintas', 'pintame', 'dibuja', 'dibujas', 'dibujame',
-    'escribe', 'muestra', 'ponme', 'pon', 'this', 'that', 'esto', 'eso',
-    'here', 'ahi', 'aquí', 'aqui', 'there', 'va', 'un',
+_EXTENSIONS = frozenset({
+    'svg', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'html', 'htm',
+    'xlsx', 'xls', 'csv', 'zip', 'docx', 'doc',
 })
 
-_FORMAT_WORDS = frozenset({
-    'svg', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'html', 'htm',
-    'xlsx', 'xls', 'csv', 'zip', 'docx', 'doc', 'file', 'archivo', 'fichero',
-    'documento', 'imagen', 'image', 'drawing', 'dibujo', 'export', 'download',
-    'descarga', 'descargar', 'descargame', 'bajame',
-})
+
+def _spoken():
+    try:
+        from . import spoken_words
+        return spoken_words
+    except ImportError:
+        import importlib.util
+        import os
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'spoken_words.py')
+        spec = importlib.util.spec_from_file_location('spoken_words', path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
 
 _GENERIC_STEMS = frozenset({
     'download', 'file', 'document', 'attachment', 'drawing', 'export',
-    'unnamed', 'response', 'chatboo', 'bin', 'data',
+    'unnamed', 'response', 'bin', 'data',
 })
 
 _EXPLICIT_FILE = re.compile(
@@ -110,7 +106,8 @@ def _axis_tokens():
         return set(AXIS_COMMANDS)
     except Exception:
         return {
-            'painter-local', 'painter-free', 'foot-verbose', 'foot-laconic',
+            'compose-agent', 'compose-model',
+            'foot-verbose', 'foot-laconic',
             'show-table', 'show-chart',
         }
 
@@ -141,7 +138,8 @@ def split_utterance(text):
 def _content_slug(text):
     tokens = re.split(r'[^A-Za-z0-9]+', _slug(text).replace('_', ' '))
     kept = []
-    skip = _FUNCTION_WORDS | _FORMAT_WORDS
+    spoken = _spoken()
+    skip = _EXTENSIONS | spoken.words('filler') | spoken.words('file')
     for tok in tokens:
         if not tok or tok in skip or tok.isdigit():
             continue
@@ -411,11 +409,6 @@ def harvest_drawing_svgs(text, min_chars=MIN_SVG_CHARS, max_count=MAX_SVGS_PER_T
     return docs, _apply_removals(text, ranges)
 
 
-def extract_inline_svgs(html, min_chars=MIN_SVG_CHARS, max_count=MAX_SVGS_PER_TURN):
-    """Return sanitized SVG documents large enough to be a drawing, not an icon."""
-    return harvest_drawing_svgs(html, min_chars=min_chars, max_count=max_count)[0]
-
-
 def svg_filename(svg, index=1, prompt=None, skill_code=None):
     title = None
     match = _TITLE.search(svg or '')
@@ -445,10 +438,7 @@ def svg_inline_view_url(chip):
         match = re.search(r'/pns_ai_mcp/session_file/(\d+)', url)
     if not match:
         return url
-    token_m = re.search(r'access_token=([^&]+)', url)
-    token = token_m.group(1) if token_m else ''
-    path = '/pns_ai_mcp/session_file/%s' % match.group(1)
-    return '%s?access_token=%s' % (path, token) if token else path
+    return '/pns_ai_mcp/session_file/%s' % match.group(1)
 
 
 def persist_inline_svgs_from_html(env, session_id, html, prompt=None, skill_code=None):
@@ -458,14 +448,14 @@ def persist_inline_svgs_from_html(env, session_id, html, prompt=None, skill_code
     fence — same gesture as a PDF chip. If nothing is stored, html is unchanged.
     Chip names follow the user prompt or skill (``gato.svg``), not ``drawing-1``.
     """
-    from .session_download import persist_chatboo_session_file
+    from .session_download import persist_turn_file
 
     docs, cleaned = harvest_drawing_svgs(html)
     chips = []
     for index, svg in enumerate(docs, 1):
         raw = svg.encode('utf-8')
         name = svg_filename(svg, index, prompt=prompt, skill_code=skill_code)
-        chip = persist_chatboo_session_file(
+        chip = persist_turn_file(
             env, session_id, raw, name, mimetype='image/svg+xml',
         )
         if not chip:

@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-"""Draft pick-list shown in Chatboo before the Safe Plan Confirm aviso."""
+"""Draft pick-list shown in the chat before the Safe Plan Confirm aviso."""
 from odoo import api, fields, models
+from odoo.addons.pns_base.utils.compat import ODOO_VERSION
 
 
 class AiSafeChoice(models.Model):
@@ -28,10 +29,15 @@ class AiSafeChoice(models.Model):
     expires_at = fields.Datetime(index=True)
     payload = fields.Text(help='JSON: steps, items, title')
 
-    _sql_constraints = [
-        ('choice_id_uniq', 'unique(choice_id)',
-         'A choice with this id already exists.'),
-    ]
+    if ODOO_VERSION >= 19:
+        _choice_id_uniq = models.Constraint(
+            'unique(choice_id)',
+            'A choice with this id already exists.',
+        )
+    else:
+        _sql_constraints = [
+            ('choice_id_uniq', 'unique(choice_id)', 'A choice with this id already exists.'),
+        ]
 
     @api.model
     def _generate_choice_id(self):
@@ -45,5 +51,9 @@ class AiSafeChoice(models.Model):
                 'implementation': 'standard',
                 'prefix': 'CHC',
                 'padding': 8,
+                'company_id': False,
             })
+        elif seq.company_id:
+            # next_by_code only sees the active company's sequences.
+            seq.write({'company_id': False})
         return self.env['ir.sequence'].next_by_code('pns_ai_mcp.safe_choice') or 'CHC0000'

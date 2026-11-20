@@ -8,6 +8,9 @@ import logging
 from datetime import timedelta
 
 from odoo import api, fields, models
+from odoo.addons.pns_base.utils.compat import ODOO_VERSION
+# Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+from odoo.addons.pns_base.utils.seges_side_env import seges_side_env
 
 from ..utils.api_call_result import API_CALL_CACHE_TTL_SECONDS, cache_key_for_api_call
 
@@ -30,7 +33,7 @@ class AIApiResultCache(models.Model):
         string='Cache key',
         required=True,
         index=True,
-        help='SHA-256 of server + tool + canonical arguments JSON.',
+        help='SHA-256 of user + server + tool + canonical arguments JSON.',
     )
     server_code = fields.Char(string='Server code', index=True)
     tool_name = fields.Char(string='Tool')
@@ -44,16 +47,53 @@ class AIApiResultCache(models.Model):
         help='After this instant the entry is stale and will be ignored / purged.',
     )
 
-    _sql_constraints = [
-        ('cache_key_unique', 'UNIQUE(cache_key)', 'A cache entry for this api_call already exists.'),
-    ]
+    if ODOO_VERSION >= 19:
+        _cache_key_unique = models.Constraint(
+            'UNIQUE(cache_key)',
+            'A cache entry for this api_call already exists.',
+        )
+    else:
+        _sql_constraints = [
+            ('cache_key_unique', 'UNIQUE(cache_key)', 'A cache entry for this api_call already exists.'),
+        ]
+
+    def init(self):
+        super().init()
+        self._revive_spent_gc_cron()
+
+    @api.model
+    def _revive_spent_gc_cron(self):
+        """Leftover: the purge cron shipped without ``numbercall=-1``.
+
+        Odoo 14 created it with ``numbercall=1``; after its first run it hit 0,
+        switched itself off and was never picked again. The data file is
+        ``noupdate``, so the fixed XML alone does not reach installed DBs.
+        Stacks whose ``ir.cron`` has no ``numbercall`` have nothing to fix.
+        """
+        if 'numbercall' not in self.env['ir.cron']._fields:
+            return 0
+        self.env.cr.execute(
+            """
+            UPDATE ir_cron
+               SET numbercall = -1,
+                   active = (active OR numbercall = 0)
+             WHERE numbercall >= 0
+               AND id IN (
+                   SELECT res_id FROM ir_model_data
+                    WHERE module = 'pns_ai_mcp'
+                      AND model = 'ir.cron'
+                      AND name = 'ir_cron_ai_api_result_cache_gc'
+               )
+            """
+        )
+        return self.env.cr.rowcount
 
     @api.model
     def _hash_key(self, server, tool, arguments):
-        return cache_key_for_api_call(server, tool, arguments)
+        return cache_key_for_api_call(server, tool, arguments, uid=self.env.uid)
 
     @api.model
-    def get_cached(self, server, tool, arguments):
+    def _get_cached(self, server, tool, arguments):
         """Return the cached full body if fresh, else None."""
         key = self._hash_key(server, tool, arguments)
         now = fields.Datetime.now()
@@ -66,8 +106,13 @@ class AIApiResultCache(models.Model):
         return rec.body or ''
 
     @api.model
-    def store(self, server, tool, arguments, body, ttl_seconds=None):
-        """Upsert a fresh cache entry. Best-effort — never breaks the turn."""
+    def _store(self, server, tool, arguments, body, ttl_seconds=None):
+        """Upsert a fresh cache entry. Best-effort — never breaks the turn.
+
+        Written on a cursor of its own and committed: a skill's code reads
+        the row from box A, a separate read-only cursor that never sees what
+        the turn's cursor has not committed.
+        """
         try:
             ttl = int(ttl_seconds or API_CALL_CACHE_TTL_SECONDS)
             if ttl <= 0 or body is None:
@@ -86,11 +131,14 @@ class AIApiResultCache(models.Model):
                 'fetched_at': now,
                 'expires_at': expires,
             }
-            existing = self.sudo().search([('cache_key', '=', key)], limit=1)
-            if existing:
-                existing.write(vals)
-            else:
-                self.sudo().create(vals)
+            # Seges: parche 38 (PNS-105, datos). Ver docs/pendiente/parches_pns_ai.md
+            with seges_side_env(), self.env.registry.cursor() as cr:
+                Cache = api.Environment(cr, self.env.uid, self.env.context)[self._name].sudo()
+                existing = Cache.search([('cache_key', '=', key)], limit=1)
+                if existing:
+                    existing.write(vals)
+                else:
+                    Cache.create(vals)
         except Exception:
             _logger.warning(
                 'ai.api.result.cache: store failed for %s/%s',
@@ -98,7 +146,7 @@ class AIApiResultCache(models.Model):
             )
 
     @api.model
-    def gc_expired(self):
+    def _gc_expired(self):
         """Cron entry point: delete expired cache rows."""
         now = fields.Datetime.now()
         stale = self.sudo().search([('expires_at', '<=', now)])

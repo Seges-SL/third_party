@@ -11,12 +11,42 @@ from typing import Any, Dict, List, Optional, Tuple
 _MAX_MODULE_LITERAL_ELTS = 8
 
 
+def _reads_a_variable(node: ast.AST) -> bool:
+    """True when the expression reads a name other than the called function.
+
+    A pasted snapshot is pure data (``round(…)`` or ``date(…)`` at most).
+    ``('Users', env['res.users'].search_count([]))`` is computed live.
+    """
+    called = {
+        id(n.func) for n in ast.walk(node)
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+    }
+    return any(
+        isinstance(n, ast.Name) and id(n) not in called
+        for n in ast.walk(node)
+    )
+
+
 def _literal_collection_size(node: ast.AST) -> int:
+    """Pasted elements of a literal collection (computed ones do not count)."""
     if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
-        return len(node.elts)
-    if isinstance(node, ast.Dict):
-        return len(node.keys)
-    return 0
+        elts = node.elts
+    elif isinstance(node, ast.Dict):
+        elts = [
+            ast.Tuple(elts=[k, v], ctx=ast.Load()) if k is not None else v
+            for k, v in zip(node.keys, node.values)
+        ]
+    else:
+        return 0
+    return sum(1 for elt in elts if not _reads_a_variable(elt))
+
+
+def _is_none_literal(node: ast.AST) -> bool:
+    """``None`` written in the code (``NameConstant`` on 3.7, ``Constant`` on 3.8+)."""
+    try:
+        return ast.literal_eval(node) is None
+    except Exception:
+        return False
 
 
 def _try_eval_data_node(node: ast.AST):
@@ -29,8 +59,6 @@ def _try_eval_data_node(node: ast.AST):
         return ast.literal_eval(node)
     except Exception:
         pass
-    if isinstance(node, ast.Constant):
-        return node.value
     if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
         v = _try_eval_data_node(node.operand)
         if isinstance(v, (int, float)):
@@ -76,14 +104,7 @@ def _try_eval_data_node(node: ast.AST):
         out = []
         for elt in node.elts:
             v = _try_eval_data_node(elt)
-            if v is None and not isinstance(elt, ast.Constant):
-                # Allow None constants only; failed fold → abort.
-                try:
-                    if ast.literal_eval(elt) is None:
-                        out.append(None)
-                        continue
-                except Exception:
-                    return None
+            if v is None and not _is_none_literal(elt):
                 return None
             out.append(v)
         return out if isinstance(node, ast.List) else tuple(out)
@@ -94,15 +115,9 @@ def _try_eval_data_node(node: ast.AST):
                 return None
             k = _try_eval_data_node(k_node)
             v = _try_eval_data_node(v_node)
-            if k is None and not isinstance(k_node, ast.Constant):
+            if k is None and not _is_none_literal(k_node):
                 return None
-            if v is None and not isinstance(v_node, ast.Constant):
-                try:
-                    if ast.literal_eval(v_node) is None:
-                        out[k] = None
-                        continue
-                except Exception:
-                    return None
+            if v is None and not _is_none_literal(v_node):
                 return None
             out[k] = v
         return out
@@ -272,11 +287,8 @@ def _call_is_named(node: Optional[ast.AST], name: str) -> bool:
 
 def _function_body_without_docstring(node: ast.FunctionDef) -> List[ast.stmt]:
     body = list(node.body or [])
-    if (
-        body
-        and isinstance(body[0], ast.Expr)
-        and isinstance(getattr(body[0], 'value', None), (ast.Constant, ast.Str))
-    ):
+    # get_docstring reads Str (3.7) and Constant (3.8+) alike.
+    if ast.get_docstring(node, clean=False) is not None:
         return body[1:]
     return body
 
@@ -494,17 +506,14 @@ def ensure_date_param_coercion(code: str) -> Tuple[str, bool]:
     if not names:
         return src, False
     body = list(func.body or [])
-    if (
-        body
-        and isinstance(body[0], ast.Expr)
-        and isinstance(getattr(body[0], 'value', None), (ast.Constant, ast.Str))
-    ):
+    if ast.get_docstring(func, clean=False) is not None:
         first_real = body[1] if len(body) > 1 else None
     else:
         first_real = body[0] if body else None
     if first_real is None:
         return src, False
-    already = ast.get_source_segment(src, func) or src
+    segment = getattr(ast, 'get_source_segment', None)  # Python 3.8+
+    already = (segment and segment(src, func)) or src
     pending = [
         n for n in names
         if ('fromisoformat(%s[:10])' % n) not in already

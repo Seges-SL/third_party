@@ -1,18 +1,24 @@
+/**
+ * Copy-to-clipboard buttons on log (and similar) forms (Odoo 14).
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ * Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+ */
 odoo.define('pns_ai_mcp.mcp_log_form', function (require) {
     "use strict";
 
     var FormController = require('web.FormController');
     var FormRenderer = require('web.FormRenderer');
-    var Notification = require('web.Notification');
     var core = require('web.core');
 
+    var _t = core._t;
 
     FormRenderer.include({
         _render: function() {
             var self = this;
             var result = this._super.apply(this, arguments);
             
-            // Cualquier formulario con botones Copy (logs, wizard import usuarios, etc.)
+            // Any form with Copy buttons (logs, user import wizard, etc.)
             var scheduleCopy = function () {
                 if (!self.$el.find('.o_field_text_copy_btn').length) {
                     return;
@@ -22,7 +28,7 @@ odoo.define('pns_ai_mcp.mcp_log_form', function (require) {
             if (result && typeof result.then === 'function') {
                 result.then(scheduleCopy);
             } else {
-                setTimeout(scheduleCopy, 100);
+                scheduleCopy();
             }
             
             return result;
@@ -40,15 +46,15 @@ odoo.define('pns_ai_mcp.mcp_log_form', function (require) {
                 var $container = $button.closest('.o_field_text_copy_container');
                 var $field = $container.find('.o_field_text_copy_target');
                 
-                // Obtener el texto del campo
+                // Get the field text
                 var textToCopy = '';
                 if ($field.length) {
-                    // Buscar el textarea dentro del campo
+                    // Look for the textarea inside the field
                     var $textarea = $field.find('textarea');
                     if ($textarea.length) {
                         textToCopy = $textarea.val();
                     } else {
-                        // Si no hay textarea, buscar directamente en el campo o en su contenedor
+                        // If there is no textarea, look directly in the field or its container
                         var $fieldContent = $field.find('.o_field_text, pre, div');
                         if ($fieldContent.length) {
                             textToCopy = $fieldContent.text();
@@ -59,7 +65,7 @@ odoo.define('pns_ai_mcp.mcp_log_form', function (require) {
                 }
                 
                 if (textToCopy) {
-                    // Copiar al portapapeles
+                    // Copy to the clipboard
                     var $temp = $('<textarea>', {
                         css: {
                             'position': 'fixed',
@@ -75,7 +81,7 @@ odoo.define('pns_ai_mcp.mcp_log_form', function (require) {
                     try {
                         var successful = document.execCommand('copy');
                         if (successful) {
-                            // Obtener el controlador para mostrar la notificaci├│n
+                            // Get the controller to show the notification
                             var controller = self.getParent();
                             while (controller && !controller.displayNotification) {
                                 controller = controller.getParent ? controller.getParent() : null;
@@ -83,26 +89,26 @@ odoo.define('pns_ai_mcp.mcp_log_form', function (require) {
                             
                             if (controller && controller.displayNotification) {
                                 controller.displayNotification({
-                                    title: 'Copiado',
-                                    message: 'Contenido copiado al portapapeles',
+                                    title: _t('Copied'),
+                                    message: _t('Content copied to clipboard'),
                                     type: 'success',
                                     sticky: false,
                                     className: 'o_mcp_copy_toast'
                                 });
                             } else {
-                                // Fallback: usar trigger_up
+                                // Fallback: use trigger_up
                                 self.trigger_up('show_notification', {
-                                    title: 'Copiado',
-                                    message: 'Contenido copiado al portapapeles',
+                                    title: _t('Copied'),
+                                    message: _t('Content copied to clipboard'),
                                     type: 'success',
                                     sticky: false,
                                 });
                             }
                         } else {
-                            console.warn('No se pudo copiar al portapapeles');
+                            console.warn('Could not copy to clipboard');
                         }
                     } catch (err) {
-                        console.error('Error al copiar:', err);
+                        console.error('Error copying:', err);
                     }
                     
                     $temp.remove();

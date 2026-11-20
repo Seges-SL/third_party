@@ -99,51 +99,70 @@ def iter_settings_fields(model, module=None, icp_prefix=None):
             yield fname, field
 
 
-def field_default(field):
+def _typed_empty(field):
+    ftype = getattr(field, 'type', 'char')
+    if ftype == 'boolean':
+        return False
+    if ftype == 'integer':
+        return 0
+    if ftype == 'float':
+        return 0.0
+    return ''
+
+
+def field_default(field, records=None):
+    """Call a field default on an empty recordset when one is available.
+
+    ``default(None)`` raises when the lambda uses ``self.env``. A failed
+    callable falls back to the empty value of the field type.
+    """
     default = getattr(field, 'default', None)
     if default is None:
-        ftype = getattr(field, 'type', 'char')
-        if ftype == 'boolean':
-            return False
-        if ftype == 'integer':
-            return 0
-        if ftype == 'float':
-            return 0.0
-        return ''
+        return _typed_empty(field)
     if callable(default):
-        return default(None)
+        try:
+            if records is not None:
+                return default(records)
+            return default(None)
+        except Exception:
+            _logger.debug(
+                'settings default for %s failed',
+                getattr(field, 'name', '?'),
+                exc_info=True,
+            )
+            return _typed_empty(field)
     return default
 
 
-def value_from_icp(field, raw):
+def value_from_icp(field, raw, records=None):
     """Coerce an ICP string (or JSON value) to a settings field value."""
     ftype = getattr(field, 'type', 'char')
     if raw is None or raw is False:
         if ftype == 'char':
             return ''
-        return field_default(field)
+        return field_default(field, records)
     if ftype == 'boolean':
         if isinstance(raw, bool):
             return raw
         return str(raw).strip().lower() in ('1', 'true', 'yes', 'on')
     if ftype == 'integer':
         if isinstance(raw, str) and not raw.strip():
-            return field_default(field)
+            return field_default(field, records)
         try:
             return int(raw)
         except (TypeError, ValueError):
-            return field_default(field)
+            return field_default(field, records)
     if ftype == 'float':
         if isinstance(raw, str) and not raw.strip():
-            return field_default(field)
+            return field_default(field, records)
         try:
             return float(raw)
         except (TypeError, ValueError):
-            return field_default(field)
+            return field_default(field, records)
     if ftype == 'char':
         return '' if raw is False else str(raw)
     if raw is False:
-        return field_default(field)
+        return field_default(field, records)
     return str(raw)
 
 
@@ -188,13 +207,16 @@ def jsonify_setting(value, field):
 def read_settings_icp(model, get_param, module=None, icp_prefix=None):
     """Load discovered settings from ICP into ``{field_name: value}``."""
     out = {}
+    empty = model.browse() if hasattr(model, 'browse') else None
     for fname, field in iter_settings_fields(
         model, module=module, icp_prefix=icp_prefix,
     ):
         icp = settings_icp_key(field, icp_prefix=icp_prefix)
         if not icp:
             continue
-        out[fname] = value_from_icp(field, get_param(icp, None))
+        out[fname] = value_from_icp(
+            field, get_param(icp, None), records=empty,
+        )
     return out
 
 
@@ -258,6 +280,14 @@ def resolve_import_overlay(
             continue
         fname, field = hit
         if not replace_existing and _has_stored_value(current.get(fname), field):
+            skipped += 1
+            continue
+        if (
+            is_secret_field(fname, field, icp_prefix=icp_prefix)
+            and not _has_stored_value(raw_val, field)
+            and _has_stored_value(current.get(fname), field)
+        ):
+            # An empty secret in the file never blanks the one already set.
             skipped += 1
             continue
         try:
@@ -333,7 +363,7 @@ def write_settings_record(
 
 
 def export_settings(
-    env, module=None, icp_prefix=None, include_secrets=True,
+    env, module=None, icp_prefix=None, include_secrets=False,
     schema_version=SCHEMA_VERSION,
 ):
     """Return a portable dict with the module's settings (secrets optional)."""

@@ -7,7 +7,7 @@ Design decision (see docs/decisions/api_key_hashing.md)
 ======================================================
 The MCP user API key is an *authentication credential verified by us*, so we
 store only a one-way **SHA-256 hash** of it, never the plaintext. The endpoint
-receives the raw key (from Cursor, Claude Desktop, Chatboo, etc.), hashes it and
+receives the raw key (from Cursor, Claude Desktop, etc.), hashes it and
 compares against the stored hash:
 
     search([('mcp_api_key_hash', '=', hash_api_key(raw_key))])

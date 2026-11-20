@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
-import base64
+"""Import AI providers from JSON (legacy servers wizard)."""
+
 import json
 import logging
 
@@ -9,12 +10,13 @@ from odoo import api, models, fields, _
 from odoo.exceptions import UserError
 
 from ..utils import mcp_ui
+from ..utils.compat import binary_bytes
 
 _logger = logging.getLogger(__name__)
 
 
 class ImportServersWizard(models.TransientModel):
-    _name = 'pns_ai_mcp.import_servers_wizard'
+    _name = 'ai.import.servers.wizard'
     _inherit = ['pns.operation.report.wizard']
     _description = 'Wizard to import AI Servers from JSON'
 
@@ -32,7 +34,7 @@ class ImportServersWizard(models.TransientModel):
             raise UserError(_("Please upload a JSON file."))
 
         try:
-            json_content = base64.b64decode(self.json_file)
+            json_content = binary_bytes(self.json_file)
             json_data, extract_warnings = mcp_ui.extract_json_from_upload(json_content)
         except (ValueError, Exception) as e:
             raise UserError(_("Error reading the file: %s") % e)
@@ -40,6 +42,9 @@ class ImportServersWizard(models.TransientModel):
         imported_count = 0
         updated_count = 0
         skipped_count = 0
+        created_names = []
+        updated_names = []
+        skipped_names = []
         errors = []
         import_warnings = list(extract_warnings)
 
@@ -55,14 +60,15 @@ class ImportServersWizard(models.TransientModel):
         }
 
         for server_data in json_data:
-            name = server_data.get('name')
+            name = server_data.get('name') or _('(no name)')
             try:
                 existing = server_model.with_context(active_test=False).search(
-                    [('name', '=', name)], limit=1
+                    [('name', '=', server_data.get('name'))], limit=1
                 )
                 if existing and not self.replace_existing:
                     skipped_count += 1
-                    _logger.info("MCP: Servidor existente omitido: %s", name)
+                    skipped_names.append(name)
+                    _logger.info("MCP: Existing server skipped: %s", name)
                     continue
 
                 vals = {'name': name}
@@ -95,42 +101,40 @@ class ImportServersWizard(models.TransientModel):
                             continue
                     vals[key] = value
 
+                roles, role_warns = server_model._roles_from_portable(server_data)
+                if roles is not None:
+                    vals['role_ids'] = roles
+                import_warnings.extend('%s: %s' % (name, w) for w in role_warns)
+
                 if existing:
                     existing.write(vals)
                     target_server = existing
                     updated_count += 1
+                    updated_names.append(name)
                 else:
                     target_server = server_model.create(vals)
                     imported_count += 1
+                    created_names.append(name)
 
-                available_models = server_data.get('available_models', [])
-                if available_models:
-                    target_server.available_model_ids.unlink()
-                    new_models = self.env['ai.provider.model']
-                    for model_name in available_models:
-                        new_models |= self.env['ai.provider.model'].create({
-                            'name': model_name,
-                            'provider_id': target_server.id
+                sel = server_data.get('selected_model')
+                if isinstance(sel, str):
+                    sel = sel.strip()
+                if sel:
+                    Model = self.env['ai.provider.model']
+                    match = target_server.available_model_ids.filtered(
+                        lambda m: m.name == sel,
+                    )
+                    if not match:
+                        match = Model.create({
+                            'name': sel,
+                            'provider_id': target_server.id,
                         })
-                    selected_model = server_data.get('selected_model')
-                    if selected_model:
-                        matching = new_models.filtered(lambda m: m.name == selected_model)
-                        if matching:
-                            target_server.model_id = matching[0].id
-
-                import_warnings += self._import_failovers(
-                    target_server,
-                    server_data.get('failovers', server_data.get('role_failovers', [])),
-                )
-                self.env['ai.provider.usage.day'].import_missing_days(
-                    target_server,
-                    server_data.get('usage_days') or [],
-                )
+                    target_server.model_id = match[0].id
 
             except Exception as e:
-                error_msg = "%s: %s" % (name or 'Sin nombre', str(e))
+                error_msg = "%s: %s" % (name or _('(no name)'), str(e))
                 errors.append(error_msg)
-                _logger.error("MCP: Error importando servidor: %s", error_msg)
+                _logger.error("MCP: Error importing server: %s", error_msg)
 
         return self._apply_operation_result(
             view_xmlid='pns_ai_mcp.view_import_servers_result_form',
@@ -139,56 +143,7 @@ class ImportServersWizard(models.TransientModel):
             skipped=skipped_count,
             errors=errors,
             warnings=import_warnings,
+            created_names=created_names,
+            updated_names=updated_names,
+            skipped_names=skipped_names,
         )
-
-    def _import_failovers(self, provider, failovers):
-        """Best-effort: vincula el proveedor a agentes (por code) con su prioridad.
-
-        Usa un savepoint por asignación para que un conflicto puntual (la
-        restricción global unique(agent_id, priority) cuando otro proveedor ya
-        ocupa ese hueco, o un agente inexistente en destino) se omita sin abortar
-        el resto de la importación. Devuelve avisos legibles para el informe.
-        """
-        warnings = []
-        if not failovers:
-            return warnings
-        Agent = self.env['ai.agent']
-        Assignment = self.env['ai.agent.provider']
-        for entry in failovers:
-            if not isinstance(entry, dict):
-                continue
-            code = (entry.get('agent_code') or '').strip()
-            if not code:
-                continue
-            agent = Agent.with_context(active_test=False).search(
-                [('code', '=', code)], limit=1
-            )
-            if not agent:
-                warnings.append(
-                    _("Provider '%s': agent '%s' does not exist here; failover entry skipped.")
-                    % (provider.name, code)
-                )
-                continue
-            avals = {
-                'agent_id': agent.id,
-                'provider_id': provider.id,
-                'priority': entry.get('priority', 0),
-                'active': entry.get('active', True),
-            }
-            existing = Assignment.with_context(active_test=False).search([
-                ('agent_id', '=', agent.id),
-                ('provider_id', '=', provider.id),
-            ], limit=1)
-            try:
-                with self.env.cr.savepoint():
-                    if existing:
-                        existing.write(avals)
-                    else:
-                        Assignment.create(avals)
-            except Exception as e:
-                warnings.append(
-                    _("Provider '%s': agent '%s' at priority %s could not be assigned "
-                      "(slot already taken).") % (provider.name, code, entry.get('priority', 0))
-                )
-                _logger.info("MCP: Assignment omitido %s/%s: %s", provider.name, code, e)
-        return warnings
