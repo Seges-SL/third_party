@@ -916,7 +916,8 @@ desactivado y solo en el proveedor 3 (SQL; el botón Canvas con los demás no se
   y se mira en el uso real. Detalle abajo, «Despliegue en LIYBEN».
 - **Crons de NUEVO-2:** confirmar que el parche 35 los corrigió (`ir_cron.code`).
 - **§6.2:** todos los AI Administrators ganan AI Conversational, y no se puede quitar. La ficha 26 se
-  reproduce con un usuario que no sea AI Administrator.
+  reproduce con un usuario que no sea AI Administrator. → **20/11/2026:** no aplica en LIYBEN (los tres internos activos
+  son AI Administrators); se reproduce en el laboratorio antes del informe (abajo, «Uso real en LIYBEN hecho»).
 - **Decisión 10:** antes de LIYBEN, consultar si sus AI Administrators tienen Ajustes (ahora también decide
   `_require_settings`).
 - **D50 (Sergio, 18/11/2026; antes del despliegue en LIYBEN):** los 7 tokens de registro de LIYBEN se vacían justo
@@ -977,6 +978,21 @@ desactivado y solo en el proveedor 3 (SQL; el botón Canvas con los demás no se
 **Despliegue en LIYBEN hecho (20/11/2026):** commit `3df4307`, de 3.1.782 a 3.1.973, con corte del servicio de
 10:42:25 a 10:55:23 UTC y todas las tandas con `TODO OK`. Resultado, INFO y lo que queda para la limpieza final y el
 uso real, en G de [liyben_3973.md](liyben_3973.md).
+
+**Uso real en LIYBEN hecho (20/11/2026; decisiones de Sergio: las recomendaciones de Claude).** Detalle en H de
+[liyben_3973.md](liyben_3973.md), con las tandas `lu_*.sh` en [`liyben_3973/`](liyben_3973/).
+- **Chatboo:** responde con el proveedor 2 (Qwen3.5-9B); sin botón Canvas, porque nadie con Diseño está activo (D62).
+- **Cadena de Chatboo:** quitada en L7 y añadida de nuevo (fila 3, igual a la 2 salvo el id); sin efecto. Se queda.
+- **D60:** las claves MCP no se regeneran; la generada durante U1 se borró. Los tres usuarios MCP, sin clave.
+- **D61, ficha 26:** no aplica en LIYBEN. **Pendiente antes del informe (punto 5):** reproducirla en el laboratorio con
+  `odoo-dev 14 shell` y `rollback`, con un usuario que no sea AI Administrator, marcando solo la casilla y la casilla
+  junto con otra, y mirando el grupo antes del `rollback` (segunda ronda, decisión 5; fila 2.9 de
+  [decisiones_pendientes_hallazgos_3879.md](decisiones_pendientes_hallazgos_3879.md)). Antes, decidir la BD: la copia
+  del ensayo (`liyben_ens_14`) se borró en F0, y el core de LIYBEN (`cc0060e`) no es el del laboratorio estándar.
+- **Las 3 traducciones de más:** la descripción en `es_ES` de `account_statement_import_online_wise` (OCA, no
+  instalado), fuera de los `pns_*`; sin efecto; no se busca la causa.
+- **Copias de L3:** se conservan hasta la limpieza final (punto 4).
+- **Siguiente:** el merge (punto 3).
 
 **Despliegue en LIYBEN (19 y 20/11/2026; decisiones de Sergio: las recomendaciones de Claude).** Documento:
 [liyben_3973.md](liyben_3973.md), con sus tandas y el SQL en [`liyben_3973/`](liyben_3973/). Antes se hizo un ensayo

@@ -4,7 +4,7 @@
   §3.2). **Commit a desplegar:** el HEAD de la rama en el commit de este documento (D58). E0 comprueba que de `c6ec077`
   a él solo cambia `docs/` y que el árbol de los módulos es el de `5d0559b` (688 archivos, `0dc381e0…ba7a`). El hash
   completo queda en `commit.txt` (E0) y se anota en G. **Preparado:** 20/11/2026. **Estado:** ejecutado el
-  20/11/2026, con el commit `3df4307` (G).
+  20/11/2026, con el commit `3df4307` (G). **Uso real:** hecho el 20/11/2026 (H).
 - **Qué se despliega:** el portado de los parches de Seges a 3.1.973 ([plan](plan_correccion_pns_ai_3973.md), fases 1 a
   4, parches 35 a 39 y pruebas con toda la rama), ya subido al staging ([staging_3973.md](staging_3973.md)). Módulos:
   `pns_base` 14.0.1.2.32 → 14.0.1.2.69, `pns_ai_mcp` 14.0.3.1.782 → 14.0.3.1.973 y `pns_ai_chatboo` 14.0.2.1.453 →
@@ -60,7 +60,8 @@ nuevas (`ld_*`).
    APLICAR_BP) · corte · L5 · L6 · L7 (interfaz) · L8
 3. E. Vuelta atrás (descrita)
 4. F. Limpieza (F0, F1 y F2)
-5. G. Resultado (vacío)
+5. G. Resultado del despliegue
+6. H. Uso real
 - Anexo A. Ensayo
 - Anexo B. Tandas del ensayo en el repo
 
@@ -1526,8 +1527,9 @@ Horas del VPS en UTC; las del equipo (E0, E1, L3, F1), locales (UTC + 1). Salida
   45 966 y 41 467; antes del `-u`, 45 482 en los dos). El `-u` real añadió 487 filas y el del ensayo 484. Dentro de los
   `pns_*`, igual que el ensayo. B′ guarda y restaura las filas de fuera tal como estaban (`guardadas=41470`,
   restauradas 49 = el ensayo) y APLICAR_BP exige la medida del comprobar de hoy: las 3 quedan intactas. Sin
-  identificar (se puede, en solo lectura, comparando por tipo y módulo `vps/l4b_foto_antes-comprobar-20261120-105038.txt`
-  con la `y6_foto_antes` de Y6 v3).
+  identificar en el despliegue (se puede, en solo lectura, comparando por tipo y módulo
+  `vps/l4b_foto_antes-comprobar-20261120-105038.txt` con la `y6_foto_antes` de Y6 v3). **Identificadas en el uso real
+  (H, U5):** la descripción en `es_ES` de un módulo OCA no instalado.
 - **WARNING de L8 por cuadruplicado:** 84 = 4 × 21 y 32 = 4 × 8, uno por cada carga del registro de LIYBEN tras el
   arranque; son los mismos del `-u`.
 - **Validado en el VPS lo que el documento dejaba pendiente (§1):** `ly_i0.sh` con `bash` desde `/tmp/liyben_3973`;
@@ -1546,10 +1548,138 @@ Horas del VPS en UTC; las del equipo (E0, E1, L3, F1), locales (UTC + 1). Salida
   `odoo-dev 14` sigue siendo `lab_liyben_3973`.
 - **Al uso real:** Chatboo y el botón Canvas en la interfaz (L1.2 y L7 no aplicaron); la ficha 26 (D61); las claves MCP,
   si hacen falta (D60); el proveedor 1 sigue inactivo, así que nadie tiene Diseño en activo (D62); opcional, identificar
-  las 3 traducciones de más.
+  las 3 traducciones de más. **Hecho el 20/11/2026: ver H.**
 
 **Fila de la §6.2 de la [instalación](instalacion_liyben_pns_ai.md):** «Despliegue de las correcciones», hecho el
 20/11/2026 con el commit `3df4307` (este apartado).
+
+---
+
+## 6. H. Uso real (20/11/2026)
+
+**Hecho el 20/11/2026, de 12:23 a 13:08 hora local** (Sergio; tandas y contraste de Claude). Punto 2 del orden: Chatboo
+y el botón Canvas en la interfaz, la ficha 26 (D61), las claves MCP (D60), el proveedor 1 (D62) y las 3 traducciones de
+más (G). **Resultado:** LIYBEN queda con la estructura del «después» de L6, salvo la cadena de Chatboo (fila 3 en vez de
+la 2, igual en todo lo demás), sin ninguna clave MCP y con el uso normal de Chatboo (1 sesión, 14 filas de `ai_log`).
+Hubo dos incidencias, las dos de la interfaz y resueltas con decisión de Sergio: la cadena de Chatboo (L7) y una clave
+MCP generada durante U1.
+
+**Método.** Todas las tandas se lanzan en el equipo, desde `~/Descargas`, y van al VPS por SSH (`VPS_PORT` y `VPS_DEST`
+de §1): en el VPS no escriben nada (desde F2, `/tmp/liyben_3973` ya no existe). PostgreSQL en sesión de solo lectura,
+como `lysql`; del log, solo recuentos, niveles y loggers, rutas sin parámetros ni IP, y las trazas sin el mensaje.
+Salidas en `~/pns_ai_3973/liyben/uso/` (700). Horas de las tandas, locales; las de la BD y el log, UTC.
+
+**Decisiones de Sergio en el uso real** (las recomendaciones de Claude salvo donde se dice):
+
+| Hora | Decisión |
+|---|---|
+| 12:23 | Organización: U0 (estado de partida), U1 (Chatboo y Canvas con `sguerrero`, id 6), U2 (ficha 26), U3 (D60: las claves MCP **no se regeneran**), U4 (D62: el proveedor 1 **sigue inactivo**), U5 (las 3 traducciones, al final) y este apartado |
+| 12:36 | **Cadena de Chatboo: opción A**, se queda la fila 3 (abajo) |
+| 12:41 | No hace falta avisar a los usuarios de LIYBEN antes de U1 y U2 |
+| 12:52 | **Clave MCP generada en U1: opción b**, borrarla con el asistente (abajo) |
+| 13:01 | **Ficha 26: opción c**, no aplica en LIYBEN; la reproducción va al laboratorio antes del informe (abajo) |
+| 13:08 | Cierre: las copias de L3 se conservan hasta la limpieza final; las 3 traducciones se cierran sin la causa; dos commits ([ADD] tandas y [DOC]) |
+
+| Tanda | Hora | Salida | Resultado |
+|---|---|---|---|
+| U0 (v1) | 12:30:39 | `u0-20261120-123039.txt`, `u0_estado-…` | **1 FALLO: `cadena` vacía** (en L6, `2|pns_ai_chatboo|0|t|f|2|t`). Todo lo demás = L6; log desde L5: 600 líneas, 0 ERROR/Traceback, 0 `/chatboo` y 0 `/mcp`; web, HEAD `3df4307`, clon limpio, copias de L3, `/web/login` 200 y `/mcp` 404 |
+| U0 (v1) | 12:32:41 | `u0-20261120-123241.txt` | 1 FALLO: `cadena` = `3|pns_ai_chatboo|0|t|f|2|t` (la fila nueva, igual a la de L6 salvo el id) |
+| U0b | 12:34:00 | `u0b-20261120-123400.txt`, `u0b_estado-…` | `TODO OK`. Causa de la cadena (abajo). Una sección con ERROR de SQL propio (`res_users_log` no tiene `user_id`; es `create_uid`), sin efecto en la conclusión |
+| U0 (v2) | 12:40:07 | `u0-20261120-124007.txt`, `u0_estado-…` (132 líneas, `4327c5a7…f810`) | `TODO OK`: 43 secciones, `cadena` con el ajuste aprobado; cadena completa `3|pns_ai_chatboo|2|0|t|45|120|f|6|2026-11-20 11:32:16` (timeouts por defecto) |
+| U1 (interfaz) | 12:44:30-12:48 | captura de Sergio | Abajo |
+| U1 | 12:48:47 | `u1-20261120-124847.txt`, `u1_estado-…` | `TODO OK`. Log desde 11:44:30 UTC: 176 líneas, 0 ERROR/Traceback; `AI: no provider holds role "design" for agent "pns_ai_chatboo"` 1 vez; 0 «no chain»; `/chatboo` con 200 (`check_health`, `providers`, `sessions/list`, `sessions/load` ×2, `stream` ×2, `async/poll`); 0 `/chatboo/canvas/*`; 1 WARNING `relaxaicode_outcome` (`Large result JSON: N bytes`, `pns_ai_mcp/controllers/relaxaicode_outcome.py:506`). SQL: 1 sesión nueva del usuario 6, 2 peticiones async, 0 trabajos y 0 páginas de Canvas, `ai_log` 14, 0 escrituras en agentes, cadena, proveedores, roles, skills y contextos. **No vigilaba `ai_mcp_user` ni `call_button`** (abajo) |
+| Claves MCP | 12:5x | (por pantalla) | Antes: usuario MCP 3 (usuario 6) `generated`, con hash, generada a las 11:45:14 UTC; log `11:45:14 generated 6`. Después del borrado: `not_generated`, sin hash, escrito a las 11:55:13; log `11:55:13 deleted 6`. Usuarios MCP 1 (usuario 2) y 2 (usuario 7) sin cambios desde el 16/10 y el 27/10 |
+| U0 (v3) | 12:57:17 | `u0-20261120-125717.txt`, `u0_estado-…` (132 líneas, `7850d505…5c9a`) | `TODO OK`: 43 secciones (la cadena con el ajuste); usuarios MCP `1|2|not_generated|f 2|7|not_generated|f 3|6|not_generated|f`; log desde L5: 1123 líneas, 0 ERROR/Traceback; INFO: `/chatboo` 9, `call_button` 6, Chatboo `1|2|2026-11|1` (la sesión 1 la borró la retención el 19/11, G), `ai_log` `14|165` (la secuencia sigue de antes) |
+| Internos activos | 12:59 | (por pantalla) | `2|t|t`, `6|t|t`, `7|t|t` (id, AI Administrator, AI Conversational) |
+| U5 | 13:01:30 | `u5-20261120-130130.txt` | `TODO OK`: 3 filas solo en LIYBEN, 0 solo en el ensayo (abajo) |
+| Traducciones | 13:03 y 13:06 | (por pantalla) | Las 3 filas identificadas (abajo) |
+
+**Cadena de Chatboo.** En L7 (11:04:30-38 UTC, ficha del agente Chatboo, usuario 6) se quitó el proveedor de la pestaña
+Proveedores y se guardó: el borrado de la línea va dentro de `ai.agent/write` (en Odoo 14, un o2m editable no deja
+`ai.agent.provider/unlink` en el log). U0 la vio vacía. A las 11:32:08-16 Sergio volvió a añadir el proveedor 2
+(`ai.agent.provider/onchange`, `ai.provider/name_search`, `ai.agent/write`): fila 3, secuencia en 3. Descartados el
+asistente «Import Agents» (`pns_ai_mcp/wizard/import_agents_wizard.py:83-85`; 0 asistentes), la restauración de
+configuración (`pns_ai_mcp/utils/config_backup.py:821-823`; sin rutas ni adjuntos de copia), los crons y la cascada (el
+proveedor 2 = L6; `ai.agent.unlink` no deja borrar agentes del módulo, `pns_ai_mcp/models/ai_agent.py:417-431`).
+**Efecto: ninguno.** Con la cadena vacía el motor usa todos los proveedores activos por id
+(`pns_ai_mcp/models/ai_execution_engine.py:202-238`), que con el 1 inactivo es solo el 2, y entre medias no hubo
+peticiones a `/chatboo`. Se notaría al activar el proveedor 1 (D62): por eso la cadena explícita. Opción A: la fila 3 se
+queda (U0 v2 y v3 la esperan como ajuste aprobado sobre L6).
+
+**U1 en la interfaz** (ventana privada, F12; `sguerrero`). Dos turnos en una sesión: el primero (12:46:27) sin datos (el
+modelo propuso otro periodo); el segundo (12:47:41, «Dame en una tabla los 5 clientes con más importe facturado para el
+año 2024») con la tabla «Top 5 clientes por importe facturado en 2024» (5 filas). Proveedor en los dos: **Qwen3.5-9B ·
+OVH**. En la tabla, solo el botón «Gráfico»: **sin botón Canvas**, como se esperaba del código (`canvas_available` =
+`get_providers_for_agent('pns_ai_chatboo', need='design')`, `pns_ai_chatboo/models/chatboo_session.py:1330-1337`; el
+motor no encuentra titular activo de Diseño y Diseño no tiene alternativa,
+`pns_ai_mcp/models/ai_execution_engine.py:256-283`; el panel recibe `canvas_available` falso,
+`pns_ai_chatboo/controllers/chatboo.py:72-96`, y `setCanvas(null)` no pone el botón,
+`pns_ai_chatboo/static/src/js/chatboo_charts.js:2915-2920`). Consola sin errores.
+
+**Clave MCP generada en U1 (D60).** En el mismo tramo de U1, Sergio generó una clave MCP para su usuario «porque no
+tenía» (Usuarios MCP → asistente de claves, `pns_ai_mcp/models/mcp_api_key_wizard.py:113-125`), contra D60. Sin efecto
+fuera de LIYBEN: Nginx da 404 en `/mcp` (D20). Opción b: borrada a las 11:55:13 UTC con el mismo asistente («Delete API
+Key» → confirmar → «Delete Key»; vacía el hash y deja el estado en «Not generated», `mcp_api_key_wizard.py:86-97`).
+Comprobado por SQL (sin leer el hash) y en el log. U0 v3 vigila desde entonces los usuarios MCP.
+
+**Ficha 26 (D61): no aplica en LIYBEN.** La ficha 26 (hoja de E4′: la casilla AI Conversational de Usuarios MCP,
+guardada, no cambió el grupo en el staging) se acordó reproducir en el **laboratorio**, con `odoo-dev 14 shell` y
+`rollback` y con un usuario que **no** sea AI Administrator (segunda ronda, decisión 5; fila 2.9 de
+[decisiones_pendientes_hallazgos_3879.md](decisiones_pendientes_hallazgos_3879.md)). En LIYBEN los tres internos activos
+(2, 6 y 7) son AI Administrators y tienen AI Conversational por la implicación: no hay con quién reproducirla sin crear
+un usuario o quitar un grupo en producción. Opción c: pasa al laboratorio, antes del informe (punto 5;
+[plan](plan_correccion_pns_ai_3973.md), «Uso real en LIYBEN hecho»).
+
+**Las 3 traducciones de más (G).** U5 compara por contenido, sin el id, la foto de L4b comprobar
+(`vps/l4b_foto_antes-comprobar-20261120-105038.txt`, 45 969 filas) con la de Y6 v3 comprobar
+(`y6_foto_antes-comprobar-20261119-153628.txt`, 45 966): 3 solo en LIYBEN y 0 solo en el ensayo; ninguna clave en las
+dos partes (son filas nuevas, no textos cambiados). Son las `es_ES` de `ir.module.module,shortdesc`, `,summary` y
+`,description` del registro **2030**, `account_statement_import_online_wise` (OCA, **no instalado**), ids 144628 a
+144630, tipo `model`, sin módulo, `translated` (en las dos primeras el texto traducido es igual al original). El
+registro no se creó ni se escribió en el `-u` y no tiene traducciones en otros idiomas. **Fuera de los `pns_*`, como
+decía G; intactas tras B′ y sin efecto.** No se ha buscado por qué el ensayo no las creó (decisión de Sergio, 13:08).
+
+**Correcciones de Claude** (anotadas para que no se repitan):
+- Dos consultas con columnas que no existen: `res_users_log.user_id` (U0b) y `ai_mcp_user.active` (la primera consulta
+  de las claves).
+- U1 no vigilaba las claves MCP (`ai_mcp_user`) ni los botones (`call_button`, que no lleva el modelo en la ruta): la
+  clave generada se vio solo por las rutas del asistente.
+- El «Esperado» de U1 anunciaba los botones «Gráfico» y «Datos» en la tabla: solo sale «Gráfico» (no se miró en el
+  código dónde se pinta «Data»).
+
+**Tandas del uso real** (en el repo, en la versión ejecutada; se lanzan desde el equipo, con `VPS_PORT` y `VPS_DEST`
+salvo U5, que es local):
+
+| Archivo | Líneas | SHA-256 | Qué hace |
+|---|---|---|---|
+| [`lu_u0.sh`](liyben_3973/lu_u0.sh) | 158 | `5fd3cd627250dcf54fdc6afeb1999e7f3ef371bf582de90884b345185cb2f1e2` | U0 (v3): `l6_despues.sql` frente al «después» de L6 (estructura FALLO; uso INFO; ajuste aprobado de la cadena), cadena completa, usuarios MCP sin clave, log desde L5 (acciones sobre claves, `call_button`), copias de L3, `/web/login` y `/mcp` |
+| [`lu_u0b.sh`](liyben_3973/lu_u0b.sh) | 93 | `1edf5b061c42233e19b18b830501b83ebff0a5e7c2605ce1b957d93a1ad0c1b4` | U0b: la cadena de Chatboo desde L6 (filas, secuencia, agentes, proveedores, entradas, adjuntos, asistente de importación y rutas de `ai.*`) |
+| [`lu_u1.sh`](liyben_3973/lu_u1.sh) | 121 | `37c10a3cd73581956e0d4064caf2d380239ae1a81acf3e1f9faefdcede8de67a` | U1, después de la interfaz: log y Chatboo desde `u1_inicio.txt` |
+| [`lu_u5.sh`](liyben_3973/lu_u5.sh) | 60 | `c2596b8d31a81d050c280a3f218cfbe24115a53831aff8b8fc7063f5313a4fdc` | U5: las dos fotos de traducciones por contenido (local) |
+
+Las versiones anteriores de U0 no entran: v1 (131 líneas,
+`1932bda3afb9e31f28823424e340866fb3d820198be89896d93b2f714a31d4c4`; sin el ajuste de la cadena) y v2 (146 líneas,
+`227a15ea27d39fabf44162648453edbd2c7ff12e82b26922a405448338ca7aef`; sin los usuarios MCP). Las consultas sueltas (claves
+MCP, internos activos y traducciones) están en la conversación del 20/11 y su resultado, en la tabla de arriba. Todas se
+probaron en el entorno de Claude con SSH, Docker, git y curl simulados (positivos y negativos); en el equipo, todas
+terminaron con su línea final.
+
+**Lo que queda:**
+- **Ficha 26:** reproducción en el laboratorio antes del informe (punto 5).
+- **Limpieza final (punto 4):** lo de G, más `~/pns_ai_3973/liyben/uso/`. **Las copias de L3 se conservan hasta la
+  limpieza final**; desde el uso real ya no son una vuelta atrás limpia (restaurarlas perdería lo hecho después).
+- **D62:** el proveedor 1 sigue inactivo (nadie con Diseño activo) hasta que se definan los proveedores.
+- **Siguiente:** el merge (punto 3).
+
+**Lecciones del uso real:**
+- Un «después» por SQL vale para el momento en que se toma: L7 fue posterior a L6 y en ella se guardó la ficha de un
+  agente. Antes y después de cada paso de interfaz se repite la foto (U0), y en cada paso se dice qué pantallas no se
+  tocan (agentes, proveedores, roles, Usuarios MCP).
+- Una tanda que vigila escrituras por el log no basta: los o2m editables escriben dentro del `write` del padre y
+  `call_button` no lleva el modelo en la ruta. Las escrituras se comprueban también en la BD, claves MCP incluidas.
+- Antes de anunciar un botón en un «Esperado» de interfaz, mirar en el código dónde se pinta.
+- Una decisión que asigna una prueba a un entorno (D61 → uso real) se contrasta con lo que ese entorno permite (no hay
+  usuario sin AI Administrator) y con las decisiones anteriores (decisión 5: laboratorio) antes de prepararla.
 
 ---
 
