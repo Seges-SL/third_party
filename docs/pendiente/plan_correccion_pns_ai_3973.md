@@ -1007,6 +1007,20 @@ uso real, en G de [liyben_3973.md](liyben_3973.md).
   local devueltas a `0447995` («Initial commit») con `--force-with-lease`. Rama por defecto del repo: `14.0`.
 - **Siguiente:** la limpieza final (punto 4).
 
+**Limpieza final hecha (20/11/2026; D69, decisión de Sergio: las recomendaciones de Claude).** Detalle en J de
+[liyben_3973.md](liyben_3973.md), con las tandas `lk_*.sh` en [`liyben_3973/`](liyben_3973/).
+- **VPS:** clon de `third_party` solo con `14.0` y `origin/14.0` en `d9b2e16` (K1); staging borrado entero (K3:
+  `pns_demo`, sitio de Nginx, certificado, `/opt/odoo/pns_staging` y los 11 `/tmp/pns_*`), con copia previa al equipo de
+  lo citado;
+  `/opt/odoo/backups` no se toca (K2). DNS y clave de Gemini del staging, quitados por Sergio (K4).
+- **Equipo:** borrados la copia de Y1, `tandas/` del ensayo, `lab_liyben_3973` y su imagen (K5 a K7); las copias de L3
+  se conservan (LIYBEN no tiene copia fuera del VPS).
+- **GitHub:** `14.0-pns-ai-3` borrada (K9).
+- **LIYBEN:** sin cambios (U0 v4, mismo estado por SQL). INFO: la copia de `auto_backup` del 20/11 falló (D15).
+- **Pendiente:** K8 (restos del staging en el equipo, al cierre de la ficha 26) y M7 (segundo merge commit y borrado de
+  `14.0-pns-ai-3973`).
+- **Siguiente:** M7; después, la ficha 26 en el laboratorio y el informe (punto 5).
+
 **Despliegue en LIYBEN (19 y 20/11/2026; decisiones de Sergio: las recomendaciones de Claude).** Documento:
 [liyben_3973.md](liyben_3973.md), con sus tandas y el SQL en [`liyben_3973/`](liyben_3973/). Antes se hizo un ensayo
 sobre una copia de LIYBEN (`liyben_ens_14`, Anexo A del documento), del que salen los «Esperado».

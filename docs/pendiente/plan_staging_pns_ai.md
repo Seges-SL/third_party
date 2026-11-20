@@ -532,7 +532,7 @@ observaciones van en una nota debajo de la tabla, sin textos de prueba ni datos 
 | 9b Tokens con Anthropic | PNS-29 | NO REALIZADA: no aplica en este staging (Gemini, N8); pendiente para LIYBEN si se elige Anthropic (§8) | — | — |
 | 10 Contexto privado en turnos de otro | PNS-12 | CORREGIDO | 16/10/2026 | Sergio con Claude |
 | 11 Glosario `es_ES` (observación) | PNS-46 | NO CONCLUYENTE | 16/10/2026 | Sergio con Claude |
-| Limpieza del §9 (borrado de `pns_demo` sin copia, proyecto `pns_staging`, proxy, certificado, DNS y clave de Gemini) | — | | | |
+| Limpieza del §9 (borrado de `pns_demo` sin copia, proyecto `pns_staging`, proxy, certificado, DNS y clave de Gemini) | — | HECHA: puntos 1 a 4 y 7 con tandas (`pns_demo` sin copia, N9), puntos 5 y 6 a mano; LIYBEN responde en cada paso, refrimar y fumihogar vigilados como INFO ([liyben_3973.md](liyben_3973.md), J) | 20/11/2026 | Sergio con Claude |
 
 **Nota (observaciones de la ejecución).** Referencias: turnos e ids de `ai_log` de la ejecución;
 detalle en la [verificación](verificacion_seguridad_pns_ai.md), «Staging (15-16/10/2026)». Fechas:
@@ -764,6 +764,13 @@ LIYBEN es el objetivo final.
 > **Aplazada (reunión del 19/10/2026):** el staging se conserva, con su clave de Gemini, para validar
 > cada entrega del [plan de corrección](plan_correccion_pns_ai.md) (N11). La limpieza se hace al
 > terminar todas las entregas.
+
+> **Hecha el 20/11/2026** (limpieza final, D69, K3 y K4; detalle en J de [liyben_3973.md](liyben_3973.md)). Puntos 1
+> a 4 y 7, con las tandas `lk_v.sh` y `lk_e.sh` (DOCKER 15:31:41, NGINX 15:32:17, CERT 15:40:32 y BORRAR 15:42:15
+> UTC): el punto 1 borró también el volumen anónimo del proyecto; el punto 4, la carpeta entera (11 `addons_*`) y
+> todos los `/tmp/pns_*` (11). Antes de borrar se copiaron al equipo los 6 archivos de diagnóstico e instalación de la
+> carpeta, los 11 `/tmp/pns_*` y el sitio de Nginx. En el punto 7, las comprobaciones de salud usan `/web` (Nginx
+> tiene `limit_req` en `/web/login`). Puntos 5 y 6 (DNS y clave de Gemini), a mano, Sergio.
 
 Al terminar el staging (después del §6), en este orden. Son operaciones destructivas: se describen,
 no se dan listas para pegar. Las hace quien administra el VPS. **No se guarda ninguna copia de
