@@ -912,7 +912,8 @@ desactivado y solo en el proveedor 3 (SQL; el botón Canvas con los demás no se
   3.1.782 no existe `fit_design`, así que tras el `-u` nadie tiene el rol. D62: al proveedor 1
   (`models/gemini-3.5-flash`, inactivo) con `use_fallback` desactivado; D67: en el mismo `write`, quitarle Decisión,
   que el `-u` le da y su protocolo (`openai`) no admite. Botón Canvas: en L7 del
-  [documento de despliegue](liyben_3973.md). Detalle abajo, «Despliegue en LIYBEN».
+  [documento de despliegue](liyben_3973.md); el 20/11 quedó cubierto por L6 (no se abrió Chatboo, decisión A de Sergio)
+  y se mira en el uso real. Detalle abajo, «Despliegue en LIYBEN».
 - **Crons de NUEVO-2:** confirmar que el parche 35 los corrigió (`ir_cron.code`).
 - **§6.2:** todos los AI Administrators ganan AI Conversational, y no se puede quitar. La ficha 26 se
   reproduce con un usuario que no sea AI Administrator.
@@ -972,6 +973,10 @@ desactivado y solo en el proveedor 3 (SQL; el botón Canvas con los demás no se
       nada y decide Sergio. Va al documento de despliegue en LIYBEN, insertado desde el archivo y con su huella.
       → En [liyben_3973.md](liyben_3973.md): L4 lo carga desde `/tmp/liyben_3973` (copiado por E1 con su huella) y
       L0 lo ensaya antes.
+
+**Despliegue en LIYBEN hecho (20/11/2026):** commit `3df4307`, de 3.1.782 a 3.1.973, con corte del servicio de
+10:42:25 a 10:55:23 UTC y todas las tandas con `TODO OK`. Resultado, INFO y lo que queda para la limpieza final y el
+uso real, en G de [liyben_3973.md](liyben_3973.md).
 
 **Despliegue en LIYBEN (19 y 20/11/2026; decisiones de Sergio: las recomendaciones de Claude).** Documento:
 [liyben_3973.md](liyben_3973.md), con sus tandas y el SQL en [`liyben_3973/`](liyben_3973/). Antes se hizo un ensayo

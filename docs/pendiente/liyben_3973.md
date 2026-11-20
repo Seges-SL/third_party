@@ -1,9 +1,10 @@
 # Despliegue de la rama 3973 en LIYBEN (de 3.1.782 a 3.1.973)
 
-- **Rama:** `14.0-pns-ai-3973`. **Montado ahora:** `578859b` (rama `14.0-pns-ai-3`, 3.1.782; [instalación](instalacion_liyben_pns_ai.md),
+- **Rama:** `14.0-pns-ai-3973`. **Montado antes del despliegue:** `578859b` (rama `14.0-pns-ai-3`, 3.1.782; [instalación](instalacion_liyben_pns_ai.md),
   §3.2). **Commit a desplegar:** el HEAD de la rama en el commit de este documento (D58). E0 comprueba que de `c6ec077`
   a él solo cambia `docs/` y que el árbol de los módulos es el de `5d0559b` (688 archivos, `0dc381e0…ba7a`). El hash
-  completo queda en `commit.txt` (E0) y se anota en G. **Preparado:** 20/11/2026. **Estado:** sin ejecutar.
+  completo queda en `commit.txt` (E0) y se anota en G. **Preparado:** 20/11/2026. **Estado:** ejecutado el
+  20/11/2026, con el commit `3df4307` (G).
 - **Qué se despliega:** el portado de los parches de Seges a 3.1.973 ([plan](plan_correccion_pns_ai_3973.md), fases 1 a
   4, parches 35 a 39 y pruebas con toda la rama), ya subido al staging ([staging_3973.md](staging_3973.md)). Módulos:
   `pns_base` 14.0.1.2.32 → 14.0.1.2.69, `pns_ai_mcp` 14.0.3.1.782 → 14.0.3.1.973 y `pns_ai_chatboo` 14.0.2.1.453 →
@@ -1471,9 +1472,84 @@ ld_f2 "$@"
 
 ## 5. G. Resultado del despliegue
 
-Sin ejecutar. Se rellena al ejecutarlo: commit desplegado (de `commit.txt`), hora de cada tanda (UTC en el VPS), salidas,
-lo obtenido en L1 y L7, los INFO, el corte real del servicio (de la parada de L2 al «HTTP service» de L5), lo que queda
-para la limpieza final y la fila de la §6.2 de la instalación.
+**Ejecutado el 20/11/2026, de 11:29 a 12:07 hora local** (Sergio; contraste de Claude tras cada tanda). **Commit
+desplegado:** `3df4307129a44719a27dd30c12dd479ab0335a6b` (`commit.txt` de E0), rama `14.0-pns-ai-3973`. LIYBEN queda en
+`pns_base` 14.0.1.2.69, `pns_ai_mcp` 14.0.3.1.973 y `pns_ai_chatboo` 14.0.2.1.587, con el web en marcha desde las
+10:55:21 UTC. **Corte real del servicio:** de la parada de L2 (10:42:25 UTC) al «HTTP service (werkzeug) running» de L5
+(10:55:23 UTC): **12 min 58 s**. Todas las tandas terminaron con `TODO OK`, sin ningún `FALLO`.
+
+Horas del VPS en UTC; las del equipo (E0, E1, L3, F1), locales (UTC + 1). Salidas del VPS, copiadas por F1 a
+`~/pns_ai_3973/liyben/despliegue/vps/`; las del equipo, en `~/pns_ai_3973/liyben/despliegue/` (no van al repo).
+
+| Tanda | Hora | Salida | Resultado |
+|---|---|---|---|
+| F0 | 11:10 y 11:12 (antes de la ventana) | `f0-comprobar-20261120-111002.txt`, `f0-BORRAR-20261120-111202.txt` | `liyben_ens_14` y su filestore borrados (la copia del ensayo solo se podría rehacer desde el `.dump` de Y1) |
+| E0 | 11:29:58 | `e0-20261120-112958.txt` | `TODO OK`: rama, árbol limpio y al día con la remota (`3df4307`, 11:03:34); de `c6ec077` al commit solo `docs/`; árbol 688 / `0dc381e0…`, versiones y lista de `ai/` (Y4 A); fuera de `pns_*` y `docs/`, solo `CLAUDE.md` |
+| E1 | 11:31:32 | `e1-20261120-113132.txt` | `TODO OK`: 17 huellas del commit = las del documento; `/tmp/liyben_3973` creada (700) con 19 archivos; `huellas.txt` `49eec712297ca9224de76719d897a43bbf67720a9bc9c5cc565633e2834b64e3` (recalculada por Claude: igual) |
+| L0 | 10:33:13 | `l0-20261120-103313.txt`, `l0_i0-…`, `l0_antes-…` | `TODO OK`. I0 `TODO OK` (276 MB, 215 módulos, 45 482 traducciones, disco 9,4 GB libres, caso b de PNS-82 67/18/2/1); `ls-remote` como el UID 101 en el commit; filestore legible entero (3028 archivos, 564 727 024 bytes); B: 79/79, 5 `fit_*`, 56 + 10 emparejados, 0 con dueño; C = I0 (35 crons activos en total; último `-u` 16/10 18:00:52); P-21 exacto (13 + 3 + 0; 3 skills reescritas, 6 retiradas); D50 en ensayo con `ROLLBACK`. «Antes»: 127 líneas, `2a8622e98b2032f2ffe5f324494a2f243e52f6d3ea2fd8a3e4b7f1b2f1128809`. Un INFO de Chatboo (abajo) |
+| L1 | — | — | Aviso del corte: no hizo falta, nadie usaba LIYBEN (Sergio). Sesión antigua de Chatboo: **no aplica** (borrada el 19/11, abajo; decisión A de Sergio, 11:48 local) |
+| L2 | 10:42:22 | `l2-20261120-104222.txt` | `TODO OK`: `fetch` como el UID 101 (`[new branch] 14.0-pns-ai-3973`), remota = commit, clon sin cambios; **web parado a las 10:42:25**; `liyben.com/web/login` 50x |
+| L3 | 11:43:31 | `l3-20261120-114331.txt` | `TODO OK`. `LIYBEN-antes-20261120-114331.dump`: 49 300 282 bytes, 832 `TABLE DATA`, `88610a70e58612356b785f6d471623d1d3dde45ff35616147137258ef06f3c34`. `LIYBEN-filestore-antes-20261120-114331.tar`: 567 234 560 bytes, 3028 archivos (= VPS), `85d529082c308bd21c0ca7b317f66b6be2f9bdefc97c018df4ece08817bdadbc`. Las dos en 600; marca `copia_ok` en el VPS |
+| L4 | 10:46:54 | `l4-20261120-104654.txt`, `u-20261120-104654.log`, `u-salida-…`, `l4_t0.txt` | `TODO OK`. D50 `VACIAR` (10:46:55): perfil exacto, 8 vaciados, `COMMIT`, 0 después. `checkout -b` sin `--track` como el UID 101: árbol 688 / `0dc381e0…`; `14.0-pns-ai-3` sigue en `578859b`. **`-u` de 10:46:56 a 10:48:26 (90 s)**, log de 382 líneas: 0 Traceback/ERROR/CRITICAL; las 5 `fit_*` y los 7 campos de Y5; la migración; parche 35 `fixed` 2; 3 actualizados y 215 cargados; «DROP leftover» 22; WARNING conocidos 3/2/2; los demás WARNING, de módulos de LIYBEN y `vertical-instaladores` (21 `decimal_precision`, 8 `odoo.models`, 8 `ir_model`, 3 `odoo.fields`, 2 `py.warnings`), como en Y5. Después: tokens 0 |
+| L4b comprobar | 10:50:38 | `l4b-comprobar-20261120-105038.txt` y su shell, log, estados y fotos | `TODO OK`, nada escrito. B: fuera de los `pns_*` 36 solo origen y 13 texto (`code`), 196 cambiadas en los `pns_*` (95/46/55); B′: 0 fuera, 49 restauradas; C: Diseño al 1 y Decisión fuera; tres `rollback`; foto externa igual. 9 WARNING de `pns_base.models.ir_translation` por recarga. INFO de traducciones (abajo) |
+| L4b APLICAR_BP | 10:52:38 | `l4b-APLICAR_BP-20261120-105238.txt` y su shell, log, estados y fotos | `TODO OK`. `Y6 MEDIDA = la del comprobar: True` y `Y6 COMMIT OK`; desde otra sesión, medida = la del shell y fuera de los `pns_*` igual (`41470|28b8cb9e413f14a483e5a4c8b096d598`); `es_ES` 45 969 filas, `e762d7c47785be1bf89ca6f1f1b4cbf9` → `a360d9eb568ab464593f6d471e6c122d`; `pns_*` 538/3810/151 → 549/3811/139; Diseño `1|f|f` sin alternativa, Decisión sin titulares, roles `1|f|…|conversation,vision,design` y `2|t|Qwen3.5-9B|conversation,vision` |
+| L5 | 10:55:21 | `l5-20261120-105521.txt`, `l5_offset.txt`, `l5_started_at.txt` | `TODO OK`: `StartedAt` 10:55:21.62, «HTTP service» 10:55:23; 0 Traceback/ERROR/CRITICAL (4 WARNING de `py.warnings`); `/web/login` 200 y `/mcp` 404 (D20) |
+| L6 | 10:56:46 | `l6-20261120-105646.txt`, `l6_despues-…` | `TODO OK`, sin INFO: versiones, 215, AI Administrators 2, 6 y 7 con AI Conversational (P-11 `3|0`; el 2 lo ganó en el `-u`, D64); 7 roles; crons de `pns_*` 7 activos, 36 en total, el único creado en el `-u` `pns_ai_mcp.ir_cron_ai_journal_trash`; NUEVO-2 con `model._gc_expired()`; skills 10; contextos 59 (13/43 escritos en el `-u`); traducciones = después de L4b; tokens 0. «Después»: 132 líneas (= Y7), `b673205e4426f0ec84c6cb2acc15af06dfa1d9d27fa904f5dc86fb6b96700967` |
+| L7 | 12:04 local | — | Ver la tabla de abajo |
+| L8 | 11:05:00 | `l8-20261120-110500.txt`, `servidor-20261120-110500.log` | `TODO OK`: 492 líneas desde el arranque, 0 ERROR/CRITICAL y 0 Traceback; WARNING 84 `decimal_precision`, 32 `odoo.models`, 4 `py.warnings` (21 y 8 por cada carga del registro); 0 peticiones a `/chatboo` y a `/mcp` |
+| F1 | 12:05:46 | `f1-20261120-120546.txt` | `TODO OK`: 49 archivos de `/tmp/liyben_3973` en `vps/`, huellas iguales, sin permisos para otros; huella de la lista `8a677881cc3e26c79cac4f5528e73fac9965fd60065920d49343e5346a718a5c` |
+| F2 | 11:07:26 | (por pantalla) | `TODO OK`: `/tmp/liyben_3973` borrada; código montado intacto (rama y árbol); disco 9,4 GB libres (87 %) |
+
+**L1 y L7 (interfaz, Sergio):**
+
+| Comprobación | Esperado | Obtenido |
+|---|---|---|
+| L1: aviso del corte | hecho | No hizo falta: nadie usaba LIYBEN |
+| L1: sesión antigua de Chatboo, antes | se anota | **No aplica:** la sesión 1 ya no existe (abajo) |
+| L7: entrada en `liyben.com` | correcta | Correcta |
+| L7: sesión antigua de Chatboo | se abre | **No aplica** (decisión A: no se abre Chatboo, para no crear una sesión después del «antes») |
+| L7: botón Canvas | no aparece | **Cubierto por L6:** el botón está dentro del panel de Chatboo y sale de `canvas_available` (`pns_ai_chatboo/static/src/js/chatboo_component_v2.js:1707`, `:3823-3824`; `pns_ai_chatboo/controllers/chatboo.py:73-96`); con Diseño solo en el proveedor 1, inactivo, nadie diseña (D62). Se mira en el uso real |
+| L7: AI Engine › roles | Diseño sin alternativa y solo en el 1; Decisión sin proveedores | Correcto |
+| L7: consola (F12) | sin errores de los `pns_*` | Sin errores |
+
+**INFO y diferencias con el ensayo (ninguna bloquea):**
+- **Chatboo 0 sesiones en L0** (I0 del 19/11: `1|1|2026-10|1`). La borró la retención de 30 días de 3.1.782: el cron
+  `pns_ai_chatboo.ir_cron_chatboo_async_maintenance` llama a `_cleanup_old_sessions()`
+  (`_fabricante/3.1.782/pns_ai_chatboo/models/chatboo_async_request.py:2144-2167`,
+  `models/chatboo_session.py:1360-1382`), que borra las sesiones con `last_used_date` de hace más de
+  `history_retention_days` (30). En `odoo-server.log`, línea 22735: «2026-11-19 14:21:17,391 … Cleaning 1 Chatboo
+  session(s) older than 30 days», posterior a la copia de Y1 (por eso el ensayo aún la tenía). Por eso L1.2 y la fila
+  de L7 no aplican (y, con la decisión A, L8 no tiene peticiones a `/chatboo`).
+- **`-u` de 90 s y log de 382 líneas** (ensayo: 67-72 s y 389). Los 90 s incluyen crear el contenedor `run`; todos los
+  recuentos del log son los de Y5. No se ha mirado de dónde salen las 7 líneas de menos.
+- **3 traducciones `es_ES` más que en el ensayo, todas fuera de los `pns_*`** (tras el `-u`: 45 969 y 41 470, frente a
+  45 966 y 41 467; antes del `-u`, 45 482 en los dos). El `-u` real añadió 487 filas y el del ensayo 484. Dentro de los
+  `pns_*`, igual que el ensayo. B′ guarda y restaura las filas de fuera tal como estaban (`guardadas=41470`,
+  restauradas 49 = el ensayo) y APLICAR_BP exige la medida del comprobar de hoy: las 3 quedan intactas. Sin
+  identificar (se puede, en solo lectura, comparando por tipo y módulo `vps/l4b_foto_antes-comprobar-20261120-105038.txt`
+  con la `y6_foto_antes` de Y6 v3).
+- **WARNING de L8 por cuadruplicado:** 84 = 4 × 21 y 32 = 4 × 8, uno por cada carga del registro de LIYBEN tras el
+  arranque; son los mismos del `-u`.
+- **Validado en el VPS lo que el documento dejaba pendiente (§1):** `ly_i0.sh` con `bash` desde `/tmp/liyben_3973`;
+  `sudo -n` como `messagebus` tras `sudo -v`; lectura del log y de todo el filestore como `ubuntu`;
+  `docker compose run … odoo shell` con `logfile` (salida del script por la salida estándar, registros al log); el
+  `ls-remote` y el `fetch` con las credenciales del clon; `curl` con el web parado (50x, `OK`).
+
+**Lo que queda para la limpieza final (punto 4 del orden) y para el uso real (punto 2):**
+- **VPS:** la rama `14.0-pns-ai-3` del clon, en `578859b` (vuelta atrás hasta el merge, punto 3); `14.0` del clon en
+  `f63d5a1`, frente a `origin/14.0` `59bd6af` del equipo (se mira en el merge); `/opt/odoo/backups` (15 y 16/10), no se
+  toca. En `/tmp` no queda nada del despliegue (F2).
+- **Equipo:** `~/pns_ai_3973/liyben/despliegue/` (700): salidas de E0, E1, L3, F0 y F1, `commit.txt`,
+  `huellas_vps.txt`, `vps/` (49 archivos) y las dos copias de L3 (600, unos 616 MB). **Las copias de L3 se conservan al
+  menos hasta terminar el uso real** (son la vuelta atrás, E). `~/pns_ai_3973/liyben/` (ensayo: `.dump` de Y1, tandas y
+  salidas); el laboratorio `~/GitHub/lab_liyben_3973` y la imagen `odoo-dev:14-lab_liyben_3973`; el contexto activo de
+  `odoo-dev 14` sigue siendo `lab_liyben_3973`.
+- **Al uso real:** Chatboo y el botón Canvas en la interfaz (L1.2 y L7 no aplicaron); la ficha 26 (D61); las claves MCP,
+  si hacen falta (D60); el proveedor 1 sigue inactivo, así que nadie tiene Diseño en activo (D62); opcional, identificar
+  las 3 traducciones de más.
+
+**Fila de la §6.2 de la [instalación](instalacion_liyben_pns_ai.md):** «Despliegue de las correcciones», hecho el
+20/11/2026 con el commit `3df4307` (este apartado).
 
 ---
 
@@ -1514,7 +1590,8 @@ esas líneas de la tanda del ensayo):
 | `l4b.py` | `ly_y6.sh:155-297` | `b7827d7dc172b9ea4caba42061a8276a72777ed61354bbfc293b3a55ed970c98` |
 | `l6_despues.sql` | `ly_y7.sh:60-202` | `d58c9f7188422273f4ea1e88aaee88441b474cc6425a4a2dd1a63d5d23110fc0` |
 
-`liyben_ens_14` se conserva, solo para consultas SQL de solo lectura, hasta el commit de este documento (F0).
+`liyben_ens_14` se conserva, solo para consultas SQL de solo lectura, hasta el commit de este documento (F0). Borrada
+el 20/11/2026 (F0, G).
 
 ## Anexo B. Tandas del ensayo en el repo
 
