@@ -1019,9 +1019,11 @@ uso real, en G de [liyben_3973.md](liyben_3973.md).
 - **GitHub:** `14.0-pns-ai-3` borrada (K9). Segundo merge commit `d8cb3f0` (PR #3, padres `d9b2e16` y `3a9b111`) y
   `14.0-pns-ai-3973` borrada (M7 y K9).
 - **LIYBEN:** sin cambios (U0 v4, mismo estado por SQL). INFO: la copia de `auto_backup` del 20/11 falló (D15).
-- **Pendiente:** K8 (restos del staging en el equipo, al cierre de la ficha 26).
+- **K8 (restos del staging en el equipo):** hecho el 20/11/2026 a las 20:50 (`lk_k8.sh`), tras cerrar la ficha 26
+  (D70): BD `lab_pns_ai_cc0060e_14`, `p15_pns_demo_14` y `p15b_pns_demo_14`, copias de T3 y de P-15, laboratorio
+  `cc0060e` e imagen. Las salidas de texto se quedan. **Nada pendiente de la limpieza final.**
 - **Siguiente:** punto 5, en la rama `14.0-pns-ai-informe` (desde `14.0` en `d8cb3f0`): la ficha 26 (hecha, abajo), K8
-  y la 2.ª entrega del informe al fabricante.
+  (hecho) y la 2.ª entrega del informe al fabricante.
 
 **Punto 5: ficha 26 en el laboratorio (20/11/2026; D70, decisiones de Sergio: las recomendaciones de Claude, salvo la
 última, suya).** Tandas en [`informe_3973/`](informe_3973/).
@@ -1069,8 +1071,8 @@ uso real, en G de [liyben_3973.md](liyben_3973.md).
   Probadas en el entorno de Claude: `f26_ctx.sh` con dobles de `odoo-dev` y `docker` con estado y el `lab_cdp.py` del
   repo (positivo y 12 negativos); `f26_lab.sh`, la parte bash con un doble de `odoo-dev shell` (positivos de los tres
   modos y negativos) y el Python solo compilado (sin Odoo; se validó en el equipo).
-- **Siguiente:** K8, con la vuelta al contexto `lab_pns_ai_3973` antes de borrar el laboratorio `cc0060e`; después, la
-  2.ª entrega del informe.
+- **Siguiente:** K8, hecho el 20/11/2026 a las 20:50 (con la vuelta al contexto `lab_pns_ai_3973`, `lk_k8.sh
+  CONTEXTO`; J de [liyben_3973.md](liyben_3973.md)); después, la 2.ª entrega del informe.
 
 **Despliegue en LIYBEN (19 y 20/11/2026; decisiones de Sergio: las recomendaciones de Claude).** Documento:
 [liyben_3973.md](liyben_3973.md), con sus tandas y el SQL en [`liyben_3973/`](liyben_3973/). Antes se hizo un ensayo

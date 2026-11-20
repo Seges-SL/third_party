@@ -482,7 +482,8 @@ s3_t3
 ```
 
 Esperado: `OK web parado`, la huella de la copia (se anota en G), `OK copia (… bytes, cabecera PGDMP)`, la marca y
-`== T3: TODO OK`. El archivo queda en 600 y se conserva hasta la limpieza final del staging.
+`== T3: TODO OK`. El archivo queda en 600 y se conserva hasta la limpieza final del staging. → Borrado el 20/11/2026
+(K8).
 
 ### T4. VPS: `-u` de los tres módulos y su log
 
@@ -938,7 +939,7 @@ Mínima, como en E4′: no hay usuarios ni claves de prueba en esta subida.
 - **Equipo:** `/tmp/pns_addons_5d0559b.tar.gz`, `/tmp/pns_addons_8d218ea_ctl.tar.gz`, `/tmp/pns_3973_e0` y
   `/tmp/pns_3973_e0_ctl` (E0), después del [DOC] del resultado. **Hecho el 18/11/2026** (L3).
 - **Laboratorio:** `p15_pns_demo_14`, `p15b_pns_demo_14`, la copia de P-15 y el laboratorio `cc0060e` se conservan hasta
-  la limpieza final del staging (traspaso de P-15).
+  la limpieza final del staging (traspaso de P-15). → Borrados el 20/11/2026 (K8).
 
 ### F1. VPS: borrado del código extraído (nueva, 18/11/2026)
 
@@ -1078,8 +1079,9 @@ tb && /^[A-Za-z_][A-Za-z0-9_.]*(:|$)/ { e = $0; m = e; sub(/:.*/, "", e); sub(/^
 
 **Limpieza final (20/11/2026, D69; J de [liyben_3973.md](liyben_3973.md)):** hecho lo de `pns_demo` (borrada entera,
 sin copia, N9), lo del VPS (`/opt/odoo/pns_staging` borrada entera, con `addons_antes_3973`) y las salidas, que siguen
-en el equipo. **Queda (K8), al cierre de la ficha 26:** la copia de T3 y `~/pns_ai_3973/staging/`, y lo del
-laboratorio (`p15_pns_demo_14`, `p15b_pns_demo_14`, la copia de P-15 y el laboratorio `cc0060e`).
+en el equipo. **K8, hecho el 20/11/2026 a las 20:50** (`lk_k8.sh`, tras cerrar la ficha 26, D70): borradas la copia
+de T3 y lo del laboratorio (`p15_pns_demo_14`, `p15b_pns_demo_14`, la copia de P-15 y el laboratorio `cc0060e` con su
+imagen y su BD). Las salidas de texto de `~/pns_ai_3973/staging/` se quedan. Nada pendiente.
 
 - **`pns_demo`:** operaciones 35 (cancelada) y 36 (ejecutada); `mail.message` 205 en el contacto 29; las sesiones de
   Chatboo de `admin` de los dos turnos: las de `user_id` 2 creadas desde `StartedAt` (16:52:46). Sus ids se sacan en la

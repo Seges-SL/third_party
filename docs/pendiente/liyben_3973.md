@@ -5,7 +5,7 @@
   a él solo cambia `docs/` y que el árbol de los módulos es el de `5d0559b` (688 archivos, `0dc381e0…ba7a`). El hash
   completo queda en `commit.txt` (E0) y se anota en G. **Preparado:** 20/11/2026. **Estado:** ejecutado el
   20/11/2026, con el commit `3df4307` (G). **Uso real:** hecho el 20/11/2026 (H). **Merge en 14.0:**
-  hecho el 20/11/2026, merge commit `d9b2e16` (I). **Limpieza final:** hecha el 20/11/2026 (J), salvo K8; con el
+  hecho el 20/11/2026, merge commit `d9b2e16` (I). **Limpieza final:** hecha el 20/11/2026 (J), K8 incluido; con el
   segundo merge commit `d8cb3f0` (PR #3) y la rama `14.0-pns-ai-3973` borrada (M7).
 - **Qué se despliega:** el portado de los parches de Seges a 3.1.973 ([plan](plan_correccion_pns_ai_3973.md), fases 1 a
   4, parches 35 a 39 y pruebas con toda la rama), ya subido al staging ([staging_3973.md](staging_3973.md)). Módulos:
@@ -1557,7 +1557,7 @@ Horas del VPS en UTC; las del equipo (E0, E1, L3, F1), locales (UTC + 1). Salida
 - **Al uso real:** Chatboo y el botón Canvas en la interfaz (L1.2 y L7 no aplicaron); la ficha 26 (D61); las claves MCP,
   si hacen falta (D60); el proveedor 1 sigue inactivo, así que nadie tiene Diseño en activo (D62); opcional, identificar
   las 3 traducciones de más. **Hecho el 20/11/2026: ver H.**
-- **Limpieza final (VPS y equipo):** hecha el 20/11/2026 (J), salvo K8.
+- **Limpieza final (VPS y equipo):** hecha el 20/11/2026 (J), con K8.
 
 **Fila de la §6.2 de la [instalación](instalacion_liyben_pns_ai.md):** «Despliegue de las correcciones», hecho el
 20/11/2026 con el commit `3df4307` (este apartado).
@@ -1760,7 +1760,7 @@ y negativos. No se probó contra un SSH real: el límite de conexiones no se vio
 **Lo que queda:**
 - **Limpieza final (punto 4):** lo de G y H, más `~/pns_ai_3973/liyben/merge/`; las ramas `14.0-pns-ai-3` y
   `14.0-pns-ai-3973` (clon del VPS y GitHub) y `refs/remotes/origin/14.0-pns-ai-3*` del clon (M5). Al acabarla, segundo
-  merge commit de la rama en `14.0` (M7). → Hecha el 20/11/2026 (J), salvo K8; M7 y el borrado de
+  merge commit de la rama en `14.0` (M7). → Hecha el 20/11/2026 (J), con K8; M7 y el borrado de
   `14.0-pns-ai-3973`, también hechos (J).
 - **Ficha 26:** reproducción en el laboratorio antes del informe (punto 5). → Hecha el 20/11/2026: no reproducida;
   fuera del informe (D70; plan de la 3973, «Punto 5: ficha 26 en el laboratorio»).
@@ -1792,7 +1792,8 @@ citan. DNS de `pns.liyben.com` y clave de Gemini del staging, quitados por Sergi
 `tandas/` del ensayo, el laboratorio `lab_liyben_3973` y su imagen, borrados (K5 a K7). En GitHub, la rama
 `14.0-pns-ai-3`, borrada (K9). LIYBEN, sin cambios (U0 v4 con el mismo estado por SQL). Después, de 17:40 a 17:47,
 el segundo merge commit (M7, `d8cb3f0`, PR #3) y el borrado de `14.0-pns-ai-3973` en GitHub y en el equipo (K9).
-**Queda:** K8 (restos del staging en el equipo, al cierre de la ficha 26).
+A las 20:50, cerrada la ficha 26 (D70), K8: restos del staging en el equipo y laboratorio `cc0060e`. **No queda
+nada de la limpieza final.**
 
 **Estado de partida (inventario, 14:44-15:02, solo lectura).**
 - **GitHub:** ramas `11.0`, `14.0`, `14.0-analisis-pns-ai`, `14.0-pns-ai-3879`, `14.0-pns-ai-correcciones`, `17.0` y
@@ -1817,7 +1818,7 @@ el segundo merge commit (M7, `d8cb3f0`, PR #3) y el borrado de `14.0-pns-ai-3973
 | K5 | Copias con datos reales en el equipo | LIYBEN **no tiene copia fuera del VPS** (Sergio): se conservan las dos de L3; se borra la de Y1 (`LIYBEN-20261119-124423.dump`) | **Hecho** 16:52 (L3 intactas, en 600; `~/pns_ai_3973/liyben` ocupa ahora 638 MB) |
 | K6 | Salidas de texto y `~/pns_ai_3973/liyben/tandas/` | Las salidas se quedan donde están; `tandas/` (15 tandas, iguales byte a byte a las del repo) se borra | **Hecho** 16:52 |
 | K7 | Laboratorio `~/GitHub/lab_liyben_3973` e imagen `odoo-dev:14-lab_liyben_3973` (4,54 GB) | Antes, cambio de contexto: `arrancar` de `lab_pns_ai_3973` y «Al acabar corto» (registro de laboratorios); después, borrado | **Hecho:** contexto a las 16:50 (15:50:39 UTC); borrado a las 16:52 |
-| K8 | Restos del staging en el equipo: copia de T3 y `~/pns_ai_3973/staging/`, `p15_pns_demo_14`, `p15b_pns_demo_14`, la copia de P-15 y el laboratorio `cc0060e` | Aplazado al cierre de la ficha 26 (punto 5: puede hacer falta el core `cc0060e`) | Pendiente; la ficha 26, cerrada el 20/11 (D70): K8 ya puede hacerse |
+| K8 | Restos del staging en el equipo: copia de T3 y `~/pns_ai_3973/staging/`, `p15_pns_demo_14`, `p15b_pns_demo_14`, la copia de P-15 y el laboratorio `cc0060e` | Aplazado al cierre de la ficha 26 (punto 5: puede hacer falta el core `cc0060e`); de `~/pns_ai_3973/staging/` y `fase4/cc0060e/`, solo las copias: las salidas de texto se quedan | **Hecho** 20:50:10 (`lk_k8.sh`), tras cerrar la ficha 26 (D70) y volver al contexto `lab_pns_ai_3973`: BD `lab_pns_ai_cc0060e_14`, `p15_pns_demo_14` y `p15b_pns_demo_14` (con su filestore), copias de T3 y de P-15, `~/GitHub/lab_pns_ai_cc0060e` e imagen `odoo-dev:14-lab_pns_ai_cc0060e` (3,86 GB; reconstruible con `lab_3973/Dockerfile.14.cc0060e`). Quedan las 7 BD y las 12 imágenes restantes y las 72 salidas de texto |
 | K9 | Ramas de GitHub | `14.0-pns-ai-3`: tanda con `--force-with-lease`; `14.0-pns-ai-3973`: tras el segundo merge commit | `14.0-pns-ai-3` **borrada** a las 16:55:08 (GitHub y local); `14.0-pns-ai-3973` **borrada** a las 17:47:28 (GitHub y local; estaba en `3a9b111`), tras M7 |
 | M7 | Segundo merge commit (D68) | Lo elige Claude: J y los [DOC] lo dejan pendiente con sus compuertas; el hash y el borrado de la rama van al traspaso y al primer [DOC] del punto 5, en una rama nueva desde `14.0` (sin commit directo en `14.0`) | **Hecho** (`lk_m.sh`): PR #3, merge commit `d8cb3f0f8cfcd4caed71139f6849351a20160e2a` a las 17:45:59, padres `d9b2e16` y `3a9b111`; 5 commits y 15 archivos, solo `docs/`. Rama borrada (K9). El VPS no lo necesita (D68): su clon sigue en `d9b2e16` |
 
@@ -1851,8 +1852,12 @@ el segundo merge commit (M7, `d8cb3f0`, PR #3) y el borrado de `14.0-pns-ai-3973
 | PR #3 | 17:45:59 | Abierto con `compare/14.0...14.0-pns-ai-3973`: base `14.0`, 5 commits, 15 archivos, «Able to merge»; «Create a merge commit», sin «Delete branch»: **`d8cb3f0`** («Merge pull request #3 from Seges-SL/14.0-pns-ai-3973») |
 | `lk_m despues` | 17:46:41 | `TODO OK`: dos padres (`d9b2e16`, `3a9b111`); árbol del merge = el de la rama; 6 commits nuevos en `14.0`; los 15 archivos; módulos 688 / `0dc381e0…`; `merge2.txt` guardado (`2312564a…9957`) |
 | `lk_m BORRAR` | 17:47:25 | `TODO OK`: `push --force-with-lease` del borrado de `14.0-pns-ai-3973` al hash medido (`3a9b111`, 17:47:28) y `git branch -d` de la local, con Desktop en `14.0`. `14.0` de GitHub y las 7 ramas restantes (con `14.0`), sin cambios |
+| `lk_k8 comprobar` (K8) | 20:48:28 | `TODO OK`: contexto `lab_pns_ai_cc0060e`, web parado; las 3 BD, las 2 copias (tamaños), el laboratorio (3 archivos, `Dockerfile` = el del repo, sin remoto), la imagen (sin contenedores); la vuelta (`lab_pns_ai_3973`); 74 archivos de salidas. Guardadas las 7 BD y las 12 imágenes que se quedan y las huellas de las copias (`k8_comprobar_estado.txt`) |
+| `lk_k8 CONTEXTO` | 20:49:04 | `TODO OK`: `arrancar` de `lab_pns_ai_3973` (20:49:08) y «Al acabar corto»: log `servidor-20261120-204923.log`, 6 líneas, todas `?`, C OK; contexto `lab_pns_ai_3973`, web parado (fila del registro de laboratorios) |
+| `lk_k8 BORRAR` | 20:50:05 | `TODO OK`: `bd-borrar` de las 3 BD desde `lab_pns_ai_3973` (20:50:10), copias, carpeta e imagen (`3515fe6401af`) borradas; BD, imágenes y salidas restantes, sin cambios |
 
-**Salidas.** Equipo: `~/pns_ai_3973/liyben/limpieza/` (700): `lk_e-*`, `lk_l-*`, `lk_g-*`, `lk_m-*`, `merge2.txt` (los hashes del
+**Salidas.** Equipo: `~/pns_ai_3973/liyben/limpieza/` (700): `lk_e-*`, `lk_l-*`, `lk_g-*`, `lk_m-*`, `lk_k8-*`, `k8_arrancar-*`,
+`k8_comprobar_estado.txt`, `merge2.txt` (los hashes del
 segundo merge y sus padres), `otras_imagenes.txt` y
 `vps/`, con las 30 del VPS (salidas de `lk_v` v2 a v4, foto, códigos, `n101.txt`, `shallow.sha256`, `lk_v.sh` v4 y
 `salvar/`). En `vps/salvar/`: `pns_staging/` (`diag_bloqueo_20261016.txt`, `diag_bloqueo_20261016_b.txt`,
@@ -1885,8 +1890,8 @@ y **1 ERROR de `auto_backup` a las 13:44:32 UTC** (`dump_db` → `exec_pg_comman
 tiene el módulo OCA `auto_backup` y su copia del 20/11 falló. Infraestructura (D15); no investigado. `call_button` 8.
 
 **Lo que queda:**
-- **K8** (restos del staging en el equipo): al cierre de la ficha 26, antes del informe (punto 5). La ficha 26 se
-  cerró el 20/11 (D70): K8 es lo siguiente.
+- **K8** (restos del staging en el equipo): al cierre de la ficha 26, antes del informe (punto 5). → **Hecho el
+  20/11/2026 a las 20:50** (arriba).
 - **M7:** hecho (arriba: `d8cb3f0`, PR #3, y `14.0-pns-ai-3973` borrada). Este registro va en el primer [DOC] del
   punto 5, en la rama `14.0-pns-ai-informe`, creada desde `14.0` en `d8cb3f0`.
 - **Copias de L3:** se conservan (LIYBEN no tiene copia fuera del VPS, K5).
@@ -1897,7 +1902,7 @@ tiene el módulo OCA `auto_backup` y su copia del 20/11 falló. Infraestructura 
 - **Los restos anotados en los documentos de la 3879** («Restos para la limpieza final» de E2′ a E4′; la contraseña de
   `admin` de `pns_demo`, fila 15 de `docs/specs/estado_hallazgos_3879.md`): resueltos con K3 (sin `pns_demo`, sin
   `addons_*`, sin `/tmp/pns_*`). Esos documentos no se reescriben.
-- **Siguiente:** punto 5: K8 y la 2.ª entrega del informe al fabricante (la ficha 26, hecha el 20/11: D70).
+- **Siguiente:** punto 5: la 2.ª entrega del informe al fabricante (la ficha 26, D70, y K8, hechas el 20/11).
 
 **Lecciones de la limpieza:**
 - `docker inspect` no devuelve `.Mounts` en orden fijo: una huella de contenedores ordena los montajes (y la simulación
@@ -1921,6 +1926,7 @@ tiene el módulo OCA `auto_backup` y su copia del 20/11 falló. Infraestructura 
 | [`lk_l.sh`](liyben_3973/lk_l.sh) | 95 | `eb3ec539ea9a779a8c439e3b44e68d2877dc268c02f37555abdb1298ea82e758` | Equipo, sin red: `comprobar` / `BORRAR` de K5, K6 y K7 |
 | [`lk_g.sh`](liyben_3973/lk_g.sh) | 64 | `3036225af9c1cdf44af7feea30dd53fde8d2b65236e5e762340801b169a99b09` | Equipo: `comprobar` / `BORRAR` de la rama `14.0-pns-ai-3` de GitHub y la local (K9) |
 | [`lk_m.sh`](liyben_3973/lk_m.sh) | 128 | `329de617d79196ea424c009c61bb9337f679f99b721391375dc06a14c6c4fcd0` | Equipo: `antes` / `despues` / `BORRAR` del segundo merge commit (M7) y del borrado de `14.0-pns-ai-3973` (K9) |
+| [`lk_k8.sh`](liyben_3973/lk_k8.sh) | 153 | `d7c12fade6ba5cda625de0be5b3fa48378bd10d032ca6f49fe5d7fb104bcdcae` | Equipo: `comprobar` / `CONTEXTO` / `BORRAR` de K8 (restos del staging y laboratorio `cc0060e`) |
 
 Las versiones anteriores no entran (solo su huella; no se conservan): `lk_v.sh` v1 (268 líneas, `3b8593ff…cae7`), v2
 (270, `075792c4…3950`) y v3 (286, `6f2b98815b259045dc5caeaef921fe8a3f3a105172b276bc67d7121105818841`, la que exige
@@ -1931,7 +1937,8 @@ de la incidencia de arriba. Todas se probaron en el entorno de Claude (git real;
 negativos; la prueba P4 reproduce el recorrido real v2 → v3 → v4 (la v2, reconstruida con su huella exacta).
 `lk_m.sh` se probó con git real (remota `bare`, PR simulado con `merge --no-ff`): recorrido positivo y 12 negativos,
 todos FALLO sin tocar la remota. Sus 15 archivos esperados se dedujeron de las dos entregas, sin el historial real;
-`antes` los confirmó.
+`antes` los confirmó. `lk_k8.sh` se probó con dobles de `odoo-dev` y `docker` con estado y el `lab_cdp.py` del repo:
+recorrido positivo de los tres modos y 18 negativos, todos FALLO sin borrar nada y con el web parado.
 
 ---
 
