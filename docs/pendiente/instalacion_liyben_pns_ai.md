@@ -172,7 +172,7 @@ Decisiones de Sergio, provisionales hasta la reunión (§5 f).
 |---|---|---|---|
 | **Usuarios de portal** (N7) | Se mantienen los 18 | Desviación de la condición «sin portal» de N7 (N3 b; guía §2.1). PNS-83 cubierto porque no se usa la mesa de PIN; **PNS-90 y PNS-91 abiertos** | Propuesta: **archivarlos** (sin acceso desde 12/2024). Antes de la demo, la consulta del §5 e) |
 | **Proveedor** (N8, D10) | Gemini `gemini-3.5-flash-lite` | **D10 pendiente:** datos reales de LIYBEN hacia un proveedor externo; condiciones de uso de datos del nivel gratuito por comprobar | Propuesta: clave nueva en otro proyecto de Google y cadena con dos proveedores (`3.5-flash-lite` y, de respaldo, `3.5-flash`) |
-| **Despliegue del código** | Rama `14.0-pns-ai-3` en el clon (opción B, §3.2) | El clon no está en `14.0` | Integrar la rama en `14.0` (PR) y volver el clon a `14.0` |
+| **Despliegue del código** | Rama `14.0-pns-ai-3` en el clon (opción B, §3.2) | El clon no está en `14.0` | Integrar la rama en `14.0` (PR) y volver el clon a `14.0`. **Hecho el 20/11/2026** (§6.2) |
 
 ---
 
@@ -255,7 +255,7 @@ Detalle y decisiones en [decisiones](pns_ai_decisiones.md), §10.
 | Claves MCP (D60) | Revocadas el 27/10/2026; no se regeneran en el despliegue (Nginx da 404 en `/mcp`, D20). **Uso real (20/11/2026):** se mantiene que no se regeneran. Una clave generada durante U1 (usuario MCP 3, usuario 6, 11:45:14 UTC) se borró a las 11:55:13 con el asistente (decisión de Sergio, opción b); comprobado por SQL sin leer el hash: los tres usuarios MCP en «Not generated» y sin hash | [documento de despliegue](liyben_3973.md), H |
 | Uso real | **Hecho el 20/11/2026:** Chatboo responde con el proveedor 2 y sin botón Canvas (D62: el proveedor 1, único con Diseño, sigue inactivo); cadena de Chatboo con la fila 3 (quitada en L7 y añadida de nuevo, sin efecto); las 3 traducciones de más, identificadas (un módulo OCA no instalado) | [documento de despliegue](liyben_3973.md), H |
 | Antes del `-u`: D50, vaciar los 7 tokens de registro; antes, comprobar en `cc0060e` qué hace `signup_cancel` de `auth_signup` | Comprobado el 19/11/2026: se vacían los 8 (los 7 de la 3b y un `reset` caducado de un interno) con `liyben_3973/d50_vaciar.sh` (`d50_vaciar VACIAR`) justo antes del `-u`; ensayo en LIYBEN OK (D50, Sergio, 18/11/2026; detalle en «D50 hecho»). Vaciados el 20/11/2026 a las 10:46:55 UTC (L4: 8 vaciados, `COMMIT`, 0 después) | [plan_correccion_pns_ai_3973.md](plan_correccion_pns_ai_3973.md), «Tras el `-u`» |
-| Integrar en `14.0` (merge commit) y volver el clon a `14.0` | Al terminar el plan de corrección | §4; plan de corrección §3 |
+| Integrar en `14.0` (merge commit) y volver el clon a `14.0` | **Hecho el 20/11/2026** (D68): PR #2, merge commit `d9b2e16` (padres `59bd6af` y `2b2f5e7`); clon del VPS en `14.0` / `d9b2e16` como el UID 101, sin parar el web ni `-u` (solo cambiaron 7 archivos de `docs/`; los `pns_*` montados, iguales). El PR #1 se fusionó por error en `main` y se deshizo (`main` de nuevo en `0447995`). Rama por defecto del repo en GitHub: `14.0`. Las ramas `14.0-pns-ai-3` y `14.0-pns-ai-3973`, hasta la limpieza final | §4; plan de corrección §3; [documento de despliegue](liyben_3973.md), I |
 | Limpieza del staging | Al terminar el plan de corrección | plan de staging, §9 |
 | D15 (infraestructura) | Se decide más adelante | decisiones, D15 |
 

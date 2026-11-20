@@ -83,6 +83,7 @@ añade a la lista negra del sandbox los métodos que privatiza; E3 cierra el res
    prueba conjunto de las entregas. Registro en [instalacion_liyben_pns_ai.md](instalacion_liyben_pns_ai.md).
 2. Staging: limpieza según el [plan de staging](plan_staging_pns_ai.md), §9, y revocar su clave de
    Gemini.
-3. Integrar la rama en `14.0` con merge commit y volver el clon del VPS a `14.0`.
+3. Integrar la rama en `14.0` con merge commit y volver el clon del VPS a `14.0`. **Hecho el 20/11/2026** con la rama
+   `14.0-pns-ai-3973` (merge commit `d9b2e16`, PR #2; D68): [liyben_3973.md](liyben_3973.md), I.
 4. Actualizar y enviar la 2.ª entrega del informe al fabricante (D2), sin código.
 5. Guía de configuración: mitigaciones que dejan de hacer falta y versión instalada.

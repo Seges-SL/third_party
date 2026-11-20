@@ -4,7 +4,8 @@
   §3.2). **Commit a desplegar:** el HEAD de la rama en el commit de este documento (D58). E0 comprueba que de `c6ec077`
   a él solo cambia `docs/` y que el árbol de los módulos es el de `5d0559b` (688 archivos, `0dc381e0…ba7a`). El hash
   completo queda en `commit.txt` (E0) y se anota en G. **Preparado:** 20/11/2026. **Estado:** ejecutado el
-  20/11/2026, con el commit `3df4307` (G). **Uso real:** hecho el 20/11/2026 (H).
+  20/11/2026, con el commit `3df4307` (G). **Uso real:** hecho el 20/11/2026 (H). **Merge en 14.0:**
+  hecho el 20/11/2026, merge commit `d9b2e16` (I).
 - **Qué se despliega:** el portado de los parches de Seges a 3.1.973 ([plan](plan_correccion_pns_ai_3973.md), fases 1 a
   4, parches 35 a 39 y pruebas con toda la rama), ya subido al staging ([staging_3973.md](staging_3973.md)). Módulos:
   `pns_base` 14.0.1.2.32 → 14.0.1.2.69, `pns_ai_mcp` 14.0.3.1.782 → 14.0.3.1.973 y `pns_ai_chatboo` 14.0.2.1.453 →
@@ -62,6 +63,7 @@ nuevas (`ld_*`).
 4. F. Limpieza (F0, F1 y F2)
 5. G. Resultado del despliegue
 6. H. Uso real
+7. I. Merge en 14.0
 - Anexo A. Ensayo
 - Anexo B. Tandas del ensayo en el repo
 
@@ -1669,7 +1671,7 @@ terminaron con su línea final.
 - **Limpieza final (punto 4):** lo de G, más `~/pns_ai_3973/liyben/uso/`. **Las copias de L3 se conservan hasta la
   limpieza final**; desde el uso real ya no son una vuelta atrás limpia (restaurarlas perdería lo hecho después).
 - **D62:** el proveedor 1 sigue inactivo (nadie con Diseño activo) hasta que se definan los proveedores.
-- **Siguiente:** el merge (punto 3).
+- **Siguiente:** el merge (punto 3): hecho el 20/11/2026 (I).
 
 **Lecciones del uso real:**
 - Un «después» por SQL vale para el momento en que se toma: L7 fue posterior a L6 y en ella se guardó la ficha de un
@@ -1680,6 +1682,91 @@ terminaron con su línea final.
 - Antes de anunciar un botón en un «Esperado» de interfaz, mirar en el código dónde se pinta.
 - Una decisión que asigna una prueba a un entorno (D61 → uso real) se contrasta con lo que ese entorno permite (no hay
   usuario sin AI Administrator) y con las decisiones anteriores (decisión 5: laboratorio) antes de prepararla.
+
+---
+
+## 7. I. Merge en 14.0 (20/11/2026)
+
+**Hecho el 20/11/2026, de 13:45 a 14:19 hora local** (Sergio; tandas y contraste de Claude). Punto 3 del orden: integrar
+`14.0-pns-ai-3973` en `14.0` con merge commit y volver el clon del VPS a `14.0`
+([plan de corrección](plan_correccion_pns_ai.md), §3; [instalación](instalacion_liyben_pns_ai.md), §4 y §6.2).
+**Resultado:** `14.0` en el merge commit **`d9b2e165b6d8069417b6b4e0329fa0f5be36c52b`** (PR #2; padres `59bd6af`, la
+`14.0` de antes, y `2b2f5e7`, la cabeza de la rama; 180 commits nuevos en `14.0`; árbol igual al de `2b2f5e7`). El clon
+del VPS, en `14.0` / `d9b2e16`, sin parar el web y sin `-u`: los `pns_*` montados siguen siendo 688 / `0dc381e0…` y
+solo cambiaron 7 archivos de `docs/`. LIYBEN, sin cambios (U0 v3 y v4 con el mismo estado por SQL). Hubo una incidencia
+en GitHub, resuelta con decisión de Sergio: el PR #1 se fusionó en `main` por error (abajo).
+
+**Estado de partida (13:26-13:27, solo lectura).** Equipo: `origin/14.0` = `14.0` local = `59bd6af` (08/10), antecesor
+de la rama; 0 commits de `14.0` fuera de la rama; entran 179; `origin/14.0-pns-ai-3` y `f63d5a1` antecesores. Cambian de
+`14.0` a la rama 887 archivos: `CLAUDE.md`, `docs` 135, `pns_ai_chatboo` 163, `pns_ai_mcp` 535 y `pns_base` 53
+(`_fabricante` no lo sigue git). Clon del VPS: `14.0-pns-ai-3973` / `3df4307`, limpio; **superficial**; refspec solo de
+`14.0`; `14.0` y `origin/14.0` del clon en `f63d5a1` (02/09), antecesor de `3df4307`; `.git` del UID 101.
+
+**Decisión de Sergio (13:28; las recomendaciones de Claude):**
+
+| | Decisión |
+|---|---|
+| D68 | **Merge en 14.0 y vuelta del clon.** M1: PR en GitHub (base `14.0`, origen la rama) con «Create a merge commit», sin «Delete branch». M2: solo si `origin/14.0` es antecesor de la rama, sin commits de `14.0` fuera y con el árbol 688 / `0dc381e0…` (cumplido). M3: en el VPS, como el UID 101, `fetch` (refspec del clon, sin `--depth`), compuertas, `update-ref refs/heads/14.0 <merge> <f63d5a1>` y `checkout 14.0`: un solo cambio de árbol, sin pasar por `f63d5a1`; `.git/shallow` igual antes y después. M4: sin parar el web ni `-u`. M5: las ramas `14.0-pns-ai-3` y `14.0-pns-ai-3973` (clon y GitHub), hasta la limpieza final. M6: tandas `lm_e`, `lm_v`, U0 v3 antes y U0 v4 después. M7: los commits de esto, en la rama; segundo merge commit al terminar la limpieza final (el VPS no necesita traerlo) |
+| D68 (b) | **PR #1 en `main` (14:02):** opción B, devolver `main` de GitHub y la local a `0447995` con `--force-with-lease` (no el «Revert» del PR). **Rama por defecto** de `third_party` en GitHub: `14.0` (14:19; la cambia Sergio) |
+
+| Paso | Hora | Salida | Resultado |
+|---|---|---|---|
+| `lm_e antes` | 13:45:55 | `lm_e-antes-20261120-134555.txt` | `TODO OK` |
+| PR #1 | 13:53:40 | — | **Fusionado en `main` por error** (la base que propone GitHub es la rama por defecto): merge `fb2e878`, padres `0447995` («Initial commit», 24/03/2023) y `2b2f5e7`; 241 commits nuevos en `main`. `14.0`, la rama y el VPS, sin cambios. Desktop adelantó la `main` local a `fb2e878` en el «Fetch» de las 13:54 |
+| `lm_main comprobar` | 14:04:50 | `lm_main-comprobar-20261120-140450.txt` | `TODO OK`: `main` (GitHub, copia y local) en `fb2e878`; `0447995` solo en su historia; `14.0` y la rama sin cambios |
+| `lm_main APLICAR` | 14:05:32 | `lm_main-APLICAR-20261120-140532.txt` | `TODO OK`: `+ fb2e878...0447995 … -> main (forced update)`; `main` local con `update-ref` al mismo; `14.0` y la rama sin cambios. El PR #1 sigue como «Merged» (GitHub no lo deshace) |
+| `lm_e antes` | 14:06:42 | `lm_e-antes-20261120-140642.txt` | `TODO OK` |
+| PR #2 | 14:09:27 | — | Abierto con `compare/14.0...14.0-pns-ai-3973`: base `14.0`, «Able to merge», 179 commits y 887 archivos (= lo medido); «Create a merge commit», sin «Delete branch»: **`d9b2e16`** |
+| `lm_e despues` | 14:12:39 | `lm_e-despues-20261120-141239.txt`, `merge.txt` (`a5d08e6c…9fc3`) | `TODO OK`: dos padres (`59bd6af`, `2b2f5e7`), árbol = el de la rama, 180 commits, la rama sigue en GitHub, árbol de los módulos 688 / `0dc381e0…`. Sin «Pull»: Desktop ya había adelantado la `14.0` local en el «Fetch» |
+| U0 v3 | 14:13:29 | `uso/u0-20261120-141329.txt`, `u0_estado-…` | `TODO OK`; `u0_estado` = el de las 12:57 (`7850d505…5c9a`). INFO nuevo: 2 Traceback (abajo) |
+| `lm_e enviar` | 14:14:07 | `lm_e-enviar-20261120-141407.txt` | `TODO OK`: `/tmp/liyben_merge` (700) con `lm_v.sh` y `merge.txt`, huellas iguales |
+| `lm_v comprobar` | 13:14:46 UTC | `vps/lm_v-comprobar-20261120-131446.txt` | `TODO OK`; `.git/shallow` `d4279572…3199`; 0 archivos del árbol de trabajo de otro dueño; `ls-remote` como el UID 101: `d9b2e16` y `2b2f5e7` |
+| `lm_v APLICAR` | 13:15:01 UTC | `vps/lm_v-APLICAR-20261120-131501.txt` | `TODO OK`: `fetch` `f63d5a1..d9b2e16`; compuertas (padres, `3df4307` y `f63d5a1` antecesores, nada fuera de `docs/`, 7 de `docs/`, árbol del merge, `.git/shallow`); `update-ref` y `checkout 14.0` a las 13:15:04; después, clon limpio y `0|0`, árbol montado 688 / `0dc381e0…`, `.git/shallow` y dueños iguales, ramas de M5, web en marcha, log sin ERROR ni Traceback, `/web/login` 200 y `/mcp` 404 |
+| U0 v4 | 14:15:30 | `uso/u0-20261120-141530.txt`, `u0_estado-…` | `TODO OK`: clon en `14.0` / `d9b2e16`; `u0_estado` igual (`7850d505…5c9a`); log sin nada nuevo salvo 13 líneas |
+| `lm_e recoger` | 14:15:54 | `lm_e-recoger-20261120-141554.txt` | **1 FALLO, nada copiado ni borrado:** la segunda conexión SSH de la tanda, «Connection refused» (seguramente un límite de conexiones del VPS: U0 v4 abrió 4 a las 14:15:30) |
+| Recogida a mano | 14:18-14:19 | `merge/vps/` (4 archivos) | Huellas en el VPS (sesión abierta) = las copiadas con un solo `scp`: `lm_v-APLICAR-…` `40beb512…012c`, `lm_v-comprobar-…` `5916cf43…e3ac`, `lm_v.sh` `139a5aaf…03eb`, `merge.txt` `a5d08e6c…9fc3`. `/tmp/liyben_merge` borrada en la sesión del VPS |
+
+Horas del equipo, locales (UTC + 1); las del VPS, en UTC. Salidas en `~/pns_ai_3973/liyben/merge/` (700) y, las de
+U0, en `~/pns_ai_3973/liyben/uso/`.
+
+**INFO: 2 Traceback en el log desde L5** (U0 v3 y v4; posteriores a U0 v3 de las 12:57, anteriores al cambio del clon;
+última hora 13:13:17 UTC). Un WARNING de `odoo.addons.http_routing.models.ir_http` con dos trazas encadenadas (la
+segunda, `AccessError`): al construir la URL (`slug`) de un registro, la lectura no estaba permitida
+(`http_routing/models/ir_http.py:94`, `:251` y `:542`; `website/models/ir_http.py:440`). Del core, sin pasar por los
+`pns_*`; ningún ERROR ni CRITICAL. No se ha buscado la petición.
+
+**Tandas del merge** (en el repo, en la versión ejecutada; las del equipo se lanzan desde `~/Descargas`):
+
+| Archivo | Líneas | SHA-256 | Qué hace |
+|---|---|---|---|
+| [`lm_e.sh`](liyben_3973/lm_e.sh) | 149 | `0f6e103c829d9837620a47c836ee5eeb5e2da4f2c27e17299e6ade22d9639334` | Equipo: `antes` (M2), `despues` (merge commit y `merge.txt`), `enviar` (`/tmp/liyben_merge`) y `recoger` (copia y borrado; su FALLO, arriba) |
+| [`lm_v.sh`](liyben_3973/lm_v.sh) | 130 | `139a5aaf83c9b184bd120a01ea681ddda1694bece5129c4d3a1eee0996bb03eb` | VPS: `comprobar` y `APLICAR` (M3) |
+| [`lm_main.sh`](liyben_3973/lm_main.sh) | 82 | `08cb34ffac22b6d73f457eee8dd9fbe0cebefb638d66a1fea22cf5abd7d315fa` | Equipo: `main` de GitHub y la local a `0447995` (`--force-with-lease` y `update-ref`) |
+| [`lu_u0_v4.sh`](liyben_3973/lu_u0_v4.sh) | 161 | `16a9d67f1871d97419a16c7d6fe61e2cc4c23ededabb8cba97bf0f4717e12454` | U0 v3 con la rama `14.0` y el commit de `merge.txt` |
+
+Todas se probaron en el entorno de Claude con git real (remota `bare`, equipo con clon completo, clon del VPS
+superficial del UID 101; `sudo`, `docker`, `curl`, `ssh` y `scp` simulados; los PR con `merge --no-ff`), con positivos
+y negativos. No se probó contra un SSH real: el límite de conexiones no se vio hasta `recoger`.
+
+**Lo que queda:**
+- **Limpieza final (punto 4):** lo de G y H, más `~/pns_ai_3973/liyben/merge/`; las ramas `14.0-pns-ai-3` y
+  `14.0-pns-ai-3973` (clon del VPS y GitHub) y `refs/remotes/origin/14.0-pns-ai-3*` del clon (M5). Al acabarla, segundo
+  merge commit de la rama en `14.0` (M7).
+- **Ficha 26:** reproducción en el laboratorio antes del informe (punto 5).
+- **Siguiente:** la limpieza final (punto 4).
+
+**Lecciones del merge:**
+- GitHub propone como base de un PR la rama por defecto del repo (aquí `main`, solo con «Initial commit»): antes de
+  crear y antes de fusionar se comprueba la base y el número de commits en la página; el enlace
+  `compare/<base>...<rama>` la fija. Con la rama por defecto en `14.0`, el riesgo baja.
+- GitHub Desktop adelanta en el «Fetch» las ramas locales que pueden avanzar sin conflicto (`main` a las 13:54, `14.0`
+  tras el merge): no sale «Pull origin». La comprobación es la de la tanda, no el botón.
+- Un error en una rama remota se deshace con un push con `--force-with-lease` al valor medido, en una tanda con
+  `comprobar` y `APLICAR`; el registro del PR se queda.
+- Las tandas que abren muchas conexiones SSH seguidas pueden chocar con un límite del VPS: reutilizar una sola
+  conexión y probarla contra un SSH real, o dejar tiempo entre tandas.
+- La huella del estado por SQL de U0 sirve también para demostrar que un cambio de código o de documentación no toca
+  la BD (igual antes y después).
 
 ---
 

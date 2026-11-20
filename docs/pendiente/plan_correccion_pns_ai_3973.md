@@ -994,6 +994,19 @@ uso real, en G de [liyben_3973.md](liyben_3973.md).
 - **Copias de L3:** se conservan hasta la limpieza final (punto 4).
 - **Siguiente:** el merge (punto 3).
 
+**Merge en 14.0 hecho (20/11/2026; D68, decisión de Sergio: las recomendaciones de Claude).** Detalle en I de
+[liyben_3973.md](liyben_3973.md), con las tandas `lm_*.sh` y `lu_u0_v4.sh` en [`liyben_3973/`](liyben_3973/).
+- **`14.0`:** merge commit `d9b2e165b6d8069417b6b4e0329fa0f5be36c52b` (PR #2; padres `59bd6af` y `2b2f5e7`; árbol = el
+  de la rama; 180 commits nuevos).
+- **Clon del VPS:** en `14.0` / `d9b2e16`, con `fetch`, `update-ref` y `checkout` como el UID 101, sin parar el web ni
+  `-u`; solo cambiaron 7 archivos de `docs/`. LIYBEN, sin cambios (U0 v3 y v4, mismo estado por SQL).
+- **D68:** PR con «Create a merge commit» y sin «Delete branch»; en el VPS, un solo cambio de árbol (`update-ref` con
+  valor previo); las ramas `14.0-pns-ai-3` y `14.0-pns-ai-3973` se quedan hasta la limpieza final; los commits de este
+  punto, en la rama, con un segundo merge commit al terminar la limpieza final.
+- **PR #1 fusionado en `main` por error** (la base que propone GitHub es la rama por defecto): `main` de GitHub y la
+  local devueltas a `0447995` («Initial commit») con `--force-with-lease`. Rama por defecto del repo: `14.0`.
+- **Siguiente:** la limpieza final (punto 4).
+
 **Despliegue en LIYBEN (19 y 20/11/2026; decisiones de Sergio: las recomendaciones de Claude).** Documento:
 [liyben_3973.md](liyben_3973.md), con sus tandas y el SQL en [`liyben_3973/`](liyben_3973/). Antes se hizo un ensayo
 sobre una copia de LIYBEN (`liyben_ens_14`, Anexo A del documento), del que salen los «Esperado».
