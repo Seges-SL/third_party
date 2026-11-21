@@ -319,3 +319,11 @@ fijados; en el §4, «(propuesta)» se lee como decidido.
   nuevos de la rama 3973: 35 a 39.
 - Altas: PNS-103 a PNS-105 (ya en el inventario sobre 3.1.879 como notas fechadas) y las 18 filas del §4.
 - La ficha 26 sale (D70).
+
+## 7. Erratas detectadas al redactar el informe (21/11/2026)
+
+- **PNS-80 (§2):** figura como «CF782 (no revisado en 3.1.973)», pero la comparación (§3.2) lo revisó en 3.1.973: NO
+  APLICA (`read_progress` no existe). Por eso el informe dice 53 corregidos sin revisar en 3.1.973, no 54.
+- **PNS-100 (§3):** la comparación (§3.1, §4 y §7.4) y `diferencias_3-1-973_seges.md` (§2) dicen que faltan 21 de los
+  28 nombres (y §3.1, «7 de 28»). 3.1.973 cubre 6 de los 28 (el séptimo nombre que añade, `build_email`, no está en la
+  lista de Seges): faltan 22, como dicen este inventario y el informe.
