@@ -165,7 +165,7 @@ M4_ETIQUETAS = (
     (_MC, 'ai_skill', 'triggers', 'Disparadores', ':5908'),
     (_MC, 'ai_skill', 'is_system', 'Habilidad de sistema', ':4068'),
     (_MC, 'ai_skill', 'show_in_slash', 'Mostrar en menú slash', ':4073'),
-    (_MC, 'ai_external_server', 'trusted', 'De confianza (auto-confirmar)', ':4443'),
+    (_MC, 'ai_api_server', 'trusted', 'De confianza (auto-confirmar)', ':4443'),
 )
 
 # M5. Contextos de fábrica (sin dueño) por módulo y tipo. Un registro por archivo: el
