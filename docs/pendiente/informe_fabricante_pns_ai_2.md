@@ -1,6 +1,10 @@
 # CONFIDENCIAL — Seguimiento del informe técnico de seguridad (continuación de la entrega del 15/10): pns_base 1.2.32, pns_ai_mcp 3.1.782 y pns_ai_chatboo 2.1.453 (Odoo 14.0)
 
 > **Borrador.** Pendiente de revisión interna antes de su envío.
+>
+> **Nota (21/11/2026):** comunicado al fabricante el 16/10/2026. El aviso «Borrador» es del documento original y no se
+> ha quitado. El estado en 3.1.973 de lo que aquí se comunica está en la
+> [2.ª entrega del informe](informe_fabricante_pns_ai_3973.md).
 
 | | |
 |---|---|
