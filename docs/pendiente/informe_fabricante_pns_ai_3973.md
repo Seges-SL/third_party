@@ -1282,7 +1282,11 @@ donde se indica, el código de 3.1.973 es el mismo.
     AI History.», `pns_ai_chatboo/models/chatboo_canvas_job.py:133, 156`), `paintCanvasButton`
     (`static/src/js/chatboo_charts.js:2971-2993`) solo pone el borde del botón en rojo, vuelve a la etiqueta «Canvas» y
     deja el motivo en el `title`. No hay aviso en pantalla; en el entorno de pruebas no salió ni el tooltip.
-    **Sugerimos** un aviso en el chat, como el que pedimos en PNS-96.
+    **Sugerimos** un aviso en el chat, como el que pedimos en PNS-96. Además, el aviso remite a un «AI History»
+    («Historial IA» en español) que no existe como menú: el registro está en «My Activity» y en «Activity», bajo
+    Seguridad (`pns_ai_mcp/views/ai_log_views.xml:281-293`), y un usuario con solo AI Conversational no ve ninguno de
+    los dos. En nuestra instalación usamos el mismo aviso en la respuesta del chat (PNS-96). **Sugerimos** nombrar el
+    menú real o indicar que lo consulte un administrador.
 14. **Idioma de las palabras de `page_tab`.** `get_discovery_entries` (`pns_ai_mcp/models/ai_context_discovery.py:59-66`)
     usa las palabras del idioma del usuario y, si no hay variante, las genéricas en inglés
     (`pns_ai_chatboo/ai/contexts/discovery/discovery_page_tab.json`). Un usuario con la interfaz en inglés que escribe en
@@ -1310,21 +1314,29 @@ donde se indica, el código de 3.1.973 es el mismo.
     en lugar de saltar la fila; la carga lo captura y devuelve un error, sin reintentar. Lo vimos en el entorno de pruebas
     sobre 3.1.879, justo al terminar un turno: la sesión no se recargó.
 
+20. **El límite de subida no admite «sin límite».** La ayuda de «Upload limit (MB)»
+    (`pns_ai_chatboo/models/ai_agent.py:65-67`, `models/res_config_settings.py:59-61`,
+    `views/res_config_settings_mcp_agents_views.xml:73`) dice «0 = no limit». Con 0, el servidor aplica su valor por
+    defecto, 15 MB (`utils/chatboo_product_icp.py:37`, `:46-59` y `:190-193`). Además, el cliente rechaza todo archivo
+    de más de 10 MB sea cual sea el ajuste (`static/src/js/chatboo_component_v2.js:4053` y `:4105`): un ajuste por
+    encima de 10 MB no tiene efecto en el chat. **Sugerimos** corregir la ayuda y que el cliente use el límite del
+    servidor.
+
 ### 8.4 Motor, skills y asistentes
 
-20. **`ensure_module_result_call` cambia el resultado de `customer_360`.** La normalización
+21. **`ensure_module_result_call` cambia el resultado de `customer_360`.** La normalización
     (`pns_ai_mcp/utils/relaxaicode_recipe.py:389-469`, llamada desde `controllers/relaxaicode_prepare.py:215` y
     `controllers/relaxaicode_repair.py:236`) añade `result = <última función>(…)` cuando `result` no se asigna en el
     nivel del módulo, aunque se asigne dentro de bloques. En la skill `customer_360` añade `result = _iso(_q)`
     (`pns_ai_chatboo/ai/skills/system/customer_360.py:70`), con `_q` el texto del cliente buscado, y la skill falla con
     `AttributeError: 'str' object has no attribute 'isoformat'`. Por la vía de skills funciona. **Sugerimos** no añadir
     la llamada cuando el código ya asigna `result` en algún punto.
-21. **`ai_log` sin el detalle del error del proveedor en el failover.** `_log_provider_failover`
+22. **`ai_log` sin el detalle del error del proveedor en el failover.** `_log_provider_failover`
     (`pns_ai_mcp/models/ai_execution_engine.py:462`, llamado desde `utils/agent_engine.py:1076`) guarda el error que
     recibe; en el camino del chat es el `ProviderConnectionError` genérico de `utils/engine_tool_loop.py:615-622` («The
     AI provider could not be reached.»), y el detalle (por ejemplo, un HTTP 429 con su texto) solo va al log de Odoo.
     Dificulta el diagnóstico a los AI Administrators.
-22. **`fields_view_get` sin `@api.model`.** La sobrescritura de `pns.operation.report.wizard`
+23. **`fields_view_get` sin `@api.model`.** La sobrescritura de `pns.operation.report.wizard`
     (`pns_base/models/operation_report_wizard.py:371`) no lleva el decorador del original. Odoo 14 no lo hereda, así que
     `call_kw` la trata como método de registros y una llamada por XML-RPC da `IndexError: tuple index out of range`. La
     interfaz no lo ve, porque pide la vista con `load_views`. Lo anotamos sin petición.
@@ -1334,8 +1346,8 @@ donde se indica, el código de 3.1.973 es el mismo.
 Sin código asociado; las anotamos porque afectan al coste y a la calidad, y porque registrar el prompt (petición de §5
 de la entrega del 16/10, §3.4) ayudaría a diagnosticarlas.
 
-23. **El orquestador reinterpreta peticiones cortas de edición:** una edición de la página se convierte en una página
+24. **El orquestador reinterpreta peticiones cortas de edición:** una edición de la página se convierte en una página
     nueva (otra consulta y otro coste). En el entorno de pruebas creó una página aunque se le pidió «No hagas ninguna
     página».
-24. **El chat llama a `relaxaicode` aunque se le pida no consultar los datos,** pese a la regla de `page_tab`
+25. **El chat llama a `relaxaicode` aunque se le pida no consultar los datos,** pese a la regla de `page_tab`
     (`pns_ai_chatboo/ai/contexts/domain/page_tab/page_tab.xml:51`). Turnos más lentos y una consulta de más.

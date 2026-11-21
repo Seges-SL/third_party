@@ -53,7 +53,7 @@
 | No comunicados, del inventario sobre 3.1.879 | 78 |
 | · al informe (§4, §5, §6 y §8) | 37 |
 | · fuera (cerrados, corregidos por 3.1.973, aceptados, no aplican o D70) | 41 |
-| Altas posteriores al inventario sobre 3.1.879 (§4 de este documento) | 18 |
+| Altas posteriores al inventario sobre 3.1.879 (§4 de este documento) | 20 |
 
 Las filas «— lo corrige 3.1.973» (8) entran en el informe en una tabla de una línea del §5 (decisión 2).
 
@@ -282,6 +282,8 @@ adelante y las gravedades «(propuesta)» quedan decididos (§5, 20/11/2026).
 | PNS-113 | Media (propuesta) | La recarga de traducciones de los `pns_*` con sobrescritura reescribe términos `code` de otros módulos (49 filas en la copia de LIYBEN, 13 con otro texto) | ABIERTO | — (en LIYBEN, B′ en el despliegue) | §6 (decisión 4) | seg «Observaciones sin ficha»; `liyben_3973.md`, Anexo A, Y6 |
 | PNS-114 | Baja (propuesta) | La conversión `fit_*` → roles del `-u` no valida contra el protocolo: un proveedor `openai` queda con Decisión y su `write` de roles da `ValidationError` | ABIERTO | — (en LIYBEN, D67) | §6 (decisión 4) | seg «Observaciones sin ficha»; `liyben_3973.md`, Y6 v1 |
 | Anexo de PNS-26 | Baja | 40001 en `/verification/execute`; en el staging del 18/11 no se reprodujo | SIN CAMBIO | — (tests, dos con skip) | §3, con PNS-26 | traspaso de la fase 4; plan 3973, staging |
+| Límite de subida «0 = no limit» | — (observación) | Con 0 el servidor usa 15 MB; el cliente corta en 10 MB sea cual sea el ajuste | ABIERTO | — | §8 (n.º 20) | manual 3973, parte 2; `utils/chatboo_product_icp.py:37`, `:46-59`, `:190-193`; `chatboo_component_v2.js:4053`, `:4105` |
+| Aviso «The reason is in the AI History» | — (observación) | Remite a un menú que no existe («Historial IA»); el real es «My Activity»/«Activity», sin traducir, que no ve un usuario con solo AI Conversational | ABIERTO | — (p34 reutiliza el aviso) | §8 (con la n.º 13) | manual 3973, parte 2; `chatboo_canvas_job.py:133`, `:156`; `ai_log_views.xml:281-293` |
 
 Antes de numerar PNS-112 a PNS-114 se buscaron en `docs/` sus síntomas (`_notify_get_reply_to`, `KeyError: 14`,
 `md5(src)`, `promote_fit_columns`, `_check_roles_match_protocol`): solo aparecen en las observaciones citadas, en el
@@ -317,7 +319,8 @@ fijados; en el §4, «(propuesta)» se lee como decidido.
 
 - Base: 3.1.973 en lugar de 3.1.879. Parches retirados por cubrirlos el fabricante: 10, 13, 14, 23, 30 y 31. Parches
   nuevos de la rama 3973: 35 a 39.
-- Altas: PNS-103 a PNS-105 (ya en el inventario sobre 3.1.879 como notas fechadas) y las 18 filas del §4.
+- Altas: PNS-103 a PNS-105 (ya en el inventario sobre 3.1.879 como notas fechadas) y las 20 filas del §4 (las dos
+  últimas, del 21/11/2026, al redactar el manual).
 - La ficha 26 sale (D70).
 
 ## 7. Erratas detectadas al redactar el informe (21/11/2026)
