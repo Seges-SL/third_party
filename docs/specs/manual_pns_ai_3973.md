@@ -972,7 +972,7 @@ Se repite con cada versión nueva del fabricante, después de adaptar los parche
 | A | Exportar a Word | `pns_ai_chatboo/static/src/js/chatboo_export.js:3590-3601` y `:3743` |
 | A | Reglas de registro | `pns_base/security/progress_job_rules.xml` (1); `pns_ai_mcp/security/security.xml` (20); `pns_ai_chatboo/security/security.xml` (6); ninguna con compañía en `domain_force`; M12 |
 | A | Resultados de las skills | `pns_ai_chatboo/ai/skills/system/customer_360.py:70-75` y `:594`; `pns_ai_mcp/utils/relaxaicode_recipe.py:266-277` y `:389`; `pns_ai_mcp/controllers/relaxaicode_prepare.py:215`; `pns_ai_mcp/controllers/relaxaicode_repair.py:236`; `pns_ai_mcp/utils/relaxaicode_render_base.py:344-355`; `pns_ai_chatboo/ai/skills/system/financial_health.py:31-37` |
-| B | Parches vigentes y qué se nota | `docs/pendiente/parches_pns_ai.md:239-271` (índice de la rama; el 38, en `:4785-4791`); nota B, §4 (`docs/pendiente/informe_3973/resumen_jefe_pns_ai.md:154-202`) |
+| B | Parches vigentes y qué se nota | `docs/pendiente/parches_pns_ai.md:240-273` (índice de la rama; el 38, en `:4785-4791`); nota B, §4 (`docs/pendiente/informe_3973/resumen_jefe_pns_ai.md:158-206`) |
 | B | 12 | `pns_ai_mcp/utils/privilege_cusp.py:102`; `pns_ai_mcp/models/ai_system_action.py:731` |
 | B | 16 | `pns_ai_mcp/models/safe_operation.py:1803-1805` |
 | B | 19 | `pns_ai_mcp/utils/mcp_client.py:103-115`; `pns_ai_mcp/utils/fetch_url_safe.py:128-139` |

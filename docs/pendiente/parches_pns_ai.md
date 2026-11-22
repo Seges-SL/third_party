@@ -251,7 +251,7 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
 | 17 | PNS-37 | seguridad | `pns_ai_mcp/models/ai_change_journal.py`, `pns_ai_mcp/controllers/safe_plan_execute.py` | 2a | Aplicado (11/11/2026) |
 | 18 | PNS-19 | seguridad | `pns_ai_mcp/models/seges_box_a_read.py`, `pns_ai_mcp/controllers/context_builder.py`, `pns_ai_mcp/controllers/controller_helpers.py`, `pns_ai_mcp/utils/seges_box_a_cache.py`, `pns_ai_mcp/utils/sandbox_helpers.py` (O1, B y B2); ampliado por P-22: `pns_ai_mcp/models/key_pin_desk.py`, `pns_ai_mcp/models/mcp_api_key_wizard.py` | 3b | Aplicado (12/11/2026); validado en el laboratorio (12/11/2026) |
 | 19 | PNS-17 | seguridad | `pns_ai_mcp/utils/fetch_url_safe.py`, `pns_ai_mcp/utils/mcp_client.py` | 2b | Aplicado (11/11/2026) |
-| 20 | PNS-70 | compatibilidad | `pns_ai_chatboo/static/src/js/chart.umd.min.js`, `pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js` | 2a | Aplicado (11/11/2026); prueba manual pendiente |
+| 20 | PNS-70 | compatibilidad | `pns_ai_chatboo/static/src/js/chart.umd.min.js`, `pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js` | 2a | Aplicado (11/11/2026); prueba manual hecha (11/11/2026, P-70 OK: «Pruebas manuales de la fase 2 en `lab_pns_ai_3973`») |
 | 21 | PNS-20 | seguridad | `pns_base/models/operation_report_wizard.py` | 2a | Aplicado (11/11/2026) |
 | 22 | PNS-100 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | 2b | Aplicado (11/11/2026): 22 nombres |
 | 23 | PNS-101 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
