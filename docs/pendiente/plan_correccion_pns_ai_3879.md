@@ -411,7 +411,7 @@ corrige lo elegido.
 | «Test Connection» escribe en el proveedor (staging E2′, 29/10/2026) | [Staging E2′](staging_e2_3879.md), «Resultado de la subida (29/10/2026)», A.7 | `models/ai_provider.py:1078` (`test_connection`): asigna `temperature_support`, `stt_support` y `usage_support` (`:1140-1154`), y el registro `ai_provider` cambia de `write_date`. Afecta a la lectura de P-20 A: el «antes» se toma después de cualquier «Test Connection» |
 | Etiqueta del cliente MCP del script de pruebas (staging E2′, 29/10/2026) | [Staging E2′](staging_e2_3879.md), D.1 | [`scripts_e2/pruebas_e2p_lab.py`](scripts_e2/pruebas_e2p_lab.py) se identifica como `seges-e2p-lab` también en el staging y queda en `last_mcp_client_label` del usuario que conecta. Script de Seges, no código de fábrica: decidir si toma la etiqueta del entorno |
 | La autenticación MCP no consulta el estado de la clave (staging E2′, 29/10/2026) | [Staging E2′](staging_e2_3879.md), D.3 | `controllers/main.py:473, 689, 837`: buscan `ai.mcp.user` solo por `mcp_api_key_hash` y no miran `mcp_api_key_state`. Revocar (`models/mcp_api_key_wizard.py:85-90`) borra el hash, así que hoy funciona; queda anotado por si alguna vía deja `not_generated` con el hash puesto |
-| Casilla AI Conversational en Usuarios MCP (staging E2′, 29/10/2026) | [Staging E2′](staging_e2_3879.md), D.0 y D.1 (P-37b) | `models/mcp_user.py:152-181` (casillas de grupos AI; `is_ai_conversational` en `:174-181`, con `_inverse_is_ai_conversational` en `:310-312`). **Fallo de la casilla `is_ai_conversational`:** Sergio confirma que la marcó y guardó la ficha de `e2p_writer` y el grupo no cambió; el grupo se puso desde la ficha del usuario. Código de fábrica. **Candidata al informe al fabricante** |
+| Casilla AI Conversational en Usuarios MCP (staging E2′, 29/10/2026) | [Staging E2′](staging_e2_3879.md), D.0 y D.1 (P-37b) | `models/mcp_user.py:152-181` (casillas de grupos AI; `is_ai_conversational` en `:174-181`, con `_inverse_is_ai_conversational` en `:310-312`). **Fallo de la casilla `is_ai_conversational`:** Sergio confirma que la marcó y guardó la ficha de `e2p_writer` y el grupo no cambió; el grupo se puso desde la ficha del usuario. Código de fábrica. **Candidata al informe al fabricante** → reproducción hecha en el laboratorio el 20/11/2026 (`lab_pns_ai_cc0060e_14`, core `cc0060e`, 6 casos): **no reproducida**; **fuera del informe** (D70) |
 | Defecto de `keys` en la muestra para Design (laboratorio de E3′, 30/10/2026) | [Laboratorio de E3′](lab_e3_3879.md), R8; [registro](parches_pns_ai.md), parche 15 | `pns_ai_chatboo/models/chatboo_canvas.py:889` (`sample_figures_for_design`) da a Design las filas con `keys`, y el DATA que escribe el servidor (`_flat_rows`, `:1487`) no las lleva: los diseños que dependen de `keys` salen vacíos y los salva la tabla de rescate. Código de fábrica, previo a los parches. **Candidata al informe al fabricante** |
 | Nombre de la descarga del lienzo (laboratorio de E3′, 30/10/2026) | [Laboratorio de E3′](lab_e3_3879.md), comprobación visual (2) | `pns_ai_chatboo/controllers/chatboo.py:1292-1299`: la descarga del lienzo usa `download_filename(session.canvas_title, …)` y sale con el nombre de la sesión, no con el de la página. Funcional |
 | Casilla «Design» en Gemini 3.5 flash lite (laboratorio del parche 29, 03/11/2026) | [Laboratorio del parche 29](lab_p29_3879.md), «Estado del laboratorio al terminar»; [staging de E3′](staging_e3_3879.md), G (toda la tarde del 03/11/2026 diseñó `lite`; el 04/11, 3.6 flash, y 3.5 flash en 5c) | Datos de `lab_pns_ai_3879_14`: el proveedor 4 (lite) no tenía «Design» el 30/10/2026 ([laboratorio de E3′](lab_e3_3879.md), 0.2) y sí el 03/11/2026. R8 se hace con un modelo de diseño que no sea `lite` (decisión 6 de la [propuesta de E3′](e3_propuesta_3879.md), «Propuesta final (29/10/2026)»; apartado E3′ de este plan). Se deja para E4′ por decisión de Sergio: decidir si se quita aquí y cómo queda en el staging y en LIYBEN |
@@ -676,7 +676,8 @@ validaciones de arriba se concretan así en el staging:
    `customer_360._iso` (fallo funcional de la skill de fábrica; hoja de E4′). Pendiente de comunicar al
    final (29/10/2026): la casilla AI Conversational de Usuarios MCP (`is_ai_conversational`,
    `models/mcp_user.py:174-181` y `:310-312`), que al marcarla y guardar no pone el grupo (hoja de E4′,
-   fila «Casilla AI Conversational en Usuarios MCP»). Pendiente de comunicar al final (05/11/2026,
+   fila «Casilla AI Conversational en Usuarios MCP»); → no reproducida en 3.1.973: fuera del informe (20/11/2026,
+   D70). Pendiente de comunicar al final (05/11/2026,
    E4′.a; [hoja de E4′](e4_hoja_3879.md), «Candidatas al informe al fabricante»):
    - **M11:** los `log_*` públicos de `ai.execution.engine` escriben filas del Historial IA a nombre de
      cualquier usuario, por RPC y con cursor propio (Seges, parche 30);
@@ -730,7 +731,8 @@ validaciones de arriba se concretan así en el staging:
    - la salvedad de PNS-28, como observación (2.6);
    - el prompt en `ai.log`, repetir (2.7);
    - U11, sin prueba (2.8);
-   - la casilla AI Conversational, tras la reproducción con un usuario no AI Administrator (2.9);
+   - ~~la casilla AI Conversational, tras la reproducción con un usuario no AI Administrator (2.9)~~: no reproducida en
+     3.1.973, fuera del informe (20/11/2026, D70);
    - la cancelación de las verificaciones pendientes (2.11);
    - `log_no_page` en `ai_log`, junto a PNS-98 (2.12);
    - obs. 6 y obs. 7 (2.14 y 2.15);

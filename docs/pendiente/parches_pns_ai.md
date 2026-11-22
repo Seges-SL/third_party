@@ -222,7 +222,8 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
   «Datos de partida»).
 - **Parches retirados** (los cubre el fabricante, comparación §4 y §7.4): 10, 13, 14, 23, 30 y 31. Sus
   entradas de más abajo no se cambian. Sus tests se conservan como no regresión de la corrección del
-  fabricante, salvo los del 23 que decidió quitar Sergio (plan, decisión 5).
+  fabricante. Del 23 se quitaron 13 tests (`test_markup_rejected_unit`, los 11 de `TestSegesEngineNames` y
+  `test_type_itemgetter_class`) y se adaptaron los demás (plan, decisión 5).
 - **Restos conocidos del parche 23 en 3.1.973** (sin vía de ataque conocida, comparación §4 y §9 P-6):
   `operator.itemgetter` se da nativo (la fachada solo sustituye `attrgetter` y `methodcaller`); un `Markup`
   admite campos simples en `format`. Se anotan sin más (decisión 5).
@@ -238,7 +239,7 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
 
 ### Índice de la rama `14.0-pns-ai-3973`
 
-| N.º | PNS / id | Tipo | Archivos en 3.1.973 (previstos) | Fase del plan | Estado |
+| N.º | PNS / id | Tipo | Archivos en 3.1.973 | Fase del plan | Estado |
 |---|---|---|---|---|---|
 | 10 | PNS-83 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
 | 11 | PNS-82 | seguridad | `pns_ai_chatboo/models/chatboo_session.py` | 2b | Aplicado (11/11/2026) |
@@ -250,7 +251,7 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
 | 17 | PNS-37 | seguridad | `pns_ai_mcp/models/ai_change_journal.py`, `pns_ai_mcp/controllers/safe_plan_execute.py` | 2a | Aplicado (11/11/2026) |
 | 18 | PNS-19 | seguridad | `pns_ai_mcp/models/seges_box_a_read.py`, `pns_ai_mcp/controllers/context_builder.py`, `pns_ai_mcp/controllers/controller_helpers.py`, `pns_ai_mcp/utils/seges_box_a_cache.py`, `pns_ai_mcp/utils/sandbox_helpers.py` (O1, B y B2); ampliado por P-22: `pns_ai_mcp/models/key_pin_desk.py`, `pns_ai_mcp/models/mcp_api_key_wizard.py` | 3b | Aplicado (12/11/2026); validado en el laboratorio (12/11/2026) |
 | 19 | PNS-17 | seguridad | `pns_ai_mcp/utils/fetch_url_safe.py`, `pns_ai_mcp/utils/mcp_client.py` | 2b | Aplicado (11/11/2026) |
-| 20 | PNS-70 | compatibilidad | `pns_ai_chatboo/static/src/js/chart.umd.min.js`, `pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js` | 2a | Aplicado (11/11/2026); prueba manual pendiente |
+| 20 | PNS-70 | compatibilidad | `pns_ai_chatboo/static/src/js/chart.umd.min.js`, `pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js` | 2a | Aplicado (11/11/2026); prueba manual hecha (11/11/2026, P-70 OK: «Pruebas manuales de la fase 2 en `lab_pns_ai_3973`») |
 | 21 | PNS-20 | seguridad | `pns_base/models/operation_report_wizard.py` | 2a | Aplicado (11/11/2026) |
 | 22 | PNS-100 | seguridad | `pns_ai_mcp/controllers/validators_base.py` | 2b | Aplicado (11/11/2026): 22 nombres |
 | 23 | PNS-101 | seguridad | — | — | Retirado en 3.1.973 (cubierto por el fabricante) |
@@ -265,9 +266,10 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
 | 32 | PNS-97 | seguridad | `pns_ai_mcp/models/ai_trusted_action.py` | 2a | Aplicado (11/11/2026) |
 | 33 | PNS-29 | seguridad | `pns_ai_mcp/models/ai_provider.py`, `pns_ai_mcp/wizard/ai_provider_usage_wizard.py` | 2a | Aplicado (11/11/2026) |
 | 34 | PNS-96 | funcional | `pns_ai_chatboo/models/chatboo_canvas.py`, `pns_ai_chatboo/models/chatboo_async_request.py` | 4 | Aplicado (16/11/2026): opción A; aviso en línea llana sin marcas (D25, sustituye a F1); L1 hecho, L2 pendiente (P-13) |
+| 35 | PNS-109 (NUEVO-2) | robustez | `pns_ai_mcp/migrations/14.0.3.1.973/post-migrate.py` | plan, «Parche 35» | Aplicado (17/11/2026); se comprueba en P-2 (a, b y c). Única excepción a «sin `migrations/` propios»: solo se ejecuta en un `-u` que cruce 3.1.973; una BD actualizada a 3.1.973 sin el parche no lo ejecuta y se corrige a mano (una instalación nueva no lo necesita). Validado en el laboratorio (P-2, 18/11/2026), en P-15 y en staging (`pns_demo`, 18/11/2026) |
 | 36 | PNS-103 | funcional | `pns_base/models/operation_report_wizard.py` | 2c | Aplicado (11/11/2026); validado en el laboratorio (12/11/2026) |
 | 37 | PNS-104 | datos | `pns_ai_mcp/controllers/controller_helpers.py` | 3b | Aplicado (12/11/2026) |
-| 35 | NUEVO-2 | robustez | `pns_ai_mcp/migrations/14.0.3.1.973/post-migrate.py` | plan, «Parche 35» | Aplicado (17/11/2026); se comprueba en P-2 (a, b y c). Única excepción a «sin `migrations/` propios»: solo se ejecuta en un `-u` que cruce 3.1.973; una BD actualizada a 3.1.973 sin el parche no lo ejecuta y se corrige a mano (una instalación nueva no lo necesita). Validado en el laboratorio (P-2, 18/11/2026), en P-15 y en staging (`pns_demo`, 18/11/2026) |
+| 38 | PNS-105 | datos | `pns_base/utils/seges_side_env.py` (nuevo) y 11 archivos de pns_ai_mcp y pns_ai_chatboo (lista en la entrada) | propuesta de la fase 3 | Aplicado (13/11/2026); validado en el laboratorio (13/11/2026), salvo la apertura 24; desplegado en staging (sin prueba propia) |
 | 39 | PNS-107 | seguridad | `pns_ai_mcp/controllers/validators_base.py`, `pns_ai_mcp/controllers/context_builder.py` | plan, «Pruebas posteriores», punto 4 (P2) | Aplicado (17/11/2026): `iap.account.get` bloqueado en la caja A por modelo y nombre, y sus 8 llamadores públicos por nombre (D40); campo calculado de `partner_autocomplete` e `iap_enrich`, restos conocidos. Validado en el laboratorio (18/11/2026, también con el core `cc0060e`); desplegado en staging (18/11/2026), con `iap_account` sin cambios |
 
 **Staging (18/11/2026):** la rama se desplegó en `pns_demo` con el commit `5d0559b`

@@ -184,7 +184,7 @@ Lo que falta para cerrar cada uno:
 | 8 | PNS-28 (salvedad) | Media | En Odoo 14 el `OPTIONS` lo contesta el core: la afirmación del fabricante es falsa en 14 (sin efecto en la seguridad). P-28 no consta hecha y no está en la lista del informe | comp §2.1, §3 «PNS-28», §4.3 P-28 |
 | 9 | Petición de §5 (prompt en `ai.log`) | — | PARCIAL: lo que recibe el modelo sigue sin guardarse. Pedido el 16/10 (inf. 16/10 §5, fila PNS-46/PNS-95). Ningún documento de `pendiente/` posterior lo trata | comp §6 y §6.1 |
 | 10 | U11 | — | Agente «Decision» huérfano tras el `-u`, no anunciado. P-9d no se hizo («no entraba en el encargo») | comp §9.2 U11, §9.6 |
-| 11 | Hoja 26 (casilla AI Conversational) | — | Va al informe (plan §3.2), pero la reproducción en el laboratorio (decisión 5 de la segunda ronda) no consta hecha (Grep en `pendiente/`: ningún registro): sin ella el caso no es reproducible para el fabricante | hoja ficha 26 y decisión 5 |
+| 11 | Hoja 26 (casilla AI Conversational) | — | Va al informe (plan §3.2), pero la reproducción en el laboratorio (decisión 5 de la segunda ronda) no consta hecha (Grep en `pendiente/`: ningún registro): sin ella el caso no es reproducible para el fabricante. → reproducción hecha en el laboratorio el 20/11/2026 (`lab_pns_ai_cc0060e_14`, core `cc0060e`, 6 casos): **no reproducida**; **fuera del informe** (D70) | hoja ficha 26 y decisión 5 |
 | 12 | Escritura sin causa en la operación 27 (staging E1′) | — | Escritura de ADM a las 16:47:55, sin efecto y sin causa en el código. Sin decisión | diag R6 §6 (consulta 2) y §7 |
 | 13 | Un rechazo de `relaxaicode` sin AI Writer cancela todas las verificaciones pendientes del usuario | — | «Para valorar en E4′»; la hoja no tiene fila para ella | seg «Observaciones sin ficha» |
 | 14 | `log_no_page` escribe en `ai_log` en cursor propio desde la caja A | — | Filas que el rollback no deshace (lab E2′, filas 318 y 319; hoja, filas 758 a 761). Solo se decidió conservar las filas, no si es un defecto (escritura fuera de la caja A) | lab_e2 «Resultado (28/10/2026)»; hoja «Comprobaciones en ejecución», nota |
@@ -210,7 +210,7 @@ nuevo de cada fila está en §3.
 | 8 | 2.6 | PNS-28 (salvedad) | AI | Observación en el informe; P-28 no se hace |
 | 9 | 2.7 | Petición de §5 | AI | Repetir la petición en el informe |
 | 10 | 2.8 | U11 | AI | Informe sin prueba (P-9d no se hace) |
-| 11 | 2.9 | Hoja 26 | AI | Reproducción en el laboratorio (shell y `rollback`, decisión 5) con un usuario que **no** sea AI Administrator, antes del informe. Pendiente de hacer |
+| 11 | 2.9 | Hoja 26 | AI | Reproducción en el laboratorio (shell y `rollback`, decisión 5) con un usuario que **no** sea AI Administrator, antes del informe. → reproducción hecha en el laboratorio el 20/11/2026 (`lab_pns_ai_cc0060e_14`, core `cc0060e`, 6 casos): **no reproducida**; **fuera del informe** (D70) |
 | 12 | 2.10 | Escritura en la operación 27 | AC | Cerrar sin acción: sin efecto y sin causa en el código |
 | 13 | 2.11 | Cancelación de las verificaciones pendientes | AI | Informe (defecto del fabricante; no cumple el criterio del bloque F) |
 | 14 | 2.12 | `log_no_page` en `ai_log` | AI | Es un defecto (escritura fuera de la caja A de solo lectura); al informe junto a PNS-98, sin parche |
@@ -497,7 +497,7 @@ Abreviaturas de origen: **inf.** informes de Seges (PNS-01 a 80, 08/10/2026; 81 
 | Hoja 23 | stE2 G A.7 | — | «Test Connection» escribe en el proveedor | AC (sin acción; 09/11) | hoja ficha 23 | §2 bis, fila 11 |
 | Hoja 24 | stE2 G D.1 | — | Etiqueta MCP del script de E2′ | CS (script de E4′.h, sin parche; lab 06 y 09/11; stg 09/11) | hoja decisión 8; plan, nota del 06/11 | — |
 | Hoja 25 | stE2 G D.3 | — | La autenticación MCP no consulta el estado de la clave | AC (sin acción) y AI (09/11) | hoja ficha 25 | §2 bis, fila 12 |
-| Hoja 26 | stE2 G D.0 y D.1 | — | Casilla AI Conversational de Usuarios MCP | AI | hoja ficha 26, decisión 5; plan §3.2 | §2, fila 11. Pendiente antes del informe: reproducción en el laboratorio con un usuario que no sea AI Administrator (decisión 5) |
+| Hoja 26 | stE2 G D.0 y D.1 | — | Casilla AI Conversational de Usuarios MCP | AI | hoja ficha 26, decisión 5; plan §3.2 | §2, fila 11. → Reproducción hecha en el laboratorio el 20/11/2026 (`lab_pns_ai_cc0060e_14`, core `cc0060e`, 6 casos): **no reproducida**; **fuera del informe** (D70) |
 | Hoja 27 | lab E3′ R8 | — | Defecto de `keys` en la muestra para Design | AI | hoja ficha 27; plan §3.2 (05/11) | — |
 | Hoja 28 | lab E3′ | — | Nombre de la descarga del lienzo | AI (09/11) | hoja ficha 28 | §2 bis, fila 13 |
 | Hoja 29 | lab p29; stE3 G | — | Casilla «Design» en `lite` | AC (hoja, decisión 6) | hoja ficha 29; plan §3.1 y §4 | Laboratorio y staging, hechos; LIYBEN, en §3.1 |
@@ -610,7 +610,8 @@ lista.
 - Exportación: F4 / HTML crudo en PDF y DOCX (§5, fila 6); copiar y XLSX con tabla sin prosa; prosa y
   aviso antes de la tabla, solo la columna `Name`, «Word» como `.doc` HTML. Fuente: plan §3.2.
 - Skills y configuración: `customer_360._iso`, causa en `ensure_module_result_call` (hoja 22); casilla AI
-  Conversational de Usuarios MCP (hoja 26; falta la reproducción, §2 fila 11). Fuente: plan §3.2.
+  Conversational de Usuarios MCP (hoja 26; no reproducida en 3.1.973, **fuera del informe**, D70, 20/11/2026).
+  Fuente: plan §3.2.
 
 **D. Actualización y paquete**
 

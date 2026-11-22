@@ -85,7 +85,7 @@ añade a la lista negra del sandbox los métodos que privatiza; E3 cierra el res
    Gemini. **Hecho el 20/11/2026** (limpieza final, D69): [liyben_3973.md](liyben_3973.md), J.
 3. Integrar la rama en `14.0` con merge commit y volver el clon del VPS a `14.0`. **Hecho el 20/11/2026** con la rama
    `14.0-pns-ai-3973` (merge commit `d9b2e16`, PR #2; D68): [liyben_3973.md](liyben_3973.md), I.
-   Pendiente: el segundo merge commit (commits de la rama posteriores al primero) y el borrado de
-   `14.0-pns-ai-3973` (D69, M7; J).
+   Segundo merge commit (commits de la rama posteriores al primero) y borrado de `14.0-pns-ai-3973`: **hechos el
+   20/11/2026** (`d8cb3f0`, PR #3; D69, M7; J).
 4. Actualizar y enviar la 2.ª entrega del informe al fabricante (D2), sin código.
 5. Guía de configuración: mitigaciones que dejan de hacer falta y versión instalada.
