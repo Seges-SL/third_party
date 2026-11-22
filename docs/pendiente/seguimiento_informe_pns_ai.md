@@ -27,7 +27,7 @@
 > [estado_hallazgos_3879.md](../specs/estado_hallazgos_3879.md).
 
 > **Nota (21/11/2026):** las fichas de este seguimiento no se reescriben. Su estado en 3.1.973 está en la
-> [2.ª entrega del informe al fabricante](informe_fabricante_pns_ai_3973.md), enviada el *(fecha de envío)*, y en el
+> [2.ª entrega del informe al fabricante](informe_fabricante_pns_ai_3973.md), ya enviada, y en el
 > [inventario sobre 3.1.973](informe_3973/estado_hallazgos_3973.md).
 
 > **Fase 3 (laboratorio) hecha**, con el parche 1 aplicado para que los módulos se importen:

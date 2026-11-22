@@ -1,14 +1,11 @@
 # CONFIDENCIAL — Informe técnico de seguridad, 2.ª entrega: pns_base 1.2.69, pns_ai_mcp 3.1.973 y pns_ai_chatboo 2.1.587 (Odoo 14.0)
 
-> **Borrador.** Pendiente de revisión interna antes de su envío.
-
 | | |
 |---|---|
 | **Destinatario** | PATANEGRA Soft |
 | **Módulos** | `pns_base` 1.2.69 · `pns_ai_mcp` 3.1.973 ("AI Engine") · `pns_ai_chatboo` 2.1.587 ("Chatboo"), descargados de la rama `14.0` de sus repositorios el 2026-11-09 (commits `3f76f58`, `2450983` y `0c2e6e3`) |
 | **Plataforma** | Odoo 14.0 |
 | **Entregas anteriores** | Informe técnico de seguridad del 2026-10-08 sobre `pns_base` 1.2.10, `pns_ai_mcp` 3.1.486 y `pns_ai_chatboo` 2.1.322 (PNS-01 a PNS-80) · Seguimiento del 2026-10-15 sobre `pns_base` 1.2.32, `pns_ai_mcp` 3.1.782 y `pns_ai_chatboo` 2.1.453 (estado de PNS-01 a PNS-80 y hallazgos nuevos PNS-81 a PNS-92) · Continuación del 2026-10-16, mismas versiones (pruebas con un proveedor de IA real y hallazgos nuevos PNS-93 a PNS-96) |
-| **Fecha** | *(fecha de envío)* |
 | **Entorno de análisis** | Odoo 14.0 con Python 3.7.3 (imagen oficial de Odoo 14, Debian Buster). Laboratorio con bases de datos de prueba, con dos versiones del core de Odoo 14: la de la imagen (14.0.20231106) y la de nuestros servidores (commit `cc0060e`, 2024-10-22). Entorno de pruebas con datos de demostración, 2 workers y un proveedor de IA real (Google Gemini por el protocolo compatible con OpenAI). Copia de una base de datos de producción de un cliente, para ensayar la actualización desde 3.1.782. |
 | **Método** | Revisión del código de 3.1.973 frente a 3.1.879, hallazgo por hallazgo; comprobaciones en el laboratorio sobre 3.1.973 sin ninguna corrección local; batería de tests automáticos sobre los módulos con nuestras correcciones; actualización desde 3.1.879 en el entorno de pruebas y desde 3.1.782 en la copia de producción. Detalle y límites en §7. |
 | **Referencias de código** | Las líneas citadas son las del código publicado de estas versiones, sin ninguna corrección local. Este informe no incluye código ni diffs de nuestras correcciones: las describimos con palabras. |
@@ -750,7 +747,7 @@ oficial (14.0.20231106).
        como interbloqueo. Por lectura, lo mismo puede pasar con las respuestas binarias de `fetch_url` y `api_call`
        (`_run_on_committed_cursor`);
   - hemos contado 24 cursores propios con `Environment` en los módulos; varios siguen este patrón;
-  - los tests no lo ven: `_create_log_entry` no escribe con los tests en marcha (`ai_log.py:716`; `utils/compat.py:42-56`).
+  - los tests no lo ven: `_create_log_entry` no escribe con los tests en marcha (`ai_log.py:716`; `pns_ai_mcp/utils/compat.py:42-57`).
 - **Sin límite en la base de datos:** `_store` no fija `lock_timeout` ni `statement_timeout`; los `SET LOCAL` del cursor
   del plan (`models/safe_operation.py:967-968, 1462-1466`) no actúan mientras su transacción está parada; y con la
   configuración por defecto de PostgreSQL, que es la de nuestros servidores, no hay ningún otro tiempo de espera.
@@ -986,7 +983,7 @@ Siguen abiertos en el código de 3.1.973. Una ficha breve por defecto.
   - los lectores (`user_ids`) solo se limitan a usuarios internos con el `domain` del campo (`:46-52`), que no actúa por
     RPC: el dueño puede añadir un usuario de portal, que recibe el aviso (por correo, si lo tiene así) aunque no pueda
     abrir la página;
-  - la regla del AI Administrator da escritura y alta sobre todas las páginas (`security/security.xml:67-76`): puede
+  - la regla del AI Administrator da escritura y alta sobre todas las páginas (`pns_ai_chatboo/security/security.xml:67-76`): puede
     cambiar el nombre y los lectores de páginas ajenas, y avisar a quien quiera.
 - **Impacto:** avisos a usuarios externos con un enlace a una página que no pueden abrir; cambios en páginas ajenas sin
   que lo sepa su dueño.
