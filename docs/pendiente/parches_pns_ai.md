@@ -222,7 +222,8 @@ Las entradas de esta rama están más abajo, en «Parches de la rama 14.0-pns-ai
   «Datos de partida»).
 - **Parches retirados** (los cubre el fabricante, comparación §4 y §7.4): 10, 13, 14, 23, 30 y 31. Sus
   entradas de más abajo no se cambian. Sus tests se conservan como no regresión de la corrección del
-  fabricante, salvo los del 23 que decidió quitar Sergio (plan, decisión 5).
+  fabricante. Del 23 se quitaron 13 tests (`test_markup_rejected_unit`, los 11 de `TestSegesEngineNames` y
+  `test_type_itemgetter_class`) y se adaptaron los demás (plan, decisión 5).
 - **Restos conocidos del parche 23 en 3.1.973** (sin vía de ataque conocida, comparación §4 y §9 P-6):
   `operator.itemgetter` se da nativo (la fachada solo sustituye `attrgetter` y `methodcaller`); un `Markup`
   admite campos simples en `format`. Se anotan sin más (decisión 5).
