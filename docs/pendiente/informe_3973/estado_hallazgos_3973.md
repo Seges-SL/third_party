@@ -27,6 +27,7 @@
 
 - **3.1.973 (fabricante):** CORREGIDO · PARCIAL · SIN CAMBIO · NO APLICA, con la precisión de la comparación. «CORREGIDO
   (sigue en 3.1.973)»: fila CF cuyo código toca 3.1.973 y la comparación da por todavía corregida (comp §3.3).
+  ABIERTO: sin corregir en el código del fabricante (hallazgos posteriores a la entrega, §4).
 - **Rama de Seges:** parche que lo corrige en la rama (`pN`), retirado o «—» (sin parche).
 - **Informe:** sección del informe al fabricante.
   - **§3 corregido:** comunicado y corregido por el fabricante. Va en la tabla, sin comentario.
@@ -53,7 +54,7 @@
 | No comunicados, del inventario sobre 3.1.879 | 78 |
 | · al informe (§4, §5, §6 y §8) | 37 |
 | · fuera (cerrados, corregidos por 3.1.973, aceptados, no aplican o D70) | 41 |
-| Altas posteriores al inventario sobre 3.1.879 (§4 de este documento) | 20 |
+| Altas posteriores al inventario sobre 3.1.879 (§4 de este documento) | 23 |
 
 Las filas «— lo corrige 3.1.973» (8) entran en el informe en una tabla de una línea del §5 (decisión 2).
 
@@ -127,7 +128,7 @@ Las filas «— lo corrige 3.1.973» (8) entran en el informe en una tabla de un
 | PNS-64 | Media | Voces remotas | CF (verificado en 3.1.879; no revisado en 3.1.973) | — | §3 corregido | est 374 |
 | PNS-65 | Media | Exportaciones del navegador | CF (verificado en 3.1.879; no revisado en 3.1.973) | — | §3 corregido | est 375 |
 | PNS-66 | Media | Skills sin grupo | CF (verificado en 3.1.879; no revisado en 3.1.973) | — | §3 corregido | est 376 |
-| PNS-67 | Media | Errores en skills financieras | CF782 (no revisado en 3.1.973) | — | §3 corregido | est 377 |
+| PNS-67 | Media | Errores en skills financieras | CORREGIDO: 3.1.973 reescribe la skill de salud financiera (filtra por fecha y compañía) y retira customer-risk-analysis; comprobado en el código (22/11/2026), sin prueba en ejecución | — | §3 corregido | est 377; `financial_health.py:27-38`, `:137-149`; `chatboo_skill_data.xml:2-11`; `ai_skill_disk.py:377-423`, `:472`; commit del fabricante `33ca68c` |
 | PNS-68 | Media | Migraciones que borran skills | CF (verificado en 3.1.879; no revisado en 3.1.973) | — | §3 corregido | est 378 |
 | PNS-69 | Baja | `SELF_*_FIELDS` como `property` | CF782 (no revisado en 3.1.973) | — | §3 corregido | est 379 |
 | PNS-70 | Alta (desde 23/10; antes Media) | Chart.js 4 en `window.Chart` | SIN CAMBIO | p20 | §3 abierto · corregido en la rama de Seges | est 380; comp 280 |
@@ -284,6 +285,9 @@ adelante y las gravedades «(propuesta)» quedan decididos (§5, 20/11/2026).
 | Anexo de PNS-26 | Baja | 40001 en `/verification/execute`; en el staging del 18/11 no se reprodujo | SIN CAMBIO | — (tests, dos con skip) | §3, con PNS-26 | traspaso de la fase 4; plan 3973, staging |
 | Límite de subida «0 = no limit» | — (observación) | Con 0 el servidor usa 15 MB; el cliente corta en 10 MB sea cual sea el ajuste | ABIERTO | — | §8 (n.º 20) | manual 3973, parte 2; `utils/chatboo_product_icp.py:37`, `:46-59`, `:190-193`; `chatboo_component_v2.js:4053`, `:4105` |
 | Aviso «The reason is in the AI History» | — (observación) | Remite a un menú que no existe («Historial IA»); el real es «My Activity»/«Activity», sin traducir, que no ve un usuario con solo AI Conversational | ABIERTO | — (p34 reutiliza el aviso) | §8 (con la n.º 13) | manual 3973, parte 2; `chatboo_canvas_job.py:133`, `:156`; `ai_log_views.xml:281-293` |
+| Agente «AI Admin» sin AI Administrator | — (observación) | La web dice que exige AI Administrator; la autoría y la captura de skills, la generación OpenAPI y la detección de servidores lo invocan sin comprobar el grupo (un AI Writer lo usa desde «My Skills») | ABIERTO | — (no se corrige) | §8 (n.º 26) | revisión del informe, 22/11/2026; `ir.model.access.csv:14`, `:62`; `ai_skill_authoring.py:139-147`; `skill_capture_wizard.py:347` |
+| Comentario desfasado en `security.xml` | — (observación) | `:12-13` dice que AI Administrator no implica Conversational, pero lo implica (`security_groups.xml:50`); `:18` remite a una ruta `stacks/…` que no existe | ABIERTO | — (no se corrige) | §8 (n.º 27) | revisión del informe, 22/11/2026; `pns_ai_mcp/security/security.xml:12-13`, `:18` |
+| Referencias huérfanas en `es.po` | — (observación) | Referencias `#:` a `field_ai_external_server__trusted` y `field_ai_mcp_server__trusted`, que no existen; el campo es `ai.api.server.trusted` | ABIERTO | — (no se corrige) | §8 (n.º 28) | revisión del informe, 22/11/2026; `pns_ai_mcp/i18n/es.po:4441`, `:4442` |
 
 Antes de numerar PNS-112 a PNS-114 se buscaron en `docs/` sus síntomas (`_notify_get_reply_to`, `KeyError: 14`,
 `md5(src)`, `promote_fit_columns`, `_check_roles_match_protocol`): solo aparecen en las observaciones citadas, en el
@@ -319,8 +323,8 @@ fijados; en el §4, «(propuesta)» se lee como decidido.
 
 - Base: 3.1.973 en lugar de 3.1.879. Parches retirados por cubrirlos el fabricante: 10, 13, 14, 23, 30 y 31. Parches
   nuevos de la rama 3973: 35 a 39.
-- Altas: PNS-103 a PNS-105 (ya en el inventario sobre 3.1.879 como notas fechadas) y las 20 filas del §4 (las dos
-  últimas, del 21/11/2026, al redactar el manual).
+- Altas: PNS-103 a PNS-105 (ya en el inventario sobre 3.1.879 como notas fechadas) y las 23 filas del §4 (las dos
+  del 21/11/2026, al redactar el manual, y las tres últimas, del 22/11/2026, al revisar el informe).
 - La ficha 26 sale (D70).
 
 ## 7. Erratas detectadas al redactar el informe (21/11/2026)

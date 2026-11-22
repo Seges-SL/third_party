@@ -227,7 +227,7 @@ en §3.2 a §3.4 describimos solo el resto.
 | PNS-64 | Media | CORREGIDO | 3.1.879 (sin revisar en 3.1.973) | — |
 | PNS-65 | Media | CORREGIDO | 3.1.879 (sin revisar en 3.1.973) | — |
 | PNS-66 | Media | CORREGIDO | 3.1.879 (sin revisar en 3.1.973) | — |
-| PNS-67 | Media | CORREGIDO | 3.1.782 (sin revisar en 3.1.973) | — |
+| PNS-67 | Media | CORREGIDO | 3.1.973 reescribe la skill de salud financiera (filtra por fecha y compañía) y retira customer-risk-analysis; comprobado en el código (22/11/2026), sin prueba en ejecución | — |
 | PNS-68 | Media | CORREGIDO | 3.1.879 (sin revisar en 3.1.973) | — |
 | PNS-69 | Baja | CORREGIDO | 3.1.782 (sin revisar en 3.1.973) | — |
 | PNS-70 | Alta | ABIERTO · corregido por Seges | 3.1.973 | Gravedad revisada (antes Media). §3.2. |
@@ -1351,3 +1351,19 @@ de la entrega del 16/10, §3.4) ayudaría a diagnosticarlas.
     página».
 25. **El chat llama a `relaxaicode` aunque se le pida no consultar los datos,** pese a la regla de `page_tab`
     (`pns_ai_chatboo/ai/contexts/domain/page_tab/page_tab.xml:51`). Turnos más lentos y una consulta de más.
+
+### 8.6 Web, comentarios y traducciones
+
+26. **El agente «AI Admin» no exige el grupo AI Administrator.** La web dice que lo exige. En el código, `ai.agent` no
+    tiene grupos: lo lee cualquier usuario interno y solo lo modifica AI Administrator
+    (`pns_ai_mcp/security/ir.model.access.csv:14` y `:62`). La autoría y la captura de skills, la generación OpenAPI y
+    la detección de servidores lo invocan sin comprobar el grupo (`models/ai_skill_authoring.py:139-147`,
+    `wizard/skill_capture_wizard.py:347`, `services/openapi_spec_generator.py:613`, `models/external_server.py:742`,
+    `:777` y `:802`), de modo que un AI Writer lo usa desde «My Skills». Nos parece coherente con su uso, pero la web
+    y el código no dicen lo mismo.
+27. **Comentario desfasado en `security.xml`.** `pns_ai_mcp/security/security.xml:12-13` dice que AI Administrator no
+    implica Conversational, pero sí lo implica (`security/security_groups.xml:50`); la línea 18 remite a
+    `stacks/owl1|owl2/security/security_groups.xml`, que no existe en el módulo entregado.
+28. **Referencias huérfanas en `es.po`.** `pns_ai_mcp/i18n/es.po:4441` y `:4442` tienen referencias `#:` a
+    `field_ai_external_server__trusted` y `field_ai_mcp_server__trusted`, campos que no existen; el campo es
+    `ai.api.server.trusted`. No afecta a la traducción, pero despista a quien busca el campo desde el `es.po`.
