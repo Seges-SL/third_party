@@ -1,5 +1,10 @@
 # Guía de configuración de pns_base, pns_ai_mcp y pns_ai_chatboo (Odoo 14)
 
+> **Nota (22/11/2026):** esta guía describe la versión 3.1.782 de los módulos y se conserva solo como registro;
+> ya no se actualiza. Para la versión vigente (3.1.973 con los parches de Seges), la referencia es el
+> [manual de los módulos](manual_pns_ai_3973.md). La ficha y el aviso que siguen son los de octubre de 2026: las
+> decisiones posteriores (cambio de base a 3.1.879 el 22/10 y a 3.1.973 el 10/11) los dejan sin efecto.
+
 **Para:** consultor funcional y técnico que preparan el VPS de pruebas (staging) · **Fecha:** 2026-10-15
 (actualizada el 2026-10-16 con el staging) · **Rama:** `14.0-pns-ai-3` · **Versiones:** `pns_base`
 1.2.32, `pns_ai_mcp` 3.1.782 y `pns_ai_chatboo` 2.1.453 (fabricante: PATANEGRA Soft), con los parches

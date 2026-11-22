@@ -786,7 +786,7 @@ Código de la rama (`14.0-pns-ai-informe`, `4224bf9`; módulos sin cambios desde
 | 11 | Grupos, implicaciones y nombres en español | `pns_ai_mcp/security/security_groups.xml:16-50`; `pns_ai_mcp/i18n/es.po:2865`, `:2872`, `:4861`, `:4867` y `:4873` |
 | 11 | Menús y sus grupos | `menus.py` (los `menuitem` de los tres módulos); `pns_ai_mcp/views/mcp_user_views.xml:145-170`; `views/res_config_settings_views.xml:10-11` y `:360-365` |
 | 11 | Plan con los permisos de quien lo pidió; AI Administrator implica AI Conversational | `docs/specs/comparacion_pns_ai_3-1-973.md`, §6.2 y §6.3 |
-| 11 | Criterio de asignación (D4, D27, N3) | `docs/specs/guia_configuracion_pns_ai.md:357-385` |
+| 11 | Criterio de asignación (D4, D27, N3) | `docs/specs/guia_configuracion_pns_ai.md:362-390` |
 | 12 | Campos del proveedor | `pns_ai_mcp/models/ai_provider.py:170-200`, `:408-429`; `:626-651` (protocolo y rol, dirección) |
 | 12 | Clave no copiada; prueba de conexión | `pns_ai_mcp/models/ai_provider.py:195-200` y `:1200-1202` |
 | 12 | Ejemplos de proveedores | `pns_ai_mcp/static/examples/providers/*.json` |
@@ -835,7 +835,7 @@ Código de la rama (`14.0-pns-ai-informe`, `4224bf9`; módulos sin cambios desde
 | 20 | Límite de subida | `pns_ai_chatboo/utils/chatboo_product_icp.py:37`, `:46-59`, `:145` y `:190-193`; `static/src/js/chatboo_component_v2.js:4053` |
 | 21 | Regla ante cada versión nueva | nota B, §8 |
 | 21 | Lo que hace la actualización | `docs/specs/comparacion_pns_ai_3-1-973.md`, §7.3; `docs/specs/diferencias_3-1-973_seges.md`, §4; `docs/pendiente/liyben_3973.md`, D66, D67 y G |
-| 22 | Problemas | las secciones citadas; `docs/specs/guia_configuracion_pns_ai.md:588-614` (los que siguen valiendo); `docs/pendiente/liyben_3973.md`, H |
+| 22 | Problemas | las secciones citadas; `docs/specs/guia_configuracion_pns_ai.md:593-619` (los que siguen valiendo); `docs/pendiente/liyben_3973.md`, H |
 
 **Se comprueba en ejecución** (prueba automática; procedimiento y resultado en «Comprobación en ejecución», al final):
 los grupos y sus implicaciones (M2), los menús por grupo (M3), las etiquetas en español de esta parte (M4), los
