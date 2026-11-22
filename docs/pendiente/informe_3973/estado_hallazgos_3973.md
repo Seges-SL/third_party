@@ -151,7 +151,7 @@ Las filas «— lo corrige 3.1.973» (8) entran en el informe en una tabla de un
 | PNS-87 | Baja | Pérdida de datos de consumo al actualizar | CF (verificado en 3.1.879; no revisado en 3.1.973) | — | §3 corregido | est 397 |
 | PNS-88 (hoja 11) | Baja | Renombrados de 3.1.518 que faltan | SIN CAMBIO | — | §3 abierto · aceptado por Seges | est 398; comp 391 |
 | PNS-89 | Baja | `key_pin/stop` sin CSRF | CF (verificado en 3.1.879; no revisado en 3.1.973) | — | §3 corregido | est 399 |
-| PNS-90 (parche 7) | Alta | Caché de `fetch_url` | CF (verificado en 3.1.879; no revisado en 3.1.973) | p7 retirado (lo corrigió el fabricante) | §3 corregido | est 400 |
+| PNS-90 (parche 7) | Alta | Caché de `fetch_url` | CORREGIDO (sigue en 3.1.973) | p7 retirado (lo corrigió el fabricante) | §3 corregido | est 400; comp 326 |
 | PNS-91 (parche 8) | Media | `ensure_domain_whitelisted` | CF (verificado en 3.1.879; no revisado en 3.1.973) | p8 retirado (lo corrigió el fabricante) | §3 corregido | est 401 |
 | PNS-92 | Media | `set_mcp_api_key` | CF (verificado en 3.1.879; no revisado en 3.1.973) | — | §3 corregido | est 402 |
 | PNS-93 (parche 5) | Media | `thought_signature` de Gemini 3 | CF (verificado en 3.1.879; no revisado en 3.1.973) | p5 retirado (lo corrigió el fabricante) | §3 corregido | est 403 |
@@ -220,7 +220,7 @@ Las filas «— lo corrige 3.1.973» (8) entran en el informe en una tabla de un
 | U9 | — (datos) | El `-u` borra `ai_log.agent_id` (nota de versión falsa) | NO APLICA a un `-u` desde 3.1.879 | — | §6 | est 478; comp 403 |
 | U6 | — (datos) | Cinco parámetros renombrados, no anunciado | SIN CAMBIO | — | — aceptado (nota interna) | est 479; comp 417 |
 | U11 | — (datos) | Agente «Decision» huérfano, no anunciado | SIN CAMBIO | — | §6 | est 480; comp 419 |
-| U15 | — (datos) | Resiembra y tres skills nuevas, no anunciadas | SIN CAMBIO (mismo mecanismo) | — | — aceptado (nota interna) | est 481; comp 418 |
+| U15 | — (datos) | Resiembra y skills nuevas, no anunciadas (tres en 3.1.879; desde 3.1.879, 3.1.973 crea 4 y retira 7) | SIN CAMBIO (mismo mecanismo) | — | — aceptado (nota interna) | est 481; comp 418 |
 | U16 | — (datos) | Historial de Chatboo reescrito, no anunciado | SIN CAMBIO | — | — aceptado (nota interna) | est 482 |
 | Numeración de `pns_base` 1.2.47 | — | Número que no casa con el contenido | CORREGIDO (dato: 1.2.69) | — | §6 | est 483 |
 | `unit_tests/` no entregados | — | Tests citados que no vienen en el paquete | SIN CAMBIO (no vienen) | — | — aceptado (nota interna) | est 484; comp 420 |
@@ -331,6 +331,8 @@ fijados; en el §4, «(propuesta)» se lee como decidido.
 
 - **PNS-80 (§2):** figura como «CF782 (no revisado en 3.1.973)», pero la comparación (§3.2) lo revisó en 3.1.973: NO
   APLICA (`read_progress` no existe). Por eso el informe dice 53 corregidos sin revisar en 3.1.973, no 54.
+- **PNS-67 y PNS-90 (22/11/2026):** PNS-67 se ha comprobado en el código de 3.1.973 (§2) y PNS-90 ya lo revisó la
+  comparación (§3.3, comp 326, fila conjunta con PNS-14): el informe pasa a 51 corregidos sin revisar en 3.1.973.
 - **PNS-100 (§3):** la comparación (§3.1, §4 y §7.4) y `diferencias_3-1-973_seges.md` (§2) dicen que faltan 21 de los
   28 nombres (y §3.1, «7 de 28»). 3.1.973 cubre 6 de los 28 (el séptimo nombre que añade, `build_email`, no está en la
   lista de Seges): faltan 22, como dicen este inventario y el informe.

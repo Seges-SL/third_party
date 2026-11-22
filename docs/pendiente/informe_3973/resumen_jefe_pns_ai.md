@@ -1,7 +1,8 @@
 # Módulos de IA de PATANEGRA Soft en Odoo 14: qué se encontró, qué ha corregido Seges y dónde estamos
 
 - **Nota interna de Seges. No se envía al fabricante.**
-- **Para:** dirección (perfil funcional de Odoo). **De:** Sergio Guerrero. **Fecha:** 21/11/2026.
+- **Para:** dirección (perfil funcional de Odoo). **De:** Sergio Guerrero. **Fecha:** 21/11/2026
+  (actualizada el 22/11/2026).
 - **Versiones:** `pns_base` 1.2.69, `pns_ai_mcp` 3.1.973 y `pns_ai_chatboo` 2.1.587, con las correcciones de Seges.
 - **Base:** el [inventario de hallazgos](estado_hallazgos_3973.md) y el
   [informe al fabricante](../informe_fabricante_pns_ai_3973.md) (2.ª entrega, pendiente de envío), donde está el
@@ -32,11 +33,13 @@ no ha corregido (los tres altos que quedan se aceptan o se le dejan a él, §7).
 **Dónde estamos (21/11/2026):**
 - **LIYBEN**, en producción con 3.1.973 y nuestras correcciones **desde el 20/11** (13 minutos de corte, sin errores).
 - **El informe al fabricante (2.ª entrega)**, pendiente de revisión y envío. Pide fecha para lo más urgente.
-- **Pendiente:** el manual de uso y configuración y, después, la versión para Odoo 17.
+- **Manual de uso y configuración:** completo (22/11/2026), `docs/specs/manual_pns_ai_3973.md`. **Pendiente:** la
+  versión para Odoo 17.
 
 **En cifras, con 3.1.973.** De lo comunicado al fabricante (111 puntos): 84 corregidos por él, 12 abiertos que corrige
-Seges, 9 abiertos con el riesgo aceptado y 6 abiertos de gravedad media o baja. De los 18 hallazgos nuevos: 1 corregido
-por el fabricante, 9 por Seges, 3 cubiertos con configuración o procedimiento y 5 abiertos (media o baja). Detalle en §3.
+Seges, 9 abiertos con el riesgo aceptado y 6 abiertos sin corrección ni aceptación: uno de gravedad alta (PNS-26), uno
+media (PNS-28) y tres observaciones y una petición, sin gravedad. De los 18 hallazgos nuevos: 1 corregido por el
+fabricante, 9 por Seges, 3 cubiertos con configuración o procedimiento y 5 abiertos (media o baja). Detalle en §3.
 
 ---
 
@@ -69,7 +72,7 @@ por el fabricante, 9 por Seges, 3 cubiertos con configuración o procedimiento y
 | Corregido por el fabricante | 84 |
 | Sigue abierto en su código; corregido por Seges | 12 |
 | Sigue abierto; Seges acepta el riesgo | 9 |
-| Sigue abierto, sin corrección ni aceptación (gravedad media o baja) | 6 |
+| Sigue abierto, sin corrección ni aceptación (PNS-26, Alta; PNS-28, Media; 3 observaciones y 1 petición) | 6 |
 
 **Hallazgos nuevos** (PNS-97 a PNS-114, 18): el fabricante ya ha corregido uno (PNS-101); Seges corrige 9; 3 se cubren
 con configuración o con el procedimiento de actualización (PNS-110, PNS-113 y PNS-114), y 5 quedan abiertos (PNS-98,
@@ -132,9 +135,10 @@ Es lo más importante, porque lo puede provocar **cualquier usuario del chat**, 
 - **Proveedores con un papel que no admiten** (Baja, PNS-114): la actualización convierte las antiguas casillas de cada
   proveedor en «roles» sin comprobar si el proveedor los admite. Después, guardar los roles de ese proveedor da error.
 - **Lo que la actualización reescribe sin anunciarlo:** los contextos de fábrica sin dueño (12 archivos, entre ellos las
-  instrucciones generales del asistente), las skills de fábrica (7 se borran y 4 se crean), el historial de Chatboo y
-  cinco parámetros que cambian de nombre. Al actualizar desde 3.1.782 se pierde además qué agente hizo cada llamada en
-  el historial del motor (en LIYBEN no se perdió nada: ese historial estaba vacío).
+  instrucciones generales del asistente), las skills de fábrica (al actualizar desde 3.1.879 se borran 7 y se crean 4;
+  desde 3.1.782, como en LIYBEN, se borran 6 y se crean 6), el historial de Chatboo y cinco parámetros que cambian de
+  nombre. Al actualizar desde 3.1.782 se pierde además qué agente hizo cada llamada en el historial del motor (en LIYBEN
+  no se perdió nada: ese historial estaba vacío).
 - **Cambios de comportamiento:** todo AI Administrator pasa a tener acceso al chat (AI Conversational); el plan se
   ejecuta como quien lo pidió y en las compañías marcadas en la pantalla; si ningún proveedor tiene el rol Diseño, las
   páginas las diseña el proveedor del chat (Baja, PNS-110).
@@ -256,7 +260,7 @@ cualquier adjunto. En el informe le reconocemos estas mejoras.
   correctas y 0 errores en el log. Uso real del chat: dos preguntas y una tabla de los 5 clientes con más facturación,
   respondidas por el proveedor OVH, sin botón Canvas (como se esperaba) y sin errores.
 
-**Salvedad.** De los 84 corregidos por el fabricante, 53 los damos por buenos por lo que comprobamos en 3.1.782 o
+**Salvedad.** De los 84 corregidos por el fabricante, 51 los damos por buenos por lo que comprobamos en 3.1.782 o
 3.1.879, sin volver a revisarlos en 3.1.973: el fabricante no ha tocado su código o son de gravedad media o baja. Los
 críticos y altos sí se han vuelto a revisar.
 
@@ -320,7 +324,8 @@ y protegerla por construcción.
    y sus tests se quedan para vigilar que no vuelva el fallo. Los demás se adaptan y se vuelve a probar todo
    (laboratorio, staging, ensayo sobre una copia y producción con copia completa antes).
 
-**Siguiente:** revisar y enviar el informe; el manual de uso y configuración; después, la versión de Odoo 17.
+**Siguiente:** revisar y enviar el informe; después, la versión de Odoo 17 (el manual de uso y configuración está
+completo desde el 22/11/2026).
 
 ---
 

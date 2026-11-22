@@ -53,9 +53,10 @@
 
    - **Críticos abiertos:** PNS-01, PNS-02, PNS-07 y PNS-54. 3.1.973 corrige parte de PNS-01, PNS-02 y PNS-07; PNS-54
      sigue igual.
-   - **Observaciones y petición de la entrega del 16/10 (15):** 11 corregidas; siguen abiertas las observaciones 6, 7 y
-     13 y la petición de §5 (registrar el prompt que recibe el modelo).
-   - **Salvedad:** 53 de los 84 corregidos (hallazgos y observaciones) se dan por corregidos por lo que comprobamos en 3.1.782 o 3.1.879, sin volver a
+   - **Observaciones y petición de la entrega del 16/10 (15; incluye la de compatibilidad de la entrega del 08/10):**
+     11 corregidas; siguen abiertas las observaciones 6, 7 y 13 y la petición de §5 (registrar el prompt que recibe el
+     modelo).
+   - **Salvedad:** 51 de los 84 corregidos (hallazgos y observaciones) se dan por corregidos por lo que comprobamos en 3.1.782 o 3.1.879, sin volver a
      revisarlos en 3.1.973, porque 3.1.973 no toca su código o son de gravedad media o baja (§7).
    - Respecto a la entrega del 16/10, PNS-70 pasa de Media a **Alta**: en Odoo 14 rompe los gráficos del propio Odoo
      (§3).
@@ -227,7 +228,7 @@ en §3.2 a §3.4 describimos solo el resto.
 | PNS-64 | Media | CORREGIDO | 3.1.879 (sin revisar en 3.1.973) | — |
 | PNS-65 | Media | CORREGIDO | 3.1.879 (sin revisar en 3.1.973) | — |
 | PNS-66 | Media | CORREGIDO | 3.1.879 (sin revisar en 3.1.973) | — |
-| PNS-67 | Media | CORREGIDO | 3.1.973 reescribe la skill de salud financiera (filtra por fecha y compañía) y retira customer-risk-analysis; comprobado en el código (22/11/2026), sin prueba en ejecución | — |
+| PNS-67 | Media | CORREGIDO | 3.1.973 | Reescribe la skill de salud financiera (filtra por fecha y compañía) y retira customer-risk-analysis; comprobado en el código (22/11/2026), sin prueba en ejecución |
 | PNS-68 | Media | CORREGIDO | 3.1.879 (sin revisar en 3.1.973) | — |
 | PNS-69 | Baja | CORREGIDO | 3.1.782 (sin revisar en 3.1.973) | — |
 | PNS-70 | Alta | ABIERTO · corregido por Seges | 3.1.973 | Gravedad revisada (antes Media). §3.2. |
@@ -250,7 +251,7 @@ en §3.2 a §3.4 describimos solo el resto.
 | PNS-87 | Baja | CORREGIDO | 3.1.879 (sin revisar en 3.1.973) | — |
 | PNS-88 | Baja | ABIERTO · Seges asume el riesgo | 3.1.973 | §3.3. |
 | PNS-89 | Baja | CORREGIDO | 3.1.879 (sin revisar en 3.1.973) | — |
-| PNS-90 | Alta | CORREGIDO | 3.1.879 (sin revisar en 3.1.973) | — |
+| PNS-90 | Alta | CORREGIDO | 3.1.973 | Sigue corregido con el código nuevo. |
 | PNS-91 | Media | CORREGIDO | 3.1.879 (sin revisar en 3.1.973) | — |
 | PNS-92 | Media | CORREGIDO | 3.1.879 (sin revisar en 3.1.973) | — |
 | PNS-93 | Media | CORREGIDO | 3.1.879 (sin revisar en 3.1.973) | — |
@@ -273,7 +274,7 @@ en §3.2 a §3.4 describimos solo el resto.
 | Petición de §5: registrar el prompt que recibe el modelo | — | ABIERTO | 3.1.973 | §3.4. |
 | Compatibilidad sin número (entrega del 08/10, §7.1 a §7.4 y §8.5) | — | CORREGIDO | 3.1.973 | Ya no aplica: el código de 3.1.973 no usa esas construcciones. |
 
-**Recuento (111 filas):** CORREGIDO 84 (53 de ellos sin revisar en 3.1.973) · ABIERTO · corregido por Seges 12 ·
+**Recuento (111 filas):** CORREGIDO 84 (51 de ellos sin revisar en 3.1.973) · ABIERTO · corregido por Seges 12 ·
 ABIERTO · Seges asume el riesgo 9 · ABIERTO 6.
 
 ### 3.2 Abiertos y corregidos por Seges en su instalación
@@ -486,7 +487,8 @@ salvo donde se indica.
   petición entera, y el reintento termina bien porque la ejecución es idempotente.
 - **Impacto:** el resultado es correcto, pero queda un error en el log en cada ejecución desde la ficha, y la
   corrección depende del reintento de Odoo. Lo vimos en el entorno de pruebas sobre 3.1.879 y lo reproducimos por
-  test en 3.1.973. En el entorno de pruebas del 18/11, sobre 3.1.973, una ejecución desde la ficha no lo reprodujo.
+  test en 3.1.973 y en el laboratorio. En el entorno de pruebas del 18/11, sobre 3.1.973, una ejecución desde la
+  ficha no lo reprodujo.
 - **Corrección sugerida:** consumir el token en el mismo cursor que ejecuta, o refrescar la fila tras la ejecución
   antes de escribirla. No lo hemos corregido: un cambio completo tocaría la caja B más de lo que justifica la
   gravedad.
@@ -1159,14 +1161,14 @@ Rutas relativas a la raíz de los módulos, como en §4.
 
 ### 7.1 Salvedad: lo que no hemos vuelto a revisar en 3.1.973
 
-De los 84 corregidos de §3.1, **53 no los hemos vuelto a revisar en 3.1.973**: los dimos por corregidos al comprobarlos
-en 3.1.879 (40) o en 3.1.782 (13), y 3.1.973 no toca su código o son de gravedad media o baja. En la tabla de §3.1
+De los 84 corregidos de §3.1, **51 no los hemos vuelto a revisar en 3.1.973**: los dimos por corregidos al comprobarlos
+en 3.1.879 (39) o en 3.1.782 (12), y 3.1.973 no toca su código o son de gravedad media o baja. En la tabla de §3.1
 figuran con la verificación «3.1.879 (sin revisar en 3.1.973)» o «3.1.782 (sin revisar en 3.1.973)»:
-- **3.1.879 (40):** PNS-22, 31, 32, 35, 38 a 43, 46, 49, 62, 64 a 66, 68, 72 a 74, 76, 85 a 87, 89 a 93 y 95, y las
+- **3.1.879 (39):** PNS-22, 31, 32, 35, 38 a 43, 46, 49, 62, 64 a 66, 68, 72 a 74, 76, 85 a 87, 89, 91 a 93 y 95, y las
   observaciones 1 a 5 y 8 a 12 de la entrega del 16/10;
-- **3.1.782 (13):** PNS-34, 44, 45, 47, 48, 52, 63, 67, 69, 71, 75, 78 y 79.
+- **3.1.782 (12):** PNS-34, 44, 45, 47, 48, 52, 63, 69, 71, 75, 78 y 79.
 
-De las 40, 3.1.973 toca el código de dos y las miramos por encima: PNS-35 sigue corregido (prefijo `'` en
+De las 39, 3.1.973 toca el código de dos y las miramos por encima: PNS-35 sigue corregido (prefijo `'` en
 `pns_ai_mcp/utils/artifact_export_table.py:285` y `controllers/formatters.py:73`); en PNS-41, los tres `website`
 apuntan fuera, y por lectura la ficha de Aplicaciones deja de mostrar el `index.html` del módulo (sin comprobar en la
 interfaz).
