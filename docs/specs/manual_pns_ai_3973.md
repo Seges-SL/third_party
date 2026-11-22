@@ -8,7 +8,8 @@
 - **Fuentes:** el código de la rama y la documentación del repo; cada parte las lista al final. La web del fabricante
   se compara aparte (Anexo A). Lo que solo se comprueba con Odoo en marcha se comprueba con la prueba automática del
   final.
-- **Estado:** borrador por partes (21/11/2026). Parte 1: §0 y Parte I. Parte 2: Parte II.
+- **Estado:** completo (22/11/2026). Parte 1: §0 y Parte I. Parte 2: Parte II. Parte 3 (22/11/2026): Anexos A y B,
+  «Etiquetas de pantalla», «Comprobación en ejecución» y «Fuentes de los anexos».
 
 ## Índice
 
@@ -39,10 +40,11 @@
   21. [Qué cambia al actualizar](#21-qué-cambia-al-actualizar)
   22. [Problemas típicos](#22-problemas-típicos)
   - [Fuentes de la Parte II](#fuentes-de-la-parte-ii)
-- Anexo A. La web frente a los módulos *(parte 3)*.
-- Anexo B. Qué cambia para el usuario en la versión de Seges *(parte 3)*.
-- Etiquetas de pantalla *(parte 3)*.
-- Comprobación en ejecución (prueba automática en `lab_pns_ai_3973`) *(parte 3)*.
+- [Anexo A. La web frente a los módulos](#anexo-a-la-web-frente-a-los-módulos)
+- [Anexo B. Qué cambia para el usuario con Seges](#anexo-b-qué-cambia-para-el-usuario-en-la-versión-de-seges)
+- [Etiquetas de pantalla](#etiquetas-de-pantalla)
+- [Comprobación en ejecución](#comprobación-en-ejecución-prueba-automática-en-lab_pns_ai_3973)
+- [Fuentes de los anexos](#fuentes-de-los-anexos)
 
 ---
 
@@ -400,9 +402,10 @@ Cada punto, por sección:
 | 10 | Riesgos aceptados | nota B, §7; `docs/pendiente/informe_3973/estado_hallazgos_3973.md` |
 | — | Menús y grupos de cada menú | los `menuitem` de las vistas de los tres módulos, con su `groups` |
 
-**Se comprueba en ejecución** (prueba automática, parte 3): los menús que ve cada grupo, las etiquetas en español de
-las vistas y menús, los nombres y comandos de las 10 skills registradas, el valor por defecto de «Permitir voces
-remotas» y el de la retención.
+**Se comprueba en ejecución** (procedimiento y resultado en «Comprobación en ejecución (prueba automática en
+`lab_pns_ai_3973`)», al final): los menús que ve cada grupo, las etiquetas en español de las vistas y menús, los
+nombres y comandos de las 10 skills registradas, el valor por defecto de «Permitir voces remotas» y el de la
+retención.
 
 ---
 
@@ -420,7 +423,7 @@ IA» en *Motor de IA → Seguridad → Usuarios*). Ninguno se asigna solo al cre
 | Grupo | Para qué | Implica |
 |---|---|---|
 | «IA Conversacional» | El chat (con la clave MCP, §1) y los clientes MCP externos. | Usuario interno |
-| «IA Escritor» | Que la IA proponga cambios (planes) y confirmarlos; contextos y skills propios. | Usuario interno |
+| «IA Escritor» | Que la IA proponga cambios (planes) y confirmarlos; contextos y skills propios (al escribir skills usa el agente «Admin IA», §13). | Usuario interno |
 | «IA URL externa» | Que un plan descargue páginas de internet (lista blanca, §16). | Usuario interno |
 | «IA API externa» | Que un plan llame a servidores externos MCP u OpenAPI (§16). | Usuario interno |
 | «IA Administrador» | Toda la configuración: proveedores, agentes, claves, servidores, lista blanca, registros. | Los otros cuatro |
@@ -525,10 +528,14 @@ los módulos y no se pueden borrar:
 |---|---|---|---|
 | Chatboo | `pns_ai_chatboo` | Inferencia | El chat. Su cadena es la que importa en el uso diario. |
 | MCP Server | `pns_ai_mcp` | Endpoint | Sirve contextos y herramientas a clientes MCP externos (§15); la IA corre en el cliente, así que no usa proveedores. |
-| «Admin IA» | `pns_ai_admin` | Inferencia | Trabajos internos del administrador: generar un OpenAPI desde la documentación, detección de servidores y ayuda al escribir skills. Si se usan, hay que darle su cadena, como a cualquier agente de inferencia. |
+| «Admin IA» | `pns_ai_admin` | Inferencia | Trabajos internos del motor: generar un OpenAPI desde la documentación, detección de servidores y ayuda al escribir skills. Si se usan, hay que darle su cadena, como a cualquier agente de inferencia. |
 
 `pns_ai_admin` es el código de este agente, no un módulo aparte. El tipo sale sin traducir («Inference (internal
 LLM)», «Endpoint (external LLM)»).
+
+**«Admin IA» no exige el grupo «IA Administrador».** Cualquier usuario interno puede leer el agente y solo un «IA
+Administrador» puede cambiarlo, pero también lo usa un «IA Escritor»: al escribir sus skills desde «Mis Habilidades» y
+con el asistente «Crear o editar skill», la ayuda la redacta este agente con su cadena de proveedores.
 
 En la ficha del agente: los proveedores (§12), «Rondas LLM máx.» (10 por defecto: cuántas veces puede llamar al modelo
 en un turno), y los contextos y skills enlazados (§14). La ficha se abre también desde los Ajustes del motor, con el
@@ -540,11 +547,17 @@ cadena queda vacía, el agente pasa a usar todos los proveedores activos (§12).
 **Contextos** (*Motor de IA → Conocimiento → Contextos*). Son el conocimiento que se le da al modelo en cada turno, con
 cuatro tipos (sin traducir):
 - `core`: las instrucciones de base del motor (`system_prompt`). Siempre van;
-- `domain`: paquetes de conocimiento de un tema (contabilidad, facturas de proveedor, contactos, nóminas…) y los de
-  Chatboo (páginas en pestaña, lienzo, foco de pantalla);
+- `domain`: paquetes de conocimiento de un tema (contabilidad, facturas de proveedor, contactos, nóminas…) y cuatro
+  de Chatboo;
 - `discovery`: las palabras que deciden qué paquete de dominio entra en un turno, por idioma (con versión en español
   de cada tema del motor);
 - `locale`: términos por idioma.
+
+**Los de Chatboo** son 6. Cuatro de dominio: `page_tab` (responder con una página en su propia pestaña),
+`presentation_grids` (cómo se presentan las tablas), `self_chatboo` (la identidad del chat; es el de reserva) y
+`ui_focus` (la pantalla de Odoo que queda debajo del chat). Y dos de descubrimiento: `discovery_page_tab` y su variante
+en español, `discovery_page_tab_es_ES`. Los contextos no tienen nombre traducido: en las listas salen por su código
+técnico, y el tipo, sin traducir.
 
 Con «Packs de dominio por turno» activado en los Ajustes del motor (lo está por defecto), un paquete de dominio solo
 entra en los turnos que lo necesitan; así el contexto de base es más pequeño. *Motor de IA → Conocimiento →
@@ -597,10 +610,11 @@ también en `/mcp/<código de agente>`.
 
 ### 16. Lista blanca, servidores externos y OpenAPI
 
-**Política de URL** (Ajustes del motor, bloque «Plan seguro»): **«Solo lista blanca»** (por defecto) u «Abierto
-(auto-añadir URLs)». Con la primera, un plan solo descarga de los dominios de la lista; fuera de ella, un «IA
-Administrador» puede confirmar que se añada el dominio. Con «Abierto» se descarga cualquier dirección y el dominio se
-añade solo: **no usarla.** En los dos casos se rechazan las direcciones internas y se comprueba cada redirección.
+**«Política de acceso a URLs»** (Ajustes del motor, bloque «Plan seguro»): **«Solo lista blanca»** (por defecto)
+u «Abierto (auto-añadir URLs)». El título del bloque sale en inglés, «URL access policy» (sin traducir). Con la
+primera, un plan solo descarga de los dominios de la lista; fuera de ella, un «IA Administrador» puede confirmar que
+se añada el dominio. Con «Abierto» se descarga cualquier dirección y el dominio se añade solo: **no usarla.** En los
+dos casos se rechazan las direcciones internas y se comprueba cada redirección.
 
 **Lista blanca** (*Conexiones → «Lista Blanca»*). Cada fila tiene «Dominio» (vale también para sus subdominios),
 «Tipo» («Web (fetch_url)», «Servidor MCP» o «Servidor OpenAPI»), «Válido desde», «Válido hasta», «Notas» y «Añadido
@@ -657,7 +671,7 @@ un cambio. Lo que un plan borra no se borra en el momento: queda «En la papeler
 | Qué | Dónde se fija | Por defecto | Con 0 o vacío |
 |---|---|---|---|
 | Registro de actividad | Ajustes del motor, «Retención del registro de actividad (días)» | Vacío | Se conserva todo |
-| Sesiones del chat (mensajes, tablas y archivos subidos), por días sin uso | Ajustes de Chatboo, «Retención de sesiones (días)» | Vacío | Se conservan |
+| Sesiones del chat (mensajes, tablas y archivos subidos), por días sin uso | Ajustes de Chatboo, «Retención de sesiones (días)» | 0 | Se conservan |
 | Papelera de cambios | Ajustes del motor, «Papelera de cambios (días)» | 30 | Hasta vaciarla |
 | Archivos de exportación de `pns_base` | Solo en Parámetros del sistema: `pns_base.export_retention_hours` | 24 horas | No se borran |
 | Copia oculta de la última tabla | Ajustes de Chatboo, «Horas que dura esa copia» | 12 horas | Lo que dure la sesión |
@@ -674,8 +688,8 @@ exportaciones, caducidad de planes y mantenimiento de la cola del chat). *(Versi
 En los Ajustes del motor:
 - **«Copia de seguridad de la configuración»**: «Exportar configuración» e «Importar configuración». Es un JSON con
   proveedores, roles (solo su estado), agentes (solo su configuración), contextos y skills que no son de fábrica,
-  servidores, lista blanca, usuarios MCP (sus permisos de IA) y algunos ajustes del motor (política de URL, packs por
-  turno y prefijos de skills).
+  servidores, lista blanca, usuarios MCP (sus permisos de IA) y algunos ajustes del motor (política de acceso a URLs,
+  packs por turno y prefijos de skills).
 - «Partial artifact bundle» (sin traducir) exporta e importa solo una parte («Export selection», «Import bundle»). Hay,
   además, botones de exportar e importar en las listas de cada modelo (por ejemplo, «Exportar seleccionados»).
 
@@ -689,8 +703,8 @@ que ya existen» (desmarcado: solo se crean los que faltan). **«Revisar»** ens
 *(versión de Seges: antes, la revisión dejaba cosas escritas)*. Los agentes solo se actualizan, nunca se crean.
 - *(Versión de Seges:)* un «IA Administrador» sin Ajustes puede revisar y aplicar una importación (antes daba un error
   de permisos).
-- **No importar copias de origen desconocido:** pueden cambiar proveedores, direcciones o la política de URL, y las
-  skills importadas quedan activas (§14).
+- **No importar copias de origen desconocido:** pueden cambiar proveedores, direcciones o la política de acceso a
+  URLs, y las skills importadas quedan activas (§14).
 
 ### 20. Ajustes de Chatboo
 
@@ -702,7 +716,7 @@ En *Motor de IA → Ajustes*, bloque «Chatboo» (varios de ellos también está
 | «Permitir voces remotas» | Desmarcado | Si no hay voz local, deja al navegador usar la de su fabricante, y el texto sale a ese servicio (§9). |
 | «Copia oculta de la lista (MB)» | 8 | La última tabla se guarda aparte para reordenarla sin volver a consultar, fuera de lo que se envía al modelo. 0 = sin tope. Seges recomienda no ponerlo a 0 (D30). |
 | «Horas que dura esa copia» | 12 | §18. |
-| «Retención de sesiones (días)» | Vacío | §18. |
+| «Retención de sesiones (días)» | 0 | §18. |
 | «Límite de descarga (MB)» | 15 | Tope de los archivos que prepara la sesión (§4). 0 = sin límite. |
 | «Límite de subida (MB)» | 15 | Tope del servidor por archivo subido. **La ayuda dice «0 = sin límite» y no es así:** con 0 se usan 15 MB (y al volver a abrir los Ajustes sale 15). Además, el chat no deja subir más de 10 MB por archivo, así que un valor mayor no tiene efecto (§5). |
 | «Motor de gráficos» | ECharts | La librería de los gráficos del chat (ECharts o Chart.js). |
@@ -733,7 +747,8 @@ del filestore antes, y comprobaciones antes y después.
 - conserva los valores de retención que ya hubiera (§18).
 
 **Comprobar después:** la cadena de cada agente, los roles (sobre todo Diseño y Decisión), los grupos de IA de los
-administradores, la retención, la política de URL y que no haya proveedores ni servidores activos que no se usen.
+administradores, la retención, la política de acceso a URLs y que no haya proveedores ni servidores activos que no
+se usen.
 
 ### 22. Problemas típicos
 
@@ -783,8 +798,10 @@ Código de la rama (`14.0-pns-ai-informe`, `4224bf9`; módulos sin cambios desde
 | 12 | Diseño sin rol (PNS-110) y LIYBEN (D62) | `docs/specs/comparacion_pns_ai_3-1-973.md`, §6.6; `docs/pendiente/liyben_3973.md`, D62 y H |
 | 12 | PNS-18 aceptado | nota B, §7; inventario 3973, PNS-18 |
 | 13 | Agentes de fábrica | `pns_ai_mcp/data/ai_agent_data.xml:8-37`; `models/ai_agent.py:283-293` (cadena de «Admin IA»); `pns_ai_chatboo/data/ai_agent_data.xml:7-13`; `pns_ai_mcp/models/ai_agent.py:60-110` |
+| 13 | «Admin IA» sin grupo propio y quién lo usa | `pns_ai_mcp/data/ai_agent_data.xml:26-36`; `pns_ai_mcp/security/ir.model.access.csv:14` y `:62`; `pns_ai_mcp/models/ai_skill_authoring.py:139-147`; `pns_ai_mcp/wizard/skill_capture_wizard.py:347`; `pns_ai_mcp/security/ir.model.access.csv:30`; `pns_ai_mcp/i18n/es.po:4751-4752` y `:8698-8699` |
 | 13 | Cadena vacía tras quitar la fila | `docs/pendiente/liyben_3973.md`, H («Cadena de Chatboo») |
 | 14 | Tipos de contexto | `pns_ai_mcp/utils/context_roles.py:31-43`; `pns_ai_mcp/ai/contexts/` |
+| 14 | Contextos de Chatboo y su nombre en pantalla | `pns_ai_chatboo/data/chatboo_context_data.xml:5`; `pns_ai_chatboo/ai/contexts/domain/page_tab/page_tab.xml:4`; `pns_ai_chatboo/ai/contexts/domain/presentation_grids/presentation_grids.xml:4`; `pns_ai_chatboo/ai/contexts/domain/self_chatboo/self_chatboo.xml:4` y `:9`; `pns_ai_chatboo/ai/contexts/domain/ui_focus/ui_focus.xml:4`; `pns_ai_chatboo/ai/contexts/discovery/`; `pns_ai_mcp/models/ai_context.py:107` y `:178-186` |
 | 14 | Packs por turno | `pns_ai_mcp/models/res_config_settings.py:91-102` |
 | 14 | Reglas de dueño (contextos y skills) | `pns_ai_mcp/security/security.xml:25-157` |
 | 14 | Restaurar desde el módulo | `pns_ai_mcp/models/ai_context_disk.py:23-60` |
@@ -797,7 +814,7 @@ Código de la rama (`14.0-pns-ai-informe`, `4224bf9`; módulos sin cambios desde
 | 15 | Herramientas publicadas | `pns_ai_mcp/controllers/tools_relaxaicode.py:39-40`; `controllers/safe_plan.py:356-357` y `:527-528`; `controllers/tools_context.py:151-154` (`get_context`, no publicada) |
 | 15 | Orígenes web | `pns_ai_mcp/models/res_config_settings.py:80-89` |
 | 15 | LIYBEN sin claves y `/mcp` 404 | `docs/pendiente/liyben_3973.md`, D20, D60 y H |
-| 16 | Política de URL | `pns_ai_mcp/models/res_config_settings.py:103-116` |
+| 16 | Política de acceso a URLs | `pns_ai_mcp/models/res_config_settings.py:103-116`; `pns_ai_mcp/i18n/es.po:2843-2845`, `:2848-2850` y `:6419-6421`; título del bloque: `pns_ai_mcp/views/res_config_settings_views.xml:237`, sin entrada en `es.po` (comprobado en el código, no en pantalla) |
 | 16 | Lista blanca: campos, permisos y datos | `pns_ai_mcp/models/url_whitelist.py:40-95`; `security/ir.model.access.csv:6` y `:48`; `data/url_whitelist_data.xml` |
 | 16 | Servidores externos, `stdio` y «De confianza (auto-confirmar)» | `pns_ai_mcp/models/external_server.py:104-125`, `:242-254` y `:575-592` |
 | 16 | Redirecciones (parche 19) | nota B, §4 |
@@ -806,7 +823,7 @@ Código de la rama (`14.0-pns-ai-informe`, `4224bf9`; módulos sin cambios desde
 | 18 | Registro de actividad | `pns_ai_mcp/security/security.xml:69-89`; `views/ai_log_views.xml:281-293` |
 | 18 | Purga del registro | `pns_ai_mcp/models/ai_log.py:908-932`; `models/res_config_settings.py:62-69` |
 | 18 | Cambios aplicados, revertir y papelera | `pns_ai_mcp/models/ai_change_journal.py:40-47` y `:618-630`; `utils/change_journal.py:17` y `:177-182`; `models/res_config_settings.py:71-79` |
-| 18 | Retención de sesiones (vacío = 0) | `pns_ai_chatboo/utils/chatboo_product_icp.py:109-150` |
+| 18 | Retención de sesiones: sin la clave, `read_product_settings` devuelve 0 y la pantalla muestra 0 | `pns_ai_chatboo/utils/chatboo_product_icp.py:124-131` y `:142`; `pns_ai_chatboo/models/res_config_settings.py:46-47` y `:118` |
 | 18 | Exportaciones de `pns_base` | `pns_base/models/ir_attachment.py:15-43` |
 | 18 | Tareas programadas | `pns_ai_mcp/data/*_cron.xml`; `pns_ai_chatboo/data/chatboo_async_cron.xml`; `pns_base/data/export_purge_cron.xml` |
 | 18 | Sesión borrada en LIYBEN | `docs/pendiente/liyben_3973.md`, G («Chatboo 0 sesiones en L0») |
@@ -820,7 +837,160 @@ Código de la rama (`14.0-pns-ai-informe`, `4224bf9`; módulos sin cambios desde
 | 21 | Lo que hace la actualización | `docs/specs/comparacion_pns_ai_3-1-973.md`, §7.3; `docs/specs/diferencias_3-1-973_seges.md`, §4; `docs/pendiente/liyben_3973.md`, D66, D67 y G |
 | 22 | Problemas | las secciones citadas; `docs/specs/guia_configuracion_pns_ai.md:588-614` (los que siguen valiendo); `docs/pendiente/liyben_3973.md`, H |
 
-**Se comprueba en ejecución** (prueba automática, parte 3): los grupos y sus implicaciones (M2), los menús por grupo
-(M3), las etiquetas en español de esta parte (M4), los contextos y skills registrados (M5 y M6), los roles y su uso
-(M7), los agentes (M8), «Permitir voces remotas» (M9), las tareas programadas (M10), los ajustes y la retención (M11)
-y las reglas multicompañía (M12).
+**Se comprueba en ejecución** (prueba automática; procedimiento y resultado en «Comprobación en ejecución», al final):
+los grupos y sus implicaciones (M2), los menús por grupo (M3), las etiquetas en español de esta parte (M4), los
+contextos y skills registrados (M5 y M6), los roles y su uso (M7), los agentes (M8), «Permitir voces remotas» (M9),
+las tareas programadas (M10), los ajustes y la retención (M11) y las reglas multicompañía (M12).
+
+---
+
+## Anexo A. La web frente a los módulos
+
+Lo que dice la web del fabricante frente a lo que hacen los módulos instalados (3.1.973 con los parches de Seges).
+
+| Tema | La web | Los módulos (3.1.973 con los parches de Seges) |
+|---|---|---|
+| Versiones de Odoo | De la 14 a la 20. Describe Chatboo 2.1.597. | Seges solo ha instalado y probado la 14. Este manual describe Chatboo 2.1.587, la instalada (M1). |
+| Licencia | Apache-2.0. | `LICENSE` con Apache-2.0 en los tres módulos. El `NOTICE` es de PATANEGRA Soft SL: las marcas PATANEGRA, Chatboo y PAAP no se ceden, y un fork no puede usar esos nombres. Los manifiestos dicen «Other OSI approved licence», porque Odoo 14 no admite Apache-2.0 en ese campo, y llevan la cabecera SPDX Apache-2.0. |
+| Roles de proveedor | 8, con audio, vídeo y embedding. | 7, sin embedding. Audio solo sirve para probar la voz al guardar el proveedor, y ningún turno pide vídeo. |
+| Ejemplos de proveedores | 10. | 5. |
+| Contextos del motor | 28. | 53 registros: 1 `core`, 24 `discovery`, 26 `domain` y 2 `locale`. |
+| Contextos de Chatboo | 5, entre ellos `record_attachments`. | 6 (§14), sin `record_attachments`. |
+| Skills de Chatboo | 10. | 10 (§6). |
+| Herramientas MCP | 3. | 3 (§15); `get_context` no se publica. |
+| Protocolos | 4. | 4; el rol Decisión solo lo admite SystemOne. |
+| Voz | Sin servicios externos. | «Permitir voces remotas», desmarcado por defecto: si se marca, el navegador puede enviar el texto al servicio de su fabricante (§9). |
+| «Admin IA» | Exige AI Administrator. | No lo exige (§13). Lo define `pns_ai_mcp`: no existe un módulo `pns_ai_admin`. Lo usan la autoría y la captura de skills, la generación de OpenAPI y la detección de servidores, también desde un «IA Escritor». |
+| Solo lectura | La IA no escribe sola. | 3.1.973 tenía cuatro caminos de escritura desde la ejecución de solo lectura (PNS-100, PNS-104, PNS-105 y PNS-107). Seges los cierra con los parches 22, 37, 38 y 39. |
+| Exportar a Word | Word. | Se descarga un `.doc` que por dentro es HTML. |
+| Multicompañía | No la cita. | Algunas skills filtran por compañía, pero no hay ninguna regla de registro por compañía: las 27 reglas son por dueño, usuario o grupo (`pns_base` 1, `pns_ai_mcp` 20 y `pns_ai_chatboo` 6). El alcance de compañía de 3.1.973, en §17. |
+| Resultados de las skills | — | Confirmado que `customer_360` puede devolver una fecha en lugar del resultado cuando su código pasa por la preparación o la reparación del motor (hoja 22). Importes: el redondeo del formateador es correcto; el texto que redacta el modelo no se ha probado. `/financial-health` filtra por fecha y compañía. |
+
+## Anexo B. Qué cambia para el usuario en la versión de Seges
+
+La versión de Seges es 3.1.973 con 24 parches vigentes. Aquí solo figura lo que se nota en pantalla o en el
+comportamiento; el resto se resume al final.
+
+**Se nota siempre**
+
+| Parche | PNS | Qué nota el usuario |
+|---|---|---|
+| 12 | PNS-01, PNS-02 | Un «IA Administrador» sin Ajustes no puede dar ni quitar grupos por el chat: el plan se rechaza con «Only a Settings administrator can add or remove user groups.» (sin traducir). |
+| 16 | PNS-54 | Al confirmar un plan desde Autorizaciones, Odoo pide la contraseña (la recuerda 10 minutos), y la tarjeta del chat solo deja confirmar al dueño del plan. |
+| 19 | PNS-17 | Un servidor MCP externo que redirige da un error que pide poner su dirección final. |
+| 20 | PNS-70 | Las vistas gráfico y los tableros de Odoo se siguen viendo bien después de abrir el chat. |
+| 26 | M2 | En el lienzo y en las páginas no salen imágenes de registros que el usuario no puede ver, ni de compañías no marcadas en el selector. |
+| 27 | F1 | La página del lienzo y sus descargas no cargan nada de fuera, tampoco gráficos de librerías externas. |
+| 28 | D1 | Una página no se puede compartir con un usuario de portal; el «IA Administrador» puede leer y borrar las páginas ajenas, pero no cambiarlas. |
+| 32 | PNS-97 | Un «IA Administrador» sin Ajustes no puede crear ni cambiar acciones de confianza: «Only a Settings administrator can change trusted actions.» (sin traducir). |
+| 34 | PNS-96 | Si el lienzo rechaza la página o falla, la respuesta termina con «No se ha creado la página. El motivo está en el Historial IA.» |
+| 36 | PNS-103 | Un «IA Administrador» sin Ajustes ya puede revisar y aplicar una importación de configuración (antes daba un error de permisos). |
+
+**Se nota en casos concretos**
+
+| Parche | PNS | Qué nota el usuario |
+|---|---|---|
+| 18 y 24 | PNS-19, PNS-102 | Si una pregunta intenta leer algo que el usuario no puede ver, el chat da un error en lugar del dato. |
+| 21 | PNS-20 | «Revisar», en la importación de configuración, es una vista previa: no escribe nada. |
+| 11 | PNS-82 | Al borrar una sesión del chat solo se borran los adjuntos de su dueño; los demás se desenganchan. |
+| 17 | PNS-37 | Un plan que borra exige que quien lo pidió tenga permiso de borrado en Odoo. |
+| 33 | PNS-29 | El consumo de los proveedores no se puede leer por la API; en pantalla se ve igual. |
+
+**Sin efecto visible.** Los otros ocho parches no cambian lo que se ve: el 15 (PNS-07) y el 22 (PNS-100) impiden que
+el código de la IA llame a 9 métodos del motor y a 22 funciones de correo, conexiones y descargas; el 39 (PNS-107), que
+cree o borre cuentas IAP; el 25 (M1) escapa los valores de las filas antes de que entren en la página y comprueba el
+dueño; el 29 (P-8e a) impide guardar una página con datos que no haya puesto el servidor; el 37 (PNS-104) guarda lo
+pendiente antes de abrir la ejecución de solo lectura; el 38 (PNS-105) hace que las piezas que guardan por su cuenta
+no toquen lo pendiente de quien las llama, y el 35 (PNS-109, NUEVO-2) corrige, tras actualizar, las dos tareas
+programadas de purga.
+
+## Etiquetas de pantalla
+
+Las etiquetas de este manual son las del español de los módulos: el `i18n/es.po` de cada uno (`pns_base`, `pns_ai_mcp`
+y `pns_ai_chatboo`), con el idioma `es_ES` cargado. `check_manual.py` (`docs/pendiente/lab_3973/`) busca cada etiqueta
+«…» en los tres `es.po` y lista las que no encuentra, que se revisan a mano (frases del usuario, citas o textos sin
+traducir).
+
+Salen sin traducir, y el manual las cita así:
+- los menús «My Activity» y «Activity» (§18);
+- «Chatboo», que es igual en los dos idiomas;
+- el título del bloque «URL access policy» de los Ajustes del motor (§16): las opciones sí están en español;
+- los tipos de contexto (`core`, `domain`, `discovery`, `locale`) y el código de cada contexto (§14).
+
+La prueba en el laboratorio comprobó 40 de 40 etiquetas de campo de la Parte II (M4, en «Comprobación en ejecución»).
+
+## Comprobación en ejecución (prueba automática en `lab_pns_ai_3973`)
+
+**Qué es.** `docs/pendiente/lab_3973/manual_lab.py` comprueba en una base de datos de laboratorio lo que el manual da
+por hecho (bloques M1 a M12) frente a lo previsto en el código de la rama. Es de solo lectura: abre una transacción
+`READ ONLY`, comprueba que lo es antes de cada bloque y la deshace al terminar (`rollback`). La salida solo lleva
+nombres técnicos, etiquetas y recuentos: nunca datos de registros ni secretos. Termina con «CÓDIGO: <n>»: 0, todo
+igual; 1, alguna diferencia; 8, no concluyente (base de datos sin actualizar o sin modelos de los tres módulos); 20,
+error interno o escritura rechazada.
+
+**Cómo se ejecuta.** Con el procedimiento del laboratorio (`docs/pendiente/lab_procedimiento_3973.md`), en el entorno
+local de Seges, con el servidor web parado:
+`odoo-dev 14 shell < docs/pendiente/lab_3973/manual_lab.py`. Antes, se puede comprobar el propio script sin Odoo ni
+base de datos con `docs/pendiente/lab_3973/manual_lab_autoprueba.py`.
+
+**Resultado del 22/11/2026** (laboratorio `lab_pns_ai_3973`, base de datos `lab_pns_ai_3973_14`, `es_ES` activo):
+**CÓDIGO 0**, todo igual.
+
+| Bloque | Qué comprueba | Iguales | Informativos |
+|---|---|---|---|
+| M1 | Versiones de los tres módulos | 3 | — |
+| M2 | Grupos y sus implicaciones | 17 | — |
+| M3 | Menús por grupo | 70 | 7 |
+| M4 | Etiquetas de campo en español | 40 | — |
+| M5 | Contextos registrados | 7 | — |
+| M6 | Skills registradas | 33 | — |
+| M7 | Roles y su uso | 9 | 3 |
+| M8 | Agentes | 4 | — |
+| M9 | «Permitir voces remotas» | 2 | — |
+| M10 | Tareas programadas | 22 | 1 (la base de datos no está neutralizada) |
+| M11 | Ajustes y retención | 6 | 18 |
+| M12 | Reglas multicompañía | 2 | 1 |
+
+Se repite con cada versión nueva del fabricante, después de adaptar los parches y antes de instalarla.
+
+## Fuentes de los anexos
+
+| Parte | Qué | Dónde |
+|---|---|---|
+| A | Lo que dice la web | Web del fabricante (patanegra.com/es: `capabilities.html`, `ai-engine.html` y `chatboo.html`), leída el 20 y el 21/11/2026; resumen propio, sin copiar su texto; puede haber cambiado después |
+| A | Versiones de los módulos | `pns_base/__manifest__.py:8`; `pns_ai_mcp/__manifest__.py:8`; `pns_ai_chatboo/__manifest__.py:7` |
+| A | Licencia | `pns_base/LICENSE:1-2`; `pns_base/NOTICE:6-12`; `pns_ai_mcp/NOTICE:7-13`; `pns_ai_chatboo/NOTICE:8-14`; `pns_base/__manifest__.py:2` y `:54-55`; `pns_ai_mcp/__manifest__.py:2` y `:29-30`; `pns_ai_chatboo/__manifest__.py:2` y `:23-24` |
+| A | Roles | `pns_ai_mcp/data/ai_provider_role_data.xml:3-59`; `pns_ai_mcp/models/ai_provider_role.py:67-68`; `pns_ai_mcp/models/ai_provider.py:298-301` y `:708-730`; M7 |
+| A | Ejemplos de proveedores | `pns_ai_mcp/static/examples/providers/` (5 archivos) |
+| A | Contextos del motor | `pns_ai_mcp/ai/contexts/` (`core` 1, `discovery` 24, `domain` 26, `locale` 2) |
+| A | Contextos y skills de Chatboo | `pns_ai_chatboo/data/chatboo_context_data.xml:5`; `pns_ai_chatboo/ai/contexts/`; `pns_ai_chatboo/ai/skills/system/` (10 skills) |
+| A | Herramientas MCP | `pns_ai_mcp/controllers/tools_relaxaicode.py:39-40`; `pns_ai_mcp/controllers/safe_plan.py:356-357` y `:527-528`; `pns_ai_mcp/controllers/tools_context.py:151-154` |
+| A | Protocolos y rol Decisión | `pns_ai_mcp/models/ai_provider.py:170-175` y `:625-639`; `pns_ai_mcp/lib/llm/drivers/systemone_driver.py:17` |
+| A | Voz | `pns_ai_chatboo/models/res_config_settings.py:96-97`; `pns_ai_chatboo/utils/chatboo_product_icp.py:152-153`; `pns_ai_chatboo/i18n/es.po:2418-2419` |
+| A | «Admin IA» | `pns_ai_mcp/data/ai_agent_data.xml:26-36`; `pns_ai_mcp/security/ir.model.access.csv:14` y `:62`; `pns_ai_mcp/models/ai_skill_authoring.py:139-147`; `pns_ai_mcp/wizard/skill_capture_wizard.py:347`; `pns_ai_mcp/services/openapi_spec_generator.py:613`; `pns_ai_mcp/models/external_server.py:742` |
+| A | Caminos de escritura y sus parches | `docs/pendiente/informe_3973/estado_hallazgos_3973.md:183`, `:187`, `:188` y `:268`; `pns_ai_mcp/controllers/validators_base.py:279-315`; `pns_ai_mcp/controllers/controller_helpers.py:189-194`; `pns_ai_mcp/models/ai_log.py:722-725`; `pns_ai_mcp/controllers/context_builder.py:308-326` |
+| A | Exportar a Word | `pns_ai_chatboo/static/src/js/chatboo_export.js:3590-3601` y `:3743` |
+| A | Reglas de registro | `pns_base/security/progress_job_rules.xml` (1); `pns_ai_mcp/security/security.xml` (20); `pns_ai_chatboo/security/security.xml` (6); ninguna con compañía en `domain_force`; M12 |
+| A | Resultados de las skills | `pns_ai_chatboo/ai/skills/system/customer_360.py:70-75` y `:594`; `pns_ai_mcp/utils/relaxaicode_recipe.py:266-277` y `:389`; `pns_ai_mcp/controllers/relaxaicode_prepare.py:215`; `pns_ai_mcp/controllers/relaxaicode_repair.py:236`; `pns_ai_mcp/utils/relaxaicode_render_base.py:344-355`; `pns_ai_chatboo/ai/skills/system/financial_health.py:31-37` |
+| B | Parches vigentes y qué se nota | `docs/pendiente/parches_pns_ai.md:239-271` (índice de la rama; el 38, en `:4785-4791`); nota B, §4 (`docs/pendiente/informe_3973/resumen_jefe_pns_ai.md:154-202`) |
+| B | 12 | `pns_ai_mcp/utils/privilege_cusp.py:102`; `pns_ai_mcp/models/ai_system_action.py:731` |
+| B | 16 | `pns_ai_mcp/models/safe_operation.py:1803-1805` |
+| B | 19 | `pns_ai_mcp/utils/mcp_client.py:103-115`; `pns_ai_mcp/utils/fetch_url_safe.py:128-139` |
+| B | 20 | `pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js:16` y `:31` |
+| B | 26 | `pns_ai_chatboo/models/chatboo_canvas.py:1008`; `pns_ai_chatboo/models/chatboo_session.py:939` |
+| B | 27 | `pns_ai_chatboo/models/chatboo_canvas.py:34` y `:76` |
+| B | 28 | `pns_ai_chatboo/security/security.xml:67-78`; `pns_ai_chatboo/models/chatboo_canvas_page.py:20` |
+| B | 32 | `pns_ai_mcp/models/ai_trusted_action.py:88-101` |
+| B | 34 | `pns_ai_chatboo/models/chatboo_async_request.py:1359-1371`; `pns_ai_chatboo/i18n/es.po:2213-2214` |
+| B | 36 | `pns_base/models/operation_report_wizard.py:370` y `:379` |
+| B | 18 y 24 | `pns_ai_mcp/models/seges_box_a_read.py:3`; `pns_ai_mcp/controllers/context_builder.py:75` y `:120` |
+| B | 21 | `pns_base/models/operation_report_wizard.py:7` y `:293` |
+| B | 11 | `pns_ai_chatboo/models/chatboo_session.py:2034` y `:2075` |
+| B | 17 | `pns_ai_mcp/models/ai_change_journal.py:501` y `:574` |
+| B | 33 | `pns_ai_mcp/models/ai_provider.py:1096` y `:1132`; `pns_ai_mcp/wizard/ai_provider_usage_wizard.py:37` |
+| B | Sin efecto visible | `pns_ai_mcp/controllers/validators_base.py:266`, `:279` y `:304`; `pns_ai_chatboo/models/chatboo_session.py:1091`; `pns_ai_chatboo/models/chatboo_canvas.py:22`; `pns_ai_mcp/controllers/controller_helpers.py:189-194`; `pns_base/utils/seges_side_env.py:3`; `pns_ai_mcp/migrations/14.0.3.1.973/post-migrate.py:1-42` |
+| B | Mensajes de los parches 12 y 32 sin traducir | sin entrada en los tres `es.po` |
+| Etiquetas | De dónde salen y cuáles no están traducidas | `pns_base/i18n/es.po`; `pns_ai_mcp/i18n/es.po:4928-4929`, `:4955-4956` y `:2843-2845`; `pns_ai_chatboo/i18n/es.po:659-660`; `pns_ai_mcp/views/res_config_settings_views.xml:237`; `pns_ai_mcp/models/ai_context.py:107` y `:178-186`; `docs/pendiente/lab_3973/check_manual.py:1-10` |
+| Comprobación | Script, protección y códigos | `docs/pendiente/lab_3973/manual_lab.py:1-36`; `docs/pendiente/lab_3973/manual_lab_autoprueba.py:1-17` |
+| Comprobación | Registro de la ejecución (CÓDIGO 0) | `docs/pendiente/lab_procedimiento_3973.md:504` |
+| Comprobación | Recuentos por bloque | Salida guardada fuera del repo (`salida_manual_lab_20261122-0055.txt`, huella registrada en `docs/pendiente/lab_procedimiento_3973.md:504`) |
