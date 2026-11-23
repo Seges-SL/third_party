@@ -1,0 +1,13 @@
+# Copyright 2026 Seges
+# License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl-3.0).
+{
+    "name": "Laboratorio pns_ai 3996: pruebas de la sección 8",
+    "summary": "Tests de confirmación de los puntos de la sección 8 de la clasificación (Odoo 17)",
+    "version": "17.0.1.0.0",
+    "category": "Hidden",
+    "author": "Seges",
+    "license": "AGPL-3",
+    "depends": ["web", "pns_ai_chatboo"],
+    "data": [],
+    "installable": True,
+}

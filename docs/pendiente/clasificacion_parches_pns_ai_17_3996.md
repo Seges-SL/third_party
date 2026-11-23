@@ -402,3 +402,50 @@ menciones del propio test (así `test_seges_rpc_access.py`) o de la entrada del 
 - **Conclusión:** no hay correcciones. Las citas del core de las secciones 4 y 6, tomadas de `6a0efa7`, valen tal
   cual para el core del laboratorio (`17.0-20260908`), y las de la sección 10 ya eran del contenedor. Si una cita
   nueva sale de la referencia, hay que confirmarla igualmente: en `odoo/tests/common.py` las dos versiones difieren.
+
+### Punto 2: `window.Chart` (parche 20)
+
+- **Método:** test de navegador (`HttpCase.browser_js`, Chrome headless) en el módulo de pruebas del laboratorio,
+  `seges_pruebas_3996` (`~/GitHub/lab_pns_ai_3996/seges_pruebas_3996/`, fuera del repo; copia en
+  `docs/pendiente/lab_3996/seges_pruebas_3996/`, idéntica (mismo `sha256sum`) a lo que se ejecutó; el manifest se
+  guarda como `__manifest__.py.txt` para que ni el kit ni los linters la tomen por un módulo (hay que renombrarlo para
+  ejecutarla)), con `depends` `web` y `pns_ai_chatboo`. Archivo `tests/test_chart_collision.py`, clase
+  `TestChatbooChartCollision`. Cada test abre `/web` en una página nueva y carga las dos librerías con el código real:
+  `loadBundle("web.chartjs_lib")` de `@web/core/assets` (Odoo) y `loadHeavyLibs()` de
+  `@pns_ai_chatboo/js/chatboo_heavy_libs` (la llamada de `chatboo_overlay.js:120` al abrir el chat). Comprueba que
+  `window.Chart` es el objeto de Odoo, que su adaptador de fechas es `luxon` y que pinta un gráfico con eje
+  `type: "time"`. Cada fallo lleva una etiqueta, `[HYPOTHESIS]` (lo que se comprueba) o `[SETUP]` y `[ERROR]` (el test
+  no vale), y termina con la versión y el adaptador de `window.Chart` encontrados.
+  - `test_chat_after_odoo_keeps_odoo_chart`: primero el Chart.js de Odoo y después las librerías del chat.
+  - `test_chat_before_odoo`: el orden inverso, como testigo de que las comprobaciones no dan falsos rojos.
+- **Mecanismo** (core `17.0-20260908`, contenedor): `assets.loadJS` y `assets.getBundle` están memorizados
+  (`addons/web/static/src/core/assets.js:30` y `:98`); el UMD de Chart.js 4.4.8 (`chart.umd.min.js`) escribe
+  `globalThis.Chart` porque en la 17 no hay `define.amd`; `chartjs-adapter-luxon` se registra sobre el `window.Chart`
+  que exista al cargarse (`addons/web/static/lib/chartjs-adapter-luxon/chartjs-adapter-luxon.js:31`). Gana el último
+  que carga, y ninguno de los dos vuelve a cargar en la misma página.
+- **Ejecución (23/11/2026):** desde el laboratorio, `odoo-dev 17 arrancar` (regenera el `addons_path` con
+  `/mnt/cliente/lab_pns_ai_3996`), `paridad seges_pruebas_3996` (se puede instalar, 0 problemas) y
+  `tests seges_pruebas_3996` (BD temporal `test_lab_pns_ai_3996_17`). Log `tests-20261123-165834.log`. Chrome
+  158.0.8127.36 (`Browser version: Chrome/158.0.8127.36`); es Google Chrome estable sin versión fija, así que puede
+  cambiar si se reconstruye la imagen.
+- **Resultado:** `1 failed, 0 error(s) of 2 tests`; 2 líneas `Starting`; 0 omisiones y 0 fallos de Chrome;
+  `analizar_log.py` da `FALLO`, que es lo esperado.
+  - `test_chat_after_odoo_keeps_odoo_chart`, rojo en 5,5 s (timeout de 120 s): `[HYPOTHESIS] window.Chart was
+    replaced: expected Odoo's Chart.js 4.3.0 with luxon | found: Chart.js 4.4.8, date adapter undefined`.
+  - `test_chat_before_odoo`, verde en 3,0 s (`test successful`).
+  - Ningún otro `console.error`, `console.warn` ni excepción de la página. Los únicos WARNING son el `FutureWarning`
+    de `urllib3/poolmanager.py:331` (sección 10) y 4 procesos `chrome_crashpad` zombis al cerrar Chrome (2 por cada
+    arranque, como en la sección 10).
+- **Conclusión:** confirmado. Si el chat se abre después de que Odoo haya cargado `web.chartjs_lib` en la misma página
+  (por ejemplo, tras abrir una vista de gráficos), `window.Chart` pasa a ser el Chart.js 4.4.8 del chat, sin
+  adaptador de fechas, hasta que se recarga la página. En el orden inverso no pasa nada: Odoo vuelve a escribir su
+  Chart.js con luxon y el chat conserva el suyo (`bindEngines`, `chatboo_charts.js:40-47`).
+- **Alcance real:** la vista de gráficos de la 17 no usa ejes de fecha (no hay `type: "time"` en
+  `addons/web/static/src/views/graph/`); usa el global `Chart` (`graph_renderer.js:63` y `:708`), así que se pintaría
+  con 4.4.8 en lugar de 4.3.0. El único del core con ejes de fecha es `spreadsheet`
+  (`addons/spreadsheet/static/src/o_spreadsheet/o_spreadsheet.js:8228-8240`): sin luxon escribe un `console.warn` y
+  desactiva los ejes de tiempo, sin error visible. Es una degradación silenciosa. No se ha probado con una vista de
+  gráficos real ni con `spreadsheet` (decisión de Sergio).
+- **Impacto en el port del parche 20:** el parche hace falta en la 17. `test_chat_after_odoo_keeps_odoo_chart` es su
+  test de aceptación: con el parche tiene que pasar a verde, y `test_chat_before_odoo` tiene que seguir en verde. En
+  la fase 2 del plan, los dos tests pasan a `pns_ai_chatboo` junto con el parche.
