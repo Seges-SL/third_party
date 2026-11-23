@@ -449,3 +449,70 @@ menciones del propio test (así `test_seges_rpc_access.py`) o de la entrada del 
 - **Impacto en el port del parche 20:** el parche hace falta en la 17. `test_chat_after_odoo_keeps_odoo_chart` es su
   test de aceptación: con el parche tiene que pasar a verde, y `test_chat_before_odoo` tiene que seguir en verde. En
   la fase 2 del plan, los dos tests pasan a `pns_ai_chatboo` junto con el parche.
+
+### Puntos 3 y 4: revisión de importación y vistas sin Ajustes (parches 21 y 36)
+
+- **Método:** dos `TransactionCase` en `seges_pruebas_3996` (el módulo del punto 2, con la misma copia en
+  `docs/pendiente/lab_3996/`), adaptados de los tests de la 14 (`14.0:pns_ai_mcp/tests/`:
+  `test_seges_import_preview.py`, de `bc699e7`, y `test_seges_review_views.py`, de `a9e348b`). Los `depends` pasan a
+  `web`, `pns_base`, `pns_ai_mcp` y `pns_ai_chatboo`. Cada fallo lleva una etiqueta: `[HYPOTHESIS]`, `[SETUP]` o
+  `[GUARD]` (lo que debe cumplirse con el parche y sin él); una excepción inesperada sale como error.
+  - `tests/test_import_review.py`, clase `TestImportReview` (punto 3): pulsa «Review» (`action_preview`) en los
+    asistentes de usuarios y de servidores, simula el final de la petición con `env.flush_all()` y lee la fila con SQL
+    directo: el valor y el `ctid`, que cambia con cada `UPDATE` y vuelve tras `ROLLBACK TO SAVEPOINT` (`write_date` no
+    sirve: `now()` es constante en la transacción del test). Antes comprueba (`[SETUP]`) que la importación se ejecutó
+    dentro de «Review».
+  - `tests/test_review_views.py`, clase `TestReviewViews` (punto 4): pide las dos pantallas con `get_view` y solo
+    `form_view_ref`, como el cliente de la 17, con dos AI Administrator sin Ajustes (con y sin
+    `base.group_erp_manager`), en los asistentes de usuarios y de servidores. Antes de cada lectura invalida la caché de
+    las dos vistas: `arch` es un campo calculado no almacenado y la caché es común a todos los usuarios.
+- **Ejecución (23/11/2026):** desde el laboratorio, `paridad seges_pruebas_3996` (se puede instalar, 0 problemas) y
+  `tests seges_pruebas_3996` (BD temporal `test_lab_pns_ai_3996_17`, que no queda). Log `tests-20261123-172135.log`.
+- **Resultado:** `8 failed, 0 error(s) of 12 tests`; `analizar_log.py` da `FALLO` y todas sus causas son
+  `[HYPOTHESIS]`. Ningún `[SETUP]`, `[GUARD]` ni error; los WARNING son los mismos que en el punto 2. El punto 2 sale
+  igual: `test_chat_after_odoo_keeps_odoo_chart` en rojo (`[HYPOTHESIS] … Chart.js 4.4.8, date adapter undefined`),
+  `test_chat_before_odoo` en verde (`test successful`); Chrome 158.0.8127.36, 0 omisiones y 0 fallos de Chrome.
+
+  | Test | Resultado | Detalle |
+  |---|---|---|
+  | `test_users_review_writes_nothing` | rojo | `('(0,2)', None)` → `('(0,5)', 'seges-3996-p21')` (`ctid`, etiqueta) |
+  | `test_providers_review_writes_nothing` | rojo | `('(0,2)', 0.7)` → `('(0,3)', 0.42)` (`ctid`, temperatura) |
+  | `test_users_review_keeps_groups` | rojo | Sin fila en `res_groups_users_rel`, pero `has_group` sigue en `True` |
+  | `test_import_still_applies` | verde | `[GUARD]`: la importación sí escribe el campo |
+  | `test_precondition_screens_not_readable` | verde | `AccessError` al leer `arch` de las dos vistas sin Ajustes |
+  | `test_admin_gets_review_screen` | rojo | `AccessError` en `ir.ui.view`: 2 usuarios × 2 asistentes |
+  | `test_admin_gets_result_screen` | rojo | Lo mismo con la pantalla de resultado |
+  | `test_admin_users_review_and_result` | rojo | «Review» e importación funcionan; fallan las 2 pantallas, 2 usuarios |
+  | `test_admin_servers_review_and_result` | rojo | Lo mismo en servidores |
+  | `test_non_admin_still_refused` | verde | `[GUARD]`: sin AI Administrator no abre las pantallas ni el asistente |
+
+- **Conclusión, parche 21:** confirmado en los dos asistentes; ninguno «no aplica». Lo que la importación deja
+  pendiente (`import_users_wizard.py:101`, `import_servers_wizard.py:110`) lo escribe el `invalidate_all()` de
+  `operation_report_wizard.py:295`, después del `ROLLBACK TO SAVEPOINT` (`:324`), y queda. Los grupos sí se deshacen en
+  la BD (`_inverse_ai_group_flag` vuelca dentro del savepoint), pero `has_group` sigue en `True` después de «Review»:
+  el ormcache (`res_users.py:1098`) guarda la respuesta de dentro del savepoint y nadie lo limpia.
+- **Conclusión, parche 36:** confirmado. Un AI Administrator sin Ajustes, con o sin «Permisos de acceso», recibe
+  `AccessError` en `ir.ui.view` al abrir la pantalla de revisión y la de resultado de los dos asistentes, aunque la
+  importación en sí funciona. Sin el parche, solo `base.group_system` ve esas pantallas.
+- **`config_backup_wizard` (leído, no probado):** su `action_preview`
+  (`pns_ai_mcp/wizard/config_backup_wizard.py:109-126`) no usa savepoint ni el del mixin: llama a
+  `config_backup.import_config(…, dry_run=True)`, y en cada sección `_should_write`
+  (`pns_ai_mcp/utils/config_backup.py:105-114`) devuelve `False` en `dry_run` antes de cualquier `write` o `create`
+  (`:507-510`, `:549-552`, `:579-582`, `:604-607`, `:646-647`, `:700-703`, `:743-746`, `:774-775`); la segunda pasada
+  se salta (`:353`) y los ajustes solo se leen (`:883-907`; no se ha leído `resolve_import_overlay`). No tiene el fallo
+  del parche 21. Sí tiene el del 36: abre las mismas pantallas (`_apply_import_preview` y `_apply_operation_result`,
+  `config_backup_wizard.py:119` y `:137`), que pasan por `_inject_screen_arch`.
+- **Cita desplazada:** en la sección 4 (L158-159, parche 36), `:327-342` y `:331` son `:329-342`
+  (`_inject_screen_arch`) y `:332-333` (`self.env.ref(xmlid)` y `src.arch`). Se anota aquí; la sección 4 no se
+  corrige.
+- **Impacto en el port:**
+  - Parche 21: hace falta. Orientación para el port (se decide en la fase 2): que no quede nada pendiente al hacer el
+    `ROLLBACK TO SAVEPOINT` (volcar dentro del savepoint), invalidar después sin volcar (`invalidate_all(flush=False)`:
+    la caché aún tiene los valores de dentro, ya deshechos en la BD, y el `invalidate_all()` normal es el que los
+    escribe) y limpiar el ormcache con `registry.clear_cache()` (`clear_caches()` no existe en la 17).
+    `TestImportReview` es su test de aceptación: los 3 rojos pasan a verde y el `[GUARD]` sigue en verde.
+  - Parche 36: hace falta. `_inject_screen_arch` tiene que leer la vista con `sudo()` (`:332-333`); `src` también se
+    usa en `postprocess_and_fields` (`:337`), y el test dirá si basta. `TestReviewViews` es su test de aceptación: los 4
+    rojos pasan a verde y los dos verdes siguen igual. El parche cubre también `config_backup_wizard`, que pasa por el
+    mismo `_inject_screen_arch`; el test no lo prueba.
+  - En la fase 2 del plan, los dos archivos pasan a `pns_ai_mcp` (donde estaban en la 14) junto con los parches.
