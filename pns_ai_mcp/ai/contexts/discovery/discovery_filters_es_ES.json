@@ -1,0 +1,16 @@
+{
+  "code": "discovery_filters_es_ES",
+  "tipo": "discovery",
+  "locale": "es_ES",
+  "target": "filters",
+  "priority": 65,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "filtro guardado",
+    "filtros guardados",
+    "vista personalizada",
+    "vistas personalizadas",
+    "filtro favorito"
+  ]
+}

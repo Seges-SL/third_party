@@ -1,0 +1,14 @@
+{
+  "code": "discovery_partners",
+  "tipo": "discovery",
+  "target": "partners",
+  "priority": 72,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "partner",
+    "partners",
+    "res.partner",
+    "supplier_rank"
+  ]
+}

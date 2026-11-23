@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- First-install Settings. Loaded from post_init_hook only (not
+     manifest data:). Inserts a key only when the row is missing. -->
+<odoo>
+    <data noupdate="1">
+        <function model="res.config.settings" name="_seed_install_icp"/>
+    </data>
+</odoo>

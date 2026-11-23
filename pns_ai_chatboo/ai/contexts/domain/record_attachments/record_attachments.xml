@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <metadata>
+        <code>record_attachments</code>
+        <tipo>domain</tipo>
+        <description>Read the files attached to an Odoo record (read_attachment): printed text, or a scan transcribed</description>
+        <version>1.0</version>
+        <agent_codes>pns_ai_chatboo</agent_codes>
+    </metadata>
+
+    <domain_knowledge>
+# Files attached to a record (record_attachments)
+
+A task, an invoice, a contact or any record can carry files
+(`ir.attachment`, by `res_model` and `res_id`). You **can read them**: the
+same reading the user gets when they drop a file in this chat. Printed
+text comes out page by page. A scanned PDF or a photo has no printed text:
+it is transcribed by this agent's own vision, once. `index_content` being
+empty says nothing: that is only Odoo's own extraction.
+
+## How
+First find the files, as any other record::
+
+    atts = env['ir.attachment'].search([
+        ('res_model', '=', 'project.task'), ('res_id', '=', 42),
+    ])
+    result = [{'id': a.id, 'name': a.name, 'mimetype': a.mimetype,
+               'file_size': a.file_size} for a in atts]
+
+Then read one by its id. The text comes back to you, not to the user::
+
+    result = read_attachment(123)                   # the whole file
+    result = read_attachment(123, page=2)           # one page
+    result = read_attachment(123, find='total')     # the pages with those words
+
+- The text stays on the conversation as a document: a later turn reads it
+  with `read_document(name)` and nothing is transcribed twice. `documents()`
+  lists what is kept.
+- Reading runs as the user. A file of a record they cannot open answers
+  with a sentence saying so. Do not try another way.
+- A transcription of a scan takes a few seconds per file. Read the files
+  the user asked about, not every file on the record.
+- "Digitize", "transcribe", "what does the attached PDF say", "read the
+  scan": that is this helper. Then answer in prose, or with the figures
+  they asked for.
+
+## Hard rules
+- Do not say you cannot read a file before calling `read_attachment`.
+- Do not paste the whole transcription unless they asked for the text
+  itself; answer the question with it.
+- When `read_attachment` says the file has no text that could be read,
+  tell the user that, in one sentence, and stop.
+    </domain_knowledge>
+</context>

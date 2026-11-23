@@ -1,0 +1,700 @@
+# -*- coding: utf-8 -*-
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Data-formatting helpers for the MCP server."""
+
+import importlib.util
+import logging
+from pathlib import Path
+
+_logger = logging.getLogger(__name__)
+
+
+def _load_ai_disclosure():
+    path = Path(__file__).resolve().parents[1] / 'utils' / 'ai_disclosure.py'
+    spec = importlib.util.spec_from_file_location('_ae_ai_disclosure', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_ai = _load_ai_disclosure()
+mark_ai_workbook = _ai.mark_ai_workbook
+
+def format_data_as_excel(data, columns_config, title="Report",
+                         include_row_index=True, caption=None, widths=None,
+                         cell_formulas=None, number_style=None):
+    """One-sheet wrapper around ``format_excel_workbook``."""
+    return format_excel_workbook([{
+        'data': data,
+        'columns_config': columns_config,
+        'title': title,
+        'include_row_index': include_row_index,
+        'caption': caption,
+        'widths': widths,
+        'cell_formulas': cell_formulas or {},
+        'number_style': number_style,
+    }])
+
+
+def format_excel_workbook(sheets):
+    """Styled .xlsx with one worksheet per spec (same look as a single sheet)."""
+    try:
+        from openpyxl import Workbook
+        import io
+
+        specs = [s for s in (sheets or []) if isinstance(s, dict)]
+        if not specs:
+            return None
+        wb = Workbook()
+        first = True
+        for spec in specs:
+            if first:
+                ws = wb.active
+                first = False
+            else:
+                ws = wb.create_sheet()
+            _fill_excel_sheet(ws, spec)
+        mark_ai_workbook(wb)
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return output.getvalue()
+    except ImportError:
+        _logger.error("MCP: openpyxl is not installed. Install it with: pip install openpyxl")
+        raise Exception("openpyxl is not installed. Install it with: pip install openpyxl")
+    except Exception as e:
+        _logger.error("MCP: Error generating Excel: %s", e)
+        raise Exception("Error generating Excel: %s" % e)
+
+
+def _excel_safe_text(text):
+    """Text a spreadsheet would read as a formula goes out quoted as text."""
+    if text and text.lstrip(' \t')[:1] in ('=', '+', '-', '@'):
+        return "'" + text
+    return text
+
+
+def _fill_excel_sheet(ws, spec):
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    data = spec.get('data') or []
+    columns_config = spec.get('columns_config') or []
+    title = spec.get('title') or 'Export'
+    include_row_index = bool(spec.get('include_row_index'))
+    caption = (spec.get('caption') or '').strip()
+    widths = spec.get('widths')
+    # {(excel_row, excel_col): '=…'}; positions count the row index column.
+    cell_formulas = spec.get('cell_formulas') or {}
+    style = spec.get('number_style') or {}
+    env = spec.get('env')
+    image_keys = {
+        cfg[0] for cfg in columns_config
+        if any(
+            isinstance(row, dict) and _pdf_is_image_ref(row.get(cfg[0]))
+            for row in data
+        )
+    }
+    int_fmt = style.get('int_format') or '#,##0'
+    float_fmt = style.get('float_format') or '#,##0.00'
+    ws.title = str(title)[:31] or 'Export'
+
+    header_fill = PatternFill(start_color="667eea", end_color="764ba2", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    center_align = Alignment(horizontal='center', vertical='center')
+    right_align = Alignment(horizontal='right', vertical='center')
+    left_align = Alignment(horizontal='left', vertical='center')
+
+    header_row = 2 if caption else 1
+    data_col0 = 2 if include_row_index else 1
+    n_data_cols = len(columns_config)
+    n_cols = n_data_cols + (1 if include_row_index else 0)
+    if caption and n_cols:
+        ws.merge_cells(
+            start_row=1, start_column=1,
+            end_row=1, end_column=max(1, n_cols),
+        )
+        cap = ws.cell(row=1, column=1, value=caption)
+        cap.alignment = left_align
+        cap.font = Font(bold=True, size=12)
+
+    headers = []
+    if include_row_index:
+        headers.append('#')
+    for key, label, formatter, align in columns_config:
+        headers.append(label)
+
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=header_row, column=col_idx, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = center_align
+        cell.border = border
+
+    for row_offset, row_data in enumerate(data, 1):
+        row_idx = header_row + row_offset
+        if include_row_index:
+            idx_cell = ws.cell(row=row_idx, column=1, value=row_offset)
+            idx_cell.border = border
+            idx_cell.alignment = center_align
+            idx_cell.number_format = int_fmt
+
+        for col_off, (key, label, formatter, align) in enumerate(columns_config):
+            col_idx = data_col0 + col_off
+            value = row_data.get(key, '') if isinstance(row_data, dict) else ''
+            cell = ws.cell(row=row_idx, column=col_idx)
+            cell.border = border
+            compiled = cell_formulas.get((row_idx, col_idx))
+            if compiled:
+                cell.value = compiled
+                if formatter == 'currency':
+                    cell.number_format = '#,##0.00 €'
+                    cell.alignment = right_align
+                elif formatter == 'percentage':
+                    cell.number_format = '0.00%'
+                    cell.alignment = center_align
+                else:
+                    cell.number_format = float_fmt
+                    cell.alignment = (
+                        center_align if formatter == 'number' else right_align
+                    )
+                continue
+            if key in image_keys:
+                ws.row_dimensions[row_idx].height = _XLSX_IMG_ROW_PT
+                photo = _excel_photo_png(value, env)
+                if photo:
+                    _excel_put_photo(
+                        ws, photo, row_idx, col_idx,
+                        _excel_photo_col_chars(label),
+                    )
+                continue
+            if formatter == 'currency':
+                cell.value = float(value) if value is not None and value != '' else 0.0
+                cell.number_format = '#,##0.00 €'
+                cell.alignment = right_align
+            elif formatter == 'percentage':
+                if value is not None and value != '':
+                    cell.value = float(value) / 100
+                    cell.number_format = '0.00%'
+                else:
+                    cell.value = '-'
+                cell.alignment = center_align
+            elif formatter == 'number':
+                cell.value = int(value) if value is not None and value != '' else 0
+                cell.number_format = int_fmt
+                cell.alignment = center_align
+            else:
+                if isinstance(value, bool):
+                    cell.value = value
+                    cell.alignment = center_align
+                elif isinstance(value, int):
+                    cell.value = value
+                    cell.number_format = int_fmt
+                    cell.alignment = right_align
+                elif isinstance(value, float):
+                    if value != value or value in (float('inf'), float('-inf')):
+                        cell.value = ''
+                    else:
+                        cell.value = value
+                        cell.number_format = float_fmt
+                    cell.alignment = right_align
+                else:
+                    cell.value = _excel_safe_text(
+                        str(value) if value is not None else '',
+                    )
+                    if align == 'center':
+                        cell.alignment = center_align
+                    elif align == 'right':
+                        cell.alignment = right_align
+                    else:
+                        cell.alignment = left_align
+
+    if include_row_index:
+        ws.column_dimensions[get_column_letter(1)].width = 5
+    for col_off, (key, label, formatter, align) in enumerate(columns_config):
+        col_idx = data_col0 + col_off
+        if key in image_keys:
+            width = _excel_photo_col_chars(label)
+        elif widths and col_off < len(widths):
+            width = widths[col_off]
+        elif formatter == 'currency':
+            width = 15
+        elif formatter == 'percentage':
+            width = 12
+        elif formatter == 'number':
+            width = 10
+        else:
+            width = max(len(str(label or '')), 20)
+        ws.column_dimensions[get_column_letter(col_idx)].width = min(float(width), 50)
+
+    ws.freeze_panes = 'A%d' % (header_row + 1)
+
+
+_XLSX_IMG_PX = 48
+_XLSX_IMG_ROW_PT = 40
+_XLSX_IMG_COL_CHARS = 9
+_XLSX_EMU_PER_PX = 9525
+
+
+def _excel_photo_col_chars(label):
+    """Width (characters) of a photo column: the photo or its header."""
+    return max(len(str(label or '')), _XLSX_IMG_COL_CHARS)
+
+
+def _excel_photo_offsets(col_chars, width_px, height_px):
+    """EMU offsets that centre a photo in its cell (column chars, photo row)."""
+    col_px = int(float(col_chars) * 7 + 5)
+    row_px = int(_XLSX_IMG_ROW_PT * 96 / 72)
+    dx = max(0, (col_px - int(width_px)) // 2)
+    dy = max(0, (row_px - int(height_px)) // 2)
+    return dx * _XLSX_EMU_PER_PX, dy * _XLSX_EMU_PER_PX
+
+
+
+def _excel_photo_png(value, env=None):
+    """``(png_bytes, width_px, height_px)`` for a photo cell, or None."""
+    raw = _pdf_image_bytes(value, env=env) if _pdf_is_image_ref(value) else None
+    if not raw:
+        return None
+    try:
+        from io import BytesIO
+        from PIL import Image as PilImage
+        pil = PilImage.open(BytesIO(raw))
+        pil.load()
+        if pil.mode not in ('RGB', 'RGBA'):
+            pil = pil.convert('RGBA')
+        pil.thumbnail((_XLSX_IMG_PX, _XLSX_IMG_PX))
+        buf = BytesIO()
+        pil.save(buf, format='PNG')
+        return buf.getvalue(), pil.width, pil.height
+    except Exception:
+        _logger.debug('MCP: xlsx image skipped', exc_info=True)
+        return None
+
+
+def _excel_put_photo(ws, photo, row, col, col_chars):
+    """Centre ``(png, w, h)`` in the 1-based cell. The cell never gets the URL."""
+    from io import BytesIO
+    from openpyxl.drawing.image import Image as XlImage
+    from openpyxl.drawing.spreadsheet_drawing import AnchorMarker, OneCellAnchor
+    from openpyxl.drawing.xdr import XDRPositiveSize2D
+    png, width, height = photo
+    dx, dy = _excel_photo_offsets(col_chars, width, height)
+    img = XlImage(BytesIO(png))
+    img.anchor = OneCellAnchor(
+        _from=AnchorMarker(col=col - 1, colOff=dx, row=row - 1, rowOff=dy),
+        ext=XDRPositiveSize2D(
+            int(width) * _XLSX_EMU_PER_PX, int(height) * _XLSX_EMU_PER_PX,
+        ),
+    )
+    ws.add_image(img)
+
+
+
+_PDF_B64_IMG_PREFIXES = (
+    ('iVBORw', 'png'),
+    ('/9j/', 'jpeg'),
+    ('R0lGOD', 'gif'),
+    ('UklGR', 'webp'),
+)
+_PDF_IMG_SRC_RE = None
+_PDF_WEB_IMAGE_RE = None
+_PDF_DATA_URI_RE = None
+
+
+def _pdf_regexes():
+    import re
+    global _PDF_IMG_SRC_RE, _PDF_WEB_IMAGE_RE, _PDF_DATA_URI_RE
+    if _PDF_IMG_SRC_RE is None:
+        _PDF_IMG_SRC_RE = re.compile(
+            r'<img[^>]+src=["\']([^"\']+)["\']', re.I,
+        )
+        _PDF_WEB_IMAGE_RE = re.compile(
+            r'/web/image/(?P<model>[\w.]+)/(?P<rid>\d+)/(?P<field>[\w.]+)',
+        )
+        _PDF_DATA_URI_RE = re.compile(
+            r'^data:image/([^;]+);base64,(.+)$', re.I | re.DOTALL,
+        )
+    return _PDF_IMG_SRC_RE, _PDF_WEB_IMAGE_RE, _PDF_DATA_URI_RE
+
+
+def _pdf_is_image_ref(value):
+    """True when a cell is a photo reference, not printable text."""
+    if value in (None, '', False, []):
+        return False
+    if isinstance(value, (bytes, bytearray)):
+        return len(value) > 16
+    text = str(value).strip()
+    if text.startswith('data:image/') or '/web/image/' in text:
+        return True
+    for prefix, _mime in _PDF_B64_IMG_PREFIXES:
+        if text.startswith(prefix) and len(text) > 64:
+            return True
+    return False
+
+
+def _pdf_plain_cell(value, formatter):
+    if value is None or value == '':
+        return ''
+    if formatter == 'currency':
+        try:
+            return f"{value:,.2f} €"
+        except (TypeError, ValueError):
+            return str(value)
+    if formatter == 'percentage':
+        try:
+            return f"{value:.2f}%"
+        except (TypeError, ValueError):
+            return str(value)
+    if formatter == 'number':
+        try:
+            return f"{value:,.0f}"
+        except (TypeError, ValueError):
+            return str(value)
+    return str(value)
+
+
+def _pdf_decode_b64(raw):
+    import base64
+    text = raw.strip()
+    if text.startswith(("b'", 'b"')) and text.endswith(("'", '"')):
+        text = text[2:-1]
+    try:
+        return base64.b64decode(text, validate=False)
+    except Exception:
+        return None
+
+
+def _pdf_image_from_env(path, env):
+    """Bytes from /web/image/<model>/<id>/<field> using the user env."""
+    if env is None or not path:
+        return None
+    _src, web_re, _data = _pdf_regexes()
+    match = web_re.search(str(path))
+    if not match:
+        return None
+    model = match.group('model')
+    try:
+        rec = env[model].browse(int(match.group('rid')))
+        if not rec.exists():
+            return None
+        raw = rec[match.group('field')]
+    except Exception:
+        return None
+    if not raw:
+        return None
+    if isinstance(raw, (bytes, bytearray)):
+        data = bytes(raw)
+        if data[:8] == b'\x89PNG\r\n\x1a\n' or data[:2] == b'\xff\xd8':
+            return data
+        decoded = _pdf_decode_b64(data.decode('ascii', errors='ignore'))
+        return decoded or data
+    if isinstance(raw, str):
+        return _pdf_decode_b64(raw)
+    return None
+
+
+def _pdf_image_bytes(value, key=None, env=None):
+    """Return image bytes for a cell, or None. Never emit a raw URL string."""
+    if value in (None, '', False, []):
+        return None
+    src_re, web_re, data_re = _pdf_regexes()
+    if isinstance(value, (bytes, bytearray)):
+        raw = bytes(value)
+        if len(raw) > 32 and (
+            raw[:8] == b'\x89PNG\r\n\x1a\n' or raw[:2] == b'\xff\xd8'
+        ):
+            return raw
+        decoded = _pdf_decode_b64(raw.decode('ascii', errors='ignore'))
+        return decoded if decoded and len(decoded) > 32 else None
+    text = str(value).strip()
+    img_src = src_re.search(text)
+    if img_src:
+        text = img_src.group(1).strip()
+    data_m = data_re.match(text)
+    if data_m:
+        return _pdf_decode_b64(data_m.group(2))
+    for prefix, _mime in _PDF_B64_IMG_PREFIXES:
+        if text.startswith(prefix) and len(text) > 64:
+            return _pdf_decode_b64(text)
+    if web_re.search(text) or text.startswith('/web/image/'):
+        return _pdf_image_from_env(text, env)
+    return None
+
+
+def _pdf_flowable_image(raw, max_side):
+    from io import BytesIO
+    from reportlab.lib.utils import ImageReader
+    from reportlab.platypus import Image
+    reader = ImageReader(BytesIO(raw))
+    iw, ih = reader.getSize()
+    if not iw or not ih:
+        return None
+    if iw >= ih:
+        width = max_side
+        height = max_side * float(ih) / float(iw)
+    else:
+        height = max_side
+        width = max_side * float(iw) / float(ih)
+    return Image(BytesIO(raw), width=width, height=height)
+
+
+def _pdf_paragraph(text, style):
+    from reportlab.platypus import Paragraph
+    safe = (text or '').replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+    safe = safe.replace('\n', '<br/>')
+    return Paragraph(safe or '&#160;', style)
+
+
+_PDF_CHART_COLORS = (
+    '#5b8def',
+    '#26a69a',
+    '#ef6c00',
+    '#8d6e63',
+)
+
+
+def _pdf_chart_drawing(spec, width, height):
+    """reportlab Drawing for a structural series. None if charts extras missing."""
+    if not spec or not spec.get('categories') or not spec.get('series'):
+        return None
+    try:
+        from reportlab.graphics.charts.barcharts import VerticalBarChart
+        from reportlab.graphics.charts.linecharts import HorizontalLineChart
+        from reportlab.graphics.charts.legends import Legend
+        from reportlab.graphics.shapes import Drawing, String
+        from reportlab.lib import colors
+    except ImportError:
+        return None
+    cats = [str(cat)[:14] for cat in spec['categories']]
+    series = spec['series']
+    data = [tuple(item.get('values') or []) for item in series]
+    if not data or not data[0]:
+        return None
+    kind = spec.get('kind') or ('line' if len(cats) >= 8 else 'bar')
+    drawing = Drawing(width, height)
+    left = 50
+    bottom = 44
+    right_pad = 14
+    top_pad = 16
+    legend_h = 14 if len(series) > 1 else 0
+    chart_w = max(80, width - left - right_pad)
+    chart_h = max(60, height - bottom - top_pad - legend_h)
+    if kind == 'line':
+        chart = HorizontalLineChart()
+        chart.joinedLines = 1
+    else:
+        chart = VerticalBarChart()
+        chart.barWidth = min(18, max(6, chart_w / max(len(cats) * len(series), 1) * 0.55))
+        chart.groupSpacing = 6
+        chart.barSpacing = 1
+    chart.x = left
+    chart.y = bottom
+    chart.width = chart_w
+    chart.height = chart_h
+    chart.data = data
+    chart.categoryAxis.categoryNames = cats
+    chart.categoryAxis.labels.fontName = 'Helvetica'
+    chart.categoryAxis.labels.fontSize = 6
+    if len(cats) > 6:
+        chart.categoryAxis.labels.angle = 40
+        chart.categoryAxis.labels.boxAnchor = 'ne'
+        chart.categoryAxis.labels.dy = -2
+    else:
+        chart.categoryAxis.labels.boxAnchor = 'n'
+    chart.valueAxis.labels.fontName = 'Helvetica'
+    chart.valueAxis.labels.fontSize = 7
+    ymin = min(min(item['values']) for item in series)
+    ymax = max(max(item['values']) for item in series)
+    chart.valueAxis.valueMin = 0 if ymin >= 0 else ymin * 1.1
+    chart.valueAxis.valueMax = ymax * 1.12 if ymax else 1
+    for idx, hexcol in enumerate(_PDF_CHART_COLORS):
+        color = colors.HexColor(hexcol)
+        if kind == 'line':
+            chart.lines[idx].strokeColor = color
+            chart.lines[idx].strokeWidth = 1.6
+        else:
+            chart.bars[idx].fillColor = color
+            chart.bars[idx].strokeColor = colors.white
+            chart.bars[idx].strokeWidth = 0.3
+    drawing.add(chart)
+    if len(series) > 1:
+        legend = Legend()
+        legend.x = left
+        legend.y = height - 10
+        legend.fontName = 'Helvetica'
+        legend.fontSize = 7
+        legend.alignment = 'right'
+        legend.colorNamePairs = [
+            (
+                colors.HexColor(_PDF_CHART_COLORS[idx % len(_PDF_CHART_COLORS)]),
+                str(item.get('name') or '')[:24],
+            )
+            for idx, item in enumerate(series)
+        ]
+        drawing.add(legend)
+    elif series:
+        drawing.add(String(
+            left, height - 10, str(series[0].get('name') or '')[:40],
+            fontName='Helvetica', fontSize=7,
+            fillColor=colors.HexColor('#5a5a5a'),
+        ))
+    return drawing
+
+
+def format_data_as_pdf(data, columns_config, title="Report", landscape=True,
+                       env=None, chart_series=None):
+    """Tabular PDF with the chat table tokens (no row #, no MCP footer).
+
+    Cells that are photos (data-URI, raw base64, /web/image via env) become
+    thumbnails. Rows split between pages; a photo stays inside its row.
+    A structural series (category + numbers) may prepend a reportlab chart.
+    """
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4, landscape as a4_landscape
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.platypus import (
+            SimpleDocTemplate, Spacer, Table, TableStyle,
+        )
+        import io
+
+        buffer = io.BytesIO()
+        pagesize = a4_landscape(A4) if landscape else A4
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=pagesize,
+            rightMargin=1 * cm,
+            leftMargin=1 * cm,
+            topMargin=1.4 * cm,
+            bottomMargin=1 * cm,
+            creator=_ai.AI_GENERATOR,
+            keywords=_ai.AI_KEYWORD,
+            subject=_ai.AI_DESCRIPTION,
+        )
+
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'AiPdfTitle',
+            parent=styles['Heading1'],
+            fontName='Helvetica-Bold',
+            fontSize=14,
+            leading=18,
+            textColor=colors.HexColor('#1a1a1a'),
+            spaceAfter=10,
+            alignment=0,
+        )
+        cell_style = ParagraphStyle(
+            'AiPdfCell',
+            parent=styles['Normal'],
+            fontName='Helvetica',
+            fontSize=8,
+            leading=10,
+            textColor=colors.HexColor('#282828'),
+        )
+        head_style = ParagraphStyle(
+            'AiPdfHead',
+            parent=cell_style,
+            fontName='Helvetica-Bold',
+            textColor=colors.HexColor('#1a1a1a'),
+        )
+
+        story = []
+        if title:
+            story.append(_pdf_paragraph(str(title), title_style))
+            story.append(Spacer(1, 0.2 * cm))
+        if chart_series:
+            try:
+                usable_w = pagesize[0] - 2 * cm
+                drawing = _pdf_chart_drawing(chart_series, usable_w, 7.2 * cm)
+                if drawing is not None:
+                    story.append(drawing)
+                    story.append(Spacer(1, 0.35 * cm))
+            except Exception:
+                _logger.debug('format_data_as_pdf: chart drawing skipped', exc_info=True)
+
+        header = []
+        for key, label, formatter, align in columns_config:
+            header.append(_pdf_paragraph(str(label or key), head_style))
+        table_data = [header]
+        thumb = 1.35 * cm
+        image_rows = set()
+
+        for row_idx, row_data in enumerate(data or []):
+            row = []
+            has_image = False
+            for key, label, formatter, align in columns_config:
+                value = row_data.get(key, '') if isinstance(row_data, dict) else ''
+                raw = _pdf_image_bytes(value, key=key, env=env)
+                if raw:
+                    flow = _pdf_flowable_image(raw, thumb)
+                    if flow is not None:
+                        row.append(flow)
+                        has_image = True
+                        continue
+                if _pdf_is_image_ref(value):
+                    row.append(_pdf_paragraph('', cell_style))
+                    continue
+                row.append(_pdf_paragraph(
+                    _pdf_plain_cell(value, formatter), cell_style,
+                ))
+            table_data.append(row)
+            if has_image:
+                image_rows.add(row_idx + 1)
+
+        row_heights = None
+        if image_rows:
+            row_heights = [None] * len(table_data)
+            for idx in image_rows:
+                row_heights[idx] = thumb + 0.25 * cm
+        table = Table(
+            table_data, repeatRows=1, splitByRow=1, rowHeights=row_heights,
+        )
+        table.hAlign = 'LEFT'
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#eceff1')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#1a1a1a')),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            ('TOPPADDING', (0, 0), (-1, 0), 6),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#282828')),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#c8c8c8')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            (
+                'ROWBACKGROUNDS', (0, 1), (-1, -1),
+                [colors.white, colors.HexColor('#f8f9fa')],
+            ),
+        ]))
+        for col_idx, (key, label, formatter, align) in enumerate(columns_config):
+            if align == 'right':
+                table.setStyle(TableStyle([
+                    ('ALIGN', (col_idx, 1), (col_idx, -1), 'RIGHT'),
+                ]))
+            elif align == 'center':
+                table.setStyle(TableStyle([
+                    ('ALIGN', (col_idx, 1), (col_idx, -1), 'CENTER'),
+                ]))
+        story.append(table)
+
+        doc.build(story)
+        buffer.seek(0)
+        return buffer.getvalue()
+    except ImportError:
+        raise Exception("reportlab is not installed. Install it with: pip install reportlab")
+    except Exception as e:
+        raise Exception(f"Error generating PDF: {str(e)}")
+

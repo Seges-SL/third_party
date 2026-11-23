@@ -1,0 +1,698 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* pns_base
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-06-13 12:00+0000\n"
+"PO-Revision-Date: 2026-06-13 12:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: es_ES\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid "Operation result"
+msgstr "Resultado de la operación"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_html
+msgid "Result"
+msgstr "Resultado"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_export_file_wizard_form
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid "Close"
+msgstr "Cerrar"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid "Operation completed successfully."
+msgstr "Operación completada correctamente."
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid "Operation completed with warnings."
+msgstr "Operación completada con avisos."
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid "Operation failed."
+msgstr "La operación ha fallado."
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_created
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid "Created"
+msgstr "Creados"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_updated
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid "Updated"
+msgstr "Actualizados"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_skipped
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid "Skipped"
+msgstr "Omitidos"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_removed
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid "Removed"
+msgstr "Eliminados"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_linked
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid "Linked"
+msgstr "Vinculados"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_manifest
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid "Manifest"
+msgstr "Manifiesto"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/ui_feedback.py:0
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_errors
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid "Errors"
+msgstr "Errores"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/ui_feedback.py:0
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_warnings
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid "Warnings"
+msgstr "Advertencias"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_detail
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid "Details"
+msgstr "Detalles"
+
+#. module: pns_base
+#: model:ir.model.fields.selection,name:pns_base.selection__pns_operation_report_wizard__result_status__success
+msgid "Success"
+msgstr "Éxito"
+
+#. module: pns_base
+#: model:ir.model.fields.selection,name:pns_base.selection__pns_operation_report_wizard__result_status__warning
+msgid "Warning"
+msgstr "Aviso"
+
+#. module: pns_base
+#: model:ir.model.fields.selection,name:pns_base.selection__pns_operation_report_wizard__result_status__danger
+msgid "Danger"
+msgstr "Peligro"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_ir_module_module__pns_index_url
+msgid "Index"
+msgstr "Index"
+
+#. module: pns_base
+#: model:ir.model.fields,help:pns_base.field_ir_module_module__pns_index_url
+msgid ""
+"Local Apps index (static/description/index.html) when the module ships one."
+msgstr ""
+"Index local de Apps (static/description/index.html) si el módulo lo trae."
+
+#. module: pns_base
+#. odoo-javascript
+#: code:addons/pns_base/static/src/js/pns_invalid_fields_dedupe.js:0
+msgid "Required field: %s"
+msgstr "Campo obligatorio: %s"
+
+#. module: pns_base
+#. odoo-javascript
+#: code:addons/pns_base/static/src/js/pns_invalid_fields_dedupe.js:0
+msgid "Required fields: %s"
+msgstr "Campos obligatorios: %s"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/settings_io.py:0
+msgid "Invalid backup file: expected a settings object."
+msgstr ""
+"Archivo de copia de seguridad no válido: se esperaba un objeto de ajustes."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/settings_io.py:0
+msgid "Unknown setting '%s' skipped."
+msgstr "Ajuste desconocido '%s' omitido."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/settings_io.py:0
+msgid "Could not apply setting '%s'; skipped."
+msgstr "No se pudo aplicar el ajuste '%s'; se omitió."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/settings_io.py:0
+msgid "Invalid backup file: expected a JSON object."
+msgstr "Archivo de copia de seguridad no válido: se esperaba un objeto JSON."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/settings_io.py:0
+msgid "Backup file has no 'settings' section."
+msgstr "El archivo de copia de seguridad no tiene sección 'settings'."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/settings_io.py:0
+msgid "Could not read settings fields; nothing was imported."
+msgstr "No se pudieron leer los campos de ajustes; no se importó nada."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/settings_io.py:0
+msgid "Could not read current settings; applying file values only."
+msgstr ""
+"No se pudieron leer los ajustes actuales; se aplican solo los del archivo."
+
+#. module: pns_base
+#: model:ir.model,name:pns_base.model_pns_export_file_wizard
+msgid "Export file result wizard"
+msgstr "Asistente de resultado de exportación"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_export_file_wizard__attachment_id
+msgid "Attachment"
+msgstr "Adjunto"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/portable_io.py:0
+#: model:ir.model.fields,field_description:pns_base.field_pns_export_file_wizard__export_filename
+msgid "File name"
+msgstr "Nombre de archivo"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/export_secrets_wizard.py:0
+#: model_terms:ir.ui.view,arch_db:pns_base.view_export_file_wizard_form
+#: model_terms:ir.ui.view,arch_db:pns_base.view_export_secrets_wizard_form
+msgid "Export"
+msgstr "Exportar"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_export_file_wizard_form
+msgid "Download"
+msgstr "Descargar"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/export_file_wizard.py:0
+msgid "No file available for download."
+msgstr "No hay archivo disponible para descargar."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "Unknown field '%s' skipped."
+msgstr "Campo desconocido '%s' omitido."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "Invalid value for '%s' skipped."
+msgstr "Valor no válido para '%s'; se omitió."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "Expected a JSON object for a record; skipped."
+msgstr "Se esperaba un objeto JSON para el registro; se omitió."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "ZIP file does not contain any .json files."
+msgstr "El ZIP no contiene ningún archivo .json."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "File '%s' in ZIP has unexpected format, skipped."
+msgstr "El archivo '%s' del ZIP tiene un formato inesperado; se omitió."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "File '%s' in ZIP could not be parsed: %s"
+msgstr "No se pudo interpretar el archivo '%s' del ZIP: %s"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "No valid JSON data found in the ZIP file."
+msgstr "No se encontraron datos JSON válidos en el ZIP."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "File is neither valid JSON nor a ZIP archive: %s"
+msgstr "El archivo no es JSON válido ni un ZIP: %s"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "JSON contained a single object; wrapped into a list."
+msgstr "El JSON contenía un solo objeto; se envolvió en una lista."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "Expected a JSON array, got %s."
+msgstr "Se esperaba un array JSON, se recibió %s."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "Export completed successfully."
+msgstr "Exportación completada correctamente."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "Click \"Download\" to choose where to save the file."
+msgstr "Pulsa «Descargar» para elegir dónde guardar el archivo."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/portable_io.py:0
+msgid "Records exported"
+msgstr "Registros exportados"
+
+#. module: pns_base
+#: model:ir.model,name:pns_base.model_pns_export_secrets_wizard
+msgid "Ask whether an export carries secrets"
+msgstr "Preguntar si una exportación lleva secretos"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_export_secrets_wizard__include_secrets
+msgid "Include secrets"
+msgstr "Incluir secretos"
+
+#. module: pns_base
+#: model:ir.model.fields,help:pns_base.field_pns_export_secrets_wizard__include_secrets
+msgid "Adds API keys and tokens in clear text to the exported file."
+msgstr "Añade al archivo exportado las claves API y los tokens en claro."
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_export_secrets_wizard_form
+msgid "The file will carry API keys and tokens in clear text. Keep it safe."
+msgstr ""
+"El archivo llevará las claves API y los tokens en claro. Guárdalo en lugar "
+"seguro."
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_export_secrets_wizard_form
+msgid ""
+"Keys and tokens stay out of the file. Importing it never blanks the ones "
+"already set."
+msgstr ""
+"Las claves y los tokens se quedan fuera del archivo. Al importarlo, nunca se"
+" vacían los que ya hay."
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_export_secrets_wizard_form
+msgid "Cancel"
+msgstr "Cancelar"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/export_secrets_wizard.py:0
+msgid "This export cannot ask for secrets."
+msgstr "Esta exportación no puede preguntar por los secretos."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/base_language_install.py:0
+msgid "Translations"
+msgstr "Traducciones"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/base_language_install.py:0
+msgid "%s duplicate translation rows were skipped so the language could load."
+msgstr ""
+"%s filas de traducción duplicadas se han saltado para que el idioma pueda "
+"cargarse."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+msgid "Review import"
+msgstr "Revisar importación"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Review this import"
+msgstr "Revisar esta importación"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "No data has been written."
+msgstr "No se ha escrito nada."
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Confirm to apply the upload."
+msgstr "Confirma para aplicar la subida."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_created_names
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Will create"
+msgstr "Creará"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_updated_names
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Will replace"
+msgstr "Sustituirá"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_skipped_names
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Will leave"
+msgstr "Dejará"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_operation_report_wizard__result_params
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Options"
+msgstr "Opciones"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Section list"
+msgstr "Lista por sección"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Apply the import"
+msgstr "Aplicar la importación"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "Discard"
+msgstr "Descartar"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+msgid "%s is on"
+msgstr "%s está activo"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+msgid "%s is off"
+msgstr "%s está inactivo"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+msgid "Review"
+msgstr "Revisar"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+msgid "This wizard has no import to review."
+msgstr "Este asistente no tiene una importación que revisar."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+msgid "%s: yes"
+msgstr "%s: sí"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/operation_report_wizard.py:0
+msgid "%s: no"
+msgstr "%s: no"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/progress_job.py:0
+msgid "%s s"
+msgstr "%s s"
+
+#. module: pns_base
+#: model:ir.model,name:pns_base.model_pns_progress_job
+msgid "Background job with progress"
+msgstr "Trabajo en segundo plano con progreso"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_progress_job__name
+msgid "Title"
+msgstr "Título"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_progress_job__key
+msgid "Key"
+msgstr "Clave"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_progress_job__user_id
+msgid "User"
+msgstr "Usuario"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_progress_job__state
+msgid "State"
+msgstr "Estado"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_progress_job__progress
+msgid "Progress"
+msgstr "Progreso"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_progress_job__step
+msgid "Step"
+msgstr "Paso"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_progress_job__summary
+msgid "Summary"
+msgstr "Resumen"
+
+#. module: pns_base
+#. odoo-javascript
+#: code:addons/pns_base/static/src/xml/pns_progress_dialog.xml:0
+#: model:ir.model.fields,field_description:pns_base.field_pns_progress_job__error
+msgid "Error"
+msgstr "Error"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_progress_job__started_at
+msgid "Started"
+msgstr "Inicio"
+
+#. module: pns_base
+#: model:ir.model.fields,field_description:pns_base.field_pns_progress_job__finished_at
+msgid "Finished"
+msgstr "Fin"
+
+#. module: pns_base
+#: model:ir.model.fields.selection,name:pns_base.selection__pns_progress_job__state__queued
+msgid "Queued"
+msgstr "En cola"
+
+#. module: pns_base
+#: model:ir.model.fields.selection,name:pns_base.selection__pns_progress_job__state__running
+msgid "Running"
+msgstr "En curso"
+
+#. module: pns_base
+#. odoo-javascript
+#: code:addons/pns_base/static/src/xml/pns_progress_dialog.xml:0
+#: model:ir.model.fields.selection,name:pns_base.selection__pns_progress_job__state__done
+msgid "Done"
+msgstr "Hecho"
+
+#. module: pns_base
+#: model:ir.model.fields.selection,name:pns_base.selection__pns_progress_job__state__failed
+msgid "Failed"
+msgstr "Fallido"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/progress_job.py:0
+msgid "The work stopped with an error. The server log has the details."
+msgstr ""
+"El trabajo se ha parado con un error. El log del servidor tiene el detalle."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/progress_job.py:0
+msgid "The work stopped answering. It may have been cut by a restart."
+msgstr ""
+"El trabajo ha dejado de responder. Puede que lo haya cortado un reinicio."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/progress_job.py:0
+msgid "%(minutes)s min %(seconds)s s"
+msgstr "%(minutes)s min %(seconds)s s"
+
+#. module: pns_base
+#. odoo-javascript
+#: code:addons/pns_base/static/src/xml/pns_progress_dialog.xml:0
+msgid "Starting…"
+msgstr "Empezando…"
+
+#. module: pns_base
+#. odoo-javascript
+#: code:addons/pns_base/static/src/xml/pns_progress_dialog.xml:0
+msgid "You can close this window: the work goes on."
+msgstr "Puedes cerrar esta ventana: el trabajo sigue."
+
+#. module: pns_base
+#. odoo-javascript
+#: code:addons/pns_base/static/src/xml/pns_progress_dialog.xml:0
+msgid "Done."
+msgstr "Hecho."
+
+#. module: pns_base
+#. odoo-javascript
+#: code:addons/pns_base/static/src/xml/pns_progress_dialog.xml:0
+msgid "Info"
+msgstr "Información"
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/models/progress_job.py:0
+msgid "This work is already running for %s. Try again when it finishes."
+msgstr ""
+"Este trabajo ya está en curso para %s. Vuelve a intentarlo cuando termine."
+
+#. module: pns_base
+#. odoo-python
+#: code:addons/pns_base/utils/ui_feedback.py:0
+msgid "Errors (%s):"
+msgstr "Errores (%s):"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid ""
+"<i class=\"fa fa-check-circle o_pns_alert_icon\" title=\"Operation completed successfully.\"/>\n"
+"                        <strong>Operation completed successfully.</strong>"
+msgstr ""
+"<i class=\"fa fa-check-circle o_pns_alert_icon\" title=\"Operación completada correctamente.\"/>\n"
+"                        <strong>Operación completada correctamente.</strong>"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid ""
+"<i class=\"fa fa-exclamation-triangle o_pns_alert_icon\" title=\"Operation completed with warnings.\"/>\n"
+"                        <strong>Operation completed with warnings.</strong>"
+msgstr ""
+"<i class=\"fa fa-exclamation-triangle o_pns_alert_icon\" title=\"Operación completada con avisos.\"/>\n"
+"                        <strong>Operación completada con avisos.</strong>"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_operation_result_form
+msgid ""
+"<i class=\"fa fa-times-circle o_pns_alert_icon\" title=\"Operation failed.\"/>\n"
+"                        <strong>Operation failed.</strong>"
+msgstr ""
+"<i class=\"fa fa-times-circle o_pns_alert_icon\" title=\"La operación ha fallado.\"/>\n"
+"                        <strong>La operación ha fallado.</strong>"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "<span class=\"o_pns_preview_attr\">Errors</span>"
+msgstr "<span class=\"o_pns_preview_attr\">Errores</span>"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "<span class=\"o_pns_preview_attr\">Linked</span>"
+msgstr "<span class=\"o_pns_preview_attr\">Vinculados</span>"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "<span class=\"o_pns_preview_attr\">Manifest</span>"
+msgstr "<span class=\"o_pns_preview_attr\">Manifiesto</span>"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "<span class=\"o_pns_preview_attr\">Options</span>"
+msgstr "<span class=\"o_pns_preview_attr\">Opciones</span>"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "<span class=\"o_pns_preview_attr\">Removed</span>"
+msgstr "<span class=\"o_pns_preview_attr\">Eliminados</span>"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "<span class=\"o_pns_preview_attr\">Section list</span>"
+msgstr "<span class=\"o_pns_preview_attr\">Lista por sección</span>"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "<span class=\"o_pns_preview_attr\">Warnings</span>"
+msgstr "<span class=\"o_pns_preview_attr\">Advertencias</span>"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "<span class=\"o_pns_preview_attr\">Will create</span>"
+msgstr "<span class=\"o_pns_preview_attr\">Creará</span>"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "<span class=\"o_pns_preview_attr\">Will leave</span>"
+msgstr "<span class=\"o_pns_preview_attr\">Dejará</span>"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid "<span class=\"o_pns_preview_attr\">Will replace</span>"
+msgstr "<span class=\"o_pns_preview_attr\">Sustituirá</span>"
+
+#. module: pns_base
+#: model_terms:ir.ui.view,arch_db:pns_base.view_pns_import_preview_form
+msgid ""
+"<strong>No data has been written.</strong>\n"
+"                    Confirm to apply the upload."
+msgstr ""
+"<strong>No se ha escrito nada.</strong>\n"
+"                    Confirma para aplicar la subida."

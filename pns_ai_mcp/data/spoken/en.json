@@ -1,0 +1,29 @@
+{
+  "what": "spoken_words",
+  "language": "en",
+  "help": ["help", "options", "params", "usage"],
+  "help_command": ["help"],
+  "today": ["today"],
+  "yesterday": ["yesterday"],
+  "day_before_yesterday": ["day before yesterday"],
+  "tomorrow": ["tomorrow"],
+  "day_after_tomorrow": ["day after tomorrow"],
+  "weekdays": [
+    ["monday", "mon"],
+    ["tuesday", "tue", "tues"],
+    ["wednesday", "wed"],
+    ["thursday", "thu", "thur", "thurs"],
+    ["friday", "fri"],
+    ["saturday", "sat"],
+    ["sunday", "sun"]
+  ],
+  "next": ["next"],
+  "this": ["this"],
+  "filler": [
+    "a", "an", "the", "my", "your", "when", "where", "what", "who",
+    "please", "pls", "plz", "can", "could", "would", "will", "want",
+    "make", "create", "generate", "give", "show", "need", "draw", "paint",
+    "this", "that", "here", "there"
+  ],
+  "file": ["file", "image", "drawing", "export", "download"]
+}

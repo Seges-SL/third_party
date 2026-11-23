@@ -1,0 +1,16 @@
+{
+  "code": "discovery_hr_contracts_es_ES",
+  "tipo": "discovery",
+  "locale": "es_ES",
+  "target": "hr_contracts",
+  "priority": 77,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "contrato laboral",
+    "contratos laborales",
+    "contrato de trabajo",
+    "contratos de trabajo",
+    "contrato de empleado"
+  ]
+}

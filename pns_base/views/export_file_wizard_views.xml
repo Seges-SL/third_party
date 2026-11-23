@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_export_file_wizard_form" model="ir.ui.view">
+        <field name="name">pns.export.file.wizard.form</field>
+        <field name="model">pns.export.file.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Export">
+                <field name="result_html" nolabel="1"/>
+                <field name="attachment_id" invisible="1"/>
+                <field name="export_filename" invisible="1"/>
+                <footer>
+                    <button name="action_download" type="object" string="Download"
+                            class="btn-primary" icon="fa-download"
+                            attrs="{'invisible': [('attachment_id', '=', False)]}"/>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

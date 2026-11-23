@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <metadata>
+        <code>hr_payroll_es_ES</code>
+        <tipo>domain</tipo>
+        <locale_code>es_ES</locale_code>
+        <description>Payroll Spain - accounting 640/4751/476 first, payslip fallback [RECOMMENDED]</description>
+        <author>Antigravity</author>
+        <version>4.3</version>
+        <created_at>2025-01-26</created_at>
+        <created_by>Antigravity</created_by>
+        <modified_at>2026-07-17</modified_at>
+        <modified_by>Antigravity</modified_by>
+    </metadata>
+    
+    <domain_knowledge>
+# Payroll in Spain (es_ES)
+
+**Source cascade:** (1) `account.move.line` multi-cuenta PGC → (2) `hr.payslip`
+solo si el paso 1 no devolvió filas o el usuario pide desglose de reglas del
+recibo → (3) sin datos.
+
+Cuentas PGC relacionadas:
+
+| Cuenta | Uso en este contexto |
+|--------|----------------------|
+| **640** | Sueldos y salarios — **bruto** (debe, por `partner_id` empleado) |
+| **4751** | Retenciones IRPF trabajador (haber, por partner) |
+| **476** | Seguridad Social — parte trabajador cuando el asiento lleva `partner_id` |
+| **642** | SS empresa (gasto; no restar del neto del empleado) |
+| **649** | Otros gastos sociales (informativo) |
+
+**640 no es neto.** Neto = bruto − IRPF (4751) − SS trabajador (476 con partner).
+
+## Step 1: Accounting (primary)
+
+AST: do NOT define `def` helpers — accumulate inline in each loop.
+
+```python
+start_date = '2026-05-01'
+end_date = '2026-05-31'
+result = None
+by_partner = {}
+
+# Bruto: 640 debe
+for line in env['account.move.line'].search([
+    ('date', '&gt;=', start_date), ('date', '&lt;=', end_date),
+    ('account_id.code', '=like', '640%'), ('debit', '&gt;', 0),
+]):
+    if line.partner_id:
+        pid = line.partner_id.id
+        by_partner.setdefault(pid, {
+            'name': line.partner_id.name,
+            'gross': 0.0, 'irpf': 0.0, 'ss_emp': 0.0, 'net': 0.0,
+        })
+        by_partner[pid]['gross'] += line.debit
+
+# IRPF: 4751 haber
+for line in env['account.move.line'].search([
+    ('date', '&gt;=', start_date), ('date', '&lt;=', end_date),
+    ('account_id.code', '=like', '4751%'), ('credit', '&gt;', 0),
+]):
+    if line.partner_id:
+        pid = line.partner_id.id
+        by_partner.setdefault(pid, {
+            'name': line.partner_id.name,
+            'gross': 0.0, 'irpf': 0.0, 'ss_emp': 0.0, 'net': 0.0,
+        })
+        by_partner[pid]['irpf'] += line.credit
+
+# SS trabajador: 476 haber con partner (si la gestoría agrupa sin partner, ss_emp=0)
+for line in env['account.move.line'].search([
+    ('date', '&gt;=', start_date), ('date', '&lt;=', end_date),
+    ('account_id.code', '=like', '476%'), ('credit', '&gt;', 0),
+]):
+    if line.partner_id:
+        pid = line.partner_id.id
+        by_partner.setdefault(pid, {
+            'name': line.partner_id.name,
+            'gross': 0.0, 'irpf': 0.0, 'ss_emp': 0.0, 'net': 0.0,
+        })
+        by_partner[pid]['ss_emp'] += line.credit
+
+for data in by_partner.values():
+    data['net'] = data['gross'] - data['irpf'] - data['ss_emp']
+
+if by_partner:
+    # → hr_payroll_accounting_present (structured rows; server renders table)
+    # Present gross and net columns; do NOT continue to payslip.
+```
+
+If the user asked only for **bruto**, show `gross`. If asked for **neto**, show
+`net` and mention when `ss_emp` is 0 because 476 has no partner breakdown.
+
+## Step 2: Payslip fallback
+
+Only when step 1 returned no `by_partner` rows, or the user needs payslip salary
+rule lines. If `'hr.payslip' in env`:
+
+```python
+slips = env['hr.payslip'].search([
+    ('date_from', '&gt;=', start_date),
+    ('date_to', '&lt;=', end_date),
+    ('state', 'in', ['done', 'paid']),
+])
+if slips:
+    rows = []
+    for slip in slips:
+        emp = slip.employee_id
+        gross_lines = slip.line_ids.filtered(lambda l: l.code == 'GROSS')
+        rows.append({
+            '__model': 'hr.payslip',
+            'employee': emp.name,
+            'dni': emp.identification_id or '',
+            'gross': gross_lines[:1].total if gross_lines else 0.0,
+            'net': slip.net_wage,
+        })
+    result = rows
+    # Present rows; stop here.
+```
+
+## Step 3: No data
+
+```python
+if not result and not by_partner:
+    result = {'formatted_text': 'No hay datos de nómina para el periodo solicitado.'}
+```
+    </domain_knowledge>
+</context>

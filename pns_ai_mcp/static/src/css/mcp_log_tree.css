@@ -1,0 +1,416 @@
+/* Styles for the MCP log tree view. No overflow clip on the renderer: when
+   the columns do not fit, a clip hides the last one, which holds the
+   optional-columns toggler. */
+.o_mcp_log_tree .o_list_table,
+.o_mcp_log_tree table.o_list_table,
+.o_list_view .o_mcp_log_tree .o_list_table {
+    table-layout: fixed;
+    width: 100% !important;
+}
+
+.o_mcp_log_tree .o_list_renderer table.o_list_table th.o_list_actions_header,
+.o_mcp_log_tree .o_list_renderer table.o_list_table td.o_list_actions_header {
+    width: 32px !important;
+    min-width: 32px !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+}
+
+/* Selection column width (checkbox) - fixed width to avoid overlap */
+.o_mcp_log_tree .o_list_table th:first-child,
+.o_mcp_log_tree .o_list_table td:first-child,
+.o_mcp_log_tree table.o_list_table th:first-child,
+.o_mcp_log_tree table.o_list_table td:first-child {
+    width: 35px !important;
+    min-width: 35px !important;
+    max-width: 35px !important;
+    padding: 4px 3px !important;
+    box-sizing: border-box !important;
+}
+
+.o_mcp_log_tree .o_list_table td:not(:first-child),
+.o_mcp_log_tree .o_list_table th:not(:first-child),
+.o_mcp_log_tree table.o_list_table td:not(:first-child),
+.o_mcp_log_tree table.o_list_table th:not(:first-child) {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    padding: 4px 8px;
+    line-height: 1.2;
+    vertical-align: middle;
+}
+
+/* Code + No.: same mono font (turn order); date/time = normal Odoo font */
+.o_mcp_log_tree .o_list_table th[data-name="user_id"],
+.o_mcp_log_tree .o_list_table td[data-name="user_id"],
+.o_mcp_log_tree .o_list_table th[data-field="user_id"],
+.o_mcp_log_tree .o_list_table td[data-field="user_id"],
+.o_mcp_log_tree table.o_list_table th[data-name="user_id"],
+.o_mcp_log_tree table.o_list_table td[data-name="user_id"],
+.o_mcp_log_tree table.o_list_table th[data-field="user_id"],
+.o_mcp_log_tree table.o_list_table td[data-field="user_id"] {
+    width: 100px !important;
+    min-width: 80px !important;
+    max-width: 100px !important;
+}
+
+.o_mcp_log_tree .o_list_table th[data-name="timestamp"],
+.o_mcp_log_tree .o_list_table td[data-name="timestamp"] {
+    width: 155px !important;
+    min-width: 140px !important;
+    max-width: 175px !important;
+}
+
+/* Negotiation icon: first data column, after the checkbox.
+   O14 cells use data-field; O19 uses data-name. The field class hits both.
+   The generic td:not(:first-child) rule sets ellipsis — at 28px that
+   "…" renders as a white dot after every icon. */
+.o_mcp_log_tree .o_mcp_flow_icon_cell,
+.o_mcp_log_tree .o_list_table .o_pns_html_readonly_cell,
+.o_mcp_log_tree .o_list_table th[data-name="flow_icon_html"],
+.o_mcp_log_tree .o_list_table td[data-name="flow_icon_html"],
+.o_mcp_log_tree .o_list_table td[data-field="flow_icon_html"],
+.o_mcp_log_tree table.o_list_table th[data-name="flow_icon_html"],
+.o_mcp_log_tree table.o_list_table td[data-name="flow_icon_html"],
+.o_mcp_log_tree table.o_list_table td[data-field="flow_icon_html"] {
+    padding: 2px !important;
+    text-align: center;
+    overflow: hidden !important;
+    text-overflow: clip !important;
+    font-size: 0 !important;
+}
+.o_mcp_log_tree .o_mcp_flow_icon_cell .pns_html_readonly,
+.o_mcp_log_tree .o_mcp_flow_icon_cell .o_mcp_flow_row_icon,
+.o_mcp_log_tree td[data-name="flow_icon_html"] .pns_html_readonly,
+.o_mcp_log_tree td[data-name="flow_icon_html"] .o_mcp_flow_row_icon,
+.o_mcp_log_tree td[data-field="flow_icon_html"] .pns_html_readonly,
+.o_mcp_log_tree td[data-field="flow_icon_html"] .o_mcp_flow_row_icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: none;
+    overflow: hidden;
+    text-overflow: clip;
+}
+.o_mcp_log_tree .o_mcp_flow_icon_cell svg,
+.o_mcp_log_tree td[data-name="flow_icon_html"] svg,
+.o_mcp_log_tree td[data-field="flow_icon_html"] svg {
+    width: 15px;
+    height: 15px;
+    display: block;
+    color: inherit;
+}
+
+/* flow_label: key column, do not truncate — shown in full */
+.o_mcp_log_tree .o_list_table th[data-name="flow_label"],
+.o_mcp_log_tree .o_list_table td[data-name="flow_label"] {
+    width: 240px !important;
+    min-width: 200px !important;
+    max-width: 320px !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    font-weight: 500;
+}
+
+/* Compressed JSON widget - avoid overflow */
+.o_field_mcp_json_compressed {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+}
+
+.mcp_json_container {
+    display: block;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+}
+
+.mcp_json_compressed {
+    display: inline-block;
+    max-width: 100% !important;
+    width: auto !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    color: #007bff;
+    text-decoration: underline;
+    box-sizing: border-box !important;
+}
+
+/* Make sure the flex container does not exceed the width */
+.mcp_json_container > div[style*="display: flex"] {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+}
+
+/* Make sure the compressed text wrapper does not overflow */
+.mcp_json_container > div[style*="display: flex"] > span {
+    max-width: calc(100% - 30px) !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    flex: 1 1 auto !important;
+}
+
+/* Make sure the copy button does not cause overflow */
+.mcp_json_copy_btn {
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
+    width: auto !important;
+    min-width: 20px !important;
+    max-width: 30px !important;
+}
+
+/* Copy buttons in the form */
+.o_field_text_copy_container {
+    position: relative;
+}
+
+.o_field_text_copy_btn {
+    position: absolute;
+    top: 5px;
+    inset-inline-end: 5px;
+    z-index: 10;
+}
+
+.mcp_json_compressed:hover {
+    color: #0056b3;
+}
+
+.mcp_json_expanded_container {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.mcp_json_expanded {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+
+/* ============================================================
+   SEMANTIC COLOURS BY INTERACTION TYPE IN THE MCP LOG
+   Each row type has a background + contrasting text:
+
+   in_llm  (ORCH→LLM)    decoration-info    : Odoo blue     — request to the model
+   out_llm (LLM→ORCH)    decoration-success : Dark green    — reply from the model
+   in_tool (ORCH→Tool)   decoration-warning : Orange        — tool (round trip)
+   write op              decoration-danger  : Soft red      — writes
+   ============================================================ */
+
+/* in_llm: Odoo blue — call sent to the LLM */
+.o_mcp_log_tree .o_list_table tr.text-info td,
+.o_mcp_log_tree table tr.text-info td {
+    background-color: #00a09d !important;
+    color: #ffffff !important;
+    font-weight: 500;
+}
+.o_mcp_log_tree .o_list_table tr.text-info td a,
+.o_mcp_log_tree .o_list_table tr.text-info td span { color: #ffffff !important; }
+
+/* out_llm: Dark green — reply received from the LLM */
+.o_mcp_log_tree .o_list_table tr.text-success td,
+.o_mcp_log_tree table tr.text-success td {
+    background-color: #1e7e34 !important;
+    color: #ffffff !important;
+    font-weight: 500;
+}
+.o_mcp_log_tree .o_list_table tr.text-success td a,
+.o_mcp_log_tree .o_list_table tr.text-success td span { color: #e8f5e9 !important; }
+
+/* in_tool: Orange — tool being run (ORCH→Tool) */
+.o_mcp_log_tree .o_list_table tr.text-warning td,
+.o_mcp_log_tree table tr.text-warning td {
+    background-color: #e67e00 !important;
+    color: #ffffff !important;
+    font-weight: 500;
+}
+.o_mcp_log_tree .o_list_table tr.text-warning td a,
+.o_mcp_log_tree .o_list_table tr.text-warning td span { color: #fff8e1 !important; }
+
+/* out_tool: Blue grey — tool result (Tool→ORCH) */
+.o_mcp_log_tree .o_list_table tr.text-muted td,
+.o_mcp_log_tree table tr.text-muted td {
+    background-color: #546e7a !important;
+    color: #eceff1 !important;
+}
+.o_mcp_log_tree .o_list_table tr.text-muted td a,
+.o_mcp_log_tree .o_list_table tr.text-muted td span { color: #cfd8dc !important; }
+
+/* write op: Red — write operations */
+.o_mcp_log_tree .o_list_table tr.text-danger td,
+.o_mcp_log_tree table tr.text-danger td {
+    background-color: #c0392b !important;
+    color: #ffffff !important;
+    font-weight: 500;
+}
+.o_mcp_log_tree .o_list_table tr.text-danger td a,
+.o_mcp_log_tree .o_list_table tr.text-danger td span { color: #ffebee !important; }
+
+/* Hover: darken the background slightly */
+.o_mcp_log_tree .o_list_table tr.text-info:hover td    { background-color: #007f7d !important; }
+.o_mcp_log_tree .o_list_table tr.text-success:hover td { background-color: #155724 !important; }
+.o_mcp_log_tree .o_list_table tr.text-warning:hover td { background-color: #b56200 !important; }
+.o_mcp_log_tree .o_list_table tr.text-muted:hover td   { background-color: #3d4f58 !important; }
+.o_mcp_log_tree .o_list_table tr.text-danger:hover td  { background-color: #96281b !important; }
+
+/* Checkbox on coloured rows */
+.o_mcp_log_tree .o_list_table tr.text-info td .o_checkbox,
+.o_mcp_log_tree .o_list_table tr.text-success td .o_checkbox,
+.o_mcp_log_tree .o_list_table tr.text-warning td .o_checkbox,
+.o_mcp_log_tree .o_list_table tr.text-muted td .o_checkbox,
+.o_mcp_log_tree .o_list_table tr.text-danger td .o_checkbox { filter: brightness(2); }
+
+/* completed (Turn completed): same contrast as the other chips — white, no italic */
+.o_mcp_log_tree .o_list_table tr.text-primary td,
+.o_mcp_log_tree table tr.text-primary td {
+    background-color: #37474f !important;
+    color: #ffffff !important;
+    font-weight: 500;
+    font-style: normal;
+}
+.o_mcp_log_tree .o_list_table tr.text-primary td a,
+.o_mcp_log_tree .o_list_table tr.text-primary td span { color: #ffffff !important; }
+.o_mcp_log_tree .o_list_table tr.text-primary:hover td { background-color: #263238 !important; }
+
+/* failover: purple — intra-role provider switch (decoration-it alone).
+   NOTE: the class decoration-it produces depends on the Odoo version:
+     - classic Odoo 14  → 'text-it'
+     - Bootstrap 4      → 'font-italic'
+     - Odoo 17+/19 (BS5)→ 'fst-italic'
+   We hook all THREE. MCP client (external) also has decoration-it, but
+   stacked with decoration-warning — the combo rule below wins. */
+.o_mcp_log_tree .o_list_table tr.fst-italic td,
+.o_mcp_log_tree .o_list_table tr.font-italic td,
+.o_mcp_log_tree .o_list_table tr.text-it td,
+.o_mcp_log_tree table tr.fst-italic td,
+.o_mcp_log_tree table tr.font-italic td,
+.o_mcp_log_tree table tr.text-it td {
+    background-color: #7b1fa2 !important;
+    color: #ffffff !important;
+    font-weight: 500;
+}
+.o_mcp_log_tree .o_list_table tr.fst-italic td a,
+.o_mcp_log_tree .o_list_table tr.fst-italic td span,
+.o_mcp_log_tree .o_list_table tr.font-italic td a,
+.o_mcp_log_tree .o_list_table tr.font-italic td span,
+.o_mcp_log_tree .o_list_table tr.text-it td a,
+.o_mcp_log_tree .o_list_table tr.text-it td span { color: #f3e5f5 !important; }
+.o_mcp_log_tree .o_list_table tr.fst-italic:hover td,
+.o_mcp_log_tree .o_list_table tr.font-italic:hover td,
+.o_mcp_log_tree .o_list_table tr.text-it:hover td { background-color: #6a1b9a !important; }
+
+/* MCP client → Odoo (external): warning + italic stacked → light blue, not orange.
+   Must come AFTER the warning (orange) and italic-only (purple) rules. */
+.o_mcp_log_tree .o_list_table tr.text-warning.fst-italic td,
+.o_mcp_log_tree .o_list_table tr.text-warning.font-italic td,
+.o_mcp_log_tree .o_list_table tr.text-warning.text-it td,
+.o_mcp_log_tree table tr.text-warning.fst-italic td,
+.o_mcp_log_tree table tr.text-warning.font-italic td,
+.o_mcp_log_tree table tr.text-warning.text-it td {
+    background-color: #039BE5 !important;
+    color: #ffffff !important;
+    font-weight: 500;
+    font-style: normal;
+}
+.o_mcp_log_tree .o_list_table tr.text-warning.fst-italic td a,
+.o_mcp_log_tree .o_list_table tr.text-warning.fst-italic td span,
+.o_mcp_log_tree .o_list_table tr.text-warning.font-italic td a,
+.o_mcp_log_tree .o_list_table tr.text-warning.font-italic td span,
+.o_mcp_log_tree .o_list_table tr.text-warning.text-it td a,
+.o_mcp_log_tree .o_list_table tr.text-warning.text-it td span { color: #ffffff !important; }
+.o_mcp_log_tree .o_list_table tr.text-warning.fst-italic:hover td,
+.o_mcp_log_tree .o_list_table tr.text-warning.font-italic:hover td,
+.o_mcp_log_tree .o_list_table tr.text-warning.text-it:hover td { background-color: #0288D1 !important; }
+.o_mcp_log_tree .o_list_table tr.text-warning.fst-italic td .o_checkbox,
+.o_mcp_log_tree .o_list_table tr.text-warning.font-italic td .o_checkbox,
+.o_mcp_log_tree .o_list_table tr.text-warning.text-it td .o_checkbox { filter: brightness(2); }
+
+/* domain_index: blue — index domain detection (decoration-bf).
+   Classes by Odoo/Bootstrap version:
+     - Odoo 14 → text-bf
+     - BS5 / Odoo 17+ → fw-bold
+   Only domain_index uses decoration-bf in this tree. */
+.o_mcp_log_tree .o_list_table tr.text-bf td,
+.o_mcp_log_tree .o_list_table tr.fw-bold td,
+.o_mcp_log_tree table tr.text-bf td,
+.o_mcp_log_tree table tr.fw-bold td {
+    background-color: #1565c0 !important;
+    color: #ffffff !important;
+    font-weight: 500;
+}
+.o_mcp_log_tree .o_list_table tr.text-bf td a,
+.o_mcp_log_tree .o_list_table tr.text-bf td span,
+.o_mcp_log_tree .o_list_table tr.fw-bold td a,
+.o_mcp_log_tree .o_list_table tr.fw-bold td span { color: #e3f2fd !important; }
+.o_mcp_log_tree .o_list_table tr.text-bf:hover td,
+.o_mcp_log_tree .o_list_table tr.fw-bold:hover td { background-color: #0d47a1 !important; }
+.o_mcp_log_tree .o_list_table tr.text-bf td .o_checkbox,
+.o_mcp_log_tree .o_list_table tr.fw-bold td .o_checkbox { filter: brightness(2); }
+
+/* Legend + spend chip share one control-panel row (colors left, total right). */
+.o_mcp_log_legend_bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: nowrap;
+    padding: 4px 8px 8px 8px;
+    font-size: 11px;
+    line-height: 1.4;
+    width: 100%;
+    box-sizing: border-box;
+}
+.o_mcp_log_legend_chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+.o_mcp_log_usage_chip {
+    flex: 0 0 auto;
+    display: none;
+    align-items: center;
+    padding: 1px 7px;
+    border-radius: 999px;
+    border: 1px solid #e9ecef;
+    background: #ffe082;
+    line-height: 1.4;
+    color: #1d1d1d;
+    white-space: nowrap;
+    margin-inline-start: auto;
+}
+.o_mcp_log_usage_chip:not([hidden]) {
+    display: inline-flex;
+}
+
+/* Legend chips: color + inline SVG from ai.log._FLOW_LEGEND. */
+.o_mcp_flow_chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    vertical-align: middle;
+}
+.o_mcp_flow_chip_icon {
+    width: 15px;
+    height: 15px;
+    flex: 0 0 15px;
+    display: block;
+}

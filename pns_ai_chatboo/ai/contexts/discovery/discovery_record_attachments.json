@@ -1,0 +1,26 @@
+{
+  "code": "discovery_record_attachments",
+  "tipo": "discovery",
+  "target": "record_attachments",
+  "priority": 70,
+  "soft_depends": [],
+  "source_module": "pns_ai_chatboo",
+  "triggers": [
+    "attachment",
+    "attachments",
+    "attached file",
+    "attached files",
+    "attached pdf",
+    "attached document",
+    "the scan",
+    "scanned",
+    "digitize",
+    "digitise",
+    "transcribe",
+    "ocr",
+    "read the pdf",
+    "read the file",
+    "what does the pdf say",
+    "what does the file say"
+  ]
+}

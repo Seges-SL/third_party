@@ -1,0 +1,1189 @@
+/** @odoo-module **/
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com> */
+/**
+ * Pure formatting utilities for Chatboo (content, markdown, tables).
+ * Shared pipeline with owl1 (formatContent / formatMarkdown / tables).
+ */
+
+import { _t } from "@web/core/l10n/translation";
+import { session } from "@web/session";
+
+/**
+ * pns_ai_chatboo.formatters — Pure formatting utilities for Chatboo.
+ * Shared pipeline with owl1 (formatContent / formatMarkdown / tables).
+ */
+
+/** Default decimal places for number formatting */
+var DEFAULT_DECIMAL_PLACES = 3;
+
+/**
+ * Active Odoo session locale (user_context.lang), BCP47 for Intl.
+ * @returns {string} e.g. 'es-ES', 'en-US'
+ */
+function getSessionLocale() {
+    var lang = (
+        (session.user_context && session.user_context.lang)
+        || session.lang
+        || (typeof document !== 'undefined' && document.documentElement.lang)
+        || 'en-US'
+    );
+    return String(lang).replace(/_/g, '-');
+}
+
+/**
+ * IANA tz of the Odoo user (Preferences). Empty → caller uses browser local.
+ */
+function getSessionTz() {
+    var tz = (
+        (session.user_context && session.user_context.tz)
+        || session.tz
+        || ''
+    );
+    return String(tz || '').trim();
+}
+
+/**
+ * Wall clock ``YYYY-MM-DD HH:MM:SS`` in the Odoo user tz (else local).
+ */
+function formatWallclock(date, tz) {
+    var d = date || new Date();
+    var opts = {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23',
+    };
+    var zone = (tz === undefined || tz === null) ? getSessionTz() : tz;
+    if (zone) {
+        opts.timeZone = zone;
+    }
+    try {
+        return new Intl.DateTimeFormat('sv-SE', opts).format(d).replace('T', ' ');
+    } catch (e) {
+        delete opts.timeZone;
+        return new Intl.DateTimeFormat('sv-SE', opts).format(d).replace('T', ' ');
+    }
+}
+
+/**
+ * Detect if content looks like raw HTML (starts with a tag).
+ *
+ * @param {string} content - Raw content string
+ * @returns {boolean} true if content appears to be HTML
+ */
+function isLikelyHtml(content) {
+    var trimmed = (content || '').trim();
+    if (!trimmed) {
+        return false;
+    }
+    if (trimmed.startsWith('<')) {
+        return true;
+    }
+    return /^<(div|table|thead|tbody|tr|td|p|span|ul|pre|caption)\b/i.test(trimmed);
+}
+
+/**
+ * Escape HTML to prevent XSS.
+ *
+ * @param {string} text - Raw text to escape
+ * @returns {string} HTML-safe string
+ */
+function escapeHtml(text) {
+    // Quotes too: the result also lands inside attributes (data-slash-code).
+    return String(text === null || text === undefined ? '' : text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/**
+ * Assistant HTML is written by the model, and the model can be steered by
+ * the data it reads. Before it reaches the page nothing in it may run code
+ * or call out on its own: no scripts or embedded documents, no on* handlers,
+ * no javascript: links, no image or CSS url from another origin.
+ * Parsing happens in an inert document, where nothing loads or fires.
+ */
+var _ALLOWED_TAGS = {
+    A: 1, ABBR: 1, B: 1, BLOCKQUOTE: 1, BR: 1, BUTTON: 1, CAPTION: 1,
+    CIRCLE: 1, CLIPPATH: 1, CODE: 1, COL: 1, COLGROUP: 1, DD: 1, DEL: 1,
+    DEFS: 1, DIV: 1, DL: 1, DT: 1, ELLIPSE: 1, EM: 1, FIGCAPTION: 1,
+    FIGURE: 1, G: 1, H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1, HR: 1,
+    I: 1, IMG: 1, INS: 1, LI: 1, LINE: 1, LINEARGRADIENT: 1, MARK: 1,
+    OL: 1, P: 1, PATH: 1, POLYGON: 1, POLYLINE: 1, PRE: 1,
+    RADIALGRADIENT: 1, RECT: 1, S: 1, SMALL: 1, SPAN: 1, STOP: 1,
+    STRONG: 1, SUB: 1, SUP: 1, SVG: 1, TABLE: 1, TBODY: 1, TD: 1,
+    TFOOT: 1, TH: 1, THEAD: 1, TITLE: 1, TR: 1, TSPAN: 1, TEXT: 1,
+    U: 1, UL: 1, DESC: 1,
+};
+var _DROP_WITH_CHILDREN = {
+    SCRIPT: 1, STYLE: 1, IFRAME: 1, FRAME: 1, FRAMESET: 1, OBJECT: 1,
+    EMBED: 1, APPLET: 1, BASE: 1, LINK: 1, META: 1, FORM: 1, INPUT: 1,
+    TEXTAREA: 1, SELECT: 1, OPTION: 1, NOSCRIPT: 1, TEMPLATE: 1, PORTAL: 1,
+    MATH: 1, FOREIGNOBJECT: 1, ANIMATE: 1, ANIMATEMOTION: 1,
+    ANIMATETRANSFORM: 1, SET: 1, DISCARD: 1, VIDEO: 1, AUDIO: 1,
+    SOURCE: 1, TRACK: 1, USE: 1, IMAGE: 1,
+};
+var _ALLOWED_ATTRS = {
+    alt: 1, 'aria-hidden': 1, 'aria-label': 1, class: 1, colspan: 1,
+    cx: 1, cy: 1, d: 1, dir: 1, disabled: 1, fill: 1, 'fill-opacity': 1,
+    height: 1, href: 1, id: 1, lang: 1, offset: 1, opacity: 1,
+    points: 1, preserveaspectratio: 1, r: 1, rel: 1, role: 1, rowspan: 1,
+    rx: 1, ry: 1, scope: 1, src: 1, 'stop-color': 1, 'stop-opacity': 1,
+    stroke: 1, 'stroke-opacity': 1, 'stroke-width': 1, style: 1, target: 1,
+    title: 1, transform: 1, type: 1, viewbox: 1, width: 1, x: 1, x1: 1,
+    x2: 1, xmlns: 1, y: 1, y1: 1, y2: 1, 'text-anchor': 1, 'font-size': 1,
+    gradientunits: 1, 'clip-path': 1,
+};
+var _LINK_PROTOCOLS = { 'http:': 1, 'https:': 1, 'mailto:': 1, 'tel:': 1 };
+var _CSS_FETCHERS_RE = /(?:image-set|image|cross-fade|element|src)\s*\(|expression\s*\(|@import|behavior\s*:|binding\s*:|\\/i;
+var _CSS_URL_RE = /url\s*\(\s*(['"]?)([^'")]*)\1\s*\)/gi;
+var _REMOTE_IMAGE_PATH = '/pns_ai_mcp/remote_image';
+var _SANITIZE_CACHE_CHARS = 4000000;
+var _sanitizeCache = new Map();
+var _sanitizeCacheChars = 0;
+var _inertDoc = null;
+
+function _inertContainer(html) {
+    if (!_inertDoc) {
+        _inertDoc = document.implementation.createHTMLDocument('');
+    }
+    var box = _inertDoc.createElement('div');
+    box.innerHTML = html;
+    return box;
+}
+
+function _resolveUrl(value) {
+    try {
+        return new URL(String(value).trim(), window.location.href);
+    } catch (e) {
+        return null;
+    }
+}
+
+function _isLocalResource(value) {
+    var raw = String(value || '').trim();
+    if (/^data:image\//i.test(raw)) {
+        return true;
+    }
+    var url = _resolveUrl(raw);
+    if (!url) {
+        return false;
+    }
+    if (url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'blob:') {
+        return url.origin === window.location.origin;
+    }
+    return false;
+}
+
+function _isSafeLink(value) {
+    var url = _resolveUrl(value);
+    if (!url) {
+        return false;
+    }
+    if (url.protocol === 'blob:') {
+        return url.origin === window.location.origin;
+    }
+    return !!_LINK_PROTOCOLS[url.protocol];
+}
+
+function _isLocalCss(value) {
+    var css = String(value || '');
+    if (_CSS_FETCHERS_RE.test(css)) {
+        return false;
+    }
+    var local = true;
+    var rest = css.replace(_CSS_URL_RE, function (all, quote, target) {
+        var t = String(target || '').trim();
+        if (t.charAt(0) === '#') {
+            return '';
+        }
+        if (!_isLocalResource(t)) {
+            local = false;
+        }
+        return '';
+    });
+    return local && !/url\s*\(/i.test(rest);
+}
+
+function _isAllowedAttrName(name) {
+    if (name.indexOf('on') === 0) {
+        return false;
+    }
+    if (_ALLOWED_ATTRS[name]) {
+        return true;
+    }
+    return name.indexOf('data-') === 0 || name.indexOf('aria-') === 0;
+}
+
+function _cleanAttributes(el, tag) {
+    var attrs = Array.prototype.slice.call(el.attributes);
+    for (var i = 0; i < attrs.length; i++) {
+        var name = attrs[i].name.toLowerCase();
+        var value = attrs[i].value;
+        var keep = _isAllowedAttrName(name);
+        if (keep) {
+            if (name === 'href' || name === 'xlink:href') {
+                keep = (tag === 'A' || tag === 'AREA') ? _isSafeLink(value) : _isLocalResource(value);
+            } else if (name === 'src' || name === 'poster') {
+                keep = _isLocalResource(value);
+            } else if (name === 'style' || /url\s*\(/i.test(value)) {
+                keep = _isLocalCss(value);
+            }
+        }
+        if (!keep) {
+            el.removeAttribute(attrs[i].name);
+        }
+    }
+    if (tag === 'A' && (el.getAttribute('target') || '').toLowerCase() === '_blank') {
+        var rel = (el.getAttribute('rel') || '').toLowerCase();
+        if (rel.indexOf('noopener') < 0) {
+            el.setAttribute('rel', (rel + ' noopener noreferrer').trim());
+        }
+    }
+}
+
+/** An image that cannot be fetched stays as a link the user may open. */
+function _imageAsLink(img) {
+    var src = img.getAttribute('src') || '';
+    var label = img.getAttribute('alt') || src;
+    if (img.parentNode && img.parentNode.closest && img.parentNode.closest('a')) {
+        return img.ownerDocument.createTextNode(label);
+    }
+    var link = img.ownerDocument.createElement('a');
+    if (_isSafeLink(src)) {
+        link.setAttribute('href', src);
+        link.setAttribute('target', '_blank');
+        link.setAttribute('rel', 'noopener noreferrer');
+    }
+    link.textContent = label;
+    return link;
+}
+
+/**
+ * An http(s) image from another origin is asked of Odoo, which fetches it only
+ * from a host the URL policy allows. Refused: the browser shows the alt (the address).
+ */
+function _imageThroughOdoo(img) {
+    var url = _resolveUrl(img.getAttribute('src') || '');
+    if (!url || (url.protocol !== 'http:' && url.protocol !== 'https:')) {
+        return _imageAsLink(img);
+    }
+    var doc = img.ownerDocument;
+    var pic = doc.createElement('img');
+    pic.setAttribute('src', _REMOTE_IMAGE_PATH + '?url=' + encodeURIComponent(url.href));
+    pic.setAttribute('alt', img.getAttribute('alt') || url.href);
+    ['title', 'style', 'class', 'width', 'height'].forEach(function (name) {
+        if (img.hasAttribute(name)) {
+            pic.setAttribute(name, img.getAttribute(name));
+        }
+    });
+    _cleanAttributes(pic, 'IMG');
+    if (img.parentNode && img.parentNode.closest && img.parentNode.closest('a')) {
+        return pic;
+    }
+    var link = doc.createElement('a');
+    link.setAttribute('href', url.href);
+    link.setAttribute('target', '_blank');
+    link.setAttribute('rel', 'noopener noreferrer');
+    link.appendChild(pic);
+    return link;
+}
+
+function _unwrapElement(node, child) {
+    var first = child.firstChild;
+    while (child.firstChild) {
+        node.insertBefore(child.firstChild, child);
+    }
+    node.removeChild(child);
+    return first;
+}
+
+function _sanitizePass(html) {
+    var box = _inertContainer(html);
+    var stack = [box];
+    while (stack.length) {
+        var node = stack.pop();
+        var child = node.firstChild;
+        while (child) {
+            var next = child.nextSibling;
+            if (child.nodeType === 8) {
+                node.removeChild(child);
+            } else if (child.nodeType === 1) {
+                var tag = child.nodeName.toUpperCase();
+                if (_DROP_WITH_CHILDREN[tag]) {
+                    node.removeChild(child);
+                } else if (!_ALLOWED_TAGS[tag]) {
+                    var first = _unwrapElement(node, child);
+                    child = first || next;
+                    continue;
+                } else if (tag === 'IMG' && !_isLocalResource(child.getAttribute('src'))) {
+                    node.replaceChild(_imageThroughOdoo(child), child);
+                } else {
+                    _cleanAttributes(child, tag);
+                    stack.push(child);
+                }
+            }
+            child = next;
+        }
+    }
+    return box.innerHTML;
+}
+
+/**
+ * HTML safe to paint with innerHTML / t-raw / markup().
+ * Two passes: what the browser re-parses from the first one is cleaned too.
+ *
+ * @param {string} html
+ * @returns {string}
+ */
+function sanitizeHtml(html) {
+    if (html === null || html === undefined) {
+        return '';
+    }
+    var src = String(html);
+    if (src.indexOf('<') === -1 || typeof document === 'undefined') {
+        return src;
+    }
+    var hit = _sanitizeCache.get(src);
+    if (hit !== undefined) {
+        return hit;
+    }
+    var clean = _sanitizePass(_sanitizePass(src));
+    _sanitizeCacheChars += src.length + clean.length;
+    if (_sanitizeCacheChars > _SANITIZE_CACHE_CHARS) {
+        _sanitizeCache.clear();
+        _sanitizeCacheChars = src.length + clean.length;
+    }
+    _sanitizeCache.set(src, clean);
+    _sanitizeCache.set(clean, clean);
+    return clean;
+}
+
+/**
+ * Text of an HTML fragment, read in the inert document.
+ *
+ * @param {string} html
+ * @returns {string}
+ */
+function textOfHtml(html) {
+    if (html === null || html === undefined) {
+        return '';
+    }
+    var src = String(html);
+    if (src.indexOf('<') === -1 && src.indexOf('&') === -1) {
+        return src;
+    }
+    if (typeof document === 'undefined') {
+        return src.replace(/<[^>]+>/g, ' ');
+    }
+    return _inertContainer(src).textContent || '';
+}
+
+/**
+ * Format JSON with line breaks between array elements and object entries.
+ * For large payloads (>20KB) skips the regex to avoid UI blocking.
+ *
+ * @param {*} obj - Parsed JSON object
+ * @param {number} [indent=2] - JSON.stringify indentation
+ * @returns {string} Formatted JSON string
+ */
+function formatJsonWithLineBreaks(obj, indent) {
+    if (indent === undefined) indent = 2;
+    var jsonStr = JSON.stringify(obj, null, indent);
+    if (jsonStr.length > 20000) return jsonStr;
+    return jsonStr
+        .replace(/},\s*{/g, '},\n{')
+        .replace(/],\s*\[/g, '],\n[')
+        .replace(/},\s*\[/g, '},\n[')
+        .replace(/],\s*{/g, '],\n{');
+}
+
+/**
+ * Format number according to the active session locale (or override).
+ *
+ * @param {number} value - Number to format
+ * @param {string} [locale] - BCP47 locale; defaults to session lang
+ * @param {number} [decimalPlaces] - Decimal places (defaults to DEFAULT_DECIMAL_PLACES)
+ * @returns {string|*} Formatted number string, or original value if not a number
+ */
+function formatNumber(value, locale, decimalPlaces) {
+    if (typeof value !== 'number') return value;
+    if (locale === undefined) locale = getSessionLocale();
+    if (decimalPlaces === undefined) decimalPlaces = DEFAULT_DECIMAL_PLACES;
+    try {
+        return new Intl.NumberFormat(locale, {
+            minimumFractionDigits: decimalPlaces,
+            maximumFractionDigits: decimalPlaces
+        }).format(value);
+    } catch (e) {
+        var loc = String(locale || '').toLowerCase();
+        if (loc === 'es-es' || loc.startsWith('es')) {
+            var parts = Math.abs(value).toFixed(decimalPlaces).toString().split('.');
+            var intPart = parts[0];
+            var decPart = parts[1] || '';
+            var intFormatted = intPart.length > 3
+                ? intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+                : intPart;
+            return (value < 0 ? '-' : '') + (decPart ? intFormatted + ',' + decPart : intFormatted);
+        }
+        return value.toFixed(decimalPlaces);
+    }
+}
+
+/**
+ * Detect markdown tables whose cells contain long prose and convert
+ * them to plain paragraphs. This prevents ChatbooMarkdown from rendering
+ * weather forecasts, descriptions, etc. as ugly HTML tables.
+ *
+ * Heuristic: if ANY data cell in the table exceeds PROSE_THRESHOLD
+ * characters of *visible* text, the whole table is "prose in disguise"
+ * and gets unwrapped.
+ *
+ * Visible length ignores Markdown links and bare URLs so remote-LLM
+ * tables with Odoo form links (`[COR/…](/web#id=…)`) stay as tables.
+ * Server-side HTML tables (`o_ai_data_table`) never enter this path.
+ *
+ * @param {string} md - Raw markdown
+ * @returns {string} Cleaned markdown (tables may be replaced with paragraphs)
+ */
+var PROSE_THRESHOLD = 60;
+
+/** Length that counts toward prose detection (label only, not href/URL). */
+function _cellProseLength(cell) {
+    var text = String(cell || '').trim();
+    if (!text) {
+        return 0;
+    }
+    // [label](url) → label (may repeat)
+    text = text.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+    // Bare URLs / Odoo hashes should not inflate "prose"
+    text = text.replace(/https?:\/\/\S+/gi, '');
+    text = text.replace(/\/web#[^\s|]*/gi, '');
+    return text.trim().length;
+}
+
+/**
+ * Remote-LLM ERP grids: Markdown pipe tables with Odoo form links.
+ * Must NOT be unwrapped by the weather/prose heuristic (long partner names).
+ * Server-side HTML tables never reach this function — local formatting untouched.
+ */
+function _isRemoteErpMarkdownTable(block) {
+    return /\/web#(?:id=|action=)/i.test(block || '')
+        || /\(\/web#id=\d+&(?:amp;)?model=[^)]+\)/i.test(block || '');
+}
+
+function _stripProseTables(md) {
+    // GFM tables may omit the leading/trailing pipe.
+    var tableBlockRe = /((?:^[ \t]*\|?.+\|.+\|?[ \t]*$\n?){2,})/gm;
+    return md.replace(tableBlockRe, function (block) {
+        var lines = block.trim().split('\n');
+        // Need at least header + separator + 1 data row
+        if (lines.length < 3) return block;
+
+        // Check if the separator row exists (|---|---| or ---|---)
+        var sepLine = lines[1];
+        if (!/^\s*\|?[\s:|-]+\|[\s:|-]+\|?\s*$/.test(sepLine)) return block;
+
+        // Remote formatting only: keep Odoo-linked grids as tables even when
+        // a partner name exceeds PROSE_THRESHOLD. Local HTML path unaffected.
+        if (_isRemoteErpMarkdownTable(block)) {
+            return block;
+        }
+
+        var headerCells = lines[0].split('|').filter(function (c) { return c.trim(); });
+        var dataLines = lines.slice(2);
+        var hasProse = false;
+        var inspect = headerCells.concat([]);
+        for (var i = 0; i < dataLines.length; i++) {
+            inspect = inspect.concat(
+                dataLines[i].split('|').filter(function (c) { return c.trim(); })
+            );
+        }
+        for (var j = 0; j < inspect.length; j++) {
+            if (_cellProseLength(inspect[j]) > PROSE_THRESHOLD) {
+                hasProse = true;
+                break;
+            }
+        }
+
+        if (!hasProse) {
+            var hasNumericOrDate = false;
+            var numDateRe = /(?:\d{4}[/-]\d{2}|\d+[.,]\d+|\$|€|£|¥|%|\d{2,})/;
+            for (var di = 0; di < dataLines.length && !hasNumericOrDate; di++) {
+                var dCells = dataLines[di].split('|').filter(function (c) { return c.trim(); });
+                for (var dj = 0; dj < dCells.length; dj++) {
+                    if (numDateRe.test(dCells[dj])) {
+                        hasNumericOrDate = true;
+                        break;
+                    }
+                }
+            }
+            if (hasNumericOrDate) return block;
+            // One chopped sentence (header or a single text row) → prose.
+            if (dataLines.length > 2) return block;
+        }
+
+        var paragraphs = [];
+        for (var r = 0; r < dataLines.length; r++) {
+            var cells = dataLines[r].split('|').filter(function (c) { return c.trim(); });
+            var parts = [];
+            for (var c = 0; c < cells.length; c++) {
+                var cellText = cells[c].trim();
+                if (!cellText) continue;
+                var header = (headerCells[c] || '').trim();
+                if (header && header.length < 30 && header !== cellText) {
+                    parts.push('**' + header + ':** ' + cellText);
+                } else {
+                    parts.push(cellText);
+                }
+            }
+            if (parts.length > 0) {
+                paragraphs.push(parts.join('. '));
+            }
+        }
+        if (headerCells.length && _cellProseLength(headerCells.join(' ')) > PROSE_THRESHOLD) {
+            paragraphs.unshift(headerCells.map(function (h) { return h.trim(); }).filter(Boolean).join('. '));
+        }
+        return '\n' + paragraphs.join('\n\n') + '\n';
+    });
+}
+
+/**
+ * Format Markdown content using ChatbooMarkdown (if available).
+ * Falls back to manual regex-based formatting.
+ *
+ * Pre-processes the markdown to strip "prose tables" — markdown tables
+ * whose cells contain long sentences instead of genuine tabular data.
+ *
+ * @param {string} content - Markdown source text
+ * @returns {string} HTML string
+ */
+function _formatMarkdown(content) {
+    if (typeof ChatbooSse !== 'undefined' && ChatbooSse.prepareMarkdownForDisplay) {
+        var prep = ChatbooSse.prepareMarkdownForDisplay(content || '');
+        content = prep.markdown;
+    }
+    if (typeof ChatbooMarkdown !== 'undefined') {
+        try {
+            content = _stripProseTables(content);
+
+            var html = ChatbooMarkdown.toHtml(content, {
+                tables: true,
+                strikethrough: true,
+                tasklists: true,
+                simpleLineBreaks: true,
+                openLinksInNewWindow: true,
+            });
+
+            html = html
+                .replace(/<table>/g, '<div class="table-responsive" style="margin: 1em 0;"><table class="table table-bordered table-sm" style="width: 100%; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'Helvetica Neue\', Arial, sans-serif; font-size: 1.125em;">')
+                .replace(/<\/table>/g, '</table></div>')
+                .replace(/<pre><code/g, '<pre class="bg-light p-3 rounded border" style="overflow-x: auto;"><code')
+                .replace(/<code(?! class="language)/g, '<code class="bg-light px-1 rounded" style="font-family: monospace;">')
+                .replace(/<blockquote>/g, '<blockquote class="border-left pl-3 ml-3" style="border-left: 4px solid #dee2e6; margin: 1em 0;">')
+                .replace(/<a href="([^"]+)"(?! target)/g, '<a href="$1" target="_blank" rel="noopener noreferrer"');
+
+            return '<div class="o_ai_prose">' + html + '</div>';
+        } catch (error) {
+            console.error('Error rendering markdown with ChatbooMarkdown:', error);
+        }
+    }
+
+    // Fallback: Simple manual formatting
+    var formatted = escapeHtml(content);
+
+    formatted = formatted.replace(/```(\w+)?\n([\s\S]*?)```/g, function (match, lang, code) {
+        var escapedCode = escapeHtml(code.trim());
+        return '<pre class="bg-light p-3 rounded border" style="overflow-x: auto;"><code class="language-' + (lang || 'text') + '">' + escapedCode + '</code></pre>';
+    });
+
+    formatted = formatted.replace(/^#### (.*$)/gim, '<h4>$1</h4>');
+    formatted = formatted.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+    formatted = formatted.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+    formatted = formatted.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+    formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    formatted = formatted.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    formatted = formatted.replace(/`([^`]+)`/g, '<code class="bg-light px-1 rounded" style="font-family: monospace;">$1</code>');
+    formatted = formatted.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    formatted = formatted.replace(/\n\n+/g, '</p><p>');
+    formatted = formatted.replace(/\n/g, '<br/>');
+
+    return formatted;
+}
+
+/**
+ * Format CSV lines as an HTML table.
+ *
+ * @param {string[]} lines - Array of CSV lines
+ * @returns {string} HTML table string
+ */
+function formatCSV(lines) {
+    var rows = lines.map(function (line) {
+        return line.split(',').map(function (cell) { return cell.trim(); });
+    });
+
+    if (rows.length === 0) return '';
+
+    var html = '<div class="table-responsive"><table class="table table-sm table-bordered table-striped o_ai_data_table">';
+
+    var firstRow = rows[0];
+    var numericCols = {};
+    if (rows.length > 1) {
+        for (var c = 0; c < firstRow.length; c++) {
+            var numHits = 0;
+            var seen = 0;
+            for (var r = 1; r < rows.length; r++) {
+                var cell = rows[r][c];
+                if (cell === undefined || cell === '') continue;
+                seen++;
+                if (/^[+-]?\d+(?:[.,]\d+)?$/.test(cell.replace(/\s/g, ''))) numHits++;
+            }
+            if (seen > 0 && numHits >= Math.max(1, Math.floor(seen * 0.8))) {
+                numericCols[c] = true;
+            }
+        }
+    }
+    html += '<thead><tr>';
+    firstRow.forEach(function (cell, idx) {
+        var cls = numericCols[idx] ? ' class="o_ai_num text-end"' : '';
+        html += '<th' + cls + '>' + escapeHtml(cell) + '</th>';
+    });
+    html += '</tr></thead>';
+
+    if (rows.length > 1) {
+        html += '<tbody>';
+        rows.slice(1).forEach(function (row) {
+            html += '<tr>';
+            row.forEach(function (cell, idx) {
+                var cls = numericCols[idx] ? ' class="o_ai_num text-end"' : '';
+                html += '<td' + cls + '>' + escapeHtml(cell) + '</td>';
+            });
+            html += '</tr>';
+        });
+        html += '</tbody>';
+    }
+
+    html += '</table></div>';
+    return html;
+}
+
+/**
+ * True only for genuine CSV (aligned short columns), not Spanish/English
+ * prose that happens to contain commas on every paragraph line.
+ * Bug: "Who are you?" replies were rendered as wide tables because every
+ * line included a comma ("Chatboo, the assistant…", "customers, orders…").
+ */
+function looksLikeCsv(lines) {
+    if (!lines || lines.length < 2) {
+        return false;
+    }
+    var joined = lines.join('\n');
+    // Prose / markdown markers → never CSV
+    if (joined.indexOf('**') !== -1 || joined.indexOf('__') !== -1) {
+        return false;
+    }
+    if (/[¿?¡!]/.test(joined)) {
+        return false;
+    }
+    var rows = lines.map(function (line) {
+        return line.split(',').map(function (c) { return c.trim(); });
+    });
+    var cols = rows[0].length;
+    if (cols < 2) {
+        return false;
+    }
+    for (var i = 0; i < rows.length; i++) {
+        if (rows[i].length !== cols) {
+            return false;
+        }
+        for (var j = 0; j < rows[i].length; j++) {
+            // Real CSV cells are short; long fragments = prose split badly
+            if (rows[i][j].length > 80) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+/**
+ * Render JSON data as an HTML table or list if the shape is suitable.
+ *
+ * Handles three cases:
+ *   1. Array of objects -> table with headers
+ *   2. Simple array -> unordered list
+ *   3. Flat object -> key-value table
+ *
+ * @param {*} data - Parsed JSON data
+ * @returns {string|null} HTML string, or null if data is not table-shaped
+ */
+function formatJsonAsTable(data) {
+    if (data && !Array.isArray(data) && typeof data === 'object' && Array.isArray(data.data)) {
+        data = data.data;
+    }
+
+    // Case 1: Array of Objects -> Table
+    if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'object' && data[0] !== null) {
+        var keys = new Set();
+        data.forEach(function (item) { Object.keys(item || {}).forEach(function (k) { keys.add(k); }); });
+        var headers = Array.from(keys);
+        if (headers.length === 0) return JSON.stringify(data);
+
+        var numericColumns = new Set();
+        var sample = data.slice(0, Math.min(100, data.length));
+        sample.forEach(function (item) {
+            headers.forEach(function (h) {
+                if (typeof item[h] === 'number') numericColumns.add(h);
+            });
+        });
+
+        var maxRows = 200;
+        var displayData = data.slice(0, maxRows);
+        var parts = [
+            '<div class="table-responsive"><table class="table table-sm table-bordered table-striped table-hover o_ai_data_table">',
+            '<thead class="thead-light"><tr>'
+        ];
+        headers.forEach(function (h) {
+            var cls = numericColumns.has(h) ? ' class="o_ai_num text-end"' : '';
+            parts.push('<th' + cls + '>', escapeHtml(h), '</th>');
+        });
+        parts.push('</tr></thead><tbody>');
+
+        displayData.forEach(function (row) {
+            parts.push('<tr>');
+            headers.forEach(function (h) {
+                var val = row[h];
+                if (val === null || val === undefined) val = "";
+                else if (typeof val === 'object') val = JSON.stringify(val);
+                else if (typeof val === 'number') val = formatNumber(val);
+                else val = String(val);
+                var cls = numericColumns.has(h) ? ' class="o_ai_num text-end"' : '';
+                parts.push('<td' + cls + '>', escapeHtml(val), '</td>');
+            });
+            parts.push('</tr>');
+        });
+        parts.push('</tbody></table></div>');
+        if (data.length > maxRows) {
+            parts.push('<p class="text-muted font-italic">... (', String(data.length - maxRows), ' more rows hidden)</p>');
+        }
+        return parts.join('');
+    }
+
+    // Case 2: Simple Array -> List
+    if (Array.isArray(data)) {
+        var html = '<ul class="list-group list-group-flush">';
+        data.forEach(function (item) {
+            var displayVal = typeof item === 'number' ? formatNumber(item) : String(item);
+            html += '<li class="list-group-item py-1">' + escapeHtml(displayVal) + '</li>';
+        });
+        html += '</ul>';
+        return html;
+    }
+
+    // Case 3: Flat Object -> Key-Value Table
+    if (data && typeof data === 'object' && data !== null) {
+        var html = '<div class="table-responsive"><table class="table table-sm table-bordered o_ai_data_table" style="width: auto;">';
+        Object.entries(data).forEach(function (_ref) {
+            var k = _ref[0], v = _ref[1];
+            var valStr;
+            var isNumber = false;
+            if (typeof v === 'object' && v !== null) {
+                valStr = JSON.stringify(v);
+            } else if (typeof v === 'number') {
+                isNumber = true;
+                valStr = formatNumber(v);
+            } else {
+                valStr = String(v);
+            }
+            var cls = isNumber ? ' class="o_ai_num text-end"' : '';
+            html += '<tr><th class="bg-light">' + escapeHtml(k) + '</th><td' + cls + '>' + escapeHtml(valStr) + '</td></tr>';
+        });
+        html += '</table></div>';
+        return html;
+    }
+
+    return null;
+}
+
+/**
+ * Post-process HTML to make standalone images (outside tables) clickable.
+ * Wraps bare <img> tags (not already inside <a>) with a link that opens
+ * the full-size image in a new tab.
+ *
+ * For /web/image/ URLs: thumbnail (image_128) as src, full-size (image_1920) as href.
+ * For data-URIs / external URLs: links to the same source.
+ *
+ * @param {string} html - Processed HTML string
+ * @returns {string} HTML with clickable standalone images
+ */
+function _wrapStandaloneImages(html) {
+    if (!html || typeof html !== 'string' || html.indexOf('<img') === -1) {
+        return html;
+    }
+    var tmp = _inertContainer(html);
+    var images = tmp.querySelectorAll('img');
+    for (var i = 0; i < images.length; i++) {
+        var img = images[i];
+        // Skip if already wrapped in <a> or inside a table cell
+        if (img.closest('a') || img.closest('td') || img.closest('th')) {
+            continue;
+        }
+        var src = img.getAttribute('src') || '';
+        if (!src) continue;
+        // Skip data-URIs: browsers block data: navigation to new tabs (blank page)
+        if (src.indexOf('data:') === 0) continue;
+        if (!_isLocalResource(src)) continue;
+
+        // Derive full-size URL: only replace image_NNN variants (Image mixin).
+        // Fields like 'logo' or 'avatar' (plain Binary) are already full-size.
+        var fullUrl = src;
+        if (src.indexOf('/web/image/') !== -1 && /\/image_\d+$/.test(src)) {
+            fullUrl = src.replace(/image_\d+$/, 'image_1920');
+        }
+
+        // Wrap with clickable link
+        var link = document.createElement('a');
+        link.href = fullUrl;
+        link.target = '_blank';
+        link.title = 'Ver imagen completa';
+        img.parentNode.insertBefore(link, img);
+        link.appendChild(img);
+    }
+    return tmp.innerHTML;
+}
+
+function _isServerChatbooTable(table) {
+    if (!table) {
+        return false;
+    }
+    if (table.classList && table.classList.contains('o_ai_data_table')) {
+        return true;
+    }
+    if (table.getAttribute && table.getAttribute('data-ai-dataset')) {
+        return true;
+    }
+    if (table.closest && table.closest('.o_ai_table_block')) {
+        return true;
+    }
+    return false;
+}
+
+function _unwrapHtmlProseTables(root) {
+    var tables = root.querySelectorAll('table');
+    for (var i = tables.length - 1; i >= 0; i--) {
+        var table = tables[i];
+        if (_isServerChatbooTable(table)) {
+            continue;
+        }
+        var markup = table.innerHTML || '';
+        if (/\/web#/i.test(markup)) {
+            continue;
+        }
+        var cells = table.querySelectorAll('th, td');
+        if (!cells.length) {
+            continue;
+        }
+        var hasNumeric = false;
+        var hasLong = false;
+        var texts = [];
+        for (var c = 0; c < cells.length; c++) {
+            var t = (cells[c].textContent || '').trim();
+            if (t) {
+                texts.push(t);
+            }
+            if (_cellProseLength(t) > PROSE_THRESHOLD) {
+                hasLong = true;
+            }
+            if (/(?:\d{4}[/-]\d{2}|\d+[.,]\d+|\$|€|£|¥|%|\d{2,})/.test(t)) {
+                hasNumeric = true;
+            }
+        }
+        var tdCount = table.querySelectorAll('td').length;
+        var rowCount = table.querySelectorAll('tr').length;
+        if (hasNumeric && !hasLong) {
+            continue;
+        }
+        if (!hasLong && tdCount >= 6 && rowCount >= 4) {
+            continue;
+        }
+        var host = document.createElement('div');
+        host.className = 'o_ai_prose';
+        for (var p = 0; p < texts.length; p++) {
+            var para = document.createElement('p');
+            para.textContent = texts[p];
+            host.appendChild(para);
+        }
+        var wrap = (table.parentNode && table.parentNode.classList
+            && table.parentNode.classList.contains('table-responsive'))
+            ? table.parentNode
+            : table;
+        if (wrap.parentNode) {
+            wrap.parentNode.replaceChild(host, wrap);
+        }
+    }
+}
+
+/**
+ * Re-render Markdown-looking prose islands inside server HTML
+ * (``.pns-result-footer``, stream footer wrappers) so ``#`` headings
+ * become real ``&lt;hN&gt;`` instead of literal text.
+ *
+ * @param {string} html
+ * @returns {string}
+ */
+function enhanceHtmlProse(html) {
+    if (!html || typeof html !== 'string') {
+        return html || '';
+    }
+    if (typeof document === 'undefined') {
+        return html;
+    }
+    var root = _inertContainer(html);
+    _unwrapHtmlProseTables(root);
+    // Full-bubble Markdown report (no Chatboo tables): re-parse as ChatbooMarkdown
+    // instead of leaving literal "#" in plain nodes.
+    if (
+        !root.querySelector('.o_ai_table_block, table, .o_ai_data_table')
+        && !root.querySelector('h1, h2, h3, h4, h5, h6, .o_ai_prose_h')
+        && /#{1,6}\s|\*\*[^*\n]{2,}|^[-*•]\s/m.test(root.textContent || '')
+    ) {
+        var cloneAll = root.cloneNode(true);
+        var brAll = cloneAll.querySelectorAll('br');
+        for (var ba = 0; ba < brAll.length; ba++) {
+            brAll[ba].parentNode.replaceChild(document.createTextNode('\n'), brAll[ba]);
+        }
+        var mdAll = (cloneAll.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+        if (typeof ChatbooSse !== 'undefined' && ChatbooSse.normalizeGluedMarkdown) {
+            mdAll = ChatbooSse.normalizeGluedMarkdown(mdAll);
+        }
+        if (mdAll) {
+            var renderedAll = _formatMarkdown(mdAll);
+            if (renderedAll && renderedAll !== mdAll) {
+                return renderedAll;
+            }
+        }
+    }
+    var nodes = root.querySelectorAll('.pns-result-footer, .o_ai_prose_host');
+    // Stream footer wrapper: last mt-2 after tables without nested table.
+    var allMt = root.querySelectorAll('div.mt-2');
+    for (var m = 0; m < allMt.length; m++) {
+        var cand = allMt[m];
+        if (cand.querySelector('table, .o_ai_table_block')) {
+            continue;
+        }
+        if (cand.querySelector('h1, h2, h3, h4, h5, h6, .o_ai_prose_h, .o_ai_prose_p')) {
+            continue;
+        }
+        var sample = (cand.textContent || '').trim();
+        if (/#{1,6}\s/.test(sample) || /\*\*[^*\n]{2,}/.test(sample)) {
+            nodes = Array.prototype.slice.call(nodes).concat([cand]);
+        }
+    }
+    var seen = [];
+    for (var i = 0; i < nodes.length; i++) {
+        var el = nodes[i];
+        if (!el || seen.indexOf(el) >= 0) {
+            continue;
+        }
+        seen.push(el);
+        if (el.querySelector && el.querySelector('h1, h2, h3, h4, h5, h6, .o_ai_prose_h')) {
+            // Already structured (server markdownish or prior ChatbooMarkdown).
+            el.classList.add('o_ai_prose');
+            continue;
+        }
+        // Keep newlines for ATX; do not collapse before detection.
+        var rawText = el.textContent || '';
+        if (!rawText.trim() || (!/#{1,6}\s/.test(rawText) && rawText.indexOf('**') < 0 && !/^[-*•]\s/m.test(rawText))) {
+            continue;
+        }
+        var clone = el.cloneNode(true);
+        var brs = clone.querySelectorAll('br');
+        for (var b = 0; b < brs.length; b++) {
+            brs[b].parentNode.replaceChild(document.createTextNode('\n'), brs[b]);
+        }
+        var md = (clone.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+        if (typeof ChatbooSse !== 'undefined' && ChatbooSse.normalizeGluedMarkdown) {
+            md = ChatbooSse.normalizeGluedMarkdown(md);
+        }
+        if (!md) {
+            continue;
+        }
+        var rendered = _formatMarkdown(md);
+        if (!rendered || rendered === md) {
+            continue;
+        }
+        el.classList.add('o_ai_prose');
+        el.innerHTML = rendered;
+    }
+    return root.innerHTML;
+}
+
+/**
+ * Main content formatting pipeline for assistant messages.
+ *
+ * Detection order (first match wins):
+ *   0. Raw HTML from server -> pass through unchanged
+ *   1. JSON object/array -> table or formatted JSON
+ *   2. CSV-like lines -> HTML table
+ *   3. Markdown (with code blocks, tables, etc.) -> HTML via ChatbooMarkdown
+ *   4. Plain text -> escaped HTML with line breaks
+ *
+ * @param {string} content - Raw content from the assistant
+ * @returns {string} HTML string ready for innerHTML
+ */
+function _formatContent(content) {
+    if (!content || typeof content !== 'string') {
+        return content || '';
+    }
+
+    var trimmed = content.trim();
+
+    // Server HTML table + LLM Markdown footer (after data_rendered).
+    // Without this split, isLikelyHtml swallows the whole block and the report
+    // ends up as a wall of raw ##/** (e.g. `...</div>## Analysis…`).
+    if (typeof ChatbooSse !== 'undefined' && ChatbooSse.splitHtmlAndMarkdownTail) {
+        var split = ChatbooSse.splitHtmlAndMarkdownTail(trimmed);
+        if (split) {
+            var foot = _formatMarkdown(split.md);
+            return _wrapStandaloneImages(enhanceHtmlProse(
+                ChatbooSse.mergeHtmlWithFooter(split.html, foot)
+            ));
+        }
+    }
+
+    if (isLikelyHtml(trimmed)) {
+        return _wrapStandaloneImages(enhanceHtmlProse(content));
+    }
+
+    if ((trimmed.startsWith('{') || trimmed.startsWith('[')) && (trimmed.endsWith('}') || trimmed.endsWith(']'))) {
+        try {
+            var parsed = JSON.parse(trimmed);
+
+            if (parsed && typeof parsed === 'object' && parsed.formatted_text) {
+                var ft = parsed.formatted_text;
+                if (typeof ft === 'string' && isLikelyHtml(ft.trim())) {
+                    return _wrapStandaloneImages(enhanceHtmlProse(ft));
+                }
+                var hasMarkdown = typeof ft === 'string' && (
+                    /^\|.+\|$/m.test(ft) || ft.includes('#') || ft.includes('```') ||
+                    ft.includes('**') || /^\s*[-*+]\s/m.test(ft)
+                );
+                var formattedHtml;
+                if (hasMarkdown && typeof ChatbooMarkdown !== 'undefined') {
+                    formattedHtml = _formatMarkdown(ft);
+                } else {
+                    formattedHtml = escapeHtml(ft).replace(/\n/g, '<br/>');
+                }
+
+                var metaHtml = '';
+                if (parsed.__payload_size__) {
+                    var size = parsed.__payload_size__;
+                    var sizeStr = size > 1024 ? (size / 1024).toFixed(1) + 'KB' : size + 'B';
+                    var source = 'LLM';
+                    if (parsed.__fmt_type__ === 'local_raw') source = 'Local Raw';
+                    else if (parsed.__fmt_type__ === 'local_json') source = 'Local JSON';
+
+                    metaHtml = '<div class="d-flex justify-content-end text-muted small mt-1 pt-1 border-top" style="font-size: 0.8em; opacity: 0.7;">' +
+                                   '<span class="mr-3" title="Payload size"><i class="fa fa-hdd-o"></i> ' + sizeStr + '</span>' +
+                                   '<span title="Formatting source"><i class="fa fa-cogs"></i> ' + source + '</span>' +
+                               '</div>';
+                }
+
+                var wrapperStyle = hasMarkdown ? '' : "font-family: 'Courier New', Courier, monospace; font-size: 1.1em; line-height: 1.5; white-space: pre-wrap;";
+                return _wrapStandaloneImages('<div' + (wrapperStyle ? ' style="' + wrapperStyle + '"' : '') + '>' + formattedHtml + '</div>' + metaHtml);
+            }
+
+            // Prefer a real table over a dark JSON dump when rows exist.
+            var asTable = formatJsonAsTable(parsed);
+            if (asTable && typeof asTable === 'string' && asTable.indexOf('<table') >= 0) {
+                return _wrapStandaloneImages(asTable);
+            }
+            // Diagnostic bags (counts, state tuples…): do not paint as <pre>.
+            if (typeof ChatbooSse !== 'undefined' && ChatbooSse.isDiagnosticJsonDump
+                    && ChatbooSse.isDiagnosticJsonDump(parsed)) {
+                return '<p class="text-muted small"><em>' + escapeHtml(_t("(intermediate data left out — ask for the list again)")) + '</em></p>';
+            }
+
+            var formatted = formatJsonWithLineBreaks(parsed);
+            return '<pre class="bg-light p-3 rounded border"><code class="language-json">' + escapeHtml(formatted) + '</code></pre>';
+        } catch (e) {
+            // Not valid JSON
+        }
+    }
+
+    if (/^<[a-z][\s\S]*>/i.test(trimmed)) {
+        return _wrapStandaloneImages(enhanceHtmlProse(content));
+    }
+
+    // HTML embedded in text (e.g. the LLM returns text + <div class="card">...)
+    // Detects meaningful HTML blocks anywhere in the text.
+    if (/<(div|table|thead|tbody|tr|td|th|ul|ol|pre|section|article|aside|nav|header|footer|caption)\b/i.test(trimmed)) {
+        return _wrapStandaloneImages(enhanceHtmlProse(content));
+    }
+
+    if (trimmed.includes(',') && trimmed.split('\n').length > 1) {
+        var lines = trimmed.split('\n').filter(function (l) { return l.trim(); });
+        var hasMarkdownTable = trimmed.includes('|');
+        if (!hasMarkdownTable && looksLikeCsv(lines)) {
+            return formatCSV(lines);
+        }
+    }
+
+    if (typeof ChatbooMarkdown !== 'undefined') {
+        // Detect actual markdown structure (not just any character).
+        // Avoid false positives: a paragraph mentioning "20-30 degrees" is NOT markdown.
+        var looksLikeMarkdown =
+            trimmed.includes('#') ||           // heading
+            trimmed.includes('`') ||            // inline code or code block
+            trimmed.includes('```') ||          // fenced code block
+            trimmed.includes('**') ||           // bold
+            trimmed.includes('__') ||           // bold (alt)
+            /^\s*[-*+]\s/m.test(trimmed) ||     // unordered list item at line start
+            /^\d+\.\s/m.test(trimmed) ||        // ordered list item
+            /^\|.+\|$/m.test(trimmed);          // table row: |col1|col2|
+
+        if (looksLikeMarkdown) {
+            var markdownResult = _formatMarkdown(content);
+            if (markdownResult && markdownResult !== content) {
+                return _wrapStandaloneImages(markdownResult);
+            }
+        }
+    }
+
+    return escapeHtml(content).replace(/\n/g, '<br/>');
+}
+
+/** @see _formatContent; the result is safe to paint. */
+function formatContent(content) {
+    return sanitizeHtml(_formatContent(content));
+}
+
+/** @see _formatMarkdown; the result is safe to paint. */
+function formatMarkdown(content) {
+    return sanitizeHtml(_formatMarkdown(content));
+}
+
+
+export {
+    DEFAULT_DECIMAL_PLACES,
+    getSessionLocale,
+    getSessionTz,
+    formatWallclock,
+    isLikelyHtml,
+    escapeHtml,
+    sanitizeHtml,
+    textOfHtml,
+    formatContent,
+    formatMarkdown,
+    enhanceHtmlProse,
+    formatCSV,
+    formatJsonWithLineBreaks,
+    formatNumber,
+    formatJsonAsTable,
+};

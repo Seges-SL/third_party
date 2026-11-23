@@ -1,0 +1,20 @@
+{
+  "what": "pns.ai.config.backup",
+  "providers": [
+    {
+      "name": "OVH - Backup",
+      "active": true,
+      "protocol": "openai",
+      "endpoint": "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions",
+      "selected_model": "Qwen3.8-27B",
+      "roles": ["conversation", "vision"],
+      "temperature": 0.7,
+      "temperature_support": "yes",
+      "usage_support": "yes",
+      "stt_support": "no",
+      "context_window": 262144,
+      "footmode": "foot-verbose",
+      "compose": "compose-agent"
+    }
+  ]
+}

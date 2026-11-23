@@ -1,0 +1,14 @@
+{
+  "code": "discovery_hr_contracts",
+  "tipo": "discovery",
+  "target": "hr_contracts",
+  "priority": 77,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "hr.contract",
+    "employment contract",
+    "labour contract",
+    "labor contract"
+  ]
+}

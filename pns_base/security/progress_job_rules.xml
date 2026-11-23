@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="rule_pns_progress_job_own" model="ir.rule">
+        <field name="name">Progress jobs: only mine</field>
+        <field name="model_id" ref="model_pns_progress_job"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+</odoo>

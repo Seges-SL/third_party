@@ -1,0 +1,70 @@
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright (C) 2026 Patanegra Soft <https://patanegra.com>
+ *
+ * One picture, full screen (static/src/js/pns_image_viewer.js).
+ */
+.pns-image-viewer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 20000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.88);
+    touch-action: none;
+    cursor: zoom-out;
+}
+
+.pns-image-viewer[hidden] {
+    display: none;
+}
+
+/* A thumbnail opens big; the larger copy takes its place when it arrives. */
+.pns-image-viewer-picture {
+    min-width: 60vmin;
+    min-height: 60vmin;
+    max-width: 96vw;
+    max-height: 92vh;
+    object-fit: contain;
+    transform-origin: center;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: zoom-in;
+}
+
+.pns-image-viewer.is-zoomed .pns-image-viewer-picture {
+    cursor: grab;
+}
+
+.pns-image-viewer-bar {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    gap: 8px;
+}
+
+.pns-image-viewer-bar button {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+    font-size: 20px;
+    line-height: 40px;
+    cursor: pointer;
+}
+
+.pns-image-viewer-bar button:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.pns-image-viewer-bar button[hidden] {
+    display: none;
+}

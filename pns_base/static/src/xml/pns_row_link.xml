@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="pns_base.RowLink" owl="1">
+        <a t-if="label" href="#" class="o_form_uri" t-on-click.prevent.stop="openRelated" t-esc="label"/>
+    </t>
+</templates>

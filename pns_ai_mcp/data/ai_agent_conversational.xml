@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Stamp only. noupdate=1 seed does not rewrite existing agent rows. -->
+<odoo>
+    <record id="ai_agent_mcp" model="ai.agent">
+        <field name="is_agent_conversational" eval="True"/>
+    </record>
+</odoo>

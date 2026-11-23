@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="pns_base.ListGear" owl="1">
+        <Dropdown t-if="items.length" class="'d-inline-block ms-1'" togglerClass="'btn btn-secondary'">
+            <t t-set-slot="toggler">
+                <i class="fa fa-cog"/>
+            </t>
+            <t t-foreach="items" t-as="item" t-key="item.key">
+                <t t-component="item.Component"/>
+            </t>
+        </Dropdown>
+    </t>
+
+    <t t-inherit="web.ListView.Buttons" t-inherit-mode="extension" owl="1">
+        <xpath expr="." position="inside">
+            <PnsListGear/>
+        </xpath>
+    </t>
+</templates>

@@ -1,0 +1,17 @@
+{
+  "code": "discovery_partners_es_ES",
+  "tipo": "discovery",
+  "locale": "es_ES",
+  "target": "partners",
+  "priority": 72,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "cliente",
+    "clientes",
+    "proveedor",
+    "proveedores",
+    "contacto comercial",
+    "contactos comerciales"
+  ]
+}

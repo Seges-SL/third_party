@@ -1,0 +1,15 @@
+{
+  "code": "discovery_trial_balance_es_ES",
+  "tipo": "discovery",
+  "locale": "es_ES",
+  "target": "trial_balance",
+  "priority": 76,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "balance de sumas",
+    "sumas y saldos",
+    "balance de comprobacion",
+    "balance de comprobación"
+  ]
+}

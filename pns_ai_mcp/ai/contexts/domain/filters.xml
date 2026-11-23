@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <metadata>
+        <code>filters</code>
+        <tipo>domain</tipo>
+        <description>ir.filters knowledge - creating and managing filters</description>
+        <created_at>2025-01-25</created_at>
+        <created_by>Administrator</created_by>
+        <modified_at>2025-01-25</modified_at>
+        <modified_by>Administrator</modified_by>
+    </metadata>
+    
+    <domain_knowledge>
+        <module name="filters" model="ir.filters">
+            <rules>
+                <rule>Always try to UPDATE existing filter before creating.</rule>
+                <rule>`model_id` must be String (e.g. 'sale.order').</rule>
+            </rules>
+            <patterns>
+                <pattern name="find_action_id">
+                    <logic>Find action to attach filter to Favorites.</logic>
+                    <code_snippet>
+                    action = env['ir.actions.act_window'].search([('res_model', '=', model_name), ('view_mode', 'ilike', 'tree')], limit=1)
+                    vals['action_id'] = action.id if action else False
+                    </code_snippet>
+                </pattern>
+            </patterns>
+        </module>
+    </domain_knowledge>
+</context>

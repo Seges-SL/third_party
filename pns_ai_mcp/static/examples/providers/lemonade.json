@@ -1,0 +1,21 @@
+{
+  "what": "pns.ai.config.backup",
+  "providers": [
+    {
+      "name": "Lemonade",
+      "alias": "Local server for AMD (like Ollama)",
+      "active": false,
+      "protocol": "openai",
+      "endpoint": "http://localhost:8000/api/v1/chat/completions",
+      "selected_model": "gpt-oss-20b-NPU",
+      "roles": [],
+      "temperature": 0.3,
+      "temperature_support": "yes",
+      "usage_support": "yes",
+      "stt_support": "unknown",
+      "context_window": 262144,
+      "footmode": "foot-laconic",
+      "compose": "compose-agent"
+    }
+  ]
+}

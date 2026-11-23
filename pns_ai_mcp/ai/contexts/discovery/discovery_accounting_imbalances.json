@@ -1,0 +1,14 @@
+{
+  "code": "discovery_accounting_imbalances",
+  "tipo": "discovery",
+  "target": "accounting_imbalances",
+  "priority": 71,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "unbalanced",
+    "unbalanced entry",
+    "sum debit",
+    "imbalance"
+  ]
+}

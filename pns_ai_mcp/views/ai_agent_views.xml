@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_ai_agent_tree" model="ir.ui.view">
+        <field name="name">ai.agent.tree</field>
+        <field name="model">ai.agent</field>
+        <field name="arch" type="xml">
+            <tree string="Agents" class="o_pns_list">
+                <header>
+                    <button name="action_export_selected" type="object" string="Export selected" class="btn-secondary" icon="fa-download" groups="pns_ai_mcp.group_ai_admin"/>
+                </header>
+                <field name="sequence" widget="handle"/>
+                <field name="name" optional="show"/>
+                <field name="code" optional="show"/>
+                <field name="agent_type" optional="show"/>
+                <field name="is_agent_conversational" optional="show" readonly="1"/>
+                <field name="origin" optional="show" decoration-info="origin == 'module'" decoration-muted="origin == 'user'"/>
+                <field name="cache_updated" optional="show"/>
+                <field name="active" optional="show"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_ai_agent_form" model="ir.ui.view">
+        <field name="name">ai.agent.form</field>
+        <field name="model">ai.agent</field>
+        <field name="arch" type="xml">
+            <form string="Agent">
+                <header>
+                    <button name="action_show_stats" type="object"
+                            string="Statistics" icon="fa-bar-chart"/>
+                    <button name="action_rebuild_cache" type="object"
+                            string="Rebuild cache"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-info" role="alert"
+                         attrs="{'invisible': [('origin', '!=', 'module')]}">
+                        <i class="fa fa-lock" title="Module managed" role="img" aria-hidden="true"/> This agent is managed by the module
+                        <strong><field name="module_name" class="d-inline" readonly="1"/></strong>.
+                        Its code and type cannot be changed. To remove it, uninstall the module.
+                    </div>
+                    <div class="alert alert-info" role="alert"
+                         attrs="{'invisible': [('agent_type', '!=', 'endpoint')]}">
+                        <i class="fa fa-plug" title="Endpoint agent" role="img" aria-hidden="true"/> <strong>Endpoint agent:</strong> the LLM
+                        runs in the external client (Cursor, Claude Desktop…). This agent
+                        only provides the knowledge and skills layer, so it has no provider
+                        failover cascade.
+                    </div>
+                    <group>
+                        <field name="name"/>
+                        <field name="code" attrs="{'readonly': [('origin', '=', 'module')]}"/>
+                        <field name="agent_type" attrs="{'readonly': [('origin', '=', 'module')]}"/>
+                        <field name="is_agent_conversational" readonly="1"/>
+                        <field name="origin"/>
+                        <field name="sequence"/>
+                        <field name="max_agent_rounds"
+                               attrs="{'invisible': [('agent_type', '=', 'endpoint')]}"/>
+                        <field name="active"/>
+                    </group>
+                    <field name="description"/>
+                    <field name="id" invisible="1"/>
+                    <field name="link_show_own" invisible="1"/>
+                    <field name="link_show_imported" invisible="1"/>
+                    <field name="link_show_inserted" invisible="1"/>
+                    <field name="link_show_extra" invisible="1"/>
+                    <notebook>
+                        <page string="Contexts" name="contexts">
+                            <div class="o_pns_origin_actions">
+                                <button name="action_reset_contexts_to_default" type="object"
+                                        string="⟳ Defaults" class="btn-sm btn-secondary"
+                                        confirm="Re-add own, imported and inserted contexts? Extra rows are kept."/>
+                                <button name="action_restore_contexts_from_module" type="object"
+                                        string="⤓ Restore from module" class="btn-sm btn-secondary"
+                                        confirm="Overwrite own and imported context content from this agent's seed? Inserted and extra rows are not touched. Nothing is deleted."/>
+                            </div>
+                            <div class="o_pns_origin_filter_bar">
+                                <a href="#" role="button" tabindex="0" data-token="own" title="From this agent's module."
+                                      class="btn btn-sm btn-primary o_pns_origin_filter o_pns_tok_own">Own</a>
+                                <a href="#" role="button" tabindex="0" data-token="imported" title="From another module; this agent asks for it."
+                                      class="btn btn-sm btn-primary o_pns_origin_filter o_pns_tok_imported">Imported</a>
+                                <a href="#" role="button" tabindex="0" data-token="inserted" title="From another module; that module puts it in this agent."
+                                      class="btn btn-sm btn-primary o_pns_origin_filter o_pns_tok_inserted">Inserted</a>
+                                <a href="#" role="button" tabindex="0" data-token="extra" title="No module manages it; a person added it."
+                                      class="btn btn-sm btn-primary o_pns_origin_filter o_pns_tok_extra">Extra</a>
+                            </div>
+                            <field name="context_ids" nolabel="1"
+                                   context="{'composition_agent_id': id}">
+                                <tree decoration-bf="composition_locked">
+                                    <field name="code" optional="show"/>
+                                    <field name="composition_origin" string="Origin" optional="show"/>
+                                    <field name="composition_locked" optional="show"/>
+                                    <field name="source_module" optional="show"/>
+                                    <field name="context_type" optional="show"/>
+                                    <field name="description" optional="show"/>
+                                    <field name="active" optional="show"/>
+                                </tree>
+                            </field>
+                            <p class="text-muted">Live composition. Origin toggles filter this list without reloading; hidden rows stay on the agent. Defaults re-adds own + imported + inserted; extra stays. Restore overwrites own + imported content only. Core contexts are always present. Locked rows cannot be removed.</p>
+                        </page>
+                        <page string="Skills" name="skills">
+                            <div class="o_pns_origin_actions">
+                                <button name="action_reset_skills_to_default" type="object"
+                                        string="⟳ Defaults" class="btn-sm btn-secondary"
+                                        confirm="Re-add own, imported and inserted skills? Extra rows are kept."/>
+                                <button name="action_restore_skills_from_module" type="object"
+                                        string="⤓ Restore from module" class="btn-sm btn-secondary"
+                                        confirm="Overwrite own and imported skill content from this agent's seed? Inserted and extra rows are not touched. Nothing is deleted."/>
+                            </div>
+                            <div class="o_pns_origin_filter_bar">
+                                <a href="#" role="button" tabindex="0" data-token="own" title="From this agent's module."
+                                      class="btn btn-sm btn-primary o_pns_origin_filter o_pns_tok_own">Own</a>
+                                <a href="#" role="button" tabindex="0" data-token="imported" title="From another module; this agent asks for it."
+                                      class="btn btn-sm btn-primary o_pns_origin_filter o_pns_tok_imported">Imported</a>
+                                <a href="#" role="button" tabindex="0" data-token="inserted" title="From another module; that module puts it in this agent."
+                                      class="btn btn-sm btn-primary o_pns_origin_filter o_pns_tok_inserted">Inserted</a>
+                                <a href="#" role="button" tabindex="0" data-token="extra" title="No module manages it; a person added it."
+                                      class="btn btn-sm btn-primary o_pns_origin_filter o_pns_tok_extra">Extra</a>
+                            </div>
+                                <field name="skill_ids" nolabel="1"
+                                       context="{'composition_agent_id': id}">
+                                    <tree>
+                                        <field name="code" optional="show"/>
+                                        <field name="composition_origin" string="Origin" optional="show"/>
+                                        <field name="source_module" optional="show"/>
+                                        <field name="name" optional="show"/>
+                                        <field name="description" optional="show"/>
+                                        <field name="active" optional="show"/>
+                                    </tree>
+                                </field>
+                                <p class="text-muted">Live composition. Origin toggles filter this list without reloading; hidden rows stay on the agent. Defaults re-adds own + imported + inserted; extra stays. Restore overwrites own + imported content only. Use Export/Import ZIP from the action menu to move this agent's skills.</p>
+                        </page>
+                        <page string="Providers" name="providers"
+                              attrs="{'invisible': [('agent_type', '=', 'endpoint')]}">
+                            <field name="provider_ids">
+                                <tree editable="bottom">
+                                    <field name="priority" widget="handle"/>
+                                    <field name="ordinal" string="#" optional="show"/>
+                                    <field name="provider_id" optional="show"/>
+                                    <field name="llm_idle_timeout" optional="show"/>
+                                    <field name="llm_round_timeout" optional="show"/>
+                                    <field name="skip_sync_fallback" optional="show"/>
+                                    <field name="active" optional="show"/>
+                                </tree>
+                            </field>
+                            <p class="text-muted">Empty list: every active provider, by id. A role (vision, audio, decision, design, …) is looked for in this list first, then among every active provider; a provider with only that role goes first. Nobody holding it: the fallback of the role, if it has one. The text turn keeps the order of this list.</p>
+                        </page>
+                        <page string="Cache" name="cache">
+                            <group col="1">
+                                <field name="cache_locale" readonly="1"/>
+                                <field name="cache_updated" readonly="1"/>
+                                <field name="cached_content" readonly="1"
+                                       nolabel="1" colspan="2" widget="text"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ai_agent" model="ir.actions.act_window">
+        <field name="name">Agents</field>
+        <field name="res_model">ai.agent</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <record id="action_server_agent_export_contexts_zip" model="ir.actions.server">
+        <field name="name">Export agent contexts to ZIP</field>
+        <field name="model_id" ref="model_ai_agent"/>
+        <field name="binding_model_id" ref="model_ai_agent"/>
+        <field name="binding_view_types">form</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_export_contexts_zip()</field>
+    </record>
+
+    <record id="action_server_agent_import_contexts_zip" model="ir.actions.server">
+        <field name="name">Import agent contexts from ZIP</field>
+        <field name="model_id" ref="model_ai_agent"/>
+        <field name="binding_model_id" ref="model_ai_agent"/>
+        <field name="binding_view_types">form</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_open_import_agent_contexts_wizard()</field>
+    </record>
+
+    <record id="action_server_agent_export_skills_zip" model="ir.actions.server">
+        <field name="name">Export agent skills to ZIP</field>
+        <field name="model_id" ref="model_ai_agent"/>
+        <field name="binding_model_id" ref="model_ai_agent"/>
+        <field name="binding_view_types">form</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_export_skills_zip()</field>
+    </record>
+
+    <record id="action_server_agent_import_skills_zip" model="ir.actions.server">
+        <field name="name">Import agent skills from ZIP</field>
+        <field name="model_id" ref="model_ai_agent"/>
+        <field name="binding_model_id" ref="model_ai_agent"/>
+        <field name="binding_view_types">form</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_open_import_agent_skills_wizard()</field>
+    </record>
+</odoo>

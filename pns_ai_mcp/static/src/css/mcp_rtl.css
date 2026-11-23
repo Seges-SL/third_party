@@ -1,0 +1,16 @@
+/* MCP module — RTL-ready overrides (see Transversal_Capacidades_Core) */
+
+[dir="rtl"] .o_mcp_context_content textarea {
+    text-align: start;
+}
+
+[dir="rtl"] .o_control_panel .o_cp_buttons .o_mcp_context_toolbar_btn {
+    margin-inline-start: 8px;
+    margin-inline-end: 0;
+}
+
+/* Stats wizard tables: keep numeric columns aligned to end in both directions */
+.o_field_html .mcp-stats-table th.text-end,
+.o_field_html .mcp-stats-table td.text-end {
+    text-align: end;
+}

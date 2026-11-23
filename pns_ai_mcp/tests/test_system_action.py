@@ -1,0 +1,547 @@
+# -*- coding: utf-8 -*-
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (C) 2025-2026 Patanegra Soft <https://patanegra.com>
+"""Trusted system actions: view modifiers, propose group gate, reset."""
+from odoo import api
+from odoo.exceptions import AccessError, UserError
+from odoo.tests import tagged, TransactionCase
+from odoo.tools import mute_logger
+from odoo.addons.pns_ai_mcp.tests._helpers import make_user, one_cursor
+
+from odoo.addons.pns_ai_mcp.controllers.safe_plan import (
+    request_safe_plan,
+    execute_safe_plan,
+    validate_safe_plan,
+)
+from odoo.addons.pns_ai_mcp.utils.field_required_plan import accept_choice
+
+# Messages are asserted in English; the instance may give users another language.
+EN = {'lang': 'en_US'}
+# Views and fields are Settings work: the AI admin who changes them also has Settings.
+ADMIN_GROUPS = 'base.group_user,base.group_system,pns_ai_mcp.group_ai_admin'
+
+
+@tagged('post_install', '-at_install', 'pns_ai_mcp')
+class TestSystemTrustedActions(TransactionCase):
+
+    def setUp(self):
+        super().setUp()
+        # Odoo logs ERROR when existing rows keep NULL in a column made required.
+        muted = mute_logger('odoo.schema')
+        muted.__enter__()
+        self.addCleanup(muted.__exit__, None, None, None)
+
+    def _form(self, field_name='comment'):
+        return self.env['ir.ui.view'].create({
+            'name': 'pns.test.system.action.form',
+            'model': 'res.partner',
+            'type': 'form',
+            'arch': (
+                '<?xml version="1.0"?>'
+                '<form><sheet>'
+                '<field name="name"/>'
+                '<field name="%s"/>'
+                '</sheet></form>'
+            ) % field_name,
+        })
+
+    def test_required_inherit_and_reset(self):
+        view = self._form()
+        Action = self.env['ai.system.action']
+        preview = Action._preview_view_set_field_required(
+            model='res.partner', field='comment', required=True,
+            view_ids=[view.id],
+        )
+        self.assertIn('comment', preview)
+        result = Action._apply_view_set_field_required(
+            model='res.partner', field='comment', required=True,
+            view_ids=[view.id],
+        )
+        self.assertTrue(result.get('ok'))
+        inherit_ids = result.get('ids') or []
+        self.assertEqual(len(inherit_ids), 1)
+        inherit = self.env['ir.ui.view'].browse(inherit_ids[0])
+        self.assertTrue(inherit.exists())
+        self.assertIn('required">1', inherit.arch or '')
+        policy = self.env['ai.view.policy'].search([
+            ('model_name', '=', 'res.partner'),
+            ('field_name', '=', 'comment'),
+            ('view_id', '=', view.id),
+        ])
+        self.assertEqual(len(policy), 1)
+
+        Action._apply_view_reset_field_modifiers(
+            model='res.partner', field='comment',
+        )
+        self.assertFalse(inherit.exists())
+        self.assertFalse(self.env['ai.view.policy'].search([
+            ('model_name', '=', 'res.partner'),
+            ('field_name', '=', 'comment'),
+            ('view_id', '=', view.id),
+        ]))
+
+    def test_unknown_field_rejected(self):
+        with self.assertRaises(UserError):
+            self.env['ai.system.action']._preview_view_set_field_required(
+                model='res.partner',
+                field='no_such_pns_field_xyz',
+                required=True,
+            )
+
+    def test_view_without_field_rejected(self):
+        view = self._form('name')
+        with self.assertRaises(UserError):
+            self.env['ai.system.action']._apply_view_set_field_required(
+                model='res.partner', field='comment', required=True,
+                view_ids=[view.id],
+            )
+
+    def test_propose_rejects_view_without_field(self):
+        """Propose lists views later; execute still fails if the view hides the field."""
+        admin = make_user(
+            self.env, 'pns_aiadmin_noview',
+            groups=ADMIN_GROUPS,
+        )
+        view = self._form('name')
+        env_a = api.Environment(self.env.cr, admin.id, EN)
+        ok, err = validate_safe_plan([{
+            'op': 'field_required',
+            'model': 'res.partner',
+            'field': 'comment',
+            'required': True,
+            'view_ids': [view.id],
+        }], env_a)
+        self.assertTrue(ok, err)
+        with self.assertRaises(UserError):
+            execute_safe_plan(env_a, [{
+                'op': 'field_required',
+                'model': 'res.partner',
+                'field': 'comment',
+                'required': True,
+                'view_only': True,
+                'view_ids': [view.id],
+            }])
+
+    def test_view_id_alias_and_extension_inherit(self):
+        Action = self.env['ai.system.action']
+        parent = self._form('name')
+        Model = self.env['ir.model'].search(
+            [('model', '=', 'res.partner')], limit=1,
+        )
+        self.env['ir.model.fields'].create({
+            'name': 'x_pns_test_alias',
+            'field_description': 'PNS test alias',
+            'model_id': Model.id,
+            'ttype': 'char',
+            'state': 'manual',
+        })
+        inherit = self.env['ir.ui.view'].create({
+            'name': 'pns.test.alias.inherit',
+            'model': 'res.partner',
+            'type': 'form',
+            'inherit_id': parent.id,
+            'arch': (
+                '<?xml version="1.0"?>'
+                '<xpath expr="//field[@name=\'name\']" position="after">'
+                '<field name="x_pns_test_alias"/>'
+                '</xpath>'
+            ),
+        })
+        preview = Action._preview_view_set_field_required(
+            model='res.partner', field='x_pns_test_alias',
+            required=True, view_id=inherit.id,
+        )
+        self.assertIn('x_pns_test_alias', preview)
+        preview_empty = Action._preview_view_set_field_required(
+            model='res.partner', field='x_pns_test_alias', required=True,
+        )
+        self.assertIn('x_pns_test_alias', preview_empty)
+
+    def test_empty_view_ids_prefers_form_not_tree(self):
+        Model = self.env['ir.model'].search(
+            [('model', '=', 'res.partner')], limit=1,
+        )
+        self.env['ir.model.fields'].create({
+            'name': 'x_pns_test_req_only',
+            'field_description': 'PNS test required only',
+            'model_id': Model.id,
+            'ttype': 'char',
+            'state': 'manual',
+        })
+        form = self._form('x_pns_test_req_only')
+        tree = self.env['ir.ui.view'].create({
+            'name': 'pns.test.system.action.tree',
+            'model': 'res.partner',
+            'type': 'tree',
+            'arch': (
+                '<?xml version="1.0"?>'
+                '<tree><field name="name"/>'
+                '<field name="x_pns_test_req_only"/></tree>'
+            ),
+        })
+        Action = self.env['ai.system.action']
+        preview = Action._preview_view_set_field_required(
+            model='res.partner', field='x_pns_test_req_only', required=True,
+        )
+        self.assertIn('1 view', preview)
+        result = Action._apply_view_set_field_required(
+            model='res.partner', field='x_pns_test_req_only', required=True,
+        )
+        inherit_ids = result.get('ids') or []
+        self.assertEqual(len(inherit_ids), 1)
+        inherit = self.env['ir.ui.view'].browse(inherit_ids[0])
+        self.assertEqual(inherit.inherit_id.id, form.id)
+        self.assertNotEqual(inherit.inherit_id.id, tree.id)
+        tree_preview = Action._preview_view_set_field_required(
+            model='res.partner', field='x_pns_test_req_only', required=True,
+            view_type='tree',
+        )
+        self.assertIn('1 view', tree_preview)
+
+    def test_required_arch_skips_read_only_copies(self):
+        view = self.env['ir.ui.view'].create({
+            'name': 'pns.test.alias.copies.form',
+            'model': 'res.partner',
+            'type': 'form',
+            'arch': (
+                '<?xml version="1.0"?>'
+                '<form><sheet>'
+                '<div class="oe_read_only"><field name="comment"/></div>'
+                '<div class="oe_edit_only"><field name="comment"/></div>'
+                '</sheet></form>'
+            ),
+        })
+        result = self.env['ai.system.action']._apply_view_set_field_required(
+            model='res.partner', field='comment', required=True,
+            view_ids=[view.id],
+        )
+        inherit = self.env['ir.ui.view'].browse(result['ids'][0])
+        self.assertIn("not(ancestor::*[hasclass('oe_read_only')])", inherit.arch)
+        self.assertIn("not(@invisible='1')", inherit.arch)
+
+    def test_propose_rejects_view_and_field_crud(self):
+        admin = make_user(
+            self.env, 'pns_aiadmin_noviewcrud',
+            groups=ADMIN_GROUPS,
+        )
+        env_a = api.Environment(self.env.cr, admin.id, EN)
+        ok, err = validate_safe_plan([{
+            'op': 'write',
+            'model': 'ir.ui.view',
+            'ids': [1],
+            'values': {'arch': '<data/>'},
+        }], env_a)
+        self.assertFalse(ok)
+        self.assertIn('field_required', (err or ''))
+        ok_f, err_f = validate_safe_plan([{
+            'op': 'write',
+            'model': 'ir.model.fields',
+            'ids': [1],
+            'values': {'required': True},
+        }], env_a)
+        self.assertFalse(ok_f)
+        self.assertIn('ir.model.fields', (err_f or ''))
+
+    def test_propose_without_ai_admin_fails(self):
+        """PAAP I6: A system action needs the AI Administrator group."""
+        writer = make_user(
+            self.env, 'pns_writer_sysact',
+            groups='base.group_user,pns_ai_mcp.group_ai_writer',
+        )
+        env_w = api.Environment(self.env.cr, writer.id, EN)
+        ok, err = validate_safe_plan([{
+            'op': 'field_required',
+            'model': 'res.partner',
+            'field': 'comment',
+            'required': True,
+        }], env_w)
+        self.assertFalse(ok)
+        self.assertIn('Administrator', (err or ''))
+
+    def test_ai_admin_without_settings_is_refused(self):
+        """Validation and apply agree: no Settings role, no field_required."""
+        ai_admin = make_user(
+            self.env, 'pns_aiadmin_nosettings',
+            groups='base.group_user,pns_ai_mcp.group_ai_admin',
+        )
+        view = self._form()
+        env_n = api.Environment(self.env.cr, ai_admin.id, EN)
+        step = {
+            'op': 'field_required',
+            'model': 'res.partner',
+            'field': 'comment',
+            'required': True,
+            'view_ids': [view.id],
+        }
+        ok, err = validate_safe_plan([dict(step)], env_n)
+        self.assertFalse(ok)
+        self.assertIn('Settings', (err or ''))
+        with self.assertRaises(AccessError):
+            execute_safe_plan(env_n, [dict(step)])
+
+    def test_apply_via_safe_plan_as_admin(self):
+        admin = make_user(
+            self.env, 'pns_aiadmin_sysact',
+            groups=ADMIN_GROUPS,
+        )
+        view = self._form()
+        env_a = api.Environment(self.env.cr, admin.id, EN)
+        ok, err = validate_safe_plan([{
+            'op': 'field_required',
+            'model': 'res.partner',
+            'field': 'comment',
+            'required': True,
+            'view_ids': [view.id],
+        }], env_a)
+        self.assertTrue(ok, err)
+        rows = execute_safe_plan(env_a, [{
+            'op': 'field_required',
+            'model': 'res.partner',
+            'field': 'comment',
+            'required': True,
+            'view_ids': [view.id],
+        }])
+        inherit_id = rows[0]['views']['ids'][0]
+        inherit = self.env['ir.ui.view'].browse(inherit_id)
+        self.assertTrue(inherit.exists())
+        self.assertIn('required">1', inherit.arch or '')
+        self.assertNotIn("oe_read_only", inherit.arch)
+
+    def test_module_preview_no_apply(self):
+        text = self.env['ai.system.action']._preview_module_update(
+            module='base', operation='upgrade',
+        )
+        self.assertIn('base', text.lower())
+        with self.assertRaises(UserError):
+            self.env['ai.system.action']._preview_module_update(
+                module='base', operation='uninstall',
+            )
+        with self.assertRaises(UserError):
+            self.env['ai.system.action']._preview_module_update(
+                module='no_such_pns_module_xyz', operation='install',
+            )
+        base = self.env['ir.module.module'].search(
+            [('name', '=', 'base')], limit=1,
+        )
+        alias_text = self.env['ai.system.action']._preview_module_update(
+            module_ids=[base.id], button='button_immediate_upgrade',
+        )
+        self.assertIn('base', alias_text.lower())
+
+    def test_user_group_preview(self):
+        target = make_user(
+            self.env, 'pns_grp_target',
+            groups='base.group_user',
+        )
+        text = self.env['ai.system.action']._preview_user_add_group(
+            user_id=target.id,
+            group='pns_ai_mcp.group_ai_writer',
+        )
+        self.assertIn(target.name, text)
+        applied = self.env['ai.system.action']._apply_user_add_group(
+            user_id=target.id,
+            group='pns_ai_mcp.group_ai_writer',
+        )
+        self.assertTrue(applied.get('ok'))
+        self.assertTrue(target.has_group('pns_ai_mcp.group_ai_writer'))
+        self.env['ai.system.action']._apply_user_remove_group(
+            user_id=target.id,
+            group='pns_ai_mcp.group_ai_writer',
+        )
+        self.assertFalse(target.has_group('pns_ai_mcp.group_ai_writer'))
+
+    def test_propose_rejects_required_atoms(self):
+        admin = make_user(
+            self.env, 'pns_aiadmin_atoms',
+            groups=ADMIN_GROUPS,
+        )
+        env_a = api.Environment(self.env.cr, admin.id, EN)
+        ok, err = validate_safe_plan([{
+            'op': 'action',
+            'action_code': 'field.set_required',
+            'args': {'model': 'res.partner', 'field': 'comment', 'required': True},
+        }], env_a)
+        self.assertFalse(ok)
+        self.assertIn('field_required', (err or ''))
+
+    def test_field_required_propose_opens_choice(self):
+        admin = make_user(
+            self.env, 'pns_aiadmin_choice',
+            groups=ADMIN_GROUPS,
+        )
+        env_a = api.Environment(self.env.cr, admin.id, EN)
+        with one_cursor(self):
+            pending = request_safe_plan(env_a, [{
+                'op': 'field_required',
+                'model': 'res.partner',
+                'field': 'comment',
+                'required': True,
+            }], title='Alias required')
+        self.assertTrue(pending.get('success'), pending)
+        self.assertEqual(pending.get('status'), 'pending_choice')
+        self.assertTrue(pending.get('choice_id'))
+        self.assertFalse(pending.get('verification_id'))
+
+    def test_views_picked_stripped_on_validate(self):
+        admin = make_user(
+            self.env, 'pns_aiadmin_strip',
+            groups=ADMIN_GROUPS,
+        )
+        env_a = api.Environment(self.env.cr, admin.id, EN)
+        step = {
+            'op': 'field_required',
+            'model': 'res.partner',
+            'field': 'comment',
+            'required': True,
+            '_views_picked': True,
+            'view_ids': [1],
+        }
+        ok, err = validate_safe_plan([step], env_a)
+        self.assertTrue(ok, err)
+        self.assertNotIn('_views_picked', step)
+
+    def test_view_only_empty_execute_rejected(self):
+        admin = make_user(
+            self.env, 'pns_aiadmin_vonly',
+            groups=ADMIN_GROUPS,
+        )
+        env_a = api.Environment(self.env.cr, admin.id, EN)
+        with self.assertRaises(UserError):
+            execute_safe_plan(env_a, [{
+                'op': 'field_required',
+                'model': 'res.partner',
+                'field': 'comment',
+                'required': True,
+                'view_only': True,
+            }])
+
+    def test_accept_choice_creates_verification(self):
+        admin = make_user(
+            self.env, 'pns_aiadmin_accept',
+            groups=ADMIN_GROUPS,
+        )
+        view = self._form()
+        env_a = api.Environment(self.env.cr, admin.id, EN)
+        with one_cursor(self):
+            pending = request_safe_plan(env_a, [{
+                'op': 'field_required',
+                'model': 'res.partner',
+                'field': 'comment',
+                'required': True,
+            }], title='Comment required')
+            item_ids = [it['id'] for it in (pending.get('items') or [])]
+            self.assertIn(view.id, item_ids)
+            result = accept_choice(
+                env_a, pending['choice_id'], [view.id],
+                request_safe_plan,
+            )
+        self.assertTrue(result.get('success'), result)
+        self.assertTrue(result.get('verification_id'))
+        self.assertEqual(result.get('status'), 'pending_confirmation')
+
+    def test_apply_uniform_marks_all_copies(self):
+        view = self.env['ir.ui.view'].create({
+            'name': 'pns.test.alias.uniform.form',
+            'model': 'res.partner',
+            'type': 'form',
+            'arch': (
+                '<?xml version="1.0"?>'
+                '<form><sheet>'
+                '<div class="oe_read_only"><field name="comment"/></div>'
+                '<div class="oe_edit_only"><field name="comment"/></div>'
+                '</sheet></form>'
+            ),
+        })
+        result = self.env['ai.system.action']._apply_view_set_field_required(
+            model='res.partner', field='comment', required=True,
+            view_ids=[view.id], uniform=True,
+        )
+        inherit = self.env['ir.ui.view'].browse(result['ids'][0])
+        self.assertNotIn('oe_read_only', inherit.arch)
+        self.assertIn("expr=\"//field[@name='comment']\"", inherit.arch)
+
+    def test_internal_user_cannot_run_public_system_or_factory_maintenance(self):
+        user = make_user(
+            self.env, 'pns_plain_internal_rpc',
+            groups='base.group_user',
+        )
+        env_u = api.Environment(self.env.cr, user.id, EN)
+        Action = env_u['ai.system.action']
+        self.assertFalse(hasattr(Action, 'apply_user_add_group'))
+        self.assertFalse(hasattr(Action, 'preview_user_add_group'))
+        self.assertTrue(hasattr(Action, '_apply_user_add_group'))
+        with self.assertRaises(AccessError):
+            env_u['ai.skill'].with_context(
+                skip_hardcoded_restrictions=True,
+            ).unlink_named_factory_skills(['not-a-real-skill'])
+
+    def test_internal_user_cannot_reach_system_action_through_trusted_action(self):
+        """PAAP I6: A plain internal user cannot reach a system action."""
+        user = make_user(
+            self.env, 'pns_plain_internal_trusted',
+            groups='base.group_user',
+        )
+        env_u = api.Environment(self.env.cr, user.id, EN)
+        trusted = env_u['ai.trusted.action']._get('user.add_group')
+        self.assertTrue(trusted)
+        self.assertFalse(hasattr(trusted, 'apply'))
+        self.assertFalse(hasattr(trusted, 'preview'))
+        with self.assertRaises(PermissionError):
+            trusted._apply(user_id=user.id, group='base.group_system')
+        self.assertFalse(user.has_group('base.group_system'))
+
+    def test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin(self):
+        """PAAP I7: not even an AI Administrator gets a plan that touches Settings / Access Rights."""
+        from odoo.addons.pns_base.utils.compat import USER_GROUPS_FIELD
+
+        admin = make_user(
+            self.env, 'pns_aiadmin_cusp',
+            groups='base.group_user,pns_ai_mcp.group_ai_writer,pns_ai_mcp.group_ai_admin',
+        )
+        target = make_user(self.env, 'pns_cusp_target', groups='base.group_user')
+        env_a = api.Environment(self.env.cr, admin.id, EN)
+        system = self.env.ref('base.group_system')
+        carrier = self.env['res.groups'].create({
+            'name': 'pns test group that carries Settings',
+            'implied_ids': [(4, system.id)],
+        })
+        plain = self.env['res.groups'].create({'name': 'pns test plain group'})
+
+        for group in ('base.group_system', 'base.group_erp_manager', carrier.id):
+            for code in ('user.add_group', 'user.remove_group'):
+                ok, err = validate_safe_plan([{
+                    'op': 'action', 'action_code': code,
+                    'args': {'user_id': target.id, 'group': group},
+                }], env_a)
+                self.assertFalse(ok, (code, group))
+                self.assertIn('maximum-privilege', err)
+        with self.assertRaises(UserError):
+            env_a['ai.trusted.action']._get('user.add_group')._apply(
+                user_id=target.id, group='base.group_system',
+            )
+        self.assertFalse(target.has_group('base.group_system'))
+
+        crud = [
+            {'op': 'write', 'model': 'res.users', 'ids': [target.id],
+             'values': {USER_GROUPS_FIELD: [[4, plain.id]]}},
+            {'op': 'create', 'model': 'res.groups',
+             'values': {'name': 'x', 'implied_ids': [[4, system.id]]}},
+            {'op': 'write', 'model': 'res.groups', 'ids': [plain.id],
+             'values': {'implied_ids': [[6, 0, [carrier.id]]]}},
+            {'op': 'write', 'model': 'res.groups', 'ids': [system.id],
+             'values': {'name': 'renamed'}},
+            {'op': 'unlink', 'model': 'res.groups', 'ids': [carrier.id]},
+        ]
+        for step in crud:
+            ok, err = validate_safe_plan([dict(step)], env_a)
+            self.assertFalse(ok, step)
+            with self.assertRaises(PermissionError):
+                execute_safe_plan(env_a, [dict(step)])
+        self.assertFalse(target.has_group('base.group_system'))
+        self.assertEqual(system.name, self.env.ref('base.group_system').name)
+
+        ok, err = validate_safe_plan([{
+            'op': 'action', 'action_code': 'user.add_group',
+            'args': {'user_id': target.id, 'group': plain.id},
+        }], env_a)
+        self.assertTrue(ok, err)

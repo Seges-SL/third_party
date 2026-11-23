@@ -1,0 +1,15 @@
+{
+  "code": "discovery_account",
+  "tipo": "discovery",
+  "target": "account",
+  "priority": 70,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "journal entry",
+    "journal entries",
+    "account.move",
+    "account.move.line",
+    "chart of accounts"
+  ]
+}

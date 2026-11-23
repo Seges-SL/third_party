@@ -1,0 +1,37 @@
+{
+  "code": "discovery_business_documents_es_ES",
+  "tipo": "discovery",
+  "locale": "es_ES",
+  "target": "business_documents",
+  "priority": 74,
+  "soft_depends": [
+    "partners"
+  ],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "presupuesto",
+    "presupuestos",
+    "albarán",
+    "albaranes",
+    "descuento",
+    "descuento global",
+    "ponle un descuento",
+    "pedido de venta",
+    "pedido de compra",
+    "crear presupuesto",
+    "modificar presupuesto",
+    "añadir línea",
+    "líneas del albarán",
+    "líneas del presupuesto",
+    "factura proforma",
+    "factura de proveedor",
+    "factura adjunta",
+    "regístrala",
+    "ya está contabilizada",
+    "contabiliza esta factura",
+    "ticket",
+    "recibo",
+    "datáfono",
+    "factura simplificada"
+  ]
+}

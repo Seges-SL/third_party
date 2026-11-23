@@ -1,0 +1,668 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Operation result: texts live in XML (Odoo i18n); Python only writes counters. -->
+<odoo>
+
+    <!-- ai.context.import.wizard -->
+    <record id="view_context_import_result_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.context_import.wizard.result</field>
+        <field name="model">ai.context.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import result">
+                <field name="show_result" invisible="1"/>
+                <field name="result_status" invisible="1"/>
+                <group name="result_alerts">
+                    <div name="alert_success" class="alert alert-success mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'success')]}">
+                        <i class="fa fa-check-circle" title="Success" role="img" aria-hidden="true"/> <strong>Import completed successfully.</strong>
+                    </div>
+                    <div name="alert_warning" class="alert alert-warning mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'warning')]}">
+                        <i class="fa fa-exclamation-triangle" title="Warning" role="img" aria-hidden="true"/> <strong>Import completed with warnings.</strong>
+                    </div>
+                    <div name="alert_danger" class="alert alert-danger mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'danger')]}">
+                        <i class="fa fa-times-circle" title="Error" role="img" aria-hidden="true"/> <strong>Import failed.</strong>
+                    </div>
+                </group>
+                <group name="result_counts">
+                    <field name="result_created" string="Created"/>
+                    <field name="result_updated" string="Updated"/>
+                    <field name="result_skipped" string="Skipped (existing, not replaced)"
+                           attrs="{'invisible': [('result_skipped', '=', 0)]}"/>
+                    <field name="result_removed" string="Protocol (protected)"
+                           attrs="{'invisible': [('result_removed', '=', 0)]}"/>
+                    <field name="result_linked" string="Skipped (not in manifest)"
+                           attrs="{'invisible': [('result_linked', '=', 0)]}"/>
+                </group>
+                <group name="result_messages">
+                    <field name="result_warnings" attrs="{'invisible': [('result_warnings', '=', False)]}"/>
+                    <field name="result_errors" attrs="{'invisible': [('result_errors', '=', False)]}"/>
+                </group>
+                <footer>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ai.agent.context.import.wizard -->
+    <record id="view_agent_context_import_result_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.agent.context.import.wizard.result</field>
+        <field name="model">ai.agent.context.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import result">
+                <field name="show_result" invisible="1"/>
+                <field name="result_status" invisible="1"/>
+                <group name="result_alerts">
+                    <div class="alert alert-success mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'success')]}">
+                        <i class="fa fa-check-circle" title="Success" role="img" aria-hidden="true"/> <strong>Import completed successfully.</strong>
+                    </div>
+                    <div class="alert alert-warning mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'warning')]}">
+                        <i class="fa fa-exclamation-triangle" title="Warning" role="img" aria-hidden="true"/> <strong>Import completed with warnings.</strong>
+                    </div>
+                    <div class="alert alert-danger mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'danger')]}">
+                        <i class="fa fa-times-circle" title="Error" role="img" aria-hidden="true"/> <strong>Import failed.</strong>
+                    </div>
+                </group>
+                <group name="result_counts">
+                    <field name="result_created" string="Created"/>
+                    <field name="result_updated" string="Updated"/>
+                    <field name="result_skipped" string="Skipped (existing, not replaced)"
+                           attrs="{'invisible': [('result_skipped', '=', 0)]}"/>
+                    <field name="result_removed" string="Protocol (protected)"
+                           attrs="{'invisible': [('result_removed', '=', 0)]}"/>
+                    <field name="result_linked" string="Skipped (not in manifest)"
+                           attrs="{'invisible': [('result_linked', '=', 0)]}"/>
+                </group>
+                <group name="result_messages">
+                    <field name="result_warnings" attrs="{'invisible': [('result_warnings', '=', False)]}"/>
+                    <field name="result_errors" attrs="{'invisible': [('result_errors', '=', False)]}"/>
+                </group>
+                <footer>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ai.agent.skill.import.wizard -->
+    <record id="view_agent_skill_import_result_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.agent.skill.import.wizard.result</field>
+        <field name="model">ai.agent.skill.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import result">
+                <field name="show_result" invisible="1"/>
+                <field name="result_status" invisible="1"/>
+                <group name="result_alerts">
+                    <div class="alert alert-success mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'success')]}">
+                        <i class="fa fa-check-circle" title="Success" role="img" aria-hidden="true"/> <strong>Import completed successfully.</strong>
+                    </div>
+                    <div class="alert alert-warning mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'warning')]}">
+                        <i class="fa fa-exclamation-triangle" title="Warning" role="img" aria-hidden="true"/> <strong>Import completed with warnings.</strong>
+                    </div>
+                    <div class="alert alert-danger mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'danger')]}">
+                        <i class="fa fa-times-circle" title="Error" role="img" aria-hidden="true"/> <strong>Import failed.</strong>
+                    </div>
+                </group>
+                <group name="result_counts">
+                    <field name="result_created" string="Created"/>
+                    <field name="result_updated" string="Updated"/>
+                    <field name="result_skipped" string="Skipped (existing, not replaced)"
+                           attrs="{'invisible': [('result_skipped', '=', 0)]}"/>
+                </group>
+                <group name="result_messages">
+                    <field name="result_warnings" attrs="{'invisible': [('result_warnings', '=', False)]}"/>
+                    <field name="result_errors" attrs="{'invisible': [('result_errors', '=', False)]}"/>
+                </group>
+                <footer>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ai.skill.import.wizard -->
+    <record id="view_skill_import_result_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.skill.import.wizard.result</field>
+        <field name="model">ai.skill.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import result">
+                <field name="show_result" invisible="1"/>
+                <field name="result_status" invisible="1"/>
+                <group name="result_alerts">
+                    <div class="alert alert-success mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'success')]}">
+                        <i class="fa fa-check-circle" title="Success" role="img" aria-hidden="true"/> <strong>Import completed successfully.</strong>
+                    </div>
+                    <div class="alert alert-warning mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'warning')]}">
+                        <i class="fa fa-exclamation-triangle" title="Warning" role="img" aria-hidden="true"/> <strong>Import completed with warnings.</strong>
+                    </div>
+                    <div class="alert alert-danger mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'danger')]}">
+                        <i class="fa fa-times-circle" title="Error" role="img" aria-hidden="true"/> <strong>Import failed.</strong>
+                    </div>
+                </group>
+                <group name="result_counts">
+                    <field name="result_created" string="Created"/>
+                    <field name="result_updated" string="Updated"/>
+                    <field name="result_skipped" string="Skipped (existing, not replaced)"
+                           attrs="{'invisible': [('result_skipped', '=', 0)]}"/>
+                </group>
+                <group name="result_messages">
+                    <field name="result_warnings" attrs="{'invisible': [('result_warnings', '=', False)]}"/>
+                    <field name="result_errors" attrs="{'invisible': [('result_errors', '=', False)]}"/>
+                    <field name="result_detail" attrs="{'invisible': [('result_detail', '=', False)]}"/>
+                </group>
+                <footer>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ai.import.agents.wizard -->
+    <record id="view_import_agents_result_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.import_agents.wizard.result</field>
+        <field name="model">ai.import.agents.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import result">
+                <field name="show_result" invisible="1"/>
+                <field name="result_status" invisible="1"/>
+                <group name="result_alerts">
+                    <div class="alert alert-success mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'success')]}">
+                        <i class="fa fa-check-circle" title="Success" role="img" aria-hidden="true"/> <strong>Import completed successfully.</strong>
+                    </div>
+                    <div class="alert alert-warning mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'warning')]}">
+                        <i class="fa fa-exclamation-triangle" title="Warning" role="img" aria-hidden="true"/> <strong>Import completed with warnings.</strong>
+                    </div>
+                    <div class="alert alert-danger mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'danger')]}">
+                        <i class="fa fa-times-circle" title="Error" role="img" aria-hidden="true"/> <strong>Import failed.</strong>
+                    </div>
+                </group>
+                <group name="result_counts">
+                    <field name="result_created" string="Created"/>
+                    <field name="result_updated" string="Updated"/>
+                    <field name="result_skipped" string="Skipped (already existed)"
+                           attrs="{'invisible': [('result_skipped', '=', 0)]}"/>
+                </group>
+                <group name="result_messages">
+                    <field name="result_detail" string="Missing providers"
+                           attrs="{'invisible': [('result_detail', '=', False)]}"/>
+                    <field name="result_errors" attrs="{'invisible': [('result_errors', '=', False)]}"/>
+                </group>
+                <footer>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ai.import.users.wizard -->
+    <record id="view_import_users_result_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.import_users.wizard.result</field>
+        <field name="model">ai.import.users.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import result">
+                <field name="show_result" invisible="1"/>
+                <field name="result_status" invisible="1"/>
+                <group name="result_alerts">
+                    <div class="alert alert-success mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'success')]}">
+                        <i class="fa fa-check-circle" title="Success" role="img" aria-hidden="true"/> <strong>Import completed successfully.</strong>
+                    </div>
+                    <div class="alert alert-warning mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'warning')]}">
+                        <i class="fa fa-exclamation-triangle" title="Warning" role="img" aria-hidden="true"/> <strong>Import completed with warnings.</strong>
+                    </div>
+                    <div class="alert alert-danger mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'danger')]}">
+                        <i class="fa fa-times-circle" title="Error" role="img" aria-hidden="true"/> <strong>Import failed.</strong>
+                    </div>
+                </group>
+                <group name="result_counts">
+                    <field name="result_created" string="Created"/>
+                    <field name="result_updated" string="Updated"/>
+                    <field name="result_skipped" string="Skipped (already existed)"
+                           attrs="{'invisible': [('result_skipped', '=', 0)]}"/>
+                    <field name="result_linked" string="API keys applied"
+                           attrs="{'invisible': [('result_linked', '=', 0)]}"/>
+                </group>
+                <group name="result_messages">
+                    <field name="result_detail" string="Odoo users not found"
+                           attrs="{'invisible': [('result_detail', '=', False)]}"/>
+                    <field name="result_errors" attrs="{'invisible': [('result_errors', '=', False)]}"/>
+                </group>
+                <footer>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- JSON import wizards: servers, whitelist, external servers -->
+    <record id="view_import_servers_result_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.import_servers.wizard.result</field>
+        <field name="model">ai.import.servers.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import result">
+                <field name="show_result" invisible="1"/>
+                <field name="result_status" invisible="1"/>
+                <group name="result_alerts">
+                    <div class="alert alert-success mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'success')]}">
+                        <i class="fa fa-check-circle" title="Success" role="img" aria-hidden="true"/> <strong>Import completed successfully.</strong>
+                    </div>
+                    <div class="alert alert-warning mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'warning')]}">
+                        <i class="fa fa-exclamation-triangle" title="Warning" role="img" aria-hidden="true"/> <strong>Import completed with warnings.</strong>
+                    </div>
+                    <div class="alert alert-danger mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'danger')]}">
+                        <i class="fa fa-times-circle" title="Error" role="img" aria-hidden="true"/> <strong>Import failed.</strong>
+                    </div>
+                </group>
+                <group name="result_counts">
+                    <field name="result_created" string="Created"/>
+                    <field name="result_updated" string="Updated"/>
+                    <field name="result_skipped" string="Skipped (already existed)"
+                           attrs="{'invisible': [('result_skipped', '=', 0)]}"/>
+                </group>
+                <group name="result_messages">
+                    <field name="result_warnings" attrs="{'invisible': [('result_warnings', '=', False)]}"/>
+                    <field name="result_errors" attrs="{'invisible': [('result_errors', '=', False)]}"/>
+                </group>
+                <footer>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_import_provider_roles_result_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.import_provider_roles.wizard.result</field>
+        <field name="model">ai.import.provider.roles.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import result">
+                <field name="show_result" invisible="1"/>
+                <field name="result_status" invisible="1"/>
+                <group name="result_alerts">
+                    <div class="alert alert-success mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'success')]}">
+                        <i class="fa fa-check-circle" title="Success" role="img" aria-hidden="true"/> <strong>Import completed successfully.</strong>
+                    </div>
+                    <div class="alert alert-warning mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'warning')]}">
+                        <i class="fa fa-exclamation-triangle" title="Warning" role="img" aria-hidden="true"/> <strong>Import completed with warnings.</strong>
+                    </div>
+                    <div class="alert alert-danger mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'danger')]}">
+                        <i class="fa fa-times-circle" title="Error" role="img" aria-hidden="true"/> <strong>Import failed.</strong>
+                    </div>
+                </group>
+                <group name="result_counts">
+                    <field name="result_updated" string="Updated"/>
+                    <field name="result_skipped" string="Skipped"
+                           attrs="{'invisible': [('result_skipped', '=', 0)]}"/>
+                </group>
+                <group name="result_messages">
+                    <field name="result_warnings" attrs="{'invisible': [('result_warnings', '=', False)]}"/>
+                    <field name="result_errors" attrs="{'invisible': [('result_errors', '=', False)]}"/>
+                </group>
+                <footer>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_import_whitelist_result_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.import_whitelist.wizard.result</field>
+        <field name="model">ai.import.whitelist.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import result">
+                <field name="show_result" invisible="1"/>
+                <field name="result_status" invisible="1"/>
+                <group name="result_alerts">
+                    <div class="alert alert-success mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'success')]}">
+                        <i class="fa fa-check-circle" title="Success" role="img" aria-hidden="true"/> <strong>Import completed successfully.</strong>
+                    </div>
+                    <div class="alert alert-warning mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'warning')]}">
+                        <i class="fa fa-exclamation-triangle" title="Warning" role="img" aria-hidden="true"/> <strong>Import completed with warnings.</strong>
+                    </div>
+                    <div class="alert alert-danger mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'danger')]}">
+                        <i class="fa fa-times-circle" title="Error" role="img" aria-hidden="true"/> <strong>Import failed.</strong>
+                    </div>
+                </group>
+                <group name="result_counts">
+                    <field name="result_created" string="Created"/>
+                    <field name="result_updated" string="Updated"/>
+                    <field name="result_skipped" string="Skipped (already existed)"
+                           attrs="{'invisible': [('result_skipped', '=', 0)]}"/>
+                </group>
+                <group name="result_messages">
+                    <field name="result_errors" attrs="{'invisible': [('result_errors', '=', False)]}"/>
+                </group>
+                <footer>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_import_external_servers_result_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.import_external_servers.wizard.result</field>
+        <field name="model">ai.import.external.servers.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import result">
+                <field name="show_result" invisible="1"/>
+                <field name="result_status" invisible="1"/>
+                <group name="result_alerts">
+                    <div class="alert alert-success mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'success')]}">
+                        <i class="fa fa-check-circle" title="Success" role="img" aria-hidden="true"/> <strong>Import completed successfully.</strong>
+                    </div>
+                    <div class="alert alert-warning mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'warning')]}">
+                        <i class="fa fa-exclamation-triangle" title="Warning" role="img" aria-hidden="true"/> <strong>Import completed with warnings.</strong>
+                    </div>
+                    <div class="alert alert-danger mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'danger')]}">
+                        <i class="fa fa-times-circle" title="Error" role="img" aria-hidden="true"/> <strong>Import failed.</strong>
+                    </div>
+                </group>
+                <group name="result_counts">
+                    <field name="result_created" string="Created"/>
+                    <field name="result_updated" string="Updated"/>
+                    <field name="result_skipped" string="Skipped (already existed)"
+                           attrs="{'invisible': [('result_skipped', '=', 0)]}"/>
+                </group>
+                <group name="result_messages">
+                    <field name="result_errors" attrs="{'invisible': [('result_errors', '=', False)]}"/>
+                </group>
+                <footer>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ai.context.tools.wizard — restore -->
+    <record id="view_mcp_context_tools_restore_result_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.context.tools.wizard.restore.result</field>
+        <field name="model">ai.context.tools.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Contexts tools — operation result">
+                <field name="show_result" invisible="1"/>
+                <field name="result_status" invisible="1"/>
+                <p class="text-muted mb-2">System contexts — restore from module</p>
+                <group name="result_alerts">
+                    <div class="alert alert-success mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'success')]}">
+                        <i class="fa fa-check-circle" title="Success" role="img" aria-hidden="true"/> <strong>Contexts restore completed.</strong>
+                    </div>
+                    <div class="alert alert-warning mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'warning')]}">
+                        <i class="fa fa-exclamation-triangle" title="Warning" role="img" aria-hidden="true"/> <strong>Contexts restore completed with warnings.</strong>
+                    </div>
+                    <div class="alert alert-danger mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'danger')]}">
+                        <i class="fa fa-times-circle" title="Error" role="img" aria-hidden="true"/> <strong>Contexts restore failed.</strong>
+                    </div>
+                </group>
+                <group name="result_counts">
+                    <field name="result_created" string="Contexts imported"/>
+                    <field name="result_updated" string="Contexts updated"/>
+                    <field name="result_skipped" string="Contexts skipped (not overwritten)"
+                           attrs="{'invisible': [('result_skipped', '=', 0)]}"/>
+                </group>
+                <group name="result_messages">
+                    <field name="result_errors" attrs="{'invisible': [('result_errors', '=', False)]}"/>
+                </group>
+                <footer>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ai.skill.tools.wizard — reload -->
+    <record id="view_skill_tools_reload_result_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.skill.tools.wizard.reload.result</field>
+        <field name="model">ai.skill.tools.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Skills tools — operation result">
+                <field name="show_result" invisible="1"/>
+                <field name="result_status" invisible="1"/>
+                <p class="text-muted mb-2">Skills — reload from module files</p>
+                <group name="result_alerts">
+                    <div class="alert alert-success mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'success')]}">
+                        <i class="fa fa-check-circle" title="Success" role="img" aria-hidden="true"/> <strong>Skills reload completed.</strong>
+                    </div>
+                    <div class="alert alert-warning mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'warning')]}">
+                        <i class="fa fa-exclamation-triangle" title="Warning" role="img" aria-hidden="true"/> <strong>Skills reload completed with warnings.</strong>
+                    </div>
+                    <div class="alert alert-danger mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'danger')]}">
+                        <i class="fa fa-times-circle" title="Error" role="img" aria-hidden="true"/> <strong>Skills reload failed.</strong>
+                    </div>
+                </group>
+                <group name="result_counts">
+                    <field name="result_created" string="Skills created"/>
+                    <field name="result_updated" string="Skills updated"/>
+                    <field name="result_skipped" string="Skills skipped (not overwritten)"
+                           attrs="{'invisible': [('result_skipped', '=', 0)]}"/>
+                </group>
+                <group name="result_messages">
+                    <field name="result_errors" attrs="{'invisible': [('result_errors', '=', False)]}"/>
+                </group>
+                <footer>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ai.agent.import.wizard — context pack -->
+    <record id="view_agent_pack_import_result_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.agent.import.wizard.result</field>
+        <field name="model">ai.agent.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import result">
+                <field name="show_result" invisible="1"/>
+                <field name="result_status" invisible="1"/>
+                <p class="text-muted mb-2">Context pack import</p>
+                <group name="result_alerts">
+                    <div class="alert alert-success mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'success')]}">
+                        <i class="fa fa-check-circle" title="Success" role="img" aria-hidden="true"/> <strong>Import completed successfully.</strong>
+                    </div>
+                    <div class="alert alert-warning mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'warning')]}">
+                        <i class="fa fa-exclamation-triangle" title="Warning" role="img" aria-hidden="true"/> <strong>Import completed with warnings.</strong>
+                    </div>
+                    <div class="alert alert-danger mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'danger')]}">
+                        <i class="fa fa-times-circle" title="Error" role="img" aria-hidden="true"/> <strong>Import failed.</strong>
+                    </div>
+                </group>
+                <group name="result_counts">
+                    <field name="result_created" string="Created"/>
+                    <field name="result_updated" string="Updated"/>
+                    <field name="result_skipped" string="Skipped (existing, not replaced)"
+                           attrs="{'invisible': [('result_skipped', '=', 0)]}"/>
+                    <field name="result_removed" string="Protocol (protected)"
+                           attrs="{'invisible': [('result_removed', '=', 0)]}"/>
+                    <field name="result_linked" string="Contexts linked"
+                           attrs="{'invisible': [('result_linked', '=', 0)]}"/>
+                    <field name="result_manifest" string="Manifest agent"
+                           attrs="{'invisible': [('result_manifest', '=', False)]}"/>
+                </group>
+                <group name="result_messages">
+                    <field name="result_warnings" attrs="{'invisible': [('result_warnings', '=', False)]}"/>
+                    <field name="result_errors" attrs="{'invisible': [('result_errors', '=', False)]}"/>
+                    <field name="result_detail" string="Removed from agent"
+                           attrs="{'invisible': [('result_detail', '=', False)]}"/>
+                </group>
+                <footer>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ai.config.backup.wizard — preview before write -->
+    <record id="view_config_backup_preview_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.config_backup.wizard.preview</field>
+        <field name="model">ai.config.backup.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Review configuration import" class="o_pns_import_preview">
+                <field name="show_result" invisible="1"/>
+                <field name="result_status" invisible="1"/>
+                <field name="json_file" invisible="1"/>
+                <field name="filename" invisible="1"/>
+                <div class="alert alert-info o_pns_preview_lead mb-0" role="alert">
+                    <strong>Nothing has been written yet.</strong>
+                    Confirm to apply this file.
+                </div>
+                <div class="o_pns_preview_params">
+                    <div class="o_pns_preview_kicker">Parameters</div>
+                    <field name="replace_existing" readonly="1"/>
+                </div>
+                <div class="o_pns_preview_board">
+                    <div class="o_pns_preview_card o_pns_preview_new">
+                        <div class="o_pns_preview_kicker">New</div>
+                        <field name="result_created" nolabel="1" readonly="1"/>
+                        <div class="o_pns_preview_hint">Will be created.</div>
+                    </div>
+                    <div class="o_pns_preview_card o_pns_preview_overwrite">
+                        <div class="o_pns_preview_kicker">Overwrite</div>
+                        <field name="result_updated" nolabel="1" readonly="1"/>
+                        <div class="o_pns_preview_hint">Matching rows will be written.</div>
+                    </div>
+                    <div class="o_pns_preview_card o_pns_preview_keep">
+                        <div class="o_pns_preview_kicker">Keep</div>
+                        <field name="result_skipped" nolabel="1" readonly="1"/>
+                        <div class="o_pns_preview_hint">Left as they are.</div>
+                    </div>
+                </div>
+                <div class="o_pns_preview_section"
+                     attrs="{'invisible': [('result_detail', '=', False)]}">
+                    <div class="o_pns_preview_kicker">Breakdown</div>
+                    <field name="result_detail" nolabel="1" readonly="1"/>
+                </div>
+                <div class="o_pns_preview_section o_pns_preview_warn"
+                     attrs="{'invisible': [('result_warnings', '=', False)]}">
+                    <div class="o_pns_preview_kicker">Warnings</div>
+                    <field name="result_warnings" nolabel="1" readonly="1"/>
+                </div>
+                <div class="o_pns_preview_section o_pns_preview_err"
+                     attrs="{'invisible': [('result_errors', '=', False)]}">
+                    <div class="o_pns_preview_kicker">Errors</div>
+                    <field name="result_errors" nolabel="1" readonly="1"/>
+                </div>
+                <footer>
+                    <button name="action_import" string="Confirm import"
+                            type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ai.config.backup.wizard — full AI configuration restore -->
+    <record id="view_config_backup_result_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.config_backup.wizard.result</field>
+        <field name="model">ai.config.backup.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Configuration import result">
+                <field name="show_result" invisible="1"/>
+                <field name="result_status" invisible="1"/>
+                <group name="result_alerts">
+                    <div class="alert alert-success mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'success')]}">
+                        <i class="fa fa-check-circle" title="Success" role="img" aria-hidden="true"/> <strong>Configuration restored successfully.</strong>
+                    </div>
+                    <div class="alert alert-warning mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'warning')]}">
+                        <i class="fa fa-exclamation-triangle" title="Warning" role="img" aria-hidden="true"/> <strong>Configuration restored with warnings.</strong>
+                    </div>
+                    <div class="alert alert-danger mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'danger')]}">
+                        <i class="fa fa-times-circle" title="Error" role="img" aria-hidden="true"/> <strong>Configuration import failed.</strong>
+                    </div>
+                </group>
+                <group name="result_counts">
+                    <field name="result_created" string="Created"/>
+                    <field name="result_updated" string="Updated"/>
+                    <field name="result_skipped" string="Skipped (already existed)"
+                           attrs="{'invisible': [('result_skipped', '=', 0)]}"/>
+                </group>
+                <group name="result_messages">
+                    <field name="result_detail" string="Breakdown by section"
+                           attrs="{'invisible': [('result_detail', '=', False)]}"/>
+                    <field name="result_warnings" attrs="{'invisible': [('result_warnings', '=', False)]}"/>
+                    <field name="result_errors" attrs="{'invisible': [('result_errors', '=', False)]}"/>
+                </group>
+                <footer>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ai.artifact.bundle.import.wizard -->
+    <record id="view_artifact_bundle_import_result_form" model="ir.ui.view">
+        <field name="name">pns_ai_mcp.artifact.bundle.import.wizard.result</field>
+        <field name="model">ai.artifact.bundle.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import result">
+                <field name="show_result" invisible="1"/>
+                <field name="result_status" invisible="1"/>
+                <group name="result_alerts">
+                    <div class="alert alert-success mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'success')]}">
+                        <i class="fa fa-check-circle" title="Success" role="img" aria-hidden="true"/> <strong>Import completed successfully.</strong>
+                    </div>
+                    <div class="alert alert-warning mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'warning')]}">
+                        <i class="fa fa-exclamation-triangle" title="Warning" role="img" aria-hidden="true"/> <strong>Import completed with warnings.</strong>
+                    </div>
+                    <div class="alert alert-danger mb-0" role="alert"
+                         attrs="{'invisible': [('result_status', '!=', 'danger')]}">
+                        <i class="fa fa-times-circle" title="Error" role="img" aria-hidden="true"/> <strong>Import failed.</strong>
+                    </div>
+                </group>
+                <group name="result_counts">
+                    <field name="result_created" string="Created"/>
+                    <field name="result_updated" string="Updated"/>
+                    <field name="result_skipped" string="Skipped (existing, not replaced)"
+                           attrs="{'invisible': [('result_skipped', '=', 0)]}"/>
+                </group>
+                <group name="result_messages">
+                    <field name="result_warnings" attrs="{'invisible': [('result_warnings', '=', False)]}"/>
+                    <field name="result_errors" attrs="{'invisible': [('result_errors', '=', False)]}"/>
+                    <field name="result_detail" attrs="{'invisible': [('result_detail', '=', False)]}"/>
+                </group>
+                <footer>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

@@ -1,0 +1,15 @@
+{
+  "code": "discovery_hr_payroll",
+  "tipo": "discovery",
+  "target": "hr_payroll",
+  "priority": 80,
+  "soft_depends": [
+    "hr_payroll_accounting_present"
+  ],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "payroll",
+    "payslip",
+    "payslips"
+  ]
+}

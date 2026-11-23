@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <metadata>
+        <code>cost_accounting</code>
+        <tipo>domain</tipo>
+        <description>Analytic accounting: correct ORM fields and group-by patterns</description>
+    </metadata>
+
+    <domain_knowledge>
+        <module name="analytic_lines" model="account.analytic.line">
+            <description>Main model for analytic entries. Each line has an amount, date and account.</description>
+            <fields>
+                <field name="amount">Monetary amount (positive=income, negative=expense)</field>
+                <field name="date">Entry date</field>
+                <field name="account_id">Many2one → account.analytic.account</field>
+                <field name="account_id.group_id">Many2one → account.analytic.group (analytic group of the account)</field>
+                <field name="account_id.name">Name of the analytic account</field>
+                <field name="account_id.code">Reference code of the analytic account</field>
+            </fields>
+            <rules>
+                <rule severity="critical">To group by analytic group: query account.analytic.line, then access account_id.group_id on each line.</rule>
+                <rule>Income = lines with amount &gt; 0. Expenses = lines with amount &lt; 0. Balance = sum(amount).</rule>
+                <rule>Date filter: use 'date' field on account.analytic.line directly.</rule>
+                <rule>Apply the 3-tier color convention by default to any result that includes a balance or total column, even if the user does not explicitly request colors.</rule>
+            </rules>
+            <pattern name="group_by_analytic_group">
+                <description>Sum income, expenses and balance per analytic group</description>
+                <code_snippet>
+start_date = 'YYYY-MM-DD'
+end_date = 'YYYY-MM-DD'
+lines = env['account.analytic.line'].search([
+    ('date', '>=', start_date),
+    ('date', '<=', end_date),
+])
+by_group = {}
+for line in lines:
+    grp = line.account_id.group_id
+    gid = grp.id if grp else 0
+    if gid not in by_group:
+        by_group[gid] = {'group': grp.name if grp else 'Sin grupo', 'income': 0, 'expense': 0}
+    if line.amount >= 0:
+        by_group[gid]['income'] += line.amount
+    else:
+        by_group[gid]['expense'] += line.amount
+result = []
+for data in by_group.values():
+    result.append({
+        'group': data['group'],
+        'income': data['income'],
+        'expense': data['expense'],
+        'balance': data['income'] + data['expense'],
+    })
+result = sorted(result, key=operator.itemgetter('balance'), reverse=True)
+result
+                </code_snippet>
+            </pattern>
+        </module>
+    </domain_knowledge>
+</context>

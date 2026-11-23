@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_openapi_spec_generate_wizard_form" model="ir.ui.view">
+        <field name="name">ai.openapi.spec.generate.wizard.form</field>
+        <field name="model">ai.openapi.spec.generate.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Generate OpenAPI from documentation">
+                <group attrs="{'invisible': [('state', '=', 'preview')]}">
+                    <field name="server_id" readonly="1"/>
+                    <field name="docs_url" placeholder="https://docs.example.com/api"/>
+                    <field name="base_url"/>
+                    <field name="error_message"
+                           attrs="{'invisible': [('error_message', '=', False)]}"/>
+                </group>
+                <group string="System prompt (doc → OpenAPI)"
+                       attrs="{'invisible': [('state', '=', 'preview')]}">
+                    <field name="openapi_gen_prompt" nolabel="1" colspan="2"
+                           placeholder="Factory English prompt…"/>
+                    <div colspan="2">
+                        <button name="action_restore_openapi_gen_prompt"
+                                type="object"
+                                string="Restore factory OpenAPI prompt"
+                                class="btn-secondary"
+                                icon="fa-undo"
+                                confirm="Replace this prompt with the current factory English default? Your edits will be lost."/>
+                        <span class="text-muted ml-2">
+                            Edits are saved on the server when you generate.
+                        </span>
+                    </div>
+                </group>
+                <group attrs="{'invisible': [('state', '!=', 'preview')]}">
+                    <field name="server_id" readonly="1"/>
+                    <field name="docs_url" readonly="1"/>
+                    <field name="tool_count"/>
+                    <field name="warning_message"
+                           attrs="{'invisible': [('warning_message', '=', False)]}"/>
+                </group>
+                <group string="Generated OpenAPI JSON"
+                       attrs="{'invisible': [('state', '!=', 'preview')]}">
+                    <field name="draft_spec_json" nolabel="1"
+                           widget="ace" options="{'mode': 'javascript'}"/>
+                </group>
+                <field name="state" invisible="1"/>
+                <field name="generation_state" invisible="1"/>
+                <field name="docs_text" invisible="1"/>
+                <footer>
+                    <div class="o_ai_last_operation_usage text-muted small"
+                         style="display:none;"/>
+                    <div class="o_skill_capture_progress" style="display:none;"
+                         aria-live="polite">
+                        <span class="o_skill_capture_typing" aria-hidden="true">
+                            <span/><span/><span/>
+                        </span>
+                        <span class="o_skill_capture_progress_label"/>
+                        <span class="o_skill_capture_usage" style="display:none;"/>
+                        <button name="action_abort_openapi" type="button"
+                                class="btn btn-link text-muted p-0 o_skill_capture_stop">
+                            <i class="fa fa-stop-circle-o"/>
+                            <span class="o_skill_capture_stop_label">Cancel</span>
+                        </button>
+                    </div>
+                    <button name="action_generate" type="object"
+                            string="Generate draft" class="btn-primary"
+                            attrs="{'invisible': [('state', '!=', 'draft')]}"/>
+                    <button name="action_apply" type="object"
+                            string="Apply spec and discover tools"
+                            class="btn-primary"
+                            attrs="{'invisible': [('state', '!=', 'preview')]}"/>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

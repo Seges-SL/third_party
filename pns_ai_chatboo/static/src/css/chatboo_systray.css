@@ -1,0 +1,48 @@
+/* Chatboo systray icon (OWL2 / Odoo 17+). */
+.o_chatboo_systray_item {
+    cursor: pointer;
+    padding: 0 8px;
+    opacity: 0.85;
+}
+.o_chatboo_systray_item:hover {
+    opacity: 1;
+}
+
+/*
+ * Icon wrapper — the badge positions relative to THIS, not the outer item.
+ * Inline-block so it hugs the 22×22 icon tightly.
+ */
+.o_chatboo_icon_wrap {
+    position: relative;
+    display: inline-block;
+    line-height: 0;
+}
+
+/*
+ * Badge: top-right corner of the 22×22 icon, half overlapping.
+ * Same visual as Odoo's native Discuss badge.
+ */
+.o_chatboo_badge {
+    position: absolute;
+    top: -4px;
+    inset-inline-end: -5px;
+    font-size: 9px;
+    min-width: 14px;
+    height: 14px;
+    line-height: 14px;
+    padding: 0 3px;
+    text-align: center;
+    border-radius: 10px;
+    background-color: #017e84;
+    color: #fff;
+    pointer-events: none;
+    z-index: 1;
+}
+.o_chatboo_badge.bg-danger {
+    background-color: #dc3545 !important;
+    color: #fff !important;
+}
+.o_chatboo_badge.bg-warning {
+    background-color: #e0a800 !important;
+    color: #fff !important;
+}

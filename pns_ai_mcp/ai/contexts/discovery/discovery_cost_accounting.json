@@ -1,0 +1,14 @@
+{
+  "code": "discovery_cost_accounting",
+  "tipo": "discovery",
+  "target": "cost_accounting",
+  "priority": 74,
+  "soft_depends": [],
+  "source_module": "pns_ai_mcp",
+  "triggers": [
+    "analytic account",
+    "analytic accounts",
+    "account.analytic",
+    "cost accounting"
+  ]
+}
