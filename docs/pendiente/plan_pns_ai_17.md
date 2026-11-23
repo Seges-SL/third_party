@@ -2,7 +2,8 @@
 
 - **Rama de trabajo:** `17.0-pns-ai`, desde `17.0` en `95110bd` (configuración de claude-odoo-kit). Primer commit: la
   base del fabricante sin cambios. A `17.0` solo llega con merge commit cuando esté corregida y validada (como en 14.0).
-- **Estado (23/11/2026):** base copiada; empieza la fase 0.
+- **Estado (23/11/2026):** base copiada; fase 0: clasificación de los parches hecha
+  (`docs/pendiente/clasificacion_parches_pns_ai_17_3996.md`); sigue el laboratorio de la 17.
 
 ## Decisiones (Sergio, 22 y 23/11/2026)
 
@@ -28,16 +29,27 @@ Descargada por Sergio de GitHub (rama 17.0) el 23/11/2026 a las 09:56. Copia de 
 
 Referencia de la 14 para comparar: `/home/soporte/pns_fabricante/3.1.973` (1.2.69, 3.1.973 y 2.1.587).
 
+**Versiones (23/11/2026):**
+- **17.0 del fabricante** (base de `17.0-pns-ai`): `pns_base` 17.0.1.2.92, `pns_ai_mcp` 17.0.3.1.996 y `pns_ai_chatboo`
+  17.0.2.1.597.
+- **14.0 del fabricante hoy** (vista en GitHub el 23/11/2026, sin descargar): `pns_base` 14.0.1.2.74, `pns_ai_mcp`
+  14.0.3.1.996 y `pns_ai_chatboo` 14.0.2.1.597. Nuestra 14 y sus parches son de 3.1.973.
+- **14.0.3.1.996:** no se descarga. No es destino ni lleva parches, y la clasificación de la fase 0 (23/11/2026) dejó
+  cuatro parches en «cambiado», todos por el cambio de serie: esa copia no los aclararía.
+
 ## Plan
 
 1. **Fase 0, viabilidad:**
-   - comparar 17.0.3.1.996 con 3.1.973 (14), separando lo que cambia de versión de lo que cambia de serie;
-   - ver qué parches de la rama `14.0-pns-ai-3973` siguen haciendo falta y cuáles se pueden portar (comparación con
-     3.1.973, §8.2: 24 de 25 tocan código común; el 20 hay que rehacerlo en owl2; el 18 y el 24 dependen de `res_users`
-     de la 17);
+   - comparar 17.0.3.1.996 con 3.1.973 (14) parche a parche: para cada parche vivo del índice de la 14, el código que
+     tocaba en 3.1.973 frente al de la 17.0.3.1.996, clasificado en «igual» (se pasa tal cual), «cambiado» (decidir si
+     el fabricante lo corrigió o hay que adaptar el parche), «desaparecido» o «no aplica»; de los retirados (10, 13, 14,
+     23, 30 y 31), confirmar en la 17 la corrección del fabricante. Lo que adaptaba `4e1ebcc` ya lo trae la
+     17.0.3.1.996. Punto de partida: comparación con 3.1.973, §8.2 (24 de 25 tocan código común; el 20 hay que
+     rehacerlo en owl2; el 18 y el 24 dependen de `res_users` de la 17). Resultado en
+     `docs/pendiente/clasificacion_parches_pns_ai_17_3996.md` de esta rama;
    - instalar los tres módulos en un laboratorio de la 17 (`odoo-dev 17 paridad` antes; librerías `openpyxl`,
-     `reportlab` y `requests`) y pasar los tests del fabricante;
-   - consultar al fabricante el soporte oficial de la 17.
+     `reportlab` y `requests`), pasar los tests del fabricante y confirmar lo que la clasificación deja para el
+     laboratorio (su sección 8).
 2. **Fase 1:** analizar el código que solo se activa en la 15 o superior y que en la 14 no se revisó
    (`ir_ui_view_patch.py`, assets, rutas JSON, cliente de Chatboo), con el criterio de los PNS.
 3. **Fase 2:** portar y aplicar los parches en esta rama, con sus tests.
@@ -47,10 +59,7 @@ Referencia de la 14 para comparar: `/home/soporte/pns_fabricante/3.1.973` (1.2.6
 
 - **Una sola copia de trabajo:** el laboratorio de la 14 y el de la 17 montan `third_party` según la rama activa; hay
   que decidir cómo trabajar con los dos a la vez.
-- **Versiones:** la 17.0 del fabricante (3.1.996) es posterior a la base de la 14 (3.1.973). Falta mirar si su rama
-  14.0 también está en 3.1.996.
 - **Manifiestos:** los del fabricante llevan el prefijo `17.0.`; los retirados no lo llevaban.
-- **`4e1ebcc`:** comprobar si la base nueva ya incluye lo que adaptaba (`ir_ui_view_patch.py`, `security_groups.xml`).
 
 ## Documentos de la 14 (rama `14.0`)
 
