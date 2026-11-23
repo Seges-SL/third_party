@@ -592,3 +592,139 @@ menciones del propio test (así `test_seges_rpc_access.py`) o de la entrada del 
   se apoya en el mecanismo del core, que vale para cualquier cursor con su propio `Environment`. En la fase 2 se
   revisan las aperturas localizadas y no leídas, por si alguna vuelca o invalida al llamador por su cuenta. El `flush`
   del fabricante en `ai_log.py:721-730` no hace falta en la 17, pero no estorba y se deja.
+
+### Punto 1: caché de secretos en la caja A (parche 18)
+
+- **Qué se buscaba:** si sigue en la 17 el fallo de partida del 18 (un valor en caché se lee sin comprobar) y si la
+  invalidación de la parte B pierde lo pendiente del llamador (sección 8, punto 1). Tres casos:
+  - (a) la caché de la caja A al abrirse y lo pendiente del llamador. En la 14 la caché era una por hilo: B la vaciaba
+    al abrir la caja A (`controller_helpers.py:224-246`, con `_seges_forget_secret_columns` de
+    `utils/seges_box_a_cache.py`; `_box_a_clear_cache`, `models/box_a_guard.py:48-63`, era de la rama 3879), y
+    NUEVO-1 (PNS-108) era el secreto que el motor dejaba en ella antes de la caja A;
+  - (b) un secreto que el código del fabricante lee con `sudo()` dentro de la caja A y que el código del usuario lee
+    después;
+  - (c) los secretos del core que en la 17 son calculados no guardados, sin caché de por medio.
+- **Mecanismo en la 17 (leído en el contenedor, `17.0-20260908`):**
+  - el guardián del fabricante solo actúa al ir a la BD: `Field.__get__` → `_fetch_field` →
+    `check_field_access_rights` (`odoo/fields.py:1176-1190`, `odoo/models.py:3809` y `:3470`; con `su` sale sin mirar,
+    `:3482-3483`), donde engancha `pns_ai_mcp/models/sandbox_secret_read.py:116-126`;
+  - un valor que ya está en la caché se devuelve sin comprobar (`odoo/fields.py:1152-1154`), y un campo calculado no
+    guardado se calcula sin comprobar (`:1209-1231`);
+  - un cursor nuevo no tiene `Transaction` (`odoo/sql_db.py:132`) y el primer `Environment` crea una, con su caché
+    (`odoo/api.py:518-520`): la caja A (`controller_helpers.py:189` y `:211`) no comparte caché con el llamador, pero
+    un `sudo()` sobre su `env` comparte la de la caja A;
+  - `Cache.invalidate` quita el valor y deja la marca de pendiente (`odoo/api.py:1292-1319`, aviso en `:1300-1302`).
+- **Método:** `tests/test_box_a_secret_cache.py` en `seges_pruebas_3996` (copia en `docs/pendiente/lab_3996/`). Los
+  `depends` suman `auth_signup` y `auth_totp` (los campos de (c)); `_StubController` y `_CursorSpy` se importan de
+  `test_side_cursors.py`. Mismas etiquetas que en los puntos anteriores.
+  - **`TransactionCase` `post_install` con cursores reales**, como el punto 5 (`[SETUP]`: registro fuera de modo test).
+  - **Datos:** en cada test, filas nuevas con etiqueta (`seges_3996_p18_` y 8 hexadecimales), confirmadas en un
+    cursor aparte: dos usuarios internos (`asker`, solo `base.group_user`, y `target`), un contacto, un
+    `ai.api.server` y el `ai.mcp.user` del `target`, con secretos aleatorios. El servidor va sin URL, así que no crea
+    fila en `ai.url.whitelist` (`external_server.py:932-950`), y confirma su fila de detección en `ai.context`
+    (`external_server.py:563` → `:821-878`), que se borra en cascada (`ai_context.py:212-216`).
+  - **El llamador** (la petición) va en otro `Cursor` real, abierto después de ese `commit`: el del test no vería las
+    filas (su instantánea es anterior). La herramienta real (`tool_relaxaicode`) corre como `asker` sobre él.
+  - **Limpieza:** antes de sus aserciones, cada test borra las filas en un tercer cursor con `commit` (también
+    `ai.context`, `mail_message` y `mail_followers` de esos ids), y un `[GUARD]` comprueba por SQL que no queda
+    ninguna, `ai_url_whitelist` incluida.
+  - **Secretos:** no se imprimen nunca. El código de la caja A devuelve una huella (16 hexadecimales de SHA-256) y el
+    test compara huellas. Solo cuenta como rechazo el texto exacto del guardián del campo
+    (`sandbox_secret_read.py:39-45`, lanzado en `:75-76`); el de la puerta de modelos (`validators_base.py:407-413`) y
+    el de los parámetros (`sandbox_secret_read.py:46-51`), que comparten el prefijo, dan `[SETUP]`.
+  - **Lo que confirma la herramienta (leído):** nada fuera de la caja A. El registro pasa por
+    `controller._log_mcp_operation` (`relaxaicode_replies.py:86-102`), que el stub no implementa; los cursores propios
+    de Chatboo (`chatboo_session.py:1011`, `:1048` y `:1415`) solo se abren si el código llama a sus helpers de página
+    o de adjuntos. El espía de cursores lo comprueba en cada ejecución (`[SETUP]`: 0 `commit`).
+- **Clases y casos:**
+  - `TestBoxACacheAtOpening` (a): qué hay en la caché de la caja A al abrirse (`[HYPOTHESIS]` solo si hay alguna
+    columna secreta o algún valor del llamador; lo demás se anota en el log) y lo pendiente del llamador al abrir y al
+    cerrar (pendiente, volcado, que es `[SETUP]`, o perdido); el token que el llamador leyó con `sudo()` (NUEVO-1);
+    la parte B de la 14 simulada al abrir; y el `[GUARD]` de `Cache.invalidate` sobre la caché del llamador.
+  - `TestBoxASecretReadInside` (b): en cada test, un control sin la vía (rechazo del guardián, `[SETUP]`), la vía sola
+    (se alcanza, `[SETUP]`) y la vía seguida de la lectura del secreto.
+  - `TestBoxAComputedSecret` (c): un control con un campo no secreto del mismo registro (`login`, `name`; `[SETUP]`
+    por su huella) y la lectura del secreto.
+- **Ejecución (23/11/2026):** `paridad seges_pruebas_3996` (se puede instalar, 0 problemas; `auth_signup` y
+  `auth_totp` ya estaban instalados) y `tests seges_pruebas_3996` (BD temporal, que no queda). Log
+  `tests-20261123-184040.log`.
+- **Resultado:** `13 failed, 0 error(s) of 30 tests`: los 8 rojos de los puntos 2, 3 y 4, los mismos que en
+  `tests-20261123-175740.log`, y 5 `[HYPOTHESIS]` nuevos. Ningún `[SETUP]` ni error; el `[GUARD]` de filas, en verde
+  en los 9. 0 secretos en el log. WARNING nuevos: 6 «Large result JSON» de la herramienta y un `DeprecationWarning`
+  de `clear_cache` (`pns_ai_mcp/models/mcp_user.py:376` → `:382`, por el `write` del `ai.mcp.user` al preparar los
+  datos; la observación del fabricante de la sección 10).
+
+  | Test | Resultado | Detalle |
+  |---|---|---|
+  | `test_box_a_opens_without_secret_or_caller_values_in_cache` | verde | Caché vacía; lo pendiente sigue al cerrar |
+  | `test_caller_cached_token_not_readable_in_box_a` | verde | NUEVO-1 no ocurre: rechazo del guardián |
+  | `test_simulated_b_keeps_caller_pending_secret_write` | verde | B no toca al llamador; su `flush` escribe |
+  | `test_invalidating_the_callers_cache_drops_its_pending_value` | verde | `[GUARD]`: sin el valor, con la marca |
+  | `test_v1_auth_call_preview_then_token` | rojo | Tras `auth_call_preview`, sale la huella del token |
+  | `test_v2_user_has_mcp_api_key_then_hash` | rojo | Tras `user_has_mcp_api_key`, sale la huella del hash |
+  | `test_synthetic_engine_sudo_read_before_code` | rojo | Sintético: lectura con `sudo()` al abrir; sale la huella |
+  | `test_core_totp_secret_without_cache` | rojo | `totp_secret` sale sin caché |
+  | `test_core_signup_token_without_cache` | rojo | `signup_token` sale sin caché |
+
+  - **Caché de la caja A al abrirse:** vacía. Transacción y caché propias, 0 campos pendientes, 0 cálculos pendientes,
+    ninguna columna secreta, ningún valor del llamador y nada más.
+- **Vías reales del caso (b) (leídas y probadas):**
+  - V1: `ai.api.server.auth_call_preview` (`external_server.py:211-216`, calculado en `:383-386`) lee
+    `self.sudo().auth_token` (`:393`);
+  - V2: `ai.mcp.user.user_has_mcp_api_key` (`mcp_user.py:314-322`) busca con `sudo()` (`:318`) y lee
+    `mcp_api_key_hash` (`:319`);
+  - el usuario llega a los dos registros con `mail.template.preview.new({'resource_ref': …}).resource_ref`, que salta
+    la puerta `RELAXAICODE_CREDENTIAL_MODELS` (`validators_base.py:189-206`; ya anotado en la 14:
+    `docs/pendiente/parches_pns_ai.md:4754`), y lee el secreto con `rec['campo']`. El atributo literal
+    `.auth_token` sí se rechaza por nombre (`validators_base.py:217`).
+- **El motor, sin lecturas de secretos (leído):** se buscó `sudo` con `git grep` en
+  `pns_ai_mcp/controllers/tools_relaxaicode.py`, `relaxaicode_*.py` y `context_builder.py`, y en
+  `pns_ai_mcp/utils/sandbox_helpers.py`, `name_affinity.py` y `field_selection.py`; y `token|secret` en
+  `pns_ai_chatboo/models/chatboo_session.py` y `chatboo_canvas.py`. En lo leído, el motor no lee ninguna columna
+  secreta con `sudo()` sobre el `env` de la caja A, antes ni durante el código: `web.base.url`
+  (`context_builder.py:677`), `env.user` y `env.company` (`:659-660`, `:781-785`), los helpers de Chatboo
+  (`sandbox_helpers.py:63-70` → `chatboo_session.py:831-861`; `_read_attachment` lee con `with_user`, `:1349`), y
+  `field_selection` y `search_by_affinity`, sin `sudo`. La conclusión vale para lo leído. El caso sintético
+  representa el de B2: un helper que leyera un secreto con `sudo()`.
+- **Caso (c) (leído y probado):** `res.users.totp_secret` (`groups=NO_ACCESS`) y `res.partner.signup_token`
+  (`base.group_erp_manager`) son calculados no guardados que leen por SQL (`addons/auth_totp/models/res_users.py:24` y
+  `:177-183`; `addons/auth_signup/models/res_partner.py:27` y `:55-58`). Leerlos los calcula sin pasar por
+  `_fetch_field`. `totp_enabled` y `signup_valid` los leen con `sudo()` (`res_users.py:69-72`,
+  `res_partner.py:38-43`).
+- **Conclusión:**
+  - (a) en la 17 la caja A nace con caché propia y vacía: NUEVO-1 lo cierra el core, B no tiene nada que vaciar y, al
+    tocar solo la caché de la caja A, no puede perder lo pendiente del llamador. El riesgo de la sección 4 (parche 18)
+    solo existiría si B alcanzara la caché del llamador, como mide el `[GUARD]`;
+  - (b) el fallo de partida sigue: lo que el código del fabricante lee con `sudo()` dentro de la caja A queda en su
+    caché y el código del usuario lo lee sin comprobación. B2 no cierra V1 ni V2, que no son helpers;
+  - (c) los secretos calculados del core se leen sin comprobación aunque no haya nada en caché.
+- **Decisión 29 (Sergio, 23/11/2026):** sin invalidación B. El parche 18 se porta como O1 ampliado (comprobar al leer
+  también con el valor en caché y en los calculados no guardados), con B2 como defensa. Los enganches de O1 van sobre
+  lo que existe en el core del contenedor (`check_field_access_rights`, `Field.__get__`, el cálculo de los no
+  guardados), no sobre los ganchos «Odoo 17+» del guardián (ver «Al margen»).
+- **Impacto en el port:**
+  - Tests de aceptación: `TestBoxASecretReadInside` y `TestBoxAComputedSecret` pasan de rojo a verde, y
+    `TestBoxACacheAtOpening` sigue en verde.
+  - Al pasar los tests de aceptación a `pns_ai_mcp`, `_StubController` y `_CursorSpy` (hoy importados de
+    `test_side_cursors.py`, que no se porta) van con ellos.
+  - Tests de la 14 (`14.0:pns_ai_mcp/tests/`, `test_seges_box_a_vias.py` y `test_seges_sandbox_credentials.py`, de
+    `42432dc`):
+    - **adaptados ya** en este punto: V1 y V2 (`*_reachable`, `*_control_getitem_refused` y `*_getitem`) en (b); V3 y
+      V4 en (c), donde su control sin cálculo deja de ser control; `test_box_a_engine_cache_before_run` en (a), con
+      una fila confirmada en vez de `new()`; y `test_helper_sudo_read_forgotten` en el caso sintético;
+    - **para el port:** de `test_seges_box_a_vias.py`, `*_mapped`, `test_decision2_*`, `test_o1_*` (negativos y
+      positivos), `test_v3_recordset_as_result`, `test_v1_literal_attr_refused` y los de P-22; de
+      `test_seges_sandbox_credentials.py`, `TestSegesSandboxCredentials` (sin la B de `_mark()`),
+      `TestSegesOutsideBoxA` y, de `TestSegesBoxAReal`, `test_box_a_reference_secret_refused`,
+      `test_sandbox_cannot_reach_sudo`, `test_box_a_cannot_lift_mark` y `test_box_a_cursor_is_marked`;
+    - **descartados:** `test_b_open_forgets_secret`, `test_b_open_keeps_non_secret` y
+      `test_box_a_icp_cache_before_run`, que miden B; y `test_computed_secret_column_refused` (`password`), que (c)
+      sustituye con secretos reales.
+- **Al margen:**
+  - **Ganchos «Odoo 17+» del guardián (leído):** `_has_field_access` y `_check_field_access`
+    (`sandbox_secret_read.py:100-113`) no existen en el core 17.0 del contenedor (no hay ningún `def` con esos nombres
+    en `odoo/models.py`). En la 17 protege el gancho comentado como «Odoo 14», `check_field_access_rights`
+    (`:116-126`), que es el que llama `_fetch_field`.
+  - **Caja A con uid 1 (localizado, no probado):** si el `env` del llamador es del uid 1, el `Environment` de la caja A
+    pasa a `su` (`odoo/api.py:507-508`) y el guardián se apaga (`_pns_sandbox_reads`, `sandbox_secret_read.py:69-70`).
+    En el port hay que revisar quién puede abrir la caja A con el uid 1.

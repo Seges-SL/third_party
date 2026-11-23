@@ -7,7 +7,14 @@
     "category": "Hidden",
     "author": "Seges",
     "license": "AGPL-3",
-    "depends": ["web", "pns_base", "pns_ai_mcp", "pns_ai_chatboo"],
+    "depends": [
+        "web",
+        "auth_signup",
+        "auth_totp",
+        "pns_base",
+        "pns_ai_mcp",
+        "pns_ai_chatboo",
+    ],
     "data": [],
     "installable": True,
 }
