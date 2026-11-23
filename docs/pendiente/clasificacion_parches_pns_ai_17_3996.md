@@ -301,6 +301,17 @@ menciones del propio test (así `test_seges_rpc_access.py`) o de la entrada del 
   **no neutralizada**: sus 7 crons `pns_*` están activos; ninguno usa la red. `third_party` es esta copia de trabajo en
   `17.0-pns-ai` (probado con HEAD `a35e4fd`). En la imagen faltan solo `pypdf` y `PyMuPDF` (opcionales), y no hay Chrome
   ni `websocket-client`.
+  - **Imagen propia (segunda ejecución, 23/11/2026):** `odoo-dev:17-lab_pns_ai_3996` (id `1ffc50661ed6`,
+    `User=odoo`, etiqueta `odoo-dev.dockerfile-hash=8237290eb74ee2f9`, 5,19 GB; la común, 3,84 GB), construida desde
+    `infra/Dockerfile.17` del laboratorio y activada con `DOCKERFILE="infra/Dockerfile.17"` en `.odoo-dev.conf`.
+    - `FROM odoo-dev:17` (la común local) y no copia del `Dockerfile.17` del kit: no descarga un `odoo:17.0` nuevo ni
+      cambia el core (se conservan `17.0-20260908` y las librerías de la primera ejecución). Si se reconstruye la
+      común, la del laboratorio no cambia hasta reconstruirla desde el laboratorio.
+    - Dos capas: Google Chrome estable sin versión fija, registrado como `google-chrome` (158.0.8127.36 el 23/11,
+      apuntado en el `CLAUDE.md` del laboratorio), y `websocket-client==1.2.3` con `pip3` (la de `python3-websocket`
+      de Jammy; Odoo 17 no la declara). Sin `shm_size`: basta `--disable-dev-shm-usage`, que ya pasa Odoo.
+    - Como dependencias de Chrome, apt actualizó `libsystemd0` (249.11-0ubuntu3.22 → 3.23) y `libx11-6`
+      (2:1.7.5-1ubuntu0.3 → 0.4): no tocan Python ni el core; se aceptan para el laboratorio.
 - **Instalación:** `paridad pns_base,pns_ai_mcp,pns_ai_chatboo`: se pueden instalar (9 comprobados, 0 problemas).
   `instalar`: OK, 26 módulos, 0 ERROR. WARNING:
   - «skip retired unlink… (no skill files on disk)» (×3), informativo;
@@ -311,10 +322,25 @@ menciones del propio test (así `test_seges_rpc_access.py`) o de la entrada del 
   (`pns_base` 1, `pns_ai_mcp` 230, `pns_ai_chatboo` 18). Las cifras de `odoo.tests.stats` (3/298/24) cuentan también
   las fases de preparación; el recuento válido es el de las líneas `Starting` o la línea final. Corrió el test de
   intrusión (5 de 5).
+  - El total de Odoo («of N tests») incluye los omitidos: los 249 ya contaban los 4. En `tests-20261123-141538.log`
+    hay 251 líneas `Starting`, de las que 249 son tests (`odoo.addons.<módulo>.tests`); en `tests-20261123-141429.log`,
+    3 y 1. Las otras dos, «Starting post tests» y «Starting enrich of company», no son tests.
+  - **Segunda ejecución, con la imagen propia.** Criterio: un test de navegador solo es bueno si tiene línea
+    `Starting`, 0 líneas de omisión o de fallo de Chrome, y 0 fallos y 0 errores (Odoo convierte casi todos los
+    fallos de Chrome en omisiones: `odoo/tests/common.py` del core `17.0-20260908` (contenedor): 1197, 1258, 1323,
+    1343, 1348 y 1875).
+    - `tests pns_base` (`tests-20261123-141429.log`): `TestWebClientStarts.test_backend_starts_without_errors` se
+      ejecuta y pasa (Chrome arranca, abre `/web`, «test successful»); 0 líneas de omisión o de fallo de Chrome;
+      `0 failed, 0 error(s) of 1 tests`; `analizar_log.py` OK. Es el único test de `pns_base`.
+    - `tests pns_base,pns_ai_mcp,pns_ai_chatboo` (`tests-20261123-141538.log`): `0 failed, 0 error(s) of 249 tests`,
+      OK (`pns_base` 1, `pns_ai_mcp` 230 con 3 omitidos, `pns_ai_chatboo` 18).
+    - Al final, `test_lab_pns_ai_3996_17` no existe y `lab_pns_ai_3996_17` sigue.
 - **Omitidos (4), todos por el entorno:**
   - `TestWebClientStarts.test_backend_starts_without_errors`: falta `websocket-client` (y faltaría Chrome);
   - `TestRequiredFieldsLive.test_a_pending_field_is_left_on_the_record_itself`: sin `crm`;
   - dos de `TestSandboxSecretRead` («arrive in Odoo 20»).
+  - En la segunda ejecución, 3: `TestRequiredFieldsLive` («crm not installed») y los dos de `TestSandboxSecretRead`
+    («arrive in Odoo 20»); `TestWebClientStarts` ya no se omite («Tests»).
 - **WARNING de los tests**, a tener en cuenta en los puntos de la sección 8 (ninguno corresponde con claridad a un
   punto concreto):
   - «no read access to res.partner [<id>] for the snapshot»;
@@ -323,7 +349,21 @@ menciones del propio test (así `test_seges_rpc_access.py`) o de la entrada del 
   - «No CSRF validation token provided for path '/chatboo/stream'»;
   - «No X-MCP-LLM or X-MCP-Agent in headers» (×7);
   - «Skill bootstrap failed… MissingError» (~90, de las skills de los tests).
+  - Además, en la segunda ejecución (los anteriores se repiten igual; los recuentos son de cada log, y `clear_cache`
+    solo sale en el de los tres módulos):
+    - «A child process was found, terminating it: … chrome_crashpad … zombie» (×2): limpieza normal al cerrar
+      Chrome; es nuevo porque antes el test no corría;
+    - `DeprecationWarning` «Deprecated model.clear_cache(), use registry.clear_cache() instead» (×1), de
+      `pns_ai_mcp/models/mcp_user.py:382` (`_forget_app_menu_cache`); ya salía antes; observación del fabricante, sin
+      parche;
+    - `FutureWarning` de `urllib3/poolmanager.py:331` (`'strict'`, ×1): del `requests` 2.25.1 de la imagen común, no
+      del fabricante;
+    - al instalar, sin marca de tiempo (`analizar_log.py` no los cuenta), ×1: `<string>:38: (ERROR/3) Unexpected
+      indentation.` y `<string>:43: (WARNING/2) Block quote ends without a blank line…`. No salen del fabricante:
+      aparecen al cargar `mail` (10 de 26), antes que los módulos `pns_*` (que además tienen
+      `static/description/index.html`), y también con solo `pns_base`; origen sin identificar, sin seguimiento.
 - **Pendiente:**
   1. Imagen propia del laboratorio con `google-chrome-stable` y `websocket-client` (`infra/Dockerfile.17` del
-     laboratorio), para el omitido de `pns_base` y el punto 2 (parche 20).
+     laboratorio), para el omitido de `pns_base` y el punto 2 (parche 20). **Hecho (23/11/2026):** «Montaje» (imagen
+     propia) y «Tests» (segunda ejecución).
   2. Después, los 8 puntos de la sección 8, con pruebas automatizadas siempre que se pueda.

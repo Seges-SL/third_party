@@ -3,9 +3,9 @@
 - **Rama de trabajo:** `17.0-pns-ai`, desde `17.0` en `95110bd` (configuración de claude-odoo-kit). Primer commit: la
   base del fabricante sin cambios. A `17.0` solo llega con merge commit cuando esté corregida y validada (como en 14.0).
 - **Estado (23/11/2026):** base copiada; fase 0: clasificación de los parches hecha
-  (`docs/pendiente/clasificacion_parches_pns_ai_17_3996.md`); laboratorio `lab_pns_ai_3996` montado: los tres módulos
-  se instalan y pasan los 249 tests del fabricante (4 omitidos por el entorno; sección 10 de la clasificación); sigue
-  la imagen del laboratorio con Chrome (sección 10, «Pendiente»).
+  (`docs/pendiente/clasificacion_parches_pns_ai_17_3996.md`); laboratorio `lab_pns_ai_3996` montado, con imagen
+  propia con Chrome: los tres módulos se instalan y pasan los 249 tests del fabricante, el del navegador incluido
+  (3 omitidos por el entorno; sección 10 de la clasificación); siguen los 8 puntos de la sección 8.
 
 ## Decisiones (Sergio, 22 y 23/11/2026)
 
