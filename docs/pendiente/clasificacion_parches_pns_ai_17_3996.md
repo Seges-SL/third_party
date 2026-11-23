@@ -516,3 +516,79 @@ menciones del propio test (así `test_seges_rpc_access.py`) o de la entrada del 
     rojos pasan a verde y los dos verdes siguen igual. El parche cubre también `config_backup_wizard`, que pasa por el
     mismo `_inject_screen_arch`; el test no lo prueba.
   - En la fase 2 del plan, los dos archivos pasan a `pns_ai_mcp` (donde estaban en la 14) junto con los parches.
+
+### Punto 5: cursores aparte (parches 37 y 38)
+
+- **Método:** `tests/test_side_cursors.py` en `seges_pruebas_3996` (copia en `docs/pendiente/lab_3996/`), adaptado de
+  `14.0:pns_ai_mcp/tests/test_seges_box_a_flush.py` (`42432dc`) y `test_seges_side_cursor_commit.py` (`348fa2d`). Sin
+  cambios en el manifest. Mismas etiquetas que en los puntos 2 a 4.
+  - **`TransactionCase` a propósito:** fuera del modo test, `registry.cursor()` da un `Cursor` real en otra conexión
+    (`odoo/modules/registry.py:931-938`), como en producción. En `HttpCase` sería un `TestCursor` sobre la conexión del
+    test (`odoo/sql_db.py:540-598`): su `rollback` es `ROLLBACK TO SAVEPOINT`, que deshace también lo que el llamador
+    haya volcado después, y el `READ ONLY` de la caja A caería en la transacción compartida.
+  - **Qué no reproduce:** la petición HTTP o el worker; el llamador es la transacción del test. Los `commit` del cursor
+    aparte son reales: solo filas nuevas con etiqueta en `ai_log` y `ai_api_result_cache`, que se borran con SQL en
+    otro cursor en la limpieza.
+  - **Prueba de que el escenario se dio:** un espía de `registry.cursor()` comprueba (`[SETUP]`) que los cursores son
+    `Cursor` reales, que hubo `rollback` o `commit` y que en el primero lo pendiente del llamador seguía ahí. Un
+    `[SETUP]` en `setUp` comprueba que el registro no está en modo test.
+- **Clases y casos:**
+  - `TestBoxACallerPending` (37), por la herramienta real (`tool_relaxaicode`; cursor en `controller_helpers.py:189`,
+    `rollback` y `close` en `tools_relaxaicode.py:273-279`): escritura pendiente, cálculo pendiente (`complete_name`),
+    lectura en la caja A de una columna pendiente del llamador (condición a; `[GUARD]`: la caja A lee el valor de la
+    BD) y caché y `new()` del llamador.
+  - `TestSideCursorCommit` (38): `ai.log` (`ai_log.py:731-858`) con E1 y E2, y `ai.api.result.cache._store`
+    (`api_result_cache.py:132`) con E3 (fila bloqueada por el llamador, `lock_timeout` de 3 s en los cursores
+    vigilados) y E4 (caché y `new()`).
+  - **Salto del `flush_all()` del fabricante en E1 y E2:** `ai_log.py:721-730` vuelca lo del llamador antes de abrir el
+    cursor (arreglo para la 14). Se salta solo durante la llamada y solo en el cursor del llamador, para que el `commit`
+    aparte encuentre lo pendiente, como en 3.1.973.
+  - **`test_log_as_shipped_keeps_caller_write`:** `ai.log` tal como viene, con su `flush`; no se exige nada pendiente
+    en el `commit` aparte.
+  - **Descartados:** `test_box_a_open_flush_error_no_cursor` (prueba el `flush` del 37), el E3 completo con plan
+    confirmado (lo cubre E3 sobre `_store`) y `TestSegesSideEnv` (prueba `seges_side_env.py`).
+- **Ejecución (23/11/2026):** `paridad seges_pruebas_3996` (se puede instalar, 0 problemas) y `tests
+  seges_pruebas_3996` (BD temporal `test_lab_pns_ai_3996_17`, que no queda). Log `tests-20261123-175740.log`.
+- **Resultado:** `8 failed, 0 error(s) of 21 tests`. Los 8 rojos son los `[HYPOTHESIS]` de los puntos 2, 3 y 4, los
+  mismos que en `tests-20261123-172135.log`. Los 9 nuevos, en verde. ERROR y WARNING iguales a los de ese log (salvo el
+  recuento y los `pid` de Chrome); 0 «store failed», 0 esperas por bloqueo y 0 errores en la limpieza.
+
+  | Test | Resultado |
+  |---|---|
+  | `TestBoxACallerPending.test_pending_write_survives_box_a_close` | verde |
+  | `TestBoxACallerPending.test_pending_compute_survives_box_a_close` | verde |
+  | `TestBoxACallerPending.test_box_a_reads_column_pending_in_caller` | verde |
+  | `TestBoxACallerPending.test_box_a_close_keeps_caller_cache_and_new` | verde |
+  | `TestSideCursorCommit.test_log_does_not_commit_caller_pending_write` (E1) | verde |
+  | `TestSideCursorCommit.test_log_keeps_pending_write_on_new_record` (E2) | verde |
+  | `TestSideCursorCommit.test_log_as_shipped_keeps_caller_write` | verde |
+  | `TestSideCursorCommit.test_store_does_not_wait_for_caller_locked_row` (E3) | verde |
+  | `TestSideCursorCommit.test_store_keeps_caller_cache_and_new` (E4) | verde |
+
+- **Conclusión, parche 37:** no aplica (confirmado). El `rollback` y el `close` de la caja A solo vacían la
+  `Transaction` de su cursor (`odoo/api.py:518-520`, `odoo/sql_db.py:490-492`): la escritura y el cálculo pendientes,
+  la caché y los `new()` del llamador siguen, y la caja A lee de la BD sin intentar volcar nada en el cursor
+  `READ ONLY`.
+- **Conclusión, parche 38:** no aplica (confirmado). El `commit` de un cursor aparte solo vuelca su `Transaction`
+  (`odoo/sql_db.py:481`): no confirma fuera lo pendiente del llamador, no lo pierde en registros creados por él, no
+  espera filas que el llamador tiene bloqueadas y no le vacía la caché. Con el `flush` del fabricante, la escritura
+  del llamador tampoco sale de su transacción.
+- **Alcance:**
+  - **probados con cursor real:** la caja A (37), `ai.log` y la caché de API (38);
+  - **leídos y no probados**, porque usan el mismo patrón (cursor propio con `registry.cursor()` y `Environment`
+    propio, sin volcar lo del llamador): `ai.change.journal` (`_record_failed_plan`, `ai_change_journal.py:398-399`)
+    y `chatboo.session` (`_store_design`, `_store_title` y `_store_documents`, `chatboo_session.py:1011`, `:1048` y
+    `:1415`). `_store_documents` no estaba en la tabla de aperturas del 38 de la 14;
+  - **localizados y no leídos:** las demás aperturas de los archivos de la sección 3 (L56-L82) solo se han localizado
+    con `git grep` (`controllers/safe_plan.py:310` y `:409`, `models/ai_skill_param_cache.py:146`,
+    `models/key_pin_desk.py:198` y `:222`, `models/safe_operation.py:696`, `:966`, `:1085`, `:1253`, `:1308` y
+    `:1590`, `utils/engine_tool_run.py:547`, `utils/field_required_plan.py:248` y `utils/session_download.py:382`,
+    todas en `pns_ai_mcp`). No se ha leído su código, así que no se da por comprobado que sigan el mismo patrón.
+- **Punto 6 (parche 29), predicción:** la 17 aísla al llamador como la 14 con el 38, así que la adaptación con
+  `flush()` de `test_edit_page_without_data` sigue haciendo falta: la escritura de la sesión del test queda pendiente
+  y pisaría lo que guarda `_store_design`. Sus tests tienen que seguir en modo test (`HttpCase`): un cursor real no ve
+  la sesión del test. Se espera verde con `flush()` y los 3 subtests en rojo sin él, como en 3.1.973.
+- **Impacto en el port:** los parches 37 y 38 no se portan; `pns_base/utils/seges_side_env.py` tampoco. La decisión
+  se apoya en el mecanismo del core, que vale para cualquier cursor con su propio `Environment`. En la fase 2 se
+  revisan las aperturas localizadas y no leídas, por si alguna vuelca o invalida al llamador por su cuenta. El `flush`
+  del fabricante en `ai_log.py:721-730` no hace falta en la 17, pero no estorba y se deja.

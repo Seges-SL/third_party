@@ -3,3 +3,4 @@
 from . import test_chart_collision
 from . import test_import_review
 from . import test_review_views
+from . import test_side_cursors
