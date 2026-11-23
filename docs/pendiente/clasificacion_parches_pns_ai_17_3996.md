@@ -367,3 +367,38 @@ menciones del propio test (así `test_seges_rpc_access.py`) o de la entrada del 
      laboratorio), para el omitido de `pns_base` y el punto 2 (parche 20). **Hecho (23/11/2026):** «Montaje» (imagen
      propia) y «Tests» (segunda ejecución).
   2. Después, los 8 puntos de la sección 8, con pruebas automatizadas siempre que se pueda.
+
+## 11. Resultado de la sección 8 (23/11/2026)
+
+### Punto 8: citas del core
+
+- **Método:** solo lectura. Origen: `git show 6a0efa7:<ruta>` en `/opt/odoo-src/17.0/odoo`, que es el repo del core
+  dentro de la referencia (clon superficial de un solo commit; `/opt/odoo-src/17.0` no es un repo). Contenedor: un solo
+  `docker run --rm`, sin volúmenes, de `odoo-dev:17-lab_pns_ai_3996`, que lee `/usr/lib/python3/dist-packages/odoo/`
+  (`odoo/…` sin el prefijo; `odoo/addons/…` y `addons/…`, bajo `addons/`). Se compara el texto de las líneas citadas
+  sin los espacios del final; la sangría cuenta. Las citas abreviadas se atribuyen por el contexto (`:215`, `:180`,
+  `res_partner.py:91…`, `iap_account.py:182`…); `base_partner_merge.py` es el de `odoo/addons/base/wizard/`, el único
+  de los cuatro que tiene esos métodos.
+- **Core del contenedor:** `release.py`, `version_info = (17, 0, 0, 'final', 0, '')` y `version = '17.0-20260908'`.
+- **Inventario:** 51 citas del core de la 17 en 28 archivos, que existen todos en el contenedor: 45 de las secciones 4
+  y 6, y las 6 de `odoo/tests/common.py` de la sección 10. No se comparan 32 citas del código `pns_*` ni 2 de P14
+  (`seges_box_a_cache.py`). Ninguna es ambigua. Tampoco son citas del core las líneas 242–273 del índice de la 14,
+  `urllib3/poolmanager.py:331` (librería de la imagen) ni `<string>:38` y `:43` (mensajes del log).
+- **Resultado:** 45 iguales y 6 desplazadas; ninguna distinta ni ausente. Los 27 archivos de las secciones 4 y 6 son
+  idénticos enteros en los dos sitios.
+- **Las 6 desplazadas** son las de la sección 10. Ya se tomaron del contenedor y allí son correctas. En `6a0efa7` el
+  mismo texto está 14 líneas más abajo; `6a0efa7` es del 05/10/2026, posterior al core del contenedor (08/09/2026), y
+  la referencia no tiene historia para saber qué commit lo desplazó:
+
+  | Línea | Cita (contenedor) | Texto | En `6a0efa7` |
+  |---|---|---|---|
+  | 330 | `odoo/tests/common.py:1197` | `SkipTest(f'Failed to detect chrome devtools port after …')` | 1211 |
+  | 330 | `odoo/tests/common.py:1258` | `SkipTest("%s not found" % cmd[0])` | 1272 |
+  | 330 | `odoo/tests/common.py:1323` | `SkipTest("Error during Chrome headless connection")` | 1337 |
+  | 331 | `odoo/tests/common.py:1343` | `SkipTest("Error during Chrome connection: never found 'page' target")` | 1357 |
+  | 331 | `odoo/tests/common.py:1348` | `SkipTest("Cannot connect to chrome dev tools")` | 1362 |
+  | 331 | `odoo/tests/common.py:1875` | `SkipTest("Chrome executable not found")` | 1889 |
+
+- **Conclusión:** no hay correcciones. Las citas del core de las secciones 4 y 6, tomadas de `6a0efa7`, valen tal
+  cual para el core del laboratorio (`17.0-20260908`), y las de la sección 10 ya eran del contenedor. Si una cita
+  nueva sale de la referencia, hay que confirmarla igualmente: en `odoo/tests/common.py` las dos versiones difieren.
