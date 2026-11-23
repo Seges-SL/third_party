@@ -1,2 +1,4 @@
 
 .vscode/shortcuts.json
+__pycache__/
+*.pyc

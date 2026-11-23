@@ -1,0 +1,17 @@
+{
+  "python.analysis.extraPaths": [
+    "/opt/odoo-src/17.0/odoo"
+  ],
+  "pylint.args": [
+    "--rcfile=${workspaceFolder}/.pylintrc"
+  ],
+  "pylint.path": [
+    "pylint"
+  ],
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  },
+  "files.exclude": {
+    "**/__pycache__": true
+  }
+}
