@@ -292,3 +292,38 @@ menciones del propio test (así `test_seges_rpc_access.py`) o de la entrada del 
 - La rama `14.0-pns-ai-3973` ya no existe; su trabajo está en `14.0` (cabeza actual `9cbb303`).
 - La ruta `_fabricante/3.1.973/ORIGEN.txt` es hoy `/home/soporte/pns_fabricante/3.1.973/ORIGEN.txt`.
 - `pns_ai_mcp/models/__init__.py` no está en la fila del 18 del índice de 3.1.973 (sección 3).
+
+## 10. Resultado del laboratorio `lab_pns_ai_3996` (23/11/2026)
+
+- **Montaje:** carpeta `~/GitHub/lab_pns_ai_3996`, fuera del repo (`.git` local sin commits ni remoto; `CLAUDE.md` y
+  `.odoo-dev.conf` con `COMPARTIDOS="third_party"`). Imagen común `odoo-dev:17`, sin Dockerfile propio (la de los VPS;
+  Python 3.10.12, Ubuntu Jammy). BD `lab_pns_ai_3996_17`, creada por `instalar` (datos de demostración, solo `en_US`) y
+  **no neutralizada**: sus 7 crons `pns_*` están activos; ninguno usa la red. `third_party` es esta copia de trabajo en
+  `17.0-pns-ai` (probado con HEAD `a35e4fd`). En la imagen faltan solo `pypdf` y `PyMuPDF` (opcionales), y no hay Chrome
+  ni `websocket-client`.
+- **Instalación:** `paridad pns_base,pns_ai_mcp,pns_ai_chatboo`: se pueden instalar (9 comprobados, 0 problemas).
+  `instalar`: OK, 26 módulos, 0 ERROR. WARNING:
+  - «skip retired unlink… (no skill files on disk)» (×3), informativo;
+  - etiquetas de campo repetidas en `ai.log` («Client»: `client_label`/`client_display`, ×3) y en
+    `ai.trusted.action` («Model»: `model_name`/`model_id`, ×2): defectos menores del fabricante; observación, sin
+    parche.
+- **Tests** (`tests`, BD temporal `test_<bd>`, `--test-tags` por módulo): 249 tests, 0 fallos, 0 errores
+  (`pns_base` 1, `pns_ai_mcp` 230, `pns_ai_chatboo` 18). Las cifras de `odoo.tests.stats` (3/298/24) cuentan también
+  las fases de preparación; el recuento válido es el de las líneas `Starting` o la línea final. Corrió el test de
+  intrusión (5 de 5).
+- **Omitidos (4), todos por el entorno:**
+  - `TestWebClientStarts.test_backend_starts_without_errors`: falta `websocket-client` (y faltaría Chrome);
+  - `TestRequiredFieldsLive.test_a_pending_field_is_left_on_the_record_itself`: sin `crm`;
+  - dos de `TestSandboxSecretRead` («arrive in Odoo 20»).
+- **WARNING de los tests**, a tener en cuenta en los puntos de la sección 8 (ninguno corresponde con claridad a un
+  punto concreto):
+  - «no read access to res.partner [<id>] for the snapshot»;
+  - `DeprecationWarning` en `pns_ai_mcp/utils/field_required_plan.py:69` («use get_combined_arch() instead»);
+  - «returns an HTTPException instead of raising it»;
+  - «No CSRF validation token provided for path '/chatboo/stream'»;
+  - «No X-MCP-LLM or X-MCP-Agent in headers» (×7);
+  - «Skill bootstrap failed… MissingError» (~90, de las skills de los tests).
+- **Pendiente:**
+  1. Imagen propia del laboratorio con `google-chrome-stable` y `websocket-client` (`infra/Dockerfile.17` del
+     laboratorio), para el omitido de `pns_base` y el punto 2 (parche 20).
+  2. Después, los 8 puntos de la sección 8, con pruebas automatizadas siempre que se pueda.
