@@ -2,7 +2,7 @@
 
 - **Rama de trabajo:** `17.0-pns-ai`, desde `17.0` en `95110bd` (configuración de claude-odoo-kit). Primer commit: la
   base del fabricante sin cambios. A `17.0` solo llega con merge commit cuando esté corregida y validada (como en 14.0).
-- **Estado (24/11/2026):** base copiada; fase 0 hecha. Clasificación de los parches en
+- **Estado (24/11/2026):** base copiada; fases 0 y 1 hechas. Clasificación de los parches en
   `docs/pendiente/clasificacion_parches_pns_ai_17_3996.md`; laboratorio `lab_pns_ai_3996` montado, con imagen propia
   con Chrome: los tres módulos se instalan y pasan los 249 tests del fabricante, el del navegador incluido (3 omitidos
   por el entorno; sección 10 de la clasificación). Sección 8 cerrada (resultados en la sección 11):
@@ -20,9 +20,12 @@
   - pendiente para el port, en la sección 11: las aperturas de cursor del punto 5 localizadas y no leídas, la caja A
     con uid 1 (decisión 48) y el alias de los parches 15 y 22 (E3).
 
-  Fase 1 (`docs/pendiente/fase1_pns_ai_17_3996.md`): etapas F1.1 a F1.5 hechas. Laboratorio:
-  `17 failed, 0 error(s) of 56 tests`: los 13 `[HYPOTHESIS]` de la sección 8 y los de F1-6, F1-2, T2b y F1-11.
-  Sigue cerrar la fase 1 y preparar las tandas de la fase 2.
+  Fase 1 hecha (24/11/2026; de `ac624f9` a `8e5100d` y el commit del cierre), en
+  `docs/pendiente/fase1_pns_ai_17_3996.md` (decisiones 60 a 113): etapas F1.1 a F1.5 y hallazgos F1-1 a F1-12. Van al
+  port como correcciones F1-2, F1-6 a F1-12 y el caso 24 (con el parche 18); su enlace con los parches, en la sección 8
+  de ese documento. Laboratorio: `17 failed, 0 error(s) of 56 tests`: los 13 `[HYPOTHESIS]` de la clasificación (su
+  sección 8) y los de F1-6, F1-2, T2b (F1-9 y F1-10) y T3 (F1-11), que pasan a verde con el port. Sigue preparar las
+  tandas de la fase 2.
 
 ## Decisiones (Sergio, 22 y 23/11/2026)
 
@@ -71,7 +74,7 @@ Referencia de la 14 para comparar: `/home/soporte/pns_fabricante/3.1.973` (1.2.6
      laboratorio (su sección 8).
 2. **Fase 1:** analizar el código que solo se activa en la 15 o superior y que en la 14 no se revisó
    (`ir_ui_view_patch.py`, assets, rutas JSON, cliente de Chatboo), con el criterio de los PNS. Alcance y etapas:
-   `docs/pendiente/fase1_pns_ai_17_3996.md`.
+   `docs/pendiente/fase1_pns_ai_17_3996.md`. Hecha el 24/11/2026; el enlace con la fase 2, en su sección 8.
 3. **Fase 2:** portar y aplicar los parches en esta rama, con sus tests.
 4. **Fase 3:** staging en la 17, cliente y merge commit en `17.0`.
 

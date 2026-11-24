@@ -3,12 +3,15 @@
 - **Fecha:** 24/11/2026.
 - **Rama y partida:** `17.0-pns-ai`, HEAD `a8713b1` (igual a `origin/17.0-pns-ai`), sin cambios locales. Módulos:
   `pns_base` 17.0.1.2.92, `pns_ai_mcp` 17.0.3.1.996 y `pns_ai_chatboo` 17.0.2.1.597 (R17).
-- **Qué es la fase 1** (`docs/pendiente/plan_pns_ai_17.md`, L71-72): «analizar el código que solo se activa en la 15 o
-  superior y que en la 14 no se revisó (`ir_ui_view_patch.py`, assets, rutas JSON, cliente de Chatboo), con el
+- **Qué es la fase 1** (`docs/pendiente/plan_pns_ai_17.md`, «Plan», punto 2): «analizar el código que solo se activa en
+  la 15 o superior y que en la 14 no se revisó (`ir_ui_view_patch.py`, assets, rutas JSON, cliente de Chatboo), con el
   criterio de los PNS». La lista sale de la 14 (`docs/specs/analisis_pns_base.md` de `14.0`: §2.3, §10 y punto 9,
   «lógica muerta en 14 (`ir_ui_view_patch.py` completo)»).
-- **Este documento:** mide el alcance (solo lectura) y propone las etapas. Cada etapa lleva sus tests en el
-  laboratorio (`seges_pruebas_3996`, con su copia en `docs/pendiente/lab_3996/`); el detalle, en la sección 6.
+- **Este documento:** fase 1 hecha (24/11/2026; de `ac624f9` a `8e5100d` y el commit del cierre). Contiene el alcance y
+  el método (secciones 1 a 4), los hallazgos F1-1 a F1-12 y las observaciones (sección 5), las etapas F1.1 a F1.5 con
+  sus tests en el laboratorio (`seges_pruebas_3996`, con su copia en `docs/pendiente/lab_3996/`; sección 6), lo que va
+  al port y la lista del staging (sección 7) y el enlace de cada hallazgo con los parches de la fase 2 (sección 8).
+  Laboratorio: `17 failed, 0 error(s) of 56 tests`, todos `[HYPOTHESIS]` esperados.
 - **Decisiones de Sergio (24/11/2026):**
   - **60.** Alcance: el del plan, las cuatro áreas con el criterio de los PNS; el inventario de condiciones de versión
     es la base. El JS se revisa por riesgo, no entero: primero un inventario con `git grep` de los puntos peligrosos y
@@ -108,6 +111,18 @@
     puede leer y otra a un id que no existe se descartan al guardarse. En rojo hoy.
   - **107.** El `sudo` de `_names_for` (`safe_plan_describe.py:82-91`, que llama `_step_targets`, `:190-198`) se
     numera aparte como F1-12, Baja; no va dentro de F1-11.
+  - **108.** Las erratas del cierre de la fase 1 se aprueban: la referencia al plan («Plan», punto 2, comprobado
+    literal), la cobertura de la sección 1, el caso 3 y la cita de las decisiones 91 y 104 en la sección 7, y las
+    remisiones al staging de F1-11 y de la nota de PNS-84 del bus.
+  - **109.** Caso 6 (coste de `Base.get_view`): inventario, sin port; en la 14 lo cubre PNS-42/PB-2. Se dice en la
+    sección 7.
+  - **110.** La lista «sin cobertura» de la sección 1 se amplía con los casos 7, 12, 13, 14, 18 y 19 (los seis dicen
+    «ninguna» o «ninguna por nombre» en la sección 3), junto con la corrección del caso 22.
+  - **111.** En la regla de los menores, el port son los parches y las correcciones F1-n.
+  - **112.** F1-4 depende de la versión: entra si el port sube la versión de `pns_ai_mcp`. Se decide al preparar las
+    tandas.
+  - **113.** F1-11 va en la tanda de F1-9 y F1-10 (y F1-12), después de los parches 11, 25, 26, 29 y 34, y del 16 si el
+    diseño toca `held`.
 - **Marcas:**
   - **[L]:** leído (el cuerpo del código o del documento).
   - **[Loc]:** localizado por búsqueda, sin leer el cuerpo.
@@ -169,7 +184,7 @@
     origen;
   - el core 14 no está en las referencias: «no existe en la 14» se apoya en los comentarios del fabricante y en
     `analisis_pns_base.md`, no en una comprobación.
-- **Cobertura (localizada por nombre en los tests; no se ejecutó nada):**
+- **Cobertura (la del fabricante, localizada por nombre; la del laboratorio, ejecutada en cada etapa):**
   - **directa, casi ninguna:**
     - tests del fabricante: `_get_env_for_operation` (`test_sandbox_live_handles.py`,
       `test_relaxaicode_sandbox_escapes_e2e.py`) y el `Content-Type: application/json` (`tests/_helpers.py`,
@@ -189,9 +204,9 @@
     - la instalación de los tres módulos ejecuta la conversión de las 250 `attrs`, `post_init_hook` y `convert_file`;
     - `TestWebClientStarts.test_backend_starts_without_errors` (`pns_base`, en verde) carga el bundle completo,
       `pns_web_paths.js` incluido, sin errores de consola;
-  - **sin cobertura:** casos 11, 15 y 21 a 23 de la sección 3 (el 11 y el 15, correctos por lectura, decisión 90;
-    el 23, correcto por lectura, decisión 83), y la
-    desinstalación (los casos 4 y 5, desde F1.1);
+  - **sin cobertura** (decisión 110): casos 7, 11 a 15, 18, 19, 21 y 23 de la sección 3 («ninguna» o «ninguna por
+    nombre»; el 11 y el 15, correctos por lectura, decisión 90; el 23, correcto por lectura, decisión 83), y la
+    desinstalación (los casos 4 y 5, desde F1.1). El 22 solo tiene la indirecta, la de `TestWebClientStarts`;
   - `TestRequiredFieldsLive` (caso 17) está omitido en el laboratorio porque no hay `crm`.
 
 ## 2. Inventario de las condiciones de versión
@@ -812,6 +827,7 @@ cambia.
     el engaño necesita que el usuario no se fije o un destino con el mismo nombre; con F1-9, el plan se puede tapar.
   - Probado: T3 (`test_marks_17.py`) en rojo: `remember_marks` conserva la marca a un `ir.config_parameter` que el
     usuario no puede leer y la de un id que no existe; T2b: `a.o_ai_namelink` queda en la salida.
+  - Comprobación manual, al staging (decisión 104; sección 7).
   - Antecedentes: `git grep` de `marks_sentence`, `record_marks`, `marked_refs`, `remember_marks`, `row_marks`,
     «filas marcadas» y `ChatbooRowMarks`: solo referencias funcionales (`analisis_bloqueo_chatboo_session.md:51`,
     `:198`; `cambios_pns_ai_3-1-782.md:116`; `manual_pns_ai_3973.md:377`; de `14.0`). `record_marks.py` y
@@ -859,6 +875,7 @@ cambia.
   - Solo se lee con `sudo` o con acceso a la BD: la ACL de `bus.bus` es `0,0,0,0` sin grupo [C].
   - El PIN y la clave en claro ya son PNS-84 (Media; Seges asume el riesgo; `informe_fabricante_pns_ai_3973.md:457-461`
     de `14.0`).
+  - Comprobación manual, al staging (sección 7).
 - **Nota para PNS-84, sin número: la lista de claves sobrevive al cierre de sesión** (decisiones 84 y 92) [L]:
   - `key_pin_desk.js` guarda en el `sessionStorage` de la pestaña, en claro, las claves por correo, los PIN y un
     token (`pns_ai_mcp/static/src/js/key_pin_desk.js:16-67`). Solo la borra «Clear» (`stopDesk`, `:331-339`);
@@ -1025,8 +1042,10 @@ en `docs/pendiente/lab_3996/`; el detalle está en el «Hecha» de cada una.
 - **F1-1 (menor, decisión 86):** con la regla de F1-3 y F1-4: solo se corrige si el port toca ese archivo.
 - **`name_get()` directo de `utils/record_label.py:35` (decisión 88):** observación con la regla de los menores (la
   de F1-3 y F1-4): solo se corrige si el port toca ese archivo.
-- **Caso 3:** todos los parches que tocan XML de vistas pasan por el convertidor; lo que salga de F1.1 vale para
-  ellos.
+- **Caso 3:** todos los parches que tocan XML de vistas pasan por el convertidor; vale para ellos lo de F1.1 (caso 3
+  correcto y las formas de F1-5). Entre los que se portan no hay ninguno (sección 8).
+- **Caso 6, sin número (decisión 109):** el coste de `Base.get_view` queda como inventario, sin port; en la 14 lo cubre
+  PNS-42/PB-2 (sección 5).
 - **F1-3 y F1-4 (menores):** solo se corrigen si el port toca esos archivos (convención del código heredado); si no,
   quedan como inventario.
 - **F1-5 (menor):** con la regla de F1-3 y F1-4; además, los parches que toquen XML de vistas evitan sus formas
@@ -1053,8 +1072,8 @@ en `docs/pendiente/lab_3996/`; el detalle está en el «Hecha» de cada una.
     corrección, T3 de `test_marks_17.py` pasa a verde; en el cliente, lo de F1-10 para `a.o_ai_namelink`.
 - **F1-12 (decisión 107):** corrección, Baja: que `_names_for` lea los nombres con los permisos del usuario, sin
   `sudo`, y muestre el id cuando no pueda leerlo.
-- **F1-9 a F1-12 también están en 3.1.973** (decisión 91): parchearlos en la 14 es una decisión aparte, fuera de esta
-  fase.
+- **F1-9 a F1-12 también están en 3.1.973** (decisiones 91 y 104; sección 5): parchearlos en la 14 es una decisión
+  aparte, fuera de esta fase.
 - **Observaciones de F1.5** (sección 5): con la regla de los menores (la de F1-3 y F1-4): solo se corrigen si el port
   toca esos archivos. Si la corrección de F1-10 toca las plantillas de los chips, el `href` de X14 y el de los chips
   sin adjunto pasan a llevar filtro de esquema.
@@ -1090,3 +1109,102 @@ en `docs/pendiente/lab_3996/`; el detalle está en el «Hecha» de cada una.
      `pns_key_pin` sigue en `bus_bus` hasta el autovacuum (sección 5).
 - **Migración 14→17:** las vistas sin xml_id de los clientes que heredan de `pns_*` y los `arch_prev` con `attrs`,
   en `docs/migracion/pendiente_17.0.md` (inferido, no probado).
+
+## 8. Cierre de la fase 1: enlace con la fase 2
+
+- **Método y límites:** se cruzan los archivos y las funciones de R17 de cada hallazgo (sección 5) con los parches
+  que se portan según `docs/pendiente/clasificacion_parches_pns_ai_17_3996.md` (924 líneas, `5cb17965…129fe`): los
+  vivos de su sección 4 menos los que no aplican (35, 37 y 38), con el 18 como O1 ampliado y B2 (su decisión 29) y
+  el 22 y el 39 con las listas de su punto 7. Los archivos de cada parche salen de su sección 3; las funciones, de
+  los marcadores `Seges: parche N` de `14.0` (`git show 14.0:<ruta>`), y las líneas, de R17 en `8e5100d`, que se
+  desplazarán con el port. No se han leído los diffs ni se ha decidido la adaptación de ningún parche: la relación
+  es por archivo y función, no por líneas. Las tandas son candidatas; se preparan en el paso siguiente.
+- **Relación:** «mismo archivo» o «misma función», según lo que toca el parche; «dependencia de orden», cuando la
+  corrección va después del parche; «de diseño», cuando el parche no toca el archivo, pero su diseño resuelve el
+  hallazgo; «ninguna», sin parche en esos archivos.
+- **Orden en un mismo archivo:** los parches de la 14 se aplican con su diff; si un parche y una corrección F1-n
+  tocan el mismo archivo, primero el parche y después la corrección, para no desplazar sus trozos.
+- **XML de vistas:** ningún parche que se porta toca XML de vistas (en la sección 3 de la clasificación solo está
+  el `security.xml` del 28); lo del caso 3 y de F1-5 (sección 7) vale para los que se escriban en el port.
+- **Correcciones y observaciones para el port:**
+
+  | Hallazgo | Archivos de R17 | Parches | Relación | Tanda candidata | Test que pasa a verde |
+  |---|---|---|---|---|---|
+  | Caso 24 | `sandbox_secret_read.py` | 18 | de diseño (lo resuelve el 18) | con el 18 | los 5 rojos del 18 |
+  | F1-2 | `ai_provider.py` | 33 | mismo archivo | con el 33 | `test_provider_model_label_from_name_get` |
+  | F1-6 | `main.py` | ninguno | ninguna | propia (`/mcp`) | `test_mcp_single_allow_origin` |
+  | F1-7 | `chatboo.py`, `ai_execution_engine.py` | ninguno | ninguna | propia (Chatboo) | ninguno |
+  | F1-8 | `safe_operation_action_buttons.js` | ninguno | ninguna | propia | ninguno (staging) |
+  | F1-9 y F1-10 | 7 archivos | 16 | dependencia de orden si se toca `held` | propia (causa común) | T2b |
+  | F1-11 | 4 archivos | 11, 25, 26, 29, 34 | mismo archivo | con F1-9 y F1-10, tras 11, 25, 26, 29 y 34 | T3 |
+  | F1-12 | `safe_plan_describe.py` | ninguno | ninguna | con F1-9 a F1-11 | ninguno |
+  | SSE sin escapar | `main.py` | ninguno | archivo de F1-6 | con F1-6 | ninguno |
+  | Creador en `session_file` | `session_file.py` | ninguno | ninguna | con F1-6 (controladores) | ninguno |
+  | `str(e)` del Chatboo | `chatboo.py` | ninguno | archivo de F1-7 | con F1-7 | ninguno |
+
+  - **Caso 24:** `pns_ai_mcp/models/sandbox_secret_read.py:100-113` (`_has_field_access` y `_check_field_access`,
+    que no existen en la 17), `:117` (`check_field_access_rights`) y `:69` (`_pns_sandbox_reads`, la caja A con uid
+    1). Relación de diseño: el 18 de la 14 no toca este archivo, pero sus enganches de O1 van sobre lo que existe en
+    el core (decisión 29 de la clasificación), así que lo resuelve el 18. Tests: `TestBoxASecretReadInside` (3) y
+    `TestBoxAComputedSecret` (2).
+  - **F1-2:** `pns_ai_mcp/models/ai_provider.py:80-87` (`name_get` de `ai.provider.model`, clase en `:26`). El 33
+    toca `_spend_month_start` (`:1083`) y `spend_cap_reached` (`:1128`) de `ai.provider`, y
+    `wizard/ai_provider_usage_wizard.py`: mismo archivo, otra clase. Test:
+    `TestDisplayName17.test_provider_model_label_from_name_get`.
+  - **F1-6:** `pns_ai_mcp/controllers/main.py:327-340` (`_mcp_cors_origin` y `_mcp_json_http_response`) y las demás
+    respuestas de `/mcp*`. Test: `TestRoutes17.test_mcp_single_allow_origin`.
+  - **F1-7:** `pns_ai_chatboo/controllers/chatboo.py:751-784` (`list_providers`) y, si la corrección va en el
+    método, `pns_ai_mcp/models/ai_execution_engine.py:237-239` (`get_providers_for_agent`). Sin test.
+  - **F1-8:** `pns_ai_mcp/static/src/js/safe_operation_action_buttons.js:17-43` (`_isSafePlanView` y
+    `_bindSafePlanBus`). El emisor (`_notify_safe_plan_hosts`, `safe_operation.py:1727`) está en un archivo del 16,
+    pero la corrección es del cliente. Sin test: staging, punto 1.
+  - **F1-9 y F1-10 (decisión 99):** en el cliente, `pns_ai_chatboo/static/src/js/chatboo_formatters.js:112-366`
+    (`sanitizeHtml`), `chatboo_app.js:1864-1873` (`_heldCardIds`), `:1969-1982` (`_showVerificationUI`) y
+    `:2836-2866`, `chatboo_choice_list.js:17`, `chatboo_svg_cards.js:323-350` y `chatboo_charts.js:3510-3535`; ningún
+    parche los toca (el 20, solo `chatboo_heavy_libs.js` y `chart.umd.min.js`). En el servidor, solo si el diseño
+    cambia `held`: `pending_card_payloads` (`pns_ai_mcp/models/safe_operation.py:2066`) llama a `card_payload`
+    (`:2034`), donde el 16 solo da el token al dueño; entonces, después del 16. Test:
+    `TestSanitizer17.test_t2b_no_chat_controls`, que también pide la parte de cliente de F1-11 (`a.o_ai_namelink`).
+  - **F1-11 (decisión 104):** en el servidor, `pns_ai_chatboo/models/chatboo_session.py:1450-1459`
+    (`remember_marks`) y `pns_ai_mcp/utils/record_marks.py:35-62` (`clean_marks`); en el cliente,
+    `chatboo_row_marks.js:25-41` y `chatboo_turn.js:58-61`. En `chatboo_session.py` tocan el 11 (`unlink`,
+    `:2096`), el 25 y el 29 (`_paint_canvas`, `:1070`) y el 26 (`_page_html`, `:918`): otra función.
+    `MARKS_SENTENCE` (`chatboo_async_request.py:284-291`) está en `_process` (`:145`), que toca el 34: misma función
+    solo si el diseño la cambia. Va en la tanda de F1-9 y F1-10, después de los parches 11, 25, 26, 29 y 34, y del 16
+    si el diseño toca `held` (decisión 113). Test: `TestMarks17.test_t3_marks_checked_on_save`; T2b, con F1-9 y
+    F1-10.
+  - **F1-12 (decisión 107):** `pns_ai_mcp/controllers/safe_plan_describe.py:82-91` (`_names_for`), que usan
+    `_describe_value` (`:112`), `_step_targets` (`:190`) y `describe_safe_plan` (`:234`). Sin test. En la tanda de
+    F1-9 a F1-11 (decisión 113), porque la tarjeta del plan es lo que limita F1-11 (sección 5).
+  - **Sin número (decisiones 74 y 79):** el SSE sin escapar (`pns_ai_mcp/controllers/main.py:532-536`), en el
+    archivo de F1-6; el creador en `session_file` (`pns_ai_mcp/controllers/session_file.py:21-36`), sin parche (el
+    38, que no se porta, tocaba `utils/session_download.py`); y el `str(e)`
+    (`pns_ai_chatboo/controllers/chatboo.py:228-744`), en el archivo de F1-7. Sin tests.
+- **Menores y observaciones** (regla de F1-3 y F1-4: solo si el port toca el archivo; el port son los parches y las
+  correcciones F1-n, decisión 111):
+
+  | Menor u observación | Archivo de R17 | Lo toca el port | Queda |
+  |---|---|---|---|
+  | F1-1 | `res_config_settings.py` | no | fuera (inventario) |
+  | F1-3 | `pns_web_paths.js` | no | fuera |
+  | F1-4 | `pns_ai_mcp/__manifest__.py` | si se sube la versión | se decide en las tandas (decisión 112) |
+  | F1-5 | `ir_ui_view_patch.py` | no | fuera |
+  | `unsubscribe` muerto | `chatboo_app.js` | si lo toca F1-9 | dentro, con F1-9 |
+  | `name_get()` de `record_label.py` | `record_label.py` | no | fuera |
+  | F1.5: `esc` de reserva | `chatboo_app.js` | si lo toca F1-9 | dentro, con F1-9 |
+  | F1.5: `localStorage` | `chatboo_app.js` y 4 JS más | solo `chatboo_app.js`, con F1-9 | `chatboo_provider_id` |
+  | F1.5: X14 | `chatboo_app.xml` | si F1-10 toca los chips | con F1-10, si los toca |
+  | F1.5: chips sin adjunto | `chatboo_session.py` | sí: 11, 25, 26, 29 y F1-11 | dentro |
+  | Notas de PNS-84 | `key_pin_desk.py`, `key_pin_desk.js` | el 18 toca `key_pin_desk.py` | staging, no port |
+
+  - Ningún parche ni corrección toca `pns_ai_mcp/models/res_config_settings.py:159` (F1-1),
+    `pns_base/static/src/js/pns_web_paths.js:11` y `:44-62` (F1-3), `pns_base/models/ir_ui_view_patch.py:409-413`
+    (F1-5) ni `pns_ai_mcp/utils/record_label.py:35`.
+  - F1-4 (`pns_ai_mcp/__manifest__.py:42` y `:68`): ningún parche toca el manifiesto; entra si el port sube la
+    versión de `pns_ai_mcp`, y eso se decide al preparar las tandas (decisión 112).
+  - Las de `chatboo_app.js` (`unsubscribe`, `:469-474`; `esc`, `:2338-2341`; `chatboo_provider_id`, `:743-786`)
+    entran si la corrección de F1-9 toca ese archivo, como prevé la sección 7 (la búsqueda por `id` de
+    `_showVerificationUI`). Los chips sin adjunto (`_claim_turn_file_chips`, `chatboo_session.py:470-502`), en otra
+    función que los parches.
+  - Notas de PNS-84: el aviso sale de `_notify_ask` (`pns_ai_mcp/models/key_pin_desk.py:147-154`); el 18 solo añade
+    `_pns_secret_fields` a los dos modelos de ese archivo. Van al staging (sección 7), no al port.
