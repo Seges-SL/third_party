@@ -75,6 +75,35 @@
     `67bb15b` en su día). Su asunto real es «[ADD] pns_ai: tests de Seges de no regresión en la 17 (T0) y la
     descripción vacía.», con texto pegado por error; el acordado era «[ADD] pns_ai: tests de Seges de no regresión
     en la 17 (T0)».
+- **Decisiones de Sergio en T1 (24/11/2026):**
+  - **140.** `test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin` (`test_system_action.py:543-547`): opción (b). El
+    cambio va dentro del parche 12, con su marcador: `assertFalse(ok)` y
+    `assertIn('Only a Settings administrator', err or '')`, en el `[FIX]`. En la 14 sigue la decisión del
+    23/10/2026 (F por diseño); esto es solo para la 17.
+  - **141.** Neutralizaciones: una por parche (N12, N32, N16, N17, N19, N33 y N40), con la batería de `pns_ai_mcp`,
+    la copia previa en el scratchpad y el sha256 comprobado al restaurar. Con la 140, N12 deja también en F
+    `test_paap_i7`.
+  - **142.** F1-2: al módulo, solo el `[HYPOTHESIS]` (`test_seges_display_name.py`, etiqueta `seges_t1`). El parche
+    40 repite la etiqueta en `_compute_display_name` y no llama a `name_get` (el del core lee `display_name`:
+    recursión). El `name_get` del fabricante no se toca. Las líneas nuevas no pasan de 110 caracteres.
+  - **143.** `onchange` del e4p: `fields_spec` como `{}` (formato de la 17) y el comentario corregido.
+  - **144.** Errata del 19: su diff está en `8d1c9b2`, no en `ef05eaa`. Consta como nota en la sección 6; la sección
+    3 no se reescribe.
+  - **145.** Estado en el registro tras T1: «Validado en el laboratorio», con el hash del `[FIX]`.
+  - **146.** Lint: I001 y C0415 en `ai_trusted_action.py` se aceptan como en la 14
+    (`14.0:docs/pendiente/parches_pns_ai.md:3082`, parche 32, «Lint», 05/11/2026; recogidos en `:3177` y `:3763`).
+  - **147.** `test_seges_change_journal.py:284`: savepoint propio (`sp = self.env.cr.savepoint()` antes y
+    `sp.close(rollback=True)` en lugar de `self.env.cr.rollback()`), con comentario y cita.
+  - **148.** Marcador del 40: id «F1-2», sin prefijo; en «Marcadores» del registro, una frase sobre `F1` (27 y 29) y
+    `F1-n`.
+  - **149.** Se autoriza `odoo-dev 17 actualizar pns_ai_mcp` en la BD del laboratorio (`lab_pns_ai_3996_17`), que
+    queda con el código de T1.
+  - **150.** El plan de prueba para el staging va en un apartado «Para el staging» de la sección 6. La fase 3 reunirá
+    la lista de la fase 1 (su sección 7) y las de cada tanda; el documento de la fase 1 no se toca.
+  - **151.** El 40 forma la etiqueta con f-string, porque el hook de lint del kit bloquea el `%` (UP031 y C0209) en
+    las líneas nuevas; la etiqueta es la misma.
+  - **152.** Las 2 líneas ERROR de N16 son efecto esperado de la neutralización (sin `check_identity`, el plan llega
+    a ejecutarse); se anotan en la tabla de neutralizaciones.
 
 ## 1. Alcance
 
@@ -120,7 +149,8 @@
       `tests-20261123-141538.log` del laboratorio, 23/11/2026; clasificación, sección 10). La línea base con los
       tests de T0 se mide en T0 (decisión 116);
     - `seges_pruebas_3996`: `17 failed, 0 error(s) of 56 tests` (fase 1, cabecera);
-  - desde T1, `test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin` queda en F por diseño (parche 12), como en la 14;
+  - desde T1, `test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin` espera el rechazo del parche 12, con un cambio
+    dentro del propio parche (decisión 140), y la batería sigue en verde; en la 14 queda en F por diseño;
   - cada parche se neutraliza una vez en el laboratorio: sus tests dan F y el SHA-256 vuelve a ser el mismo al
     restaurar (como en la 14);
   - lint: `python3 ~/.claude/hooks/odoo_lint.py --revisar <modulo>/`.
@@ -295,8 +325,9 @@
 | Tanda | Estado |
 |---|---|
 | T0 | hecha (24/11/2026): 0 F y 0 E de 330 tests, 5 omitidos; laboratorio, 17 F de 56; `CLAUDE.md`, con la regla |
-| T1 | pendiente (la siguiente) |
-| T2 a T10 | pendientes |
+| T1 | hecha (24/11/2026): 0 F y 0 E de 378 tests, 5 omitidos; laboratorio, 16 F de 56 |
+| T2 | pendiente (la siguiente) |
+| T3 a T10 | pendientes |
 
 ## 5. T0: tests de no regresión, registro y `CLAUDE.md`
 
@@ -399,3 +430,154 @@
   los tests de la 14 de T1 a T6 no hay más (solo estaban en las partes de T0 del e4p). En T1, vigilar
   `test_seges_verification.py:78` (`assertFalse` sobre `comment`, que es Html en la 17). No hay comparaciones de
   igualdad con campos que pasan de Text a Html.
+
+## 6. T1: parches 12, 32, 16, 17, 19 y 33, y el 40 (F1-2)
+
+- **Fecha:** 24/11/2026. Partida: HEAD `146df1b` («[DOC] pns_ai 17: registro de parches, regla de terceros y tanda
+  T0 (fase 2)»), sin cambios locales.
+- **Fase 1** (solo lectura, 24/11/2026). Las citas del core son del contenedor del laboratorio
+  (`/usr/lib/python3/dist-packages/odoo`, Odoo 17.0-20260908); las marcadas «ref.», de `/opt/odoo-src/17.0`:
+  - los 10 archivos de R17 de T1 son idénticos a la base 3.1.973 de la 14 (`33ca68c`), salvo
+    `ai_change_journal.py:222-227` (el `AccessError` del snapshot pasa a `warning`; de ahí el +6 del 17). Los
+    parches dan el mismo código que en la 14; lo que cambia es el core;
+  - `check_identity` (`odoo/addons/base/models/res_users.py:139-176`), como en la 14: exige HTTP, recuerda la
+    contraseña 10 minutos y, si no, devuelve el asistente `res.users.identitycheck`; `run_check` (`:2023-2031`)
+    vuelve a llamar al método y la contraseña se valida con `_check_credentials` (`:2015-2021`);
+  - `has_group`: `ormcache('self._uid', 'group_ext_id')` y SQL (`res_users.py:1088-1113`), con la caché vaciada al
+    escribir grupos (`:748-758` y `:1511-1522`); el `many2many` se escribe al momento (`odoo/fields.py:4906`, ref.);
+  - `AccessError` sigue heredando de `UserError` (`odoo/exceptions.py:18` y `:74`); `check_access_rights` y
+    `check_access_rule`, en `odoo/models.py:4139` y `:4150`; el primer `onchange` llama a `default_get`
+    (`odoo/addons/web/models/models.py:970-978`), así que el 33 cubre también esa vía; `requests` 2.25.1
+    (`Response.is_redirect`; `Session.post` admite `allow_redirects`);
+  - las 14 aperturas de cursor del punto 5 (clasificación, sección 11) se han leído: cada una abre su cursor con su
+    `Environment` y su `Transaction`, y su `commit` solo vuelca esa transacción (`odoo/sql_db.py:134-138`,
+    `:176-181` y `:479-488`). Ninguna vuelca ni invalida al llamador por su cuenta y ninguna exige nada en T1.
+    Por `safe_operation.py:966` y `:1085` pasan el 12, el 32 y el 17 con las claves `ai_journal_*` que pone
+    `execute_plan_now` (`:1470-1479`); `key_pin_desk.py:198` y `:222` vuelven a leerse en T3 (caso 24);
+  - en la 17, `TransactionCase` hace cada test en un savepoint (`odoo/tests/common.py:904-906`): el
+    `self.env.cr.rollback()` de `test_seges_change_journal.py:284` lo destruiría (decisión 147).
+- **Errata (decisión 144):** el diff del 19 está en `8d1c9b2` (fase 2b de la 14), no en `ef05eaa` como dice la
+  sección 3. Con `8d1c9b2` entra limpio.
+- **Archivos:**
+  - código (`[FIX]`, 11): `pns_ai_mcp/`: `controllers/safe_plan_execute.py`, `models/ai_change_journal.py`,
+    `models/ai_provider.py`, `models/ai_system_action.py`, `models/ai_trusted_action.py`, `models/safe_operation.py`,
+    `utils/fetch_url_safe.py`, `utils/mcp_client.py`, `utils/privilege_cusp.py`,
+    `wizard/ai_provider_usage_wizard.py` y `tests/test_system_action.py` (decisión 140);
+  - tests (`[ADD]`, 7): `pns_ai_mcp/tests/`: `__init__.py` (bloque de Seges de T1), `test_seges_e4p.py` y, nuevos,
+    `test_seges_user_groups.py`, `test_seges_verification.py`, `test_seges_change_journal.py`,
+    `test_seges_fetch_redirect.py` y `test_seges_display_name.py`.
+- **Cambios respecto a `14.0` en el código** (`git apply -v`, en el orden 12, 32, 16, 17, 19 y 33; 31 marcadores):
+  - 12, 32, 16, 19 y 33: el diff de la 14 tal cual (`ef05eaa`; el 19, de `8d1c9b2`), limpio;
+  - 17: el diff de `ef05eaa`; en `ai_change_journal.py`, los tres trozos con un desplazamiento de +6;
+  - 40 (F1-2), a mano en `ai_provider.py`: `_compute_display_name` con `@api.depends('title', 'name')`
+    (`odoo/models.py:1660-1695`) antes del `name_get` del fabricante, que no se toca; repite la etiqueta y no
+    llama a `name_get` (decisión 142), con f-string (decisión 151);
+  - `test_system_action.py:547-550`: `test_paap_i7` espera el rechazo del 12, con su marcador (decisión 140).
+- **Cambios respecto a `14.0` en los tests** (los 7 llevan en la cabecera las líneas de la 14 sin cambios y la línea
+  de la 17, decisiones 128 y 134):
+  - copiados sin cambios de código: `test_seges_user_groups.py` y `test_seges_fetch_redirect.py`;
+  - `test_seges_verification.py`: `flush_all()` (`odoo/api.py:735`) e `invalidate_recordset()` ×4
+    (`odoo/models.py:6747`); la L78 (`assertFalse` sobre `comment`, Html) no cambia: vacío es `False` y escrito
+    sería `'<p>…</p>'`;
+  - `test_seges_change_journal.py`: `invalidate_recordset()` ×7, `invalidate_model()` ×1 (`odoo/models.py:6732`) y
+    `flush_all()` ×2; en `test_failed_plan_row_survives_rollback`, un savepoint propio en lugar de
+    `cr.rollback()` (decisión 147; `odoo/sql_db.py:84-112` y `:153-162`);
+  - `test_seges_e4p.py`: las partes del 32 y el 33 (`TestSegesE4pTrustedAction`, `TestSegesE4pUsage` y los 3 casos
+    del 33 de `TestSegesE4pRpc`) con sus imports y constantes; `invalidate_recordset()` ×3 e `invalidate_model()`
+    ×1; `_xmlid_to_res_id` ×2 (`odoo/addons/base/models/ir_model.py:2228`); `convert_file(self.env, …)`
+    (`odoo/tools/convert.py:674`); `onchange` con `fields_spec` `{}` y el comentario de la 17 (decisión 143;
+    `odoo/addons/web/models/models.py:933` y `:970-978`); el docstring de T0 actualizado;
+  - `test_seges_display_name.py` (nuevo): el `[HYPOTHESIS]` de `TestDisplayName17` del laboratorio, como test
+    normal (decisión 142);
+  - `tests/__init__.py`: el bloque de Seges de T1, debajo del de T0.
+- **`odoo-dev 17 actualizar pns_ai_mcp`** (decisión 149; log `actualizar-20261124-174412.log`): «RESULTADO: OK», 0
+  bloqueantes. `trusted_actions_system.xml` se recarga sin error (el 32 no rompe el `-u`). 5 WARNING del
+  fabricante, ya conocidos (`instalar-20261123-132159.log` y la línea base): etiquetas repetidas en `ai.log` y
+  `ai.trusted.action`, y «skip retired unlink». El servidor web se reinicia.
+- **Baterías** (desde el laboratorio):
+  - tres módulos (log `tests-20261124-174508.log`): `0 failed, 0 error(s) of 378 tests`, «RESULTADO: OK», sin
+    líneas `ERROR`. Omitidos (5), los de T0;
+  - `seges_pruebas_3996` (log `tests-20261124-174709.log`): `16 failed, 0 error(s) of 56 tests`. Frente a
+    `tests-20261124-170030.log`, solo deja de fallar `TestDisplayName17.test_provider_model_label_from_name_get`.
+- **Por archivo:**
+
+| Archivo | Parche | Casos de T1 | Verdes |
+|---|---|---|---|
+| `test_seges_user_groups.py` | 12 | 12 | 12 |
+| `test_seges_e4p.py` (28 en el archivo) | 32 y 33 | 19 | 19 |
+| `test_seges_verification.py` | 16 | 2 | 2 |
+| `test_seges_change_journal.py` | 17 | 11 | 11 |
+| `test_seges_fetch_redirect.py` | 19 | 3 | 3 |
+| `test_seges_display_name.py` | 40 | 1 | 1 |
+| `test_system_action.py` (`test_paap_i7`, del fabricante) | 12 | cambiado | 1 |
+| **Total T1** | | **48 nuevos** | **48** |
+
+- **Neutralizaciones** (decisión 141): una por parche, con la batería de `pns_ai_mcp` (356 tests), la copia previa
+  en el scratchpad y el sha256 comprobado al restaurar. Todas dan las F esperadas y todas las restauraciones, el
+  mismo sha256. Después, los 11 archivos del `[FIX]` tienen el sha256 del final del paso de código.
+
+| N | Qué se revierte | Log | F |
+|---|---|---|---|
+| N12 | `settings_admin_error` devuelve `None` | `tests-20261124-174925.log` | 12, con `test_paap_i7` (detalle debajo) |
+| N32 | `_check_settings_admin` sin efecto | `tests-20261124-175107.log` | 13: los 8 negativos, con subtests |
+| N16 | `safe_operation.py` de HEAD | `tests-20261124-175246.log` | 2: los de `verification` (decisión 152) |
+| N17 | diario y `safe_plan_execute.py` de HEAD | `tests-20261124-175421.log` | 4 |
+| N19 | `fetch_url_safe.py` y `mcp_client.py` de HEAD | `tests-20261124-175555.log` | 2 |
+| N33 | alias `month_usage` y el asistente de HEAD | `tests-20261124-175727.log` | 6 en 5 tests (detalle debajo) |
+| N40 | sin `_compute_display_name` | `tests-20261124-175908.log` | 1 |
+
+  - N16 (decisión 152): 2 líneas `ERROR` de `safe_operation` («MCP: Error executing plan …» y «execute_plan_now …
+    failed: You are not allowed to …»). Sin `check_identity`, la llamada por RPC llega a ejecutar el plan, que
+    falla; con el parche no aparecen.
+  - Detalle de N12: `test_propose_rejected_without_settings`, `test_propose_rejected_with_access_rights`,
+    `test_confirmed_add_group_rejected_without_settings`, `test_confirmed_remove_group_rejected_without_settings`,
+    `test_registry_edit_does_not_lift_check`, `test_direct_methods_rejected_without_settings`,
+    `test_context_identities_checked`, `test_view_actions_unchanged_for_ai_admin`,
+    `test_crud_res_groups_refused_without_settings`, `test_plan_confirmed_for_ai_admin_refused`,
+    `test_sudo_in_plan_context_refused` y `test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin`.
+  - Detalle de N17: `test_ai_admin_write_refused`, `test_ai_admin_create_refused`,
+    `test_plan_unlink_requires_unlink_right` y `test_rejected_plan_journals_failed_row`. N19:
+    `test_custom_auth_header_dropped_on_other_host` y `test_mcp_client_redirect_refused`. N33:
+    `test_month_usage_rpc_refused` (interno y portal), `test_usage_wizard_default_get_rpc_refused` y
+    `test_usage_wizard_onchange_rpc_refused` (interno), `test_month_usage_public_name_gone` y
+    `test_default_get_refused_for_internal`.
+- **Línea base para T2:** `0 failed, 0 error(s) of 378 tests`, 5 omitidos, «RESULTADO: OK»; laboratorio,
+  `16 failed, 0 error(s) of 56 tests`. La línea base para T1 de la sección 5 («queda en F por diseño») la sustituye
+  la decisión 140.
+- **Lint** (`python3 ~/.claude/hooks/odoo_lint.py --revisar pns_ai_mcp/`): 2 incidencias nuevas, las de la decisión
+  146 en `ai_trusted_action.py` (I001 en la L24 y C0415 en la L94), aceptadas como en la 14
+  (`14.0:docs/pendiente/parches_pns_ai.md:3082`); 0 en los tests nuevos; 552 preexistentes, del fabricante.
+- **Entorno:** comprobado antes y después. `odoo-dev 17 estado` igual (BD `lab_pns_ai_3996_17`,
+  `CONF_HASH=c5c7138b608673bb`), `bd-lista` sin `test_…` y el mismo sha256 de los `.py` de `seges_pruebas_3996`
+  (`b5e46c60…`). La BD del laboratorio queda con el código de T1 (decisión 149).
+- **Registro:** en `docs/pendiente/parches_pns_ai.md`, las filas 12, 16, 17, 19, 32 y 33, «Validado en el
+  laboratorio» con `f70c3c0` (decisión 145; la del 12 cita la 140); la fila del 40 (F1-2) en las correcciones de
+  la fase 1, y la frase de «Marcadores» sobre `F1` y `F1-n` (decisión 148).
+- **Commits** (los hace Sergio): `[FIX]` `f70c3c0` («[FIX] pns_ai_mcp: parches 12, 32, 16, 17, 19 y 33 portados a
+  17.0.3.1.996 y F1-2 (T1)»); `[ADD]` `dfcf7e0` («[ADD] pns_ai_mcp: tests de Seges de los parches 12, 32, 16, 17,
+  19 y 33 y de F1-2 en la 17 (T1)»); `[DOC]`, el de este registro.
+- **Para el staging** (decisión 150; se actualiza `pns_ai_mcp`):
+  - 16: en Autorizaciones, Confirmar pide la contraseña (una vez cada 10 minutos). Antes, comprobar que los AI
+    Administrators tienen contraseña local; los usuarios sin ella (OAuth o LDAP) no pasan `check_identity`
+    (`_check_credentials`);
+  - 12: un AI Administrator sin Ajustes no da ni quita grupos con un plan, tampoco con «Permisos de acceso»;
+  - 32: un AI Administrator sin Ajustes no crea, cambia ni borra acciones de confianza;
+  - 33: «This month» del proveedor, solo para el AI Administrator;
+  - 19: un servidor MCP cuya URL redirige da el error «… answered with a redirect …»; revisar antes que las URLs
+    MCP configuradas son las finales;
+  - 17: revertir una fila del diario y vaciar la papelera siguen funcionando para el AI Administrator;
+  - 40: el modelo del proveedor se muestra como «Título (slug)» en el formulario.
+- **Para las tandas siguientes:**
+  - el hook de lint del kit bloquea el formato con `%` (UP031 y C0209) en las líneas escritas a mano: usar f-string
+    (decisión 151). Lo que entra con `git apply` no pasa por el hook;
+  - en la 17, `TransactionCase` trabaja en un savepoint por test: nada de `cr.rollback()` ni `cr.commit()` sobre el
+    cursor del test. En los tests de la 14 de T3 a T5b (`test_seges_identity_su.py`, `test_seges_box_a_vias.py`,
+    `test_seges_sandbox_credentials.py`, `test_seges_sandbox_side_effects.py` y los tres del Chatboo) no hay
+    ningún `rollback` del cursor del test;
+  - siguen haciendo falta en los tests de la 14: `invalidate_cache` → `invalidate_recordset`/`invalidate_model`,
+    `flush()` → `flush_all()`, `xmlid_to_res_id` → `_xmlid_to_res_id`, `convert_file(env, …)` y la firma de
+    `onchange` de la 17;
+  - la batería de `pns_ai_mcp` sola tiene 356 tests tras T1: es la referencia para las neutralizaciones de las
+    tandas de `pns_ai_mcp`;
+  - en el contenedor, `docker run --rm -i` (sin `-i`, el heredoc no llega) y Python fuera del directorio de
+    `odoo` o con `-I` (si no, `import logging` carga `odoo/logging.py`).

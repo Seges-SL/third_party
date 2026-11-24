@@ -21,8 +21,10 @@ Junto a cada cambio, como en la 14:
 
 `<id>` es el PNS o el id de la 14 (`M1`, `F1`…); `<tipo>`, `seguridad`, `robustez`, `compatibilidad`,
 `funcional` o `datos`; en JS, `// …`, y en XML, `<!-- … -->`. Las correcciones de la fase 1 llevan su número
-desde el 40 y su F1-n como id (decisión 120). Los tests de Seges van en `tests/test_seges_*.py`, con el bloque de
-Seges al final de `tests/__init__.py`. Listado:
+desde el 40 y su F1-n como id (decisión 120). `F1` (27 y 29) es el hallazgo F1 de la revisión E3′ de la 14;
+`F1-n`, desde el 40, son los de `fase1_pns_ai_17_3996.md`, sección 5 (decisión 148): en `grep`, `(F1,` y `(F1-`
+no se confunden. Los tests de Seges van en `tests/test_seges_*.py`, con el bloque de Seges al final de
+`tests/__init__.py`. Listado:
 
 ```sh
 grep -rn "Seges: parche" pns_base pns_ai_mcp pns_ai_chatboo
@@ -40,14 +42,14 @@ fabricante). De los demás:
 | 9 | PNS-85 | T0 (test) | Retirado en 3.1.879 (cubierto por el fabricante); no regresión | — |
 | 10 | PNS-83 | T0 (test) | Retirado en 3.1.973 (cubierto por el fabricante); no regresión | — |
 | 11 | PNS-82 | T5a | Pendiente | — |
-| 12 | PNS-01, PNS-02 | T1 | Pendiente | — |
+| 12 | PNS-01, PNS-02 | T1 | Validado en el laboratorio (con `test_system_action.py`, decisión 140) | `f70c3c0` |
 | 13 | M10 | T0 (test) | Retirado en 3.1.973 (cubierto por el fabricante); no regresión | — |
 | 14 | M13 | T0 (test) | Retirado en 3.1.973 (cubierto por el fabricante); no regresión | — |
 | 15 | PNS-07 | T4 | Pendiente | — |
-| 16 | PNS-54 | T1 | Pendiente | — |
-| 17 | PNS-37 | T1 | Pendiente | — |
+| 16 | PNS-54 | T1 | Validado en el laboratorio | `f70c3c0` |
+| 17 | PNS-37 | T1 | Validado en el laboratorio | `f70c3c0` |
 | 18 | PNS-19 | T3 | Pendiente: O1 ampliado con B2 y P-22, sin B | — |
-| 19 | PNS-17 | T1 | Pendiente | — |
+| 19 | PNS-17 | T1 | Validado en el laboratorio | `f70c3c0` |
 | 20 | PNS-70 | T6 | Pendiente | — |
 | 21 | PNS-20 | T2 | Pendiente | — |
 | 22 | PNS-100 | T4 | Pendiente | — |
@@ -60,8 +62,8 @@ fabricante). De los demás:
 | 29 | F1 (P-8e a) | T5b | Pendiente | — |
 | 30 | M11 | T0 (test) | Retirado en 3.1.973 (cubierto por el fabricante); no regresión | — |
 | 31 | M12 | T0 (test) | Retirado en 3.1.973 (cubierto por el fabricante); no regresión | — |
-| 32 | PNS-97 | T1 | Pendiente | — |
-| 33 | PNS-29 | T1 | Pendiente | — |
+| 32 | PNS-97 | T1 | Validado en el laboratorio | `f70c3c0` |
+| 33 | PNS-29 | T1 | Validado en el laboratorio | `f70c3c0` |
 | 34 | PNS-96 | T5b | Pendiente | — |
 | 35 | PNS-109 (NUEVO-2) | — | No aplica: migración atada a 14.0.3.1.973 | — |
 | 36 | PNS-103 | T2 | Pendiente | — |
@@ -85,8 +87,9 @@ fabricante). De los demás:
 ## Correcciones de la fase 1 (desde el 40)
 
 Reciben número al portarse, uno por corrección y en el orden de las tandas, con su F1-n como id (decisión 120).
-Pendientes: F1-2 (T1), caso 24 (T3), F1-6, SSE sin escapar y creador en `session_file` (T7), F1-7 y `str(e)`
+Pendientes: caso 24 (T3), F1-6, SSE sin escapar y creador en `session_file` (T7), F1-7 y `str(e)`
 del Chatboo (T8), F1-8 (T9) y F1-9 a F1-12 (T10).
 
 | N.º | id | Tanda | Estado | Commit |
 |---|---|---|---|---|
+| 40 | F1-2 | T1 | Validado en el laboratorio | `f70c3c0` |
