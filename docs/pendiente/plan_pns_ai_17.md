@@ -31,7 +31,9 @@
   de la fase 1, sin cambiar la versión de los manifiestos (F1-4 queda fuera, decisión 115). T0 hecha (24/11/2026):
   tests de no regresión y registro `docs/pendiente/parches_pns_ai.md`; línea base, 0 F y 0 E de 330. T1 hecha
   (24/11/2026): parches 12, 32, 16, 17, 19 y 33, y el 40 (F1-2), validados en el laboratorio (`f70c3c0`); línea
-  base, 0 F y 0 E de 378; laboratorio, 16 F de 56. Sigue la tanda T2.
+  base, 0 F y 0 E de 378; laboratorio, 16 F de 56. T2 hecha (24/11/2026): parches 21 y 36, validados en el
+  laboratorio (`[FIX]` `b391159` y `[ADD]` `0e41cab`); línea base, 0 F y 0 E de 390; laboratorio, 9 F de 56. Sigue
+  la tanda T3.
 
 ## Decisiones (Sergio, 22 y 23/11/2026)
 

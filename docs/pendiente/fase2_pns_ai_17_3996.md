@@ -104,6 +104,19 @@
     las líneas nuevas; la etiqueta es la misma.
   - **152.** Las 2 líneas ERROR de N16 son efecto esperado de la neutralización (sin `check_identity`, el plan llega
     a ejecutarse); se anotan en la tabla de neutralizaciones.
+- **Decisiones de Sergio en T2 (24/11/2026):**
+  - **153.** Parche 21 con la semántica de `_FlushingSavepoint` del core: `cr.flush()` antes del `SAVEPOINT`;
+    `env.flush_all()` dentro, tras `action_import()`; `cr.clear()` y `registry.clear_cache()` tras el `ROLLBACK`; sin
+    volcado en el `except` ni `contextlib`. Sustituye al punto 3 de la sección 11 de la clasificación (su orientación
+    para el port) y resuelve las dudas del `precommit` y del camino de excepción.
+  - **154.** La falta de `_postprocess_access_rights` en `_inject_screen_arch` es una observación de R17, fuera de T2.
+  - **155.** Lectura ORM en `test_providers_review_writes_nothing`, `[GUARD]`
+    `test_caller_pending_write_survives_review` y neutralizaciones N21a, N21b y N21c, como excepción a la 141 por ser
+    el riesgo alto.
+  - **156.** `test_admin_gets_config_backup_screens`, en un caso aparte.
+  - **157.** `odoo-dev 17 actualizar pns_base` en el laboratorio (`lab_pns_ai_3996_17`), como en la 149.
+  - **158.** Nombres: archivo, clase y etiqueta de la 14 y nombres de los casos del laboratorio.
+  - **159.** Las 3 líneas de 89 a 91 caracteres copiadas del laboratorio se quedan tal cual (el lint no las marca).
 
 ## 1. Alcance
 
@@ -326,8 +339,9 @@
 |---|---|
 | T0 | hecha (24/11/2026): 0 F y 0 E de 330 tests, 5 omitidos; laboratorio, 17 F de 56; `CLAUDE.md`, con la regla |
 | T1 | hecha (24/11/2026): 0 F y 0 E de 378 tests, 5 omitidos; laboratorio, 16 F de 56 |
-| T2 | pendiente (la siguiente) |
-| T3 a T10 | pendientes |
+| T2 | hecha (24/11/2026): 0 F y 0 E de 390 tests, 5 omitidos; laboratorio, 9 F de 56 |
+| T3 | pendiente (la siguiente) |
+| T4 a T10 | pendientes |
 
 ## 5. T0: tests de no regresión, registro y `CLAUDE.md`
 
@@ -581,3 +595,142 @@
     tandas de `pns_ai_mcp`;
   - en el contenedor, `docker run --rm -i` (sin `-i`, el heredoc no llega) y Python fuera del directorio de
     `odoo` o con `-I` (si no, `import logging` carga `odoo/logging.py`).
+
+## 7. T2: parches 21 y 36
+
+- **Fecha:** 24/11/2026. Partida: HEAD `22f3d85` («[DOC] pns_ai 17: registro de la tanda T1 (parches 12, 32, 16,
+  17, 19, 33 y 40) (fase 2)»), sin cambios locales.
+- **Fase 1** (solo lectura, 24/11/2026). Las citas del core son del contenedor del laboratorio
+  (`/usr/lib/python3/dist-packages/odoo`, Odoo 17.0-20260908); las de `pns_base`, de R17 (`operation_report_wizard.py`
+  de `22f3d85`):
+  - `git apply --check` falla en los 4 trozos, también uno a uno: el 21 en `:4` (R17 ya no importa `ast` ni
+    `json`), `:288` (`invalidate_cache()` es `self.env.invalidate_all()`, `:295`) y `:308` (`pns_import_preview` es
+    `form_view_ref`, `:317`); el 36 en `:367` (las dos funciones `_inject_*` son ahora `_inject_screen_arch`,
+    `:329-342`, con `postprocess_and_fields`, y `fields_view_get` es `get_view`, `:354-365`);
+  - 21 en R17: sin volcado antes del `SAVEPOINT` (`:315`); tras el `ROLLBACK TO SAVEPOINT` (`:324`),
+    `invalidate_all()` vuelca lo que la importación dejó pendiente (`odoo/api.py:719-728` y `:735-739`) y queda;
+    `Cache.invalidate()` sin argumentos solo vacía `_data`, no `_dirty` (`api.py:1306-1307`), e `invalidate_all` no
+    toca `tocompute`; `Cursor.clear()` vacía la caché con `_dirty`, `tocompute` y el `precommit`
+    (`odoo/sql_db.py:140-144`, `api.py:881-884` y `:1321-1325`);
+  - el core: `Cursor.flush()` es `transaction.flush()` más `precommit.run()` (`sql_db.py:134-138`, `api.py:870-879`);
+    `_FlushingSavepoint` hace `cr.flush()` al abrir y `cr.clear()` en el `rollback` (`sql_db.py:101-108`). `Cursor` y
+    `TestCursor` no redefinen `flush` ni `clear` (`BaseCursor`, `:121`);
+  - `has_group`: `_has_group` con `ormcache('self._uid', 'group_ext_id')` (`odoo/addons/base/models/res_users.py:1098`);
+    el `ROLLBACK` no lo deshace. `registry.clear_cache()` vacía `default` y `templates.cached_values`
+    (`odoo/modules/registry.py:50-55` y `:716-724`) y lo avisa a los demás workers al final de la petición
+    (`:858-885`); `ormcache.clear` está obsoleto y vacía más (`odoo/tools/cache.py:111-114`). Es el mismo coste que
+    escribir grupos (`res_users.py:758`);
+  - 36: `ir.ui.view` solo lo lee `base.group_system` (`odoo/addons/base/security/ir.model.access.csv:34-35`); `env.ref`
+    no comprueba permisos (`browse` y `exists`) y el `AccessError` sale en `src.arch` (`:333`). El core lee la vista en
+    `sudo` (`odoo/addons/base/models/ir_ui_view.py:2534`), la procesa con `postprocess_and_fields` en `sudo` en
+    `_get_view_cache` (`:2596-2632`) y después `get_view` aplica `check_access_rights('read')` y
+    `_postprocess_access_rights` con el usuario (`:2635-2666`). `get_view` de R17 solo llama a `_inject_screen_arch`
+    con las dos pantallas fijas (`:356`) y ya comprobó la lectura del asistente con el usuario (`:358`);
+  - comprobaciones previas de la parte 1 (paso 0): `_invalidate_after_preview_rollback` solo se llama desde
+    `action_preview` (`:322` y `:326`) y nadie la redefine; en los dos caminos, tras el `ROLLBACK` van el `RELEASE`, la
+    invalidación y, después, `raise` (relanza) o `_apply_import_preview` (sus escrituras en el asistente,
+    `_store_operation_result`, `:225`, van siempre después); `_preview_snapshot` (`:275-292`) solo lee y devuelve
+    datos simples; en los `action_import` de los 17 asistentes y en lo de `pns_*` que importan solo aparecen el
+    `with env.cr.savepoint()` de `pns_ai_mcp/utils/config_backup.py:676` y el cursor propio de
+    `pns_ai_mcp/models/ai_agent.py:1405` (`openapi_spec_generate_wizard.py:242` y `progress_job.py` no heredan el
+    mixin);
+  - módulo de los tests: `pns_ai_mcp`. `pns_base` solo depende de `web` y `mail`, y los tests necesitan los asistentes
+    de `pns_ai_mcp`, `ai.mcp.user`, `ai.provider` y `group_ai_admin`; como en la 14 y en la clasificación.
+- **Archivos:**
+  - código (`[FIX]`, 1): `pns_base/models/operation_report_wizard.py` (387 líneas, `2b5c71f7…a17a4`);
+  - tests (`[ADD]`, 3): `pns_ai_mcp/tests/`: `__init__.py` (bloque de Seges de T2; 60 líneas, `e4ee77bb…6808`) y,
+    nuevos, `test_seges_import_preview.py` (258, `62a9ae32…0074`) y `test_seges_review_views.py` (245,
+    `1a5178a9…d788`).
+- **Cambios respecto a `14.0` en el código** (a mano; 5 marcadores; líneas nuevas de 88 caracteres como máximo, sin
+  `%`):
+  - 21: la 14 volcaba antes y dentro del `SAVEPOINT` (también en el `except`, con `contextlib.suppress`) y, tras el
+    `ROLLBACK`, hacía `cr.precommit.clear()`, `env.clear()` y `registry.clear_caches()`. En la 17, la decisión 153:
+    `cr.flush()` antes del `SAVEPOINT` (`:323-327`), `env.flush_all()` tras `action_import()` (`:331-335`) y, en
+    `_invalidate_after_preview_rollback` (`:294-303`), `cr.clear()` y `registry.clear_cache()`;
+  - 36: `src = self.env.ref(xmlid).sudo()` en `_inject_screen_arch` (`:350-354`), que cubre las dos pantallas (en la
+    14 eran dos `.sudo()`, uno por función).
+- **Cambios respecto a `14.0` en los tests** (los dos llevan en la cabecera las líneas de la 14 sin cambios y la línea
+  de la 17, decisiones 128 y 134; nombres, decisión 158):
+  - `test_seges_import_preview.py` (`TestSegesImportPreview`, `seges_e2p`): los 4 casos de `TestImportReview` del
+    laboratorio (los de la 14 adaptados a la 17: SQL con `ctid` y valor, y `has_group` visto durante la vista
+    previa); la lectura ORM sin invalidar en `test_providers_review_writes_nothing` y el `[GUARD]`
+    `test_caller_pending_write_survives_review` (decisión 155: el campo, en `get_dirty_fields()` y no en el SQL antes;
+    en el SQL justo tras «Review», tras `flush_all()` y por el ORM). Sin `invalidate_cache`, `env['base'].flush()`
+    ni `cr.rollback()`;
+  - `test_seges_review_views.py` (`TestSegesReviewViews`, `seges_e2p`): los 6 casos de `TestReviewViews` del
+    laboratorio (`get_view` con `form_view_ref` en lugar de `fields_view_get` con `pns_import_preview` y
+    `pns_operation_result`; `invalidate_recordset()`) y `test_admin_gets_config_backup_screens` (decisión 156);
+  - los docstrings citan las líneas del archivo final; 3 líneas copiadas del laboratorio miden de 89 a 91
+    caracteres (decisión 159);
+  - `tests/__init__.py`: el bloque de Seges de T2, debajo del de T1.
+- **`odoo-dev 17 actualizar pns_base`** (decisión 157; log `actualizar-20261124-215349.log`): «RESULTADO: OK», 0
+  bloqueantes y 0 `ERROR`. Arrastra a `pns_ai_mcp` y `pns_ai_chatboo`; los 5 WARNING del fabricante de T1. El
+  servidor web se reinicia.
+- **Baterías** (desde el laboratorio):
+  - tres módulos (log `tests-20261124-215513.log`): `0 failed, 0 error(s) of 390 tests`, «RESULTADO: OK», sin
+    líneas `ERROR`. Omitidos (5), los de T0;
+  - `seges_pruebas_3996` (log `tests-20261124-215843.log`): `9 failed, 0 error(s) of 56 tests`. Frente a
+    `tests-20261124-174709.log`, pasan a verde los 7 `[HYPOTHESIS]` de los puntos 3 y 4 de la clasificación y no
+    hay rojos nuevos: `TestImportReview` (`test_users_review_writes_nothing`, `test_providers_review_writes_nothing`
+    y `test_users_review_keeps_groups`) y `TestReviewViews` (`test_admin_gets_review_screen`,
+    `test_admin_gets_result_screen`, `test_admin_users_review_and_result` y `test_admin_servers_review_and_result`).
+- **Por archivo:**
+
+| Archivo | Parche | Casos de T2 | Verdes |
+|---|---|---|---|
+| `test_seges_import_preview.py` | 21 | 5 | 5 |
+| `test_seges_review_views.py` | 36 | 7 | 7 |
+| **Total T2** | | **12 nuevos** | **12** |
+
+- **Neutralizaciones** (decisiones 141 y 155): con la batería de `pns_ai_mcp` (368 tests), la copia previa en el
+  scratchpad y el sha256 comprobado al restaurar; las F previstas, escritas antes de ejecutar cada una. Todas dan las
+  F previstas y todas las restauraciones, el sha256 del archivo final (`2b5c71f7…a17a4`). Las líneas `ERROR` de cada
+  log son solo las de sus F y la del resumen.
+
+| N | Qué se quita | F previstas | F obtenidas | Log |
+|---|---|---|---|---|
+| N21 | los cambios del 21 (el 36 se queda) | 3 | 3 (detalle debajo) | `tests-20261124-220205.log` |
+| N21a | el `cr.flush()` previo | 1 | 1: `test_caller_pending_write_survives_review` | `tests-20261124-220530.log` |
+| N21b | el `cr.clear()` | 1 | 1: `test_providers_review_writes_nothing` (ORM) | `tests-20261124-220832.log` |
+| N21c | el `registry.clear_cache()` | 1 | 1: `test_users_review_keeps_groups` | `tests-20261124-221155.log` |
+| N36 | el `.sudo()` | 5 | 5 (detalle debajo) | `tests-20261124-221517.log` |
+
+  - N21: `test_users_review_writes_nothing` (`ctid` y etiqueta cambiados), `test_providers_review_writes_nothing`
+    (la lectura ORM da 0.42) y `test_users_review_keeps_groups` (`has_group` en `True`). N21a: justo tras «Review»,
+    el SQL da `None` (lo del llamador se volcó dentro del savepoint y se perdió). N21b: la caché se queda con 0.42.
+  - N36: `test_admin_gets_review_screen`, `test_admin_gets_result_screen`, `test_admin_users_review_and_result`,
+    `test_admin_servers_review_and_result` y `test_admin_gets_config_backup_screens`; F, no E (el `AccessError` se
+    recoge en la lista de problemas).
+- **Línea base para T3:** tres módulos, `0 failed, 0 error(s) of 390 tests`, 5 omitidos, «RESULTADO: OK»
+  (`tests-20261124-215513.log`); `seges_pruebas_3996`, `9 failed, 0 error(s) of 56 tests`
+  (`tests-20261124-215843.log`). La batería de `pns_ai_mcp` sola tiene 368 tests.
+- **Lint** (`python3 ~/.claude/hooks/odoo_lint.py --revisar <modulo>/`): 0 incidencias nuevas en `pns_base/`
+  (`operation_report_wizard.py`, 24 preexistentes, del fabricante) y en `pns_ai_mcp/` (los dos tests nuevos, sin
+  preexistentes; `tests/__init__.py`, las 2 preexistentes: `UP009` e `I001`, decisión 137).
+- **Entorno:** comprobado antes y después. `odoo-dev 17 estado` igual (BD `lab_pns_ai_3996_17`,
+  `CONF_HASH=c5c7138b608673bb`), `bd-lista` sin `test_…` y el mismo sha256 de los `.py` de `seges_pruebas_3996`
+  (`b5e46c60…`). La BD del laboratorio queda con el código de T2 (decisión 157).
+- **Registro:** en `docs/pendiente/parches_pns_ai.md`, las filas 21 y 36, «Validado en el laboratorio» con
+  `b391159`.
+- **Commits** (los hace Sergio): `[FIX]` `b391159` («[FIX] pns_base: parches 21 y 36 adaptados a la 17 (PNS-20,
+  PNS-103) (T2)»); `[ADD]` `0e41cab` («[ADD] pns_ai_mcp: tests de Seges de los parches 21 y 36 en la 17 (T2)»);
+  `[DOC]`, el de este registro.
+- **Para el staging** (decisión 150; se actualiza `pns_base`):
+  - 21: como AI Administrator, pulsar «Review» en los usuarios MCP (etiqueta y AI Writer) y en los proveedores
+    (temperatura). Nada cambia, el usuario no gana el grupo (menús, sin volver a entrar) y «Apply» sí aplica. Una
+    importación que falle en «Review» muestra el error y no deja nada escrito. En el log aparece un INFO «Caches
+    invalidated… ['default']» en cada «Review»: es esperado;
+  - 36: un AI Administrator sin Ajustes, con y sin «Permisos de acceso», abre las pantallas de revisión y de
+    resultado en los dos asistentes, en la copia de configuración y en otro asistente cualquiera (por ejemplo, la
+    importación de skills). Un usuario sin AI Administrator sigue rechazado.
+- **Para las tandas siguientes:**
+  - observación de R17 (decisión 154): `_inject_screen_arch` no aplica `_postprocess_access_rights` por usuario
+    (el core lo hace en `get_view`, `ir_ui_view.py:2635-2666`). No lo amplía el `sudo` y hoy no tiene efecto: las
+    pantallas no tienen `groups=` ni los campos del mixin, y solo quedarían sin marcar `create`, `edit` y `delete` del
+    formulario;
+  - el `postcommit` de la vista previa no se vacía, igual que en el core (`cr.clear()` no lo toca); como mucho, un
+    aviso del bus sin efecto;
+  - `pns_ai_mcp/models/ai_agent.py:1405`, `_persist_cache_isolated`: cursor propio con `commit`; solo localizado, y
+    no se llega a él directamente desde ningún `action_import`;
+  - el savepoint anidado de `pns_ai_mcp/utils/config_backup.py:676` (`_FlushingSavepoint`) es compatible con la 153:
+    vuelca y limpia solo lo de la vista previa, porque lo del llamador ya está volcado.

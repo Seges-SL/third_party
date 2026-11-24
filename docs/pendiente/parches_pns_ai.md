@@ -51,7 +51,7 @@ fabricante). De los demás:
 | 18 | PNS-19 | T3 | Pendiente: O1 ampliado con B2 y P-22, sin B | — |
 | 19 | PNS-17 | T1 | Validado en el laboratorio | `f70c3c0` |
 | 20 | PNS-70 | T6 | Pendiente | — |
-| 21 | PNS-20 | T2 | Pendiente | — |
+| 21 | PNS-20 | T2 | Validado en el laboratorio | `b391159` |
 | 22 | PNS-100 | T4 | Pendiente | — |
 | 23 | PNS-101 | T0 (test) | Retirado en 3.1.973 (cubierto por el fabricante); no regresión | — |
 | 24 | PNS-102 | T3 | Pendiente | — |
@@ -66,7 +66,7 @@ fabricante). De los demás:
 | 33 | PNS-29 | T1 | Validado en el laboratorio | `f70c3c0` |
 | 34 | PNS-96 | T5b | Pendiente | — |
 | 35 | PNS-109 (NUEVO-2) | — | No aplica: migración atada a 14.0.3.1.973 | — |
-| 36 | PNS-103 | T2 | Pendiente | — |
+| 36 | PNS-103 | T2 | Validado en el laboratorio | `b391159` |
 | 37 | PNS-104 | — | No aplica: cada cursor tiene su `Transaction` en la 17 | — |
 | 38 | PNS-105 | — | No aplica: la misma causa que el 37 | — |
 | 39 | PNS-107 | T4 | Pendiente | — |

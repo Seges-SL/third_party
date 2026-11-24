@@ -514,6 +514,8 @@ menciones del propio test (así `test_seges_rpc_access.py`) o de la entrada del 
     la caché aún tiene los valores de dentro, ya deshechos en la BD, y el `invalidate_all()` normal es el que los
     escribe) y limpiar el ormcache con `registry.clear_cache()` (`clear_caches()` no existe en la 17).
     `TestImportReview` es su test de aceptación: los 3 rojos pasan a verde y el `[GUARD]` sigue en verde.
+    Decidido en la fase 2 (24/11/2026): esta orientación la sustituye la decisión 153 de
+    `docs/pendiente/fase2_pns_ai_17_3996.md` (la semántica de `_FlushingSavepoint`; registro en su sección 7).
   - Parche 36: hace falta. `_inject_screen_arch` tiene que leer la vista con `sudo()` (`:332-333`); `src` también se
     usa en `postprocess_and_fields` (`:337`), y el test dirá si basta. `TestReviewViews` es su test de aceptación: los 4
     rojos pasan a verde y los dos verdes siguen igual. El parche cubre también `config_backup_wizard`, que pasa por el
