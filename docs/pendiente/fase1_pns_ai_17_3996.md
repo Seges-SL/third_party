@@ -55,6 +55,15 @@
     dónde, o el cuerpo del código del core leído allí; no es una ejecución de ese código (eso es [C-ej] o probado)».
   - **81.** Las citas de documentos de la 14 con «fabricante» en el nombre se quedan: son antecedentes internos. La
     decisión 74 se refiere a no escribir nada dirigido al fabricante.
+  - **82.** F1-8 (Baja) va al port como corrección, como F1-6 y F1-7. Verificado en código, sin test de navegador.
+    La reproducción manual (abrir Autorizaciones, ir a otro menú, empezar a editar un formulario, que otro usuario
+    cree un plan y ver la recarga) va a la lista de comprobaciones del staging de la fase 3.
+  - **83.** Sin test de navegador en F1.3. El caso 20 queda probado con los 6 tests del servidor; el caso 23,
+    correcto por lectura ([C] para `handleMessage` y `subscribe` del core, [L] para los lectores), no probado.
+  - **84.** El sexto emisor (`ai_skill.py:36-38`) entra en el caso 20. La nota del PIN en `bus_bus` va con PNS-84,
+    sin número, con la frecuencia real del autovacuum citada. La clave que guarda `key_pin_desk.js` en el navegador
+    se apunta para F1.5.
+  - **85.** El `unsubscribe` muerto de `chatboo_app.js:469-474` es una observación con la regla de los menores.
 - **Marcas:**
   - **[L]:** leído (el cuerpo del código o del documento).
   - **[Loc]:** localizado por búsqueda, sin leer el cuerpo.
@@ -121,11 +130,14 @@
     - laboratorio, F1.1: `test_view_patch_17.py` (casos 3 a 6, sección 6);
     - laboratorio, F1.2: `test_routes_17.py` (caso 9, F1-6, el error de una ruta `json`, `text/plain` y CSRF;
       sección 6);
+    - laboratorio, F1.3: `test_bus_17.py` (caso 20: los 6 emisores, con el canal y el mensaje de `bus.bus`;
+      sección 6);
   - **indirecta (probado, sección 10 de la clasificación):**
     - la instalación de los tres módulos ejecuta la conversión de las 250 `attrs`, `post_init_hook` y `convert_file`;
     - `TestWebClientStarts.test_backend_starts_without_errors` (`pns_base`, en verde) carga el bundle completo,
       `pns_web_paths.js` incluido, sin errores de consola;
-  - **sin cobertura:** casos 11, 20 a 23 y 25 de la sección 3, y la desinstalación (los casos 4 y 5, desde F1.1);
+  - **sin cobertura:** casos 11, 21 a 23 y 25 de la sección 3 (el 23, correcto por lectura; decisión 83), y la
+    desinstalación (los casos 4 y 5, desde F1.1);
   - `TestRequiredFieldsLive` (caso 17) está omitido en el laboratorio porque no hay `crm`.
 
 ## 2. Inventario de las condiciones de versión
@@ -152,7 +164,7 @@
   `web_search_read` ×2, `web_read`, `_compute_display_name` ×2, `_has_field_access`, `_check_field_access`), 2
   `name_get` (API de la 14) y 4 que existen en las dos (`_compute_arch`, `_process_ondelete`, `session_info` ×2).
 - **JS, comprobaciones de existencia:** `pns_web_paths.js` (3 módulos) y la forma de la notificación del bus
-  (`chatboo_app.js:25-40`, `chatboo_systray.js:114`).
+  (suscripción `chatboo_app.js:456-481`, interpretación `:25-64`; `chatboo_systray.js:47-59`; caso 23).
 - **Criterio de descarte:**
   - `getattr(request, 'mcp_*')` y similares: atributos propios del fabricante;
   - `hasattr`/`getattr` sobre datos o registros propios (`invoke_code`, `isoformat`, `_ids`, `probe_stt`…) y sobre
@@ -357,15 +369,41 @@ cambia.
   - Rama: `check_access_rights` y `check_access_rule`. Core: `odoo/models.py:4139`, `:4150`; `check_access` no
     existe [C].
   - Clase: correcto. Cobertura: ninguna. Parche: ninguno.
-- **Caso 20. Avisos por el bus (servidor):** `pns_ai_chatboo/models/chatboo_session.py:523`,
-  `models/chatboo_canvas_page.py:119`, `models/chatboo_async_request.py:1625`, `pns_ai_mcp/models/key_pin_desk.py:72`
-  y `models/safe_operation.py:1753` [L].
-  - Rama: `bus.bus._sendone(partner, tipo, payload)`.
-  - Core: `addons/bus/models/bus.py:111` [C]; el cliente se suscribe al partner de la sesión
-    (`addons/bus/models/ir_websocket.py:75-76`, ref.).
-  - Clase: correcto en el servidor; la recepción, en el caso 23. Cobertura: ninguna.
+- **Caso 20. Avisos por el bus (servidor):** 6 emisores (decisión 84): `pns_ai_chatboo/models/chatboo_session.py:523`,
+  `models/chatboo_canvas_page.py:119`, `models/chatboo_async_request.py:1625`, `models/ai_skill.py:36-38`,
+  `pns_ai_mcp/models/key_pin_desk.py:72` y `models/safe_operation.py:1753` [L].
+  - Rama: `bus.bus._sendone(partner, tipo, payload)`; los fallbacks `sendone` de la 14 están muertos en la 17 [L].
+    Cuerpos idénticos a 3.1.973 (decisión 76).
+  - Core [C]:
+    - `_sendone` (`addons/bus/models/bus.py:111-125`): el canal de un partner es `(bd, 'res.partner', id)`
+      (`channel_with_db`, `:58-65`) y el mensaje, `{"type": tipo, "payload": payload}`;
+    - la fila de `bus.bus` se crea con `sudo` en el `precommit` (`:131-133`) y el `NOTIFY` sale en el `postcommit`
+      (`:135-160`): si la transacción se deshace, no sale nada;
+    - el cliente se suscribe a `'broadcast'` y a su propio partner (`addons/bus/models/ir_websocket.py:65-77`);
+    - los canales que pide el cliente deben ser cadenas (`:95-96`) y una cadena es `(bd, cadena)` (`bus.py:63-64`):
+      un usuario no puede suscribirse al partner de otro. Ningún módulo PNS sobrescribe `_build_bus_channel_list` ni
+      `ir.websocket` [Loc].
+  - Emisores [L] (los disparadores, [Loc]; `sync` es `pns_chatboo_sync`):
+
+    | Emisor | Tipo | Destinatario | Payload | Disparador |
+    |---|---|---|---|---|
+    | `notify_files_updated` | `sync` | dueño de la sesión | `message_received`, `session_id` | exportación |
+    | `_tell_new_readers` | `sync` | lectores nuevos | `page_shared`, `page_id`, `title`, `owner`, `url` | compartir |
+    | `_notify` | `sync` | dueño del trabajo | `action`, `session_id`, `request_id`, `is_error` | trabajo, cron |
+    | `_chatboo_notify_skills_changed` | `sync` | usuario actual | `skills_changed`, `confirm`, `session_id` | skills |
+    | `_broadcast` | `pns_key_pin*` (4) | AI Admins, mesas | `open`; `type`; `pin`, `email`, `login` | rutas del PIN |
+    | `_notify_safe_plan_hosts` | `pns_safe_plan` | dueño, AI Admins | `verification_id`, `status`, `executed` | plan |
+
+    - Ningún payload lleva texto del LLM ni datos de otros usuarios leídos con `sudo`; `verification_id` sale de una
+      secuencia (`safe_operation.py:438-457`), no es secreto.
+    - Van a un partner distinto del de quien los provoca, por diseño: la página compartida (el dueño la comparte;
+      la suplantación del dueño ya es P-8h, `e3_propuesta_3879.md:286-293` de `14.0`), la mesa del PIN (solo AI
+      Administrator, `controllers/key_pin.py:14-18`; PNS-84) y los planes (supervisión de los AI Administrators).
+  - Clase: **correcto, probado** (F1.3, 24/11/2026; antes, correcto en el servidor): los 6 tests de
+    `test_bus_17.py`, en verde (sección 6). La recepción, en el caso 23.
   - Parche: 11, 25, 26, 29 y 38 (`chatboo_session.py`); 28 (`chatboo_canvas_page.py`); 34
-    (`chatboo_async_request.py`); 18 y 38 (`key_pin_desk.py`); 16 y 38 (`safe_operation.py`).
+    (`chatboo_async_request.py`); 18 y 38 (`key_pin_desk.py`); 16 y 38 (`safe_operation.py`); ninguno en
+    `ai_skill.py` (búsqueda en la clasificación).
 - **Caso 21. PDF:** `pns_base/utils/pdf_io.py:45-57`, `:219`, `:386` [L].
   - Rama: `PyPDF2`; sin `fitz`, `pdfminer`. Imagen: `pypdf` no, `PyPDF2` 1.26.0, `fitz` no, `pdfminer` sí [C].
   - Clase: correcto (depende de la imagen, no de la serie). Cobertura: ninguna por nombre. Parche: ninguno.
@@ -379,11 +417,26 @@ cambia.
     importa nadie, y el comentario de la L11 es falso en la 17.0, que solo trata como módulo lo que lleva
     `@odoo-module` (`odoo/tools/js_transpiler.py:673`) [C]. Hallazgo F1-3.
   - Cobertura: `TestWebClientStarts` (probado indirecto: el bundle carga). Parche: ninguno.
-- **Caso 23. Avisos por el bus (cliente):** `pns_ai_chatboo/static/src/js/chatboo_app.js:25-40` y
-  `chatboo_systray.js:114` [L].
-  - Rama: interpretan la notificación de la 17 (lista o `{type, payload}`).
-  - Core: `bus_service` de la 17, no comprobado.
-  - Clase: sin saber. Cobertura: ninguna. Parche: ninguno.
+- **Caso 23. Avisos por el bus (cliente):** `pns_ai_chatboo/static/src/js/chatboo_app.js` (suscripción
+  `:456-481`; interpretación `:25-64`) y `chatboo_systray.js:47-59` [L].
+  - Rama: en la 17 usan `bus_service.subscribe` (existe), así que la rama de `useBus(…, "notification")` queda
+    muerta. Los demás lectores de esos tipos: `pns_ai_mcp/static/src/js/key_pin_desk.js:243-261` (los cuatro
+    `pns_key_pin*`, una sola suscripción por la bandera `listening`) y `safe_operation_action_buttons.js:35-43`
+    (`pns_safe_plan`; F1-8) [L].
+  - Core [C] (`addons/bus/static/src/services/bus_service.js`; líneas de la referencia, que tiene las mismas 241
+    líneas):
+    - `handleMessage` recibe `[{id, message: {type, payload}}]` y llama a `notificationBus.trigger(type, payload)`
+      (`:68-73`); el evento `"notification"` lleva la lista de `{type, payload}` (`:107`);
+    - `subscribe(tipo, cb)` llama a `cb(payload)` (`:232`); no hay `unsubscribe`.
+  - Forma: el callback recibe el `message` de Python tal cual; los analizadores solo quitan una capa `payload`
+    cuando existe, y aquí no la hay. Cuadra con la 17 [L+C].
+  - Qué hacen: recargar la sesión, invalidar la caché de skills, quitar la tarjeta del plan y, en el systray, el
+    aviso de página compartida, con `title` y `owner` como texto (`t-out` escapa,
+    `addons/web/static/src/core/notifications/notification.xml:7`, `:12`, [C]) y la URL solo si empieza por
+    `/chatboo/page/` (`chatboo_systray.js:138-158`) [L]. No pintan HTML del payload.
+  - Clase: **correcto** por lectura (decisión 83), no probado. Cobertura: ninguna. Parche: ninguno.
+  - Relacionado: F1-8 (`safe_operation_action_buttons.js`) y la observación del `unsubscribe` muerto de
+    `chatboo_app.js:469-474` (decisión 85), en la sección 5.
 - **Caso 24. Ganchos «Odoo 17+» del guardián:** `pns_ai_mcp/models/sandbox_secret_read.py:100-113` [L].
   - Core: `_has_field_access` y `_check_field_access` no existen en la 17 [C]; protege el gancho de la 14
     (`:116-126`).
@@ -449,7 +502,7 @@ cambia.
   - Incluido en las 12.888 líneas de `pns_ai_chatboo`: de sus 28 assets, 16 son idénticos a 3.1.973; de sus 19 JS,
     6 son módulos `@odoo-module` y el resto, scripts sin esa marca (varios se declaran «shared owl1 / owl2»).
   - Enganche con el servidor: casos 20, 22 y 23.
-  - Falta: la recepción por el bus (etapa F1.3) y la revisión por riesgo (etapa F1.5).
+  - Hecha la recepción por el bus (etapa F1.3: casos 20 y 23; F1-8). Falta la revisión por riesgo (etapa F1.5).
 - **`ir_ui_view_patch.py`:**
   - 519 líneas [L]. En la 17 están activos `_load_records`, `create`, `write`, `_compute_arch`, `_auto_convert_attrs`
     (paso 1) y `Base.get_view` (casos 3 a 6). Están muertos `<tree>`→`<list>`, `column_invisible`, el xpath de
@@ -527,6 +580,40 @@ cambia.
   - Antecedente: PNS-71 (Baja, verificado en código; corregido en 3.1.782), «`/chatboo/providers` lista con
     `sudo` todos los proveedores si el agente no tiene cadena» (`informe_fabricante_pns_ai.md:109`, `:1230`;
     `informe_3973/estado_hallazgos_3973.md:135`, «no revisado en 3.1.973»; de `14.0`).
+- **F1-8. `pns_safe_plan` recarga la página aunque ya no estés en Autorizaciones** (caso 23), Baja, verificado en
+  código (decisión 82) [L; core C y ref.]:
+  - `_bindSafePlanBus` (`pns_ai_mcp/static/src/js/safe_operation_action_buttons.js:35-43`) se suscribe a
+    `pns_safe_plan` en cada `setup` de un `ListController` o `FormController` de `ai.safe.operation`, y el
+    `bus_service` de la 17 no tiene `unsubscribe` (`bus_service.js:232`) [C]. El controlador viejo sigue cumpliendo
+    `_isSafePlanView` (`:17-22`), así que cada aviso llama a `doAction({tag: 'reload'})` (`:24-33`) [L]: una recarga
+    completa del cliente web estés donde estés, una vez por cada suscripción.
+  - Quién lo alcanza: cualquier usuario cuyo agente proponga un plan, y el cron de caducidad. El aviso va al dueño
+    y a todos los AI Administrators (caso 20); la recarga, a quien haya abierto Autorizaciones en esa pestaña.
+  - Qué permite: un formulario a medias se guarda solo (`urgentSave`,
+    `addons/web/static/src/views/form/form_controller.js:383-388`, ref.) o el navegador pregunta si quiere salir.
+    Integridad de los datos (una edición a medias guardada), no seguridad.
+  - Archivo nuevo en la 17: en 3.1.973 era `safe_operation_tree_v14.js`, sobre el bus antiguo (`on(…, this, …)`);
+    que allí se quitara al destruir el widget es inferido, no comprobado (el core 14 no está en las referencias).
+  - Reproducción manual (decisión 82): abrir Autorizaciones, ir a otro menú, empezar a editar un formulario, que
+    otro usuario cree un plan y ver la recarga. Va al staging de la fase 3 (sección 7).
+  - Antecedentes: `git grep` en `docs/` de `14.0` de `bus.bus`, `_sendone`, `pns_safe_plan`, `pns_key_pin`,
+    `page_shared`, `bus_service`, `unsubscribe`, `_notify_safe_plan_hosts` y `key_pin_desk`: nada del mismo
+    síntoma. Relacionado: PNS-31 (los oyentes globales de `key_pin_desk_v14.js`,
+    `informe_fabricante_pns_ai_2.md:546-553` de `14.0`).
+- **Observación, sin número: `unsubscribe` muerto en `chatboo_app.js`** (caso 23, decisión 85), menor [L; core C]:
+  - `pns_ai_chatboo/static/src/js/chatboo_app.js:469-474` solo se da de baja si existe `busService.unsubscribe`,
+    que la 17 no tiene (`bus_service.js:232`) [C]: las suscripciones de `:467-468` no se quitan.
+  - Sin efecto: `ChatbooApp` se monta una sola vez (`chatMounted` no vuelve a `false`, `chatboo_overlay.js:94`,
+    `:121-122`) [L]. Va con la regla de los menores (sección 7).
+- **Nota para PNS-84, sin número** (decisión 84) [L; core C]:
+  - El aviso `pns_key_pin` lleva el PIN, el correo y el login (`pns_ai_mcp/models/key_pin_desk.py:147-154`), y la
+    fila queda en `bus_bus` hasta la siguiente ejecución del autovacuum: `_gc_messages` lleva `@api.autovacuum` y
+    borra las filas de más de 100 s (`addons/bus/models/bus.py:96-99`, `TIMEOUT` en `:26`), y el cron
+    `base.autovacuum_job` corre una vez al día (`odoo/addons/base/data/ir_cron_data.xml:3-12`) [C]. Como máximo,
+    un día y 100 s si el cron es puntual; más si se retrasa.
+  - Solo se lee con `sudo` o con acceso a la BD: la ACL de `bus.bus` es `0,0,0,0` sin grupo [C].
+  - El PIN y la clave en claro ya son PNS-84 (Media; Seges asume el riesgo; `informe_fabricante_pns_ai_3973.md:457-461`
+    de `14.0`).
 - **Caso 6, sin número:** el coste de `Base.get_view` ya lo cubre PNS-42/PB-2, «parche global nuevo y menor» en el
   servidor (`comparacion_pns_ai_3-1-879.md:616` y `:805`; `estado_hallazgos_3879.md:352`; de `14.0`).
 
@@ -578,8 +665,26 @@ laboratorio (decisión 64). Los tests van como idea; no hay ninguno escrito.
     - Resultado: caso 9 correcto, probado (sección 3); F1-6 confirmado y F1-7 (sección 5).
 - **F1.3. Bus del Chatboo (casos 20 y 23):**
   - Leer: el `bus_service` de la 17.0 y los dos lectores del cliente.
-  - Test de navegador: `notify_files_updated` en el servidor y el cliente recibe `pns_chatboo_sync`.
-  - Necesita: Chrome en la imagen del laboratorio (ya está, sección 10 de la clasificación).
+  - Test: los 6 emisores del caso 20, con las filas de `bus.bus` (canal y mensaje) en la misma transacción. Sin test
+    de navegador (decisión 83): necesitaría un commit real para el `NOTIFY`.
+  - **Hecha (24/11/2026):**
+    - `seges_pruebas_3996/tests/test_bus_17.py`, clase `TestBus17` (`TransactionCase`), seis tests `[CHECK]`, en el
+      laboratorio y en su copia de `docs/pendiente/lab_3996/` (mismo `sha256sum`). Cada test ejecuta
+      `cr.precommit.run()` (como `addons/mail/tests/common.py:1254`) y lee las filas creadas tras una marca,
+      filtradas por canal y tipo:
+      1. `notify_files_updated`: una fila al partner del dueño de la sesión, `message_received` y `session_id`;
+      2. `_chatboo_notify_skills_changed` con el usuario U: una sola fila, la de U;
+      3. página compartida: una fila al lector nuevo y ninguna al dueño; claves exactas y `url` relativa;
+      4. `_notify('error')` de un trabajo: una fila al dueño con `is_error`;
+      5. `_notify_safe_plan_hosts`: al dueño y a los AI Administrators, no a un tercero;
+      6. `notify_changed` de la mesa del PIN: a los AI Administrators (y a quien llama), no a un tercero.
+    - Los 6, en verde. Arreglo del propio test: el 5 salió `[SETUP]` en la primera ejecución porque no pasaba
+      `expires_at` (NOT NULL en la tabla), que el módulo siempre pasa (`safe_operation.py:520-535`); no cambia lo
+      que comprueba.
+    - Laboratorio: `odoo-dev 17 tests seges_pruebas_3996` (BD temporal `test_lab_pns_ai_3996_17`, que no queda al
+      terminar): `14 failed, 0 error(s) of 50 tests`; los 14 de antes. Log `tests-20261124-115249.log`.
+    - Resultado: caso 20 correcto, probado; caso 23 correcto por lectura (sección 3); F1-8, la observación del
+      `unsubscribe` y la nota para PNS-84 (sección 5).
 - **F1.4. Lecturas sueltas (casos 5, 11, 15 y 25):**
   - Leer: `ir_ui_view.py:220` (caso 5); `action_service` y `view_service` de la 17.0 (caso 11); `Transaction.clear`
     (caso 15); `odoo/models.py:1678` (caso 25).
@@ -589,6 +694,8 @@ laboratorio (decisión 64). Los tests van como idea; no hay ninguno escrito.
   - Inventario con `git grep` de los puntos peligrosos en los 80 assets y en las librerías bajo demanda; revisión a
     mano de lo que salga, empezando por lo que pinta HTML (`chatboo_formatters.js`, `chatboo_markdown.js`,
     `sanitizeHtml`) y lo que llama al servidor (`key_pin_desk.js`, con su `csrf_token`).
+  - Apuntado (decisión 84): la clave que guarda `key_pin_desk.js` en el navegador (lista de claves y PIN; responde
+    con ella a `pns_key_pin`, `:193-218`).
   - Resultado: lo revisado, lo que queda sin revisar y los hallazgos `F1-n`.
 
 ## 7. Lo que va al port
@@ -607,6 +714,12 @@ laboratorio (decisión 64). Los tests van como idea; no hay ninguno escrito.
     `Origin`); con la corrección, el test 4 de `test_routes_17.py` pasa a verde;
   - F1-7: `/chatboo/providers` sin la lista de todos los proveedores activos cuando el agente no tiene cadena, como
     pedía PNS-71.
+- **F1-8 (decisión 82):** corrección, como F1-6 y F1-7: que `safe_operation_action_buttons.js` no deje suscripciones
+  de controladores ya cerrados (o que no recargue si su vista ya no está abierta). La reproducción manual (abrir
+  Autorizaciones, ir a otro menú, empezar a editar un formulario, que otro usuario cree un plan y ver la recarga) va
+  a la lista de comprobaciones del staging de la fase 3.
+- **`unsubscribe` muerto de `chatboo_app.js:469-474` (decisión 85):** observación con la regla de los menores (la
+  de F1-3 y F1-4): solo se corrige si el port toca ese archivo.
 - **Observaciones para el port (decisiones 74 y 79), sin número; iguales en 3.1.973:**
   - el SSE de `/mcp/sse` y `/mcp/<agent_code>/sse` mete el mensaje del agente, que lleva el código de la URL, en el
     JSON sin escapar (`pns_ai_mcp/controllers/main.py:532-536`). La respuesta solo la recibe quien hace la
