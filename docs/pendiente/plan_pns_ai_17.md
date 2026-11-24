@@ -20,8 +20,8 @@
   - pendiente para el port, en la sección 11: las aperturas de cursor del punto 5 localizadas y no leídas, la caja A
     con uid 1 (decisión 48) y el alias de los parches 15 y 22 (E3).
 
-  Sigue la fase 1 (el código que solo se activa en la 15 o superior; medir antes su alcance) y después la fase 2, el
-  port por tandas, como en la 14.
+  Fase 1 en curso: alcance medido en `docs/pendiente/fase1_pns_ai_17_3996.md` (24/11/2026); sigue su etapa F1.1
+  (`ir_ui_view_patch.py`) y, al terminar la fase 1, la fase 2, el port por tandas, como en la 14.
 
 ## Decisiones (Sergio, 22 y 23/11/2026)
 
@@ -69,7 +69,8 @@ Referencia de la 14 para comparar: `/home/soporte/pns_fabricante/3.1.973` (1.2.6
      `reportlab` y `requests`), pasar los tests del fabricante y confirmar lo que la clasificación deja para el
      laboratorio (su sección 8).
 2. **Fase 1:** analizar el código que solo se activa en la 15 o superior y que en la 14 no se revisó
-   (`ir_ui_view_patch.py`, assets, rutas JSON, cliente de Chatboo), con el criterio de los PNS.
+   (`ir_ui_view_patch.py`, assets, rutas JSON, cliente de Chatboo), con el criterio de los PNS. Alcance y etapas:
+   `docs/pendiente/fase1_pns_ai_17_3996.md`.
 3. **Fase 2:** portar y aplicar los parches en esta rama, con sus tests.
 4. **Fase 3:** staging en la 17, cliente y merge commit en `17.0`.
 
