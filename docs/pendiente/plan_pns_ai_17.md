@@ -2,10 +2,26 @@
 
 - **Rama de trabajo:** `17.0-pns-ai`, desde `17.0` en `95110bd` (configuración de claude-odoo-kit). Primer commit: la
   base del fabricante sin cambios. A `17.0` solo llega con merge commit cuando esté corregida y validada (como en 14.0).
-- **Estado (23/11/2026):** base copiada; fase 0: clasificación de los parches hecha
-  (`docs/pendiente/clasificacion_parches_pns_ai_17_3996.md`); laboratorio `lab_pns_ai_3996` montado, con imagen
-  propia con Chrome: los tres módulos se instalan y pasan los 249 tests del fabricante, el del navegador incluido
-  (3 omitidos por el entorno; sección 10 de la clasificación); siguen los 8 puntos de la sección 8.
+- **Estado (24/11/2026):** base copiada; fase 0 hecha. Clasificación de los parches en
+  `docs/pendiente/clasificacion_parches_pns_ai_17_3996.md`; laboratorio `lab_pns_ai_3996` montado, con imagen propia
+  con Chrome: los tres módulos se instalan y pasan los 249 tests del fabricante, el del navegador incluido (3 omitidos
+  por el entorno; sección 10 de la clasificación). Sección 8 cerrada (resultados en la sección 11):
+  - punto 8, citas del core: 51, 45 iguales y 6 desplazadas, ninguna distinta ni ausente (`cd3192f`);
+  - punto 2, parche 20 (`window.Chart`): confirmado (`dbca83c`);
+  - puntos 3 y 4, parches 21 y 36 (revisión de importación y vistas sin Ajustes): confirmados (`2eda904`);
+  - punto 5, parches 37 y 38 (cursores aparte): no aplican, no se portan (`67bb15b`);
+  - punto 1, parche 18 (caché de secretos en la caja A): (a) sin invalidación B, (b) y (c) confirmados; se porta como
+    O1 ampliado (decisión 29, `59a4662`);
+  - punto 7, parches 22 y 39 (métodos con efectos): las listas se actualizan en el port; salen 6, entran 13 en la
+    lista global y en la tabla por modelo y 6 solo en la tabla (`b7c09b8`);
+  - punto 6, parche 29: sus tests, en la fase 2 del plan (la predicción está en la sección 11);
+  - laboratorio (`seges_pruebas_3996`, copia en `docs/pendiente/lab_3996/`): `13 failed, 0 error(s) of 30 tests`, los
+    13 `[HYPOTHESIS]` esperados de los puntos 2, 3, 4 y 1, que pasan a verde con el port;
+  - pendiente para el port, en la sección 11: las aperturas de cursor del punto 5 localizadas y no leídas, la caja A
+    con uid 1 (decisión 48) y el alias de los parches 15 y 22 (E3).
+
+  Sigue la fase 1 (el código que solo se activa en la 15 o superior; medir antes su alcance) y después la fase 2, el
+  port por tandas, como en la 14.
 
 ## Decisiones (Sergio, 22 y 23/11/2026)
 

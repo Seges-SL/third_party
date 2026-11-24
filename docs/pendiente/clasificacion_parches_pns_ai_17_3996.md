@@ -1,7 +1,9 @@
 # Clasificación de los parches `pns_ai` para la 17.0.3.1.996
 
 - **Rama:** `17.0-pns-ai`, sobre `27c8045` ([plan](plan_pns_ai_17.md), fase 0).
-- **Fecha:** 23/11/2026. Solo lectura: no se ha aplicado, instalado ni probado nada.
+- **Fecha:** 23/11/2026; la sección 11, del 23 y 24/11/2026. No se ha aplicado ningún parche. Las secciones 1 a 9 son
+  de solo lectura; la 10 instala y prueba los tres módulos en el laboratorio `lab_pns_ai_3996`, y la 11 confirma la
+  sección 8 con tests en su módulo `seges_pruebas_3996` (copia en `docs/pendiente/lab_3996/`).
 - **Alcance:** qué parches de la 14 hacen falta en la 17 y por qué. Cómo se adapta cada uno se decide después (fase 2
   del plan).
 
@@ -366,9 +368,10 @@ menciones del propio test (así `test_seges_rpc_access.py`) o de la entrada del 
   1. Imagen propia del laboratorio con `google-chrome-stable` y `websocket-client` (`infra/Dockerfile.17` del
      laboratorio), para el omitido de `pns_base` y el punto 2 (parche 20). **Hecho (23/11/2026):** «Montaje» (imagen
      propia) y «Tests» (segunda ejecución).
-  2. Después, los 8 puntos de la sección 8, con pruebas automatizadas siempre que se pueda.
+  2. Después, los 8 puntos de la sección 8, con pruebas automatizadas siempre que se pueda. **Hecho (24/11/2026):**
+     resultados en la sección 11.
 
-## 11. Resultado de la sección 8 (23/11/2026)
+## 11. Resultado de la sección 8 (23 y 24/11/2026)
 
 ### Punto 8: citas del core
 
