@@ -292,7 +292,15 @@ class PnsOperationReportWizard(models.AbstractModel):
         }
 
     def _invalidate_after_preview_rollback(self):
-        self.env.invalidate_all()
+        # Seges: parche 21 (PNS-20, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        # action_preview flushed the caller's pending work before the savepoint:
+        # after the rollback, whatever is left in the cache (dirty or not), in
+        # tocompute and in precommit belongs to the undone preview. Drop it all
+        # unwritten, as Odoo's _FlushingSavepoint.rollback does with cr.clear().
+        self.env.cr.clear()
+        # Seges: parche 21 (PNS-20, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        # The rollback does not undo the ormcache (has_group, access rules...).
+        self.env.registry.clear_cache()
 
     def _wizard_defines_import(self):
         for cls in type(self).mro():
@@ -312,9 +320,19 @@ class PnsOperationReportWizard(models.AbstractModel):
         if not self._wizard_defines_import():
             raise UserError(_("This wizard has no import to review."))
         cr = self.env.cr
+        # Seges: parche 21 (PNS-20, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        # Flush the caller's pending writes and run its precommit before the
+        # savepoint, as Odoo's _FlushingSavepoint does: the rollback must not
+        # undo them, and the cleanup after it must not drop them.
+        cr.flush()
         cr.execute('SAVEPOINT %s' % _PREVIEW_SAVEPOINT)
         try:
             self.with_context(form_view_ref=False).action_import()
+            # Seges: parche 21 (PNS-20, seguridad). Ver docs/pendiente/parches_pns_ai.md
+            # The import's pending writes go to the database inside the savepoint:
+            # the snapshot sees all of it, a failing flush goes to the except
+            # branch, and the rollback undoes it instead of the end of the request.
+            self.env.flush_all()
             snap = self._preview_snapshot()
         except Exception:
             cr.execute('ROLLBACK TO SAVEPOINT %s' % _PREVIEW_SAVEPOINT)
@@ -329,7 +347,11 @@ class PnsOperationReportWizard(models.AbstractModel):
     def _inject_screen_arch(self, result, xmlid):
         """The screen's arch in place of the wizard's form, postprocessed for
         this model, with the fields it shows (the client loads only those)."""
-        src = self.env.ref(xmlid)
+        # Seges: parche 36 (PNS-103, funcional). Ver docs/pendiente/parches_pns_ai.md
+        # ir.ui.view is readable only by Settings. get_view passes only the two
+        # fixed screens and already checked read on the wizard as the user; the
+        # screen is read and postprocessed in sudo, as Odoo's _get_view_cache does.
+        src = self.env.ref(xmlid).sudo()
         arch = src.arch
         View = self.env['ir.ui.view']
         if hasattr(View, '_auto_convert_attrs'):
