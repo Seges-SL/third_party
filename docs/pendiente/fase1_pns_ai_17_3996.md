@@ -37,12 +37,30 @@
   - **71.** `tests/__init__.py` se queda con su patrón (solo la línea añadida, sin reordenar ni `noqa`).
   - **72.** El pendiente de migración va en `docs/migracion/pendiente_17.0.md` (regla `pendiente_<rama>.md`, con la
     rama de destino); es el primer archivo de la carpeta y su formato queda como convención.
+  - **73.** F1-6 se numera ya como «sin confirmar» (como F1-1 y F1-2); lo confirma o lo descarta el test 4
+    (`[HYPOTHESIS]`).
+  - **74.** Los tres puntos iguales en la 14 (el mensaje sin escapar en el SSE, el creador que pasa siempre en
+    `session_file` y el `str(e)` en las respuestas del Chatboo) van como observación para el port en la sección 7,
+    sin número `F1-n`, con sus antecedentes de la 14.
+  - **75.** El test 3 entra: con un método sin efectos ni red (`tools/list`), el permiso conversacional como
+    `[SETUP]` y una clave creada en el test que nunca sale en el log ni en el informe.
+  - **76.** Para los cuerpos idénticos a 3.1.973 vale la revisión de la 14. El alcance de F1.2 es lo que cambia en
+    el core 17 más el cambio de `list_providers`.
+  - **77.** El cambio de `list_providers` se numera como F1-7, regresión de PNS-71 (Baja).
+  - **78.** F1-6 y F1-7 van al port como correcciones (no con la regla de los menores de F1-3 a F1-5). Con la
+    corrección de F1-6, el test 4 pasa a verde.
+  - **79.** El `str(e)` de las rutas del Chatboo distintas de `check_health`, el mensaje sin escapar del SSE y el
+    creador en `session_file` van como observación para el port en la sección 7, con sus antecedentes.
+  - **80.** Se amplía la definición de la marca [C]: «capturado del contenedor en una ejecución sin red: existencia y
+    dónde, o el cuerpo del código del core leído allí; no es una ejecución de ese código (eso es [C-ej] o probado)».
+  - **81.** Las citas de documentos de la 14 con «fabricante» en el nombre se quedan: son antecedentes internos. La
+    decisión 74 se refiere a no escribir nada dirigido al fabricante.
 - **Marcas:**
   - **[L]:** leído (el cuerpo del código o del documento).
   - **[Loc]:** localizado por búsqueda, sin leer el cuerpo.
-  - **[C]:** comprobado en el contenedor de `odoo-dev:17-lab_pns_ai_3996` (core `17.0-20260908`,
-    `/usr/lib/python3/dist-packages/odoo`) en una única ejecución, sin red ni volúmenes: búsqueda en las fuentes o
-    `hasattr` tras importar `odoo` sin BD. Prueba que algo existe y dónde, no cómo se comporta.
+  - **[C]:** capturado del contenedor de `odoo-dev:17-lab_pns_ai_3996` (core `17.0-20260908`,
+    `/usr/lib/python3/dist-packages/odoo`) en una ejecución sin red (decisión 80): existencia y dónde, o el cuerpo
+    del código del core leído allí; no es una ejecución de ese código (eso es [C-ej] o probado).
   - **(ref.):** cita de `/opt/odoo-src/17.0/odoo` (`6a0efa7`), solo para lo que esa ejecución no capturó.
   - **[C-ej]:** código de R17 ejecutado en el contenedor, sin Odoo ni BD (decisión 65): el convertidor de
     `ir_ui_view_patch.py:20-301`, con el script por la entrada estándar. Muestra cómo se comporta ese código; no
@@ -85,7 +103,11 @@
 - **Puede quedar fuera:**
   - código de la 15 o superior sin condición y con un nombre que no está en la lista (por ejemplo, una firma que
     cambia de sentido sin cambiar de nombre);
-  - el comportamiento en la 17 de las 59 rutas: solo están contadas;
+  - las 59 rutas ya no están solo contadas: están inventariadas en F1.2 (sección 4). Alcance de F1.2 (decisión 76):
+    lo que cambia en el core 17 y `list_providers`. Los 59 decoradores son idénticos a los de 3.1.973 (comparados
+    por AST: URL, función y argumentos) y los cuerpos también, salvo `list_providers` y el import de
+    `content_disposition` de `chatboo.py` (comparación de los archivos de `controllers/` y de sus utilidades); esos
+    cuerpos no se han vuelto a revisar en la 17: vale la revisión de la 14;
   - el JS: solo está medido, no revisado;
   - el core 14 no está en las referencias: «no existe en la 14» se apoya en los comentarios del fabricante y en
     `analisis_pns_base.md`, no en una comprobación.
@@ -97,11 +119,13 @@
     - laboratorio: `test_review_views.py` (el `get_view` del asistente, parches 21 y 36) y `test_side_cursors.py`
       (`test_is_running`);
     - laboratorio, F1.1: `test_view_patch_17.py` (casos 3 a 6, sección 6);
+    - laboratorio, F1.2: `test_routes_17.py` (caso 9, F1-6, el error de una ruta `json`, `text/plain` y CSRF;
+      sección 6);
   - **indirecta (probado, sección 10 de la clasificación):**
     - la instalación de los tres módulos ejecuta la conversión de las 250 `attrs`, `post_init_hook` y `convert_file`;
     - `TestWebClientStarts.test_backend_starts_without_errors` (`pns_base`, en verde) carga el bundle completo,
       `pns_web_paths.js` incluido, sin errores de consola;
-  - **sin cobertura:** casos 9, 11, 20 a 23 y 25 de la sección 3, y la desinstalación (los casos 4 y 5, desde F1.1);
+  - **sin cobertura:** casos 11, 20 a 23 y 25 de la sección 3, y la desinstalación (los casos 4 y 5, desde F1.1);
   - `TestRequiredFieldsLive` (caso 17) está omitido en el laboratorio porque no hay `crm`.
 
 ## 2. Inventario de las condiciones de versión
@@ -254,10 +278,29 @@ cambia.
 - **Caso 9. `/mcp` sin `http_patch`:** `pns_base/utils/compat.py:28` → `pns_ai_mcp/http_patch.py:26` [L].
   - Rama: no hay parche; el POST con `Content-Type: application/json` a `/mcp` (rutas `type='http'`) lo despacha el
     core.
-  - Core: `odoo/http.py:2098-2102` (`HttpDispatcher`, `is_compatible_with`), `:2162-2171` (`JsonRPCDispatcher`) [C,
-    cuerpos sin leer].
-  - Clase: sin saber (área de las rutas JSON). Cobertura: los tests del fabricante que envían `application/json`
-    (`tests/_helpers.py:372`), sin comprobar qué ruta tocan. Parche: ninguno.
+  - Core [C; ejecución de F1.2, cuerpos leídos; `odoo/http.py` y `odoo/addons/base/models/ir_http.py` tienen el
+    mismo sha256 que en `6a0efa7`]:
+    - `_set_request_dispatcher` elige el dispatcher por el `type` de la ruta y da 400 si no es compatible
+      (`odoo/http.py:1907-1918`). `HttpDispatcher.is_compatible_with` devuelve siempre `True` (`:2098-2103`);
+      `JsonRPCDispatcher`, solo con `application/json` o `application/json-rpc` (`:2162-2172`);
+    - el CSRF solo lo mira `HttpDispatcher`, con un método fuera de `CSRF_FREE_METHODS` y `csrf` distinto de
+      `False` (`:2117-2127`). `/mcp` lleva `csrf=False` (`pns_ai_mcp/controllers/main.py:759`) y `auth='none'`, que
+      deja `uid=None` aunque haya cookie (`odoo/addons/base/models/ir_http.py:142-144`);
+    - con `cors='*'` el core añade `Access-Control-Allow-Origin` y contesta él los `OPTIONS` con 204, sin llegar al
+      controlador (`odoo/http.py:2055-2067`).
+  - Respuesta según la clave [L] (`main.py:760-1033`), con el `Origin` ausente o permitido (si no, 403, `:767-768`)
+    y el agente `pns_ai_mcp` activo (si no, 404, `:769-775`). El `id` es el del cuerpo:
+
+    | Clave | HTTP | Respuesta JSON-RPC |
+    |---|---|---|
+    | Ninguna | 401 | error `-32000`, «API key required» (`:828`, `:835`; el 401, `controllers/utils.py:62-68`) |
+    | Incorrecta | 401 | error `-32000`, «Invalid API key» (`:851`) |
+    | Correcta (usuario activo, permiso conversacional) | 200 | `result` del método (`:940`, `:974`) |
+
+  - Clase: correcto, probado (F1.2, 24/11/2026; antes, sin saber): tests 1 a 3 de `test_routes_17.py` en verde
+    (sección 6); el 1 devuelve el `id` del cuerpo, así que el cuerpo se lee. Cobertura: esos tres tests; los del
+    fabricante envían `application/json` (`tests/_helpers.py:372`) sin comprobar la ruta. Parche: ninguno. Las
+    cabeceras de la respuesta: F1-6 (sección 5).
 - **Caso 10. Assets de la 14:** `pns_ai_mcp/utils/compat.py:66` [L].
   - Rama: vuelve sin hacer nada; los assets entran por el manifiesto. Clase: correcto. Parche: ninguno.
 - **Caso 11. `'list'` en una acción de Ajustes:** `pns_ai_mcp/models/res_config_settings.py:158-159`, usado en
@@ -373,9 +416,35 @@ cambia.
     `verification_ui.py` 4, `key_pin.py` 3, `choice_ui.py` 2, `remote_image.py` 1, `session_file.py` 1).
   - Ocurrencias de `type=`: 34 `JSON_ROUTE_TYPE` (`'json'` en la 17) y 27 `'http'`. 14 `csrf=False`, todas en
     `pns_ai_mcp/controllers/main.py`.
-  - Sin `http_patch` en la 17 (caso 9).
-  - Falta: el inventario de las 59 (`auth=`, `type=`, `csrf=`, `methods=` y quién las alcanza), empezando por las 14
-    `csrf=False` de `main.py` (etapa F1.2).
+  - Sin `http_patch` en la 17 (caso 9). Las 27 ocurrencias de `'http'` son 25 rutas y dos comentarios
+    (`main.py:763`, `http_patch.py:4`).
+  - Inventario (F1.2) [L], por combinación de `auth`, `type` y `csrf`:
+    - `none` · `http` · `csrf=False` · `cors='*'` · `save_session=False`: 14, todas `/mcp*` de `main.py`; las alcanza
+      cualquiera desde internet. Protecciones: `Origin` (`main.py:308-318`; `utils/mcp_origin.py`) y clave por
+      cabecera (hash en `ai.mcp.user`); sin clave no escriben nada (`main.py:116-123`). Los 6 `OPTIONS` los contesta
+      el core (caso 9). Sin clave se distingue un agente que existe (401 o 405) de uno que no (404), como en la 14;
+    - `user` · `http` · CSRF del core: 11. Aceptan POST 5: `key_pin.py:37` (administrador de IA),
+      `chatboo.py:788` (`/chatboo/stream`), `:1192` (compartir el lienzo), `:1216` (lectores de una página) y
+      `session_file.py:41` (sin `methods`). Solo GET 6: `remote_image.py:24` (lista blanca) y, en `chatboo.py`, el
+      lienzo, `share/people`, la página compartida y las dos descargas (`attachment`);
+    - `user` · `json`: 34 (`verification_ui.py` 4, `key_pin.py` 2, `choice_ui.py` 2, `chatboo.py` 26). Sin CSRF en
+      el core; solo se llaman con `Content-Type` JSON (test 8), que entre orígenes exige preflight, y ninguna lleva
+      `cors`. Comprobación propia: dueño (verificaciones y elecciones), administrador de IA (PIN) o acceso al
+      Chatboo con sesión o trabajo propios. Escriben: las 4 de verificación (`pending` genera el token), las 2 de
+      elección, `key_pin/supply` (recibe una clave) y, en `chatboo.py`, prefs, sesiones (también `load` y
+      `async/poll`, que marcan uso o vistos), exportación, lienzo, trabajos y skills; `key_pin/desk` (`_touch`), sin
+      leer [Loc];
+    - `public`: 0. `user` con `csrf=False`: 0.
+  - 58 reglas registradas: los decoradores interiores apilados de `main.py:261` y `:282` (`OPTIONS` de
+    `/mcp/message` y `/mcp/<agent_code>/message`) se pierden (`odoo/http.py:792-806`, `:870-894`) [C], y
+    `session_file` lleva dos URL. El preflight de esas dos URL lo contesta igualmente la regla POST, porque
+    `ir.http` añade `OPTIONS` a todas las reglas (`odoo/addons/base/models/ir_http.py:262-267`, ref.; mismo
+    sha256 que el contenedor).
+  - Ninguna ruta es nueva frente a 3.1.973 (decisión 76, sección 1). Revisiones de la 14 que cubren los cuerpos
+    (de `14.0`): `analisis_pns_ai_mcp_4_servidor_mcp.md` §2.1-2.4 (rutas MCP, preflight, decoradores apilados y
+    elección de BD), `analisis_pns_ai_chatboo_1_servidor.md` §4, `comparacion_pns_ai_3-1-879.md` §8.1 (10 rutas
+    del lienzo, el PIN y `fulfill_export`) y PNS-21, PNS-28, PNS-31, PNS-58, PNS-59, PNS-71 y PNS-89.
+  - Hallazgos: F1-6 (cabeceras de `/mcp*`) y F1-7 (`list_providers`), en la sección 5.
 - **Cliente del Chatboo:**
   - Incluido en las 12.888 líneas de `pns_ai_chatboo`: de sus 28 assets, 16 son idénticos a 3.1.973; de sus 19 JS,
     6 son módulos `@odoo-module` y el resto, scripts sin esa marca (varios se declaran «shared owl1 / owl2»).
@@ -428,6 +497,36 @@ cambia.
   - Antecedentes: `git grep` en `docs/` de `14.0` (`9cbb303`) y de `17.0-pns-ai` (`ac624f9`) de `ir_ui_view_patch`,
     `_auto_convert_attrs`, `o_pns_view`, `fields_view_get` y «conversión de `attrs`». Solo aparece el arreglo del
     escape (`pns_base` 1.2.68; `comparacion_pns_ai_3-1-973.md:578` y `:864` de `14.0`), que es otro síntoma.
+- **F1-6. `Access-Control-Allow-Origin` repetida en las respuestas de `/mcp*`** (caso 9), Baja, confirmado
+  (decisión 73) [L; C; probado]:
+  - El módulo pone la cabecera con el `Origin` de quien llama, o `*` sin `Origin` (`_mcp_cors_origin`,
+    `pns_ai_mcp/controllers/main.py:327-331`; `_mcp_json_http_response`, `:333-340`, y las demás respuestas de
+    `/mcp*`). El core añade la de `cors='*'` (`odoo/http.py:2055-2061`) [C] con `headers.extend`, que no sustituye
+    (`_inject_future_response`, `:1804-1806`, ref.; mismo sha256 que el contenedor).
+  - Probado: el test 4 de `test_routes_17.py` (`[HYPOTHESIS]`) sale en rojo con
+    `Lists differ: ['https://allowed.lab-3996.test', '*'] != ['https://allowed.lab-3996.test']`.
+  - Quién lo nota: un cliente MCP de navegador desde un origen permitido (`pns_ai_mcp.mcp_allowed_origins` o
+    `web.base.url`). El navegador rechaza los dos valores y no deja leer la respuesta, aunque la petición ya se ha
+    ejecutado. Los clientes de escritorio no envían `Origin` ni miran CORS.
+  - Gravedad: Baja, sin seguridad: la respuesta queda más restringida y no hay `Access-Control-Allow-Credentials`.
+  - Antecedentes: `git grep` en `docs/` de `14.0` (`9cbb303`) y de `17.0-pns-ai` (`81250fc`) de
+    `_inject_future_response`, `headers.extend`, «dos cabeceras» y «dos valores»: nada del mismo síntoma. PNS-28
+    (validar el `Origin`) y el preflight de la 14 (`analisis_pns_ai_mcp_4_servidor_mcp.md` §2.2, de `14.0`) son
+    otros síntomas.
+- **F1-7. `/chatboo/providers` vuelve a listar todos los proveedores activos** (decisión 77), Baja, regresión de
+  PNS-71 [L]:
+  - `list_providers` (`pns_ai_chatboo/controllers/chatboo.py:751-784`) llama a
+    `get_providers_for_agent(agent_code, need='conversation')`. Si el agente no tiene cadena, ese método devuelve
+    todos los proveedores activos, leídos con `sudo` (`pns_ai_mcp/models/ai_execution_engine.py:237-239`; igual en
+    3.1.973). En 3.1.973 la ruta solo usaba los failovers del agente y, sin cadena, devolvía una lista vacía.
+  - Devuelve por proveedor (`_serialize_provider`, `chatboo.py:1063-1080`, igual que en 3.1.973): id, nombre,
+    protocolo, modelo, alias y etiqueta; el host solo si no hay alias ni nombre (`_provider_host`, `:1048-1061`).
+    Sin claves ni endpoint.
+  - Quién lo alcanza: los usuarios con acceso al Chatboo (grupo conversacional y clave MCP). Qué permite: ver la
+    infraestructura de IA configurada (nombres, protocolos y modelos), lo que PNS-71 pedía no exponer.
+  - Antecedente: PNS-71 (Baja, verificado en código; corregido en 3.1.782), «`/chatboo/providers` lista con
+    `sudo` todos los proveedores si el agente no tiene cadena» (`informe_fabricante_pns_ai.md:109`, `:1230`;
+    `informe_3973/estado_hallazgos_3973.md:135`, «no revisado en 3.1.973»; de `14.0`).
 - **Caso 6, sin número:** el coste de `Base.get_view` ya lo cubre PNS-42/PB-2, «parche global nuevo y menor» en el
   servidor (`comparacion_pns_ai_3-1-879.md:616` y `:805`; `estado_hallazgos_3879.md:352`; de `14.0`).
 
@@ -458,6 +557,25 @@ laboratorio (decisión 64). Los tests van como idea; no hay ninguno escrito.
   - Test: `HttpCase` con un POST `application/json` a `/mcp` sin clave, que debe dar un error MCP, no un 400 ni un
     error de CSRF; y una ruta `json` que falla, con el formato de error esperado.
   - Necesita: `HttpCase` en el laboratorio.
+  - **Hecha (24/11/2026):**
+    - `seges_pruebas_3996/tests/test_routes_17.py`, clase `TestRoutes17` (`HttpCase`), nueve tests, en el
+      laboratorio y en su copia de `docs/pendiente/lab_3996/` (mismo `sha256sum`):
+      1. POST JSON a `/mcp` sin clave: 401, «API key required» y el `id` del cuerpo;
+      2. con una clave aleatoria: 401, «Invalid API key»;
+      3. con una clave creada en el test para un usuario con el grupo conversacional, `tools/list` (sin red ni
+         sesión SSE; decisión 75): 200 y una lista de herramientas;
+      4. `[HYPOTHESIS]` (F1-6): una sola `Access-Control-Allow-Origin` con un `Origin` permitido;
+      5. `Origin` ajeno: 403, «Origin not allowed»;
+      6. `OPTIONS /mcp`: 204 del core, con su `Access-Control-Allow-Headers` fijo;
+      7. ruta `json` que falla (`/chatboo/sessions/load` sin `session_id`): HTTP 200, código 200, «Odoo Server
+         Error», `builtins.TypeError` y `debug`;
+      8. POST `text/plain` a `/pns_ai_mcp/verification/pending`: 400 «Request inferred type is compatible with…»;
+      9. POST sin `csrf_token` a `/pns_ai_mcp/key_pin/stop` y a `/chatboo/stream`: 400 «Session expired (invalid
+         CSRF token)».
+    - Ocho en verde y el 4 en rojo (F1-6 confirmado). Ningún test se corrigió tras la ejecución.
+    - Laboratorio: `odoo-dev 17 tests seges_pruebas_3996` (BD temporal `test_lab_pns_ai_3996_17`, que no queda al
+      terminar): `14 failed, 0 error(s) of 44 tests`; los 13 de antes y el test 4. Log `tests-20261124-112619.log`.
+    - Resultado: caso 9 correcto, probado (sección 3); F1-6 confirmado y F1-7 (sección 5).
 - **F1.3. Bus del Chatboo (casos 20 y 23):**
   - Leer: el `bus_service` de la 17.0 y los dos lectores del cliente.
   - Test de navegador: `notify_files_updated` en el servidor y el cliente recibe `pns_chatboo_sync`.
@@ -484,5 +602,25 @@ laboratorio (decisión 64). Los tests van como idea; no hay ninguno escrito.
   quedan como inventario.
 - **F1-5 (menor):** con la regla de F1-3 y F1-4; además, los parches que toquen XML de vistas evitan sus formas
   (`attrs` en un texto, espacio inicial, atributo fijo repetido y `<attribute name="attrs">`).
+- **F1-6 y F1-7 (decisión 78):** correcciones, no con la regla de los menores:
+  - F1-6: una sola `Access-Control-Allow-Origin` en las respuestas de `/mcp*` (la del módulo, que valida el
+    `Origin`); con la corrección, el test 4 de `test_routes_17.py` pasa a verde;
+  - F1-7: `/chatboo/providers` sin la lista de todos los proveedores activos cuando el agente no tiene cadena, como
+    pedía PNS-71.
+- **Observaciones para el port (decisiones 74 y 79), sin número; iguales en 3.1.973:**
+  - el SSE de `/mcp/sse` y `/mcp/<agent_code>/sse` mete el mensaje del agente, que lleva el código de la URL, en el
+    JSON sin escapar (`pns_ai_mcp/controllers/main.py:532-536`). La respuesta solo la recibe quien hace la
+    petición. Antecedentes: ninguno; `git grep` en `docs/` de `14.0` de `bind_err`, `_bind_mcp_agent`, escapes en
+    SSE y `agent_code` con «escap» o «inyec» (el SSE del Chatboo, `e3_hallazgo_p8ea_3879.md:129`, es otro punto);
+  - `session_file` deja pasar siempre al creador del adjunto, aunque ya no pueda leer el registro del que cuelga
+    (`pns_ai_mcp/controllers/session_file.py:21-36`) [L]. El core solo se fía del creador si el adjunto no tiene
+    `res_id`; si lo tiene, mira el acceso al registro (`ir.attachment.check`,
+    `odoo/addons/base/models/ir_attachment.py:473-485`, ref.). Antecedentes relacionados, no del mismo síntoma:
+    PNS-21 (descargas con `auth='user'` y dueño, corregido; `comparacion_pns_ai_3-1-973.md:312`) y
+    PNS-82 (`_may_read` entrega los adjuntos reclamados; `informe_seguimiento_fabricante_pns_ai.md:451-465`);
+  - las rutas del Chatboo distintas de `check_health` devuelven `str(e)` en sus errores: 23 casos en 19 rutas
+    (`pns_ai_chatboo/controllers/chatboo.py:228-744`), 5 de ellos de `UserError` (`:669`, `:685`, `:703`, `:727`,
+    `:744`). Antecedentes: PNS-71 solo cubre `check_health` (`informe_fabricante_pns_ai.md:1230`); relacionado,
+    PNS-40 (el error del driver, `comparacion_pns_ai_3-1-879.md:450-452`); de `14.0`.
 - **Migración 14→17:** las vistas sin xml_id de los clientes que heredan de `pns_*` y los `arch_prev` con `attrs`,
   en `docs/migracion/pendiente_17.0.md` (inferido, no probado).

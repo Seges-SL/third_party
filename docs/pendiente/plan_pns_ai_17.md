@@ -20,9 +20,9 @@
   - pendiente para el port, en la sección 11: las aperturas de cursor del punto 5 localizadas y no leídas, la caja A
     con uid 1 (decisión 48) y el alias de los parches 15 y 22 (E3).
 
-  Fase 1 en curso (`docs/pendiente/fase1_pns_ai_17_3996.md`): F1.1 hecha, `ir_ui_view_patch.py` correcto en la 17
-  (laboratorio: `13 failed, 0 error(s) of 35 tests`); sigue F1.2 (rutas JSON y `/mcp`) y, al terminar la fase 1, la
-  fase 2, el port por tandas, como en la 14.
+  Fase 1 en curso (`docs/pendiente/fase1_pns_ai_17_3996.md`): F1.1 y F1.2 hechas
+  (laboratorio: `14 failed, 0 error(s) of 44 tests`: los 13 `[HYPOTHESIS]` de la sección 8 y el de F1-6); sigue F1.3
+  (bus del Chatboo) y, al terminar la fase 1, la fase 2, el port por tandas, como en la 14.
 
 ## Decisiones (Sergio, 22 y 23/11/2026)
 
