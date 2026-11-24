@@ -20,9 +20,9 @@
   - pendiente para el port, en la sección 11: las aperturas de cursor del punto 5 localizadas y no leídas, la caja A
     con uid 1 (decisión 48) y el alias de los parches 15 y 22 (E3).
 
-  Fase 1 en curso (`docs/pendiente/fase1_pns_ai_17_3996.md`): F1.1, F1.2, F1.3 y F1.4 hechas (laboratorio:
-  `15 failed, 0 error(s) of 52 tests`: los 13 `[HYPOTHESIS]` de la sección 8, el de F1-6 y el de F1-2); sigue F1.5
-  (JS por riesgo), la última de la fase 1, y después la fase 2, el port por tandas, como en la 14.
+  Fase 1 (`docs/pendiente/fase1_pns_ai_17_3996.md`): etapas F1.1 a F1.5 hechas. Laboratorio:
+  `17 failed, 0 error(s) of 56 tests`: los 13 `[HYPOTHESIS]` de la sección 8 y los de F1-6, F1-2, T2b y F1-11.
+  Sigue cerrar la fase 1 y preparar las tandas de la fase 2.
 
 ## Decisiones (Sergio, 22 y 23/11/2026)
 

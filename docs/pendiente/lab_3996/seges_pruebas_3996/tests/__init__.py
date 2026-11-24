@@ -9,3 +9,5 @@ from . import test_view_patch_17
 from . import test_routes_17
 from . import test_bus_17
 from . import test_display_name_17
+from . import test_sanitizer_17
+from . import test_marks_17

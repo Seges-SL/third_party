@@ -7,7 +7,8 @@
   superior y que en la 14 no se revisó (`ir_ui_view_patch.py`, assets, rutas JSON, cliente de Chatboo), con el
   criterio de los PNS». La lista sale de la 14 (`docs/specs/analisis_pns_base.md` de `14.0`: §2.3, §10 y punto 9,
   «lógica muerta en 14 (`ir_ui_view_patch.py` completo)»).
-- **Este documento:** mide el alcance (solo lectura) y propone las etapas. No hay ningún test escrito ni ejecutado.
+- **Este documento:** mide el alcance (solo lectura) y propone las etapas. Cada etapa lleva sus tests en el
+  laboratorio (`seges_pruebas_3996`, con su copia en `docs/pendiente/lab_3996/`); el detalle, en la sección 6.
 - **Decisiones de Sergio (24/11/2026):**
   - **60.** Alcance: el del plan, las cuatro áreas con el criterio de los PNS; el inventario de condiciones de versión
     es la base. El JS se revisa por riesgo, no entero: primero un inventario con `git grep` de los puntos peligrosos y
@@ -73,6 +74,40 @@
     menores, diciendo que hasta corregir F1-2 `where_it_is` muestra «Título (slug)» y `display_name`, el slug.
   - **89.** La línea desfasada de la sección 4 («Falta: … casos 3 a 6 (etapa F1.1)») se corrige en el mismo commit.
   - **90.** Sin tests para los casos 11 y 15.
+  - **91.** F1-9 se numera, Baja de forma provisional hasta la lectura de los `data-*`; también está en 3.1.973. Si se
+    parchea en la 14, es una decisión aparte, fuera de esta fase.
+  - **92.** La nota para PNS-84 (la lista de claves sobrevive al cierre de sesión) va sin número; su comprobación
+    manual, a la lista del staging de la fase 3.
+  - **93.** La imagen del laboratorio ya trae Chrome (sección 10 de la clasificación; `TestWebClientStarts`).
+  - **94.** Para el JS, la decisión 76 exige una revisión con entradas hostiles; una lectura funcional no cuenta.
+  - **95.** pdf.js 2.16.105 es del core: una línea en los límites (sección 1) como efecto fuera de los módulos, sin
+    revisar.
+  - **96.** Entran T1 y T2 (el saneador en el navegador); no entra un test de navegador de F1-9: se reproduce a mano
+    en el staging de la fase 3, como F1-8.
+  - **97.** Antes de la fase 2 de F1.5, una lectura de los `data-*` y de los eventos SSE.
+  - **98.** F1-9, Media provisional; se confirma o se baja en el staging de la fase 3 (si el `position:fixed` no sale
+    de la burbuja, baja a Baja).
+  - **99.** F1-10, aparte y Baja, con la causa común con F1-9 anotada (el saneador deja pasar `id`, `class` y
+    `data-*`, y el cliente no distingue el HTML del servidor del del modelo); corrección conjunta en el port, con su
+    diseño allí.
+  - **100.** Tests (decisión 69): T1 `[CHECK]` (lo que ya se cumple); T2a `[CHECK]` (idempotencia y nodo vivo); T2b
+    `[HYPOTHESIS]` (la salida no contiene mandos del chat), en rojo hoy.
+  - **101.** Antes de los tests, dos lecturas del servidor: el origen de las URL de `assistant_files` y `clip_data`,
+    y el uso de las filas marcadas, parando si alguna da un riesgo.
+  - **102.** La lista de comprobaciones del staging de la fase 3 es un bloque propio de la sección 7 (F1-8, F1-9 y la
+    nota de PNS-84).
+  - **103.** Lo que no tiene puntos peligrosos (la lógica de `chatboo_app.js`, `chatboo_export.js` y
+    `chatboo_charts.js`, el tooltip de ECharts y el interior de las librerías) se declara sin revisar (decisión 60),
+    y F1.5 se cierra así.
+  - **104.** Las filas marcadas son F1-11, aparte y Media provisional. Causa común con F1-9 y F1-10 (decisión 99);
+    corrección en el servidor, con su diseño en el port. También en 3.1.973. Su comprobación manual, al staging de la
+    fase 3 (decisión 102).
+  - **105.** Antes de los tests, dos lecturas: los planes de confianza que se confirman solos y qué muestra la tarjeta
+    de un plan, parando si un plan de confianza puede escribir sobre el registro marcado sin tarjeta.
+  - **106.** T3 `[HYPOTHESIS]` (`TransactionCase`, `test_marks_17.py`): una marca a un registro que el usuario no
+    puede leer y otra a un id que no existe se descartan al guardarse. En rojo hoy.
+  - **107.** El `sudo` de `_names_for` (`safe_plan_describe.py:82-91`, que llama `_step_targets`, `:190-198`) se
+    numera aparte como F1-12, Baja; no va dentro de F1-11.
 - **Marcas:**
   - **[L]:** leído (el cuerpo del código o del documento).
   - **[Loc]:** localizado por búsqueda, sin leer el cuerpo.
@@ -126,7 +161,12 @@
     por AST: URL, función y argumentos) y los cuerpos también, salvo `list_providers` y el import de
     `content_disposition` de `chatboo.py` (comparación de los archivos de `controllers/` y de sus utilidades); esos
     cuerpos no se han vuelto a revisar en la 17: vale la revisión de la 14;
-  - el JS: solo está medido, no revisado;
+  - el JS: revisado por riesgo en F1.5 (decisión 60; sección 4). Queda sin revisar lo que no tiene puntos
+    peligrosos (decisión 103): la lógica de `chatboo_app.js`, `chatboo_export.js` y `chatboo_charts.js`, el tooltip
+    por defecto de ECharts (no hay `formatter` propio) y el interior de las librerías bajo demanda;
+  - fuera de los módulos, sin revisar (decisión 95): el core trae pdf.js 2.16.105
+    (`addons/web/static/lib/pdfjs/build/pdf.js`) [C], que `chatboo_pdf_viewer.js` usa para abrir PDF del mismo
+    origen;
   - el core 14 no está en las referencias: «no existe en la 14» se apoya en los comentarios del fabricante y en
     `analisis_pns_base.md`, no en una comprobación.
 - **Cobertura (localizada por nombre en los tests; no se ejecutó nada):**
@@ -143,6 +183,8 @@
       sección 6);
     - laboratorio, F1.4: `test_display_name_17.py` (caso 25: el `display_name` de `ai.provider.model` y de
       `ai.mcp.user`; sección 6);
+    - laboratorio, F1.5: `test_sanitizer_17.py` (`sanitizeHtml` del módulo en el navegador: T1, T2a y T2b; F1-9,
+      F1-10 y F1-11 en el lado del cliente) y `test_marks_17.py` (T3: `remember_marks`, F1-11); sección 6;
   - **indirecta (probado, sección 10 de la clasificación):**
     - la instalación de los tres módulos ejecuta la conversión de las 250 `attrs`, `post_init_hook` y `convert_file`;
     - `TestWebClientStarts.test_backend_starts_without_errors` (`pns_base`, en verde) carga el bundle completo,
@@ -509,7 +551,37 @@ cambia.
     `pns_ai_mcp` 3.619, `pns_ai_chatboo` 12.888).
   - Fuera del manifiesto, 9 archivos de `pns_ai_chatboo/static/src`: 7 librerías que se cargan bajo demanda
     (`chart.umd.min.js`, `echarts.min.js`, `html2canvas.min.js`, `jspdf*`) y 2 SVG (zona del parche 20).
-  - Falta: la revisión por riesgo (etapa F1.5).
+  - Revisión por riesgo (F1.5, decisión 60) [L]: `git grep` en los JS y XML de `static/src` de los tres módulos, sin
+    `lib/` ni `*.min.js`: 64 archivos (62 del manifiesto y `jspdf_umd_pre.js`/`_post.js`); frente a 3.1.973, 15
+    iguales, 8 distintos y 41 nuevos. Triaje por el origen del dato: (a) del modelo, de otro usuario o de fuera;
+    (b) del propio usuario o del servidor con escape; (c) constantes o `_t()`; (d) comentarios, lecturas, ramas
+    muertas.
+
+    | Punto peligroso | Total | (a) | (b) | (c) | (d) |
+    |---|---|---|---|---|---|
+    | HTML (`innerHTML`, `markup(`, `t-out`…) | 58 | 18 | 4 | 20 | 16 |
+    | `eval`, `new Function`, temporizador con cadena | 0 | – | – | – | – |
+    | `postMessage` y oyentes de `message` | 0 | – | – | – | – |
+    | `iframe`, `sandbox`, `srcdoc` | 11 | 1 | 2 | – | 8 |
+    | `localStorage`, `sessionStorage` (`indexedDB`, `document.cookie`: 0) | 26 | – | 24 | – | 2 |
+    | Red (`fetch`, `window.open`, `.src`, `loadJS`) | 29 | 7 | 8 | 7 | 7 |
+    | URL absolutas (57 cabeceras de licencia y 6 espacios de nombres SVG) | 63 | – | – | – | 63 |
+    | Llamadas al servidor (`rpc`, `orm`, rutas JSON, `csrf_token`) | 63 | – | 63 | – | – |
+
+    Ninguna (a) llega a `innerHTML` sin saneado ni escape, ni a `eval`. No hay URL externas ni librerías de la red.
+  - Librerías bajo demanda: se cargan con `loadJS` desde `/pns_ai_chatboo/static/src/js/…`
+    (`chatboo_heavy_libs.js:11-19`) [L]. Chart.js 4.4.8, ECharts 5.6.0 y html2canvas 1.4.1, con el mismo sha256 que
+    en 3.1.973; jsPDF 4.2.1 y AutoTable 5.0.8, iguales salvo una primera línea `/** @odoo-module ignore */`;
+    `jspdf_umd_pre.js` y `_post.js`, nuevos, solo guardan y restauran `define`, `module` y `exports`. No se han
+    revisado por dentro (decisión 103).
+  - Los 2 SVG (`chatboo_tts_volume_on/off.svg`): sin `<script>`, sin `on*` y sin referencias externas [L].
+  - Qué consta revisado en la 14 con entradas hostiles (decisión 94; de `14.0`): el saneado de la respuesta y de la
+    exportación (PNS-60, prueba 8 del staging, `plan_staging_pns_ai.md:530`; «sigue corregido con el código nuevo»
+    en 3.1.973, `informe_fabricante_pns_ai_3973.md:221`, `comparacion_pns_ai_3-1-973.md:303`, `:331`). La lectura
+    del pintado de `chatboo_markdown.js` (`parches_pns_ai.md:5521`) es funcional y no cuenta. Las versiones `_v14`
+    de `key_pin_desk.js` (PNS-83, PNS-84, PNS-31) y de `pns_html_readonly_widget.js` (PNS-15), y
+    `pns_module_index.js` (PNS-41), tienen antecedentes, no revisión de la versión de la 17. Por eso todo lo de la
+    tabla se ha revisado aquí.
 - **Rutas:**
   - 59 `@http.route`: 34 en `pns_ai_chatboo/controllers/chatboo.py` y 25 en `pns_ai_mcp` (`main.py` 14,
     `verification_ui.py` 4, `key_pin.py` 3, `choice_ui.py` 2, `remote_image.py` 1, `session_file.py` 1).
@@ -548,7 +620,33 @@ cambia.
   - Incluido en las 12.888 líneas de `pns_ai_chatboo`: de sus 28 assets, 16 son idénticos a 3.1.973; de sus 19 JS,
     6 son módulos `@odoo-module` y el resto, scripts sin esa marca (varios se declaran «shared owl1 / owl2»).
   - Enganche con el servidor: casos 20, 22 y 23.
-  - Hecha la recepción por el bus (etapa F1.3: casos 20 y 23; F1-8). Falta la revisión por riesgo (etapa F1.5).
+  - Hecha la recepción por el bus (etapa F1.3: casos 20 y 23; F1-8) y la revisión por riesgo (etapa F1.5).
+  - Saneador (`sanitizeHtml`, `chatboo_formatters.js:112-366`; misma lógica que 3.1.973) [L; probado]: lista blanca
+    de etiquetas y atributos en un documento inerte, en dos pasadas. Quita los atributos `on*`; en los enlaces deja
+    `http`, `https`, `mailto`, `tel` y `blob:` del mismo origen; `src` solo local o `data:image`, y las imágenes
+    externas pasan por `/pns_ai_mcp/remote_image`; en `style` quita `url()` externos y las funciones que cargan
+    recursos; descarta `script`, `iframe`, `math`, `template`, `use`, `foreignObject` y `animate`; a `_blank` le
+    añade `rel="noopener noreferrer"`. `escapeHtml` escapa las dos comillas y `ChatbooMarkdown` escapa todo `<`.
+    Todo el contenido del asistente pasa por él (`chatboo_app.js:121`, `:2289`; los 9 `innerHTML` de la
+    exportación). Deja pasar `id`, `class`, cualquier `data-*` y cualquier propiedad CSS sin `url()` (F1-9 a F1-11).
+  - `data-*` y clases que el cliente lee del HTML del mensaje (lo que pueden disparar) [L]:
+    - `id="pns_verif_<vid>"` con `data-confirm-token`: entra en `held` y la tarjeta real no se pinta (F1-9);
+      `id="pns_choice_<id>"`, igual con la lista de elección (`chatboo_choice_list.js:17`);
+    - `.o_ai_svg_card[data-ai-card]` de tipo `form`: con un clic, `/chatboo/open-form` con la acción, el modelo, el
+      registro y los valores del JSON (F1-10); de tipo `link`, `clock` o `fact`: con `safeHref` y `escapeXml`;
+    - `.o_ai_table_block[data-ai-dataset]`: gráficos y, con un clic, el lienzo de la sesión propia
+      (`/chatboo/canvas/build`, `_own_session`); `data-msg-index` lo puede poner el propio mensaje (sesión propia);
+    - `.o_ai_cell_copy[data-copy-text]`: copia el atributo, no el texto visible (F1-10);
+    - `a.o_ai_namelink` en `table.o_ai_data_table`: al marcar la fila, el modelo y el id del enlace van con la
+      siguiente orden (F1-11);
+    - el diseño del tablero en `localStorage` (prefijo propio), el orden y la presentación: sin efecto fuera.
+    - Ninguno llega a `location`, `eval` ni a una ruta elegida libremente.
+  - Eventos SSE de `/chatboo/stream` [L]: `_sse_event` codifica con `json.dumps` (`chatboo.py:1132-1134`), así que el
+    texto del modelo no puede fabricar una trama; los eventos estructurados los crea el motor en el servidor
+    (`chatboo_async_request.py:459-476`). El cliente trata 7 (`chatboo_app.js:1606-1643`): `token` y `replace`
+    (pintado saneado), `status` (`t-esc`), `meta` (ids de la sesión y del trabajo), `done` (metadatos; los
+    archivos, con URL del servidor), `choice` y `verification` (tarjetas construidas con `textContent`). Los demás
+    se ignoran.
 - **`ir_ui_view_patch.py`:**
   - 519 líneas [L]. En la 17 están activos `_load_records`, `create`, `write`, `_compute_arch`, `_auto_convert_attrs`
     (paso 1) y `Base.get_view` (casos 3 a 6). Están muertos `<tree>`→`<list>`, `column_invisible`, el xpath de
@@ -651,6 +749,90 @@ cambia.
     `page_shared`, `bus_service`, `unsubscribe`, `_notify_safe_plan_hosts` y `key_pin_desk`: nada del mismo
     síntoma. Relacionado: PNS-31 (los oyentes globales de `key_pin_desk_v14.js`,
     `informe_fabricante_pns_ai_2.md:546-553` de `14.0`).
+- **F1-9. El HTML del asistente puede ocultar la tarjeta de confirmación y ponerse encima**, Media provisional
+  (decisión 98) [L; probado en parte]:
+  - `sanitizeHtml` deja pasar `id`, `data-*` y `style` sin filtrar propiedades, salvo `url()` y las funciones que
+    cargan recursos (`pns_ai_chatboo/static/src/js/chatboo_formatters.js:132-142`, `:195-212`).
+  - `_showVerificationUI` busca la tarjeta por `id` (`chatboo_app.js:1969-1974`): si ya hay un elemento
+    `pns_verif_<vid>`, no pinta la real y escribe el token en ese elemento. `_heldCardIds` (`:1864-1873`) manda al
+    servidor como `held` los `pns_verif_*` con `data-confirm-token`, y el servidor no genera token para ellos
+    (`pending_card_payloads`, `pns_ai_mcp/models/safe_operation.py`): al restaurar, la real tampoco se pinta. Igual con
+    `pns_choice_` (`chatboo_choice_list.js:17`).
+  - El modelo tiene el `verification_id`: `safe_plan_request` se lo devuelve
+    (`pns_ai_mcp/controllers/safe_plan.py:502-517`) y es secuencial por verbo, del tipo `WRIT0042`
+    (`safe_operation.py:438-456`).
+  - Superposición, por lectura y sin probar: la tarjeta real va fija abajo a la derecha (`chatboo_app.js:1982`);
+    `position:fixed`, `z-index`, `opacity` y `pointer-events` pasan el saneador, y ningún contenedor normal del
+    mensaje tiene `transform` (CSS del módulo). Una capa del mensaje podría tapar el texto de la tarjeta real sin
+    captar el clic, y el usuario confirmaría creyendo que cancela.
+  - Quién lo alcanza: quien consiga meter texto en lo que lee el modelo (un registro, una página de `fetch_url`); lo
+    ve el usuario de esa sesión. Qué permite: ocultar la confirmación (la operación sigue pendiente y se puede
+    confirmar en Autorizaciones), suplantar la tarjeta y, con la superposición, una escritura con los permisos de la
+    víctima por su propio clic. No ejecuta código ni da secretos.
+  - Probado: T2b (`test_sanitizer_17.py`) en rojo; `[id^="pns_verif_"]` y `[id^="pns_choice_"]` quedan en la salida
+    (sección 6). La ocultación y la superposición, a mano en el staging de la fase 3 (decisión 96).
+  - Gravedad: Media provisional; baja a Baja si en el staging el `fixed` no sale de la burbuja (decisión 98).
+  - Antecedentes: `git grep` en `docs/` de `14.0` y de `17.0-pns-ai` de `clobber`, `getElementById`, `pns_verif_`,
+    `pns_choice_`, `position: fixed`, `pointer-events`, `clickjack`, `held`, `_heldCardIds` y `confirmToken`: nada
+    del mismo síntoma; `held` solo se analizó por carreras y pestañas (`plan_correccion_pns_ai_3973.md:601-612`, de
+    `14.0`). Relacionado: PNS-54. También en 3.1.973 (`chatboo_component_v2.js:2190-2200`, `:2311`; decisión 91).
+- **F1-10. El HTML del asistente puede imitar los mandos del chat**, Baja (decisión 99) [L; probado en parte]:
+  - El saneador deja `class` y `data-*`, y el cliente no distingue el HTML del servidor del del modelo. Con un clic:
+    - `.o_ai_svg_card[data-ai-card]` de tipo `form` abre un formulario con la acción, el modelo, el registro y los
+      valores que elija el modelo (`chatboo_svg_cards.js:323-350` → `chatboo_app.js:2836-2866`). El servidor usa los
+      permisos del usuario, sin `sudo`; solo acepta `ir.actions.act_window`, pide `write` para editar y filtra los
+      campos visibles y editables; nada se guarda sin «Guardar» (`pns_ai_chatboo/utils/form_draft.py`, igual que
+      3.1.973);
+    - `.o_ai_cell_copy` copia `data-copy-text`, no el texto visible (`chatboo_charts.js:3510-3535`).
+  - Quién lo alcanza: como F1-9. Qué permite: ingeniería social (un formulario propuesto, otro texto en el
+    portapapeles); sin escalada, sin secretos y sin escritura sin el «Guardar» del usuario.
+  - Probado: T2b en rojo; `.o_ai_svg_card[data-ai-card]` y `.o_ai_cell_copy` quedan en la salida.
+  - Antecedentes: `git grep` de `data-copy-text`, «portapapeles», `form_draft`, `open-form` y `kind=form`: nada
+    igual. Relacionado: PNS-75 (copia TSV sin neutralizar fórmulas; `informe_fabricante_pns_ai.md:113`, `:1234`, de
+    `14.0`). También en 3.1.973.
+- **F1-11. Las filas marcadas dejan al modelo elegir el sujeto de la siguiente orden**, Media provisional
+  (decisión 104) [L; probado]:
+  - Al marcar una fila, el cliente toma el modelo y el id del enlace `a.o_ai_namelink` y la etiqueta de su texto
+    (`chatboo_row_marks.js:25-41`) y los manda con la siguiente orden (`chatboo_turn.js:58-61`). El servidor los
+    guarda (`pns_ai_chatboo/controllers/chatboo.py:836` → `remember_marks`, `chatboo_session.py:1450-1459`);
+    `clean_marks` solo comprueba el tipo (`pns_ai_mcp/utils/record_marks.py:35-62`), no la existencia, el acceso ni
+    la coincidencia con la fila visible. El trabajo añade al mensaje `MARKS_SENTENCE`, que pide usar esos ids como
+    sujeto (`chatboo_async_request.py:284-291`; `record_marks.py:19-23`).
+  - Qué permite: una fila que muestra un nombre y apunta a otro registro. Si el usuario la marca y da una orden, el
+    motor recibe como sujeto el registro que eligió el modelo, y la etiqueta (80 caracteres) entra como texto del
+    usuario.
+  - Lo que lo limita [L]:
+    - las lecturas van con los permisos del usuario;
+    - ningún plan de confianza escribe en Odoo sin tarjeta: solo se confirman solos `fetch_url` a hosts de
+      confianza y `api_call` a servidores `trusted` (`pns_ai_mcp/controllers/safe_plan_describe.py:15-56`; un paso
+      CRUD da `False`, `:55`), que configuran los AI Administrators (`ir.model.access.csv:48-49`);
+    - la tarjeta muestra el nombre real del modelo y el `display_name` real de los destinos, hasta 5 ids y 3 pasos
+      (`safe_plan_describe.py:184-198`, `:335-367`); no el id. El título sí viene del modelo.
+  - Quién lo alcanza: como F1-9, con el clic y la orden del usuario. Gravedad: Media provisional; con la tarjeta,
+    el engaño necesita que el usuario no se fije o un destino con el mismo nombre; con F1-9, el plan se puede tapar.
+  - Probado: T3 (`test_marks_17.py`) en rojo: `remember_marks` conserva la marca a un `ir.config_parameter` que el
+    usuario no puede leer y la de un id que no existe; T2b: `a.o_ai_namelink` queda en la salida.
+  - Antecedentes: `git grep` de `marks_sentence`, `record_marks`, `marked_refs`, `remember_marks`, `row_marks`,
+    «filas marcadas» y `ChatbooRowMarks`: solo referencias funcionales (`analisis_bloqueo_chatboo_session.md:51`,
+    `:198`; `cambios_pns_ai_3-1-782.md:116`; `manual_pns_ai_3973.md:377`; de `14.0`). `record_marks.py` y
+    `chatboo_row_marks.js`, iguales en 3.1.973.
+- **F1-12. La tarjeta de un plan muestra nombres de registros que el usuario no puede leer**, Baja (decisión 107)
+  [L]:
+  - `_names_for` lee el `display_name` con `sudo` (`pns_ai_mcp/controllers/safe_plan_describe.py:82-91`), y
+    `describe_safe_plan` lo usa para los destinos de un paso (`_step_targets`, `:195`), el origen de una copia
+    (`:217`) y los Many2one y x2many de los valores (`_describe_value`, `:124`, `:126`, `:142`). La descripción
+    también vuelve al modelo en el resultado de `safe_plan_request` (`safe_plan.py:502-506`).
+  - Quién lo alcanza: cualquier usuario del Chatboo cuyo modelo proponga un plan con ids que el usuario no puede leer.
+    Qué permite: ver el nombre de esos registros, más allá del ACL y de las reglas; solo el nombre. La ejecución
+    falla después con los permisos del usuario.
+  - Antecedentes: en 3.1.486, `_names_for` «no se invoca desde `describe_safe_plan`… Sin fuga efectiva hoy»
+    (`analisis_pns_ai_mcp_5_caja_b.md:191-192`, de `14.0`); en 3.1.973 ya se invoca. Otro punto: la D-5 de
+    `correcciones_pns_ai_entrega2.md:898` («no revela nombres en `sudo`»). Misma familia que el core
+    (`Many2one.convert_to_read` con `value.sudo().display_name`, `propuesta_fase3_3973.md:1737`).
+    `safe_plan_describe.py` es idéntico a 3.1.973 (mismo sha256).
+- **Causa común de F1-9, F1-10 y F1-11** (decisiones 99 y 104): el saneador deja pasar `id`, `class` y `data-*`, y el
+  cliente no distingue el HTML que escribe el servidor (tablas, tarjetas de las skills) del que escribe el modelo; en
+  F1-11, además, el servidor acepta lo que el cliente lee de ese HTML sin comprobarlo.
 - **Observación, sin número: `unsubscribe` muerto en `chatboo_app.js`** (caso 23, decisión 85), menor [L; core C]:
   - `pns_ai_chatboo/static/src/js/chatboo_app.js:469-474` solo se da de baja si existe `busService.unsubscribe`,
     que la 17 no tiene (`bus_service.js:232`) [C]: las suscripciones de `:467-468` no se quitan.
@@ -677,13 +859,42 @@ cambia.
   - Solo se lee con `sudo` o con acceso a la BD: la ACL de `bus.bus` es `0,0,0,0` sin grupo [C].
   - El PIN y la clave en claro ya son PNS-84 (Media; Seges asume el riesgo; `informe_fabricante_pns_ai_3973.md:457-461`
     de `14.0`).
+- **Nota para PNS-84, sin número: la lista de claves sobrevive al cierre de sesión** (decisiones 84 y 92) [L]:
+  - `key_pin_desk.js` guarda en el `sessionStorage` de la pestaña, en claro, las claves por correo, los PIN y un
+    token (`pns_ai_mcp/static/src/js/key_pin_desk.js:16-67`). Solo la borra «Clear» (`stopDesk`, `:331-339`);
+    `pagehide` solo avisa al servidor (`:500-511`). Tras cerrar sesión, si otro AI Administrator entra en la misma
+    pestaña, la mesa se abre con esa lista (`:596-597`). Igual en `key_pin_desk_v14.js:486-495` de 3.1.973.
+  - La lee cualquier JS del mismo origen. La rama del JS que entrega una clave por correo o login, sin PIN, no tiene
+    quien la active: el servidor solo crea peticiones con PIN (`pns_ai_mcp/models/mcp_user.py:806` → `_collect_pin`).
+  - Ya es PNS-84 («no conservar la lista de claves en el navegador más allá de lo imprescindible»,
+    `informe_seguimiento_fabricante_pns_ai.md:509-530` de `14.0`). Comprobación manual, al staging (sección 7).
+- **Observaciones de F1.5, sin número** [L]:
+  - `esc` de reserva sin comillas en `chatboo_app.js:2338-2341`: solo actúa si falta `ChatbooContextStats`, cuyo
+    `esc` sí escapa `"` (`chatboo_context_stats.js:16-22`); acaba en un `title="…"` del modal de estadísticas
+    (`chatboo_app.js:2443`) con la pregunta del propio usuario. Antecedente: X10 de
+    `analisis_pns_ai_chatboo_2_componente.md:266` de `14.0` (otra función, ya corregida);
+  - `localStorage` sin separar por usuario: `chatboo_provider_id` (`chatboo_app.js:743-786`), `chatboo_unread`
+    (`chatboo_systray.js:39`, `:235`, `:248`; `chatboo_overlay.js:81`), `chatboo.tts.enabled` (`chatboo_tts.js:18`)
+    y el diseño de los tableros (`chatboo_dashboard.js:17-45`) pasan al siguiente usuario del mismo navegador. Sin
+    datos de negocio. Antecedente: inventariados, sin este punto (`analisis_pns_ai_chatboo_2_componente.md:69-73`
+    de `14.0`);
+  - X14 sigue: `t-att-href` sin filtro de esquema en los chips (`chatboo_app.xml:126`, `:174`, `:186`). Hoy solo le
+    llegan datos de la sesión propia (PNS-53) o URL del servidor: `content_download_url` de un adjunto
+    (`pns_ai_mcp/utils/session_download.py:447`) o `'#'` (`artifact_export.py:247`) (lectura de la decisión 101).
+    Antecedente: X14 de `analisis_pns_ai_chatboo_2_componente.md:270` de `14.0`;
+  - chips sin adjunto sin filtro: `_claim_turn_file_chips` (`pns_ai_chatboo/models/chatboo_session.py:470-502`)
+    conserva sin tocar un chip cuya URL no apunta a un adjunto. Hoy solo son `'#'` o exportaciones pendientes; si
+    otro emisor metiera una URL libre, llegaría al `t-att-href` sin filtro. Antecedente, otro síntoma: PNS-82, el
+    filtro de dueño y creador de los adjuntos en ese método (`correcciones_pns_ai_entrega2.md:227`, de `14.0`); de
+    la URL de un chip sin adjunto, nada.
 - **Caso 6, sin número:** el coste de `Base.get_view` ya lo cubre PNS-42/PB-2, «parche global nuevo y menor» en el
   servidor (`comparacion_pns_ai_3-1-879.md:616` y `:805`; `estado_hallazgos_3879.md:352`; de `14.0`).
 
 ## 6. Etapas
 
 Cada etapa tiene su fase 1 (lectura y propuesta) y su fase 2 (escritura); los tests se ejecutan antes en el
-laboratorio (decisión 64). Los tests van como idea; no hay ninguno escrito.
+laboratorio (decisión 64). Las etapas tienen sus tests escritos y ejecutados en `seges_pruebas_3996`, con su copia
+en `docs/pendiente/lab_3996/`; el detalle está en el «Hecha» de cada una.
 
 - **F1.1. `ir_ui_view_patch.py` (casos 3 a 6):**
   - Leer: `ir_ui_view_patch.py` con el criterio de los PNS; en el core, `_compute_arch` (`ir_ui_view.py:220`), la
@@ -772,7 +983,37 @@ laboratorio (decisión 64). Los tests van como idea; no hay ninguno escrito.
     `sanitizeHtml`) y lo que llama al servidor (`key_pin_desk.js`, con su `csrf_token`).
   - Apuntado (decisión 84): la clave que guarda `key_pin_desk.js` en el navegador (lista de claves y PIN; responde
     con ella a `pns_key_pin`, `:193-218`).
-  - Resultado: lo revisado, lo que queda sin revisar y los hallazgos `F1-n`.
+  - **Hecha (24/11/2026):**
+    - Lecturas: el inventario y el triaje (sección 4); a fondo, el camino del modelo al DOM, la lista de claves, los
+      iframes, las librerías y los SVG; después, los `data-*` y los eventos SSE (decisión 97), el origen de las URL
+      de los chips y de `clip_data` y las filas marcadas (decisión 101), y los planes de confianza y la tarjeta de un
+      plan (decisión 105).
+    - `seges_pruebas_3996/tests/test_sanitizer_17.py`, clase `TestSanitizer17` (`HttpCase`), y
+      `test_marks_17.py`, clase `TestMarks17` (`TransactionCase`), en el laboratorio y en su copia de
+      `docs/pendiente/lab_3996/` (mismo `sha256sum`). Los tests del navegador abren `/web` como admin con
+      `browser_js` (como `TestWebClientStarts`) y llaman al `sanitizeHtml` de
+      `odoo.loader.modules.get("@pns_ai_chatboo/js/chatboo_formatters")`; un `[SETUP]` comprueba antes que el
+      módulo está cargado, que tiene la función y que conserva un `<b>t</b>`. Entradas sintéticas mínimas:
+      1. T1 `[CHECK]`, en verde: `on*` → `<b>t</b>`; `javascript:` → `<a>t</a>`; `javascript:` en `<svg><a>` →
+         `<svg><a><text>t</text></a></svg>`; una imagen externa → un `<img>` con
+         `src="/pns_ai_mcp/remote_image?url=…"` dentro de un enlace con `rel="noopener noreferrer"`; un `url()`
+         externo en `style` → `<span>t</span>`; `<math>` y `<template>` → solo el `<p>t</p>` que los acompaña;
+      2. T2a `[CHECK]`, en verde, con 10 entradas: sanear otra vez no cambia nada y, en un nodo vivo, no queda
+         ningún `on*` ni un `href` fuera de `http`, `https`, `mailto`, `tel` o `blob:` del mismo origen;
+      3. T2b `[HYPOTHESIS]` (F1-9, F1-10 y F1-11 en el cliente), en rojo; quedan los cinco mandos:
+         `[HYPOTHESIS] chat controls in the output: [id^="pns_verif_"] kept: … | [id^="pns_choice_"] kept: … |`
+         `.o_ai_svg_card[data-ai-card] kept: … | .o_ai_cell_copy kept: … | a.o_ai_namelink kept: …`;
+      4. T3 `[HYPOTHESIS]` (F1-11), en rojo, con `remember_marks` como el usuario (el punto de `chatboo.py:836`):
+         `kept [('ir.config_parameter', 20), ('res.partner', 100075), ('res.partner', 75)] (unreadable`
+         `ir.config_parameter#20, missing res.partner#100075)`; esperado, solo el partner que el usuario lee.
+    - Ajustes de diseño, antes de ejecutar (no cambian lo que se comprueba): `sanitizeHtml` guarda su salida en
+      caché, así que T2a sanea `salida + "<!---->"` (clave nueva, pasada real; el comentario se quita y se espera
+      exactamente la salida); la imagen externa queda fuera de T2a, porque en un nodo vivo pediría
+      `/pns_ai_mcp/remote_image` (T1 ya la cubre). Ningún test se corrigió tras la ejecución.
+    - Laboratorio: `odoo-dev 17 tests seges_pruebas_3996` (BD temporal `test_lab_pns_ai_3996_17`, que no queda al
+      terminar): `17 failed, 0 error(s) of 56 tests`; los 15 de antes, T2b y T3. Log `tests-20261124-131215.log`.
+    - Resultado: F1-9 a F1-12, la nota para PNS-84 de la lista de claves y las observaciones de F1.5 (sección 5); lo
+      que queda sin revisar, en la sección 1 (decisión 103). Con F1.5 terminan las etapas de la fase 1.
 
 ## 7. Lo que va al port
 
@@ -799,6 +1040,24 @@ laboratorio (decisión 64). Los tests van como idea; no hay ninguno escrito.
   de controladores ya cerrados (o que no recargue si su vista ya no está abierta). La reproducción manual (abrir
   Autorizaciones, ir a otro menú, empezar a editar un formulario, que otro usuario cree un plan y ver la recarga) va
   a la lista de comprobaciones del staging de la fase 3.
+- **F1-9, F1-10 y F1-11 (decisiones 98, 99 y 104):** correcciones, con una causa común (sección 5): el saneador deja
+  pasar `id`, `class` y `data-*`, y el cliente no distingue el HTML del servidor del del modelo. El diseño se hace en
+  el port; como punto de partida:
+  - F1-9 y F1-10, en el cliente: que el contenido del asistente no pueda llevar los `id`, las clases ni los `data-*`
+    que el cliente toma por mandos (o que los del servidor vayan marcados de una forma que el modelo no pueda
+    imitar), que la tarjeta y la lista de elección no se busquen por `id` en todo el documento y que `style` quede
+    limitado en ese contenido (al menos `position`, `z-index` y `pointer-events`). Con la corrección, T2b de
+    `test_sanitizer_17.py` pasa a verde;
+  - F1-11, en el servidor: que `remember_marks` descarte las marcas a registros que no existen o que el usuario no
+    puede leer y, si se puede, las que no están en el conjunto de datos del turno (como `narrow_rows`). Con la
+    corrección, T3 de `test_marks_17.py` pasa a verde; en el cliente, lo de F1-10 para `a.o_ai_namelink`.
+- **F1-12 (decisión 107):** corrección, Baja: que `_names_for` lea los nombres con los permisos del usuario, sin
+  `sudo`, y muestre el id cuando no pueda leerlo.
+- **F1-9 a F1-12 también están en 3.1.973** (decisión 91): parchearlos en la 14 es una decisión aparte, fuera de esta
+  fase.
+- **Observaciones de F1.5** (sección 5): con la regla de los menores (la de F1-3 y F1-4): solo se corrigen si el port
+  toca esos archivos. Si la corrección de F1-10 toca las plantillas de los chips, el `href` de X14 y el de los chips
+  sin adjunto pasan a llevar filtro de esquema.
 - **`unsubscribe` muerto de `chatboo_app.js:469-474` (decisión 85):** observación con la regla de los menores (la
   de F1-3 y F1-4): solo se corrige si el port toca ese archivo.
 - **Observaciones para el port (decisiones 74 y 79), sin número; iguales en 3.1.973:**
@@ -816,5 +1075,18 @@ laboratorio (decisión 64). Los tests van como idea; no hay ninguno escrito.
     (`pns_ai_chatboo/controllers/chatboo.py:228-744`), 5 de ellos de `UserError` (`:669`, `:685`, `:703`, `:727`,
     `:744`). Antecedentes: PNS-71 solo cubre `check_health` (`informe_fabricante_pns_ai.md:1230`); relacionado,
     PNS-40 (el error del driver, `comparacion_pns_ai_3-1-879.md:450-452`); de `14.0`.
+- **Lista de comprobaciones del staging de la fase 3** (decisión 102), a mano, con datos de prueba:
+  1. F1-8: abrir Autorizaciones, ir a otro menú, empezar a editar un formulario, que otro usuario cree un plan y ver
+     si la página se recarga;
+  2. F1-9: con un mensaje del asistente que lleve un elemento con el `id` de la tarjeta de un plan pendiente, ver si
+     la tarjeta real deja de pintarse (en directo y al recargar) y si el plan se puede confirmar desde
+     Autorizaciones; con un elemento de posición fija, ver si sale de la burbuja y queda sobre la tarjeta real. Si no
+     sale, F1-9 baja a Baja (decisión 98);
+  3. F1-11: con una tabla del asistente cuya fila muestre un registro y enlace otro, marcar la fila, dar una orden de
+     escritura y ver qué registro aparece en la tarjeta y cuál se escribiría;
+  4. PNS-84, lista de claves: cargarla, cerrar sesión, entrar con otro AI Administrator en la misma pestaña y ver si
+     aparece «This tab is holding keys» y la mesa se abre sola;
+  5. PNS-84, aviso en `bus_bus`: tras canjear un PIN, ver con una consulta de solo lectura que la fila del aviso
+     `pns_key_pin` sigue en `bus_bus` hasta el autovacuum (sección 5).
 - **Migración 14→17:** las vistas sin xml_id de los clientes que heredan de `pns_*` y los `arch_prev` con `attrs`,
   en `docs/migracion/pendiente_17.0.md` (inferido, no probado).
