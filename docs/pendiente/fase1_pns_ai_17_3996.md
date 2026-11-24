@@ -25,6 +25,18 @@
   - **64.** Los tests de la fase 1 se escriben en `seges_pruebas_3996` y en su copia de `docs/pendiente/lab_3996/`,
     por etapas, cada una con su fase 1 y su fase 2: primero se ejecutan en el laboratorio y después se escriben en el
     repo.
+  - **65.** La marca `[C-ej]` (código de R17 ejecutado en el contenedor, sin Odoo ni BD) es propia; no equivale a
+    «probado».
+  - **66.** F1-5 se numera como menor, con la regla de F1-3 y F1-4 para el port.
+  - **67.** Lo de la migración 14→17 va a `docs/migracion/`, como inferido (no probado).
+  - **68.** El test 3 (b), en verde, describe lo que pasa: la pista pesa más que el xml_id.
+  - **69.** `[HYPOTHESIS]` solo para un test que afirma el comportamiento seguro y sale en rojo mientras haya defecto;
+    los tests de F1.1 son normales y se esperan en verde; los mensajes se comprueban con el texto literal de la capa
+    que se prueba; el criterio de los PNS reconstruido de la 14 está en la sección 1.
+  - **70.** La etiqueta `[CHECK]` (test que documenta lo que pasa, en verde) se acepta.
+  - **71.** `tests/__init__.py` se queda con su patrón (solo la línea añadida, sin reordenar ni `noqa`).
+  - **72.** El pendiente de migración va en `docs/migracion/pendiente_17.0.md` (regla `pendiente_<rama>.md`, con la
+    rama de destino); es el primer archivo de la carpeta y su formato queda como convención.
 - **Marcas:**
   - **[L]:** leído (el cuerpo del código o del documento).
   - **[Loc]:** localizado por búsqueda, sin leer el cuerpo.
@@ -32,7 +44,15 @@
     `/usr/lib/python3/dist-packages/odoo`) en una única ejecución, sin red ni volúmenes: búsqueda en las fuentes o
     `hasattr` tras importar `odoo` sin BD. Prueba que algo existe y dónde, no cómo se comporta.
   - **(ref.):** cita de `/opt/odoo-src/17.0/odoo` (`6a0efa7`), solo para lo que esa ejecución no capturó.
-  - **probado:** ejecutado en el laboratorio. En esta fase solo hay pruebas indirectas (sección 1).
+  - **[C-ej]:** código de R17 ejecutado en el contenedor, sin Odoo ni BD (decisión 65): el convertidor de
+    `ir_ui_view_patch.py:20-301`, con el script por la entrada estándar. Muestra cómo se comporta ese código; no
+    equivale a probado.
+  - **probado:** ejecutado en el laboratorio: las pruebas indirectas (sección 1) y los tests de cada etapa
+    (sección 6).
+  - **Etiquetas de los tests del laboratorio** (decisión 70):
+    - `[HYPOTHESIS]`: el test afirma el comportamiento seguro y sale en rojo mientras haya defecto;
+    - `[CHECK]`: el test documenta lo que pasa y se espera en verde;
+    - `[SETUP]`: falla una condición previa; no dice nada de la hipótesis.
   - Las rutas del core van como en el árbol de fuentes (`odoo/…`, `odoo/addons/base/…`, `addons/<módulo>/…`).
 
 ## 1. Método y límites
@@ -50,6 +70,18 @@
     (`/home/soporte/pns_fabricante/3.1.973`), rutas (`@http.route`, `type=`, `csrf=False`) y XML con `attrs`.
 - **Core:** una ejecución de Docker (marca [C]) para la existencia de cada API de la que depende un caso; lo que no
   capturó, en la referencia (ref.).
+- **Criterio de los PNS** (el de la 14; no está escrito con ese nombre: `git grep -i "criterio de los PNS"` en
+  `docs/` de `14.0` no da nada). Reconstruido para F1.1 y lo usan F1.2 a F1.5 (citas de `14.0`):
+  - ficha: ubicación, descripción, reproducción, impacto y recomendación (`informe_fabricante_pns_ai.md:144-184`);
+    estado: reproducido, verificado en código, inferido o no reproducido (`:32`);
+  - gravedad (crítica, alta, media o baja; `:28`) según quién alcanza el código (portal, cualquier interno, un rol de
+    IA o un administrador; `:181`) y qué permite (escalada, secretos, integridad de los datos, XSS o inyección;
+    PNS-15, `:53`);
+  - la puerta es la llamada por RPC, con el contexto y el `browse` de quien llama
+    (`comparacion_pns_ai_3-1-879.md:1011-1015`); la gravedad es siempre una propuesta (`:1011`);
+  - los efectos fuera de los módulos PNS son una categoría propia (tema 7, `pns_ai_decisiones.md:236`; riesgo 1 de
+    `analisis_pns_base.md` §13); en ella se valora el coste de los parches globales (PB-2,
+    `comparacion_pns_ai_3-1-879.md:805`).
 - **Puede quedar fuera:**
   - código de la 15 o superior sin condición y con un nombre que no está en la lista (por ejemplo, una firma que
     cambia de sentido sin cambiar de nombre);
@@ -64,11 +96,12 @@
       `test_session_download.py`, `test_chatboo_perimeter.py`);
     - laboratorio: `test_review_views.py` (el `get_view` del asistente, parches 21 y 36) y `test_side_cursors.py`
       (`test_is_running`);
+    - laboratorio, F1.1: `test_view_patch_17.py` (casos 3 a 6, sección 6);
   - **indirecta (probado, sección 10 de la clasificación):**
     - la instalación de los tres módulos ejecuta la conversión de las 250 `attrs`, `post_init_hook` y `convert_file`;
     - `TestWebClientStarts.test_backend_starts_without_errors` (`pns_base`, en verde) carga el bundle completo,
       `pns_web_paths.js` incluido, sin errores de consola;
-  - **sin cobertura:** casos 4, 5, 9, 11, 20 a 23 y 25 de la sección 3, y la desinstalación;
+  - **sin cobertura:** casos 9, 11, 20 a 23 y 25 de la sección 3, y la desinstalación (los casos 4 y 5, desde F1.1);
   - `TestRequiredFieldsLive` (caso 17) está omitido en el laboratorio porque no hay `crm`.
 
 ## 2. Inventario de las condiciones de versión
@@ -144,23 +177,74 @@ cambia.
   - Rama: convierte `attrs` en `invisible`/`readonly`/`required` en las vistas `pns_*`; `<tree>` se queda.
     Alcance: 250 `attrs=` en 19 XML (`pns_base` 31 en 4, `pns_ai_mcp` 219 en 15, `pns_ai_chatboo` 0).
   - Core: `odoo/addons/base/models/ir_ui_view.py:394` rechaza `attrs` «Since 17.0» [C].
-  - Clase: correcto según la instalación; pendiente la revisión con el criterio de los PNS (expresión regular no
-    voraz `\{.*?\}`, escapado, lo que se deja sin convertir con un ERROR).
-  - Cobertura: instalación (probado indirecto). Parche: ninguno; lo usan los parches 21 y 36 (`_inject_screen_arch`).
+  - Clase: **correcto** (F1.1, 24/11/2026; antes, correcto según la instalación y pendiente de revisar).
+    - Algoritmo [L]: `attrs=(["'])(\{.*?\})\1` (`:410`) acaba en el primer `}` seguido de la misma comilla; lxml
+      escribe los atributos entre `"` y la `"` del valor como `&quot;` (`odoo/tools/convert.py:141-144` [C]), así
+      que un `}` del valor no la corta. Después, `html.unescape` (`:217`), `ast.literal_eval` (`:219`), el dominio
+      en notación prefija (`:135-195`, valores con `%r`) y `html.escape(quote=True)` (`:236`).
+    - Lo que no convierte: ERROR y el `attrs` se queda; el core rechaza todo `//*[@attrs]` del arch combinado
+      (`odoo/addons/base/models/ir_ui_view.py:392-394` [C]), así que falla a la vista y la condición no se pierde en
+      silencio. Las formas límite, en F1-5.
+    - Alcance [L]: las vistas con xml_id `pns*` (también las `pns_*` que heredan del core) y, por las pistas de
+      modelo o nombre (`:82-91`), las de terceros sobre modelos `ai.*`; una vista de un tercero sin pistas que
+      hereda de una `pns_*` no se convierte. Ninguna vista `pns_*` está en un archivo `noupdate="1"`: en cada `-u`
+      se recargan y se convierten (`odoo/tools/convert.py:366-378` [C]).
+    - Las 250 `attrs` [C-ej]: 51 vistas; claves `invisible` 231, `readonly` 17 y `required` 5; solo `=` (190) y
+      `!=` (96); 25 modificadores con varios términos (máximo, 6 hojas). Ninguna forma difícil: 0 no literales, 0
+      valores con `{ } < > & '` o `"`, 0 atributos fijos repetidos, 0 en un texto, 0 `<attribute name="attrs">` y
+      0 `states=`. Convertidas: 0 ERROR, 0 `attrs` que queden, y todas pasan `get_expression_field_names`. Las
+      comparaciones con `True`/`False` son sobre Boolean, Char, Text, Many2one y Selection, ninguna numérica [L].
+    - Probado: `test_converter_difficult_values` y `test_no_pns_view_keeps_attrs`, en verde (sección 6).
+    - Sin saber: un Char o Text vaciado a `""` en el cliente (`= False` en la 14 frente a `not x` en la 17).
+  - Cobertura: instalación (probado indirecto) y los dos tests. Parche: ninguno; lo usan los parches 21 y 36
+    (`_inject_screen_arch`).
 - **Caso 4. `write` por pistas:** `ir_ui_view_patch.py:348` [L].
   - Rama: convierte si el nombre o el modelo de la vista contienen una pista (`'pns'`, `'inherit.mcp'`, `'ai.'`,
     `'mcp.'`, `'relaxaicode'`), sin mirar el xml_id.
-  - Clase: sin saber (falsos positivos de las pistas en vistas ajenas). Cobertura: ninguna. Parche: ninguno.
+  - Clase: **correcto** (F1.1, 24/11/2026; antes, sin saber por los falsos positivos de las pistas en vistas ajenas).
+    - Pistas: 0 de 1.264 `_name`, 0 de 6.620 vistas (`name` y `model`) y 0 módulos `pns*` de 642 en el contenedor
+      [C]; 0 de 1.101 `_name`, 0 vistas y 0 módulos `pns*` en `oca/` y `vertical-instaladores/` (ref.).
+    - Un falso positivo solo cambia archs con `attrs=` o `name="attrs"`, que la 17 rechaza: en el peor caso arregla
+      una vista ajena inválida o reescribe un texto (F1-5). En `ir.ui.view` solo escribe `base.group_system`
+      (`odoo/addons/base/security/ir.model.access.csv:35`; la `:34`, sin grupo, es `0,0,0,0`) [C], o código en
+      `sudo`.
+    - Probado: `test_write_hints`, en verde. Sin pista, el core rechaza `attrs` con su mensaje literal; con la pista
+      `ai.` y un xml_id que no es `pns*`, se convierte (la pista pesa más que el xml_id; decisión 68); sin sintaxis
+      antigua, el arch se guarda tal cual.
+    - Sin saber: módulos de clientes que no están en las referencias.
+  - Cobertura: `test_write_hints`. Parche: ninguno.
 - **Caso 5. `_compute_arch`:** `ir_ui_view_patch.py:355-378` [L].
   - Rama: convierte el arch del archivo (`--dev=xml` o lectura de `arch_fs`).
-  - Core: `odoo/addons/base/models/ir_ui_view.py:220` [C], cuerpo sin leer.
-  - Clase: se resuelve leyendo el core. Cobertura: ninguna. Parche: ninguno.
+  - Core: `odoo/addons/base/models/ir_ui_view.py:220` [C]; cuerpo leído en F1.1 (`:218-258` [C]).
+  - Clase: **correcto** (F1.1, 24/11/2026; antes, se resolvía leyendo el core).
+    - El core lee el archivo con `read_arch_from_file` en el contexto, o con `--dev=xml` y sin `arch_updated`
+      (`:235-236`), si hay `arch_fs` y xml_id o `key` (`:237`); si no, `arch_db` (`:258`) [C]. El archivo conserva
+      las `attrs`: sin el parche fallarían `--dev=xml`, «Restablecer al archivo» (`reset_arch('hard')`,
+      `:299-301`) y el diff con el archivo (`:2239-2240`) (ref.).
+    - Coste: en una lectura normal, las listas `pns_*` tienen `<tree`, así que mira el xml_id (una consulta por
+      lote, `:331-337` [C], también para las vistas del core con `<tree`) y llama a un convertidor que no cambia
+      nada. Solo cuando `_get_view_cache` no tiene la vista, que está en caché salvo con `--dev=xml`
+      (`:2591-2596` [C]).
+    - Probado: `test_arch_from_file_and_reset`, en verde.
+  - Cobertura: `test_arch_from_file_and_reset`. Parche: ninguno.
 - **Caso 6. `Base.get_view` sin condición:** `ir_ui_view_patch.py:507-519` [L].
   - Rama: añade la clase `o_pns_view` a las vistas `pns_*`; en cada `get_view` de cualquier modelo hace `browse` y lee
     `view.xml_id`, fuera de la caché de vistas.
   - Core: `odoo/addons/base/models/ir_ui_view.py:2635` [C]; devuelve una copia, `dict(self._get_view_cache(…))`
-    (`:2660`, ref.).
-  - Clase: correcto; revisión con el criterio de los PNS: coste por llamada. Cobertura: ninguna. Parche: ninguno.
+    (`:2660` [C], comprobado en F1.1).
+  - Clase: **correcto**, revisado con el criterio de los PNS (F1.1, 24/11/2026; antes, correcto con el coste por
+    llamada por revisar).
+    - Core (`:2634-2664` [C]): `check_access_rights('read')`, la copia de `:2660` y, en cada llamada,
+      la lectura y escritura del arch (`:2662-2664`).
+    - Añade por llamada una consulta (`_compute_xml_id`: `ir.model.data.sudo().search_read`, `:334` [C]; el campo no
+      se guarda) y, solo en las vistas `pns*`, otra lectura y escritura del arch. No toca la caché (cambia un `str`
+      de la copia) ni usa `sudo()` (lo usa el core). Sin AccessError para quien no lee `ir.ui.view`: solo los campos
+      guardados pasan por `_fetch_field` (`odoo/fields.py:1176-1184` [C]; el camino de los calculados, ref.).
+    - `o_pns_view`, solo si el módulo del xml_id de la vista raíz empieza por `pns`: no hay ningún módulo así fuera
+      de `third_party`, ni en el contenedor [C] ni en la referencia (ref.).
+    - Probado: `test_get_view_class_and_cost`, en verde, con una diferencia de exactamente 1 consulta.
+    - Sin saber: la caché de `get_views` en el cliente web, sin leer. Sin número: lo cubre PNS-42/PB-2 (sección 5).
+  - Cobertura: `test_get_view_class_and_cost`. Parche: ninguno.
 - **Caso 7. `read_sums`:** `pns_ai_mcp/utils/compat.py:33` [L].
   - Rama: `_read_group(domain, [], ['<campo>:sum'])`. Core: `odoo/models.py:1857` [C].
   - Clase: correcto. Quién lo llama: sin buscar. Cobertura: ninguna. Parche: ninguno.
@@ -329,6 +413,23 @@ cambia.
     `static/src`, y la 17.0 solo trata así lo que lleva `@odoo-module`. Confirmado por lectura; sin efecto conocido.
 - **F1-4. `mcp_context_list.css` repetido**, menor [L]:
   - Aparece dos veces en `assets` de `pns_ai_mcp/__manifest__.py` (web.assets_backend). Sin efecto conocido.
+- **F1-5. El convertidor de `attrs` trabaja sobre texto** (caso 3), menor [L; C-ej] (decisión 66):
+  - `_auto_convert_attrs` (`pns_base/models/ir_ui_view_patch.py:409-413`) busca con expresiones regulares en el
+    texto del arch, no en sus atributos XML. Con casos sintéticos [C-ej]:
+    - reescribe `attrs="{…}"` también dentro de un texto (un `<p>`), sin aviso;
+    - con un espacio inicial (`attrs=" {…}"`) no coincide ni da ERROR; después lo rechaza el core;
+    - un atributo fijo y un `attrs` con la misma clave dan un atributo repetido y un arch que no se puede leer;
+    - `<attribute name="attrs">{}</attribute>` se queda igual y lo rechaza el core. Y en la 14 un
+      `<attribute name="attrs">` sustituía el diccionario entero; convertido, solo las claves que trae [L].
+  - Quién lo alcanza: XML `pns_*` futuro, o un administrador que escribe vistas (`base.group_system`). Hoy, 0 casos
+    en las 250 `attrs` (caso 3); todo, salvo lo del texto, acaba en un error visible al instalar.
+  - Gravedad: Baja, sin seguridad: no hay inyección, porque solo `base.group_system` escribe vistas y el escape no
+    deja salir del atributo.
+  - Antecedentes: `git grep` en `docs/` de `14.0` (`9cbb303`) y de `17.0-pns-ai` (`ac624f9`) de `ir_ui_view_patch`,
+    `_auto_convert_attrs`, `o_pns_view`, `fields_view_get` y «conversión de `attrs`». Solo aparece el arreglo del
+    escape (`pns_base` 1.2.68; `comparacion_pns_ai_3-1-973.md:578` y `:864` de `14.0`), que es otro síntoma.
+- **Caso 6, sin número:** el coste de `Base.get_view` ya lo cubre PNS-42/PB-2, «parche global nuevo y menor» en el
+  servidor (`comparacion_pns_ai_3-1-879.md:616` y `:805`; `estado_hallazgos_3879.md:352`; de `14.0`).
 
 ## 6. Etapas
 
@@ -342,6 +443,15 @@ laboratorio (decisión 64). Los tests van como idea; no hay ninguno escrito.
     con `attrs=` en `arch_db`; un `write` sobre una vista ajena cuyo modelo contiene `ai.` no se toca; `get_view` de
     un modelo ajeno sin `o_pns_view`.
   - Necesita: la BD del laboratorio con los tres módulos.
+  - **Hecha (24/11/2026):**
+    - `seges_pruebas_3996/tests/test_view_patch_17.py`, clase `TestViewPatch17`: cinco tests `[CHECK]`, sin
+      `[HYPOTHESIS]` (decisiones 68 y 69), en el laboratorio y en su copia de `docs/pendiente/lab_3996/` (mismo
+      `sha256sum`). El test del `write` se ajustó a lo leído: una vista ajena con la pista `ai.` sí se convierte.
+    - Los 5, en verde; el de `get_view` mide una diferencia de exactamente 1 consulta.
+    - Laboratorio: `odoo-dev 17 tests seges_pruebas_3996` (BD temporal `test_lab_pns_ai_3996_17`, que no queda al
+      terminar): `13 failed, 0 error(s) of 35 tests`; los 13 fallos son los de antes. Log
+      `tests-20261124-110046.log`.
+    - Resultado: casos 3 a 6 correctos (sección 3) y F1-5 (sección 5).
 - **F1.2. Rutas JSON y `/mcp` (caso 9 y las 59 rutas):**
   - Leer: `odoo/http.py:2038-2214` (despacho, compatibilidad, CSRF); el inventario de las 59 rutas, empezando por las
     14 `csrf=False` de `main.py`.
@@ -372,3 +482,7 @@ laboratorio (decisión 64). Los tests van como idea; no hay ninguno escrito.
   ellos.
 - **F1-3 y F1-4 (menores):** solo se corrigen si el port toca esos archivos (convención del código heredado); si no,
   quedan como inventario.
+- **F1-5 (menor):** con la regla de F1-3 y F1-4; además, los parches que toquen XML de vistas evitan sus formas
+  (`attrs` en un texto, espacio inicial, atributo fijo repetido y `<attribute name="attrs">`).
+- **Migración 14→17:** las vistas sin xml_id de los clientes que heredan de `pns_*` y los `arch_prev` con `attrs`,
+  en `docs/migracion/pendiente_17.0.md` (inferido, no probado).

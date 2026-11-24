@@ -5,3 +5,4 @@ from . import test_import_review
 from . import test_review_views
 from . import test_side_cursors
 from . import test_box_a_secret_cache
+from . import test_view_patch_17
