@@ -5,3 +5,7 @@
 
 from . import test_chat_agent_composition
 from . import test_chatboo_perimeter
+# Seges: tests de la fase 2 en la 17, tanda T0 (esqueleto de E0′ y no regresión del
+# parche 23, retirado). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_chatboo_smoke
+from . import test_seges_skill_env

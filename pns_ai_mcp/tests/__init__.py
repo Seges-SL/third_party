@@ -38,3 +38,12 @@ from . import test_server_identity_detection
 from . import test_sandbox_secret_read
 from . import test_one_company_live
 from . import test_key_of_settings_admin
+# Seges: tests de la fase 2 en la 17, tanda T0 (no regresión de los parches 7 a 10, 13, 14,
+# 23, 30 y 31, retirados, y anexo de PNS-26, sin parche). Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_rpc_access
+from . import test_seges_safe_operation
+from . import test_seges_e4p
+from . import test_seges_facade_class
+from . import test_seges_format_guard
+from . import test_seges_sandbox_env
+from . import test_seges_verify_execute_40001
