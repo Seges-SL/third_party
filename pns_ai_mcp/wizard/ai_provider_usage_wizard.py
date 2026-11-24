@@ -34,7 +34,9 @@ class AIProviderUsageWizard(models.TransientModel):
         from ..utils.provider_spend import cap_is_set
         from ..utils.usage_display import format_cost_label, format_turn_tokens_label
 
-        usage = provider.month_usage()
+        # Seges: parche 33 (PNS-29, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        self.check_access_rights('create')
+        usage = provider._month_usage()
         cost = format_cost_label(self.env, usage.get('cost') or None)
         cap_usd = provider.spend_cap_usd
         cap_tokens = provider.spend_cap_tokens

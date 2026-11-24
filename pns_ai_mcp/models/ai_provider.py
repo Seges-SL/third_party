@@ -77,6 +77,18 @@ class AIProviderModel(models.Model):
                 parts.append(_('Decision'))
             rec.apt_label = ', '.join(parts)
 
+    # Seges: parche 40 (F1-2, compatibilidad). Ver docs/pendiente/parches_pns_ai.md
+    @api.depends('title', 'name')
+    def _compute_display_name(self):
+        # Odoo 17 computes display_name here and no longer calls name_get
+        # (odoo/models.py:1660-1695): the same label as name_get below. It does
+        # not call name_get: the core one reads display_name (recursion).
+        for rec in self:
+            label = rec.title or rec.name
+            if rec.title and rec.title != rec.name:
+                label = f'{rec.title} ({rec.name})'
+            rec.display_name = label
+
     def name_get(self):
         result = []
         for rec in self:
@@ -1093,7 +1105,8 @@ class AIProvider(models.Model):
             start_utc = start_local
         return fields.Datetime.to_string(start_utc)
 
-    def month_usage(self):
+    # Seges: parche 33 (PNS-29, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    def _month_usage(self):
         """Tokens and cost of this provider since the start of the month."""
         self.ensure_one()
         start = self._spend_month_start()
@@ -1128,8 +1141,9 @@ class AIProvider(models.Model):
     def spend_cap_reached(self):
         self.ensure_one()
         from ..utils.provider_spend import spend_cap_hit
+        # Seges: parche 33 (PNS-29, seguridad). Ver docs/pendiente/parches_pns_ai.md
         return spend_cap_hit(
-            self.month_usage(),
+            self._month_usage(),
             cap_usd=self.spend_cap_usd,
             cap_tokens=self.spend_cap_tokens,
         )

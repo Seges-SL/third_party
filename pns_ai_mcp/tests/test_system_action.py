@@ -544,4 +544,7 @@ class TestSystemTrustedActions(TransactionCase):
             'op': 'action', 'action_code': 'user.add_group',
             'args': {'user_id': target.id, 'group': plain.id},
         }], env_a)
-        self.assertTrue(ok, err)
+        # Seges: parche 12 (PNS-01/02, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        # Con el 12, un AI Administrator sin Ajustes tampoco da un grupo que no es cúspide.
+        self.assertFalse(ok)
+        self.assertIn('Only a Settings administrator', err or '')
