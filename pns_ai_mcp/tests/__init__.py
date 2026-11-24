@@ -54,3 +54,7 @@ from . import test_seges_verification
 from . import test_seges_change_journal
 from . import test_seges_fetch_redirect
 from . import test_seges_display_name
+# Seges: tests de la fase 2 en la 17, tanda T2 (parches 21 y 36).
+# Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_import_preview
+from . import test_seges_review_views
