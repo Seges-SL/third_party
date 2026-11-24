@@ -47,3 +47,10 @@ from . import test_seges_facade_class
 from . import test_seges_format_guard
 from . import test_seges_sandbox_env
 from . import test_seges_verify_execute_40001
+# Seges: tests de la fase 2 en la 17, tanda T1 (parches 12, 32, 16, 17, 19 y 33, y el 40, F1-2).
+# Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_user_groups
+from . import test_seges_verification
+from . import test_seges_change_journal
+from . import test_seges_fetch_redirect
+from . import test_seges_display_name

@@ -5,6 +5,9 @@
 # Seges: adaptado a la 17 (fase 2, T0): solo los casos del 30 y del 31 (los del 32 y el 33, en T1), flush_all(),
 # assertRaises(AttributeError) en los tres casos en Python y mute_logger('odoo.http') en _rpc;
 # los documentos que citan las líneas anteriores están en 14.0. Ver docs/pendiente/parches_pns_ai.md
+# Seges: adaptado a la 17 (fase 2, T1): casos del 32 y del 33, invalidate_recordset() e invalidate_model(),
+# _xmlid_to_res_id(), convert_file(env, …) y onchange con la firma de la 17; los documentos que citan las
+# líneas anteriores están en 14.0. Ver docs/pendiente/parches_pns_ai.md
 """Parches 30 a 33 (M11, M12, PNS-97 y PNS-29, resto 3).
 
 En 3.1.973 el fabricante pasa los seis ``log_*`` y ``chat_completion`` a
@@ -24,24 +27,39 @@ En 3.1.973 ``_create_log_entry`` no escribe mientras corre un test
 (``test_is_running``): ``TestSegesE4pLogRows`` lo simula en lugar de contar
 filas confirmadas.
 
-En la 17 (fase 2, T0) solo están los casos del 30 y del 31; los del 32
-(``TestSegesE4pTrustedAction``) y los del 33 (``TestSegesE4pUsage`` y los tres
-de ``TestSegesE4pRpc``) entran en la tanda T1, con su parche.
+En la 17 (fase 2), los casos del 30 y del 31 entraron en la tanda T0, y los
+del 32 (``TestSegesE4pTrustedAction``) y del 33 (``TestSegesE4pUsage`` y los
+tres de ``TestSegesE4pRpc``), en la T1, con su parche.
 """
 
 import inspect
 import json
 from unittest.mock import MagicMock, patch
 
-from odoo import SUPERUSER_ID
+from odoo import SUPERUSER_ID, api
+from odoo.exceptions import AccessError
 from odoo.tests import HttpCase, TransactionCase, tagged
 from odoo.tests.common import new_test_user
-from odoo.tools import mute_logger
+from odoo.tools import convert_file, mute_logger
+
+from odoo.addons.pns_ai_mcp.controllers.safe_plan import execute_safe_plan
 
 LOG_ENDPOINT = 'seges_e4p_m11'
 AGENT = 'pns_ai_mcp'
 MESSAGES = [{'role': 'user', 'content': 'x'}]
 FAKE_RESPONSE = {'choices': [{'message': {'content': 'seges e4p'}}]}
+NEW_CODE = 'seges.e4p'
+TRUSTED_XMLIDS = (
+    'trusted_action_field_set_required',
+    'trusted_action_view_set_field_required',
+    'trusted_action_view_set_field_readonly',
+    'trusted_action_view_set_field_invisible',
+    'trusted_action_view_set_field_domain',
+    'trusted_action_view_reset_field_modifiers',
+    'trusted_action_module_update',
+    'trusted_action_user_add_group',
+    'trusted_action_user_remove_group',
+)
 
 # (método, args JSON sin ids, kwargs JSON) de los seis log_* públicos.
 LOG_CALLS = (
@@ -182,6 +200,44 @@ class TestSegesE4pRpc(_SegesE4pRpcBase, HttpCase):
         make_driver.assert_not_called()
         driver.chat_completion.assert_not_called()
 
+    # ── Parche 33 ────────────────────────────────────────────────────────────
+
+    def test_month_usage_rpc_refused(self):
+        for login in self.logins:
+            with self.subTest(login=login):
+                res = self._rpc(
+                    login, 'ai.provider', 'month_usage', [[self.provider.id]])
+                self._assert_error(res, 'builtins.AttributeError')
+                res = self._rpc(
+                    login, 'ai.provider', '_month_usage', [[self.provider.id]])
+                self._assert_error(res, 'odoo.exceptions.AccessError')
+
+    def test_usage_wizard_default_get_rpc_refused(self):
+        for login in self.logins:
+            with self.subTest(login=login):
+                res = self._rpc(
+                    login, 'ai.provider.usage.wizard', 'default_get',
+                    [['total_tokens', 'cost_display']],
+                    {'context': {'default_provider_id': self.provider.id}})
+                self._assert_error(res, 'odoo.exceptions.AccessError')
+                self.assertNotIn('total_tokens', json.dumps(res))
+
+    def test_usage_wizard_onchange_rpc_refused(self):
+        # Seges: adaptado a la 17: onchange(values, field_names, fields_spec); en la primera llamada
+        # (field_names vacío) llama a default_get (odoo/addons/web/models/models.py:933 y :970-978).
+        # fields_spec, con el formato de la 17 ({} por campo).
+        for login in self.logins:
+            with self.subTest(login=login):
+                res = self._rpc(
+                    login, 'ai.provider.usage.wizard', 'onchange',
+                    [[], {}, [], {
+                        'provider_id': {}, 'total_tokens': {},
+                        'cost_display': {},
+                    }],
+                    {'context': {'default_provider_id': self.provider.id}})
+                self._assert_error(res, 'odoo.exceptions.AccessError')
+                self.assertNotIn('total_tokens', json.dumps(res))
+
 
 @tagged('post_install', '-at_install', 'pns_ai_mcp', 'seges_e4p')
 class TestSegesE4pLogRows(TransactionCase):
@@ -284,3 +340,218 @@ class TestSegesE4pChatCompletion(TransactionCase):
         res = engine.sudo()._chat_completion(AGENT, MESSAGES)
         self.assertEqual(res, FAKE_RESPONSE)
         self.driver.chat_completion.assert_called_once()
+
+
+@tagged('post_install', '-at_install', 'pns_ai_mcp', 'seges_e4p')
+class TestSegesE4pTrustedAction(TransactionCase):
+    """Parche 32. ``execute_safe_plan`` escribe el diario en el mismo cursor:
+    todo se deshace con la transacción del test."""
+
+    def setUp(self):
+        super().setUp()
+        self.adm = new_test_user(
+            self.env, login='seges_e4p_adm',
+            groups='base.group_user,pns_ai_mcp.group_ai_admin',
+        )
+        self.sys_adm = new_test_user(
+            self.env, login='seges_e4p_sys',
+            groups='base.group_user,base.group_system,pns_ai_mcp.group_ai_admin',
+        )
+        self.env_adm = api.Environment(self.env.cr, self.adm.id, {})
+        self.env_sys = api.Environment(self.env.cr, self.sys_adm.id, {})
+        self.ai_admin_group = self.env.ref('pns_ai_mcp.group_ai_admin')
+        self.readonly = self.env.ref(
+            'pns_ai_mcp.trusted_action_view_set_field_readonly')
+        # Como lo pone execute_plan_now: propuso el AI Administrator sin
+        # Ajustes y confirmó el administrador de Ajustes.
+        self.plan_ctx = {
+            'ai_journal_user_id': self.adm.id,
+            'ai_journal_confirmed_by_uid': self.sys_adm.id,
+        }
+
+    def _new_vals(self, code=NEW_CODE):
+        return {
+            'code': code,
+            'label': 'Seges E4p',
+            'model_id': self.env['ir.model']._get('res.partner').id,
+            'preview_method': '_seges_e4p_preview',
+            'apply_method': '_seges_e4p_apply',
+        }
+
+    def _count(self, code=NEW_CODE):
+        return self.env['ai.trusted.action'].sudo().with_context(
+            active_test=False).search_count([('code', '=', code)])
+
+    def _clear_groups_step(self):
+        return {
+            'op': 'write', 'model': 'ai.trusted.action',
+            'ids': [self.readonly.id], 'values': {'group_ids': [(5, 0, 0)]},
+        }
+
+    def _assert_readonly_groups_kept(self):
+        # Seges: adaptado a la 17 (invalidate_recordset, odoo/models.py:6747).
+        self.readonly.invalidate_recordset()
+        self.assertEqual(self.readonly.group_ids, self.ai_admin_group)
+
+    # ── Negativos: AI Administrator sin Ajustes ──────────────────────────────
+
+    def test_ai_admin_cannot_create(self):
+        with self.assertRaises(AccessError):
+            self.env_adm['ai.trusted.action'].create(self._new_vals())
+        self.assertEqual(self._count(), 0)
+
+    def test_ai_admin_cannot_write(self):
+        action = self.env_adm['ai.trusted.action']._get('user.add_group')
+        for vals in (
+            {'apply_method': '_seges_e4p_apply'},
+            {'group_ids': [(5, 0, 0)]},
+            {'label': 'Seges E4p'},
+            {'danger': 'low'},
+            {'active': False},
+        ):
+            with self.subTest(vals=vals):
+                with self.assertRaises(AccessError):
+                    action.write(vals)
+        # Seges: adaptado a la 17 (invalidate_recordset, odoo/models.py:6747).
+        action.invalidate_recordset()
+        action = action.sudo()
+        self.assertEqual(action.apply_method, '_apply_user_add_group')
+        self.assertEqual(action.group_ids, self.ai_admin_group)
+        self.assertEqual(action.label, 'Add native security group to user')
+        self.assertEqual(action.danger, 'high')
+        self.assertTrue(action.active)
+
+    def test_ai_admin_cannot_unlink(self):
+        action = self.env_adm['ai.trusted.action']._get('user.add_group')
+        with self.assertRaises(AccessError):
+            action.unlink()
+        self.assertTrue(action.sudo().exists())
+
+    def test_ai_admin_cannot_copy(self):
+        action = self.env_adm['ai.trusted.action']._get('user.add_group')
+        with self.assertRaises(AccessError):
+            action.copy({'code': NEW_CODE})
+        self.assertEqual(self._count(), 0)
+
+    def test_plan_create_step_refused(self):
+        with self.assertRaises(AccessError):
+            execute_safe_plan(self.env_adm, [{
+                'op': 'create', 'model': 'ai.trusted.action',
+                'values': self._new_vals(),
+            }])
+        self.assertEqual(self._count(), 0)
+
+    def test_plan_write_step_refused(self):
+        with self.assertRaises(AccessError):
+            execute_safe_plan(self.env_adm, [self._clear_groups_step()])
+        self._assert_readonly_groups_kept()
+
+    # ── Negativos: «confused deputy» ─────────────────────────────────────────
+
+    def test_plan_confirmed_for_ai_admin_refused(self):
+        # El caso que deja pasar is_system() solo.
+        with self.assertRaises(AccessError):
+            execute_safe_plan(
+                self.env_sys(context=self.plan_ctx), [self._clear_groups_step()])
+        self._assert_readonly_groups_kept()
+
+    def test_sudo_in_plan_context_refused(self):
+        action = self.env_sys['ai.trusted.action'].with_context(
+            **self.plan_ctx).sudo().browse(self.readonly.id)
+        with self.assertRaises(AccessError):
+            action.write({'group_ids': [(5, 0, 0)]})
+        self._assert_readonly_groups_kept()
+
+    # ── Controles ────────────────────────────────────────────────────────────
+
+    def test_settings_admin_can_edit(self):
+        action = self.env_sys['ai.trusted.action'].create(self._new_vals())
+        action.write({'label': 'Seges E4p 2', 'danger': 'low'})
+        self.assertEqual(action.label, 'Seges E4p 2')
+        action.unlink()
+        self.assertEqual(self._count(), 0)
+
+    def test_sudo_can_edit(self):
+        action = self.env_adm['ai.trusted.action'].sudo().create(self._new_vals())
+        action.write({'label': 'Seges E4p 2', 'danger': 'low'})
+        self.assertEqual(action.label, 'Seges E4p 2')
+        action.unlink()
+        self.assertEqual(self._count(), 0)
+
+    def test_factory_data_reload(self):
+        Data = self.env['ir.model.data']
+        # Seges: adaptado a la 17 (xmlid_to_res_id pasa a privado: _xmlid_to_res_id,
+        # odoo/addons/base/models/ir_model.py:2228).
+        before = {
+            xmlid: Data._xmlid_to_res_id('pns_ai_mcp.' + xmlid)
+            for xmlid in TRUSTED_XMLIDS
+        }
+        # Como un -u: la carga de datos corre en su.
+        # Seges: adaptado a la 17 (convert_file recibe env, odoo/tools/convert.py:674).
+        convert_file(
+            self.env, 'pns_ai_mcp', 'data/trusted_actions_system.xml', {},
+            'update', False, 'data')
+        # Seges: adaptado a la 17 (invalidate_model, odoo/models.py:6732).
+        Data.invalidate_model()
+        for xmlid in TRUSTED_XMLIDS:
+            with self.subTest(xmlid=xmlid):
+                res_id = Data._xmlid_to_res_id('pns_ai_mcp.' + xmlid)
+                self.assertTrue(before[xmlid])
+                self.assertEqual(res_id, before[xmlid])
+                self.assertTrue(
+                    self.env['ai.trusted.action'].browse(res_id).exists())
+
+    def test_plan_settings_admin_allowed(self):
+        # Propuesto y confirmado por el administrador de Ajustes: se aplica.
+        ctx = {
+            'ai_journal_user_id': self.sys_adm.id,
+            'ai_journal_confirmed_by_uid': self.sys_adm.id,
+        }
+        execute_safe_plan(self.env_sys(context=ctx), [self._clear_groups_step()])
+        # Seges: adaptado a la 17 (invalidate_recordset, odoo/models.py:6747).
+        self.readonly.invalidate_recordset()
+        self.assertFalse(self.readonly.group_ids)
+
+
+@tagged('post_install', '-at_install', 'pns_ai_mcp', 'seges_e4p')
+class TestSegesE4pUsage(TransactionCase):
+    """Parche 33 desde Python. ``_month_usage`` solo lee."""
+
+    def setUp(self):
+        super().setUp()
+        self.internal = new_test_user(
+            self.env, login='seges_e4p_usage_internal', groups='base.group_user',
+        )
+        self.ai_admin = new_test_user(
+            self.env, login='seges_e4p_usage_adm',
+            groups='base.group_user,pns_ai_mcp.group_ai_admin',
+        )
+        self.provider = self.env['ai.provider'].sudo().create({
+            'name': 'Seges E4p usage',
+            'endpoint': 'https://seges.invalid/v1/chat/completions',
+        })
+
+    def _wizard(self, user):
+        return self.env['ai.provider.usage.wizard'].with_user(user).with_context(
+            default_provider_id=self.provider.id)
+
+    def test_month_usage_public_name_gone(self):
+        Provider = type(self.env['ai.provider'])
+        self.assertFalse(hasattr(Provider, 'month_usage'))
+        self.assertTrue(hasattr(Provider, '_month_usage'))
+
+    def test_default_get_refused_for_internal(self):
+        with self.assertRaises(AccessError):
+            self._wizard(self.internal).default_get(
+                ['provider_id', 'period_label', 'total_tokens'])
+
+    def test_default_get_ai_admin_sees_figures(self):
+        res = self._wizard(self.ai_admin).default_get(
+            ['provider_id', 'period_label', 'total_tokens'])
+        self.assertEqual(res.get('provider_id'), self.provider.id)
+        self.assertIn('period_label', res)
+        self.assertIn('total_tokens', res)
+
+    def test_spend_cap_still_works(self):
+        res = self.provider.with_user(self.internal).spend_cap_reached()
+        self.assertIsInstance(res, bool)
