@@ -64,6 +64,15 @@
     sin número, con la frecuencia real del autovacuum citada. La clave que guarda `key_pin_desk.js` en el navegador
     se apunta para F1.5.
   - **85.** El `unsubscribe` muerto de `chatboo_app.js:469-474` es una observación con la regla de los menores.
+  - **86.** F1-1 pasa a menor (regla de F1-3 y F1-4): la contradicción interna sigue, el efecto queda descartado.
+    Sale de «correcciones nuevas» en la sección 7.
+  - **87.** F1-2, Baja y cosmética, se da por confirmado si el test `[HYPOTHESIS]` sale en rojo. Corrección en el
+    port: un `_compute_display_name` con `@api.depends('title', 'name')` en `ai.provider.model`; su `name_get` se
+    deja (código multiversión); en `ai.mcp.user`, nada.
+  - **88.** El `name_get()` directo de `utils/record_label.py:35`, observación sin número con la regla de los
+    menores, diciendo que hasta corregir F1-2 `where_it_is` muestra «Título (slug)» y `display_name`, el slug.
+  - **89.** La línea desfasada de la sección 4 («Falta: … casos 3 a 6 (etapa F1.1)») se corrige en el mismo commit.
+  - **90.** Sin tests para los casos 11 y 15.
 - **Marcas:**
   - **[L]:** leído (el cuerpo del código o del documento).
   - **[Loc]:** localizado por búsqueda, sin leer el cuerpo.
@@ -132,11 +141,14 @@
       sección 6);
     - laboratorio, F1.3: `test_bus_17.py` (caso 20: los 6 emisores, con el canal y el mensaje de `bus.bus`;
       sección 6);
+    - laboratorio, F1.4: `test_display_name_17.py` (caso 25: el `display_name` de `ai.provider.model` y de
+      `ai.mcp.user`; sección 6);
   - **indirecta (probado, sección 10 de la clasificación):**
     - la instalación de los tres módulos ejecuta la conversión de las 250 `attrs`, `post_init_hook` y `convert_file`;
     - `TestWebClientStarts.test_backend_starts_without_errors` (`pns_base`, en verde) carga el bundle completo,
       `pns_web_paths.js` incluido, sin errores de consola;
-  - **sin cobertura:** casos 11, 21 a 23 y 25 de la sección 3 (el 23, correcto por lectura; decisión 83), y la
+  - **sin cobertura:** casos 11, 15 y 21 a 23 de la sección 3 (el 11 y el 15, correctos por lectura, decisión 90;
+    el 23, correcto por lectura, decisión 83), y la
     desinstalación (los casos 4 y 5, desde F1.1);
   - `TestRequiredFieldsLive` (caso 17) está omitido en el laboratorio porque no hay `crm`.
 
@@ -318,16 +330,26 @@ cambia.
 - **Caso 11. `'list'` en una acción de Ajustes:** `pns_ai_mcp/models/res_config_settings.py:158-159`, usado en
   `:196` [L].
   - Rama: en la 17 devuelve `'list'` para `view_mode` (`'list,form'`) y para `views`.
+  - Quién la llama: los botones «Browse all» de `pns_ai_mcp/views/res_config_settings_views.xml:29` y `:51`, dentro
+    de `<app … groups="pns_ai_mcp.group_ai_admin">` (`:10`), solo para `group_ai_admin`; abre `ai.agent` con
+    `view_ai_agent_tree` y el formulario (`res_config_settings.py:189-202`) [L].
   - Core: `VIEW_TYPES` (`odoo/addons/base/models/ir_actions.py:346-347`, ref.) solo tiene `'tree'`, pero solo valida
     los registros guardados de `ir.actions.act_window.view`; esta acción es un `dict` que va directo al cliente web,
-    así que no prueba que `'list'` falle. En sentido contrario, `get_views` convierte `'list'` en `'tree'` antes de
-    llamar a `get_view` (`odoo/addons/base/models/ir_ui_view.py:2475-2476`: `:2475` [C], comprobado en el contenedor
-    en el punto 7 de la sección 11 de la clasificación; la conversión de `:2476`, ref.), lo que indica que el cliente
-    17.0 trabaja con `'list'`.
+    así que no prueba que `'list'` falle. La cadena de conversiones (F1.4):
+    - servidor: `call_button` pasa la acción por `clean_action` (`addons/web/controllers/dataset.py:27-31`, ref.),
+      que llama a `fix_view_modes` (`addons/web/controllers/utils.py:28-31`, ref.); con `views` y sin `view_type`,
+      cambia `'tree'` por `'list'` en `view_mode` y en `views` (`:127-140`, ref.); un `'list'` pasa igual;
+    - cliente: `action_service.js:267` vuelve a cambiar `'tree'` por `'list'` [C]; `_executeActWindowAction` busca
+      cada tipo en el registro de vistas, cuya clave es `list` (`:931-937`, ref.); `view_service.js:73-101` manda
+      `views` tal cual a `get_views` [C] (`addons/web/static/src/…`);
+    - `get_views` cambia `'list'` por `'tree'` antes de llamar a `get_view`
+      (`odoo/addons/base/models/ir_ui_view.py:2474-2480`, la conversión en `:2476`) [C].
+    - Con `'list'` o con `'tree'`, al cliente le llega `'list'` y al servidor `'tree'`: la acción abre igual.
   - Contradice `pns_base/utils/version_gates.py:16` (`TREE_TO_LIST_FROM = 18`) y el comentario de
     `ir_ui_view_patch.py:107` («Odoo 17 still uses view_mode 'tree'») [L].
-  - Clase: sin saber (falta leer `action_service` y `view_service` de la 17.0). Cobertura: ninguna. Parche: ninguno.
-    Hallazgo F1-1.
+  - Clase: **correcto** (F1.4, 24/11/2026; antes, sin saber). Cobertura: sin test (decisión 90); el test del
+    módulo `pns_ai_mcp/tests/test_mcp_agent.py:107-115` acepta las dos formas (`'list'` o `'tree'`) [L].
+    Parche: ninguno. Hallazgo F1-1, menor (decisión 86).
 - **Caso 12. Hilos y registro:** `pns_base/utils/thread_env.py:15`, `:22`, `:32`;
   `pns_ai_chatboo/models/chatboo_job.py:47`, `:62`, `:104` [L].
   - Rama: sin `Environment.manage` usa `nullcontext`; usa `odoo.registry`; llama a `in_test_mode`.
@@ -347,9 +369,16 @@ cambia.
     (`safe_operation.py`), 18 (el guardián).
 - **Caso 15. Sin invalidar tras el `rollback()`:** `pns_ai_mcp/controllers/main.py:1378-1380` [L].
   - Rama: en la 17 existe `invalidate_all`, así que no invalida nada a mano.
-  - Core: `Cursor.rollback` llama a `self.clear()` (`odoo/sql_db.py:490-492`, ref.), que llama a
-    `self.transaction.clear()` (`:140-143`, ref.); `Transaction.clear` sin localizar ni leer.
-  - Clase: correcto si `Transaction.clear` invalida la caché (falta leerlo). Cobertura: ninguna. Parche: ninguno.
+  - Core: `Cursor.rollback` llama a `self.clear()` (`odoo/sql_db.py:490-492` [C]), que llama a
+    `self.transaction.clear()` (`:140-143` [C]). `Transaction.clear` hace `self.cache.clear()` y
+    `self.tocompute.clear()` (`odoo/api.py:881-884` [C]); `Cache.clear` vacía `_data`, `_dirty` y `_patches`
+    (`api.py:1321-1325`, ref.). Tras el `rollback()` quedan vacíos la caché, las escrituras pendientes y los
+    cálculos pendientes.
+  - Después del `rollback()`, el controlador solo arma el diccionario de error y lo devuelve (`main.py:1382-1396`)
+    [L]. Igual que en 3.1.973: el `rollback` es de PNS-26 (resto, 3.1.842; `comparacion_pns_ai_3-1-879.md:608` de
+    `14.0`).
+  - Clase: **correcto** (F1.4, 24/11/2026; antes, correcto si `Transaction.clear` invalida la caché). Cobertura:
+    sin test (decisión 90). Parche: ninguno.
 - **Caso 16. `request.jsonrequest`:** `pns_ai_mcp/controllers/controller_helpers.py:133` [L].
   - Rama: en la 17 `request` no tiene `jsonrequest` (solo `JsonRPCDispatcher`, `odoo/http.py:2205`) [C]; el error
     sale con `id` nulo.
@@ -446,10 +475,27 @@ cambia.
   `:26-27`) y `models/mcp_user.py:536` (de `ai.mcp.user`, `_rec_name = 'user_id'`, `:71-73`) [L].
   - Rama: etiquetas «título (nombre)» y «nombre del usuario» / «No user»; ningún `_compute_display_name` en esos
     modelos [Loc].
-  - Core: `name_get` obsoleto desde la 17.0 (`odoo/models.py:1694`, ref.); `display_name` se calcula con
-    `_compute_display_name` (`:1678`, ref., cuerpo sin leer).
-  - Clase: probablemente muerto en la 17; se resuelve leyendo `odoo/models.py:1678`. Cobertura: ninguna.
-  - Parche: 33 (`ai_provider.py`). Hallazgo F1-2.
+  - Core (números del contenedor; sustituyen a `:1678` y `:1694` de la referencia) [C]:
+    - `_compute_display_name` (`odoo/models.py:1660-1675`) convierte el `_rec_name` con `convert_to_display_name` y
+      no llama a `name_get`; sin `_rec_name`, `"<modelo>,<id>"`;
+    - `name_get` (`:1677-1695`) está obsoleto desde la 17.0: avisa (`DeprecationWarning`, `:1694`) y devuelve el
+      `display_name`. En `odoo/models.py`, `fields.py`, `api.py`, `osv/`, `addons/web` (controladores y modelos) y
+      `odoo/addons/base/models` nadie lo llama;
+    - `Many2one.convert_to_display_name` devuelve el `display_name` del valor (`odoo/fields.py:3173-3174`), y
+      `res_users.py` no redefine `_compute_display_name`.
+  - Etiqueta en la 17:
+    - `ai.provider.model` (sin `_rec_name`: `name`): el slug, en lugar de «título (nombre)». Se ve en el Many2one
+      `model_id` del formulario del proveedor (`pns_ai_mcp/views/ai_provider_views.xml:32`) y en `placed_label`
+      (`utils/record_label.py:51`), que usan `controllers/safe_plan_describe.py:141` y
+      `utils/ack_record_card.py:52` [L]. La búsqueda no cambia: en la 14 y en la 17 busca en `name`;
+    - `ai.mcp.user`: el nombre del usuario, como su `name_get`; «No user» no se alcanza (`user_id` es
+      `required=True`, `mcp_user.py:79-82`) [L].
+  - Probado (`test_display_name_17.py`, F1.4): el `[HYPOTHESIS]` de `ai.provider.model` (`name='lab-slug'`,
+    `title='Lab Title'`) sale en rojo con `AssertionError: 'lab-slug' != 'Lab Title (lab-slug)'`; el de
+    `ai.mcp.user` (`display_name` igual a `user.name`), en verde.
+  - Clase: **distinto** en `ai.provider.model` (muestra el slug); sin cambio en `ai.mcp.user` (F1.4, 24/11/2026;
+    antes, probablemente muerto en la 17). Cobertura: `test_display_name_17.py`.
+  - Parche: 33 (`ai_provider.py`). Hallazgo F1-2, confirmado (decisión 87).
 
 ## 4. Las cuatro áreas, medidas
 
@@ -507,7 +553,7 @@ cambia.
   - 519 líneas [L]. En la 17 están activos `_load_records`, `create`, `write`, `_compute_arch`, `_auto_convert_attrs`
     (paso 1) y `Base.get_view` (casos 3 a 6). Están muertos `<tree>`→`<list>`, `column_invisible`, el xpath de
     Ajustes de la 19 y la normalización de `view_mode` (7 condiciones, sección 2).
-  - Falta: la revisión con el criterio de los PNS de los casos 3 a 6 (etapa F1.1).
+  - Hecha la revisión con el criterio de los PNS de los casos 3 a 6 (etapa F1.1; F1-5) (decisión 89).
 
 ## 5. Hallazgos F1
 
@@ -521,15 +567,20 @@ cambia.
     `ai.provider.model` (tabla de la caja A); no habla de su efecto. El resto, sobre el `name_get` del core;
   - `res_config_settings.py`: solo otras líneas y otros módulos.
   - No hay antecedente del síntoma de ninguno de los cuatro.
-- **F1-1. `'list'` en una acción de la 17** (caso 11) [L]:
+- **F1-1. `'list'` en una acción de la 17** (caso 11), menor (decisión 86) [L; core C y ref.]:
   - El hallazgo es la contradicción interna: `pns_ai_mcp/models/res_config_settings.py:159` devuelve `'list'` con
     `ODOO_VERSION >= 17`, frente al umbral 18 de `pns_base/utils/version_gates.py:16` y al comentario de
     `pns_base/models/ir_ui_view_patch.py:107` [L]. Afecta a `_action_open_module_agents` (`:196-202`).
-  - El efecto, sin confirmar: el cliente 17.0 trabaja con `'list'` (`get_views`, caso 11), así que puede no fallar
-    (etapa F1.4).
-- **F1-2. `name_get` sin efecto en la 17** (caso 25) [L; core ref.]:
-  - `ai.provider.model` y `ai.mcp.user` perderían sus etiquetas. Sin confirmar: falta leer `odoo/models.py:1678`
-    (etapa F1.4). La corrección, en el port (decisión 61).
+  - Efecto descartado (F1.4): con `'list'` o con `'tree'`, al cliente le llega `'list'` y al servidor `'tree'`, y la
+    acción abre igual (cadena de conversiones en el caso 11). Va con la regla de F1-3 y F1-4 (sección 7).
+- **F1-2. `name_get` sin efecto en la 17** (caso 25), Baja, cosmética, confirmado (decisión 87) [L; core C; probado]:
+  - `ai.provider.model` muestra el slug en lugar de «título (nombre)» (`ai_provider.py:80-87`): en el Many2one
+    `model_id` del formulario del proveedor y en `placed_label` (caso 25). Lo ve quien lee el modelo
+    (`base.group_user`, `pns_ai_mcp/security/ir.model.access.csv:11`) [L]. No permite nada más: solo cambia la etiqueta.
+  - `ai.mcp.user`: su `name_get` está muerto, pero sin efecto (misma etiqueta; caso 25).
+  - Probado: el `[HYPOTHESIS]` de `test_display_name_17.py` sale en rojo con
+    `AssertionError: 'lab-slug' != 'Lab Title (lab-slug)'`; el test de `ai.mcp.user`, en verde.
+  - La corrección, en el port (decisiones 61 y 87; sección 7).
 - **F1-3. `@web/core/user` sin uso y comentario falso** (caso 22), menor [L; core C]:
   - `pns_web_paths.js:44-62` define un módulo que nadie importa; la L11 dice que la 17 trata como módulo todo
     `static/src`, y la 17.0 solo trata así lo que lleva `@odoo-module`. Confirmado por lectura; sin efecto conocido.
@@ -605,6 +656,18 @@ cambia.
     que la 17 no tiene (`bus_service.js:232`) [C]: las suscripciones de `:467-468` no se quitan.
   - Sin efecto: `ChatbooApp` se monta una sola vez (`chatMounted` no vuelve a `false`, `chatboo_overlay.js:94`,
     `:121-122`) [L]. Va con la regla de los menores (sección 7).
+- **Observación, sin número: `name_get()` directo en `record_label.py`** (caso 25, decisión 88), menor [L; core C y
+  ref.]:
+  - `where_it_is` (`pns_ai_mcp/utils/record_label.py:35`) llama a `rec.with_context(show_address=True).name_get()`.
+    En un modelo sin `name_get` propio entra en el del core: funciona (el `display_name` de `res.partner` respeta
+    `show_address`, `odoo/addons/base/models/res_partner.py:893-897` [C]), pero avisa con un `DeprecationWarning`
+    (`odoo/models.py:1694` [C]), que el log muestra una vez por proceso (`odoo/netsvc.py:190`, ref.).
+  - En `ai.provider.model` llama a su `name_get` propio: hasta corregir F1-2, `where_it_is` recibe «Título (slug)»
+    y `display_name`, el slug. Como solo usa las líneas siguientes a la primera (`:39`), aquí devuelve vacío [L].
+  - Antecedentes: `git grep` en `docs/` de `14.0` y de `17.0-pns-ai` de `record_label`, `where_it_is` y
+    `DeprecationWarning`: nada del mismo síntoma. Misma familia: el `DeprecationWarning` de `clear_cache`,
+    observación del fabricante sin parche (`clasificacion_parches_pns_ai_17_3996.md:358-360`).
+  - Va con la regla de los menores (sección 7).
 - **Nota para PNS-84, sin número** (decisión 84) [L; core C]:
   - El aviso `pns_key_pin` lleva el PIN, el correo y el login (`pns_ai_mcp/models/key_pin_desk.py:147-154`), y la
     fila queda en `bus_bus` hasta la siguiente ejecución del autovacuum: `_gc_messages` lleva `@api.autovacuum` y
@@ -690,6 +753,19 @@ laboratorio (decisión 64). Los tests van como idea; no hay ninguno escrito.
     (caso 15); `odoo/models.py:1678` (caso 25).
   - Test solo si la lectura no basta: abrir la acción de Ajustes en el navegador (caso 11); `display_name` de
     `ai.provider.model` y `ai.mcp.user` con etiqueta `[HYPOTHESIS]` (caso 25).
+  - **Hecha (24/11/2026):**
+    - Caso 5: ya se hizo en F1.1. Casos 11 y 15: por lectura, sin test (decisión 90); el core, en una ejecución sin
+      red (marca [C]) y lo que no capturó, en la referencia (ref.).
+    - Caso 25: `seges_pruebas_3996/tests/test_display_name_17.py`, clase `TestDisplayName17` (`TransactionCase`),
+      dos tests, en el laboratorio y en su copia de `docs/pendiente/lab_3996/` (mismo `sha256sum`):
+      1. `[HYPOTHESIS]` (F1-2): `ai.provider.model` con `name='lab-slug'` y `title='Lab Title'` tiene
+         `display_name == 'Lab Title (lab-slug)'`. En rojo: `AssertionError: 'lab-slug' != 'Lab Title (lab-slug)'`;
+      2. el `display_name` del `ai.mcp.user` de un usuario creado en el test es `user.name`. En verde.
+    - Ningún test se corrigió tras la ejecución.
+    - Laboratorio: `odoo-dev 17 tests seges_pruebas_3996` (BD temporal `test_lab_pns_ai_3996_17`, que no queda al
+      terminar): `15 failed, 0 error(s) of 52 tests`; los 14 de antes y el test 1. Log `tests-20261124-121539.log`.
+    - Resultado: casos 11 y 15 correctos (sección 3); caso 25 distinto en `ai.provider.model`; F1-1 menor, F1-2
+      confirmado y la observación de `record_label.py` (sección 5).
 - **F1.5. JS por riesgo (decisión 60):**
   - Inventario con `git grep` de los puntos peligrosos en los 80 assets y en las librerías bajo demanda; revisión a
     mano de lo que salga, empezando por lo que pinta HTML (`chatboo_formatters.js`, `chatboo_markdown.js`,
@@ -702,7 +778,12 @@ laboratorio (decisión 64). Los tests van como idea; no hay ninguno escrito.
 
 - **Caso 24** (parche 18, decisión 48): los ganchos «Odoo 17+» no existen y la caja A con uid 1 da `su` (localizado,
   no probado; decisión 48).
-- **Casos 11 y 25** (F1-1 y F1-2): correcciones nuevas, si se confirman en F1.4.
+- **F1-2 (decisión 87):** corrección: un `_compute_display_name` con `@api.depends('title', 'name')` en
+  `ai.provider.model`; su `name_get` se deja (código multiversión); en `ai.mcp.user`, nada. Con la corrección, el
+  `[HYPOTHESIS]` de `test_display_name_17.py` pasa a verde.
+- **F1-1 (menor, decisión 86):** con la regla de F1-3 y F1-4: solo se corrige si el port toca ese archivo.
+- **`name_get()` directo de `utils/record_label.py:35` (decisión 88):** observación con la regla de los menores (la
+  de F1-3 y F1-4): solo se corrige si el port toca ese archivo.
 - **Caso 3:** todos los parches que tocan XML de vistas pasan por el convertidor; lo que salga de F1.1 vale para
   ellos.
 - **F1-3 y F1-4 (menores):** solo se corrigen si el port toca esos archivos (convención del código heredado); si no,
