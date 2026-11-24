@@ -728,3 +728,194 @@ menciones del propio test (así `test_seges_rpc_access.py`) o de la entrada del 
   - **Caja A con uid 1 (localizado, no probado):** si el `env` del llamador es del uid 1, el `Environment` de la caja A
     pasa a `su` (`odoo/api.py:507-508`) y el guardián se apaga (`_pns_sandbox_reads`, `sandbox_secret_read.py:69-70`).
     En el port hay que revisar quién puede abrir la caja A con el uid 1.
+
+### Punto 7: métodos con efectos frente al core de la 17 (parches 22 y 39)
+
+- **Qué se buscaba:** si los nombres de los parches 22 y 39 siguen existiendo y llegando a su efecto en la 17, y si
+  hay públicos nuevos con efectos fuera de la caja A (sección 8, punto 7). Solo lectura; el test va a la fase 2 del
+  plan, con el port.
+- **Criterio (el de la 14):** método público de modelo (también `@api.model`, acciones y campos calculados) que sale
+  a la red, ejecuta otro código o confirma en un cursor propio sin escribir antes, así que el `READ ONLY` de la caja A
+  no lo frena (A, C); se añade también una vía estándar de envío que escriba antes (B, defensa). En la 14:
+  `14.0:docs/pendiente/e2_propuesta_3879.md:1230-1309` (barrido del 22, un salto por privados del mismo módulo, 47
+  módulos instalados) y `14.0:docs/pendiente/parches_pns_ai.md:5094-5137` (inventario de `get` del 39, todos los
+  addons, OCA y `vertical-instaladores`).
+- **Caja A de R17 (leído):** un `self.env.cr.commit()` dentro de la caja A no confirma nada: el `commit` de su cursor
+  está anulado (`controller_helpers.py:229`). Solo escapan los cursores propios (`self.pool.cursor()`); por eso
+  `bus.presence.update_presence` (`addons/bus/models/bus_presence.py:67`, `commit` en `:79`) no tiene efecto.
+- **Método:** seis ejecuciones de solo lectura en el contenedor (`17.0-20260908`, sin red ni volúmenes), con scripts
+  en línea. Las rutas se citan como en el árbol de fuentes (`addons/<módulo>`; en el contenedor,
+  `odoo/addons/<módulo>`):
+  - **barrido automático:** los 641 módulos de `addons/`; métodos de clases con `_name` o `_inherit` (sin `tests/` ni
+    `migrations/`); el cuerpo y los privados del mismo módulo hasta 3 saltos (la 14, uno), con patrones de
+    `smtplib`, `requests`, `urllib`, `http.client`, `socket`/`imaplib`/`poplib`, `xmlrpc`, `subprocess`,
+    `iap_jsonrpc`/`_contact_iap`/`iap.account.get`, cursores propios y `commit`, y ejecución de acciones y crons;
+    los `compute` con coincidencia directa. 175 candidatos: 57 en los módulos del laboratorio y 118 fuera;
+  - **llamadores de `iap.account.get`, `get_credits`, `get_credits_url` y `get_config_account_url`** en todos los
+    addons, directos, por variable y por privados del mismo módulo hasta 3 saltos (el método del 39), repetido en la
+    quinta ejecución;
+  - **revisión a mano:** las cadenas de los nombres del 22 y del 39, y los candidatos de los módulos del laboratorio;
+  - **quinta y sexta, antes de escribir esta subsección:** los llamadores de `get` (arriba), las colisiones de nombre
+    de los que entran y `get_views` (`odoo/addons/base/models/ir_ui_view.py:2446`, clase `base`), que llama a
+    `get_view` del mismo modelo (`:2475`);
+  - **los 26 módulos del laboratorio:** no están escritos en el repo. Se derivan de los manifiestos (`depends` y
+    `auto_install` desde `pns_base`, `pns_ai_mcp` y `pns_ai_chatboo`), sin consultar la BD; salen 26, como en la
+    sección 10: `auth_signup`, `auth_totp`, `auth_totp_mail`, `base`, `base_import`, `base_import_module`,
+    `base_install_request`, `base_setup`, `bus`, `google_gmail`, `iap`, `iap_mail`, `mail`, `mail_bot`,
+    `partner_autocomplete`, `phone_validation`, `privacy_lookup`, `sms`, `snailmail`, `web`, `web_editor`,
+    `web_tour`, `web_unsplash` y los tres `pns_*`.
+- **Límites:** no se siguen las llamadas a métodos públicos de otro modelo ni a los genéricos del ORM
+  (`odoo/models.py` y la clase `base` de `ir_ui_view.py`), como en la 14, salvo `get_views` → `get_view` y los campos
+  calculados; no se han mirado los métodos `@api.onchange` que ejecuta `onchange`. Los patrones dan falsos positivos
+  (`ir.attachment.check` e `ir.model.access.check` heredan la coincidencia de `res.users.check`, mismo módulo y
+  nombre) y pueden dejar fuera cadenas por un nombre de librería distinto. Los candidatos de fuera del laboratorio no
+  se han revisado a mano; no se ha buscado en OCA ni en `vertical-instaladores`. Las colisiones de nombre se cuentan
+  en el contenedor.
+- **R17 hoy (leído):** la lista global trae del fabricante `send_email`, `build_email`, `send`, `send_mail`,
+  `process_email_queue`, `run` y `method_direct_trigger` (`validators_base.py:257-266`); no existe la tabla por
+  modelo. La lista se aplica en el AST a las llamadas (`validators_checks.py:478-485`, que da `requires_write`) y en
+  tiempo de ejecución solo al nombre dinámico (`context_builder.py:227`); la lectura literal sin llamada no la mira
+  (`sandbox_attr`, `:286`). Los nombres que empiezan por `_` se rechazan en el AST (`validators.py:304`,
+  `blocked_private_attr`, `validators_base.py:164-170`) y en ejecución (`context_builder.py:210`, `_refuse_attr_name`,
+  que usa `sandbox_attr`). El 22 añade 22 nombres, y el 39, 8 y la tabla
+  (`14.0:pns_ai_mcp/controllers/validators_base.py:279-334`).
+- **Puertas de R17 para los que entran (leído):** ninguna frena sus llamadas. Sus modelos no están en
+  `RELAXAICODE_CREDENTIAL_MODELS` (`validators_base.py:189-206`: modelos de `pns_ai_mcp` y `res.users.apikeys`) ni
+  en el catálogo (`catalogue_inspect_error`, `validators_base.py:416-428`, antes citado en `:357-364`; AST en
+  `validators_checks.py:433-437`). El cierre de columnas secretas (`models/sandbox_secret_read.py`, criterio en
+  `utils/sandbox_secrets.py:36-71`) impide leer campos como `account_token`; no se ha comprobado si alcanza a lo que
+  estos métodos leen dentro con `sudo()` (punto 1, decisión 48).
+- **Nombres del 22 en la 17 (leído):**
+  - **igual:** `connect` en `ir.mail_server` (SMTP, `odoo/addons/base/models/ir_mail_server.py:344`; no conecta
+    en modo test, `:368`) y en `fetchmail.server` (IMAP o POP, `addons/mail/models/fetchmail.py:150`, `:160`,
+    `:163`); `test_smtp_connection` (`ir_mail_server.py:284`); `load_remote_url` (`requests.get` a cualquier URL,
+    `addons/web_editor/models/ir_qweb_fields.py:502`, `:511`); `fetch_mail` (IMAP, `fetchmail.py:215`, `:230`);
+    `button_confirm_login` (`connect` en `fetchmail.py:184`, antes del `write` de `:185`); `get_credits` (`get` y
+    JSON-RPC, `addons/iap/models/iap_account.py:221-222`, `:235`); `send_letter`
+    (`addons/snailmail/models/mail_message.py:30-31` → `get('snailmail')`, `snailmail_letter.py:229`);
+    `update_notification` (`requests.post`, `addons/mail/models/update.py:83`, `:79`); `upgrade_module`
+    (`odoo/addons/base/wizard/base_module_upgrade.py:50`); `action_start_automatic_process` y
+    `parent_migration_process_cb` (`base_partner_merge.py:546`, `:570`); `message_process` y `message_route`
+    (`addons/mail/models/mail_thread.py:1365`, `:1079`; rebote en `:1220` y `:1269`, B); `get_usd_fx`, método de
+    R17 y no del core (sección 4); y, fuera del laboratorio, `action_process_edi_web_services`
+    (`addons/account_edi/models/account_move.py:378`);
+  - **frenado, como en la 14:** `snailmail_print` escribe antes (`snailmail_letter.py:428-429`);
+  - **sin efecto:** `autocomplete`, `enrich_company` y `read_by_vat`, vacíos
+    (`addons/partner_autocomplete/models/res_partner.py:73`, `:78`, `:83`), y `start_sync`, vacío
+    (`res_partner_autocomplete_sync.py:17-18`);
+  - **desaparece:** `install_from_urls`;
+  - **pasa a privado:** `execute_callback` (`_execute_callback`, `addons/payment/models/payment_transaction.py:880`),
+    que frena el rechazo de los nombres con `_`.
+- **`iap.account.get` en la 17 (leído, `iap_account.py:124-171`):** como en la 14, borra con `sudo()` las cuentas sin
+  token en un cursor propio que confirma (`:133-143`) y, si no hay cuenta, la crea en otro (`:149-161`) y deja el
+  token en la caché (`:164-166`). Cambia: hace `flush_all()` del llamador antes de abrir cada cursor (`:139`, `:155`),
+  y en una BD neutralizada la cuenta nueva sale con el token desactivado (`:114-121`).
+- **Nombres del 39 en la 17 (leído):**
+  - **igual:** `get_credits_url` (`get` si no se le pasa token, `iap_account.py:174`, `:182`);
+    `get_config_account_url` (`:208`, `:210`); `redirect_to_buy_autocomplete_credit`
+    (`addons/partner_autocomplete/models/res_config_settings.py:15`, `:19`); `sms.resend.action_buy_credits`
+    (`addons/sms/wizard/sms_resend.py:116-117`); y, fuera del laboratorio, `action_buy_sms_credits`
+    (`addons/mass_mailing_sms/models/mailing_mailing.py:142-143`) y `action_submit` (`get('reveal')`,
+    `addons/crm_iap_mine/models/crm_iap_lead_mining_request.py:314`, `:318`, `:240`);
+  - **frenados por el `READ ONLY` (pasan de A a B):** `sms.composer.action_send_sms` en modo `numbers`, que crea los
+    `sms.sms` (`addons/sms/wizard/sms_composer.py:215`) antes de enviar (`:216`; los modos `comment` y `mass`,
+    `:200-204`, no se han leído); `action_send_sms_mass_now` (`write` en `:189` o `action_send_sms` en `:190`); y
+    `mailing.sms.test.action_send_sms`, que crea los `sms.sms` (`addons/mass_mailing_sms/wizard/mailing_sms_test.py:35`)
+    antes de enviar (`:37`).
+  - Ya en la sección 4 y confirmados: `iap.account.action_buy_credits` (`iap_account.py:193`, solo sin token),
+    `crm.iap.lead.mining.request.action_buy_credits` (`crm_iap_lead_mining_request.py:356`, `:359`) y
+    `res.config.settings.l10n_in_edi_buy_iap` (`addons/l10n_in_edi/models/res_config_settings.py:47`, `:52`), fuera
+    del laboratorio. En la 14, `l10n_in_edi_buy_iap` no está en la lista ni en la tabla, y la tabla solo trae
+    `action_submit` para `crm.iap.lead.mining.request` (`14.0:pns_ai_mcp/controllers/validators_base.py:333`).
+  - Restos conocidos, iguales: `res.config.settings.partner_autocomplete_insufficient_credit`
+    (`res_config_settings.py:10-13`, `get_credits` al leerlo) y `crm.lead.iap_enrich`
+    (`addons/crm_iap_enrich/models/crm_lead.py:51`, frenado por `FOR UPDATE NOWAIT` en `:58-60` antes de `:90`).
+  - **Inventario de llamadores (todos los addons):** 21 métodos públicos llegan a `get`, directos, por variable, por
+    privados del mismo módulo o a través de `get_credits`, `get_credits_url` y `get_config_account_url`; todos están
+    en esta subsección o en las listas del fabricante y del 22. Tres son nuevos, de la localización india y fuera del
+    laboratorio, y solo se alcanzan con 2 o 3 saltos (no se ha revisado a mano si escriben antes):
+    `res.config.settings.l10n_in_edi_test` (`addons/l10n_in_edi/models/res_config_settings.py:30` →
+    `account_edi_format.py:716`, `:685`, `:686`), `res.config.settings.l10n_in_edi_ewaybill_test`
+    (`addons/l10n_in_edi_ewaybill/models/res_config_settings.py:17` → `account_edi_format.py:641`, `:609`, `:610`) y
+    `l10n.in.ewaybill.cancel.cancel_ewaybill` (`addons/l10n_in_ewaybill_stock/wizard/l10n_in_ewaybill_cancel.py:20`
+    → `tools/ewaybill_api.py:174`, `:112`, `:60`, `:61`). Este último tiene el nombre en común con
+    `l10n.in.ewaybill.cancel_ewaybill` (`addons/l10n_in_ewaybill_stock/models/l10n_in_ewaybill.py:234`), que solo
+    devuelve la acción que abre el asistente (leído en la referencia).
+- **Candidatos nuevos en los módulos del laboratorio (leídos):**
+  - `res.partner`: `autocomplete_by_name`, `autocomplete_by_vat`, `enrich_by_duns`, `enrich_by_gst` y
+    `enrich_by_domain` (`res_partner.py:91`, `:108`, `:171`, `:178`, `:185`) → `_request_partner_autocomplete` →
+    `get` (`iap_autocomplete_api.py:22`) y JSON-RPC (`:34`). Usuario interno; un `def` cada uno;
+  - `iap.account.get_services`: JSON-RPC con los tokens de todas las cuentas, leídos con `sudo()`
+    (`iap_account.py:95`, `:100`, `:105`), antes de crear (`:110`); `get_view` de tipo `tree`, que lo llama
+    (`:46-49`); y `get_views` con una vista `list` o `tree`, que llama a `get_view` (clase `base`,
+    `ir_ui_view.py:2475`). Usuario interno; `get_view` tiene 7 `def` (uno en `iap.account`) y `get_views`, 7
+    (ninguno en `iap.account`);
+  - `base_import.import.execute_import`: HTTP a cualquier URL de una columna de imagen
+    (`addons/base_import/models/base_import.py:1329` → `_parse_import_data`, `:1361` → `_import_image_by_url`,
+    `:1243`, `:1300`), antes de `load` (`:1380`) y sin control de host (`:1287-1327`). Usuario interno; un `def`;
+  - `res.users.authenticate`: cursor propio que confirma en `_login`
+    (`odoo/addons/base/models/res_users.py:906`, `:879`, `:884`, `:896`); con un usuario del sistema y
+    `base_location`, `set_param` (`:917-927`); también `addons/auth_signup/models/res_users.py:124-127`. Usuario
+    interno, con el nombre de la BD y una contraseña; 5 `def` (3 en `res.users`);
+  - `res.company.iap_enrich_auto`: IAP por `enrich_by_domain` antes del `write`
+    (`addons/partner_autocomplete/models/res_company.py:42`, `:45`, `:63`, `:73`). Solo usuarios del sistema;
+    un `def`;
+  - `ir.module.module.button_immediate_install_app`: descarga e instala
+    (`addons/base_import_module/models/ir_module.py:414-419`). Solo administrador; un `def`;
+  - `discuss.channel.rtc.session.action_disconnect`: `requests.post` a la URL guardada del servidor SFU
+    (`addons/mail/models/discuss/discuss_channel_rtc_session.py:90`, `:99-106`). ACL de Ajustes; un `def`.
+  - **Defensa, fuera del criterio (localizado, no probado):** `res.users.check` (`res_users.py:934-946`) comprueba una
+    contraseña en un cursor propio, sin confirmar: no tiene efecto, pero sirve para probar contraseñas desde la caja
+    A, como `authenticate`; 10 `def` (uno en `res.users`). Otras vías que comprueban una contraseña no se han revisado.
+  - **Fuera del criterio, con motivo:** `ir.module.module.web_search_read`, `web_read` y `search_panel_select_range`
+    (`base_import_module/models/ir_module.py:317-320`, `:338-342`, `:497`): `requests.post` a un host fijo
+    (`_call_apps`, `:389-391`), solo con `module_type` `industries`, y nombres genéricos; `res.partner.onchange_email`
+    (Gravatar, `odoo/addons/base/models/res_partner.py:514`), como en la 14; `bus.presence.update_presence` (arriba);
+    las vías B que escriben antes (`message_post`, `message_notify`, `action_send_mail`, `action_resend`,
+    `force_send`); y `create`, `write` y `unlink`, que el AST ya trata como escritura.
+- **Fuera del laboratorio (barrido automático, sin revisar a mano):** 118 candidatos (por tipo: `commit` 58, `http`
+  49, `iap` 16, `exec` 4; un candidato puede tener varios). Los de modelos que un usuario interno lee por ACL, sin
+  `create`, `write` ni `unlink`: `account_peppol` (`account.journal.peppol_get_new_documents`,
+  `res.partner.button_account_peppol_check_partner_endpoint` y el campo `account_peppol_verification_label`),
+  `auth_oauth` (`res.users.auth_oauth`), `base_vat` (campo `res.partner.vies_valid`), `crm`
+  (`crm.team.action_assign_leads`), `event` (campo `res.partner.static_map_url_is_valid`), `gamification`
+  (`accept_challenge`, `action_check`, `update_goal`), `l10n_eg_edi_eta`, `l10n_es_edi_verifactu`, `l10n_fr_pdp`,
+  `l10n_hu_edi`, `l10n_it_edi`, `l10n_my_edi_extended`, `l10n_ro_edi_stock`, `l10n_ro_efactura`,
+  `l10n_ro_efactura_synchronize`, `l10n_tr_nilvera`, `l10n_tr_nilvera_einvoice` y `l10n_vn_edi_viettel` (botones de
+  EDI de `account.move`, `account.journal`, `res.partner` y `stock.picking`), `microsoft_calendar`
+  (`calendar.event.action_mass_archive`), `pos_mercury` (`do_payment`, `do_return`, `do_reversal`, `do_voidsale`),
+  `stock` (`procurement.group.run_scheduler`, `stock.picking.action_confirm`), `website` (`configurator_*`) y
+  `website_twitter` (`website.fetch_favorite_tweets`). El campo `crm.lead.email_domain_criterion` es un falso
+  positivo (`iap_tools` sin red). Quedan como inventario; si un cliente con `l10n_es_edi_verifactu` o
+  `account_peppol` instala `pns_ai`, se revisan a mano antes.
+- **Conclusión:** las listas del 22 y del 39 hay que actualizarlas para la 17; el criterio de la 14 sigue valiendo.
+  - **Alcance:** los 26 módulos del laboratorio y los llamadores de `get` de todos los addons (como el 39, aquí hasta
+    3 saltos); el resto de fuera del laboratorio queda como inventario.
+  - **Salen (6):** `install_from_urls` (desaparece), `execute_callback` (lo frena el rechazo de los nombres con `_`)
+    y los cuatro vacíos de `partner_autocomplete` (`autocomplete`, `enrich_company`, `read_by_vat` y `start_sync`).
+  - **Entran en la lista global y en la tabla por modelo (13):** los cinco de `partner_autocomplete` en
+    `res.partner`, `get_services` en `iap.account`, `execute_import` en `base_import.import`, `iap_enrich_auto` en
+    `res.company`, `button_immediate_install_app` en `ir.module.module`, `action_disconnect` en
+    `discuss.channel.rtc.session` y, fuera del laboratorio, `l10n_in_edi_buy_iap`, `l10n_in_edi_test` y
+    `l10n_in_edi_ewaybill_test` en `res.config.settings`.
+  - **Entran solo en la tabla por modelo (6):** por colisión de nombre, `get_view` y `get_views` en `iap.account`,
+    `authenticate` en `res.users` y, fuera del laboratorio, `cancel_ewaybill` en `l10n.in.ewaybill.cancel`;
+    `action_buy_credits` en `crm.iap.lead.mining.request`, fuera del laboratorio (el nombre ya está en la lista
+    global); y, como defensa fuera del criterio, `check` en `res.users`.
+  - **Cambian de grupo:** `sms.composer.action_send_sms` (en modo `numbers`), `action_send_sms_mass_now` y
+    `mailing.sms.test.action_send_sms` pasan de A a B (escriben antes); se mantienen como vía estándar de envío.
+  - **Alias (E3, D-2):** sigue igual en R17 (el AST solo ve llamadas y la lista global solo el nombre dinámico). Como
+    D40d en la 14, la tabla por modelo cierra también el alias para los que están en ella; la familia de los parches
+    15 y 22 sigue pendiente.
+- **Impacto en el port:** `test_seges_sandbox_side_effects.py` (`14.0`, `5d0559b`; 15 tests) se adapta:
+  - se mantienen `test_names_in_denylist` y `test_ast_flags_literal_call` (con la lista nueva), los de correo, URL,
+    acción de servidor y cron, y los cinco de `get` (`test_box_a_iap_get_*`);
+  - `test_box_a_iap_refused` pasa de `read_by_vat` (vacío) a `autocomplete_by_name`;
+    `test_box_a_module_from_urls_refused` pasa a `button_immediate_install_app`; en
+    `test_box_a_iap_get_indirect_refused`, los casos de `action_send_sms` comprueban el rechazo por nombre y que el
+    `READ ONLY` los frena;
+  - casos nuevos: `get_services`, `get_view` de lista y `get_views` con una vista `list` en `iap.account`,
+    `execute_import` con una URL de imagen (con `requests.Session.get` sustituido), los cinco de
+    `partner_autocomplete`, `authenticate`, `check`, `iap_enrich_auto` y el alias de cada uno; `iap_jsonrpc` rechaza
+    las llamadas en modo test (`addons/iap/tools/iap_tools.py:117-118`), así que los tests deben sustituirlo antes;
+  - los candidatos de fuera del laboratorio quedan como inventario para los clientes que instalen esos módulos.
