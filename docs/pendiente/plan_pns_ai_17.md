@@ -28,7 +28,8 @@
 
   Fase 2: tandas preparadas (24/11/2026) en `docs/pendiente/fase2_pns_ai_17_3996.md` (decisiones desde la 114): T0
   (tests de no regresión, registro de parches y regla de terceros) y T1 a T10, con los 21 parches y las correcciones
-  de la fase 1, sin cambiar la versión de los manifiestos (F1-4 queda fuera, decisión 115). Sigue la tanda T0.
+  de la fase 1, sin cambiar la versión de los manifiestos (F1-4 queda fuera, decisión 115). T0 hecha (24/11/2026):
+  tests de no regresión y registro `docs/pendiente/parches_pns_ai.md`; línea base, 0 F y 0 E de 330. Sigue la tanda T1.
 
 ## Decisiones (Sergio, 22 y 23/11/2026)
 

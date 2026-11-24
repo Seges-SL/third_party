@@ -25,6 +25,18 @@
   `readme/*.md` (en español) e icono de la empresa;
   `README.rst` y `static/description/index.html` se generan con `odoo-readme <modulo>`.
   En módulos existentes no se crea esa estructura salvo que se pida.
+- Módulos de terceros `pns_base`, `pns_ai_mcp` y `pns_ai_chatboo` (PATANEGRA Soft, Apache-2.0):
+  Seges mantiene la versión 3.1.996 de la 17 (R17) como base propia (decisiones N11, N12 y N15 en
+  `14.0:docs/pendiente/pns_ai_decisiones.md`). Solo se modifican con un parche registrado en
+  `docs/pendiente/parches_pns_ai.md`, con el marcador `# Seges: parche N (<id>, <tipo>)` junto a
+  cada cambio y su test (`<id>`: el PNS, el id de la 14 o, en las correcciones de la fase 1, su F1-n).
+  Cambio mínimo, compatible con Python 3.10, sin dependencias nuevas y sin tocar `version`, `depends`,
+  `external_dependencies` ni `i18n`. No se tocan `LICENSE` ni `NOTICE`. Los parches no añaden
+  `migrations/` propios.
+  Plan de trabajo vigente: `docs/pendiente/plan_pns_ai_17.md` y, para el port de los parches,
+  `docs/pendiente/fase2_pns_ai_17_3996.md`.
+  Este archivo lo generó `configurar_repo.py` del kit y la regla se añadió a mano: no lo regeneres con
+  `configurar_repo.py --force`, que la borraría.
 - No hagas `git commit` ni `git push`.
 - IMPORTANTE: `/opt/odoo-src/17.0/third_party` es una copia de referencia de ESTE repo (la versión publicada). No la consultes: trabaja siempre con los archivos locales del repo.
 

@@ -42,6 +42,39 @@
     (`TestSegesCanvasPictures` y `TestSegesSharedPage`, en `test_seges_chatboo_canvas.py`); solo el 20 no tiene test.
   - **125.** Ninguna línea del documento pasa de 120 caracteres, tampoco las de las tablas. En la tabla, «N archivos»
     o nombres cortos; la lista completa, debajo de la tabla (como la sección 8 de la fase 1).
+  - **126.** `CLAUDE.md`: lo genera el kit (`configurar_repo.py`); se añade a mano la regla de terceros, como en `14.0`
+    (`9288d5a`), opción (a). En este repo no se usa `configurar_repo.py --force`. La opción (c), un sitio en la
+    plantilla del kit para reglas propias del repo, queda como pendiente del kit, aparte.
+  - **127.** `seges_common.py` y `common.py`, enteros en T0.
+  - **128.** Cabeceras de los tests: las líneas históricas de la 14 sin cambios, más una línea de la 17
+    (`# Seges: adaptado a la 17 (fase 2, T0): …` en los que cambian), que dice que los documentos que citan las
+    líneas históricas están en `14.0`.
+  - **129.** Anexo de PNS-26: se adaptan `_bus_notices` (formato del bus de la 17, `{"type", "payload"}`) y el texto
+    de los `skip`.
+  - **130.** Sin neutralización en T0: el código del fabricante que prueban los tests es el de `14.0` y cada archivo
+    tiene su control positivo.
+  - **131.** Columna «Commit» de los retirados en el registro de parches: «—»; el hash del `[ADD]` de T0, en la
+    sección 5.
+  - **132.** Cada `assertRaises` espera una sola excepción, la que da R17, establecida leyendo R17 y el core (si es
+    `AccessError`, `assertRaises(AccessError)`, que en la 17 vacía la caché antes). En T0, `AttributeError` en los
+    tres casos en Python de `test_seges_e4p.py`.
+  - **133.** El FAIL del anexo de PNS-26 en la primera ejecución es un error de adaptación, no un hallazgo
+    (`res.partner.comment` es Html en la 17): la comprobación `applied` compara por subcadena con un valor único.
+  - **134.** La línea de la 17 va en las cabeceras de los 13 archivos de tests, también en los copiados sin cambios
+    de código.
+  - **135.** Tras corregir los fallos de adaptación, se vuelve a ejecutar la batería de los tres módulos y se sigue
+    con el laboratorio, el lint y la comprobación del entorno, con las mismas reglas.
+  - **136.** Se silencian solo las trazas que los tests provocan a propósito, para que la línea base vuelva a
+    «RESULTADO: OK»: `mute_logger('odoo.http')` en `_SegesE4pRpcBase._rpc` y `mute_logger('odoo.sql_db')` solo en
+    el primer intento del anexo de PNS-26. Nada más amplio.
+  - **137.** El `I001` de los dos `tests/__init__.py` se deja: ordenarlo movería líneas del fabricante.
+  - **138.** `test_execute_retry_is_idempotent` comprueba él mismo la carrera:
+    `assertEqual(codes, [errorcodes.SERIALIZATION_FAILURE], …)`, como `PRECONDITION` (el `mute_logger` de la 136 ya
+    no la deja ver en el log).
+  - **139.** El asunto del commit `d7c872c` se deja como está, sin amend ni push forzado (como el cuerpo de
+    `67bb15b` en su día). Su asunto real es «[ADD] pns_ai: tests de Seges de no regresión en la 17 (T0) y la
+    descripción vacía.», con texto pegado por error; el acordado era «[ADD] pns_ai: tests de Seges de no regresión
+    en la 17 (T0)».
 
 ## 1. Alcance
 
@@ -261,5 +294,108 @@
 
 | Tanda | Estado |
 |---|---|
-| T0 | pendiente (la siguiente) |
-| T1 a T10 | pendientes |
+| T0 | hecha (24/11/2026): 0 F y 0 E de 330 tests, 5 omitidos; laboratorio, 17 F de 56; `CLAUDE.md`, con la regla |
+| T1 | pendiente (la siguiente) |
+| T2 a T10 | pendientes |
+
+## 5. T0: tests de no regresión, registro y `CLAUDE.md`
+
+- **Fecha:** 24/11/2026. Partida: HEAD `b093519` («[DOC] pns_ai 17: tandas del port (fase 2)»), sin cambios
+  locales.
+- **Fase 1** (solo lectura, 24/11/2026). Las citas del core son del contenedor del laboratorio
+  (`/usr/lib/python3/dist-packages/odoo`, Odoo 17.0-20260908), no de `/opt/odoo-src/17.0`:
+  - `CLAUDE.md`: lo genera el kit (`configurar_repo.py:299`, plantilla `plantilla-repo/CLAUDE.md.tpl`; entero y
+    solo si no existe, salvo `--force`, `:144-149`), sin sitio para reglas propias del repo. Por la decisión 121,
+    se paró ese punto; se resolvió con la decisión 126.
+  - Código del fabricante que prueban los tests (22 archivos): igual en R17 que en `14.0` salvo los parches de
+    Seges (15 a 18, 22, 37, 38 y 39) y `ai_log.py` (cambios de 3.1.996; la firma de `_create_log_entry`, que los
+    tests simulan, es igual). Los nombres privados de los parches 7 a 10, 13, 14, 30 y 31 siguen en R17.
+  - En la 17 no existen `BaseModel.flush()`, `invalidate_cache()`, `sql_db.flush_env` ni `Transaction.towrite`;
+    `get_module_resource` es un alias obsoleto que avisa.
+- **Archivos (13 de tests, nuevos salvo los dos `__init__.py`):**
+  - `pns_ai_mcp/tests/`: `__init__.py` (bloque de Seges al final), `seges_common.py`, `test_seges_rpc_access.py`,
+    `test_seges_safe_operation.py`, `test_seges_e4p.py` (sin `TestSegesE4pTrustedAction`, `TestSegesE4pUsage` ni
+    los 3 casos del 33 de `TestSegesE4pRpc`, que entran en T1), `test_seges_facade_class.py`,
+    `test_seges_format_guard.py`, `test_seges_sandbox_env.py` y `test_seges_verify_execute_40001.py`;
+  - `pns_ai_chatboo/tests/`: `__init__.py`, `common.py`, `test_seges_skill_env.py` y `test_seges_chatboo_smoke.py`.
+- **Cambios respecto a `14.0`** (los 13 llevan en la cabecera las líneas de la 14 sin cambios y la línea de la 17,
+  decisiones 128 y 134):
+  - copiados sin cambios de código: `seges_common.py`, `test_seges_safe_operation.py`,
+    `test_seges_facade_class.py`, `test_seges_format_guard.py` y `test_seges_chatboo_smoke.py`;
+  - `test_seges_rpc_access.py`: `self.env.flush_all()` en L127 y L155 (`odoo/api.py:735`);
+    `invalidate_recordset()` en L374 (`odoo/models.py:6747`); el comentario de `result` cita `odoo/http.py:2253`
+    (L145);
+  - `test_seges_e4p.py`: solo los casos del 30 y del 31; sin los imports `api`, `convert_file`,
+    `execute_safe_plan` ni `AccessError`; `flush_all()` (L80); `mute_logger('odoo.http')` en `_rpc` (L91,
+    decisión 136); `assertRaises(AttributeError)` en L224, L233 y L276 (decisión 132: el modelo solo tiene `_log_*`,
+    `models/ai_execution_engine.py:425-781`, y `_chat_completion`, `:872`; el `:38` es del envoltorio del driver;
+    `odoo/models.py` no tiene `__getattr__`);
+  - `test_seges_sandbox_env.py`: solo el docstring (L26-30: `env.all` es la `Transaction` del cursor,
+    `odoo/api.py:532`; el fabricante la rechaza, `controllers/context_builder.py:169-173`);
+  - `test_seges_verify_execute_40001.py`:
+    - `cache.get_dirty_fields()` en lugar de `towrite` (L113, `odoo/api.py:1260`) y `flush_all()` (L144, L154 y
+      L222);
+    - `applied` por subcadena (L250, decisión 133; `res_partner.py:239`, Html en la 17 y Text en la 14);
+    - `_bus_notices` con `{"type", "payload"}` (L297, decisión 129; `bus/models/bus.py:111-120`;
+      `safe_operation.py:1753` y `:1768-1769`);
+    - `cr.flush()` (L349, `odoo/service/model.py:155`, `odoo/sql_db.py:134`) y `env_p.reset()` (L369,
+      `model.py:160-161`; `api.py:501` y `:886`);
+    - `mute_logger('odoo.sql_db')` solo en el primer intento (L374, decisión 136);
+    - `assertEqual(codes, [errorcodes.SERIALIZATION_FAILURE], …)` en `test_execute_retry_is_idempotent` (L434-437,
+      decisión 138);
+    - citas del core de la 17 y de R17 en el docstring y los comentarios, y el texto de los `skip` (L410 y L473);
+  - `common.py`: `flush_all()` (L57) y el docstring (`odoo/tests/common.py:1934`);
+  - `test_seges_skill_env.py`: `file_path` (L27, `odoo/tools/misc.py:158`; `odoo/modules/module.py:220-240`).
+- **Primera ejecución** (log `tests-20261124-165129.log`): `1 failed, 3 error(s) of 330 tests`, cuatro fallos de
+  adaptación, ninguno del fabricante:
+  - 3 ERROR en `test_seges_e4p.py` (`test_foreign_user_leaves_no_row`, `test_external_user_leaves_no_row` y
+    `test_direct_call_refused`): en la 17, `assertRaises` no admite una tupla de excepciones
+    (`odoo/tests/common.py:445-456`, `TypeError: issubclass() arg 1 must be a class`). Corrección: la decisión 132;
+  - 1 FAIL en `test_execute_retry_is_idempotent`, con el mensaje `PRECONDITION`: la comprobación `applied`
+    comparaba `comment` por igualdad y en la 17 es Html. Corrección: la decisión 133. Con ella, el reintento
+    idempotente sí se evaluó y pasa (primer intento con 40001; el plan no se vuelve a ejecutar).
+- **Segunda ejecución** (log `tests-20261124-165725.log`): `0 failed, 0 error(s) of 330 tests`, pero el resumen de
+  `analizar_log.py` daba «RESULTADO: FALLO» por 26 líneas `ERROR` que los tests provocan a propósito: 25
+  `odoo.http` de los 4 casos RPC de `TestSegesE4pRpc` y 1 `odoo.sql_db: bad query` del 40001 del anexo. Se
+  resolvió con la decisión 136, y la 138 hace que el caso compruebe la carrera que el log ya no enseña.
+- **Baterías** (desde el laboratorio):
+  - tres módulos (log `tests-20261124-171048.log`): `0 failed, 0 error(s) of 330 tests`, «RESULTADO: OK», sin
+    líneas `ERROR`. Omitidos (5): `crm not installed`, los 2 de «typed parameter readers/setters arrive in Odoo
+    20» y los 2 del anexo de PNS-26 (sin parche, decisión del 13/11/2026);
+  - `seges_pruebas_3996` (log `tests-20261124-170030.log`): `17 failed, 0 error(s) of 56 tests`, los mismos 17
+    casos que en `tests-20261124-131215.log`.
+- **Por archivo:**
+
+| Archivo | Casos | Verdes | `skip` |
+|---|---|---|---|
+| `test_seges_rpc_access.py` | 22 | 22 | 0 |
+| `test_seges_safe_operation.py` | 4 | 4 | 0 |
+| `test_seges_e4p.py` | 9 | 9 | 0 |
+| `test_seges_facade_class.py` | 9 | 9 | 0 |
+| `test_seges_format_guard.py` | 19 | 19 | 0 |
+| `test_seges_sandbox_env.py` | 12 | 12 | 0 |
+| `test_seges_verify_execute_40001.py` | 3 | 1 | 2 |
+| `test_seges_skill_env.py` | 1 | 1 | 0 |
+| `test_seges_chatboo_smoke.py` | 2 | 2 | 0 |
+| **Total T0** | **81** | **79** | **2** |
+
+- **Línea base para T1:** `0 failed, 0 error(s) of 330 tests`, 5 omitidos. Desde T1,
+  `test_paap_i7_cusp_roles_out_of_reach_of_an_ai_admin` queda en F por diseño (parche 12).
+- **Lint** (`python3 ~/.claude/hooks/odoo_lint.py --revisar <modulo>/`): 0 incidencias nuevas en `pns_ai_mcp/` y
+  `pns_ai_chatboo/`. Preexistentes, del fabricante: en cada `tests/__init__.py`, `UP009` (L1, `# -*- coding:
+  utf-8 -*-`) e `I001` (L6, bloque de imports sin ordenar, que abarca el bloque de Seges; se deja, decisión 137).
+- **Entorno:** la BD del laboratorio no se toca (los tests usan una BD nueva que se borra). Comprobado antes y
+  después: `odoo-dev 17 estado` igual (BD `lab_pns_ai_3996_17`, `CONF_HASH=c5c7138b608673bb`, mismo servidor
+  web), `bd-lista` sin `test_…` y el mismo sha256 de los `.py` de `seges_pruebas_3996` (`b5e46c60…`).
+- **Registro:** `docs/pendiente/parches_pns_ai.md` (nuevo, 92 líneas): índice de los parches 7 a 39, tests sin
+  parche y hueco desde el 40.
+- **`CLAUDE.md`:** la regla de terceros, a mano (12 líneas, tras «En módulos existentes…»; decisión 126).
+- **Commits** (los hace Sergio):
+  - `[ADD]`: `d7c872c`. Errata (decisión 139): su asunto real es «[ADD] pns_ai: tests de Seges de no regresión
+    en la 17 (T0) y la descripción vacía.»; el acordado era «[ADD] pns_ai: tests de Seges de no regresión en la
+    17 (T0)»;
+  - `[DOC]`: el de este registro, «[DOC] pns_ai 17: registro de parches, regla de terceros y tanda T0 (fase 2)».
+- **Para las tandas siguientes:** en la 17, `assertRaises` no admite tuplas (`odoo/tests/common.py:445-456`); en
+  los tests de la 14 de T1 a T6 no hay más (solo estaban en las partes de T0 del e4p). En T1, vigilar
+  `test_seges_verification.py:78` (`assertFalse` sobre `comment`, que es Html en la 17). No hay comparaciones de
+  igualdad con campos que pasan de Text a Html.
