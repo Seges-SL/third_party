@@ -32,8 +32,10 @@
   tests de no regresión y registro `docs/pendiente/parches_pns_ai.md`; línea base, 0 F y 0 E de 330. T1 hecha
   (24/11/2026): parches 12, 32, 16, 17, 19 y 33, y el 40 (F1-2), validados en el laboratorio (`f70c3c0`); línea
   base, 0 F y 0 E de 378; laboratorio, 16 F de 56. T2 hecha (24/11/2026): parches 21 y 36, validados en el
-  laboratorio (`[FIX]` `b391159` y `[ADD]` `0e41cab`); línea base, 0 F y 0 E de 390; laboratorio, 9 F de 56. Sigue
-  la tanda T3.
+  laboratorio (`[FIX]` `b391159` y `[ADD]` `0e41cab`); línea base, 0 F y 0 E de 390; laboratorio, 9 F de 56. T3
+  hecha (25/11/2026): parches 24 y 18 (O1 con B2 y P-22, sin B), validados en el laboratorio (`[FIX]` `3af8b5b`
+  y `[ADD]` `3c72f2c`); el caso 24 lo cierra el 18, salvo la caja A con uid 1 (resto conocido); línea base, 0 F y
+  0 E de 460; laboratorio, 4 F de 56. Sigue la tanda T4.
 
 ## Decisiones (Sergio, 22 y 23/11/2026)
 
