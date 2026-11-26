@@ -27,6 +27,8 @@ try:  # pragma: no cover - Odoo runtime path
         RELAXAICODE_SAFE_INTERNAL_MODULES,
         RELAXAICODE_SAFE_MODULES,
         RELAXAICODE_SIDE_EFFECT_METHODS,
+        # Seges: parche 39 (PNS-107, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        RELAXAICODE_SIDE_EFFECT_MODEL_METHODS,
         _unsafe_import_error,
         blocked_private_attr,
         catalogue_inspect_error,
@@ -48,6 +50,8 @@ except Exception:  # pragma: no cover - unit test / standalone path
     RELAXAICODE_SAFE_MODULES = _vm.RELAXAICODE_SAFE_MODULES
     RELAXAICODE_SAFE_INTERNAL_MODULES = _vm.RELAXAICODE_SAFE_INTERNAL_MODULES
     RELAXAICODE_SIDE_EFFECT_METHODS = _vm.RELAXAICODE_SIDE_EFFECT_METHODS
+    # Seges: parche 39 (PNS-107, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    RELAXAICODE_SIDE_EFFECT_MODEL_METHODS = _vm.RELAXAICODE_SIDE_EFFECT_MODEL_METHODS
     _unsafe_import_error = _vm._unsafe_import_error
     blocked_private_attr = _vm.blocked_private_attr
     catalogue_inspect_error = _vm.catalogue_inspect_error
@@ -305,9 +309,54 @@ def _seges_check_field_attr(obj, name, value):
         raise AttributeError(_seges_field_callable_hint(name))
 
 
+# Seges: parche 39 (PNS-107, seguridad). Ver docs/pendiente/parches_pns_ai.md
+def _seges_check_model_method(obj, name):
+    """A method that commits on its own cursor, refused only on its model.
+
+    ``iap.account.get`` deletes and creates accounts on a cursor of its own;
+    the name is too common for the global list (``dict.get``).
+    """
+    if _SegesBaseModel is None or not isinstance(name, str):
+        return
+    if isinstance(obj, _SegesBaseModel):
+        model = obj._name
+    elif isinstance(obj, type) and issubclass(obj, _SegesBaseModel):
+        model = getattr(obj, '_name', None)
+    else:
+        return
+    if name in RELAXAICODE_SIDE_EFFECT_MODEL_METHODS.get(model, ()):
+        raise AttributeError(
+            f"Method {name!r} writes outside RelaxAICode's rollback and is not "
+            "allowed here (use safe_plan_request for writes)."
+        )
+
+
+# Seges: parche 41 (E3, seguridad). Ver docs/pendiente/parches_pns_ai.md
+def _seges_check_side_effect_alias(obj, name):
+    """A method of the global list read without a call, on a model.
+
+    ``f = rec.connect`` then ``f(...)``: the AST only flags calls and
+    ``_refuse_attr_name`` applies the list to dynamic names only. A field
+    with one of those names (a wizard's ``send_mail``) is data and stays.
+    """
+    if _SegesBaseModel is None or name not in RELAXAICODE_SIDE_EFFECT_METHODS:
+        return
+    if not (isinstance(obj, _SegesBaseModel)
+            or (isinstance(obj, type) and issubclass(obj, _SegesBaseModel))):
+        return
+    if name in (getattr(obj, '_fields', None) or ()):
+        return
+    raise AttributeError(
+        f"Method {name!r} writes outside RelaxAICode's rollback and is not "
+        "allowed here (use safe_plan_request for writes)."
+    )
+
+
 def _read_attr(obj, name, default):
     if is_db_handle(obj):
         raise AttributeError(_DB_HANDLE_HINT % (name,))
+    # Seges: parche 39 (PNS-107, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    _seges_check_model_method(obj, name)
     if name in _STR_FORMAT_METHODS and (
             isinstance(obj, str)
             or (isinstance(obj, type) and issubclass(obj, str))):
@@ -349,6 +398,8 @@ def sandbox_attr(obj, name):
     if name == '__name__' and isinstance(obj, type):
         return obj.__name__
     _refuse_attr_name(name, dynamic=False)
+    # Seges: parche 41 (E3, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    _seges_check_side_effect_alias(obj, name)
     return _read_attr(obj, name, ())
 
 

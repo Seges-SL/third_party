@@ -263,7 +263,92 @@ RELAXAICODE_SIDE_EFFECT_METHODS = frozenset({
     'process_email_queue',
     'run',
     'method_direct_trigger',
+    # Seges: parche 15 (PNS-07, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    # Public methods that reach a cursor of their own (registry.cursor()),
+    # which box A's READ ONLY transaction and blocked commit do not hold.
+    # 3.1.973 made the other names of this list private.
+    'mark_seen',
+    'sandbox_helpers',
+    'action_suggest_detection',
+    'action_author_params',
+    'action_author_help',
+    'action_adapt_code',
+    'action_generate_openapi',
+    'action_generate',
+    'action_log_generation_usage',
+    # Seges: parche 22 (PNS-100, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    # Public methods that send mail, open a connection or run other code
+    # without writing first, so box A's READ ONLY does not stop them.
+    'connect',
+    'test_smtp_connection',
+    'load_remote_url',
+    'fetch_mail',
+    'button_confirm_login',
+    'get_credits',
+    'send_letter',
+    'snailmail_print',
+    'update_notification',
+    'action_process_edi_web_services',
+    'get_usd_fx',
+    'upgrade_module',
+    'action_start_automatic_process',
+    'parent_migration_process_cb',
+    'message_process',
+    'message_route',
+    # Odoo 17: partner_autocomplete (IAP), iap.account.get_services (JSON-RPC
+    # with every token), image URLs of an import, module download, call SFU.
+    'autocomplete_by_name',
+    'autocomplete_by_vat',
+    'enrich_by_duns',
+    'enrich_by_gst',
+    'enrich_by_domain',
+    'iap_enrich_auto',
+    'get_services',
+    'execute_import',
+    'button_immediate_install_app',
+    'action_disconnect',
+    # Seges: parche 39 (PNS-107, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    # Public methods that reach iap.account.get (own cursor, commit) before
+    # writing anything, so box A's READ ONLY does not stop them.
+    'get_credits_url',
+    'get_config_account_url',
+    'redirect_to_buy_autocomplete_credit',
+    'action_buy_credits',
+    'action_buy_sms_credits',
+    'action_send_sms',
+    'action_send_sms_mass_now',
+    'action_submit',
+    # Odoo 17, Indian localisation: they reach iap.account.get before writing.
+    'l10n_in_edi_buy_iap',
+    'l10n_in_edi_test',
+    'l10n_in_edi_ewaybill_test',
 })
+
+# Seges: parche 39 (PNS-107, seguridad). Ver docs/pendiente/parches_pns_ai.md
+# Methods that commit on a cursor of their own but carry a common name
+# (``get``), so they cannot go in the list above: blocked only on the model
+# that defines them, at run time, literal or dynamic.
+# The public callers of iap.account.get are also listed on their models, so
+# that a bare read (``f = rec.action_send_sms``) is refused too: the AST only
+# sees calls and the global list only applies to dynamic names.
+RELAXAICODE_SIDE_EFFECT_MODEL_METHODS = {
+    'iap.account': frozenset({
+        'get', 'get_credits_url', 'get_config_account_url',
+        # Seges: parche 22 (PNS-100, seguridad). Ver docs/pendiente/parches_pns_ai.md
+        # A list view calls get_services: JSON-RPC with every account's token.
+        'get_view', 'get_views',
+    }),
+    'res.config.settings': frozenset({'redirect_to_buy_autocomplete_credit'}),
+    'sms.resend': frozenset({'action_buy_credits'}),
+    'mailing.mailing': frozenset({'action_buy_sms_credits'}),
+    'sms.composer': frozenset({'action_send_sms', 'action_send_sms_mass_now'}),
+    'mailing.sms.test': frozenset({'action_send_sms'}),
+    'crm.iap.lead.mining.request': frozenset({'action_submit'}),
+    # Seges: parche 22 (PNS-100, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    # authenticate commits the login on its own cursor; check tries a password.
+    # Common names elsewhere (ir.attachment.check), so only on res.users.
+    'res.users': frozenset({'authenticate', 'check'}),
+}
 
 # RelaxAICode always runs as the asking user. These names hand out another
 # identity: ``sudo()``, ``with_user(1)`` (uid 1 is superuser), ``with_env``,
