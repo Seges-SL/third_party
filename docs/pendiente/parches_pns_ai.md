@@ -45,14 +45,14 @@ fabricante). De los demás:
 | 12 | PNS-01, PNS-02 | T1 | Validado en el laboratorio (con `test_system_action.py`, decisión 140) | `f70c3c0` |
 | 13 | M10 | T0 (test) | Retirado en 3.1.973 (cubierto por el fabricante); no regresión | — |
 | 14 | M13 | T0 (test) | Retirado en 3.1.973 (cubierto por el fabricante); no regresión | — |
-| 15 | PNS-07 | T4 | Pendiente | — |
+| 15 | PNS-07 | T4 | Validado en el laboratorio | `e5b6600` |
 | 16 | PNS-54 | T1 | Validado en el laboratorio | `f70c3c0` |
 | 17 | PNS-37 | T1 | Validado en el laboratorio | `f70c3c0` |
 | 18 | PNS-19 | T3 | Validado en el laboratorio | `3af8b5b` |
 | 19 | PNS-17 | T1 | Validado en el laboratorio | `f70c3c0` |
 | 20 | PNS-70 | T6 | Pendiente | — |
 | 21 | PNS-20 | T2 | Validado en el laboratorio | `b391159` |
-| 22 | PNS-100 | T4 | Pendiente | — |
+| 22 | PNS-100 | T4 | Validado en el laboratorio | `e5b6600` |
 | 23 | PNS-101 | T0 (test) | Retirado en 3.1.973 (cubierto por el fabricante); no regresión | — |
 | 24 | PNS-102 | T3 | Validado en el laboratorio | `3af8b5b` |
 | 25 | M1 | T5a | Pendiente | — |
@@ -69,7 +69,8 @@ fabricante). De los demás:
 | 36 | PNS-103 | T2 | Validado en el laboratorio | `b391159` |
 | 37 | PNS-104 | — | No aplica: cada cursor tiene su `Transaction` en la 17 | — |
 | 38 | PNS-105 | — | No aplica: la misma causa que el 37 | — |
-| 39 | PNS-107 | T4 | Pendiente | — |
+| 39 | PNS-107 | T4 | Validado en el laboratorio | `e5b6600` |
+| 41 | E3 | T4 | Validado en el laboratorio (nuevo en la 17: alias sin llamada en modelos; decisión 173) | `e5b6600` |
 
 - **Estados:** Pendiente → Aplicado → Validado en el laboratorio → Validado en staging. Además, «Retirado» (lo
   cubre el fabricante) y «No aplica» (clasificación, secciones 5 y 6, y su sección 11, punto 5).
@@ -87,8 +88,8 @@ fabricante). De los demás:
 ## Correcciones de la fase 1 (desde el 40)
 
 Reciben número al portarse, uno por corrección y en el orden de las tandas, con su F1-n como id (decisión 120).
-Pendientes: F1-6, SSE sin escapar y creador en `session_file` (T7), F1-7 y `str(e)` del Chatboo (T8), F1-8
-(T9) y F1-9 a F1-12 (T10).
+El 41 es E3 (T4, en el índice): las pendientes se numeran desde el 42 (decisión 173). Pendientes: F1-6, SSE sin
+escapar y creador en `session_file` (T7), F1-7 y `str(e)` del Chatboo (T8), F1-8 (T9) y F1-9 a F1-12 (T10).
 
 - **Caso 24 (T3, sin número):** la parte de `_has_field_access` y `_check_field_access` (ganchos «Odoo 17+» del
   guardián, que no existen en la 17) la cierra el parche 18. La caja A con uid 1 (en `su`, sin guardián) queda

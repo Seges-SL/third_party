@@ -903,6 +903,7 @@ menciones del propio test (así `test_seges_rpc_access.py`) o de la entrada del 
     `res.company`, `button_immediate_install_app` en `ir.module.module`, `action_disconnect` en
     `discuss.channel.rtc.session` y, fuera del laboratorio, `l10n_in_edi_buy_iap`, `l10n_in_edi_test` y
     `l10n_in_edi_ewaybill_test` en `res.config.settings`.
+    Decidido en la fase 2 (26/11/2026): con el 41 no van a la tabla; en ella, solo lo de las decisiones 175 y 184.
   - **Entran solo en la tabla por modelo (6):** por colisión de nombre, `get_view` y `get_views` en `iap.account`,
     `authenticate` en `res.users` y, fuera del laboratorio, `cancel_ewaybill` en `l10n.in.ewaybill.cancel`;
     `action_buy_credits` en `crm.iap.lead.mining.request`, fuera del laboratorio (el nombre ya está en la lista
@@ -912,6 +913,7 @@ menciones del propio test (así `test_seges_rpc_access.py`) o de la entrada del 
   - **Alias (E3, D-2):** sigue igual en R17 (el AST solo ve llamadas y la lista global solo el nombre dinámico). Como
     D40d en la 14, la tabla por modelo cierra también el alias para los que están en ella; la familia de los parches
     15 y 22 sigue pendiente.
+    Decidido en la fase 2 (26/11/2026): cerrado en la 17 con el parche 41 (decisiones 172 y 173; registro, sección 9).
 - **Impacto en el port:** `test_seges_sandbox_side_effects.py` (`14.0`, `5d0559b`; 15 tests) se adapta:
   - se mantienen `test_names_in_denylist` y `test_ast_flags_literal_call` (con la lista nueva), los de correo, URL,
     acción de servidor y cron, y los cinco de `get` (`test_box_a_iap_get_*`);

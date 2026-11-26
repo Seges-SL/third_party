@@ -145,6 +145,32 @@
     `%` del aviso del enganche 4, que en la 17 es un f-string.
   - **171.** Se aceptan los dos `pylint: disable` (`too-many-lines` y `too-many-positional-arguments`) de
     `test_seges_box_a_vias.py`, que salen de copiar el laboratorio en ese archivo.
+- **Decisiones de Sergio en T4 (26/11/2026):**
+  - **172.** E3 se cierra con el parche 41, genérico, en `sandbox_attr` y solo sobre modelos (recordsets y clases de
+    modelo), con las comprobaciones a y b del paso 0 de la parte 1.
+  - **173.** Es el parche 41 (id `E3`), en una fila nueva del registro; las correcciones pendientes de la fase 1 se
+    numeran desde el 42.
+  - **174.** Los campos con un nombre de la lista no se rechazan (`_fields`); lo prueba t24.
+  - **175.** Tabla por modelo: las entradas de la 14, más `get_view` y `get_views` en `iap.account`, y `authenticate`
+    y `check` en `res.users` (la cifra de las entradas de la 14 la corrige la 184).
+  - **176.** `cancel_ewaybill`, fuera (grupo B: escribe y bloquea antes de llegar a `get`).
+  - **177.** Se quitan los 6 nombres (`install_from_urls`, `execute_callback`, `autocomplete`, `enrich_company`,
+    `read_by_vat` y `start_sync`), con la comprobación c del paso 0.
+  - **178.** La exportación (`test_seges_chatboo_export.py`), con `compile_sandbox`.
+  - **179.** Se autoriza `odoo-dev 17 actualizar pns_ai_mcp` en el laboratorio (`lab_pns_ai_3996_17`).
+  - **180.** E3 en la 14: una nota en «Para las tandas siguientes»; la rama `14.0` no se toca.
+  - **181.** La frase «después, el 39, limpio» de la fase 1 de T3 (sección 8, líneas 777-778 de la versión
+    `391caec9`; citada como «:776») es una errata, como la 144 y la 160: sobre el HEAD de T3, el trozo 3 de `631b924`
+    solo entra con `-C2`.
+  - **182.** `authenticate` y `check` se sustituyen sin `autospec`: son `classmethod` heredados en la clase del
+    registro y, con `autospec`, el sustituto fallaba con `TypeError` antes de anotar la llamada (N22 daba 33 F en vez
+    de 37). La comprobación en la shell demuestra el hueco que cierra la entrada de `res.users`.
+  - **183.** Se acepta el `pylint: disable-next=too-many-public-methods` de `TestSegesSandboxSideEffects` (como la 171).
+  - **184.** Errata de la fase 1 de T4: la tabla del 39 tiene 10 nombres en 7 modelos, no «14 entradas». Corrige la
+    cifra de la 175.
+  - **185.** La puerta de credenciales (`RELAXAICODE_CREDENTIAL_MODELS`) no cubre todos los modelos de `pns_*` (por
+    ejemplo, `ai.provider`); lo que se dijo en la fase 1 de T4 no era exacto. No afecta a T4: t22 solo usa modelos del
+    core.
 
 ## 1. Alcance
 
@@ -369,8 +395,9 @@
 | T1 | hecha (24/11/2026): 0 F y 0 E de 378 tests, 5 omitidos; laboratorio, 16 F de 56 |
 | T2 | hecha (24/11/2026): 0 F y 0 E de 390 tests, 5 omitidos; laboratorio, 9 F de 56 |
 | T3 | hecha (25/11/2026): 0 F y 0 E de 460 tests, 5 omitidos; laboratorio, 4 F de 56 |
-| T4 | pendiente (la siguiente) |
-| T5a a T10 | pendientes |
+| T4 | hecha (26/11/2026): 0 F y 0 E de 490 tests, 19 omitidos; laboratorio, 4 F de 56; parche 41 (E3) nuevo |
+| T5a | pendiente (la siguiente) |
+| T5b a T10 | pendientes |
 
 ## 5. T0: tests de no regresión, registro y `CLAUDE.md`
 
@@ -943,3 +970,208 @@
     afectan al caso 24;
   - `api.private`: en el contenedor, `filtered` lo lleva, pero R17 no lo consulta (`git grep`: 0); no afecta al
     sandbox.
+
+## 9. T4: parches 15, 22, 39 y 41
+
+- **Fecha:** 26/11/2026. Partida: HEAD `9e34401` («[DOC] pns_ai 17: registro de la tanda T3 (parches 24 y 18)
+  (fase 2)»), sin cambios locales.
+- **Fase 1** (solo lectura, 26/11/2026). Las citas del core son del contenedor del laboratorio
+  (`/usr/lib/python3/dist-packages/odoo`, Odoo 17.0-20260908); las de `pns_ai_mcp`, de R17:
+  - R17 y 3.1.973 tienen el mismo contenido en `validators_base.py` y `context_builder.py` (`33ca68c` frente a
+    `bfa6b49`); en HEAD, `validators_base.py` sigue igual a R17 (428 líneas) y `context_builder.py` lleva T3 (1046);
+  - `git apply --check` en orden, sobre una copia de HEAD: `8d1c9b2` (15 y 22), limpio; `631b924` (39) sin él, falla
+    en `validators_base.py:301` (la cadena); tras él, falla el trozo 3 en `context_builder.py:301`, porque su contexto
+    es la línea con `%` que T3 cambió por `_seges_field_callable_hint`; con `-C2` entra («Hunk #3 tuvo éxito en 310
+    (6 líneas compensadas)»). Las líneas nuevas del 39 ya no llevan `%` (decisión 170; errata de la 181);
+  - 15: los 9 nombres siguen públicos en R17 (`mark_seen`, `chatboo_async_request.py:1484`, con cursor propio en
+    `:1491`; `sandbox_helpers`, `chatboo_session.py:831`; los asistentes de skills y de OpenAPI);
+  - 22: `get_services` envía por JSON-RPC los tokens de todas las cuentas, leídos con `sudo()`
+    (`addons/iap/models/iap_account.py:95-112`), y lo llama `get_view` con `tree` (`:45-50`); `get_views` llama a
+    `get_view` (`odoo/addons/base/models/ir_ui_view.py:2446`, `:2475`); `load_views` no existe. `authenticate` y
+    `check` son `classmethod` con cursor propio (`res_users.py:905-930` y `:932-946`; cursores en `:884`, `:918` y
+    `:941`);
+  - 39: `iap.account.get` (`iap_account.py:124-171`) hace `flush_all()` del llamador antes de cada cursor propio
+    (`:139`, `:155`) y, en modo test, crea la cuenta en el mismo cursor (`:145-147`); `iap_jsonrpc` lanza `AccessError`
+    en modo test (`addons/iap/tools/iap_tools.py:117-118`). Por eso los tests sustituyen el método;
+  - localización india: `l10n_in_edi_test` (`l10n_in_edi/models/res_config_settings.py:30` →
+    `account_edi_format.py:686`) y `l10n_in_edi_ewaybill_test` (`l10n_in_edi_ewaybill/models/res_config_settings.py:17`
+    → `account_edi_format.py:610`) llegan a `get` sin escribir antes (grupo A); `l10n_in_edi_buy_iap` (`:47`), por
+    `get_credits_url`. `cancel_ewaybill` escribe antes (`l10n_in_ewaybill_stock/wizard/l10n_in_ewaybill_cancel.py:21`)
+    y bloquea con `FOR UPDATE NOWAIT` (`l10n_in_ewaybill.py:424`, `:390`): grupo B, fuera (decisión 176);
+  - E3: `sandbox_attr` llama a `_refuse_attr_name(name, dynamic=False)` (`context_builder.py:351`), que no aplica la
+    lista global, y el AST solo marca llamadas (`validators_checks.py:481-485`); afecta a todos los nombres de la lista.
+    En la 14, D-2 de E1 y D40d (`14.0:docs/pendiente/parches_pns_ai.md:5077-5080` y `:5214-5217`). En R17 no hay
+    lecturas sin llamada de los 71 nombres (`git grep`); ningún campo de R17 se llama como ellos, y en el core sí,
+    `send_email` o `send_mail`, en 4 asistentes de fuera del laboratorio (`mail_group`, `survey`, `website_slides` y
+    `hr_recruitment`): de ahí la 174.
+- **Paso 0 de la parte 1** (solo lectura; ninguna comprobación contradice el diseño):
+  - a: los builtins de la caja A (`context_builder.py:686-718`) solo dan atributos por `getattr`, que es
+    `guarded_getattr` (`:716`), y por `hasattr`, que solo da un booleano; no están `vars`, `dir`, `super`, `object`,
+    `eval` ni `exec`. Los módulos (`validators_base.py:88-103`) pasan por la fachada (`context_builder.py:511-537`),
+    con `attrgetter` y `methodcaller` guardados (`_operator` es el mismo objeto); en el contenedor, ningún nombre
+    público de los módulos seguros es el `getattr` real, `vars`, `dir`, `object.__getattribute__`, `getattr_static`,
+    `eval`, `exec`, `super` ni `object`. Los dunders están rechazados (`validators_base.py:116-134`); `str.format` con
+    campos pasa por `sandbox_attr` (`context_builder.py:365-368`); `type(rec).mro()` da clases de `BaseModel`, que
+    cubre el 41. Los dos `exec` compilan con `compile_sandbox` (`tools_relaxaicode.py:190` y `:223`;
+    `skill_runtime.py:258`);
+  - b: `_SegesBaseModel` (`context_builder.py:272-276`) solo vale `None` si falla el import, fuera de Odoo; el
+    `[SETUP]` de t24 comprueba que es `odoo.models.BaseModel`;
+  - c: `install_from_urls` y `execute_callback` no existen en el contenedor; los cuatro de `partner_autocomplete`
+    devuelven `[]`, `{}`, `[]` y `pass` (`res_partner.py:73-84`, `res_partner_autocomplete_sync.py:17-18`);
+  - d: cada test sustituye el método con efecto en la clase del registro (`mock.patch.object`), así que ni con el
+    parche ni con una neutralización se ejecuta el real; como segunda capa, `smtplib.SMTP` y `SMTP_SSL`,
+    `requests.get`, `requests.post`, `requests.Session.request` e `iap_tools.iap_jsonrpc`. Los argumentos respetan las
+    firmas del contenedor (con `autospec`, una firma distinta daría `TypeError` antes de anotar la llamada).
+
+| Test | Método sustituido |
+|---|---|
+| t3, t4 | `ir.mail_server.send_email`, `connect` |
+| t5 | `ir.qweb.field.image.load_remote_url` |
+| t6, t7 | `ir.actions.server.run`, `ir.cron.method_direct_trigger` |
+| t8 | `mail.mail.process_email_queue` y `send` |
+| t9 | `iap.account.get_credits`, `res.partner.autocomplete_by_name` |
+| t10 | `ir.module.module.button_immediate_install_app` |
+| t11, t12 | `iap.account.get` |
+| t14, t15 | los 13 del grupo A, el suyo en cada subtest |
+| t16 | `iap.account.get_services`, `get_view` y `get_views` |
+| t17 | `base_import.import.execute_import` |
+| t18 | los 5 de `partner_autocomplete` y `res.company.iap_enrich_auto` |
+| t19 | `res.users.authenticate` y `check`, sin `autospec` (decisión 182) |
+| t20 | `discuss.channel.rtc.session.action_disconnect` |
+| t21, t22 | el método de cada alias |
+| t1, t2, t13, t23, t24 | ninguno: no ejecutan métodos con efecto |
+
+- **Archivos:**
+  - código (`[FIX]`, 2): `pns_ai_mcp/controllers/validators_base.py` (513 líneas, `bc18ef33…35efb`) y
+    `controllers/context_builder.py` (1097, `5fce7107…1a1a9`);
+  - tests (`[ADD]`, 4): `pns_ai_mcp/tests/__init__.py` (bloque de T4; 68, `ceddc63a…b37d9`) y, nuevo,
+    `test_seges_sandbox_side_effects.py` (405, `6dd34224…95289`); `pns_ai_chatboo/tests/__init__.py` (bloque de T4;
+    14, `71ddbd80…d6d76`) y, nuevo, `test_seges_chatboo_export.py` (236, `ecb4e5fa…28f90`). `seges_common.py` no se
+    toca.
+- **Cambios respecto a `14.0` en el código** (6 marcadores nuevos en `validators_base.py` y 6 en `context_builder.py`,
+  4 del 39 y 2 del 41; líneas nuevas de 85 caracteres como máximo, sin `%`):
+  - `git apply` de `8d1c9b2` y `git apply -C2` de `631b924`, este antes de editar la lista del 22, porque su trozo de
+    `validators_base.py` toma como contexto el final de ese bloque;
+  - lista del 22 de la 17: salen 6 (`install_from_urls`, `execute_callback`, `autocomplete`, `enrich_company`,
+    `read_by_vat` y `start_sync`; decisión 177) y entran 10, con un comentario: los cinco `autocomplete_by_*` y
+    `enrich_by_*`, `iap_enrich_auto`, `get_services`, `execute_import`, `button_immediate_install_app` y
+    `action_disconnect`;
+  - lista del 39: los 3 de la localización india tras `action_submit` (`l10n_in_edi_buy_iap`, `l10n_in_edi_test` y
+    `l10n_in_edi_ewaybill_test`);
+  - tabla por modelo: las 10 entradas de la 14 (decisión 184) y, con marcador del 22, `get_view` y `get_views` en
+    `iap.account`, y `authenticate` y `check` en `res.users` (decisión 175);
+  - parche 41, nuevo: `_seges_check_side_effect_alias`, tras `_seges_check_model_method`, llamado en `sandbox_attr`:
+    rechaza un nombre de la lista global leído de un recordset o de una clase de modelo, salvo si es un campo
+    (decisiones 172 y 174).
+- **Cambios respecto a `14.0` en los tests** (cabeceras de la 14 sin cambios y la línea de la 17, decisiones 128 y
+  134):
+  - `test_seges_sandbox_side_effects.py` (`TestSegesSandboxSideEffects`, `seges_e2p`): `_StubController` de
+    `seges_common.py`; los 15 casos de la 14 (`E2P_NAMES` con 32 nombres; `test_box_a_iap_refused` con
+    `autocomplete_by_name`; `test_box_a_module_from_urls_refused` con `button_immediate_install_app`; el indirecto y el
+    alias del 39, con 13 casos: los 9 de la 14, `action_buy_credits` de `crm.iap.lead.mining.request` y los 3 de la
+    India) y 9 nuevos: `iap_services`, `import_url`, `partner_autocomplete`, `login_check`, `rtc_disconnect`,
+    `new_names_alias` (14 subtests), `alias_of_listed_names` (41, 6 subtests), `alias_controls_pass` y
+    `test_alias_check_keeps_fields` (t24, con su `[SETUP]`). Segunda capa de sustituciones (paso 0 d); `authenticate`
+    y `check` sin `autospec` (decisión 182); `pylint: disable-next=too-many-public-methods` (decisión 183);
+    contraseña ficticia `seges-t4-pw-e3c1`;
+  - `test_seges_chatboo_export.py` (`TestSegesChatbooExport`, 5 casos, y `TestSegesChatbooExportOwn`, 1;
+    `seges_e1p`): `env['base'].flush()` → `env.flush_all()` (3) y `compile_sandbox` (decisión 178);
+  - sin `cr.rollback()` ni `cr.commit()` sobre el cursor del test y sin `assertRaises` con tupla; los `rollback` son de
+    la caja A y el `commit` de `_purge`, de un cursor propio;
+  - `tests/__init__.py` de los dos módulos: el bloque de Seges de T4.
+- **`odoo-dev 17 actualizar pns_ai_mcp`** (decisión 179; log `actualizar-20261126-164204.log`): «RESULTADO: OK», 0
+  bloqueantes y 0 `ERROR`; los 5 WARNING del fabricante. El servidor web se reinicia.
+- **Baterías** (desde el laboratorio):
+  - tres módulos (log `tests-20261126-165651.log`): `0 failed, 0 error(s) of 490 tests`, «RESULTADO: OK».
+    Omitidos (19): los 5 de T0 (`crm` no instalado, los 2 de «Odoo 20» y los 2 del anexo de PNS-26) y 14 subtests,
+    7 en `test_box_a_iap_get_indirect_refused` y 7 en `test_box_a_iap_get_alias_refused`: en cada uno,
+    `mailing.mailing.action_buy_sms_credits` y `mailing.sms.test.action_send_sms` (`mass_mailing_sms` no instalado),
+    `crm.iap.lead.mining.request.action_submit` y `action_buy_credits` (`crm_iap_mine`) y los 3 de
+    `res.config.settings` (`l10n_in_edi` y `l10n_in_edi_ewaybill`). `pns_ai_mcp` sola tiene 462 tests;
+  - antes: `tests-20261126-164247.log`, 490 en verde, antes del retoque de `authenticate` y `check` (decisión 182);
+  - `seges_pruebas_3996` (log `tests-20261126-164510.log`): `4 failed, 0 error(s) of 56 tests`, los mismos 4 de T3.
+- **Por archivo:**
+
+| Archivo | Parche | Casos de T4 | Verdes |
+|---|---|---|---|
+| `test_seges_sandbox_side_effects.py` | 22, 39 y 41 | 24 | 24 |
+| `test_seges_chatboo_export.py` | 15 | 6 | 6 |
+| **Total T4** | | **30 nuevos** | **30** |
+
+- **Neutralizaciones** (decisión 141, sin excepciones): N15 con las baterías de `pns_ai_mcp` y `pns_ai_chatboo` (489
+  tests) y las demás con la de `pns_ai_mcp` (462); copia previa en el scratchpad, F previstas escritas antes de
+  ejecutar ninguna y sha256 comprobado al restaurar. Ronda final: todas dan exactamente las F previstas, 0 E, y todas
+  las restauraciones, el sha256 del archivo final. Las líneas `ERROR` son solo las de sus F y la del resumen (decisión
+  152). Odoo cuenta cada subtest fallido como una F.
+
+| N | Qué se quita | F previstas | F obtenidas | Log |
+|---|---|---|---|---|
+| N15 | el bloque del 15 | 2 | 2 | `tests-20261126-165838.log` |
+| N22 | el bloque del 22 (26 nombres) y sus 2 entradas de la tabla | 37 (13 tests) | 37 | `tests-20261126-170028.log` |
+| N39 | el bloque del 39 (11 nombres) y sus 10 entradas de la tabla | 21 (4 tests) | 21 | `tests-20261126-170213.log` |
+| N41 | la llamada en `sandbox_attr` | 16 (2 tests) | 16 | `tests-20261126-170400.log` |
+
+  - N15: `test_names_in_denylist` y `test_ast_flags_literal_call` de la exportación;
+  - N22: `test_names_in_denylist`, `test_ast_flags_literal_call`, `connect`, `load_remote_url`, `iap_refused`,
+    `module_from_urls`, `import_url`, `rtc_disconnect` (1 cada uno), `iap_services` (3), `partner_autocomplete` (6),
+    `login_check` (2), `new_names_alias` (14) y `alias_of_listed_names` (4: `connect`, `get_credits`, `message_route`
+    y `connect` por la clase);
+  - N39: `iap_get_refused`, `iap_get_dynamic_refused`, `iap_get_indirect_refused` (13: 6 instalados y 7 en el
+    `assertIn`) e `iap_get_alias_refused` (6 instalados);
+  - N41: `new_names_alias` (los 10 nombres solo globales; `get_view`, `get_views`, `authenticate` y `check` los sigue
+    rechazando la tabla) y `alias_of_listed_names` (6);
+  - primera ronda (logs `tests-20261126-164756.log`, `…165017.log`, `…165212.log` y `…165357.log`): N15 2, N39 21 y
+    N41 16, como en la final; N22, 33 en vez de 37. Faltaban `login_check` (2) y los subtests `authenticate` y
+    `check` de `new_names_alias`: con `autospec`, el sustituto fallaba con `TypeError` antes de anotar la llamada.
+    En `odoo-dev 17 shell` (la tabla, cambiada solo en memoria; savepoint y `rollback`), sin `autospec`, la caja A
+    llega a los dos métodos y devuelve «1»: es el hueco que cierra la entrada de `res.users` (decisión 182);
+  - nada real ejecutado: el método se sustituye siempre y ninguna aserción de la segunda capa falla; 0 líneas
+    «Unavailable during tests» y 0 de peticiones bloqueadas; los «Login successful» son de usuarios de test de otros
+    casos (108 en la batería completa, como en T3) y no hay instalaciones.
+- **Secretos en los logs:** 0 apariciones de `seges-t4-pw-e3c1` y de tokens de IAP (`account_token`, `services-token`)
+  en los 11 logs de las baterías y las neutralizaciones.
+- **Línea base para T5a:** tres módulos, `0 failed, 0 error(s) of 490 tests`, 19 omitidos, «RESULTADO: OK»
+  (`tests-20261126-165651.log`); `seges_pruebas_3996`, `4 failed, 0 error(s) of 56 tests`
+  (`tests-20261126-164510.log`). La batería de `pns_ai_mcp` sola tiene 462 tests.
+- **Lint** (`python3 ~/.claude/hooks/odoo_lint.py --revisar`): 0 incidencias nuevas. Preexistentes: en `pns_ai_mcp/`,
+  `context_builder.py` 148, `validators_base.py` 14 y `tests/__init__.py` 2; en `pns_ai_chatboo/`, `tests/__init__.py`
+  2. El hook marcó `R0904 too-many-public-methods` (25 de 20) en `TestSegesSandboxSideEffects`: se desactiva solo en
+  la clase con `pylint: disable-next` (decisión 183). Las 5 líneas de más de 88 caracteres de
+  `test_seges_chatboo_export.py` son de la 14.
+- **Entorno:** comprobado antes y después. `odoo-dev 17 estado` igual (BD `lab_pns_ai_3996_17`,
+  `CONF_HASH=c5c7138b608673bb`), `bd-lista` sin `test_…` y el mismo sha256 de los `.py` de `seges_pruebas_3996`
+  (`b5e46c60…`). La BD del laboratorio queda con el código de T4 (decisión 179).
+- **Registro:** en `docs/pendiente/parches_pns_ai.md`, las filas 15, 22 y 39, «Validado en el laboratorio» con
+  `e5b6600`; la fila nueva del 41 (E3), igual; y, en «Correcciones de la fase 1», la numeración desde el 42
+  (decisión 173).
+- **Commits** (los hace Sergio): `[FIX]` `e5b6600` («[FIX] pns_ai_mcp: parches 15, 22, 39 y 41 adaptados a la 17
+  (PNS-07, PNS-100, PNS-107, E3) (T4)»); `[ADD]` `160a293` («[ADD] pns_ai_mcp, pns_ai_chatboo: tests de Seges de los
+  parches 15, 22, 39 y 41 en la 17 (T4)»); `[DOC]`, el de este registro.
+- **Erratas** (como la 144; las secciones anteriores no se reescriben):
+  - decisión 181: la fase 1 de T3 (sección 8) dice «después, el 39, limpio»; sobre el HEAD de T3, el trozo 3 de
+    `631b924` solo entra con `-C2`;
+  - decisión 184: la fase 1 de T4 habló de «14 entradas» en la tabla del 39; son 10 nombres en 7 modelos.
+- **Para el staging** (decisión 150; se actualiza `pns_ai_mcp`):
+  - un turno normal de Chatboo y MCP (contactos, correo, la lista de cuentas IAP con `search`) y varias skills de
+    fábrica, sin errores;
+  - desde el chat: `env['res.partner'].autocomplete_by_name('x')` se rechaza como escritura;
+    `f = env['ir.mail_server'].connect` se rechaza con «writes outside RelaxAICode's rollback»; y
+    `env['iap.account'].get_view(view_type='tree')` se rechaza;
+  - `iap_account` igual antes y después, y en el log, sin `ERROR`.
+- **Para las tandas siguientes:**
+  - E3 sigue abierto en la 14 (los nombres del 15 y del 22); la decisión, más adelante (decisión 180);
+  - decisión 185: modelos de `pns_*` con columnas de credencial que no están en la puerta de credenciales (por
+    nombre, con el criterio de `utils/sandbox_secrets.py`; localizado):
+    - `ai.provider.api_key` (`models/ai_provider.py:207`): lo cubren tests de T3 en la caja A
+      (`test_seges_sandbox_credentials.py`, `test_read_group`, `:153-155`; `test_read_group_alias_provider`, `:213`;
+      `test_provider_read_no_fields`, `:305-310`);
+    - `ai.api.server.auth_token` (`models/external_server.py:194`): el modelo lo cierra la puerta del catálogo
+      (`validators_base.py:149`; `test_gate_env_getitem`, `test_seges_sandbox_credentials.py:128-131`), y V1 de
+      `test_seges_box_a_vias.py` (`:338`) prueba la columna;
+    - **comprobación pendiente**, sin test en la caja A: `ai.api.server.key.token` (`models/api_server_key.py:52`) y
+      `ai.safe.operation.confirm_token_hash` (`models/safe_operation.py:221`, con `groups='base.group_system'`); son
+      `Char` con «token» en el nombre, así que el guardián de columnas los trata como secretos
+      (`utils/sandbox_secrets.py`, `field_is_secret`), pero no se ha probado en ejecución. `confirm_token_at`
+      (`:227`) es un `Datetime`: no es una credencial y el guardián no lo trata como secreto;
+  - los subtests de `mass_mailing_sms`, `crm_iap_mine` y `l10n_in_*` se saltan en el laboratorio porque esos módulos
+    no están instalados: no se han probado en ejecución.
