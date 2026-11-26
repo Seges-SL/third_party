@@ -58,3 +58,8 @@ from . import test_seges_display_name
 # Ver docs/pendiente/parches_pns_ai.md
 from . import test_seges_import_preview
 from . import test_seges_review_views
+# Seges: tests de la fase 2 en la 17, tanda T3 (parches 24 y 18, con P-22).
+# Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_identity_su
+from . import test_seges_box_a_vias
+from . import test_seges_sandbox_credentials
