@@ -9,3 +9,6 @@ from . import test_chatboo_perimeter
 # parche 23, retirado). Ver docs/pendiente/parches_pns_ai.md
 from . import test_seges_chatboo_smoke
 from . import test_seges_skill_env
+# Seges: tests de la fase 2 en la 17, tanda T4 (parche 15).
+# Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_chatboo_export

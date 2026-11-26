@@ -63,3 +63,6 @@ from . import test_seges_review_views
 from . import test_seges_identity_su
 from . import test_seges_box_a_vias
 from . import test_seges_sandbox_credentials
+# Seges: tests de la fase 2 en la 17, tanda T4 (parches 22, 39 y 41, E3).
+# Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_sandbox_side_effects
