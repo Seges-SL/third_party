@@ -12,3 +12,7 @@ from . import test_seges_skill_env
 # Seges: tests de la fase 2 en la 17, tanda T4 (parche 15).
 # Ver docs/pendiente/parches_pns_ai.md
 from . import test_seges_chatboo_export
+# Seges: tests de la fase 2 en la 17, tanda T5a (parches 11, 25, 26 y 28).
+# Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_chatboo_access
+from . import test_seges_chatboo_canvas
