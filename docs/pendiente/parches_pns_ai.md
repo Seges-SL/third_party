@@ -41,7 +41,7 @@ fabricante). De los demás:
 | 8 | PNS-91 | T0 (test) | Retirado en 3.1.879 (cubierto por el fabricante); no regresión | — |
 | 9 | PNS-85 | T0 (test) | Retirado en 3.1.879 (cubierto por el fabricante); no regresión | — |
 | 10 | PNS-83 | T0 (test) | Retirado en 3.1.973 (cubierto por el fabricante); no regresión | — |
-| 11 | PNS-82 | T5a | Pendiente | — |
+| 11 | PNS-82 | T5a | Validado en el laboratorio | `30e75f7` |
 | 12 | PNS-01, PNS-02 | T1 | Validado en el laboratorio (con `test_system_action.py`, decisión 140) | `f70c3c0` |
 | 13 | M10 | T0 (test) | Retirado en 3.1.973 (cubierto por el fabricante); no regresión | — |
 | 14 | M13 | T0 (test) | Retirado en 3.1.973 (cubierto por el fabricante); no regresión | — |
@@ -55,10 +55,10 @@ fabricante). De los demás:
 | 22 | PNS-100 | T4 | Validado en el laboratorio | `e5b6600` |
 | 23 | PNS-101 | T0 (test) | Retirado en 3.1.973 (cubierto por el fabricante); no regresión | — |
 | 24 | PNS-102 | T3 | Validado en el laboratorio | `3af8b5b` |
-| 25 | M1 | T5a | Pendiente | — |
-| 26 | M2 | T5a | Pendiente | — |
+| 25 | M1 | T5a | Validado en el laboratorio | `30e75f7` |
+| 26 | M2 | T5a | Validado en el laboratorio | `30e75f7` |
 | 27 | F1 | T5b | Pendiente | — |
-| 28 | D1 | T5a | Pendiente | — |
+| 28 | D1 | T5a | Validado en el laboratorio | `30e75f7` |
 | 29 | F1 (P-8e a) | T5b | Pendiente | — |
 | 30 | M11 | T0 (test) | Retirado en 3.1.973 (cubierto por el fabricante); no regresión | — |
 | 31 | M12 | T0 (test) | Retirado en 3.1.973 (cubierto por el fabricante); no regresión | — |

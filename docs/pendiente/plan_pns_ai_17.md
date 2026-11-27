@@ -37,7 +37,8 @@
   y `[ADD]` `3c72f2c`); el caso 24 lo cierra el 18, salvo la caja A con uid 1 (resto conocido); línea base, 0 F y
   0 E de 460; laboratorio, 4 F de 56. T4 hecha (26/11/2026): parches 15, 22 y 39 con las listas de la 17 y el 41
   (E3, nuevo), validados en el laboratorio (`[FIX]` `e5b6600` y `[ADD]` `160a293`); línea base, 0 F y 0 E de 490;
-  laboratorio, 4 F de 56. Sigue la tanda T5a.
+  laboratorio, 4 F de 56. T5a hecha (26/11/2026): parches 11, 25, 26 y 28, validados en el laboratorio (`[FIX]`
+  `30e75f7` y `[ADD]` `f259667`); línea base, 0 F y 0 E de 523; laboratorio, 4 F de 56. Sigue la tanda T5b.
 
 ## Decisiones (Sergio, 22 y 23/11/2026)
 

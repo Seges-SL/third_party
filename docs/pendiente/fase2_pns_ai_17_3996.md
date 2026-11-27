@@ -171,6 +171,16 @@
   - **185.** La puerta de credenciales (`RELAXAICODE_CREDENTIAL_MODELS`) no cubre todos los modelos de `pns_*` (por
     ejemplo, `ai.provider`); lo que se dijo en la fase 1 de T4 no era exacto. No afecta a T4: t22 solo usa modelos del
     core.
+- **Decisiones de Sergio en T5a (26/11/2026):**
+  - **186.** Se añade `test_unlink_foreign_session_touches_nothing`, sin `assertRaises` (`try`/`except` de una sola
+    excepción, `AccessError`) y con un docstring que explica por qué.
+  - **187.** El marcador interior del 11 y el comentario XML del 28 se parten en dos líneas.
+  - **188.** `test_seges_chatboo_access.py` entero: los 14 casos de la 14, más el nuevo.
+  - **189.** El docstring del archivo del canvas, sin cambios; lo aclara la línea de la 17 de la cabecera.
+  - **190.** La comprobación de la 185 va en T7; en T5a no se toca `pns_ai_mcp`.
+  - **191.** Se autoriza `odoo-dev 17 actualizar pns_ai_chatboo` en el laboratorio (`lab_pns_ai_3996_17`).
+  - **192.** La búsqueda de secretos en los logs no aplica: el proveedor está sustituido y las contraseñas de los
+    tests son el propio login.
 
 ## 1. Alcance
 
@@ -396,8 +406,9 @@
 | T2 | hecha (24/11/2026): 0 F y 0 E de 390 tests, 5 omitidos; laboratorio, 9 F de 56 |
 | T3 | hecha (25/11/2026): 0 F y 0 E de 460 tests, 5 omitidos; laboratorio, 4 F de 56 |
 | T4 | hecha (26/11/2026): 0 F y 0 E de 490 tests, 19 omitidos; laboratorio, 4 F de 56; parche 41 (E3) nuevo |
-| T5a | pendiente (la siguiente) |
-| T5b a T10 | pendientes |
+| T5a | hecha (26/11/2026): 0 F y 0 E de 523 tests, 19 omitidos; laboratorio, 4 F de 56 |
+| T5b | pendiente (la siguiente) |
+| T6 a T10 | pendientes |
 
 ## 5. T0: tests de no regresión, registro y `CLAUDE.md`
 
@@ -1175,3 +1186,173 @@
       (`:227`) es un `Datetime`: no es una credencial y el guardián no lo trata como secreto;
   - los subtests de `mass_mailing_sms`, `crm_iap_mine` y `l10n_in_*` se saltan en el laboratorio porque esos módulos
     no están instalados: no se han probado en ejecución.
+
+## 10. T5a: parches 11, 25, 26 y 28
+
+- **Fecha:** 26/11/2026 (fase 1 y parte 1 de la fase 2); registro, 27/11/2026. Partida: HEAD `3a80278` («[DOC] pns_ai
+  17: registro de la tanda T4 (parches 15, 22, 39 y 41) (fase 2)»), sin cambios locales.
+- **Fase 1** (solo lectura, 26/11/2026). Las citas del core son del contenedor del laboratorio
+  (`/usr/lib/python3/dist-packages/odoo`, Odoo 17.0-20260908); las de `pns_ai_chatboo`, de R17:
+  - `chatboo_canvas.py`, `chatboo_canvas_page.py` y `security.xml` son iguales en 3.1.973 (`33ca68c`), R17
+    (`bfa6b49`) y HEAD; `chatboo_session.py` cambia en R17 (+123 −3: el helper `read_attachment`, `:851-857`;
+    `_session_of_this_turn`, `:1305-1319`; `_read_attachment` y `_store_documents`, `:1329-1434`, que guardan
+    documentos en la sesión, no adjuntos), fuera de los trozos parcheados;
+  - `git apply --check` de `8d1c9b2` limitado a `pns_ai_chatboo/`, sobre una copia de HEAD: limpio (en la sesión, +4
+    y +120). En el canvas, el trozo de `8d1c9b2` es solo el del 26: no adelanta nada del 27, el 29 ni el 34. El 27
+    (`52660ab`) entra limpio tras el 26, sin desplazamiento, y también sin él (−1): no comparten contexto;
+  - 11: el `unlink` de R17 borra en `sudo` los jobs y los adjuntos antes de `super().unlink()`
+    (`chatboo_session.py:2125-2160`), que es donde el core comprueba el acceso (`odoo/models.py:4227-4228`);
+    `check_access_rights` y `check_access_rule` siguen en la 17 (`models.py:4138` y `:4150`). `assertRaises` del core
+    abre un savepoint y lo deshace (`odoo/tests/common.py:446-456`): por RPC o con `assertRaises`, ningún test de la
+    14 mide la comprobación de acceso (de ahí la decisión 186);
+  - 25: el `_` ya lo cierra por RPC (`check_method_name`, `models.py:145`), pero `_session_of_this_turn` deja pasar
+    a uid 1 sobre sesiones ajenas (`chatboo_canvas.py:643-644`) y R17 no comprueba el dueño en `_paint_canvas`
+    (`chatboo_session.py:1070`): defensa en profundidad;
+  - 26: los helpers se publican en `sudo` (`pns_ai_mcp/utils/sandbox_helpers.py:73-75`) y `_web_image_picture`
+    busca con el entorno que recibe (`chatboo_canvas.py:677-697`). `Environment.__call__(…, su=None)`
+    (`odoo/api.py:569-585`): con `su=False` solo cae `su`;
+  - 28: `Many2many.write_real` deja la relación nueva en la caché (`odoo/fields.py:4980-4982`) antes de
+    `_validate_fields` (`models.py:4476` en `write` y `:4918` en `create`): la restricción ve al lector de portal.
+    `Many2many.read` aplica el `domain` (`fields.py:4874-4877`): sigue la observación m3 de la 14;
+  - APIs de los tests: `invalidate_cache` y `BaseModel.flush` no existen en la 17 (`invalidate_recordset`,
+    `models.py:6746`; `Environment.flush_all`, `api.py:735`).
+- **Paso 0 de la parte 1** (solo lectura; ninguna comprobación contradice el diseño):
+  - a: `_paint_canvas` solo lo llaman `open_page` (`chatboo_canvas.py:924`) y `edit_page` (`:948`). Se llega por
+    los helpers del turno (`page_url` y `page_edit`, `chatboo_session.py:858-859`, `:907` y `:974`), por la página
+    en espera (`fulfill`, `:877-883`, que ejecuta `fulfill_waiting_page`, `pns_ai_mcp/utils/result_page.py:157-178`,
+    desde el motor: `engine_tool_run.py:394` y `engine_presentation.py:231`) y por el job del botón Canvas
+    (`chatboo_canvas_job.py:107-117`). El turno corre con el uid de quien creó el job (`chatboo_job.py:184`, `:206`),
+    que solo puede crearlo en su sesión (`:149-159`); el job de Canvas lo arranca `/chatboo/canvas_build` con
+    `_own_session` (`controllers/chatboo.py:360` y `:101-108`), con `user_id = env.uid` (`chatboo_canvas_job.py:60`)
+    y un hilo con ese uid. El cron (`cron_maintenance`) solo marca los jobs atascados (`_reclaim_stuck`,
+    `chatboo_job.py:355-420`); no relanza ninguno. Ningún camino llega con otro uid;
+  - b: ACL `group_user 1,1,1,1` y regla `user_id = user.id`; no hay regla de AI Administrator ni de Ajustes sobre
+    `chatboo.session`, así que hoy tampoco borran sesiones ajenas. Las rutas de borrado filtran por
+    `user_id = uid` (`chatboo.py:488-491` y `:508-516`); el cron `_cleanup_old_sessions` va en `sudo`
+    (`chatboo_session.py:2191`), y en `su` pasan las dos comprobaciones (`odoo/addons/base/models/ir_model.py:2049` y
+    `models.py:4157`). Nadie pierde el borrado;
+  - c: `odoo-dev 17 tests` borra la BD `test_…`, la crea con `-i` desde el código montado (la copia de trabajo, con
+    `security.xml`) y la borra al acabar: la regla neutralizada se carga.
+
+| Efecto | Dónde | Tratamiento |
+|---|---|---|
+| Proveedor de diseño (red) | `_ask_design` (`chatboo_session.py:1209-1231`) | `mock.patch(LLM)` |
+| Cursores propios con `commit` | 4 métodos (debajo) | modo test |
+| Correo | `_tell_new_readers` → `message_notify` | modo test y segunda capa |
+| HTTP | `requests.get` y `requests.post` | segunda capa |
+| HTTP de `HttpCase` | `requests.Session.request` | sin sustituir |
+| Archivos | `ir.attachment.unlink` | filestore de la BD de tests |
+
+  - proveedor: `_ask_design` importa `llm_completion_for_agent` al llamar, así que `mock.patch(LLM)` lo sustituye,
+    como en la 14; es una función de módulo (la decisión 182 no aplica);
+  - modo test: `HttpCase` pone el registro en modo test (`odoo/tests/common.py:1934`); los cursores propios
+    (`_store_design`, `_store_title`, `_store_documents` y `_is_cancel_requested`) son `TestCursor` y no confirman
+    nada;
+  - correo: `ir.mail_server.send_email` y `connect` no envían en modo test (`ir_mail_server.py:733` y `:368`). La
+    segunda capa, en `_SegesCanvasCase.setUp`: `smtplib.SMTP`, `SMTP_SSL`, `requests.get` y `requests.post` con
+    `startPatcher`, y un `addCleanup` que da E (`RuntimeError`) si alguno se llama;
+  - `requests.Session.request` no se sustituye: el `Opener` de `HttpCase` es un `requests.Session`
+    (`common.py:1951`) y rompería `_rpc` y `_get`;
+  - archivos: `unlink` solo marca para el GC el filestore de la BD de tests, que se borra al acabar.
+- **Archivos:**
+  - código (`[FIX]`, 4): `pns_ai_chatboo/models/chatboo_session.py` (2214 líneas, `9fc450b1…72647`),
+    `models/chatboo_canvas.py` (2258, `d5178aea…d54c5a`), `models/chatboo_canvas_page.py` (198, `a0864f3e…7647d9`) y
+    `security/security.xml` (82, `ef29f9d0…5da6`);
+  - tests (`[ADD]`, 3): `pns_ai_chatboo/tests/__init__.py` (bloque de T5a; 18, `1595009c…91debe`) y, nuevos,
+    `test_seges_chatboo_access.py` (415, `50360eea…507017`) y `test_seges_chatboo_canvas.py` (290,
+    `3dbd3df2…424442605`).
+- **Cambios respecto a `14.0` en el código** (8 marcadores; líneas nuevas de 88 caracteres como máximo, sin `%`):
+  - `git apply` de `8d1c9b2` limitado a `pns_ai_chatboo/` y los dos cortes de la decisión 187 (el marcador interior
+    del 11, de 96 caracteres, y la segunda línea del comentario XML del 28, de 98);
+  - `chatboo_canvas.py` y `chatboo_canvas_page.py` quedan idénticos a los de `14.0` (blobs `7a074fa` y `da75369`).
+- **Cambios respecto a `14.0` en los tests** (cabeceras de la 14 sin cambios y la línea de la 17, decisiones 128 y
+  134):
+  - `test_seges_chatboo_access.py` (`TestSegesChatbooRpc`, 7; `TestSegesChatbooFlows`, 7; `TestSegesChatbooSandbox`,
+    1; `seges_e0`): entero (decisión 188); `env['base'].flush()` → `env.flush_all()` (4), el import de `AccessError`
+    y el caso nuevo `test_unlink_foreign_session_touches_nothing` (decisión 186);
+  - `test_seges_chatboo_canvas.py` (`TestSegesPaintCanvas`, 4; `TestSegesCanvasPictures`, 5; `TestSegesSharedPage`,
+    9; `seges_e3p`): solo lo de los parches 25, 26 y 28, sin los imports ni las constantes del 27; docstring de la
+    14 (decisión 189); `invalidate_recordset()` en `_fresh`, `flush_all()` en el `setUp` de Pictures y la segunda
+    capa;
+  - sin `cr.rollback()` ni `cr.commit()` sobre el cursor del test y sin `assertRaises` con tupla. Las líneas de más
+    de 88 caracteres (5 y 9) son de la 14;
+  - `tests/__init__.py`: el bloque de Seges de T5a.
+- **`odoo-dev 17 actualizar pns_ai_chatboo`** (decisión 191; log `actualizar-20261126-174816.log`): «RESULTADO: OK», 0
+  bloqueantes y 0 `ERROR`; un WARNING del fabricante (`ai.log`, dos campos con la etiqueta «Client»). El servidor web
+  se reinicia. En la BD del laboratorio (`SELECT`), `chatboo_canvas_page_admin_rule` queda con `perm_read` y
+  `perm_unlink`, sin `perm_write` ni `perm_create`, y `noupdate` falso. La BD se actualizó antes del arreglo del
+  espacio de `owner ={` (debajo): sin efecto en los datos, y el servidor carga el código definitivo al arrancar.
+- **Baterías** (desde el laboratorio):
+  - tres módulos, la definitiva (log `tests-20261126-180308.log`): `0 failed, 0 error(s) of 523 tests`, «RESULTADO:
+    OK», 0 `ERROR`. Omitidos (19): los de T4. Se ejecutan los 33 casos nuevos, ninguno omitido;
+  - antes: `tests-20261126-174838.log`, 523 en verde, con `owner ={s.id…`. El corte de la decisión 187 se hizo
+    reemplazando un texto que acababa en espacio, y ese espacio se perdió. No cambia el comportamiento, pero la línea
+    debe ser la de la 14; se vio al preparar N11, se corrigió (ahora todas las líneas añadidas de `8d1c9b2` están
+    exactas en la sesión) y se repitió la batería;
+  - control de `pns_ai_chatboo` (log `tests-20261126-175325.log`): `0 failed … of 60 tests`. No estaba previsto: el
+    primer intento de N11 falló en su comprobación sin cambiar nada (el texto buscado no casaba, por el espacio), pero
+    la batería se lanzó igual. Desde entonces, la batería solo se lanza si el cambio se aplicó;
+  - `seges_pruebas_3996` (log `tests-20261126-175116.log`): `4 failed, 0 error(s) of 56 tests`, los mismos 4 de T4.
+- **Por archivo:**
+
+| Archivo | Parche | Casos de T5a | Verdes |
+|---|---|---|---|
+| `test_seges_chatboo_access.py` | 11 (y no regresión de 3.1.879) | 15 | 15 |
+| `test_seges_chatboo_canvas.py` | 25, 26 y 28 | 18 | 18 |
+| **Total T5a** | | **33 nuevos** | **33** |
+
+- **Neutralizaciones** (decisión 141, sin excepciones), con la batería de `pns_ai_chatboo` (60 tests); copia previa
+  en el scratchpad, F previstas escritas antes de ejecutar ninguna y sha256 comprobado al restaurar. Todas dan
+  exactamente las F previstas y 0 E. Las líneas `ERROR` son solo las de sus F y la del resumen (decisión 152).
+
+| N | Qué se quita | F previstas | F obtenidas | Log |
+|---|---|---|---|---|
+| N11 | la comprobación de acceso y el filtro de adjuntos | 3 | 3 | `tests-20261126-175529.log` |
+| N25 | la comprobación del dueño en `_paint_canvas` | 1 | 1 | `tests-20261126-175709.log` |
+| N26 | `su=False` en las dos llamadas | 2 | 2 | `tests-20261126-175855.log` |
+| N28 | la restricción, y la regla vuelve a `True` | 2 | 2 | `tests-20261126-180051.log` |
+
+  - N11: `test_unlink_own_session_keeps_foreign`, `test_cron_unlink_sudo_keeps_foreign` (el filtro) y
+    `test_unlink_foreign_session_touches_nothing` (la comprobación);
+  - N25: `test_foreign_session_refused`, con «AccessError not raised»: sin el parche, el pintado de la sesión ajena
+    se completa (con el proveedor sustituido);
+  - N26: `test_page_html_hidden_picture` y `test_page_url_hidden_picture`;
+  - N28: `test_portal_reader_refused` y `test_ai_admin_cannot_write_foreign`;
+  - nada real ejecutado: la segunda capa no se llamó nunca (0 E y 0 «salida real intentada» en los seis logs de
+    `pns_ai_chatboo` y de los tres módulos) y el proveedor estuvo siempre sustituido. Los `mail.mail` del log (354 en
+    cada ejecución, también en el control) son los de restablecer contraseña de `new_test_user`; N28 suma 3, los
+    avisos al lector de portal (el `write`, el alta y el `write` en `sudo`). Todos pasan por
+    `ir.mail_server.send_email`, que en modo test vuelve sin enviar (`ir_mail_server.py:733`).
+- **Secretos en los logs:** no aplica (decisión 192).
+- **Línea base para T5b:** tres módulos, `0 failed, 0 error(s) of 523 tests`, 19 omitidos, «RESULTADO: OK»
+  (`tests-20261126-180308.log`); `seges_pruebas_3996`, `4 failed, 0 error(s) of 56 tests`
+  (`tests-20261126-175116.log`). La batería de `pns_ai_chatboo` sola tiene 60 tests.
+- **Lint** (`python3 ~/.claude/hooks/odoo_lint.py --revisar pns_ai_chatboo/`): 0 incidencias nuevas. Preexistentes:
+  `chatboo_canvas.py` 104, `chatboo_canvas_page.py` 11, `chatboo_session.py` 175 y `tests/__init__.py` 2.
+- **Entorno:** comprobado antes y después. `odoo-dev 17 estado` igual (BD `lab_pns_ai_3996_17`,
+  `CONF_HASH=c5c7138b608673bb`, no neutralizada; solo cambia el tiempo del contenedor web, que `actualizar`
+  reinició) y `bd-lista` sin `test_…`. Los `.py` de `seges_pruebas_3996`, sin cambios: en la parte 1 se comprobó con
+  otro método (concatenación, `b46296ff…`, igual antes y después); recalculado el 27/11/2026 con el de las secciones 8
+  y 9, `b5e46c60…`. La BD del laboratorio queda con el código de T5a (decisión 191).
+- **Registro:** en `docs/pendiente/parches_pns_ai.md`, las filas 11, 25, 26 y 28, «Validado en el laboratorio» con
+  `30e75f7`.
+- **Commits** (los hace Sergio): `[FIX]` `30e75f7` («[FIX] pns_ai_chatboo: parches 11, 25, 26 y 28 en la 17 (PNS-82,
+  M1, M2, D1) (T5a)»); `[ADD]` `f259667` («[ADD] pns_ai_chatboo: tests de Seges de los parches 11, 25, 26 y 28 en la
+  17 (T5a)»); `[DOC]`, el de este registro.
+- **Para el staging** (decisión 150; se actualiza `pns_ai_chatboo`):
+  - antes del `-u`: `SELECT count(*) FROM chatboo_canvas_page_user_rel r JOIN res_users u ON u.id = r.user_id
+    WHERE u.share;` (m3) y el `noupdate` de `pns_ai_chatboo.chatboo_canvas_page_admin_rule` en `ir_model_data`;
+  - después del `-u`: la regla, con `perm_write` y `perm_create` en `false`;
+  - borrar del historial una sesión propia con imágenes: se borran la sesión y sus adjuntos, sin `ERROR` en el log;
+  - Canvas: una página con fotos de contactos propios se ve con las imágenes; con un usuario sin acceso a los
+    contactos de otra compañía, esa foto no sale; el botón Canvas y `page_edit` siguen funcionando;
+  - páginas compartidas: compartir con un interno envía el aviso; el AI Administrator abre y borra una página ajena,
+    pero guardarla o «Stop sharing» da `AccessError`.
+- **Para las tandas siguientes:**
+  - huecos de la 14 que siguen sin test: el job del botón Canvas con el 25 (el paso 0 a lo comprueba leyendo), uid 1
+    sobre una sesión ajena y `note_page_waiting` con el 26;
+  - m3: la restricción no detecta los lectores de portal ya guardados (se mira en el staging);
+  - la comprobación de la 185, en T7 (decisión 190);
+  - el WARNING del fabricante en `ai.log` (dos campos con la etiqueta «Client»), solo anotado;
+  - la huella de los `.py` de `seges_pruebas_3996` se calcula con el método de las secciones 8 y 9: desde la raíz
+    del laboratorio, `find seges_pruebas_3996 -name '*.py' | sort | xargs sha256sum | sha256sum` (`b5e46c60…`).
