@@ -17,6 +17,8 @@ from markupsafe import Markup
 
 from odoo import api, fields, models, _
 from odoo.exceptions import AccessError
+# Seges: parche 28 (D1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+from odoo.exceptions import ValidationError
 
 from odoo.addons.pns_ai_mcp.utils.markup_rename import rename_stored_markup
 
@@ -64,6 +66,14 @@ class ChatbooCanvasPage(models.Model):
         ).rstrip('/')
         for page in self:
             page.url = '%s/chatboo/page/%s' % (base, page.id) if page.id else ''
+
+    # Seges: parche 28 (D1, seguridad). Ver docs/pendiente/parches_pns_ai.md
+    @api.constrains('user_ids')
+    def _check_user_ids_internal(self):
+        if self.mapped('user_ids').filtered('share'):
+            raise ValidationError(
+                _('A page can only be shared with internal users.'),
+            )
 
     # The page is a copy of the owner's own canvas, made by the share route
     # after it checked the session. Free HTML sent over RPC would be a page
