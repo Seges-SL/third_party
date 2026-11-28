@@ -16,6 +16,8 @@ import time
 from odoo import models, fields, api, _
 from odoo.exceptions import AccessError
 
+# Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
+from .chatboo_canvas import _NO_PAGE_WATCH, page_refused_in_job, watch_no_page
 from .chatboo_job import _env_manage, _get_registry, _is_test_mode
 from ..utils import document_reading, file_text, turn_documents
 from ..utils.chatboo_product_icp import CHATBOO_AGENT_CODE
@@ -156,6 +158,9 @@ class ChatbooAsyncRequest(models.Model):
         self.sudo().write({'state': 'running', 'started_at': fields.Datetime.now()})
         self.env.cr.commit()
         self._notify('thinking')
+        # Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
+        no_page_token = watch_no_page(
+            self.id, self.session_id.id, self.session_id.canvas_rev)
 
         acc = ''
         struct = []
@@ -525,6 +530,8 @@ class ChatbooAsyncRequest(models.Model):
             self._release_turn_cursor()
             self._finalize(acc, struct, done_meta, error=str(exc) or exc.__class__.__name__)
         finally:
+            # Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
+            _NO_PAGE_WATCH.reset(no_page_token)
             # Stop the heartbeat whatever happens (success or error).
             self._stop_heartbeat(beat)
             # This cursor holds a REPEATABLE READ snapshot of the WHOLE turn.
@@ -1298,6 +1305,19 @@ class ChatbooAsyncRequest(models.Model):
                 **({'clip_data': _clip_data} if _clip_data else {}),
             })
         else:
+            # Seges: parche 34 (PNS-96, funcional). Ver docs/pendiente/parches_pns_ai.md
+            _content = acc or ''
+            if page_refused_in_job(self.id, session.id, session.canvas_rev):
+                _note = _('No page was built. The reason is in the AI History.')
+                # A plain line, with no markdown or HTML marks: the client paints
+                # an answer by several routes (_formatContent, chatboo_formatters.js)
+                # and marks show up literally in some of them. Plain text reads
+                # the same in all (laboratorio del 34, L1, 16/11/2026).
+                if (acc or '').strip():
+                    _content = f"{acc}\n\n{_note}"
+                else:
+                    _content = _note
+                _assistant_content = _content
             # Answer footer: each stack reads a different shape and we must
             # write BOTH so the footer survives a session reload
             # (the client used to write it live; now the worker writes it):
@@ -1355,8 +1375,14 @@ class ChatbooAsyncRequest(models.Model):
             }
             messages.append({
                 'role': 'assistant',
-                'content': acc or '',
-                'original_content': acc or '',
+                # Seges: parche 34 (PNS-96, funcional).
+                # Ver docs/pendiente/parches_pns_ai.md
+                'content': _content,
+                # Seges: parche 34 (PNS-96, funcional).
+                # Ver docs/pendiente/parches_pns_ai.md
+                # Opción A (Sergio, 05/11/2026): con aviso, original_content lleva
+                # el mismo texto que content; sin aviso, el valor de hoy (acc or '').
+                'original_content': _content,
                 'raw': True,
                 # ── owl1 (flat fields read by chatboo_component_v2.js) ──
                 'usage': _usage,
