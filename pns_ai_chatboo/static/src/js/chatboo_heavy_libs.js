@@ -14,7 +14,9 @@ const VENDOR = [
     "/pns_ai_chatboo/static/src/js/jspdf.plugin.autotable.min.js",
     "/pns_ai_chatboo/static/src/js/jspdf_umd_post.js",
     "/pns_ai_chatboo/static/src/js/html2canvas.min.js",
-    "/pns_ai_chatboo/static/src/js/chart.umd.min.js",
+    // Seges: parche 20 (PNS-70, compatibilidad). Ver docs/pendiente/parches_pns_ai.md
+    // New url: a browser must not reuse its cached copy of the original.
+    "/pns_ai_chatboo/static/src/js/chart.umd.min.js?seges=20",
     "/pns_ai_chatboo/static/src/js/echarts.min.js",
 ];
 
@@ -24,7 +26,9 @@ export function loadHeavyLibs() {
             for (const url of VENDOR) {
                 await loadJS(url);
             }
-            const chart = window.Chart;
+            // Seges: parche 20 (PNS-70, compatibilidad).
+            // Ver docs/pendiente/parches_pns_ai.md
+            const chart = window.PnsChatbooChart;
             const echarts = window.echarts;
             if (window.ChatbooCharts && window.ChatbooCharts.bindEngines) {
                 window.ChatbooCharts.bindEngines(chart, echarts);
