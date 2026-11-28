@@ -14,7 +14,8 @@
     O1 ampliado (decisión 29, `59a4662`);
   - punto 7, parches 22 y 39 (métodos con efectos): las listas se actualizan en el port; salen 6, entran 13 en la
     lista global y en la tabla por modelo y 6 solo en la tabla (`b7c09b8`);
-  - punto 6, parche 29: sus tests, en la fase 2 del plan (la predicción está en la sección 11);
+  - punto 6, parche 29: sus tests, en la fase 2 del plan (la predicción está en la sección 11); confirmado en T5b
+    por el control P6 (27/11/2026; `docs/pendiente/fase2_pns_ai_17_3996.md`, sección 11);
   - laboratorio (`seges_pruebas_3996`, copia en `docs/pendiente/lab_3996/`): `13 failed, 0 error(s) of 30 tests`, los
     13 `[HYPOTHESIS]` esperados de los puntos 2, 3, 4 y 1, que pasan a verde con el port;
   - pendiente para el port, en la sección 11: las aperturas de cursor del punto 5 localizadas y no leídas, la caja A
@@ -38,7 +39,9 @@
   0 E de 460; laboratorio, 4 F de 56. T4 hecha (26/11/2026): parches 15, 22 y 39 con las listas de la 17 y el 41
   (E3, nuevo), validados en el laboratorio (`[FIX]` `e5b6600` y `[ADD]` `160a293`); línea base, 0 F y 0 E de 490;
   laboratorio, 4 F de 56. T5a hecha (26/11/2026): parches 11, 25, 26 y 28, validados en el laboratorio (`[FIX]`
-  `30e75f7` y `[ADD]` `f259667`); línea base, 0 F y 0 E de 523; laboratorio, 4 F de 56. Sigue la tanda T5b.
+  `30e75f7` y `[ADD]` `f259667`); línea base, 0 F y 0 E de 523; laboratorio, 4 F de 56. T5b hecha (27/11/2026):
+  parches 27, 29 y 34, validados en el laboratorio (`[FIX]` `3f65651` y `[ADD]` `f2575f3`); línea base, 0 F y 0 E
+  de 567; laboratorio, 4 F de 56. Sigue la tanda T6.
 
 ## Decisiones (Sergio, 22 y 23/11/2026)
 

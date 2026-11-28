@@ -181,6 +181,21 @@
   - **191.** Se autoriza `odoo-dev 17 actualizar pns_ai_chatboo` en el laboratorio (`lab_pns_ai_3996_17`).
   - **192.** La búsqueda de secretos en los logs no aplica: el proveedor está sustituido y las contraseñas de los
     tests son el propio login.
+- **Decisiones de Sergio en T5b (27/11/2026):**
+  - **193.** El logger del 29, tal como en la 14 (`_logger.info('… %s …', reason)`). La regla «sin %» va por el
+    operador de formateo (decisión 151), no por los argumentos del logger. El hook de lint aceptó la línea y
+    `chatboo_canvas.py` queda idéntico al de `14.0` (blob `acd5525`).
+  - **194.** Los casos con proveedor real (L2 del 34; 6c y 6d′ del 29), solo en «Para el staging» (decisión 122); sin
+    tests con `skip`.
+  - **195.** El comentario de las esperas de `TestSegesCanvasModelData` se sustituye por el de la 17, en los dos
+    sitios.
+  - **196.** Se acepta `# pylint: disable=too-many-lines` en `test_seges_chatboo_canvas.py` (como la 171).
+  - **197.** Docstring del archivo del canvas: la viñeta del 34 y el párrafo de la 17 (completa la 189).
+  - **198.** Control del punto 6: `TestSegesCanvasModelData` sin los dos `flush_all()`, con 3 F previstas.
+  - **199.** Se aceptan el `I001` y el C901 que suben en líneas sin cambios (como la 137 y la 146).
+  - **200.** Se autoriza `odoo-dev 17 actualizar pns_ai_chatboo` en el laboratorio (`lab_pns_ai_3996_17`).
+  - **201.** En el comentario de `_fresh` (T5a), la cita `odoo/models.py:6746` pasa a `:6747` (el `def`; `:6746` es
+    el decorador).
 
 ## 1. Alcance
 
@@ -407,8 +422,9 @@
 | T3 | hecha (25/11/2026): 0 F y 0 E de 460 tests, 5 omitidos; laboratorio, 4 F de 56 |
 | T4 | hecha (26/11/2026): 0 F y 0 E de 490 tests, 19 omitidos; laboratorio, 4 F de 56; parche 41 (E3) nuevo |
 | T5a | hecha (26/11/2026): 0 F y 0 E de 523 tests, 19 omitidos; laboratorio, 4 F de 56 |
-| T5b | pendiente (la siguiente) |
-| T6 a T10 | pendientes |
+| T5b | hecha (27/11/2026): 0 F y 0 E de 567 tests, 19 omitidos; laboratorio, 4 F de 56 |
+| T6 | pendiente (la siguiente) |
+| T7 a T10 | pendientes |
 
 ## 5. T0: tests de no regresión, registro y `CLAUDE.md`
 
@@ -1356,3 +1372,178 @@
   - el WARNING del fabricante en `ai.log` (dos campos con la etiqueta «Client»), solo anotado;
   - la huella de los `.py` de `seges_pruebas_3996` se calcula con el método de las secciones 8 y 9: desde la raíz
     del laboratorio, `find seges_pruebas_3996 -name '*.py' | sort | xargs sha256sum | sha256sum` (`b5e46c60…`).
+
+## 11. T5b: parches 27, 29 y 34
+
+- **Fecha:** 27/11/2026 (fase 1 y parte 1 de la fase 2); registro, 28/11/2026. Partida: HEAD `db9f2e9` («[DOC] pns_ai
+  17: registro de la tanda T5a (parches 11, 25, 26 y 28) (fase 2)»), sin cambios locales.
+- **Fase 1** (solo lectura, 27/11/2026). Las citas del core son del contenedor del laboratorio
+  (`/usr/lib/python3/dist-packages/odoo`, Odoo 17.0-20260908); las de `pns_ai_chatboo`, de R17:
+  - `chatboo_canvas.py` es el mismo blob en 3.1.973 (`33ca68c`) y en R17 (`bfa6b49`), `3971bfb`; en HEAD, `7a074fa`
+    (con el 26), que es la base de `52660ab` en la 14. `chatboo_session.py` cambia en R17 fuera de los trozos del 29.
+    `chatboo_async_request.py` cambia en R17 (+19 −70: la lectura de PDF pasa a `document_reading` y entra su import
+    en `:22`, que es el contexto con el que choca el trozo 2 del 34); HEAD es igual a R17 (`d89f289`);
+  - `git apply --check` en cadena sobre una copia de HEAD: el 27, limpio; el 29, limpio en el canvas y −2 en los tres
+    trozos de la sesión; el 34 (`272ebb5`) falla sin `-C1` y con `-C1` entra (+4 con el contexto reducido, −4 y −51);
+    `617b9b3`, con `-C1`, −51. El canvas resultante es el de `14.0` (blob `acd5525`);
+  - cabeceras: el fabricante pone su CSP y `nosniff` en las dos carcasas (`controllers/chatboo.py:1160-1172`) y solo
+    `nosniff` en las descargas (`:1277-1284` y `:1305-1312`). El core, en `post_dispatch`, llama a `set_csp`
+    (`odoo/http.py:2088` y `:2358-2368`): reescribe `X-Content-Type-Options` con el mismo valor, no toca una CSP que
+    ya exista y solo añade `default-src 'none'` a `image/*`. `X-Frame-Options` solo la pone en `/web`
+    (`addons/web/controllers/home.py:60`) y en el login (`:134-135`). El 27 no añade cabeceras: su `<meta>` se suma
+    a la del fabricante en el `srcdoc` (más estricta) y es la única política de la descarga. No se duplica ni choca;
+    `PAGE_CSP` del test es igual a `_PAGE_CSP` de R17;
+  - JSON en `<script>`: el core tiene `odoo.tools.json.scriptsafe` (`odoo/tools/json.py:9-20` y `:27-55`), con los
+    mismos caracteres (`<>&\u2028\u2029`), pero solo escapa en `__html__` (QWeb). El lienzo arma el HTML concatenando
+    cadenas, así que se queda `_script_json`, como en la 14;
+  - punto 6 del 29: `_store_design` escribe con `registry.cursor()` (`chatboo_session.py:1012`), que en modo test es
+    un `TestCursor` con `savepoint(flush=False)` (`odoo/modules/registry.py:935-937`, `odoo/sql_db.py:553`): no vuelca
+    lo pendiente del test. `_fresh` llama a `invalidate_recordset()`, que vuelca antes de invalidar
+    (`odoo/models.py:6757-6758`) y pisaría la página guardada. El `flush_all()` hace falta también sin el 38;
+  - 34: el turno corre en el hilo del job (`chatboo_job.py:223`); el único hilo aparte es el del latido (`:298`), que
+    no llama a `log_no_page` (los mismos 3 `Thread(` en 3.1.973 y en R17). `_save_to_session` (`:1133` de R17) no
+    abre cursores ni confirma; `_assistant_content`, en `:1202` y `:1501-1502`;
+  - laboratorio: ningún test de `seges_pruebas_3996` pasa por lo que cambia T5b; las 4 F siguen;
+  - los 17 casos puros de las cinco clases se simularon en el contenedor (`python3 -I`, por la entrada estándar, sin
+    BD) con la copia parcheada y con N27 y N29: son las F marcadas [C] abajo. Las [R] se razonaron leyendo el código.
+- **Paso 0 de la parte 1** (solo lectura): HEAD `db9f2e9`, árbol limpio; huella del laboratorio `b5e46c60…`;
+  `odoo-dev 17 estado` (BD `lab_pns_ai_3996_17`, `CONF_HASH=c5c7138b608673bb`, no neutralizada) y `bd-lista` sin
+  `test_…`.
+
+| Efecto | Dónde | Tratamiento |
+|---|---|---|
+| Proveedor de diseño (red) | `_ask_design` | `mock.patch(LLM)` (`_answers`); función de módulo, la 182 no aplica |
+| Cursores propios con `commit` | `_store_design`, `_store_title` y `ai.log` | modo test (`TestCursor`) |
+| Correo y HTTP saliente | — | segunda capa de `_SegesCanvasCase`, sin cambios |
+| HTTP de `HttpCase` | `_get` de Shell y Headers | sin sustituir (`requests.Session.request`) |
+| Hilos y bus | `_process` y `_spawn` no se llaman; `_save_to_session` no notifica | testigo con `addCleanup` |
+
+- **Archivos:**
+  - código (`[FIX]`, 3): `pns_ai_chatboo/models/chatboo_canvas.py` (2571 líneas, `78ee3ea4…198a61`),
+    `models/chatboo_session.py` (2249, `4fea3b7d…684f7f`) y `models/chatboo_async_request.py` (1661,
+    `3552a1e8…631fc9`);
+  - tests (`[ADD]`, 1): `pns_ai_chatboo/tests/test_seges_chatboo_canvas.py` (1027, `d628813e…a2da11`).
+    `tests/__init__.py` no cambia.
+- **Cambios respecto a `14.0` en el código** (37 marcadores: 12 del 27, 14 del 29 y 11 del 34; líneas nuevas de 88
+  caracteres como máximo; el único `%` nuevo es el argumento del logger, decisión 193):
+  - `git apply` de `52660ab` y de `34606ab`, y `git apply -C1` de `272ebb5` y de `617b9b3`, en ese orden;
+  - cortes (como la 187): el marcador interior de la sesión (92 caracteres) y, en el async, el marcador al final de la
+    línea de `'content'` (114) y el de `'original_content'` (92), cada uno en dos líneas;
+  - `chatboo_canvas.py` queda idéntico al de `14.0` (blob `acd5525`);
+  - el 34, trozo por trozo, frente a `14.0` (ninguno cae en otro sitio):
+
+| Trozo (17) | Función en la 17 | En `14.0` | Comprobación |
+|---|---|---|---|
+| `+19` | cabecera (import de `chatboo_canvas`) | cabecera (`:19`) | el mismo import |
+| `+161` | `_process`, tras `_notify('thinking')` (`:160`), antes del `try` de `:391` | `_process` (`:164`) | igual |
+| `+533` | `_process`, primera línea del `finally` (`:532`) | `_process` (`:536`) | igual |
+| `+1308` | `_save_to_session`, rama `else` (`:1307`), tras `incomplete` y `error` | rama `else` (`:1358`) | idéntico |
+| `+1378` | `_save_to_session`, el `messages.append` de esa rama | `:1429-1430` | solo los cortes |
+
+- **Cambios respecto a `14.0` en los tests** (cabeceras de la 14 sin cambios y la línea de la 17, decisiones 128 y
+  134):
+  - las cinco clases, en el orden de la 14: `TestSegesCanvasScriptJson` (8), `TestSegesCanvasShell` (8) y
+    `TestSegesCanvasHeaders` (3), del 27; `TestSegesCanvasModelData` (16), del 29; `TestSegesNoPageNotice` (9,
+    `seges_e4p`), del 34. Con los imports del 27 (`html`, `json`, `re` y `chatboo_canvas as canvas`) y sus
+    constantes y helpers (`EVIL`, `EVIL_COMMENT`, `BREAKOUTS`, `PAGE_CSP`, `_json_after`, `B1_DESIGNS` y
+    `_assert_csp_served`);
+  - la línea de la 17 de la cabecera, nueva para T5a y T5b, con `# pylint: disable=too-many-lines` (decisión 196);
+  - el docstring, con la viñeta del 34 y el párrafo de la 17 (decisión 197);
+  - las dos esperas de `TestSegesCanvasModelData`, con el comentario de la 17 (decisión 195), y 4 `flush_all()`
+    (`setUp` de Shell y de Headers y las dos esperas);
+  - en `_fresh`, la cita pasa a `odoo/models.py:6747` (decisión 201);
+  - sin `cr.rollback()` ni `cr.commit()` sobre el cursor del test y sin `assertRaises`. 62 casos (18 de T5a y 44
+    nuevos); 23 líneas nuevas, de 88 caracteres como máximo y sin `%`; las de más de 88 son de la 14 o de T5a.
+- **`odoo-dev 17 actualizar pns_ai_chatboo`** (decisión 200; log `actualizar-20261127-170359.log`): «RESULTADO: OK», 0
+  bloqueantes y 0 `ERROR`; el WARNING del fabricante de T5a (`ai.log`, dos campos con la etiqueta «Client»). El
+  servidor web se reinicia.
+- **Baterías** (desde el laboratorio):
+  - tres módulos (log `tests-20261127-170448.log`): `0 failed, 0 error(s) of 567 tests`, «RESULTADO: OK», 0 `ERROR`.
+    Omitidos (19, 5 casos y 14 subtests): los de T4. Se ejecutan los 44 casos nuevos, ninguno omitido;
+  - `seges_pruebas_3996` (log `tests-20261127-170936.log`): `4 failed, 0 error(s) of 56 tests`, los mismos 4 de T5a.
+- **Por archivo:**
+
+| Archivo | Parche | Casos de T5b | Verdes |
+|---|---|---|---|
+| `test_seges_chatboo_canvas.py` | 27, 29 y 34 | 44 | 44 |
+| **Total T5b** | | **44 nuevos** | **44** |
+
+- **Neutralizaciones** (decisión 141, sin excepciones), con la batería de `pns_ai_chatboo` (104 tests); copia previa
+  en el scratchpad, F previstas escritas antes de ejecutar ninguna (separando las [C] de las [R]), la batería solo si
+  el cambio se aplicó y sha256 comprobado al restaurar (los cuatro archivos, iguales las cuatro veces). Todas dan
+  exactamente las F previstas, caso por caso, y 0 E. Las líneas `ERROR` son solo las de sus F y la del resumen
+  (decisión 152).
+
+| N | Qué se quita | F previstas | F obtenidas | Log |
+|---|---|---|---|---|
+| N27 | 27 a, a′ y b (debajo) | 44 (30 C, 14 R) | 44 | `tests-20261127-171326.log` |
+| N29 | 29 A, B, C1, comillas, formas y D (debajo) | 27 (15 C, 12 R) | 27 | `tests-20261127-171623.log` |
+| N34 | el aviso de `_save_to_session` (debajo) | 4 (R) | 4 | `tests-20261127-171926.log` |
+| P6 | los dos `flush_all()` de ModelData (debajo) | 3 (R) | 3 | `tests-20261127-172229.log` |
+
+  - qué se quita: N27, `_script_safe` devuelve el texto sin escapar, `_with_csp` devuelve el diseño sin prefijo y
+    `_picture_of` acepta cualquier `data:`; N29, `place_rows_on_page` devuelve la página sin consultar A ni B, la
+    muestra va sin `_script_safe` (C1), `quote=False` en `_cell_html` y `_rows_as_table`, las formas de
+    `_page_shows_rows` vuelven a las del fabricante y, en la sesión, `if page and not _blocks_for_page(rows):` pasa a
+    `if False:` (D); N34, `if page_refused_in_job(…)` pasa a `if False:` (como N34s de la 14); P6, los dos
+    `self.env.flush_all()` de las esperas de `TestSegesCanvasModelData` pasan a `pass`. La regla del prompt no se
+    neutraliza (es un texto; la comprueban `test_design_rule` y `test_design_rule_text_content`);
+  - N27, [C]: los 8 de ScriptJson; los 14 subtests de `test_csp_prefix_cases`; los 7 subtests de
+    `test_raw_value_in_markup` (también `R&D Ltd`: el DATA del servidor deja en crudo los valores hostiles de esas
+    filas); `test_hostile_rows_design_kept`. [R]: `test_canvas_shell`, `test_page_shell`, `test_canvas_download`,
+    `test_page_download`; los 2 subtests de `test_p9_downloads`; los 3 `test_sample_copied_*`,
+    `test_page_html_hostile_template`, `test_edit_rebinds_rows`, `test_edit_unescaped_data`,
+    `test_edit_raw_value_in_markup` y `test_design_prompt_escaped`;
+  - N29, [C]: los 6 subtests de `test_data_not_written_by_server`; 6 de los 7 de `test_raw_value_in_markup` (el de
+    `R&D Ltd` pasa); `test_hostile_rows_design_kept`; los 2 de `test_quoted_values_in_server_table`. [R]: los 3
+    `test_sample_copied_*`, `test_page_html_hostile_template`, los 3 `test_edit_*`, `test_design_prompt_escaped` y 4
+    subtests de `test_edit_page_without_data` («(2) hostil», «(2) hostil, filas escalares», «(3) sin DATA ni tabla» y
+    «dos pasos, hostil»);
+  - N34, [R]: `test_notice_after_refusal`, `test_notice_unknown_session`, `test_notice_empty_answer` y
+    `test_notice_html_answer`;
+  - nada real ejecutado: la segunda capa no se llamó nunca (0 E y 0 «salida real intentada» ni `RuntimeError` en los
+    cuatro logs ni en el de los tres módulos) y el proveedor estuvo siempre sustituido. Los `mail.mail` del log son
+    los de restablecer contraseña de `new_test_user`, que en modo test no se envían (`ir_mail_server.py:733`).
+- **Control del punto 6 (P6, decisión 198):** fallan los 3 subtests previstos de `test_edit_page_without_data`,
+  «(2) inocente», «dos pasos, hostil» y «dos pasos, inocente». Los dos inocentes dan `1 != 2` en `canvas_rev`. «dos
+  pasos, hostil» pasa la comprobación de la revisión y falla en `assertNotIn(EVIL, page_rows_texts(step1))` (`:853`):
+  el volcado de `_fresh` pisó `canvas_design` con la página anterior y dejó la revisión nueva, que no estaba
+  pendiente. Es el mismo pisado de lo pendiente, no un fallo del test. Queda confirmada la predicción de la
+  clasificación (sección 11, punto 6): verde con `flush_all()` y 3 subtests en rojo sin él.
+- **Secretos en los logs:** no aplica (decisión 192).
+- **Línea base para T6:** tres módulos, `0 failed, 0 error(s) of 567 tests`, 19 omitidos, «RESULTADO: OK»
+  (`tests-20261127-170448.log`); `seges_pruebas_3996`, `4 failed, 0 error(s) of 56 tests`
+  (`tests-20261127-170936.log`). La batería de `pns_ai_chatboo` sola tiene 104 tests.
+- **Lint** (`python3 ~/.claude/hooks/odoo_lint.py --revisar pns_ai_chatboo/`): 0 incidencias nuevas. Preexistentes:
+  `chatboo_async_request.py` 167, `chatboo_canvas.py` 102, `chatboo_session.py` 176 y
+  `test_seges_chatboo_canvas.py` 0. El `I001` de la cabecera de imports del canvas y los C901 de `_paint_canvas` y
+  `_save_to_session` suben en líneas sin cambios (decisión 199).
+- **Entorno:** comprobado antes y después. `odoo-dev 17 estado` igual (BD `lab_pns_ai_3996_17`,
+  `CONF_HASH=c5c7138b608673bb`, no neutralizada; solo cambia el tiempo del contenedor web, que `actualizar` reinició)
+  y `bd-lista` sin `test_…`. Huella de los `.py` de `seges_pruebas_3996`, `b5e46c60…`, igual antes y después. La BD
+  del laboratorio queda con el código de T5b (decisión 200).
+- **Registro:** en `docs/pendiente/parches_pns_ai.md`, las filas 27, 29 y 34, «Validado en el laboratorio» con
+  `3f65651`.
+- **Commits** (los hace Sergio): `[FIX]` `3f65651` («[FIX] pns_ai_chatboo: parches 27, 29 y 34 en la 17 (F1, P-8e a,
+  PNS-96) (T5b)»); `[ADD]` `f2575f3` («[ADD] pns_ai_chatboo: tests de Seges de los parches 27, 29 y 34 en la 17
+  (T5b)»); `[DOC]`, el de este registro.
+- **Para el staging** (decisión 150; se actualiza `pns_ai_chatboo`):
+  - 27: en el lienzo y en una página compartida, el `srcdoc` empieza por el prefijo con la `<meta>` de CSP; un diseño
+    que cargue una librería o una fuente externa sale «Refused» en la consola; las dos descargas se abren sin
+    conexión y llevan la `<meta>`; las fotos `data:` se siguen viendo;
+  - 29: 6c, un contacto con el nombre `</script><script>alert(1)</script>` no da `alert` y sale escapado o en la
+    página de rescate (el contacto hostil se borra al acabar la prueba); 6d′, editar sin filas una página antigua
+    («fondo azul») con el proveedor real; un valor con `"` se ve con sus comillas;
+  - 34: L2, un turno con la página rechazada (un agente sin Design) muestra el aviso en línea llana, en vivo y tras
+    recargar, y un turno que crea la página no lo muestra. Mirar en qué idioma sale el aviso: `es.po` lo traduce
+    (`pns_ai_chatboo/i18n/es.po:2500-2501`, «No se ha creado la página. El motivo está en el Historial IA.»);
+  - regresión: el botón Canvas, `page_edit` y compartir; en el log, las líneas «Chatboo canvas: the page kept …».
+- **Para las tandas siguientes:**
+  - huecos sin test: la apertura y el `reset` del testigo en `_process`, `_finalize` en un turno real y
+    `swap_pictures` con un `data:` no válido;
+  - el testigo queda sin `reset` si algo falla entre `chatboo_async_request.py:161` (apertura) y el `try` de `:391`.
+    Sin efecto: el hilo es uno por job y muere, y `page_refused_in_job` compara el job; igual que en la 14;
+  - el aviso del 34: el msgid está en `es.po` (`:2500-2501`), con la referencia a `chatboo_canvas_job.py`, que usa el
+    mismo texto (`:133` y `:156`). El del 34 (`chatboo_async_request.py:1311`) solo sale en español si el entorno del
+    hilo del job lleva el idioma del usuario; no se ha comprobado y se mira en el staging (L2). T5b no toca `i18n`;
+  - el 38 no se porta (clasificación, sección 6); el punto 6 queda confirmado por P6.

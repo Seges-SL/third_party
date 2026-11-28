@@ -57,14 +57,14 @@ fabricante). De los demás:
 | 24 | PNS-102 | T3 | Validado en el laboratorio | `3af8b5b` |
 | 25 | M1 | T5a | Validado en el laboratorio | `30e75f7` |
 | 26 | M2 | T5a | Validado en el laboratorio | `30e75f7` |
-| 27 | F1 | T5b | Pendiente | — |
+| 27 | F1 | T5b | Validado en el laboratorio | `3f65651` |
 | 28 | D1 | T5a | Validado en el laboratorio | `30e75f7` |
-| 29 | F1 (P-8e a) | T5b | Pendiente | — |
+| 29 | F1 (P-8e a) | T5b | Validado en el laboratorio | `3f65651` |
 | 30 | M11 | T0 (test) | Retirado en 3.1.973 (cubierto por el fabricante); no regresión | — |
 | 31 | M12 | T0 (test) | Retirado en 3.1.973 (cubierto por el fabricante); no regresión | — |
 | 32 | PNS-97 | T1 | Validado en el laboratorio | `f70c3c0` |
 | 33 | PNS-29 | T1 | Validado en el laboratorio | `f70c3c0` |
-| 34 | PNS-96 | T5b | Pendiente | — |
+| 34 | PNS-96 | T5b | Validado en el laboratorio | `3f65651` |
 | 35 | PNS-109 (NUEVO-2) | — | No aplica: migración atada a 14.0.3.1.973 | — |
 | 36 | PNS-103 | T2 | Validado en el laboratorio | `b391159` |
 | 37 | PNS-104 | — | No aplica: cada cursor tiene su `Transaction` en la 17 | — |
