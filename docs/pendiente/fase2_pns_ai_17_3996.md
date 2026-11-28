@@ -196,6 +196,18 @@
   - **200.** Se autoriza `odoo-dev 17 actualizar pns_ai_chatboo` en el laboratorio (`lab_pns_ai_3996_17`).
   - **201.** En el comentario de `_fresh` (T5a), la cita `odoo/models.py:6746` pasa a `:6747` (el `def`; `:6746` es
     el decorador).
+- **Decisiones de Sergio en T6 (28/11/2026):**
+  - **202.** El laboratorio no se toca (decisión 117). Se espera 4 F de 56: `test_chat_after_odoo_keeps_odoo_chart`
+    pasa a verde y `test_chat_before_odoo` cae en `[SETUP]` (sección 12). La tabla de la sección 3 (T6 → 3 F) y la
+    clasificación (`:452-454`) se anotan como errata en la sección 12, sin reescribirlas.
+  - **203.** N20 y N20b: N20b demuestra en ejecución que el caso 3 mide el trozo 2. N20b dio 1 F
+    (`test_chat_engine_is_its_own_chart`, «got Chart.js 4.3.0, date adapter luxon»).
+  - **204.** `chart.umd.min.js`, idéntico al de `14.0`: `git apply` de `ef05eaa` tal cual, con los marcadores de la 14
+    (blob `fd2decf`). Es una excepción a los 88 caracteres, como la 159: archivo minificado del fabricante y el lint
+    no revisa JS. Se comprueba con `git hash-object`, que da `fd2decf8680c67913eda21343a43801c2f133fe7`.
+  - **205.** Etiqueta `seges_t6`, como `seges_t1` del 40.
+  - **206.** Se añade `test_chat_engine_is_its_own_chart`.
+  - **207.** Se autoriza `odoo-dev 17 actualizar pns_ai_chatboo` en el laboratorio (`lab_pns_ai_3996_17`).
 
 ## 1. Alcance
 
@@ -423,8 +435,9 @@
 | T4 | hecha (26/11/2026): 0 F y 0 E de 490 tests, 19 omitidos; laboratorio, 4 F de 56; parche 41 (E3) nuevo |
 | T5a | hecha (26/11/2026): 0 F y 0 E de 523 tests, 19 omitidos; laboratorio, 4 F de 56 |
 | T5b | hecha (27/11/2026): 0 F y 0 E de 567 tests, 19 omitidos; laboratorio, 4 F de 56 |
-| T6 | pendiente (la siguiente) |
-| T7 a T10 | pendientes |
+| T6 | hecha (28/11/2026): 0 F y 0 E de 570 tests, 19 omitidos; laboratorio, 4 F de 56 (con el `[SETUP]` de T6) |
+| T7 | pendiente (la siguiente) |
+| T8 a T10 | pendientes |
 
 ## 5. T0: tests de no regresión, registro y `CLAUDE.md`
 
@@ -1547,3 +1560,138 @@
     mismo texto (`:133` y `:156`). El del 34 (`chatboo_async_request.py:1311`) solo sale en español si el entorno del
     hilo del job lleva el idioma del usuario; no se ha comprobado y se mira en el staging (L2). T5b no toca `i18n`;
   - el 38 no se porta (clasificación, sección 6); el punto 6 queda confirmado por P6.
+
+## 12. T6: parche 20
+
+- **Fecha:** 28/11/2026 (fase 1, partes 1 y 2 de la fase 2). Partida: HEAD `db6c390` («[DOC] pns_ai 17: registro de la
+  tanda T5b (parches 27, 29 y 34) (fase 2)»), sin cambios locales.
+- **Fase 1** (solo lectura, 28/11/2026). Las citas del core son del contenedor del laboratorio
+  (`/usr/lib/python3/dist-packages/odoo`, Odoo 17.0-20260908); las de `pns_ai_chatboo`, de R17:
+  - `git apply --check` de `ef05eaa`: `chart.umd.min.js` entra limpio (en HEAD es el blob `9d6df8e`, el mismo que el
+    original de la 14, `ef05eaa~1`; md5 `45f5b4f1…`, 206 553 bytes, tokens en los desplazamientos 584 y 206491, como
+    en 3.1.879); `chatboo_heavy_libs.js` falla en `:13`. R17 lo reescribe como módulo ES (`/** @odoo-module **/`,
+    `import { loadJS } from "@web/core/assets"` en `:7`, bucle `async` en `:21-35`), sin `odoo.define` ni `web.ajax`,
+    y añade `jspdf_umd_pre.js` y `jspdf_umd_post.js` a `VENDOR` (`:12` y `:15`). Ninguna tanda anterior lo toca;
+  - `loadJS` está memorizado por la URL exacta (`addons/web/static/src/core/assets.js:30`, `memoize` de
+    `core/utils/functions.js:11-22`; exportado en `assets.js:204`) y `/static` se sirve con una semana de caché
+    (`odoo/http.py:294` y `:1934`): `?seges=20` da una URL nueva, que no reutiliza la copia cacheada, como en la 14;
+  - en R17, `window.Chart` solo se lee en `chatboo_heavy_libs.js:27`; `chatboo_charts.js` usa su copia `ChartLib`
+    (`:36-46`, `:1636` y `:2006`), que recibe por `bindEngines` (expuesto en `window.ChatbooCharts`, `:3477`). Ningún
+    `.py` ni `.xml` de `pns_*` carga `chart.umd`;
+  - el Chart.js de Odoo es el 4.3.0 con `chartjs-adapter-luxon` (`addons/web/__manifest__.py:458-460`), que cargan a
+    demanda la vista de gráficos (`graph_renderer.js:63`), `gauge_field`, `journal_dashboard_graph`, `spreadsheet` y
+    otros. El parche sigue haciendo falta (clasificación, sección 11, punto 2);
+  - simulación en el contenedor (`node` 12, la librería por la entrada estándar, sin escribir nada): la original
+    define `Chart` (4.4.8) y no `PnsChatbooChart`; la de `14.0` define `PnsChatbooChart` (4.4.8) y no `Chart`. Por eso
+    `test_chat_before_odoo` del laboratorio (`test_chart_collision.py:129-132`) cae en `[SETUP]` con el parche;
+  - laboratorio: los otros 3 F no pasan por lo que cambia T6 (`TestMarks17` es un `TransactionCase`, `TestRoutes17`
+    prueba rutas y `TestSanitizer17` usa `chatboo_formatters`, no `chatboo_heavy_libs`).
+- **Paso 0 de la parte 1** (solo lectura): HEAD `db6c390`, árbol limpio; huella del laboratorio `b5e46c60…`;
+  `odoo-dev 17 estado` (BD `lab_pns_ai_3996_17`, `CONF_HASH=c5c7138b608673bb`, no neutralizada) y `bd-lista` sin
+  `test_…`. La imagen `odoo-dev:17-lab_pns_ai_3996` tiene `/usr/bin/google-chrome-stable` (Google Chrome
+  158.0.8127.36): los `browser_js` no se saltan.
+
+| Efecto | Dónde | Tratamiento |
+|---|---|---|
+| Red | Chrome headless, solo contra el servidor del test (127.0.0.1) | sin sustituir, como en `pns_base` |
+| Proveedor LLM y correo | no se abre el chat ni hay turno (solo `loadHeavyLibs`) | — |
+| Cursores y commits | las peticiones del servidor usan el cursor del test (modo test) | — |
+| Hilos y bus | el websocket del bus de `/web`, local | — |
+| `mock` | ninguno | la 182 no aplica |
+
+- **Archivos:**
+  - código (`[FIX]`, 2): `pns_ai_chatboo/static/src/js/chatboo_heavy_libs.js` (39 líneas, `1af19cd9…26a9c7`) y
+    `static/src/js/chart.umd.min.js` (22, `6062337d…2d1ed1`);
+  - tests (`[ADD]`, 2): `pns_ai_chatboo/tests/test_seges_chart_collision.py` (226, nuevo, `43787f38…062e8c`) y
+    `tests/__init__.py` (21, `235237a5…578879`), con el bloque de T6 al final.
+- **Cambios respecto a `14.0` en el código** (4 marcadores: 2 en cada archivo):
+  - `chart.umd.min.js`: `git apply` de `ef05eaa` tal cual; queda idéntico al de `14.0` (`git hash-object`,
+    `fd2decf8680c67913eda21343a43801c2f133fe7`; decisión 204). Tokens: `PnsChatbooChart=e()` y
+    `window.PnsChatbooChart=An`, 1 de cada; `.Chart=e()` y `window.Chart=An`, 0; `An.Chart=An`, sin tocar;
+  - `chatboo_heavy_libs.js`, a mano, en dos trozos: la URL pasa a `chart.umd.min.js?seges=20` (con el marcador y la
+    línea «New url…») y `bindEngines` recibe `window.PnsChatbooChart`. El marcador interior, en dos líneas (como la
+    187). Líneas nuevas de 49 a 86 caracteres (`awk`), sin `%`.
+- **Cambios respecto a `14.0` en los tests:** en la 14 no había test (P-70 era manual; decisión 124). Se copian del
+  laboratorio (decisión 117) a `TestSegesChatbooChartCollision` (`HttpCase`, etiqueta `seges_t6`, decisión 205), con la
+  cabecera y el docstring del patrón del 40:
+  - `_HELPERS` y `test_chat_after_odoo_keeps_odoo_chart` (el `[HYPOTHESIS]`), idénticos al laboratorio (`diff`);
+  - `test_chat_before_odoo`, el testigo, adaptado: comprueba que las librerías del chat no cambian `window.Chart`, que
+    definen `PnsChatbooChart` y que después Odoo tiene el suyo con luxon, sin confundirse;
+  - `test_chat_engine_is_its_own_chart`, nuevo (decisión 206): un espía sobre `ChatbooCharts.bindEngines` comprueba
+    que recibe `PnsChatbooChart` y que no es `window.Chart`;
+  - sin `cr.rollback()` ni `cr.commit()` sobre el cursor del test y sin `assertRaises`; 0 líneas de más de 88
+    caracteres y sin `%`.
+- **`odoo-dev 17 actualizar pns_ai_chatboo`** (decisión 207; log `actualizar-20261128-164614.log`): «RESULTADO: OK», 0
+  bloqueantes y 0 `ERROR`; el WARNING del fabricante de T5a (`ai.log`, dos campos con la etiqueta «Client»). El
+  servidor web se reinicia.
+- **Baterías** (desde el laboratorio):
+  - tres módulos (log `tests-20261128-164643.log`): `0 failed, 0 error(s) of 570 tests`, «RESULTADO: OK», 0 `ERROR`.
+    Omitidos (19): los mismos de T4 (`diff` con el log de T5b). Se ejecutan los 3 casos nuevos, ninguno omitido;
+  - `seges_pruebas_3996` (log `tests-20261128-165228.log`): `4 failed, 0 error(s) of 56 tests`. Cambia la
+    composición: `test_chat_after_odoo_keeps_odoo_chart` pasa a verde y `test_chat_before_odoo` cae en
+    `[SETUP] the chat libraries did not define window.Chart | found: window.Chart is undefined` (decisión 202). Los
+    otros 3 (`test_t3_marks_checked_on_save`, `test_mcp_single_allow_origin` y `test_t2b_no_chat_controls`) dan los
+    mismos mensajes que en T5b (`diff`).
+- **Por archivo:**
+
+| Archivo | Parche | Casos de T6 | Verdes |
+|---|---|---|---|
+| `test_seges_chart_collision.py` | 20 | 3 | 3 |
+| **Total T6** | | **3 nuevos** | **3** |
+
+- **Neutralizaciones** (decisiones 141 y 203), con la batería de `pns_ai_chatboo` (107 tests); copia previa en el
+  scratchpad, F previstas escritas antes de ejecutar ninguna, la batería solo si el sha256 de lo neutralizado era el
+  de R17 y sha256 comprobado al restaurar (y `git hash-object` de `chart.umd.min.js`, `fd2decf…`, las dos veces).
+  Las dos dan exactamente las F previstas y 0 E. Las líneas `ERROR` son solo las de sus F y la del resumen (decisión
+  152): 7 en N20 y 3 en N20b.
+
+| N | Qué se quita | F previstas | F obtenidas | Log |
+|---|---|---|---|---|
+| N20 | los dos JS vuelven a R17 | 3 (los tres casos) | 3 | `tests-20261128-165600.log` |
+| N20b | solo `chatboo_heavy_libs.js` vuelve a R17 | 1 (el caso 3, debajo) | 1 | `tests-20261128-165920.log` |
+
+  - N20: el caso 1, «[HYPOTHESIS] window.Chart was replaced: expected Odoo's Chart.js 4.3.0 with luxon | found:
+    Chart.js 4.4.8, date adapter undefined»; el caso 2, «[HYPOTHESIS] the chat libraries replaced window.Chart»; el
+    caso 3, «[HYPOTHESIS] bindEngines did not get the chat's Chart.js: got Chart.js 4.4.8, date adapter undefined»;
+  - N20b: los casos 1 y 2, en verde; el caso 3, «[HYPOTHESIS] bindEngines did not get the chat's Chart.js: got
+    Chart.js 4.3.0, date adapter luxon»: `bindEngines` recibe el Chart.js de Odoo. El caso 3 mide el trozo 2;
+  - nada real ejecutado: solo cambia JS estático; no se abre el chat ni hay turno ni proveedor.
+- **Secretos en los logs:** no aplica (decisión 192).
+- **Línea base para T7:** tres módulos, `0 failed, 0 error(s) of 570 tests`, 19 omitidos, «RESULTADO: OK»
+  (`tests-20261128-164643.log`); `seges_pruebas_3996`, `4 failed, 0 error(s) of 56 tests`
+  (`tests-20261128-165228.log`): los 3 `[HYPOTHESIS]` de T7 a T10 y el `[SETUP]` de `test_chat_before_odoo`. La
+  batería de `pns_ai_chatboo` sola tiene 107 tests.
+- **Lint** (`python3 ~/.claude/hooks/odoo_lint.py --revisar pns_ai_chatboo/`): 0 incidencias nuevas;
+  `test_seges_chart_collision.py`, 0 preexistentes; `tests/__init__.py`, 2 preexistentes en líneas sin cambios. El
+  lint solo revisa `.py` y `.xml`: las líneas nuevas del JS se comprueban con `awk`.
+- **Entorno:** comprobado antes y después. `odoo-dev 17 estado` igual (BD `lab_pns_ai_3996_17`,
+  `CONF_HASH=c5c7138b608673bb`, no neutralizada; solo cambia el tiempo del contenedor web, que `actualizar` reinició)
+  y `bd-lista` sin `test_…`. Huella de los `.py` de `seges_pruebas_3996`, `b5e46c60…`, igual antes y después. La BD
+  del laboratorio queda con el código de T6 (decisión 207).
+- **Registro:** en `docs/pendiente/parches_pns_ai.md`, la fila 20, «Validado en el laboratorio» con `381fac2`.
+- **Commits** (los hace Sergio): `[FIX]` `381fac2` («[FIX] pns_ai_chatboo: parche 20 adaptado a la 17 (PNS-70)
+  (T6)»); `[ADD]` `cf5d3f1` («[ADD] pns_ai_chatboo: tests de Seges del parche 20 en la 17 (T6)»); `[DOC]`, el de este
+  registro.
+- **Erratas** (decisión 202, como la 144; no se reescriben):
+  - la tabla de la sección 3 (línea 263) da «3 F» para el laboratorio tras T6: con el 20 queda en 4 F, porque
+    `test_chat_before_odoo` exige que las librerías del chat definan `window.Chart`, que es lo que el parche quita;
+  - la clasificación (`clasificacion_parches_pns_ai_17_3996.md:452-454`) dice que `test_chat_before_odoo` «tiene que
+    seguir en verde»: con el parche cae en `[SETUP]`, que según su docstring no dice nada de la hipótesis;
+  - en consecuencia, las cifras de T7 a T10 de esa tabla tienen 1 F más y T10 terminará en 1 F (el `[SETUP]`), no en
+    0.
+- **Para el staging** (decisión 150; se actualiza `pns_ai_chatboo`). En la consola del navegador, en cada paso:
+  `[window.Chart && Chart.version, window.PnsChatbooChart && PnsChatbooChart.version]`; se espera
+  `["4.3.0", "4.4.8"]` tras abrir el chat:
+  1. vista de gráfico de `sale.order` → abrir el chat y pedir un gráfico con el proveedor real → volver sin F5 y
+     cambiar a barras, líneas y circular, sin errores en la consola;
+  2. el tablero de Facturación (`journal_dashboard_graph`) y, si está instalado, una hoja de `spreadsheet` con eje de
+     fecha, sin el aviso de luxon;
+  3. el orden inverso: F5, abrir el chat y después las vistas de gráfico;
+  4. una sesión antigua con gráfico: se pinta;
+  5. con la caché normal, en un navegador que abrió el chat antes del parche: en la pestaña Red se pide
+     `chart.umd.min.js?seges=20`.
+- **Para las tandas siguientes:**
+  - los 3 tests de T6 son `browser_js`: sin Chrome (la imagen `odoo-dev:17` del kit no lo tiene) se omiten, y la
+    batería de los tres módulos daría 22 omitidos;
+  - el objetivo del laboratorio al final de T10 queda en 1 F, el `[SETUP]` de `test_chat_before_odoo` (decisión 202);
+  - T7 incluye la comprobación de la 185 (decisión 190).

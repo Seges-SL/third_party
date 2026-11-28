@@ -50,7 +50,7 @@ fabricante). De los demás:
 | 17 | PNS-37 | T1 | Validado en el laboratorio | `f70c3c0` |
 | 18 | PNS-19 | T3 | Validado en el laboratorio | `3af8b5b` |
 | 19 | PNS-17 | T1 | Validado en el laboratorio | `f70c3c0` |
-| 20 | PNS-70 | T6 | Pendiente | — |
+| 20 | PNS-70 | T6 | Validado en el laboratorio | `381fac2` |
 | 21 | PNS-20 | T2 | Validado en el laboratorio | `b391159` |
 | 22 | PNS-100 | T4 | Validado en el laboratorio | `e5b6600` |
 | 23 | PNS-101 | T0 (test) | Retirado en 3.1.973 (cubierto por el fabricante); no regresión | — |

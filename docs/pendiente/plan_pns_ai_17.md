@@ -41,7 +41,10 @@
   laboratorio, 4 F de 56. T5a hecha (26/11/2026): parches 11, 25, 26 y 28, validados en el laboratorio (`[FIX]`
   `30e75f7` y `[ADD]` `f259667`); línea base, 0 F y 0 E de 523; laboratorio, 4 F de 56. T5b hecha (27/11/2026):
   parches 27, 29 y 34, validados en el laboratorio (`[FIX]` `3f65651` y `[ADD]` `f2575f3`); línea base, 0 F y 0 E
-  de 567; laboratorio, 4 F de 56. Sigue la tanda T6.
+  de 567; laboratorio, 4 F de 56. T6 hecha (28/11/2026): parche 20, validado en el laboratorio (`[FIX]` `381fac2` y
+  `[ADD]` `cf5d3f1`); línea base, 0 F y 0 E de 570; laboratorio, 4 F de 56: `test_chat_after_odoo_keeps_odoo_chart`
+  pasa a verde y el testigo `test_chat_before_odoo` cae en `[SETUP]` (el parche quita lo que el testigo da por
+  hecho), así que T10 terminará en 1 F (decisión 202; erratas en la sección 12 de la fase 2). Sigue la tanda T7.
 
 ## Decisiones (Sergio, 22 y 23/11/2026)
 
