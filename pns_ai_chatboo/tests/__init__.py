@@ -16,3 +16,6 @@ from . import test_seges_chatboo_export
 # Ver docs/pendiente/parches_pns_ai.md
 from . import test_seges_chatboo_access
 from . import test_seges_chatboo_canvas
+# Seges: tests de la fase 2 en la 17, tanda T6 (parche 20).
+# Ver docs/pendiente/parches_pns_ai.md
+from . import test_seges_chart_collision
